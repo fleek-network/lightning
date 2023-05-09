@@ -1,11 +1,15 @@
 [package]
 name = "affair"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
-description = "reserved."
+authors = ["Parsa Ghadimi <parsa@fleek.xyz>"]
+description = "A Tokio-based worker abstraction layer."
 license = "MIT"
 repository = "https://github.com/fleek-network/draco"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+tokio = { version="1.28", features=["rt", "sync", "macros"]}
+futures = "0.3"
+async-trait = "0.1"
