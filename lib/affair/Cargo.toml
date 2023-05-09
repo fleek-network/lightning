@@ -1,0 +1,11 @@
+[package]
+name = "affair"
+version = "0.0.0"
+edition = "2021"
+description = "reserved."
+license = "MIT"
+repository = "https://github.com/fleek-network/draco"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
