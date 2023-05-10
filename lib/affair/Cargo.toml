@@ -1,6 +1,6 @@
 [package]
 name = "affair"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Parsa Ghadimi <parsa@fleek.xyz>"]
 description = "A Tokio-based worker abstraction layer."

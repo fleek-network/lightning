@@ -60,15 +60,31 @@ pub trait AsyncWorker: Send + 'static {
 
 /// A port that can be used to communicate with a worker, you can use a port to send
 /// requests to a worker and wait for the response.
-#[derive(Clone)]
 pub struct Port<Req, Res> {
     sender: mpsc::Sender<Task<Req, Res>>,
 }
 
+/// Implementing [`Clone`] by hand because `#[derive(Clone)]` sucks for generics.
+impl<Req, Res> Clone for Port<Req, Res> {
+    fn clone(&self) -> Self {
+        Self {
+            sender: self.sender.clone(),
+        }
+    }
+}
+
 /// A weak reference to a [`Port`] that does not keep the worker alive.
-#[derive(Clone)]
 pub struct WeakPort<Req, Res> {
     sender: mpsc::WeakSender<Task<Req, Res>>,
+}
+
+/// Implementing [`Clone`] by hand because `#[derive(Clone)]` sucks for generics.
+impl<Req, Res> Clone for WeakPort<Req, Res> {
+    fn clone(&self) -> Self {
+        Self {
+            sender: self.sender.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
