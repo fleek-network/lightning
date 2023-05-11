@@ -1,44 +1,17 @@
-use std::{hash::Hash, sync::Arc};
+use std::hash::Hash;
 
 use fxhash::FxHashMap;
 
-use crate::{atomic::OncePtr, atomo::Operation};
+use crate::db::Operation;
+use crate::gc_list::GcNode;
 
-pub(crate) struct Snapshot<K, V> {
-    entries: OncePtr<FxHashMap<K, Operation<V>>>,
-    next: OncePtr<Arc<Snapshot<K, V>>>,
-}
+pub(crate) type Snapshot<K, V> = GcNode<SnapshotData<K, V>>;
 
-impl<K, V> Snapshot<K, V> {
-    pub fn new() -> Self {
-        Snapshot {
-            entries: OncePtr::null(),
-            next: OncePtr::null(),
-        }
-    }
+pub(crate) struct SnapshotData<K, V>(pub FxHashMap<K, Operation<V>>);
 
-    pub fn with_empty_entries_and_next(next: Arc<Snapshot<K, V>>) -> Self {
-        Snapshot {
-            entries: OncePtr::new(FxHashMap::default()),
-            next: OncePtr::new(next),
-        }
-    }
-
-    pub fn into_entries(self) -> Option<FxHashMap<K, Operation<V>>> {
-        self.entries.into_inner()
-    }
-
-    /// # Panics
-    ///
-    /// If the entries is already set.
-    #[inline]
-    pub fn set_entries(&self, entries: FxHashMap<K, Operation<V>>) {
-        self.entries.store(entries);
-    }
-
-    #[inline]
-    pub fn set_next(&self, next: Arc<Snapshot<K, V>>) {
-        self.next.store(next);
+impl<K, V> Default for SnapshotData<K, V> {
+    fn default() -> Self {
+        Self(FxHashMap::default())
     }
 }
 
@@ -48,14 +21,18 @@ where
 {
     #[inline]
     pub fn insert(&mut self, key: K, value: V) {
-        debug_assert!(!self.entries.is_null());
-        unsafe { self.entries.load_mut_unchecked() }.insert(key, Operation::Put(value));
+        debug_assert!(!self.value.is_null());
+        unsafe { self.value.load_mut_unchecked() }
+            .0
+            .insert(key, Operation::Put(value));
     }
 
     #[inline]
     pub fn remove(&mut self, key: K) {
-        debug_assert!(!self.entries.is_null());
-        unsafe { self.entries.load_mut_unchecked() }.insert(key, Operation::Delete);
+        debug_assert!(!self.value.is_null());
+        unsafe { self.value.load_mut_unchecked() }
+            .0
+            .insert(key, Operation::Delete);
     }
 
     #[inline]
@@ -63,8 +40,8 @@ where
         let mut current = self;
 
         loop {
-            if let Some(entries) = current.entries.load() {
-                match entries.get(key) {
+            if let Some(entries) = current.value.load() {
+                match entries.0.get(key) {
                     Some(Operation::Put(v)) => return Some(Some(v)),
                     Some(Operation::Delete) => return Some(None),
                     None => {}

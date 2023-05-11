@@ -1,11 +1,15 @@
 use std::{hash::Hash, marker::PhantomData, sync::Arc};
 
-use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use fxhash::FxHashMap;
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{context::Context, snapshot::Snapshot, DefaultSerdeBackend, SerdeBackend};
+use crate::{
+    context::Context,
+    gc_list::GcList,
+    snapshot::{Snapshot, SnapshotData},
+    DefaultSerdeBackend, SerdeBackend,
+};
 
 pub struct Atomo<K, V, S: SerdeBackend = DefaultSerdeBackend> {
     inner: Arc<AtomoInner<K, V, S>>,
@@ -14,8 +18,8 @@ pub struct Atomo<K, V, S: SerdeBackend = DefaultSerdeBackend> {
 pub type Batch = Vec<(Box<[u8]>, Option<Box<[u8]>>)>;
 
 pub(crate) struct AtomoInner<K, V, S: SerdeBackend> {
-    persistence: DashMap<Box<[u8]>, Box<[u8]>>,
-    head: ArcSwap<Snapshot<K, V>>,
+    persistence: DashMap<Box<[u8]>, Box<[u8]>, fxhash::FxBuildHasher>,
+    head: GcList<SnapshotData<K, V>>,
     serde: PhantomData<S>,
 }
 
@@ -42,8 +46,8 @@ impl<K, V, S: SerdeBackend> Atomo<K, V, S> {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(AtomoInner {
-                persistence: DashMap::new(),
-                head: ArcSwap::new(Arc::new(Snapshot::new())),
+                persistence: DashMap::default(),
+                head: GcList::new(),
                 serde: PhantomData,
             }),
         }
@@ -140,12 +144,12 @@ where
         (diff, batch)
     }
 
-    pub fn run<F, R>(this: Arc<Self>, closure: F) -> (R, Snapshot<K, V>)
+    pub fn run<F, R>(this: &Arc<Self>, closure: F) -> (R, Snapshot<K, V>)
     where
         F: Fn(&mut Context<K, V, S>) -> R,
     {
-        let snapshot = this.head.load().clone();
-        let mut ctx = Context::new(this, snapshot);
+        let snapshot = this.head.current();
+        let mut ctx = Context::new(this.clone(), snapshot);
         let result = closure(&mut ctx);
         (result, ctx.into_snapshot())
     }
@@ -160,7 +164,7 @@ where
     where
         F: Fn(&mut Context<K, V, S>) -> R,
     {
-        let (res, _) = AtomoInner::run(self.0.clone(), query);
+        let (res, _) = AtomoInner::run(&self.0, query);
         res
     }
 }
@@ -179,20 +183,20 @@ where
     where
         F: Fn(&mut Context<K, V, S>) -> R,
     {
-        let (res, snap) = AtomoInner::run(self.0.clone(), mutation);
-        let entries = snap.into_entries().unwrap();
+        let (res, snap) = AtomoInner::run(&self.0, mutation);
+
+        let entries = snap.into_value().unwrap().0;
         let (inverse, batch) = self.0.generate_inverse_and_batch(entries);
 
-        let next = Arc::new(Snapshot::new());
-
-        {
-            let head = self.0.head.load();
-            head.set_entries(inverse);
-            head.set_next(next.clone());
-        }
+        // SAFETY: We are the only one calling this method.
+        let next = unsafe { self.0.head.push(SnapshotData(inverse)) };
 
         self.0.perform_batch(batch);
-        self.0.head.store(next);
+
+        // SAFETY: We are calling this immediately after `push`.
+        unsafe {
+            self.0.head.set_head(next);
+        }
 
         res
     }

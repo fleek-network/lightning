@@ -1,18 +1,22 @@
-pub mod atomic;
-pub mod atomo;
 pub mod context;
+pub mod db;
+pub mod gc_list;
+pub mod mt;
+pub mod once_ptr;
 pub mod serder;
+pub mod shared;
 pub mod snapshot;
 
-pub use atomo::{Atomo, QueryHalf, UpdateHalf};
-pub use context::{Context, Shared};
+pub use context::Context;
+pub use db::{Atomo, QueryHalf, UpdateHalf};
 pub use serder::SerdeBackend;
+pub use shared::Shared;
 
 pub type DefaultSerdeBackend = serder::BincodeSerde;
 
 #[cfg(test)]
 mod tests {
-    use crate::atomo::Atomo;
+    use crate::Atomo;
 
     #[test]
     fn x() {

@@ -9,9 +9,10 @@ use rand::Rng;
 
 type UserId = u8;
 
-fn mint<S: SerdeBackend>(ctx: &mut Context<UserId, u128, S>, user: UserId, amount: u128) {
+fn mint<S: SerdeBackend>(ctx: &mut Context<UserId, u128, S>, user: UserId, amount: u128) -> u128 {
     let balance = ctx.get(&user).map(|s| *s).unwrap_or(0);
     ctx.insert(user, balance + amount);
+    balance + amount
 }
 
 fn balance<S: SerdeBackend>(ctx: &mut Context<UserId, u128, S>, user: UserId) -> u128 {
@@ -67,22 +68,39 @@ fn main() {
     START.store(true, std::sync::atomic::Ordering::Relaxed);
 
     let now = std::time::Instant::now();
-    let mut updates = 0;
-    loop {
-        let r = rng;
-        rng = u.run(move |ctx| {
-            let mut rng = r;
-            for _ in 0..num_mint_per_update {
-                rng = rng.wrapping_mul(48271) % 0x7fffffff;
-                black_box(mint(ctx, rng as u8, 17))
-            }
-            rng
-        });
-        updates += 1;
-        if updates % 10 == 0 && PENDING.load(std::sync::atomic::Ordering::Relaxed) == 0 {
-            break;
+    let updates = if num_query_threads == 0 {
+        for _ in 0..num_query_per_thread {
+            let r = rng;
+            rng = u.run(move |ctx| {
+                let mut rng = r;
+                for _ in 0..num_mint_per_update {
+                    rng = rng.wrapping_mul(48271) % 0x7fffffff;
+                    black_box(mint(ctx, rng as u8, 17));
+                }
+                rng
+            });
         }
-    }
+
+        num_query_per_thread
+    } else {
+        let mut updates = 0;
+        loop {
+            let r = rng;
+            rng = u.run(move |ctx| {
+                let mut rng = r;
+                for _ in 0..num_mint_per_update {
+                    rng = rng.wrapping_mul(48271) % 0x7fffffff;
+                    black_box(mint(ctx, rng as u8, 17));
+                }
+                rng
+            });
+            updates += 1;
+            if updates % 10 == 0 && PENDING.load(std::sync::atomic::Ordering::Relaxed) == 0 {
+                break;
+            }
+        }
+        updates
+    };
     let updates_duration = now.elapsed();
 
     // Compute stuff

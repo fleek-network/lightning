@@ -1,6 +1,8 @@
 use serde::{de::DeserializeOwned, Serialize};
 
-pub trait SerdeBackend {
+/// The serialization backend that can empower [`Atomo`] with Serde for
+/// serializing the data for the persistence layer.
+pub trait SerdeBackend: 'static {
     fn serialize<T>(value: &T) -> Vec<u8>
     where
         T: Serialize;
@@ -10,6 +12,7 @@ pub trait SerdeBackend {
         T: DeserializeOwned;
 }
 
+/// The bincode serializer from the [`bincode`] crate.
 pub struct BincodeSerde;
 
 impl SerdeBackend for BincodeSerde {
