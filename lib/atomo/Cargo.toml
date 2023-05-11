@@ -1,0 +1,17 @@
+[package]
+name = "atomo"
+version = "0.0.1"
+edition = "2021"
+authors = ["Parsa Ghadimi <parsa@fleek.xyz>"]
+description = "reserved for atomic snapshots"
+license = "MIT"
+repository = "https://github.com/fleek-network/draco"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fxhash = "0.2"
+dashmap = "5.4"
+serde = "1.0"
+arc-swap = "1.6.0"
+bincode = "1.3"
