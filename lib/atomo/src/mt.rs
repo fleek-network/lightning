@@ -137,30 +137,7 @@ impl<O, S: SerdeBackend> MtAtomo<O, S> {
         K: Hash + Eq + Serialize + DeserializeOwned + Any,
         V: Serialize + DeserializeOwned + Any,
     {
-        let name = name.as_ref();
-        let index = *self
-            .inner
-            .table_name_to_id
-            .get(name)
-            .unwrap_or_else(|| panic!("Table {name} not found."));
-
-        let info = &self.inner.tables[index as usize];
-        let k_id = TypeId::of::<K>();
-        let v_id = TypeId::of::<V>();
-        let k_str = std::any::type_name::<K>();
-        let v_str = std::any::type_name::<V>();
-
-        assert_eq!(
-            info.k_id, k_id,
-            "Could not resolve table '{name}' with key type '{k_str}'."
-        );
-
-        assert_eq!(
-            info.v_id, v_id,
-            "Could not resolve table '{name}' with key type '{v_str}'."
-        );
-
-        ResolvedTableReference::<K, V>::new(self.inner.id, index)
+        self.inner.resolve::<K, V>(name)
     }
 }
 
@@ -261,6 +238,37 @@ impl<S: SerdeBackend> MtAtomoInner<S> {
             }
         }
     }
+
+    #[inline]
+    pub fn resolve<K, V>(&self, name: impl AsRef<str>) -> ResolvedTableReference<K, V>
+    where
+        K: Hash + Eq + Serialize + DeserializeOwned + Any,
+        V: Serialize + DeserializeOwned + Any,
+    {
+        let name = name.as_ref();
+        let index = *self
+            .table_name_to_id
+            .get(name)
+            .unwrap_or_else(|| panic!("Table {name} not found."));
+
+        let info = &self.tables[index as usize];
+        let k_id = TypeId::of::<K>();
+        let v_id = TypeId::of::<V>();
+        let k_str = std::any::type_name::<K>();
+        let v_str = std::any::type_name::<V>();
+
+        assert_eq!(
+            info.k_id, k_id,
+            "Could not resolve table '{name}' with key type '{k_str}'."
+        );
+
+        assert_eq!(
+            info.v_id, v_id,
+            "Could not resolve table '{name}' with key type '{v_str}'."
+        );
+
+        ResolvedTableReference::<K, V>::new(self.id, index)
+    }
 }
 
 /// The table selector contain multiple tables and is provided to the
@@ -275,6 +283,21 @@ pub struct TableSelector<S: SerdeBackend> {
     /// If we want to collect the inverse and batch we should provide
     /// a non-empty value for this.
     inv_batch_list: Option<InverseAndBatchList>,
+}
+
+impl<S: SerdeBackend> TableSelector<S> {
+    /// Return the table reference for the table with the provided name and K, V type.
+    ///
+    /// # Panics
+    ///
+    /// If the information provided are not correct and such a table does not exists.
+    pub fn get_table<K, V>(&self, name: impl AsRef<str>) -> TableRef<K, V, S>
+    where
+        K: Hash + Eq + Serialize + DeserializeOwned + Any,
+        V: Serialize + DeserializeOwned + Any,
+    {
+        self.atomo.resolve::<K, V>(name).get(&self)
+    }
 }
 
 struct InverseAndBatchList {
