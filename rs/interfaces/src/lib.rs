@@ -1,15 +1,12 @@
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Display},
-    ops::Deref,
-};
+use std::{collections::HashMap, ops::Deref};
 
+use affair::Port;
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 
 /// An implementer of this trait should handle providing the configurations from
 /// the loaded configuration file.
-pub trait ConfigProviderInterface {
+pub trait ConfigProviderInterface: Send + Sync {
     /// Returns the configuration for the given object. If the key is not present
     /// in the loaded file we should return the default object.
     fn get<S: ConfigConsumer>(&self) -> S::Config;
@@ -29,64 +26,89 @@ pub trait ConfigConsumer {
     type Config: Serialize + DeserializeOwned + Default;
 }
 
-#[async_trait]
-pub trait Port<Message>: Clone + Send + Sync {
-    type Error: Debug + Display;
-
-    async fn send(&self, message: Message) -> Result<(), Self::Error>;
+pub enum TransactionList {
+    // x
 }
 
-pub struct TransactionList {}
-
+#[async_trait]
 pub trait WithStartAndShutdown {
-    /// Returns true if this run
+    /// Returns true if this system is running or not.
     fn is_running(&self) -> bool;
 
-    fn start(&self);
+    /// Start the system, should not do anything if the system is already
+    /// started.
+    async fn start(&self);
 
-    fn shutdown(&self);
+    /// Send the shutdown signal to the system.
+    async fn shutdown(&self);
 }
 
-#[async_trait]
-pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized {
-    type Port<M>: Port<M>;
+/// A port that gives services and other sub-systems the required functionality to
+/// submit messages/transactions to the consensus.
+///
+/// # Safety
+///
+/// This port is safe to freely pass around, sending transactions through this port
+/// does not guarantee their execution on the application layer. You can think about
+/// this as if the current node was only an external client to the network.
+pub type MempoolPort = Port<TransactionList, ()>;
 
+/// The port that is handled by the application layer and fed by consensus (or other
+/// synchronization systems in place) which executes and persists transactions that
+/// are put into it.
+///
+/// # Safety
+///
+/// This port should be used with as much caution as possible, for all intend and purposes
+/// this port should be sealed and preferably not accessible out side of the scope in which
+/// it is created.
+pub type ExecutionEnginePort = Port<TransactionList, ()>;
+
+/// The port which upon receiving a delivery acknowledgment can add it to the aggregator
+/// queue which will later roll up a batch of delivery acknowledgments to the consensus.
+pub type DeliveryAcknowledgmentPort = Port<DeliveryAcknowledgment, ()>;
+
+#[async_trait]
+pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
     /// Create a new consensus service with the provided config and executor.
     async fn init(
         config: Self::Config,
-        executor: impl Port<TransactionList>,
+        executor: Port<TransactionList, ()>,
     ) -> anyhow::Result<Self>;
 
-    /// Returns a port that can be used to submit transactions to the consensus.
-    fn port(&self) -> Self::Port<TransactionList>;
+    /// Returns a port that can be used to submit transactions to the consensus,
+    /// this can be used by any other systems that are interested in posting some
+    /// transaction to the consensus.
+    fn mempool(&self) -> MempoolPort;
 }
 
 #[async_trait]
-pub trait ApplicationInterface: WithStartAndShutdown + ConfigConsumer + Sized {
-    type Port<M>: Port<M>;
-
+pub trait ApplicationInterface:
+    WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
+{
     /// Create a new instance of the application layer using the provided configuration.
     async fn init(config: Self::Config) -> anyhow::Result<Self>;
 
     /// Returns a port that should be used to submit transactions to be executed
     /// by the application layer.
-    fn port(&self) -> Self::Port<TransactionList>;
+    ///
+    /// # Safety
+    ///
+    /// See the safety document for the [`ExecutionEnginePort`].
+    fn transaction_executor(&self) -> ExecutionEnginePort;
 }
 
 pub struct DeliveryAcknowledgment;
 
 #[async_trait]
 pub trait DeliveryAcknowledgmentAggregatorInterface:
-    WithStartAndShutdown + ConfigConsumer + Sized
+    WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
-    type Port<M>: Port<M>;
+    ///
+    async fn init(config: Self::Config, consensus: MempoolPort) -> anyhow::Result<Self>;
 
-    async fn init(
-        config: Self::Config,
-        consensus: impl Port<TransactionList>,
-    ) -> anyhow::Result<Self>;
-
-    fn port(&self) -> Self::Port<DeliveryAcknowledgment>;
+    ///
+    fn port(&self) -> DeliveryAcknowledgmentPort;
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
@@ -103,8 +125,6 @@ pub struct PeerId;
 
 #[async_trait]
 pub trait ReputationAggregatorInterface: Clone {
-    type Port<M>: Port<M>;
-
     fn new() -> anyhow::Result<Self>;
 
     fn report_sat(peer_id: &PeerId, weight: Weight);
@@ -135,8 +155,12 @@ pub trait BlockStoreInterface: Clone + Send + Sync + ConfigConsumer {
     async fn put_block(&self, block_counter: u32, data: &[u8]);
 }
 
+/// The abstraction layer for different origins and how we handle them in the codebase in
+/// a modular way, and [`OriginProvider`] can be something like a provider for resolving
+/// *IPFS* files.
 #[async_trait]
 pub trait OriginProvider<Stream: tokio_stream::Stream<Item = bytes::BytesMut>> {
+    ///
     fn fetch(&self, uri: &[u8]) -> Stream;
 }
 
@@ -178,12 +202,15 @@ impl<
 
         let application = Application::init(configuration.get::<Application>()).await?;
 
-        let consensus =
-            Consensus::init(configuration.get::<Consensus>(), application.port()).await?;
+        let consensus = Consensus::init(
+            configuration.get::<Consensus>(),
+            application.transaction_executor(),
+        )
+        .await?;
 
         let delivery_acknowledgment_aggregator = DeliveryAcknowledgmentAggregator::init(
             configuration.get::<DeliveryAcknowledgmentAggregator>(),
-            consensus.port(),
+            consensus.mempool(),
         )
         .await?;
 
@@ -206,8 +233,18 @@ impl<
             panic!("Duplicate origin provider.");
         }
     }
+
+    /// Returns true if the node is in a healt
+    pub fn is_healthy(&self) -> bool {
+        let application_status = self.application.is_running();
+        let consensus_status = self.consensus.is_running();
+        let aggregator_status = self.delivery_acknowledgment_aggregator.is_running();
+
+        (application_status == consensus_status) && (consensus_status == aggregator_status)
+    }
 }
 
+#[async_trait]
 impl<
         ConfigProvider: ConfigProviderInterface,
         Consensus: ConsensusInterface,
@@ -224,18 +261,25 @@ impl<
         Stream,
         DeliveryAcknowledgmentAggregator,
     >
+where
+    Self: Send,
+    for<'a> &'a Self: Send,
 {
     fn is_running(&self) -> bool {
-        self.application.is_running() && self.consensus.is_running()
+        self.application.is_running()
+            && self.consensus.is_running()
+            && self.delivery_acknowledgment_aggregator.is_running()
     }
 
-    fn start(&self) {
-        self.application.start();
-        self.consensus.start();
+    async fn start(&self) {
+        self.application.start().await;
+        self.consensus.start().await;
+        self.delivery_acknowledgment_aggregator.start().await;
     }
 
-    fn shutdown(&self) {
-        self.application.shutdown();
-        self.consensus.shutdown();
+    async fn shutdown(&self) {
+        self.application.shutdown().await;
+        self.consensus.shutdown().await;
+        self.delivery_acknowledgment_aggregator.shutdown().await;
     }
 }

@@ -12,3 +12,7 @@ async-trait = "0.1"
 tokio = {version="1.28", features=["full"]}
 tokio-stream = "0.1"
 bytes = "1.4"
+
+# Our libraries
+affair = {path="../../lib/affair"}
+atomo = {path="../../lib/atomo"}
