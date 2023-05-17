@@ -21,9 +21,9 @@
 //!
 //! #[tokio::main(flavor = "current_thread")]
 //! async fn main() {
-//!     let port = DedicatedThread::spawn(CounterWorker::default());
-//!     assert_eq!(port.run(10).await.unwrap(), 10);
-//!     assert_eq!(port.run(3).await.unwrap(), 13);
+//!     let socket = DedicatedThread::spawn(CounterWorker::default());
+//!     assert_eq!(socket.run(10).await.unwrap(), 10);
+//!     assert_eq!(socket.run(3).await.unwrap(), 13);
 //! }
 //! ```
 
@@ -58,14 +58,14 @@ pub trait AsyncWorker: Send + 'static {
     async fn handle(&mut self, req: Self::Request) -> Self::Response;
 }
 
-/// A port that can be used to communicate with a worker, you can use a port to send
+/// A socket that can be used to communicate with a worker, you can use a socket to send
 /// requests to a worker and wait for the response.
-pub struct Port<Req, Res> {
+pub struct Socket<Req, Res> {
     sender: mpsc::Sender<Task<Req, Res>>,
 }
 
 /// Implementing [`Clone`] by hand because `#[derive(Clone)]` sucks for generics.
-impl<Req, Res> Clone for Port<Req, Res> {
+impl<Req, Res> Clone for Socket<Req, Res> {
     fn clone(&self) -> Self {
         Self {
             sender: self.sender.clone(),
@@ -73,13 +73,13 @@ impl<Req, Res> Clone for Port<Req, Res> {
     }
 }
 
-/// A weak reference to a [`Port`] that does not keep the worker alive.
-pub struct WeakPort<Req, Res> {
+/// A weak reference to a [`Socket`] that does not keep the worker alive.
+pub struct WeakSocket<Req, Res> {
     sender: mpsc::WeakSender<Task<Req, Res>>,
 }
 
 /// Implementing [`Clone`] by hand because `#[derive(Clone)]` sucks for generics.
-impl<Req, Res> Clone for WeakPort<Req, Res> {
+impl<Req, Res> Clone for WeakSocket<Req, Res> {
     fn clone(&self) -> Self {
         Self {
             sender: self.sender.clone(),
@@ -89,10 +89,10 @@ impl<Req, Res> Clone for WeakPort<Req, Res> {
 
 #[derive(Debug, Clone, Copy)]
 pub enum RunError<Req> {
-    /// The [`Port`] failed to put the [`Req`] to be processed, this can be caused
-    /// when the port is closed.
+    /// The [`Socket`] failed to put the [`Req`] to be processed, this can be caused
+    /// when the socket is closed.
     FailedToEnqueueReq(Req),
-    /// The [`Port`] failed to wait for the response, this can be due to the worker
+    /// The [`Socket`] failed to wait for the response, this can be due to the worker
     /// that is unexpectedly closed before processing a request.
     FailedToGetResponse,
 }
@@ -112,19 +112,19 @@ impl<Req> Display for RunError<Req> {
 
 /// An execution engine that handles spawning a [`Worker`].
 pub trait Executor {
-    /// Spawn a [`Worker`] and returns a [`Port`] which can be used to send requests to the spawned
+    /// Spawn a [`Worker`] and returns a [`Socket`] which can be used to send requests to the spawned
     /// worker.
     ///
-    /// The worker is stopped when all of the references to [`Port`] are dropped, if you want a
-    /// port that does not keep the worker alive consider using a [`WeakPort`].
-    fn spawn<H: Worker>(handler: H) -> Port<H::Request, H::Response>;
+    /// The worker is stopped when all of the references to [`Socket`] are dropped, if you want a
+    /// socket that does not keep the worker alive consider using a [`WeakSocket`].
+    fn spawn<H: Worker>(handler: H) -> Socket<H::Request, H::Response>;
 
-    /// Spawn a [`AsyncWorker`] and returns a [`Port`] which can be used to send requests to the
+    /// Spawn a [`AsyncWorker`] and returns a [`Socket`] which can be used to send requests to the
     /// spawned worker.
     ///
-    /// The worker is stopped when all of the references to [`Port`] are dropped, if you want a
-    /// port that does not keep the worker alive consider using a [`WeakPort`].
-    fn spawn_async<H: AsyncWorker>(handler: H) -> Port<H::Request, H::Response>;
+    /// The worker is stopped when all of the references to [`Socket`] are dropped, if you want a
+    /// socket that does not keep the worker alive consider using a [`WeakSocket`].
+    fn spawn_async<H: AsyncWorker>(handler: H) -> Socket<H::Request, H::Response>;
 }
 
 struct Task<Req, Res> {
@@ -141,30 +141,30 @@ pub struct DedicatedThread;
 pub struct TokioSpawn;
 
 impl Executor for DedicatedThread {
-    fn spawn<H: Worker>(handler: H) -> Port<H::Request, H::Response> {
+    fn spawn<H: Worker>(handler: H) -> Socket<H::Request, H::Response> {
         let (tx, rx) = mpsc::channel(64);
         std::thread::spawn(|| run_blocking(rx, handler));
-        Port { sender: tx }
+        Socket { sender: tx }
     }
 
-    fn spawn_async<H: AsyncWorker>(handler: H) -> Port<H::Request, H::Response> {
+    fn spawn_async<H: AsyncWorker>(handler: H) -> Socket<H::Request, H::Response> {
         let (tx, rx) = mpsc::channel(64);
         std::thread::spawn(|| run_blocking_async(rx, handler));
-        Port { sender: tx }
+        Socket { sender: tx }
     }
 }
 
 impl Executor for TokioSpawn {
-    fn spawn<H: Worker>(handler: H) -> Port<H::Request, H::Response> {
+    fn spawn<H: Worker>(handler: H) -> Socket<H::Request, H::Response> {
         let (tx, rx) = mpsc::channel(64);
         tokio::spawn(run_non_blocking(rx, handler));
-        Port { sender: tx }
+        Socket { sender: tx }
     }
 
-    fn spawn_async<H: AsyncWorker>(handler: H) -> Port<H::Request, H::Response> {
+    fn spawn_async<H: AsyncWorker>(handler: H) -> Socket<H::Request, H::Response> {
         let (tx, rx) = mpsc::channel(64);
         tokio::spawn(run_non_blocking_async(rx, handler));
-        Port { sender: tx }
+        Socket { sender: tx }
     }
 }
 
@@ -216,11 +216,11 @@ async fn run_non_blocking_async<Req, Res, H: AsyncWorker<Request = Req, Response
     }
 }
 
-impl<Req, Res> Port<Req, Res> {
-    /// Downgrade this [`Port`] into a [`WeakPort`] which does not keep the worker around if
-    /// there are no [`Port`]s anymore.
-    pub fn downgrade(&self) -> WeakPort<Req, Res> {
-        WeakPort {
+impl<Req, Res> Socket<Req, Res> {
+    /// Downgrade this [`Socket`] into a [`WeakPort`] which does not keep the worker around if
+    /// there are no [`Socket`]s anymore.
+    pub fn downgrade(&self) -> WeakSocket<Req, Res> {
+        WeakSocket {
             sender: self.sender.downgrade(),
         }
     }
@@ -258,15 +258,15 @@ impl<Req, Res> Port<Req, Res> {
     }
 }
 
-impl<Req, Res> WeakPort<Req, Res> {
-    /// Upgrade this weak port into a [`Port`], returns [`None`] if the port is already dropped.
-    pub fn upgrade(&self) -> Option<Port<Req, Res>> {
-        self.sender.upgrade().map(|sender| Port { sender })
+impl<Req, Res> WeakSocket<Req, Res> {
+    /// Upgrade this weak socket into a [`Socket`], returns [`None`] if the socket is already dropped.
+    pub fn upgrade(&self) -> Option<Socket<Req, Res>> {
+        self.sender.upgrade().map(|sender| Socket { sender })
     }
 }
 
-impl<Req, Res> Unpin for Port<Req, Res> {}
-impl<Req, Res> Unpin for WeakPort<Req, Res> {}
+impl<Req, Res> Unpin for Socket<Req, Res> {}
+impl<Req, Res> Unpin for WeakSocket<Req, Res> {}
 
 #[cfg(test)]
 mod tests {
@@ -300,23 +300,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_dedicated_thread() {
-        let port = DedicatedThread::spawn(CounterWorker::default());
-        assert_eq!(port.run(10).await.unwrap(), 10);
-        assert_eq!(port.run(3).await.unwrap(), 13);
+        let socket = DedicatedThread::spawn(CounterWorker::default());
+        assert_eq!(socket.run(10).await.unwrap(), 10);
+        assert_eq!(socket.run(3).await.unwrap(), 13);
 
-        let port = DedicatedThread::spawn_async(CounterWorker::default());
-        assert_eq!(port.run(10).await.unwrap(), 10);
-        assert_eq!(port.run(3).await.unwrap(), 13);
+        let socket = DedicatedThread::spawn_async(CounterWorker::default());
+        assert_eq!(socket.run(10).await.unwrap(), 10);
+        assert_eq!(socket.run(3).await.unwrap(), 13);
     }
 
     #[tokio::test]
     async fn test_tokio_spawn() {
-        let port = TokioSpawn::spawn(CounterWorker::default());
-        assert_eq!(port.run(10).await.unwrap(), 10);
-        assert_eq!(port.run(3).await.unwrap(), 13);
+        let socket = TokioSpawn::spawn(CounterWorker::default());
+        assert_eq!(socket.run(10).await.unwrap(), 10);
+        assert_eq!(socket.run(3).await.unwrap(), 13);
 
-        let port = DedicatedThread::spawn_async(CounterWorker::default());
-        assert_eq!(port.run(10).await.unwrap(), 10);
-        assert_eq!(port.run(3).await.unwrap(), 13);
+        let socket = DedicatedThread::spawn_async(CounterWorker::default());
+        assert_eq!(socket.run(10).await.unwrap(), 10);
+        assert_eq!(socket.run(3).await.unwrap(), 13);
     }
 }
