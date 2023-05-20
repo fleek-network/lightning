@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
-use affair::Port;
+use affair::Socket;
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -51,7 +51,7 @@ pub trait WithStartAndShutdown {
 /// This port is safe to freely pass around, sending transactions through this port
 /// does not guarantee their execution on the application layer. You can think about
 /// this as if the current node was only an external client to the network.
-pub type MempoolPort = Port<TransactionList, ()>;
+pub type MempoolPort = Socket<TransactionList, ()>;
 
 /// The port that is handled by the application layer and fed by consensus (or other
 /// synchronization systems in place) which executes and persists transactions that
@@ -62,18 +62,18 @@ pub type MempoolPort = Port<TransactionList, ()>;
 /// This port should be used with as much caution as possible, for all intend and purposes
 /// this port should be sealed and preferably not accessible out side of the scope in which
 /// it is created.
-pub type ExecutionEnginePort = Port<TransactionList, ()>;
+pub type ExecutionEnginePort = Socket<TransactionList, ()>;
 
 /// The port which upon receiving a delivery acknowledgment can add it to the aggregator
 /// queue which will later roll up a batch of delivery acknowledgments to the consensus.
-pub type DeliveryAcknowledgmentPort = Port<DeliveryAcknowledgment, ()>;
+pub type DeliveryAcknowledgmentPort = Socket<DeliveryAcknowledgment, ()>;
 
 #[async_trait]
 pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
     /// Create a new consensus service with the provided config and executor.
     async fn init(
         config: Self::Config,
-        executor: Port<TransactionList, ()>,
+        executor: Socket<TransactionList, ()>,
     ) -> anyhow::Result<Self>;
 
     /// Returns a port that can be used to submit transactions to the consensus,
