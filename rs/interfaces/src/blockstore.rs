@@ -8,9 +8,9 @@ use crate::{
     config::ConfigConsumer,
 };
 
-pub struct Blake3Hash(pub [u8; 32]);
+pub type Blake3Hash = [u8; 32];
 
-pub struct Blake3Tree(pub Vec<[u8; 32]>);
+pub struct Blake3Tree(pub Vec<Blake3Hash>);
 
 /// A chunk of content (usually 256KiB) with a compression tag which determines
 /// the compression algorithm that was used to compress this data.

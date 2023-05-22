@@ -11,7 +11,7 @@ pub enum CompressionAlgorithm {
 
 /// A set of [`CompressionAlgorithm`] values. The [`CompressionAlgorithm::Uncompressed`]
 /// is a special case
-#[derive(Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Hash, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct CompressionAlgoSet(u8);
 
 impl CompressionAlgoSet {
@@ -49,43 +49,43 @@ mod tests {
     fn test_compression_set() {
         let mut set = CompressionAlgoSet::new();
         // {}
-        assert_eq!(set.contains(CompressionAlgorithm::Uncompressed), true);
-        assert_eq!(set.contains(CompressionAlgorithm::Snappy), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Gzip), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Brotli), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Lz4), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Lzma), false);
+        assert!(set.contains(CompressionAlgorithm::Uncompressed));
+        assert!(!set.contains(CompressionAlgorithm::Snappy));
+        assert!(!set.contains(CompressionAlgorithm::Gzip));
+        assert!(!set.contains(CompressionAlgorithm::Brotli));
+        assert!(!set.contains(CompressionAlgorithm::Lz4));
+        assert!(!set.contains(CompressionAlgorithm::Lzma));
         // {Lz4}
         set.insert(CompressionAlgorithm::Lz4);
-        assert_eq!(set.contains(CompressionAlgorithm::Uncompressed), true);
-        assert_eq!(set.contains(CompressionAlgorithm::Snappy), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Gzip), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Brotli), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Lz4), true);
-        assert_eq!(set.contains(CompressionAlgorithm::Lzma), false);
+        assert!(set.contains(CompressionAlgorithm::Uncompressed));
+        assert!(!set.contains(CompressionAlgorithm::Snappy));
+        assert!(!set.contains(CompressionAlgorithm::Gzip));
+        assert!(!set.contains(CompressionAlgorithm::Brotli));
+        assert!(set.contains(CompressionAlgorithm::Lz4));
+        assert!(!set.contains(CompressionAlgorithm::Lzma));
         // {Lz4, Brotli}
         set.insert(CompressionAlgorithm::Brotli);
-        assert_eq!(set.contains(CompressionAlgorithm::Uncompressed), true);
-        assert_eq!(set.contains(CompressionAlgorithm::Snappy), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Gzip), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Brotli), true);
-        assert_eq!(set.contains(CompressionAlgorithm::Lz4), true);
-        assert_eq!(set.contains(CompressionAlgorithm::Lzma), false);
+        assert!(set.contains(CompressionAlgorithm::Uncompressed));
+        assert!(!set.contains(CompressionAlgorithm::Snappy));
+        assert!(!set.contains(CompressionAlgorithm::Gzip));
+        assert!(set.contains(CompressionAlgorithm::Brotli));
+        assert!(set.contains(CompressionAlgorithm::Lz4));
+        assert!(!set.contains(CompressionAlgorithm::Lzma));
         // {Lz4}
         set.remove(CompressionAlgorithm::Brotli);
-        assert_eq!(set.contains(CompressionAlgorithm::Uncompressed), true);
-        assert_eq!(set.contains(CompressionAlgorithm::Snappy), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Gzip), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Brotli), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Lz4), true);
-        assert_eq!(set.contains(CompressionAlgorithm::Lzma), false);
+        assert!(set.contains(CompressionAlgorithm::Uncompressed));
+        assert!(!set.contains(CompressionAlgorithm::Snappy));
+        assert!(!set.contains(CompressionAlgorithm::Gzip));
+        assert!(!set.contains(CompressionAlgorithm::Brotli));
+        assert!(set.contains(CompressionAlgorithm::Lz4));
+        assert!(!set.contains(CompressionAlgorithm::Lzma));
         // {}
         set.remove(CompressionAlgorithm::Lz4);
-        assert_eq!(set.contains(CompressionAlgorithm::Uncompressed), true);
-        assert_eq!(set.contains(CompressionAlgorithm::Snappy), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Gzip), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Brotli), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Lz4), false);
-        assert_eq!(set.contains(CompressionAlgorithm::Lzma), false);
+        assert!(set.contains(CompressionAlgorithm::Uncompressed));
+        assert!(!set.contains(CompressionAlgorithm::Snappy));
+        assert!(!set.contains(CompressionAlgorithm::Gzip));
+        assert!(!set.contains(CompressionAlgorithm::Brotli));
+        assert!(!set.contains(CompressionAlgorithm::Lz4));
+        assert!(!set.contains(CompressionAlgorithm::Lzma));
     }
 }

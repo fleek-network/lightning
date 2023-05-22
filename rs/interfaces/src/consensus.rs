@@ -3,7 +3,7 @@ use async_trait::async_trait;
 
 use crate::{
     application::ExecutionEnginePort, common::WithStartAndShutdown, config::ConfigConsumer,
-    transaction::UpdateMethod,
+    signer::SignerInterface, types::UpdateRequest,
 };
 
 /// A port that gives services and other sub-systems the required functionality to
@@ -14,12 +14,27 @@ use crate::{
 /// This port is safe to freely pass around, sending transactions through this port
 /// does not guarantee their execution on the application layer. You can think about
 /// this as if the current node was only an external client to the network.
-pub type MempoolPort = Socket<UpdateMethod, ()>;
+pub type MempoolPort = Socket<UpdateRequest, ()>;
 
 #[async_trait]
 pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
+    /// Internal type that is used for the Ed25519 secret key.
+    type Ed25519SecretKey;
+
+    /// Internal type that is used for the BLS secret key.
+    type BlsSecretKey;
+
     /// Create a new consensus service with the provided config and executor.
-    async fn init(config: Self::Config, executor: ExecutionEnginePort) -> anyhow::Result<Self>;
+    async fn init<
+        S: SignerInterface<
+            Ed25519SecretKey = Self::Ed25519SecretKey,
+            BlsSecretKey = Self::BlsSecretKey,
+        >,
+    >(
+        config: Self::Config,
+        signer: &S,
+        executor: ExecutionEnginePort,
+    ) -> anyhow::Result<Self>;
 
     /// Returns a port that can be used to submit transactions to the consensus,
     /// this can be used by any other systems that are interested in posting some

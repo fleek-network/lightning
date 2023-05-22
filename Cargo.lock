@@ -107,6 +107,29 @@ name = "draco-consensus"
 version = "0.0.0"
 
 [[package]]
+name = "draco-interfaces"
+version = "0.1.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "atomo",
+ "bytes",
+ "serde",
+ "serde-big-array",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
+name = "draco-node"
+version = "0.1.0"
+dependencies = [
+ "draco-interfaces",
+]
+
+[[package]]
 name = "draco-reputation"
 version = "0.0.0"
 
@@ -239,21 +262,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "interfaces"
-version = "0.1.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "atomo",
- "bytes",
- "serde",
- "thiserror",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.144"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -294,13 +302,6 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.45.0",
-]
-
-[[package]]
-name = "node"
-version = "0.1.0"
-dependencies = [
- "interfaces",
 ]
 
 [[package]]
@@ -430,6 +431,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71b2f6e1ab5c2b98c05f0f35b236b22e8df7ead6ffbf51d7808da7f8817e7ab6"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-big-array"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11fc7cc2c76d73e0f27ee52abbd64eec84d46f370c88371120433196934e4b7f"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

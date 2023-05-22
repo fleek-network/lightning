@@ -1,14 +1,26 @@
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
+
 /// The public key of a peer.
-#[derive(Debug, Hash, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum PeerId {
     Ed25519([u8; 32]),
+    #[serde(with = "BigArray")]
     BLS([u8; 48]),
 }
 
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
+pub struct BlsPublicKey(#[serde(with = "BigArray")] pub [u8; 48]);
+
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
+pub struct Ed25519PublicKey(pub [u8; 32]);
+
 /// A signature.
-#[derive(Debug, Hash, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Hash, Clone, Copy, PartialEq, PartialOrd, Eq, Serialize, Deserialize)]
 pub enum Signature {
+    #[serde(with = "BigArray")]
     Ed25519([u8; 64]),
+    #[serde(with = "BigArray")]
     BLS([u8; 96]),
 }
 
@@ -43,11 +55,23 @@ pub trait SignatureVerifierInterface {
         assert_eq!(digest.len(), signature.len());
 
         for (digest, (signer, signature)) in digest.iter().zip(signer.iter().zip(signature)) {
-            if !Self::verify_signature(*digest, *signer, *signature) {
+            if !Self::verify_signature(digest, signer, signature) {
                 return false;
             }
         }
 
         true
+    }
+}
+
+impl From<BlsPublicKey> for PeerId {
+    fn from(value: BlsPublicKey) -> Self {
+        Self::BLS(value.0)
+    }
+}
+
+impl From<Ed25519PublicKey> for PeerId {
+    fn from(value: Ed25519PublicKey) -> Self {
+        Self::Ed25519(value.0)
     }
 }
