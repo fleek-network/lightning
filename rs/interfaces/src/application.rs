@@ -11,17 +11,19 @@ use crate::{
 /// The response generated from executing an entire batch of transactions (aka a block).
 #[derive(Debug, PartialEq, PartialOrd, Hash, Eq)]
 pub struct BlockExecutionResponse {
+    /// The new block hash
+    pub block_hash: [u8; 32],
     /// This *flag* is only set to `true` if performing a transaction in the block
     /// has determined that we should move the epoch forward.
-    change_epoch: bool,
+    pub change_epoch: bool,
     /// The changes to the node registry.
-    node_registry_delta: Vec<(BlsPublicKey, NodeRegistryChange)>,
+    pub node_registry_delta: Vec<(BlsPublicKey, NodeRegistryChange)>,
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Hash, Eq)]
 pub enum NodeRegistryChange {
-    NewNode,
-    Slashed,
+    New,
+    Removed,
 }
 
 /// The port that is handled by the application layer and fed by consensus (or other
