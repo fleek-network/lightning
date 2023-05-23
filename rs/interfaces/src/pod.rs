@@ -1,5 +1,6 @@
 use affair::Socket;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 
 use crate::{common::WithStartAndShutdown, config::ConfigConsumer, signer::SubmitTxPort};
 
@@ -18,4 +19,5 @@ pub trait DeliveryAcknowledgmentAggregatorInterface:
     fn port(&self) -> DeliveryAcknowledgmentPort;
 }
 
+#[derive(Serialize, Deserialize, Debug, Hash)]
 pub struct DeliveryAcknowledgment;

@@ -2,9 +2,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::digest::ToDigest;
 use crate::identity::{BlsPublicKey, Ed25519PublicKey, PeerId, Signature};
+use crate::pod::DeliveryAcknowledgment;
 
 /// Unix time stamp in second.
 pub type UnixTs = u64;
+
+/// Application epoch number
+pub type Epoch = u64;
+
+/// Service Id
+pub type ServiceID = u64;
 
 /// A block of transactions, which is a list of update requests each signed by a user,
 /// the block is the atomic view into the network, meaning that queries do not view
@@ -16,9 +23,23 @@ pub struct Block {
     pub transactions: Vec<UpdateRequest>,
 }
 
+#[derive(Serialize, Deserialize, Hash, Debug)]
+pub enum Tokens {
+    USDC,
+    FLK,
+}
+
+/// Placeholder
+/// Information about the services
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash)]
+pub struct Service {
+    pub commodity_price: u128,
+    /// TODO: List of circuits to prove a node should be slashed
+    pub slashing: (),
+}
+
 /// An update transaction, sent from users to the consensus to migrate the application
 /// from one state to the next state.
-///
 #[derive(Debug, Hash)]
 pub struct UpdateRequest {
     /// The sender of the transaction.
@@ -35,8 +56,6 @@ pub struct UpdateRequest {
 pub struct QueryRequest {
     /// The sender of this query request.
     pub sender: PeerId,
-    /// The signature on this payload.
-    pub signature: Signature,
     /// The query function.
     pub query: QueryMethod,
 }
@@ -53,13 +72,95 @@ pub struct UpdatePayload {
 /// All of the update functions in our logic, along their parameters.
 #[derive(Debug, Hash)]
 pub enum UpdateMethod {
-    // TODO
+    /// The main function of the application layer. After aggregating ProofOfAcknowledgements a node will submit this
+    ///     transaction to get paid.
+    /// Revisit the naming of this transaction.
+    SubmitDeliveryAcknowledgmentAggregation {
+        /// How much of the commodity was served
+        commodity: u128,
+        /// The service id of the service this was provided through(CDN, compute, ect.)
+        service_id: u64,
+        /// The PoD of delivery in bytes
+        proof: Vec<DeliveryAcknowledgment>,
+        /// Optional metadata to provide information additional information about this batch
+        metadata: Option<Vec<u8>>,
+    },
+    /// Withdraw tokens from the network back to the L2
+    Withdraw {
+        /// The amount to withdrawl
+        amount: u128,
+        /// Which token to withdrawl
+        token: Tokens,
+        /// The address to recieve these tokens on the L2
+        receiving_address: PeerId,
+    },
+    /// Submit of PoC from the bridge on the L2 to get the tokens in network
+    Deposit {
+        /// The proof of the bridge recieved from the L2,
+        proof: ProofOfConsensus,
+        /// Which token was bridged
+        token: Tokens,
+        /// Amount bridged
+        amount: u128,
+    },
+    /// Stake FLK in network
+    Stake {
+        /// The proof of the bridge recieved from the L2,
+        proof: ProofOfConsensus,
+        /// Amount bridged
+        amount: u128,
+        /// Node Public Key
+        node: PeerId,
+    },
+    /// Unstake FLK, the tokens will be locked for a set amount of time(ProtocolParameter::LockTime) before they can be withdrawn
+    Unstake { amount: u128 },
+    /// Sent by committee member to signal he is ready to change epoch
+    ChangeEpoch,
+    /// Adding a new service to the protocol
+    AddService {
+        service: Service,
+        service_id: ServiceId,
+    },
+    /// Removing a service from the protocol
+    RemoveService {
+        /// Service Id of the service to be removed
+        service_id: ServiceId,
+    },
+    /// Provide proof of misbehavior to slash a node
+    Slash {
+        /// Service id of the service a node misbehaved in
+        service_id: ServiceId,
+        /// The public key of the node that misbehaved
+        node: PeerId,
+        /// Zk proof to be provided to the slash circuit
+        proof_of_misbehavior: ProofOfMisbehavior,
+    },
 }
 
 /// All of the query functions in our logic, along their parameters.
 #[derive(Debug, Hash)]
 pub enum QueryMethod {
-    // TODO
+    /// Get the balance of unlocked FLK a public key has
+    FLK { public_key: PeerId },
+    /// Get the balance of locked FLK a public key has
+    Locked { public_key: PeerId },
+    /// Get the amount of prepaid bandwidth a public key has
+    Bandwidth { public_key: PeerId },
+    /// Get the amount of stake a node has
+    Staked { node: PeerId },
+    /// Get the amound of bandwidth served in an epoch
+    Served {
+        /// the epoch
+        epoch: Epoch,
+        /// The node public Key
+        node: PeerId,
+    },
+    /// Get the total served for all nodes in an epoch
+    TotalServed { epoch: Epoch },
+    /// Get the amount in the reward pool for an epoch
+    RewardPool { epoch: Epoch },
+    /// Get the current epoch information
+    CurrentEpochInfo,
 }
 
 /// The serialized response from executing a query.
@@ -126,3 +227,13 @@ impl ToDigest for QueryMethod {
         todo!()
     }
 }
+
+/// Placeholder
+/// This is the proof presented to the slashing function that proves a node misbehaved and should be slashed
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash)]
+pub struct ProofOfMisbehavior {}
+
+/// Placeholder
+/// This is the proof used to operate our PoC bridges
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash)]
+pub struct ProofOfConsensus {}

@@ -6,15 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0"
-serde = {version="1.0", features=["derive"]}
-serde-big-array = "0.5.1"
-async-trait = "0.1"
-tokio = {version="1.28", features=["full"]}
-tokio-stream = "0.1"
-bytes = "1.4"
-thiserror = "1.0"
+anyhow.workspace = true
+serde.workspace = true
+serde-big-array.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+bytes.workspace = true
+thiserror.workspace = true
 
 # Our libraries
-affair = {path="../../lib/affair"}
-atomo = {path="../../lib/atomo"}
+affair.workspace = true
+atomo.workspace = true
