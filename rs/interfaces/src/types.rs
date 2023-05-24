@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::digest::ToDigest;
+use crate::common::ToDigest;
 use crate::identity::{BlsPublicKey, Ed25519PublicKey, PeerId, Signature};
 use crate::pod::DeliveryAcknowledgment;
 

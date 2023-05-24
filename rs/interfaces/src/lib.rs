@@ -4,7 +4,6 @@ pub mod common;
 pub mod compression;
 pub mod config;
 pub mod consensus;
-pub mod digest;
 pub mod fs;
 pub mod handshake;
 pub mod identity;
@@ -20,3 +19,4 @@ pub mod types;
 
 // TODO:
 // - SDK: Read DA.
+// - SDK: Clock functionality and event listeners.
