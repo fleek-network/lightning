@@ -183,6 +183,29 @@ pub struct NodeInfo {
     pub addresses: Vec<InternetAddress>,
 }
 
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum ProtocolParams {
+    /// The time in seconds that an epoch lasts for. Genesis 24 hours(86400)
+    EpochTime = 0,
+    /// The size of the committee
+    CommitteeSize = 1,
+    /// The min FLK a node has to stake to participate in the network
+    MinimumNodeStake = 2,
+    /// The time in epochs a node has to be staked to participate in the network
+    EligibilityTime = 3,
+    /// The time in epochs a node has to wait to withdraw after unstaking
+    LockTime = 4,
+    /// The percentage of the reward pool the protocol gets
+    ProtocolPercentage = 5,
+    /// The maximum targed inflation rate in a year
+    MaxInflation = 6,
+    /// The minimum targeted inflation rate in a year
+    MinInflation = 7,
+    /// The amount of FLK minted per GB they consume.
+    ConsumerRebate = 8,
+}
+
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
 pub struct ServiceId(pub [u8; 32]);
 

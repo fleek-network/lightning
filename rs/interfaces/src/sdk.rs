@@ -5,7 +5,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::{
     application::SyncQueryRunnerInterface, fs::FileSystemInterface, identity::PeerId,
-    reputation::ReputationReporterInterface, signer::SubmitTxPort, types::UpdateMethod,
+    reputation::ReputationReporterInterface, signer::SubmitTxSocket, types::UpdateMethod,
 };
 
 /// The request handler of a service.
@@ -31,7 +31,7 @@ pub trait SdkInterface: Clone + Send + Sync + 'static {
         q: Self::SyncQuery,
         r: Self::ReputationReporter,
         f: Self::FileSystem,
-        t: SubmitTxPort,
+        t: SubmitTxSocket,
     ) -> Self;
 
     /// Returns the reputation reporter.

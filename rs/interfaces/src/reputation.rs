@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::{
     application::SyncQueryRunnerInterface, config::ConfigConsumer, identity::PeerId,
-    signer::SubmitTxPort,
+    signer::SubmitTxSocket,
 };
 
 #[async_trait]
@@ -16,7 +16,7 @@ pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
     type ReputationQuery: ReputationQueryInteface;
 
     /// Create a new reputation
-    async fn init(config: Self::Config, submit_tx: SubmitTxPort) -> anyhow::Result<Self>;
+    async fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self>;
 
     /// Returns a reputation reporter that can be used to capture interactions that we have
     /// with another peer.

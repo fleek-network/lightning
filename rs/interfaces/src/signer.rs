@@ -3,15 +3,15 @@ use async_trait::async_trait;
 
 use crate::{
     config::ConfigConsumer,
-    consensus::MempoolPort,
+    consensus::MempoolSocket,
     identity::{BlsPublicKey, Ed25519PublicKey, Signature},
     types::UpdateMethod,
 };
 
-/// A port that is responsible to submit a transaction to the consensus from our node,
-/// implementation of this port needs to assure the consistency and increment of the
+/// A socket that is responsible to submit a transaction to the consensus from our node,
+/// implementation of this socket needs to assure the consistency and increment of the
 /// nonce (which we also refer to as the counter).
-pub type SubmitTxPort = Socket<UpdateMethod, u64>;
+pub type SubmitTxSocket = Socket<UpdateMethod, u64>;
 
 /// The signature provider is responsible for signing messages using the private key of
 /// the node.
@@ -26,9 +26,9 @@ pub trait SignerInterface: ConfigConsumer + Sized {
     /// Initialize the signature service.
     async fn init(config: Self::Config) -> anyhow::Result<Self>;
 
-    /// Provide the signer service with the mempool port after initialization, this function
+    /// Provide the signer service with the mempool socket after initialization, this function
     /// should only be called once.
-    fn provide_mempool(&mut self, mempool: MempoolPort);
+    fn provide_mempool(&mut self, mempool: MempoolSocket);
 
     /// Returns the `BLS` public key of the current node.
     fn get_bls_pk(&self) -> BlsPublicKey;
@@ -44,14 +44,14 @@ pub trait SignerInterface: ConfigConsumer + Sized {
     /// be used with the greatest caution.
     fn get_sk(&self) -> (Self::Ed25519SecretKey, Self::BlsSecretKey);
 
-    /// Returns a port that can be used to submit transactions to the mempool, these
+    /// Returns a socket that can be used to submit transactions to the mempool, these
     /// transactions are signed by the node and a proper nonce is assigned by the
     /// implementation.
     ///
     /// # Panics
     ///
     /// This function can panic if there has not been a prior call to `provide_mempool`.
-    fn get_port(&self) -> SubmitTxPort;
+    fn get_socket(&self) -> SubmitTxSocket;
 
     /// Sign the provided raw digest and return a signature.
     ///

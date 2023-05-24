@@ -26,27 +26,27 @@ pub enum NodeRegistryChange {
     Removed,
 }
 
-/// The port that is handled by the application layer and fed by consensus (or other
+/// The socket that is handled by the application layer and fed by consensus (or other
 /// synchronization systems in place) which executes and persists transactions that
 /// are put into it.
 ///
 /// # Safety
 ///
-/// This port should be used with as much caution as possible, for all intend and purposes
-/// this port should be sealed and preferably not accessible out side of the scope in which
+/// This socket should be used with as much caution as possible, for all intend and purposes
+/// this socket should be sealed and preferably not accessible out side of the scope in which
 /// it is created.
-pub type ExecutionEnginePort = Socket<Block, BlockExecutionResponse>;
+pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
 
-/// The port that is handled by the application layer and fed by consensus (or other
+/// The socket that is handled by the application layer and fed by consensus (or other
 /// synchronization systems in place) which executes and persists transactions that
 /// are put into it.
 ///
 /// # Safety
 ///
-/// This port should be used with as much caution as possible, for all intend and purposes
-/// this port should be sealed and preferably not accessible out side of the scope in which
+/// This socket should be used with as much caution as possible, for all intend and purposes
+/// this socket should be sealed and preferably not accessible out side of the scope in which
 /// it is created.
-pub type QueryPort = Socket<QueryRequest, QueryResponse>;
+pub type QuerySocket = Socket<QueryRequest, QueryResponse>;
 
 #[async_trait]
 pub trait ApplicationInterface:
@@ -58,17 +58,17 @@ pub trait ApplicationInterface:
     /// Create a new instance of the application layer using the provided configuration.
     async fn init(config: Self::Config) -> anyhow::Result<Self>;
 
-    /// Returns a port that should be used to submit transactions to be executed
+    /// Returns a socket that should be used to submit transactions to be executed
     /// by the application layer.
     ///
     /// # Safety
     ///
-    /// See the safety document for the [`ExecutionEnginePort`].
-    fn transaction_executor(&self) -> ExecutionEnginePort;
+    /// See the safety document for the [`ExecutionEngineSocket`].
+    fn transaction_executor(&self) -> ExecutionEngineSocket;
 
-    /// Returns a port that can be used to execute queries on the application layer. This
-    /// port can be passed to the *RPC* as an example.
-    fn query_port(&self) -> QueryPort;
+    /// Returns a socket that can be used to execute queries on the application layer. This
+    /// socket can be passed to the *RPC* as an example.
+    fn query_socket(&self) -> QuerySocket;
 
     /// Returns the instance of a sync query runner which can be used to run queries without
     /// blocking or awaiting. A naive (& blocking) implementation can achieve this by simply
@@ -112,4 +112,16 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
 
     /// Returns the committee members of the current epoch.
     fn get_committee_members(&self) -> Vec<BlsPublicKey>;
+}
+
+#[derive(Clone, Debug)]
+pub enum ExecutionError {
+    InvalidSignature,
+    InvalidNonce,
+    InvalidProof,
+    NotNodeOwner,
+    NotCommitteeMember,
+    NodeDoesNotExist,
+    AlreadySignaled,
+    NonExistingService,
 }

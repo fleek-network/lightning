@@ -111,7 +111,7 @@ impl<
         )
         .await?;
 
-        // Provide the mempool port to the signer so it can use it to send messages to consensus.
+        // Provide the mempool socket to the signer so it can use it to send messages to consensus.
         signer.provide_mempool(consensus.mempool());
 
         let store = BlockStore::init(configuration.get::<BlockStore>()).await?;
@@ -122,20 +122,20 @@ impl<
 
         let delivery_acknowledgment_aggregator = DeliveryAcknowledgmentAggregator::init(
             configuration.get::<DeliveryAcknowledgmentAggregator>(),
-            signer.get_port(),
+            signer.get_socket(),
         )
         .await?;
 
         let reputation_aggregator = ReputationAggregator::init(
             configuration.get::<ReputationAggregator>(),
-            signer.get_port(),
+            signer.get_socket(),
         )
         .await?;
 
         let rpc = Rpc::init(
             configuration.get::<Rpc>(),
             consensus.mempool(),
-            application.query_port(),
+            application.query_socket(),
         )
         .await?;
 
@@ -177,7 +177,7 @@ impl<
             self.application.sync_query(),
             self.reputation_aggregator.get_reporter(),
             self.fs.clone(),
-            self.signer.get_port(),
+            self.signer.get_socket(),
         );
 
         let handler = setup(&sdk);

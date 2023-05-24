@@ -2,19 +2,19 @@ use affair::Socket;
 use async_trait::async_trait;
 
 use crate::{
-    application::ExecutionEnginePort, common::WithStartAndShutdown, config::ConfigConsumer,
+    application::ExecutionEngineSocket, common::WithStartAndShutdown, config::ConfigConsumer,
     signer::SignerInterface, types::UpdateRequest,
 };
 
-/// A port that gives services and other sub-systems the required functionality to
+/// A socket that gives services and other sub-systems the required functionality to
 /// submit messages/transactions to the consensus.
 ///
 /// # Safety
 ///
-/// This port is safe to freely pass around, sending transactions through this port
+/// This socket is safe to freely pass around, sending transactions through this socket
 /// does not guarantee their execution on the application layer. You can think about
 /// this as if the current node was only an external client to the network.
-pub type MempoolPort = Socket<UpdateRequest, ()>;
+pub type MempoolSocket = Socket<UpdateRequest, ()>;
 
 #[async_trait]
 pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
@@ -33,11 +33,11 @@ pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Se
     >(
         config: Self::Config,
         signer: &S,
-        executor: ExecutionEnginePort,
+        executor: ExecutionEngineSocket,
     ) -> anyhow::Result<Self>;
 
-    /// Returns a port that can be used to submit transactions to the consensus,
+    /// Returns a socket that can be used to submit transactions to the consensus,
     /// this can be used by any other systems that are interested in posting some
     /// transaction to the consensus.
-    fn mempool(&self) -> MempoolPort;
+    fn mempool(&self) -> MempoolSocket;
 }
