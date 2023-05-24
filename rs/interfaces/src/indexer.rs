@@ -10,6 +10,7 @@ pub trait IndexerInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send
     async fn init(config: Self::Config) -> anyhow::Result<Self>;
 
     /// Publish to everyone that we have cached a content with the given `cid` successfully.
+    // TODO: Put the service that caused this cid to be cached as a param here.
     fn publish(&self, cid: &Blake3Hash);
 
     /// Returns the list of top nodes that should have a content cached.

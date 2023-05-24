@@ -21,3 +21,4 @@ pub trait DeliveryAcknowledgmentAggregatorInterface:
 
 #[derive(Serialize, Deserialize, Debug, Hash)]
 pub struct DeliveryAcknowledgment;
+
