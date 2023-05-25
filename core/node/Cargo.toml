@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 draco-interfaces = {path="../interfaces"}
+anyhow.workspace = true
+serde.workspace = true
 toml = "0.7"
-anyhow = "1.0"
