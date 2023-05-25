@@ -1,0 +1,11 @@
+[package]
+name = "fleek-cdn"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+draco-interfaces = {path="../rs/interfaces"}
+draco-sdk = {path="../rs/sdk"}
+anyhow = "1.0"

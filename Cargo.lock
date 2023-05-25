@@ -68,6 +68,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "blake3-tree"
+version = "0.0.0"
+
+[[package]]
 name = "byteorder"
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -111,7 +115,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "draco-blockstore"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "draco-interfaces",
+]
+
+[[package]]
 name = "draco-consensus"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "draco-interfaces",
+]
+
+[[package]]
+name = "draco-handshake"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "draco-interfaces",
+]
+
+[[package]]
+name = "draco-identity"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -144,6 +172,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "draco-origin-arweave"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "draco-interfaces",
+]
+
+[[package]]
+name = "draco-origin-filecoin"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "draco-interfaces",
+]
+
+[[package]]
+name = "draco-origin-ipfs"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "draco-interfaces",
+]
+
+[[package]]
+name = "draco-pod"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "draco-interfaces",
+]
+
+[[package]]
 name = "draco-reputation"
 version = "0.0.0"
 dependencies = [
@@ -152,7 +212,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "draco-server"
+name = "draco-rpc"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "draco-interfaces",
+]
+
+[[package]]
+name = "draco-sdk"
 version = "0.0.0"
 dependencies = [
  "anyhow",

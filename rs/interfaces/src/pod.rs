@@ -19,6 +19,11 @@ pub trait DeliveryAcknowledgmentAggregatorInterface:
     fn socket(&self) -> DeliveryAcknowledgmentSocket;
 }
 
+pub trait LaneManager {}
+
+/// A batch of delivery acknowledgments.
+#[derive(Serialize, Deserialize, Debug, Hash)]
+pub struct DeliveryAcknowledgmentBatch;
+
 #[derive(Serialize, Deserialize, Debug, Hash)]
 pub struct DeliveryAcknowledgment;
-
