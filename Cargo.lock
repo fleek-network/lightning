@@ -228,6 +228,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fleek-cdn"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "draco-interfaces",
+ "draco-sdk",
+]
+
+[[package]]
 name = "futures"
 version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"

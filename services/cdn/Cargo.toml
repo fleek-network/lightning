@@ -6,6 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-draco-interfaces = {path="../rs/interfaces"}
-draco-sdk = {path="../rs/sdk"}
+draco-interfaces = {path="../../core/interfaces"}
+draco-sdk = {path="../../core/sdk"}
 anyhow = "1.0"
