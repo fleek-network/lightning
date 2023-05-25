@@ -96,7 +96,9 @@ TAG = 0x01 << 2
 [ TAG . compression . schnorr signature . bytes len (u64) . proof len (u64) . proof . bytes ]
 ```
     
-### Delivery Acknowledgement: Client sent acknowledgement proving the node sent a block of content
+### Delivery Acknowledgement: 
+
+Client sent acknowledgement proving the node sent a block of content
         
 ```
 TAG = 0x01 << 3
@@ -104,7 +106,9 @@ TAG = 0x01 << 3
 [ TAG . signature ]
 ```
         
-### Decryption Key: Sent by the node for the client to actually get their content in the tentative mode.
+### Decryption Key: 
+
+Sent by the node for the client to actually get their content in the tentative mode.
 
 ```
 TAG = 0x01 << 4
