@@ -68,60 +68,67 @@ sequenceDiagram
   Client--)Node: Session Close
 ```
     
-## Sub-protocol Codec
+## Codec
 
-- Content Request
+### Content Request
     
-  ```
-  TAG = 0x01 << 0
-  [ TAG . blake3 hash ]
-  ```
-    
-- Content Range Request
-    
-  ```
-  TAG = 0x01 << 1
-  [ TAG . blake3 hash . starting block (u64) . num blocks (u16) ]
+```
+TAG = 0x01 << 0
 
-  If number of blocks is 0, the content should be served up to the last block
-  ```
+[ TAG . blake3 hash ]
+```
     
-- Content Block Response:
+### Content Range Request
     
-  ```
-  TAG = 0x01 << 2
-  [ TAG . compression . schnorr signature . bytes len (u64) . proof len (u64) . proof . bytes ]
-  ```
+```
+TAG = 0x01 << 1
+
+[ TAG . blake3 hash . starting block (u64) . num blocks (u16) ]
+
+If number of blocks is 0, the content should be served up to the last block
+```
     
-- Delivery Acknowledgement: Client sent acknowledgement proving the node sent a block of content
+### Content Block Response:
+    
+```
+TAG = 0x01 << 2
+
+[ TAG . compression . schnorr signature . bytes len (u64) . proof len (u64) . proof . bytes ]
+```
+    
+### Delivery Acknowledgement: Client sent acknowledgement proving the node sent a block of content
         
-  ```
-  TAG = 0x01 << 3
-  [ TAG . signature ]
-  ```
-        
-- Decryption Key: Sent by the node for the client to actually get their content in the tentative mode.
+```
+TAG = 0x01 << 3
 
-  ```
-  TAG = 0x01 << 4
-  [ TAG . decryption key ]
-  ```
+[ TAG . signature ]
+```
         
-- Signals: Sent from a node to a client to notify about certain things. A single byte (above 0x80) is enough to provide a signal id and some data bits 
+### Decryption Key: Sent by the node for the client to actually get their content in the tentative mode.
 
-  ```
-  [ 0x80 | signal id | data bits ]
+```
+TAG = 0x01 << 4
+
+[ TAG . decryption key ]
+```
+        
+### Signals
+
+Sent from a node to a client to notify about certain things. A single byte (above 0x80) is enough to provide a signal id and some data bits 
+
+```
+[ 0x80 | signal id | data bits ]
       
-  1 [ 0 0 0 ] [ 0 0 0 0 ] - data bits
-   \     \_ Signal Id
-     \_ Signal bit
+1 [ 0 0 0 ] [ 0 0 0 0 ] - data bits
+ \     \_ Signal Id
+  \_ Signal bit
         
-  Signal Ids:
-  000: Update Service Epoch
-  111: Termination(reason)
-      
-  Termination Reasons:
-  0000: Codec Violation
-  0001: InsufficientBalance
-  1111: Unknown
-  ```
+Signal Ids:
+000: Update Service Epoch
+111: Termination(reason)
+
+Termination Reasons:
+0000: Codec Violation
+0001: InsufficientBalance
+1111: Unknown
+```
