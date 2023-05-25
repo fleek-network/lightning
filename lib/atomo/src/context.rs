@@ -2,10 +2,12 @@ use std::{hash::Hash, sync::Arc};
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::db::AtomoInner;
-use crate::shared::Shared;
-use crate::snapshot::{Snapshot, SnapshotData};
-use crate::SerdeBackend;
+use crate::{
+    db::AtomoInner,
+    shared::Shared,
+    snapshot::{Snapshot, SnapshotData},
+    SerdeBackend,
+};
 
 pub struct Context<K, V, S: SerdeBackend> {
     atomo: Arc<AtomoInner<K, V, S>>,

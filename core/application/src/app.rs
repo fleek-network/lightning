@@ -1,11 +1,12 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use draco_interfaces::application::{ApplicationInterface, ExecutionEngineSocket, QuerySocket};
-use draco_interfaces::common::WithStartAndShutdown;
-use draco_interfaces::config::ConfigConsumer;
+use draco_interfaces::{
+    application::{ApplicationInterface, ExecutionEngineSocket, QuerySocket},
+    common::WithStartAndShutdown,
+    config::ConfigConsumer,
+};
 
-use crate::config::Config;
-use crate::query_runner::QueryRunner;
+use crate::{config::Config, query_runner::QueryRunner};
 
 pub struct Application {
     query_socket: QuerySocket,
@@ -43,7 +44,7 @@ impl ApplicationInterface for Application {
     type SyncExecutor = QueryRunner;
 
     /// Create a new instance of the application layer using the provided configuration.
-    async fn init(config: Self::Config) -> Result<Self> {
+    async fn init(_config: Self::Config) -> Result<Self> {
         todo!()
     }
 

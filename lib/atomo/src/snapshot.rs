@@ -2,8 +2,7 @@ use std::hash::Hash;
 
 use fxhash::FxHashMap;
 
-use crate::db::Operation;
-use crate::gc_list::GcNode;
+use crate::{db::Operation, gc_list::GcNode};
 
 pub(crate) type Snapshot<K, V> = GcNode<SnapshotData<K, V>>;
 
@@ -44,7 +43,7 @@ where
                 match entries.0.get(key) {
                     Some(Operation::Put(v)) => return Some(Some(v)),
                     Some(Operation::Delete) => return Some(None),
-                    None => {}
+                    None => {},
                 }
             }
 

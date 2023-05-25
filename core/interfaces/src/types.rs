@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-use crate::common::ToDigest;
-use crate::identity::{BlsPublicKey, Ed25519PublicKey, PeerId, Signature};
-use crate::pod::DeliveryAcknowledgment;
+use crate::{
+    common::ToDigest,
+    identity::{BlsPublicKey, Ed25519PublicKey, PeerId, Signature},
+    pod::DeliveryAcknowledgment,
+};
 
 /// Unix time stamp in second.
 pub type UnixTs = u64;
@@ -72,8 +74,8 @@ pub struct UpdatePayload {
 /// All of the update functions in our logic, along their parameters.
 #[derive(Debug, Hash)]
 pub enum UpdateMethod {
-    /// The main function of the application layer. After aggregating ProofOfAcknowledgements a node will submit this
-    ///     transaction to get paid.
+    /// The main function of the application layer. After aggregating ProofOfAcknowledgements a
+    /// node will submit this     transaction to get paid.
     /// Revisit the naming of this transaction.
     SubmitDeliveryAcknowledgmentAggregation {
         /// How much of the commodity was served
@@ -112,7 +114,8 @@ pub enum UpdateMethod {
         /// Node Public Key
         node: PeerId,
     },
-    /// Unstake FLK, the tokens will be locked for a set amount of time(ProtocolParameter::LockTime) before they can be withdrawn
+    /// Unstake FLK, the tokens will be locked for a set amount of
+    /// time(ProtocolParameter::LockTime) before they can be withdrawn
     Unstake { amount: u128 },
     /// Sent by committee member to signal he is ready to change epoch
     ChangeEpoch,
@@ -252,7 +255,8 @@ impl ToDigest for QueryMethod {
 }
 
 /// Placeholder
-/// This is the proof presented to the slashing function that proves a node misbehaved and should be slashed
+/// This is the proof presented to the slashing function that proves a node misbehaved and should be
+/// slashed
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash)]
 pub struct ProofOfMisbehavior {}
 

@@ -30,18 +30,18 @@ pub struct Node<
     FileSystem: FileSystemInterface<BlockStore = BlockStore, Indexer = Indexer>,
     SignatureVerifier: SignatureVerifierInterface,
     Signer: SignerInterface<
-        Ed25519SecretKey = Consensus::Ed25519SecretKey,
-        BlsSecretKey = Consensus::BlsSecretKey,
-    >,
+            Ed25519SecretKey = Consensus::Ed25519SecretKey,
+            BlsSecretKey = Consensus::BlsSecretKey,
+        >,
     Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
     DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
     ReputationAggregator: ReputationAggregatorInterface,
     Rpc: RpcInterface<SignatureVerifier>,
     Sdk: SdkInterface<
-        SyncQuery = Application::SyncExecutor,
-        ReputationReporter = ReputationAggregator::ReputationReporter,
-        FileSystem = FileSystem,
-    >,
+            SyncQuery = Application::SyncExecutor,
+            ReputationReporter = ReputationAggregator::ReputationReporter,
+            FileSystem = FileSystem,
+        >,
     Handshake: HandshakeInterface<Sdk = Sdk>,
 > {
     pub configuration: ConfigProvider,
@@ -60,28 +60,28 @@ pub struct Node<
 }
 
 impl<
-        ConfigProvider: ConfigProviderInterface,
-        Consensus: ConsensusInterface,
-        Application: ApplicationInterface,
-        BlockStore: BlockStoreInterface,
-        Indexer: IndexerInterface,
-        FileSystem: FileSystemInterface<BlockStore = BlockStore, Indexer = Indexer>,
-        SignatureVerifier: SignatureVerifierInterface,
-        Signer: SignerInterface<
+    ConfigProvider: ConfigProviderInterface,
+    Consensus: ConsensusInterface,
+    Application: ApplicationInterface,
+    BlockStore: BlockStoreInterface,
+    Indexer: IndexerInterface,
+    FileSystem: FileSystemInterface<BlockStore = BlockStore, Indexer = Indexer>,
+    SignatureVerifier: SignatureVerifierInterface,
+    Signer: SignerInterface<
             Ed25519SecretKey = Consensus::Ed25519SecretKey,
             BlsSecretKey = Consensus::BlsSecretKey,
         >,
-        Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
-        DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
-        ReputationAggregator: ReputationAggregatorInterface,
-        Rpc: RpcInterface<SignatureVerifier>,
-        Sdk: SdkInterface<
+    Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
+    DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
+    ReputationAggregator: ReputationAggregatorInterface,
+    Rpc: RpcInterface<SignatureVerifier>,
+    Sdk: SdkInterface<
             SyncQuery = Application::SyncExecutor,
             ReputationReporter = ReputationAggregator::ReputationReporter,
             FileSystem = FileSystem,
         >,
-        Handshake: HandshakeInterface<Sdk = Sdk>,
-    >
+    Handshake: HandshakeInterface<Sdk = Sdk>,
+>
     Node<
         ConfigProvider,
         Consensus,
@@ -198,28 +198,28 @@ impl<
 
 #[async_trait]
 impl<
-        ConfigProvider: ConfigProviderInterface,
-        Consensus: ConsensusInterface,
-        Application: ApplicationInterface,
-        BlockStore: BlockStoreInterface,
-        Indexer: IndexerInterface,
-        FileSystem: FileSystemInterface<BlockStore = BlockStore, Indexer = Indexer>,
-        SignatureVerifier: SignatureVerifierInterface,
-        Signer: SignerInterface<
+    ConfigProvider: ConfigProviderInterface,
+    Consensus: ConsensusInterface,
+    Application: ApplicationInterface,
+    BlockStore: BlockStoreInterface,
+    Indexer: IndexerInterface,
+    FileSystem: FileSystemInterface<BlockStore = BlockStore, Indexer = Indexer>,
+    SignatureVerifier: SignatureVerifierInterface,
+    Signer: SignerInterface<
             Ed25519SecretKey = Consensus::Ed25519SecretKey,
             BlsSecretKey = Consensus::BlsSecretKey,
         >,
-        Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
-        DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
-        ReputationAggregator: ReputationAggregatorInterface,
-        Rpc: RpcInterface<SignatureVerifier>,
-        Sdk: SdkInterface<
+    Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
+    DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
+    ReputationAggregator: ReputationAggregatorInterface,
+    Rpc: RpcInterface<SignatureVerifier>,
+    Sdk: SdkInterface<
             SyncQuery = Application::SyncExecutor,
             ReputationReporter = ReputationAggregator::ReputationReporter,
             FileSystem = FileSystem,
         >,
-        Handshake: HandshakeInterface<Sdk = Sdk>,
-    > WithStartAndShutdown
+    Handshake: HandshakeInterface<Sdk = Sdk>,
+> WithStartAndShutdown
     for Node<
         ConfigProvider,
         Consensus,

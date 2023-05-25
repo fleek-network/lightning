@@ -1,24 +1,22 @@
-use draco_interfaces::application::SyncQueryRunnerInterface;
-use draco_interfaces::identity::PeerId;
-use draco_interfaces::types::NodeInfo;
+use draco_interfaces::{application::SyncQueryRunnerInterface, identity::PeerId, types::NodeInfo};
 
 #[derive(Clone)]
 pub struct QueryRunner {}
 
 impl SyncQueryRunnerInterface for QueryRunner {
-    fn get_balance(&self, peer: &PeerId) -> u128 {
+    fn get_balance(&self, _peer: &PeerId) -> u128 {
         todo!()
     }
 
-    fn get_reputation(&self, peer: &PeerId) -> u128 {
+    fn get_reputation(&self, _peer: &PeerId) -> u128 {
         todo!()
     }
 
-    fn get_relative_score(&self, n1: &PeerId, n2: &PeerId) -> u128 {
+    fn get_relative_score(&self, _n1: &PeerId, _n2: &PeerId) -> u128 {
         todo!()
     }
 
-    fn get_node_info(&self, id: &PeerId) -> Option<NodeInfo> {
+    fn get_node_info(&self, _id: &PeerId) -> Option<NodeInfo> {
         todo!()
     }
 
@@ -26,7 +24,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
         todo!()
     }
 
-    fn is_valid_node(&self, id: &PeerId) -> bool {
+    fn is_valid_node(&self, _id: &PeerId) -> bool {
         todo!()
     }
 

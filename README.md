@@ -50,4 +50,7 @@ the top-down specification of all of the project.
 The design pattern adopted for this software is highly inspired by the Object-Oriented model
 described by Alan Kay, which may be a bit different from OOP that grew to fame due to Java.
 
-In a nutshell
+In a nutshell this is similar to the same idea, and we represent different units of computation
+and process as objects that communicate with each other by message passing.
+
+

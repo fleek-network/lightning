@@ -43,7 +43,7 @@ fn main() {
     for _ in 0..num_query_threads {
         let q = q.clone();
         let handle = std::thread::spawn(move || {
-            while !START.load(std::sync::atomic::Ordering::Relaxed) {}
+            while !START.load(std::sync::atomic::Ordering::Relaxed) { std::hint::spin_loop() }
 
             let mut rng: u32 = rand::thread_rng().gen();
 
@@ -167,7 +167,7 @@ fn op_per_sec(duration: &Duration, count: usize) -> usize {
 }
 
 fn get_arg(name: &str) -> Option<usize> {
-    let mut args = std::env::args().into_iter();
+    let mut args = std::env::args();
 
     while let Some(arg) = args.next() {
         if arg == name {

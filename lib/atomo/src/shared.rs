@@ -1,7 +1,9 @@
-use std::borrow::Borrow;
-use std::fmt::{Debug, Display};
-use std::hash::Hash;
-use std::ops::Deref;
+use std::{
+    borrow::Borrow,
+    fmt::{Debug, Display},
+    hash::Hash,
+    ops::Deref,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -54,7 +56,7 @@ impl<'a, T> Deref for Shared<'a, T> {
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
         match &self.0 {
-            SharedInner::Reference(t) => *t,
+            SharedInner::Reference(t) => t,
             SharedInner::Owned(t) => t,
         }
     }
@@ -64,7 +66,7 @@ impl<'a, T> AsRef<T> for Shared<'a, T> {
     #[inline(always)]
     fn as_ref(&self) -> &T {
         match &self.0 {
-            SharedInner::Reference(t) => *t,
+            SharedInner::Reference(t) => t,
             SharedInner::Owned(t) => t,
         }
     }
@@ -74,7 +76,7 @@ impl<'a, T> Borrow<T> for Shared<'a, T> {
     #[inline]
     fn borrow(&self) -> &T {
         match &self.0 {
-            SharedInner::Reference(t) => *t,
+            SharedInner::Reference(t) => t,
             SharedInner::Owned(t) => t,
         }
     }

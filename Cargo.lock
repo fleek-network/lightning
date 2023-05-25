@@ -120,6 +120,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "draco-interfaces",
+ "serde",
 ]
 
 [[package]]
@@ -128,6 +129,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "draco-interfaces",
+ "serde",
 ]
 
 [[package]]
@@ -136,6 +138,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "draco-interfaces",
+ "serde",
 ]
 
 [[package]]
@@ -144,6 +147,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "draco-interfaces",
+ "serde",
 ]
 
 [[package]]
@@ -160,6 +164,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "zeroize",
 ]
 
 [[package]]
@@ -168,6 +173,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "draco-interfaces",
+ "serde",
  "toml",
 ]
 
@@ -177,6 +183,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "draco-interfaces",
+ "serde",
 ]
 
 [[package]]
@@ -185,6 +192,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "draco-interfaces",
+ "serde",
 ]
 
 [[package]]
@@ -193,6 +201,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "draco-interfaces",
+ "serde",
 ]
 
 [[package]]
@@ -201,6 +210,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "draco-interfaces",
+ "serde",
 ]
 
 [[package]]
@@ -209,6 +219,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "draco-interfaces",
+ "serde",
 ]
 
 [[package]]
@@ -217,6 +228,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "draco-interfaces",
+ "serde",
 ]
 
 [[package]]
@@ -225,6 +237,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "draco-interfaces",
+ "serde",
 ]
 
 [[package]]
@@ -885,3 +898,9 @@ checksum = "61de7bac303dc551fe038e2b3cef0f571087a47571ea6e79a87692ac99b99699"
 dependencies = [
  "memchr",
 ]
+
+[[package]]
+name = "zeroize"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a0956f1ba7c7909bfb66c2e9e4124ab6f6482560f6628b5aaeba39207c9aad9"

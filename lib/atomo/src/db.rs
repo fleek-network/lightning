@@ -81,10 +81,10 @@ where
             match op {
                 Some(value) => {
                     self.persistence.insert(k, value);
-                }
+                },
                 None => {
                     self.persistence.remove(&k);
-                }
+                },
             }
         }
     }
@@ -119,14 +119,14 @@ where
                         let value = S::deserialize(&old_value_ser);
                         diff.insert(key, Operation::Put(value));
                     }
-                }
+                },
                 (Some(old_value_ser), Operation::Delete) => {
                     let key_boxed = key_ser.into_boxed_slice();
                     batch.push((key_boxed, None));
 
                     let value = S::deserialize(&old_value_ser);
                     diff.insert(key, Operation::Put(value));
-                }
+                },
                 (None, Operation::Put(new_value)) => {
                     let new_value_ser = S::serialize(&new_value);
                     let key_boxed = key_ser.into_boxed_slice();
@@ -134,10 +134,10 @@ where
                     batch.push((key_boxed, Some(value_boxed)));
 
                     diff.insert(key, Operation::Delete);
-                }
+                },
                 (None, Operation::Delete) => {
                     // Not a change.
-                }
+                },
             }
         }
 

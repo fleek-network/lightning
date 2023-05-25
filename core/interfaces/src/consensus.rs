@@ -27,9 +27,9 @@ pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Se
     /// Create a new consensus service with the provided config and executor.
     async fn init<
         S: SignerInterface<
-            Ed25519SecretKey = Self::Ed25519SecretKey,
-            BlsSecretKey = Self::BlsSecretKey,
-        >,
+                Ed25519SecretKey = Self::Ed25519SecretKey,
+                BlsSecretKey = Self::BlsSecretKey,
+            >,
     >(
         config: Self::Config,
         signer: &S,

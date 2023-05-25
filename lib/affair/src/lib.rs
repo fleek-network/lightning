@@ -102,18 +102,18 @@ impl<Req> Display for RunError<Req> {
         match &self {
             RunError::FailedToEnqueueReq(_) => {
                 write!(f, "failed to enqueue a request.")
-            }
+            },
             RunError::FailedToGetResponse => {
                 write!(f, "failed to recv the response")
-            }
+            },
         }
     }
 }
 
 /// An execution engine that handles spawning a [`Worker`].
 pub trait Executor {
-    /// Spawn a [`Worker`] and returns a [`Socket`] which can be used to send requests to the spawned
-    /// worker.
+    /// Spawn a [`Worker`] and returns a [`Socket`] which can be used to send requests to the
+    /// spawned worker.
     ///
     /// The worker is stopped when all of the references to [`Socket`] are dropped, if you want a
     /// socket that does not keep the worker alive consider using a [`WeakSocket`].
@@ -259,7 +259,8 @@ impl<Req, Res> Socket<Req, Res> {
 }
 
 impl<Req, Res> WeakSocket<Req, Res> {
-    /// Upgrade this weak socket into a [`Socket`], returns [`None`] if the socket is already dropped.
+    /// Upgrade this weak socket into a [`Socket`], returns [`None`] if the socket is already
+    /// dropped.
     pub fn upgrade(&self) -> Option<Socket<Req, Res>> {
         self.sender.upgrade().map(|sender| Socket { sender })
     }

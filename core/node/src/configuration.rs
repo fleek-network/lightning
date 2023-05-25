@@ -36,7 +36,7 @@ impl TomlConfigProvider {
 
 impl ConfigProviderInterface for TomlConfigProvider {
     fn get<S: draco_interfaces::config::ConfigConsumer>(&self) -> S::Config {
-        let key = S::KEY;
+        let _key = S::KEY;
 
         todo!()
     }

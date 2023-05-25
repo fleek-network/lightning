@@ -231,10 +231,10 @@ impl<S: SerdeBackend> MtAtomoInner<S> {
             match op {
                 Some(value) => {
                     table.insert(k, value);
-                }
+                },
                 None => {
                     table.remove(&k);
-                }
+                },
             }
         }
     }
@@ -296,7 +296,7 @@ impl<S: SerdeBackend> TableSelector<S> {
         K: Hash + Eq + Serialize + DeserializeOwned + Any,
         V: Serialize + DeserializeOwned + Any,
     {
-        self.atomo.resolve::<K, V>(name).get(&self)
+        self.atomo.resolve::<K, V>(name).get(self)
     }
 }
 
@@ -438,7 +438,7 @@ impl GcNode<MtSnapshotData> {
                 match entries.0.get(key) {
                     Some(Operation::Put(v)) => return Some(Some(v)),
                     Some(Operation::Delete) => return Some(None),
-                    None => {}
+                    None => {},
                 }
             }
 
@@ -470,7 +470,7 @@ where
         match self.batch.0.get(key) {
             Some(Operation::Put(value)) => return Some(Shared::new(value)),
             Some(Operation::Delete) => return None,
-            _ => {}
+            _ => {},
         }
 
         if let Some(data) = self.selector.snapshot.get::<K, V>(self.tid, key) {
@@ -509,14 +509,14 @@ where
                         let value = S::deserialize(&old_value_ser);
                         diff.insert(key, Operation::Put(value));
                     }
-                }
+                },
                 (Some(old_value_ser), Operation::Delete) => {
                     let key_boxed = key_ser.into_boxed_slice();
                     batch.push((key_boxed, None));
 
                     let value = S::deserialize(&old_value_ser);
                     diff.insert(key, Operation::Put(value));
-                }
+                },
                 (None, Operation::Put(new_value)) => {
                     let new_value_ser = S::serialize(&new_value);
                     let key_boxed = key_ser.into_boxed_slice();
@@ -524,10 +524,10 @@ where
                     batch.push((key_boxed, Some(value_boxed)));
 
                     diff.insert(key, Operation::Delete);
-                }
+                },
                 (None, Operation::Delete) => {
                     // Not a change.
-                }
+                },
             }
         }
 
