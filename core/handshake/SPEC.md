@@ -41,10 +41,10 @@ The signal flag will always be set to 1.
  \_ signal flag
 
 Termination Reasons:
-0x80 & 0: Codec Violation
-0x80 & 1: Out of Lanes
-0x80 & 2: ...
-0x80 & 127: Unknown
+0x80: Codec Violation
+0x81: Out of Lanes
+0x82: ...
+0xFF: Unknown
 ```
 
 ### Handshake Request Frame
@@ -52,15 +52,16 @@ Termination Reasons:
 ```
 TAG = 0x01 << 0
 
-[ TAG . b"UFDP" . version . supported compression bitmap . pubkey . lane ]
+[ TAG . b"DRACO" . version (u8) . supported compression bitmap (u8) . pubkey (48 bytes) . optional unlock lane (u8) ]
+
+Length: 57 bytes
 
 Supported Compression Bits:
 SNAPPY = 0x01 << 0
 GZIP = 0x01 << 1
 LZ4 = 0x01 << 2
 
-If lane is 0xFF, the node should select an open lane for the client. Otherwise,
-the lane provided should be unlocked.
+If lane is 0xFF, the node should select an open lane for the client. Otherwise, the lane provided should be unlocked.
 ```
 
 ### Handshake Response Frame
@@ -68,13 +69,39 @@ the lane provided should be unlocked.
 ```
 TAG = 0x01 << 1
 
-[ TAG . lane . node pubkey ]
+[ TAG . lane (u8) . node pubkey (33 bytes) . nonce (u64) ]
+
+Length: 43 bytes
 ```
 
 ### Handshake Response Frame (Unlock Lane)
 
+> TODO: Figure out commodities 
+
 ```
 TAG = 0x01 << 2
 
-[ TAG . lane . node pubkey . lane . last service id . last params ]
+[ TAG . lane (u8) . node pubkey (33 bytes) . nonce (u64) . last service id (32 bytes) . last bytes (u64) . last delivery ack (96) ]
+
+Length: 179 bytes
+```
+
+### Delivery Acknowledgment Frame 
+
+```
+TAG = 0x01 << 3
+
+[ TAG . signature (96 bytes) ]
+
+Length: 97 bytes
+```
+
+### Service Request Frame 
+
+```
+TAG = 0x01 << 4
+
+[ TAG . service id ]
+
+Length: 33 bytes
 ```
