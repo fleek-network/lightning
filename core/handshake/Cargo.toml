@@ -15,7 +15,15 @@ bytes = "1.4"
 tokio.workspace = true
 futures = "0.3"
 
+[dev-dependencies]
+criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
+
 [features]
 default = ["server", "client"]
 server = []
 client = []
+
+[[bench]]
+name = "connection"
+harness = false
+

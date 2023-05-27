@@ -223,7 +223,8 @@ where
     pub fn new(stream: T) -> Self {
         Self {
             stream,
-            buffer: BytesMut::with_capacity(148),
+            // The maximum frame size is 179, so it should be enough to read into at all times
+            buffer: BytesMut::with_capacity(179),
         }
     }
 
