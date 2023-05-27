@@ -1,5 +1,7 @@
 # Fleek Network
 
+[![Rust](https://github.com/fleek-network/draco/actions/workflows/rust.yml/badge.svg)](https://github.com/fleek-network/draco/actions/workflows/rust.yml)
+
 This repository contains the source code for the implementation of the *Fleek Network*. A
 multi-service edge network.
 
