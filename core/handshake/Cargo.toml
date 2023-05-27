@@ -13,7 +13,7 @@ arrayvec = "0.7"
 async-trait = "0.1"
 bytes = "1.4"
 tokio.workspace = true
-
+futures = "0.3"
 
 [features]
 default = ["server", "client"]
