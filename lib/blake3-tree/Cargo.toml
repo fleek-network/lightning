@@ -1,8 +1,23 @@
 [package]
 name = "blake3-tree"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["qti3e <i@parsa.oo>"]
 
 [dependencies]
+blake3 = { git="https://github.com/fleek-network/BLAKE3.git", rev="0e15418f195d138a52f5b86210d721fcb4f370d5" }
+thiserror = "1.0"
+arrayref = "0.3"
+arrayvec = "0.7"
+
+[features]
+all-tests = []
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+rand = "0.8"
+
+[[bench]]
+name = "tree"
+harness = false
+
