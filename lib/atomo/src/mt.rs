@@ -383,6 +383,38 @@ pub struct ResolvedTableReference<K, V> {
     kv: PhantomData<(K, V)>,
 }
 
+/// An
+pub struct KeyIterator<
+    'selector,
+    K: Hash + Eq + Serialize + DeserializeOwned + Any,
+    V: Serialize + DeserializeOwned + Any,
+    S: SerdeBackend,
+> {
+    _new_keys: FxHashSet<K>,
+    _deleted_keys: FxHashSet<K>,
+    _selector: &'selector TableSelector<S>,
+    value: PhantomData<V>,
+}
+
+impl<'selector, K, V, S: SerdeBackend> KeyIterator<'selector, K, V, S>
+where
+    K: Hash + Eq + Serialize + DeserializeOwned + Any,
+    V: Serialize + DeserializeOwned + Any,
+{
+}
+
+impl<'selector, K, V, S: SerdeBackend> Iterator for KeyIterator<'selector, K, V, S>
+where
+    K: Hash + Eq + Serialize + DeserializeOwned + Any,
+    V: Serialize + DeserializeOwned + Any,
+{
+    type Item = K;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!()
+    }
+}
+
 impl<K, V> ResolvedTableReference<K, V> {
     fn new(atomo_id: usize, index: TableId) -> Self {
         ResolvedTableReference {
@@ -458,6 +490,15 @@ where
     K: Hash + Eq + Serialize + DeserializeOwned + Any,
     V: Serialize + DeserializeOwned + Any,
 {
+    /// Returns an iterator of the keys in this table.
+    pub fn keys<'iter, 'table>(&'table self) -> KeyIterator<'iter, K, V, S>
+    where
+        'selector: 'iter,
+        'iter: 'table,
+    {
+        todo!()
+    }
+
     pub fn insert(&mut self, key: K, value: V) {
         self.batch.0.insert(key, Operation::Put(value));
     }
