@@ -211,18 +211,22 @@ impl From<HandshakeCodecError> for std::io::Error {
 }
 
 /// Implementation for reading and writing handshake frames on a connection.
-pub struct HandshakeConnection<T: AsyncRead + AsyncWrite + Unpin> {
-    pub stream: T,
+pub struct HandshakeConnection<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> {
+    pub reader: R,
+    pub writer: W,
     buffer: BytesMut,
 }
 
-impl<T> HandshakeConnection<T>
+impl<R, W> HandshakeConnection<R, W>
 where
-    T: AsyncRead + AsyncWrite + Unpin,
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
 {
-    pub fn new(stream: T) -> Self {
+    #[inline(always)]
+    pub fn new(reader: R, writer: W) -> Self {
         Self {
-            stream,
+            reader,
+            writer,
             // The maximum frame size is 179, so it should be enough to read into at all times
             buffer: BytesMut::with_capacity(179),
         }
@@ -232,7 +236,7 @@ where
     pub async fn write_frame(&mut self, frame: HandshakeFrame) -> std::io::Result<()> {
         match frame {
             HandshakeFrame::TerminationSignal(reason) => {
-                self.stream.write_u8(reason as u8).await?;
+                self.writer.write_u8(reason as u8).await?;
             },
             HandshakeFrame::HandshakeRequest {
                 version,
@@ -250,7 +254,7 @@ where
                 buf.push(lane.unwrap_or(0xFF));
                 buf.write_all(&pubkey).unwrap();
 
-                self.stream.write_all(&buf).await?;
+                self.writer.write_all(&buf).await?;
             },
             HandshakeFrame::HandshakeResponse {
                 pubkey,
@@ -264,7 +268,7 @@ where
                 buf.write_all(&pubkey).unwrap();
                 buf.write_all(&nonce.to_be_bytes()).unwrap();
 
-                self.stream.write_all(&buf).await?;
+                self.writer.write_all(&buf).await?;
             },
             HandshakeFrame::HandshakeResponseUnlock {
                 pubkey,
@@ -284,7 +288,7 @@ where
                 buf.write_all(&last_bytes.to_be_bytes()).unwrap();
                 buf.write_all(&last_signature).unwrap();
 
-                self.stream.write_all(&buf).await?;
+                self.writer.write_all(&buf).await?;
             },
             HandshakeFrame::DeliveryAcknowledgement { signature } => {
                 let mut buf = ArrayVec::<u8, 97>::new_const();
@@ -292,7 +296,7 @@ where
                 buf.push(FrameTag::DeliveryAcknowledgement as u8);
                 buf.write_all(&signature).unwrap();
 
-                self.stream.write_all(&buf).await?;
+                self.writer.write_all(&buf).await?;
             },
             HandshakeFrame::ServiceRequest { service_id } => {
                 let mut buf = ArrayVec::<u8, 33>::new_const();
@@ -300,7 +304,7 @@ where
                 buf.push(FrameTag::ServiceRequest as u8);
                 buf.write_all(&service_id).unwrap();
 
-                self.stream.write_all(&buf).await?;
+                self.writer.write_all(&buf).await?;
             },
         }
 
@@ -319,7 +323,7 @@ where
             }
 
             // Otherwise, read as many bytes as we can for a fixed frame.
-            if 0 == self.stream.read_buf(&mut self.buffer).await? {
+            if 0 == self.reader.read_buf(&mut self.buffer).await? {
                 // Handle connection closed. If there are bytes in the buffer, it means the
                 // connection was interrupted mid-transmission.
                 if self.buffer.is_empty() {
@@ -455,6 +459,11 @@ where
         self.write_frame(HandshakeFrame::TerminationSignal(reason))
             .await
     }
+
+    /// Finish the connection, consuming the struct and returning the reader and writer.
+    pub fn finish(self) -> (R, W) {
+        (self.reader, self.writer)
+    }
 }
 
 #[cfg(test)]
@@ -480,12 +489,14 @@ mod tests {
         });
 
         // create streams
-        let alice_stream = TcpStream::connect(addr).await?;
-        let bob_stream = rx.recv().await.unwrap();
+        let mut alice_stream = TcpStream::connect(addr).await?;
+        let mut bob_stream = rx.recv().await.unwrap();
 
         // create a raw ufdp connection to encode/decode with
-        let mut alice = HandshakeConnection::new(alice_stream);
-        let mut bob = HandshakeConnection::new(bob_stream);
+        let (r, w) = alice_stream.split();
+        let mut alice = HandshakeConnection::new(r, w);
+        let (r, w) = bob_stream.split();
+        let mut bob = HandshakeConnection::new(r, w);
 
         // write/read the frame, comparing the result afterwards
         alice.write_frame(frame.clone()).await?;
