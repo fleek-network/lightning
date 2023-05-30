@@ -11,36 +11,35 @@ mod transport {
     use bytes::BytesMut;
     use tokio::io::{AsyncRead, AsyncWrite};
 
-    /// Direct transport for benchmarking frames.
-    /// - `in_buf`: Holds a frame to read, every time.
-    /// - `out_buf`: Holds the last frame written.
-    #[derive(Default, Clone)]
-    pub struct DirectTransport {
-        pub in_buf: BytesMut,
-        pub out_buf: BytesMut,
-    }
+    #[derive(Clone, Default)]
+    /// DummyReader always returns a clone of the internal buffer
+    pub struct DummyReader(pub BytesMut);
 
-    impl AsyncRead for DirectTransport {
+    impl AsyncRead for DummyReader {
         fn poll_read(
             self: std::pin::Pin<&mut Self>,
             _cx: &mut std::task::Context<'_>,
             buf: &mut tokio::io::ReadBuf<'_>,
         ) -> std::task::Poll<std::io::Result<()>> {
             // always return the same frame
-            let bytes = self.in_buf.clone();
+            let bytes = self.0.clone();
             buf.put_slice(&bytes);
             std::task::Poll::Ready(Ok(()))
         }
     }
 
-    impl AsyncWrite for DirectTransport {
+    #[derive(Clone, Default)]
+    /// DummyWriter holds the last thing written to it in a buffer
+    pub struct DummyWriter(pub BytesMut);
+
+    impl AsyncWrite for DummyWriter {
         fn poll_write(
             self: std::pin::Pin<&mut Self>,
             _cx: &mut std::task::Context<'_>,
             buf: &[u8],
         ) -> std::task::Poll<Result<usize, std::io::Error>> {
             // store the last thing written to out_buf
-            let out_buf = &mut self.get_mut().out_buf;
+            let out_buf = &mut self.get_mut().0;
             *out_buf = BytesMut::from(buf);
             std::task::Poll::Ready(Ok(out_buf.len()))
         }
@@ -72,10 +71,12 @@ fn bench_frame<T: Measurement>(
         .unwrap();
 
     g.throughput(Throughput::Bytes(frame.size_hint() as u64));
-    let transport = transport::DirectTransport::default();
+
+    let reader = transport::DummyReader::default();
+    let writer = transport::DummyWriter::default();
 
     g.bench_function(format!("{title}/write"), |b| {
-        let conn = Mutex::new(HandshakeConnection::new(transport.clone()));
+        let conn = Mutex::new(HandshakeConnection::new(reader.clone(), writer.clone()));
         b.to_async(&runtime).iter(|| async {
             // executed sequentially so should be a minimal await
             let mut conn = conn.lock().await;
@@ -84,16 +85,16 @@ fn bench_frame<T: Measurement>(
     });
 
     // setup for decoding
-    let transport = block_on(async move {
-        let mut conn = HandshakeConnection::new(transport);
+    let (reader, writer) = block_on(async move {
+        let mut conn = HandshakeConnection::new(reader, writer);
         conn.write_frame(frame.clone()).await.unwrap();
-        // out_buf contains the encoded frame, so we take that into in_buf to be decoded
-        conn.stream.in_buf = conn.stream.out_buf.split();
-        conn.stream
+        // writer contains the encoded frame, so we put that into the reader to be decoded
+        conn.reader.0 = conn.writer.0.split();
+        conn.finish()
     });
 
     g.bench_function(format!("{title}/read"), |b| {
-        let conn = Mutex::new(HandshakeConnection::new(transport.clone()));
+        let conn = Mutex::new(HandshakeConnection::new(reader.clone(), writer.clone()));
         b.to_async(&runtime).iter(|| async {
             let mut conn = conn.lock().await;
             conn.read_frame(None).await
