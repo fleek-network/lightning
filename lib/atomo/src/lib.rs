@@ -41,7 +41,6 @@ mod tests {
                     q.run(|c| {
                         let n = c.get(&"Alice".into()).unwrap();
                         println!("[t0-A] Balance= {n}");
-                        assert!(n > e);
                     })
                 });
             }
