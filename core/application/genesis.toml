@@ -1,0 +1,56 @@
+epoch_start = 1684276288383
+epoch_time = 120000
+committee_size = 10
+min_stake = 1000
+eligibility_time = 1
+lock_time = 1
+protocol_percentage = 10
+max_inflation = 20
+min_inflation = 10
+consumer_rebate = 0
+
+[[committee]]
+owner = "EfP5ha4KNRu/qkfIuF3lWK7GPeP5IqPKP8esnM0mo2s="
+primary_public_key = "l0Jel6KEFG7H6sV2nWKOQxDaMKWMeiUBqK5VHKcStWrLPHAANRB+dt7gp0jQ7ooxEaI7ukOQZk6U5vcL7ESHA1J/iAWQ7YNO/ZCvR1pfWfcTNBONIzeiUWAN+iyKfV10"
+primary_address = "/ip4/127.0.0.1/udp/38000"
+network_key = "EfP5ha4KNRu/qkfIuF3lWK7GPeP5IqPKP8esnM0mo2s="
+worker_address = "/ip4/127.0.0.1/udp/38101/http"
+worker_public_key = "Z/wR6iweRxwJwhJxLjyyTKzFGXZZdYBJXdKzukjitwM="
+worker_mempool = "/ip4/127.0.0.1/tcp/38102/http"
+
+[[committee]]
+owner = "Ke9zCMItF3ryUI8ZCLj5oy97zFuT1eaaigZ1YuTmeuI="
+primary_public_key = "qipezx5pzmPFWICevMx+SL5+bIjG4yw3A9ieYKKwf2wTEvK0gMRYOln9+KmbNRB3FRbVQBLuCEWIHT0V9GxATT9VeJ+HT88vh/B/6dj7CbWBdWbZ4QXzo0q+uyGchopl"
+primary_address = "/ip4/127.0.0.1/udp/28000"
+network_key = "Ke9zCMItF3ryUI8ZCLj5oy97zFuT1eaaigZ1YuTmeuI="
+worker_address = "/ip4/127.0.0.1/udp/28101/http"
+worker_public_key = "Lgcg7TEXuXLhZXrtsQLZPh9qCDelWbTaa/KYY79tll8="
+worker_mempool = "/ip4/127.0.0.1/tcp/28102/http"
+
+[[committee]]
+owner = "OEPeT9W4mz4WG2tGzqmtDavt2NGIfcmDsb1Qbzg5hoY="
+primary_public_key = "mAT9YIKvBhmi8L3e50/pr/dna1EaYELYTBuTwWgc7qoj5GrJ86/+7aX2mubVYOMxCUr2CO4H5nCgBBssNJ2u/buAPeM4MmEl+wmPgrX0uAAMzHyUOYQKVHCBFeFWsHJR"
+primary_address = "/ip4/127.0.0.1/udp/18000"
+network_key = "OEPeT9W4mz4WG2tGzqmtDavt2NGIfcmDsb1Qbzg5hoY="
+worker_address = "/ip4/127.0.0.1/udp/18101/http"
+worker_public_key = "xD114IYSBkc/5R2uXU2h9IZw6WqY1X0rynnt60eG7Q0="
+worker_mempool = "/ip4/127.0.0.1/tcp/18102/http"
+
+[[committee]]
+owner = "FzAP+CZcG2HTzYHaGzGsamJDpw1nq0CRnmzl5SgUqmE="
+primary_public_key = "tgLk6pAP2M9GrlrZnB9Y2zOCSbtAhc+bVXtnkX2oBZa0iH5JNPhyQWO0YhAHCisjCMbGSQEm8D2q/4THiCQOmXOXETHQ5Mb1SJQ5PvIRaavZ/UZm5KVYOfj2Zg415aUa"
+primary_address = "/ip4/127.0.0.1/udp/8000"
+network_key = "FzAP+CZcG2HTzYHaGzGsamJDpw1nq0CRnmzl5SgUqmE="
+worker_address = "/ip4/127.0.0.1/udp/8101/http"
+worker_public_key = "FzAP+CZcG2HTzYHaGzGsamJDpw1nq0CRnmzl5SgUqmE="
+worker_mempool = "/ip4/127.0.0.1/tcp/8102/http"
+
+[[service]]
+id = 0
+commodity_price = 1
+
+[[account]]
+public_key = "J4OBdUiRNpm5vpDYP+cgAapgCFTcfLxOnDNsTunTeoc="
+flk_balance = 100
+bandwidth_balance = 100
+staked = 100

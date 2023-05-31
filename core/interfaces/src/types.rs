@@ -4,7 +4,11 @@ use fleek_crypto::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{common::ToDigest, pod::DeliveryAcknowledgment};
+use crate::{
+    common::ToDigest,
+    identity::{BlsPublicKey, Ed25519PublicKey, EthPublicKey, PeerId, Signature},
+    pod::DeliveryAcknowledgment,
+};
 
 /// Unix time stamp in second.
 pub type UnixTs = u64;
@@ -12,8 +16,8 @@ pub type UnixTs = u64;
 /// Application epoch number
 pub type Epoch = u64;
 
-/// Service Id
-pub type ServiceID = u64;
+/// The Id of a Service
+pub type ServiceId = u32;
 
 /// A block of transactions, which is a list of update requests each signed by a user,
 /// the block is the atomic view into the network, meaning that queries do not view
@@ -25,7 +29,7 @@ pub struct Block {
     pub transactions: Vec<UpdateRequest>,
 }
 
-#[derive(Serialize, Deserialize, Hash, Debug)]
+#[derive(Serialize, Deserialize, Hash, Debug, Clone)]
 pub enum Tokens {
     USDC,
     FLK,
@@ -42,7 +46,7 @@ pub struct Service {
 
 /// An update transaction, sent from users to the consensus to migrate the application
 /// from one state to the next state.
-#[derive(Debug, Hash)]
+#[derive(Debug, Hash, Clone)]
 pub struct UpdateRequest {
     /// The sender of the transaction.
     pub sender: TransactionSender,
@@ -54,7 +58,7 @@ pub struct UpdateRequest {
 }
 
 /// A query request, which is still signed and submitted by a user.
-#[derive(Debug, Hash)]
+#[derive(Debug, Hash, Clone)]
 pub struct QueryRequest {
     /// The sender of this query request.
     pub sender: TransactionSender,
@@ -63,7 +67,7 @@ pub struct QueryRequest {
 }
 
 /// The payload data of an update request.
-#[derive(Debug, Hash)]
+#[derive(Debug, Hash, Clone)]
 pub struct UpdatePayload {
     /// The counter or nonce of this request.
     pub counter: u64,
@@ -72,7 +76,7 @@ pub struct UpdatePayload {
 }
 
 /// All of the update functions in our logic, along their parameters.
-#[derive(Debug, Hash)]
+#[derive(Debug, Hash, Clone)]
 pub enum UpdateMethod {
     /// The main function of the application layer. After aggregating ProofOfAcknowledgements a
     /// node will submit this     transaction to get paid.
@@ -83,7 +87,7 @@ pub enum UpdateMethod {
         /// The service id of the service this was provided through(CDN, compute, ect.)
         service_id: u64,
         /// The PoD of delivery in bytes
-        proof: Vec<DeliveryAcknowledgment>,
+        proofs: Vec<DeliveryAcknowledgment>,
         /// Optional metadata to provide information additional information about this batch
         metadata: Option<Vec<u8>>,
     },
@@ -94,7 +98,13 @@ pub enum UpdateMethod {
         /// Which token to withdrawl
         token: Tokens,
         /// The address to recieve these tokens on the L2
+<<<<<<< HEAD
         receiving_address: AccountOwnerPublicKey,
+||||||| parent of 1b0120a (Wip)
+        receiving_address: PeerId,
+=======
+        receiving_address: EthPublicKey,
+>>>>>>> 1b0120a (Wip)
     },
     /// Submit of PoC from the bridge on the L2 to get the tokens in network
     Deposit {
@@ -134,14 +144,20 @@ pub enum UpdateMethod {
         /// Service id of the service a node misbehaved in
         service_id: ServiceId,
         /// The public key of the node that misbehaved
+<<<<<<< HEAD
         node: NodePublicKey,
+||||||| parent of 1b0120a (Wip)
+        node: PeerId,
+=======
+        node: BlsPublicKey,
+>>>>>>> 1b0120a (Wip)
         /// Zk proof to be provided to the slash circuit
         proof_of_misbehavior: ProofOfMisbehavior,
     },
 }
 
 /// All of the query functions in our logic, along their parameters.
-#[derive(Debug, Hash)]
+#[derive(Debug, Hash, Clone)]
 pub enum QueryMethod {
     /// Get the balance of unlocked FLK a public key has
     FLK { public_key: AccountOwnerPublicKey },
@@ -169,6 +185,23 @@ pub enum QueryMethod {
 /// The serialized response from executing a query.
 pub type QueryResponse = Vec<u8>;
 
+/// The account info stored per account on the blockchain
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
+pub struct AccountInfo {
+    pub flk_balance: u128,
+    pub bandwidth_balance: u128,
+    pub nonce: u128,
+    pub staking: Staking,
+}
+
+/// Struct that stores
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
+pub struct Staking {
+    pub staked: u128,
+    pub locked: u128,
+    pub locked_until: u64,
+}
+
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
 pub struct NodeInfo {
     /// The BLS public key of the node which is used for our BFT DAG consensus
@@ -186,6 +219,13 @@ pub struct NodeInfo {
     pub addresses: Vec<InternetAddress>,
 }
 
+/// Metadata, state stored in the blockchain that applies to the current block
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Metadata {
+    Epoch,
+}
+
+/// Adjustable paramaters that are stored in the blockchain
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum ProtocolParams {
@@ -209,8 +249,18 @@ pub enum ProtocolParams {
     ConsumerRebate = 8,
 }
 
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
-pub struct ServiceId(pub [u8; 32]);
+/// Error type for transaction execution on the application layer
+#[derive(Clone, Debug)]
+pub enum ExecutionError {
+    InvalidSignature,
+    InvalidNonce,
+    InvalidProof,
+    NotNodeOwner,
+    NotCommitteeMember,
+    NodeDoesNotExist,
+    AlreadySignaled,
+    NonExistingService,
+}
 
 /// The physical address of a node where it can be reached, the port numbers are
 /// omitted since each node is responsible to open the standard port numbers for
@@ -227,7 +277,7 @@ pub struct ServiceId(pub [u8; 32]);
 /// not modify these default port numbers. Just like how 80 is the port for HTTP,
 /// and 443 is the port for SSL traffic, we should chose our numbers and stick
 /// with them.
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
 pub enum InternetAddress {
     Ipv4([u8; 4]),
     Ipv6([u8; 16]),

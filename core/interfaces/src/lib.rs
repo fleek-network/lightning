@@ -17,11 +17,6 @@ pub mod types;
 
 pub mod signer;
 
-// TODO(qti3e,dalton): Remove this as soon as Dalton changed the transaction
-// types.
-// #[deprecated]
-// pub mod identity;
-
 // TODO:
 // - SDK: Read DA.
 // - SDK: Clock functionality and event listeners.
