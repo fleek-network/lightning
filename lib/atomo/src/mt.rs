@@ -361,7 +361,7 @@ impl InverseAndBatchList {
 
 struct MtSnapshotData {
     /// The snapshot data of each table.
-    /// The box is supposed to be SnapshotData<K, V>.
+    /// The box is supposed to be [`SnapshotData<K, V>`].
     tables: Vec<Option<Box<dyn Any>>>,
 }
 
@@ -390,10 +390,21 @@ pub struct KeyIterator<
     V: Serialize + DeserializeOwned + Any,
     S: SerdeBackend,
 > {
-    _new_keys: FxHashSet<K>,
-    _deleted_keys: FxHashSet<K>,
+    tid: TableId,
+    new_keys: Vec<K>,
+    removed: FxHashSet<K>,
     _selector: &'selector TableSelector<S>,
     value: PhantomData<V>,
+}
+
+struct SnapshotKeyIterator<
+    K: Hash + Eq + Serialize + DeserializeOwned + Any + Clone,
+    V: Serialize + DeserializeOwned + Any,
+    S: SerdeBackend,
+> {}
+
+enum IteratorInner {
+    Latest { index: usize },
 }
 
 impl<'selector, K, V, S: SerdeBackend> KeyIterator<'selector, K, V, S>
@@ -483,6 +494,8 @@ impl GcNode<MtSnapshotData> {
 
         None
     }
+
+    fn keys(&self) {}
 }
 
 impl<'selector, K, V, S: SerdeBackend> TableRef<'selector, K, V, S>
@@ -496,6 +509,7 @@ where
         'selector: 'iter,
         'iter: 'table,
     {
+        let latest = Vec::with_capacity(self.batch.0.len());
         todo!()
     }
 
