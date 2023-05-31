@@ -1,4 +1,5 @@
 use std::{
+    num::NonZeroU64,
     ptr::null_mut,
     sync::atomic::{AtomicPtr, AtomicUsize, Ordering},
 };
@@ -22,7 +23,10 @@ pub struct SnapshotList {
 impl SnapshotList {
     /// Create a new empty snapshot list.
     pub fn new() -> Self {
-        let collector = Collector::new();
+        let collector = Collector::new()
+            .batch_size(16)
+            .epoch_frequency(NonZeroU64::new(10));
+
         let node = collector.link_boxed(SnapshotInner::empty());
 
         SnapshotList {
@@ -177,7 +181,7 @@ fn rewrite() {
             std::thread::spawn(move || {
                 for _ in 0..5_000 {
                     let snapshot = list.current();
-                    std::thread::sleep(Duration::from_micros(750));
+                    std::thread::sleep(Duration::from_micros(50));
                 }
             })
         })
