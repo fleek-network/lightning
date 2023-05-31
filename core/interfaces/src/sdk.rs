@@ -1,10 +1,11 @@
 use std::{future::Future, pin::Pin};
 
 use async_trait::async_trait;
+use fleek_crypto::ClientPublicKey;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::{
-    application::SyncQueryRunnerInterface, fs::FileSystemInterface, identity::PeerId,
+    application::SyncQueryRunnerInterface, fs::FileSystemInterface,
     reputation::ReputationReporterInterface, signer::SubmitTxSocket, types::UpdateMethod,
 };
 
@@ -68,5 +69,5 @@ pub trait ConnectionInterface: Send + Sync {
     fn get_lane(&self) -> u8;
 
     /// Returns the ID of the client that has established this connection.
-    fn get_client(&self) -> &PeerId;
+    fn get_client(&self) -> &ClientPublicKey;
 }

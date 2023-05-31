@@ -19,3 +19,4 @@ zeroize.workspace = true
 # Our libraries
 affair.workspace = true
 atomo.workspace = true
+fleek-crypto.workspace = true

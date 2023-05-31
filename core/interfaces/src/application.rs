@@ -1,10 +1,10 @@
 use affair::Socket;
 use async_trait::async_trait;
+use fleek_crypto::{ClientPublicKey, NodePublicKey};
 
 use crate::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
-    identity::{BlsPublicKey, PeerId},
     types::{Block, NodeInfo, QueryRequest, QueryResponse},
 };
 
@@ -17,7 +17,7 @@ pub struct BlockExecutionResponse {
     /// has determined that we should move the epoch forward.
     pub change_epoch: bool,
     /// The changes to the node registry.
-    pub node_registry_delta: Vec<(BlsPublicKey, NodeRegistryChange)>,
+    pub node_registry_delta: Vec<(NodePublicKey, NodeRegistryChange)>,
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Hash, Eq)]
@@ -80,10 +80,10 @@ pub trait ApplicationInterface:
 
 pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
     /// Returns the latest balance associated with the given peer.
-    fn get_balance(&self, peer: &PeerId) -> u128;
+    fn get_balance(&self, client: &ClientPublicKey) -> u128;
 
     /// Returns the global reputation of a node.
-    fn get_reputation(&self, peer: &PeerId) -> u128;
+    fn get_reputation(&self, node: &NodePublicKey) -> u128;
 
     /// Returns the relative score between two nodes, this score should measure how much two
     /// nodes `n1` and `n2` trust each other. Of course in real world a direct measurement
@@ -92,17 +92,17 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
     /// a relative score between two nodes.
     ///
     /// Existence of this data can allow future optimizations of the network topology.
-    fn get_relative_score(&self, n1: &PeerId, n2: &PeerId) -> u128;
+    fn get_relative_score(&self, n1: &NodePublicKey, n2: &NodePublicKey) -> u128;
 
     /// Returns information about a single node.
-    fn get_node_info(&self, id: &PeerId) -> Option<NodeInfo>;
+    fn get_node_info(&self, id: &NodePublicKey) -> Option<NodeInfo>;
 
     /// Returns a full copy of the entire node-registry, but only contains the nodes that
     /// are still a valid node and have enough stake.
     fn get_node_registry(&self) -> Vec<NodeInfo>;
 
     /// Returns true if the node is a valid node in the network, with enough stake.
-    fn is_valid_node(&self, id: &PeerId) -> bool;
+    fn is_valid_node(&self, id: &NodePublicKey) -> bool;
 
     /// Returns the amount that is required to be a valid node in the network.
     fn get_staking_amount(&self) -> u128;
@@ -111,7 +111,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
     fn get_epoch_randomness_seed(&self) -> &[u8; 32];
 
     /// Returns the committee members of the current epoch.
-    fn get_committee_members(&self) -> Vec<BlsPublicKey>;
+    fn get_committee_members(&self) -> Vec<NodePublicKey>;
 }
 
 #[derive(Clone, Debug)]

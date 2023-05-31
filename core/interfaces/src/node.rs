@@ -10,7 +10,6 @@ use crate::{
     consensus::ConsensusInterface,
     fs::FileSystemInterface,
     handshake::HandshakeInterface,
-    identity::SignatureVerifierInterface,
     indexer::IndexerInterface,
     origin::OriginProviderInterface,
     pod::DeliveryAcknowledgmentAggregatorInterface,
@@ -28,15 +27,11 @@ pub struct Node<
     BlockStore: BlockStoreInterface,
     Indexer: IndexerInterface,
     FileSystem: FileSystemInterface<BlockStore = BlockStore, Indexer = Indexer>,
-    SignatureVerifier: SignatureVerifierInterface,
-    Signer: SignerInterface<
-        Ed25519SecretKey = Consensus::Ed25519SecretKey,
-        BlsSecretKey = Consensus::BlsSecretKey,
-    >,
+    Signer: SignerInterface,
     Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
     DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
     ReputationAggregator: ReputationAggregatorInterface,
-    Rpc: RpcInterface<SignatureVerifier>,
+    Rpc: RpcInterface,
     Sdk: SdkInterface<
         SyncQuery = Application::SyncExecutor,
         ReputationReporter = ReputationAggregator::ReputationReporter,
@@ -56,7 +51,7 @@ pub struct Node<
     pub delivery_acknowledgment_aggregator: DeliveryAcknowledgmentAggregator,
     pub reputation_aggregator: ReputationAggregator,
     pub handshake: Handshake,
-    pub signature_verifier: PhantomData<(SignatureVerifier, Sdk)>,
+    pub sdk: PhantomData<Sdk>,
 }
 
 impl<
@@ -66,15 +61,11 @@ impl<
     BlockStore: BlockStoreInterface,
     Indexer: IndexerInterface,
     FileSystem: FileSystemInterface<BlockStore = BlockStore, Indexer = Indexer>,
-    SignatureVerifier: SignatureVerifierInterface,
-    Signer: SignerInterface<
-        Ed25519SecretKey = Consensus::Ed25519SecretKey,
-        BlsSecretKey = Consensus::BlsSecretKey,
-    >,
+    Signer: SignerInterface,
     Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
     DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
     ReputationAggregator: ReputationAggregatorInterface,
-    Rpc: RpcInterface<SignatureVerifier>,
+    Rpc: RpcInterface,
     Sdk: SdkInterface<
         SyncQuery = Application::SyncExecutor,
         ReputationReporter = ReputationAggregator::ReputationReporter,
@@ -89,7 +80,6 @@ impl<
         BlockStore,
         Indexer,
         FileSystem,
-        SignatureVerifier,
         Signer,
         Stream,
         DeliveryAcknowledgmentAggregator,
@@ -154,7 +144,7 @@ impl<
             delivery_acknowledgment_aggregator,
             reputation_aggregator,
             handshake,
-            signature_verifier: PhantomData,
+            sdk: PhantomData,
         })
     }
 
@@ -204,15 +194,11 @@ impl<
     BlockStore: BlockStoreInterface,
     Indexer: IndexerInterface,
     FileSystem: FileSystemInterface<BlockStore = BlockStore, Indexer = Indexer>,
-    SignatureVerifier: SignatureVerifierInterface,
-    Signer: SignerInterface<
-        Ed25519SecretKey = Consensus::Ed25519SecretKey,
-        BlsSecretKey = Consensus::BlsSecretKey,
-    >,
+    Signer: SignerInterface,
     Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
     DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
     ReputationAggregator: ReputationAggregatorInterface,
-    Rpc: RpcInterface<SignatureVerifier>,
+    Rpc: RpcInterface,
     Sdk: SdkInterface<
         SyncQuery = Application::SyncExecutor,
         ReputationReporter = ReputationAggregator::ReputationReporter,
@@ -227,7 +213,6 @@ impl<
         BlockStore,
         Indexer,
         FileSystem,
-        SignatureVerifier,
         Signer,
         Stream,
         DeliveryAcknowledgmentAggregator,

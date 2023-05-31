@@ -18,19 +18,8 @@ pub type MempoolSocket = Socket<UpdateRequest, ()>;
 
 #[async_trait]
 pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
-    /// Internal type that is used for the Ed25519 secret key.
-    type Ed25519SecretKey;
-
-    /// Internal type that is used for the BLS secret key.
-    type BlsSecretKey;
-
     /// Create a new consensus service with the provided config and executor.
-    async fn init<
-        S: SignerInterface<
-            Ed25519SecretKey = Self::Ed25519SecretKey,
-            BlsSecretKey = Self::BlsSecretKey,
-        >,
-    >(
+    async fn init<S: SignerInterface>(
         config: Self::Config,
         signer: &S,
         executor: ExecutionEngineSocket,

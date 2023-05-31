@@ -1,10 +1,10 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
+use fleek_crypto::NodePublicKey;
 
 use crate::{
-    application::SyncQueryRunnerInterface, config::ConfigConsumer, identity::PeerId,
-    signer::SubmitTxSocket,
+    application::SyncQueryRunnerInterface, config::ConfigConsumer, signer::SubmitTxSocket,
 };
 
 #[async_trait]
@@ -31,7 +31,7 @@ pub trait ReputationQueryInteface: Clone {
     type SyncQuery: SyncQueryRunnerInterface;
 
     /// Returns the reputation of the provided node locally.
-    fn get_reputation_of(&self, peer: &PeerId) -> u128;
+    fn get_reputation_of(&self, peer: &NodePublicKey) -> u128;
 }
 
 /// Reputation reporter is a cheaply cleanable object which can be used to report the interactions
@@ -40,16 +40,16 @@ pub trait ReputationQueryInteface: Clone {
 /// that it can send it to the application layer.
 pub trait ReputationReporterInterface: Clone {
     /// Report a satisfactory (happy) interaction with the given peer.
-    fn report_sat(&self, peer: &PeerId, weight: Weight);
+    fn report_sat(&self, peer: &NodePublicKey, weight: Weight);
 
     /// Report a unsatisfactory (happy) interaction with the given peer.
-    fn report_unsat(&self, peer: &PeerId, weight: Weight);
+    fn report_unsat(&self, peer: &NodePublicKey, weight: Weight);
 
     /// Report a latency which we witnessed from another peer.
-    fn report_latency(&self, peer: &PeerId, latency: Duration);
+    fn report_latency(&self, peer: &NodePublicKey, latency: Duration);
 
     /// Report the number of (healthy) bytes which we received from another peer.
-    fn report_bytes_received(&self, peer: &PeerId, bytes: u64);
+    fn report_bytes_received(&self, peer: &NodePublicKey, bytes: u64);
 }
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq)]

@@ -15,14 +15,12 @@ pub mod rpc;
 pub mod sdk;
 pub mod types;
 
-// experimental:
-pub mod id;
-
-#[deprecated]
 pub mod signer;
 
-#[deprecated]
-pub mod identity;
+// TODO(qti3e,dalton): Remove this as soon as Dalton changed the transaction
+// types.
+// #[deprecated]
+// pub mod identity;
 
 // TODO:
 // - SDK: Read DA.

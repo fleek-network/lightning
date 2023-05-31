@@ -1,10 +1,10 @@
+use fleek_crypto::{
+    AccountOwnerPublicKey, ClientPublicKey, NodeNetworkingPublicKey, NodePublicKey,
+    TransactionSender, TransactionSignature,
+};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    common::ToDigest,
-    identity::{BlsPublicKey, Ed25519PublicKey, PeerId, Signature},
-    pod::DeliveryAcknowledgment,
-};
+use crate::{common::ToDigest, pod::DeliveryAcknowledgment};
 
 /// Unix time stamp in second.
 pub type UnixTs = u64;
@@ -45,9 +45,9 @@ pub struct Service {
 #[derive(Debug, Hash)]
 pub struct UpdateRequest {
     /// The sender of the transaction.
-    pub sender: PeerId,
+    pub sender: TransactionSender,
     /// The signature by the user signing this payload.
-    pub signature: Signature,
+    pub signature: TransactionSignature,
     /// The payload of an update request, which contains a counter (nonce), and
     /// the transition function itself.
     pub payload: UpdatePayload,
@@ -57,7 +57,7 @@ pub struct UpdateRequest {
 #[derive(Debug, Hash)]
 pub struct QueryRequest {
     /// The sender of this query request.
-    pub sender: PeerId,
+    pub sender: TransactionSender,
     /// The query function.
     pub query: QueryMethod,
 }
@@ -94,7 +94,7 @@ pub enum UpdateMethod {
         /// Which token to withdrawl
         token: Tokens,
         /// The address to recieve these tokens on the L2
-        receiving_address: PeerId,
+        receiving_address: AccountOwnerPublicKey,
     },
     /// Submit of PoC from the bridge on the L2 to get the tokens in network
     Deposit {
@@ -112,7 +112,7 @@ pub enum UpdateMethod {
         /// Amount bridged
         amount: u128,
         /// Node Public Key
-        node: PeerId,
+        node: NodePublicKey,
     },
     /// Unstake FLK, the tokens will be locked for a set amount of
     /// time(ProtocolParameter::LockTime) before they can be withdrawn
@@ -134,7 +134,7 @@ pub enum UpdateMethod {
         /// Service id of the service a node misbehaved in
         service_id: ServiceId,
         /// The public key of the node that misbehaved
-        node: PeerId,
+        node: NodePublicKey,
         /// Zk proof to be provided to the slash circuit
         proof_of_misbehavior: ProofOfMisbehavior,
     },
@@ -144,19 +144,19 @@ pub enum UpdateMethod {
 #[derive(Debug, Hash)]
 pub enum QueryMethod {
     /// Get the balance of unlocked FLK a public key has
-    FLK { public_key: PeerId },
+    FLK { public_key: AccountOwnerPublicKey },
     /// Get the balance of locked FLK a public key has
-    Locked { public_key: PeerId },
+    Locked { public_key: AccountOwnerPublicKey },
     /// Get the amount of prepaid bandwidth a public key has
-    Bandwidth { public_key: PeerId },
+    Bandwidth { public_key: ClientPublicKey },
     /// Get the amount of stake a node has
-    Staked { node: PeerId },
-    /// Get the amound of bandwidth served in an epoch
+    Staked { node: NodePublicKey },
+    /// Get the amount of bandwidth served in an epoch
     Served {
         /// the epoch
         epoch: Epoch,
         /// The node public Key
-        node: PeerId,
+        node: NodePublicKey,
     },
     /// Get the total served for all nodes in an epoch
     TotalServed { epoch: Epoch },
@@ -173,9 +173,9 @@ pub type QueryResponse = Vec<u8>;
 pub struct NodeInfo {
     /// The BLS public key of the node which is used for our BFT DAG consensus
     /// multi signatures.
-    pub public_key: BlsPublicKey,
+    pub public_key: NodePublicKey,
     /// Public key that is used for fast communication signatures for this node.
-    pub network_public_key: Ed25519PublicKey,
+    pub network_public_key: NodeNetworkingPublicKey,
     /// The time stamp that this node staked at,
     pub staked_since: u64,
     /// The amount of stake by the node.

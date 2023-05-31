@@ -457,6 +457,7 @@ dependencies = [
  "async-trait",
  "atomo",
  "bytes",
+ "fleek-crypto",
  "serde",
  "serde-big-array",
  "thiserror",
@@ -572,6 +573,13 @@ dependencies = [
  "anyhow",
  "draco-interfaces",
  "draco-sdk",
+]
+
+[[package]]
+name = "fleek-crypto"
+version = "0.0.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

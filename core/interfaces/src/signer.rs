@@ -1,12 +1,10 @@
 use affair::Socket;
 use async_trait::async_trait;
-
-use crate::{
-    config::ConfigConsumer,
-    consensus::MempoolSocket,
-    identity::{BlsPublicKey, Ed25519PublicKey, Signature},
-    types::UpdateMethod,
+use fleek_crypto::{
+    NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
+
+use crate::{config::ConfigConsumer, consensus::MempoolSocket, types::UpdateMethod};
 
 /// A socket that is responsible to submit a transaction to the consensus from our node,
 /// implementation of this socket needs to assure the consistency and increment of the
@@ -17,12 +15,6 @@ pub type SubmitTxSocket = Socket<UpdateMethod, u64>;
 /// the node.
 #[async_trait]
 pub trait SignerInterface: ConfigConsumer + Sized {
-    /// Internal type that is used for the Ed25519 secret key.
-    type Ed25519SecretKey;
-
-    /// Internal type that is used for the BLS secret key.
-    type BlsSecretKey;
-
     /// Initialize the signature service.
     async fn init(config: Self::Config) -> anyhow::Result<Self>;
 
@@ -31,10 +23,10 @@ pub trait SignerInterface: ConfigConsumer + Sized {
     fn provide_mempool(&mut self, mempool: MempoolSocket);
 
     /// Returns the `BLS` public key of the current node.
-    fn get_bls_pk(&self) -> BlsPublicKey;
+    fn get_bls_pk(&self) -> NodePublicKey;
 
     /// Returns the `Ed25519` (network) public key of the current node.
-    fn get_ed25519_pk(&self) -> Ed25519PublicKey;
+    fn get_ed25519_pk(&self) -> NodeNetworkingPublicKey;
 
     /// Returns the loaded secret key material.
     ///
@@ -42,7 +34,7 @@ pub trait SignerInterface: ConfigConsumer + Sized {
     ///
     /// Just like any other function which deals with secret material this function should
     /// be used with the greatest caution.
-    fn get_sk(&self) -> (Self::Ed25519SecretKey, Self::BlsSecretKey);
+    fn get_sk(&self) -> (NodeNetworkingSecretKey, NodeSecretKey);
 
     /// Returns a socket that can be used to submit transactions to the mempool, these
     /// transactions are signed by the node and a proper nonce is assigned by the
@@ -60,5 +52,5 @@ pub trait SignerInterface: ConfigConsumer + Sized {
     /// This function is unsafe to use without proper reasoning, which is trivial since
     /// this function is responsible for signing arbitrary messages from other parts of
     /// the system.
-    fn sign_raw_digest(&self, digest: &[u8; 32]) -> Signature;
+    fn sign_raw_digest(&self, digest: &[u8; 32]) -> NodeSignature;
 }

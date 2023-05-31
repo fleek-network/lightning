@@ -19,3 +19,18 @@ zeroize = "1.6"
 # Our libraries
 affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
+fleek-crypto = { path = "lib/fleek-crypto" }
+
+[profile.release]
+# 2 full, 0 nothing, 1 good enough.
+debug = 1
+# currently enabled, may increase build time, but runtime faster, can set to `"thin"`.
+lto = true
+# optimize for binary size, but also turn off loop vectorization.
+opt-level = 'z'
+# speeds up build time to offset some of the link time optimization.
+codegen-units = 1
+# strip debug info from binary.
+strip = 'debuginfo'
+# On panic terminate the process.
+panic = 'abort'
