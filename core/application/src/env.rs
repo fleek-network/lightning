@@ -48,7 +48,7 @@ impl Env<UpdatePerm> {
         }
     }
 
-    // /// This function will panic if the genesis file cannot be decoded into the correct types
+    // This function will panic if the genesis file cannot be decoded into the correct types
     // fn genesis(&mut self) {
     //     self.atomo.run(|ctx| {
     //         let genesis = Genesis::load().unwrap();

@@ -74,6 +74,7 @@ impl From<&GenesisCommittee> for NodeInfo {
         let public_key = BLS12381PublicKey::decode_base64(&value.primary_public_key)
             .unwrap()
             .bytes
+            .clone()
             .into_inner()
             .unwrap();
 
