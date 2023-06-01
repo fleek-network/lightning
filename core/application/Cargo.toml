@@ -17,3 +17,4 @@ fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "9fbe55e9
 # Our libraries
 affair.workspace = true
 atomo.workspace = true
+fleek-crypto.workspace = true

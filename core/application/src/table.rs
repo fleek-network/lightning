@@ -1,6 +1,6 @@
-use draco_interfaces::types::{ProofOfConsensus, ProofOfMisbehavior,UpdateRequest, ExecutionError };
-use draco_interfaces::identity::{PeerId, BlsPublicKey};
-use atomo::mt::{TableRef as AtomoTableRef, TableSelector};
+use draco_interfaces::types::{ProofOfConsensus, ProofOfMisbehavior,UpdateRequest, ExecutionError};
+use fleek_crypto::{AccountOwnerPublicKey, NodePublicKey, TransactionSender};
+use atomo::{TableRef as AtomoTableRef, TableSelector};
 use atomo::SerdeBackend;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -22,8 +22,8 @@ pub trait Backend {
     /// Takes in a zk Proof Of Delivery and returns true if valid
     fn verify_proof_of_delivery(
         &self,
-        client: &PeerId,
-        provider: &BlsPublicKey,
+        client: &AccountOwnerPublicKey,
+        provider: &NodePublicKey,
         commodity: &u128,
         service_id: &u64,
         proof: (),
@@ -62,8 +62,8 @@ impl<'selector, S: SerdeBackend> Backend for StateTables<'selector, S> {
 
     fn verify_proof_of_delivery(
         &self,
-        client: &PeerId,
-        provider: &BlsPublicKey,
+        client: &AccountOwnerPublicKey,
+        provider: &NodePublicKey,
         commodity: &u128,
         service_id: &u64,
         proof: (),
@@ -100,9 +100,8 @@ impl<
 
     fn get(&self, key: &K) -> Option<V> {
         match self.0.borrow_mut().get(key) {
-            Some(x) => Some(x.into_inner()),
+            Some(x) => Some(x),
             None => None,
         }
     }
 }
-

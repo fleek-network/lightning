@@ -1,22 +1,26 @@
-use draco_interfaces::{application::SyncQueryRunnerInterface, identity::PeerId, types::NodeInfo};
+use draco_interfaces::{application::SyncQueryRunnerInterface, types::NodeInfo};
 
 #[derive(Clone)]
 pub struct QueryRunner {}
 
 impl SyncQueryRunnerInterface for QueryRunner {
-    fn get_balance(&self, _peer: &PeerId) -> u128 {
+    fn get_balance(&self, client: &fleek_crypto::ClientPublicKey) -> u128 {
         todo!()
     }
 
-    fn get_reputation(&self, _peer: &PeerId) -> u128 {
+    fn get_reputation(&self, node: &fleek_crypto::NodePublicKey) -> u128 {
         todo!()
     }
 
-    fn get_relative_score(&self, _n1: &PeerId, _n2: &PeerId) -> u128 {
+    fn get_relative_score(
+        &self,
+        n1: &fleek_crypto::NodePublicKey,
+        n2: &fleek_crypto::NodePublicKey,
+    ) -> u128 {
         todo!()
     }
 
-    fn get_node_info(&self, _id: &PeerId) -> Option<NodeInfo> {
+    fn get_node_info(&self, id: &fleek_crypto::NodePublicKey) -> Option<NodeInfo> {
         todo!()
     }
 
@@ -24,7 +28,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
         todo!()
     }
 
-    fn is_valid_node(&self, _id: &PeerId) -> bool {
+    fn is_valid_node(&self, id: &fleek_crypto::NodePublicKey) -> bool {
         todo!()
     }
 
@@ -36,7 +40,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
         todo!()
     }
 
-    fn get_committee_members(&self) -> Vec<draco_interfaces::identity::BlsPublicKey> {
+    fn get_committee_members(&self) -> Vec<fleek_crypto::NodePublicKey> {
         todo!()
     }
 }

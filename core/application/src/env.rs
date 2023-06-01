@@ -1,11 +1,8 @@
-use atomo::{
-    mt::{MtAtomo, MtAtomoBuilder, QueryPerm, UpdatePerm},
-    DefaultSerdeBackend,
+use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
+use draco_interfaces::types::{
+    Epoch, Metadata, ProtocolParams, QueryRequest, Service, ServiceId, UpdateRequest,
 };
-use draco_interfaces::{
-    identity::{BlsPublicKey, Ed25519PublicKey},
-    types::{Epoch, Metadata, ProtocolParams, QueryRequest, Service, ServiceId, UpdateRequest},
-};
+use fleek_crypto::{AccountOwnerPublicKey, NodePublicKey};
 
 use crate::{
     state::{AccountInfo, BandwidthInfo, Committee, NodeInfo, State, TransactionResponse},
@@ -13,15 +10,15 @@ use crate::{
 };
 
 pub struct Env<P> {
-    inner: MtAtomo<P>,
+    inner: Atomo<P>,
 }
 
 impl Env<UpdatePerm> {
     pub fn new() -> Self {
-        let atomo = MtAtomoBuilder::<DefaultSerdeBackend>::new()
+        let atomo = AtomoBuilder::<DefaultSerdeBackend>::new()
             .with_table::<Metadata, u64>("metadata")
-            .with_table::<Ed25519PublicKey, AccountInfo>("account")
-            .with_table::<BlsPublicKey, NodeInfo>("node")
+            .with_table::<AccountOwnerPublicKey, AccountInfo>("account")
+            .with_table::<NodePublicKey, NodeInfo>("node")
             .with_table::<Epoch, Committee>("committee")
             .with_table::<Epoch, BandwidthInfo>("bandwidth")
             .with_table::<ServiceId, Service>("service")

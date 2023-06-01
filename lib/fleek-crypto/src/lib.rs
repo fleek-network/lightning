@@ -1,25 +1,26 @@
 use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct NodePublicKey;
-pub struct NodeSecretKey;
+pub struct NodePublicKey(#[serde(with = "BigArray")] pub [u8; 96]);
+pub struct NodeSecretKey([u8; 48]);
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct NodeSignature;
+pub struct NodeSignature(#[serde(with = "BigArray")] pub [u8; 48]);
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct NodeNetworkingPublicKey;
+pub struct NodeNetworkingPublicKey(pub [u8; 32]);
 pub struct NodeNetworkingSecretKey;
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct NodeNetworkingSignature;
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct ClientPublicKey;
-pub struct ClientSecretKey;
+pub struct ClientPublicKey(pub [u8; 20]);
+pub struct ClientSecretKey([u8; 32]);
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct ClientSignature;
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct AccountOwnerPublicKey;
+pub struct AccountOwnerPublicKey(pub [u8; 32]);
 pub struct AccountOwnerSecretKey;
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct AccountOwnerSignature;
@@ -151,5 +152,23 @@ impl SecretKey for AccountOwnerSecretKey {
 
     fn to_pk(&self) -> Self::PublicKey {
         todo!()
+    }
+}
+
+impl From<[u8; 32]> for NodeNetworkingPublicKey {
+    fn from(value: [u8; 32]) -> Self {
+        Self(value)
+    }
+}
+
+impl From<[u8; 32]> for AccountOwnerPublicKey {
+    fn from(value: [u8; 32]) -> Self {
+        Self(value)
+    }
+}
+
+impl From<[u8; 96]> for NodePublicKey {
+    fn from(value: [u8; 96]) -> Self {
+        Self(value)
     }
 }

@@ -88,15 +88,16 @@ impl From<&GenesisCommittee> for NodeInfo {
             public_key: Ed25519PublicKey::decode_base64(&value.worker_public_key)
                 .unwrap()
                 .0
-                .to_bytes(),
+                .to_bytes()
+                .into(),
             address: value.worker_address.parse().unwrap(),
             mempool: value.worker_mempool.parse().unwrap(),
         };
 
         NodeInfo {
-            owner,
-            public_key,
-            network_key,
+            owner: owner.into(),
+            public_key: public_key.into(),
+            network_key: network_key.into(),
             domain,
             workers: [worker].to_vec(),
         }

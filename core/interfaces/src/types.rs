@@ -4,11 +4,7 @@ use fleek_crypto::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    common::ToDigest,
-    identity::{BlsPublicKey, Ed25519PublicKey, EthPublicKey, PeerId, Signature},
-    pod::DeliveryAcknowledgment,
-};
+use crate::{common::ToDigest, pod::DeliveryAcknowledgment};
 
 /// Unix time stamp in second.
 pub type UnixTs = u64;
@@ -98,13 +94,7 @@ pub enum UpdateMethod {
         /// Which token to withdrawl
         token: Tokens,
         /// The address to recieve these tokens on the L2
-<<<<<<< HEAD
         receiving_address: AccountOwnerPublicKey,
-||||||| parent of 1b0120a (Wip)
-        receiving_address: PeerId,
-=======
-        receiving_address: EthPublicKey,
->>>>>>> 1b0120a (Wip)
     },
     /// Submit of PoC from the bridge on the L2 to get the tokens in network
     Deposit {
@@ -144,13 +134,7 @@ pub enum UpdateMethod {
         /// Service id of the service a node misbehaved in
         service_id: ServiceId,
         /// The public key of the node that misbehaved
-<<<<<<< HEAD
         node: NodePublicKey,
-||||||| parent of 1b0120a (Wip)
-        node: PeerId,
-=======
-        node: BlsPublicKey,
->>>>>>> 1b0120a (Wip)
         /// Zk proof to be provided to the slash circuit
         proof_of_misbehavior: ProofOfMisbehavior,
     },
