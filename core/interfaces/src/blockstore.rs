@@ -87,7 +87,7 @@ pub trait BlockStoreInterface: Clone + Send + Sync + ConfigConsumer {
     /// The block store has the ability to use a smart pointer to avoid duplicating
     /// the same content multiple times in memory, this can be used for when multiple
     /// services want access to the same buffer of data.
-    type SharedPointer<T: ?Sized>: Deref<Target = T> + Clone + Send + Sync;
+    type SharedPointer<T: ?Sized + Send + Sync>: Deref<Target = T> + Clone + Send + Sync;
 
     /// The incremental putter which can be used to write a file to block store.
     type Put: IncrementalPutInterface;

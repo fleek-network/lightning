@@ -1,6 +1,7 @@
 use std::{collections::HashMap, marker::PhantomData};
 
 use async_trait::async_trait;
+use tokio_stream::Stream;
 
 use crate::{
     application::ApplicationInterface,

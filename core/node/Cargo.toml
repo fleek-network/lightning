@@ -10,3 +10,9 @@ draco-interfaces = {path="../interfaces"}
 anyhow.workspace = true
 serde.workspace = true
 toml = "0.7"
+async-trait.workspace = true
+mockall = "0.11.4"
+tokio.workspace = true
+bytes.workspace = true
+tokio-stream.workspace = true
+fleek-crypto.workspace = true
