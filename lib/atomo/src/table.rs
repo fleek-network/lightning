@@ -1,5 +1,6 @@
 use std::{
     any::{Any, TypeId},
+    borrow::Borrow,
     cell::RefCell,
     hash::Hash,
     marker::PhantomData,
@@ -135,19 +136,19 @@ where
     //     todo!()
     // }
 
-    pub fn insert(&mut self, key: impl AsRef<K>, value: impl AsRef<V>) {
-        let k = S::serialize(key.as_ref()).into_boxed_slice();
-        let v = S::serialize(value.as_ref()).into_boxed_slice();
+    pub fn insert(&mut self, key: impl Borrow<K>, value: impl Borrow<V>) {
+        let k = S::serialize(key.borrow()).into_boxed_slice();
+        let v = S::serialize(value.borrow()).into_boxed_slice();
         self.batch.as_mut().insert(k, Operation::Insert(v));
     }
 
-    pub fn remove(&mut self, key: impl AsRef<K>) {
-        let k = S::serialize(key.as_ref()).into_boxed_slice();
+    pub fn remove(&mut self, key: impl Borrow<K>) {
+        let k = S::serialize(key.borrow()).into_boxed_slice();
         self.batch.as_mut().insert(k, Operation::Remove);
     }
 
-    pub fn get(&self, key: impl AsRef<K>) -> Option<V> {
-        let k = S::serialize(key.as_ref()).into_boxed_slice();
+    pub fn get(&self, key: impl Borrow<K>) -> Option<V> {
+        let k = S::serialize(key.borrow()).into_boxed_slice();
 
         match self.batch.as_mut().get(&k) {
             Some(Operation::Insert(value)) => return Some(S::deserialize(&value)),
