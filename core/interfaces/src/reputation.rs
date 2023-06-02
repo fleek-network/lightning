@@ -18,6 +18,11 @@ pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
     /// Create a new reputation
     async fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self>;
 
+    /// Called by the scheduler to notify that it is time to submit the aggregation, to do
+    /// so one should use the [`SubmitTxSocket`] that is passed during the initialization
+    /// to submit a transaction to the consensus.
+    fn submit_aggregation(&self);
+
     /// Returns a reputation reporter that can be used to capture interactions that we have
     /// with another peer.
     fn get_reporter(&self) -> Self::ReputationReporter;
@@ -31,7 +36,7 @@ pub trait ReputationQueryInteface: Clone {
     type SyncQuery: SyncQueryRunnerInterface;
 
     /// Returns the reputation of the provided node locally.
-    fn get_reputation_of(&self, peer: &NodePublicKey) -> u128;
+    fn get_reputation_of(&self, peer: &NodePublicKey) -> Option<u128>;
 }
 
 /// Reputation reporter is a cheaply cleanable object which can be used to report the interactions
@@ -39,17 +44,23 @@ pub trait ReputationQueryInteface: Clone {
 /// reporters which can use any method to report the data they capture to their aggregator so
 /// that it can send it to the application layer.
 pub trait ReputationReporterInterface: Clone {
-    /// Report a satisfactory (happy) interaction with the given peer.
+    /// Report a satisfactory (happy) interaction with the given peer. Used for up time.
     fn report_sat(&self, peer: &NodePublicKey, weight: Weight);
 
-    /// Report a unsatisfactory (happy) interaction with the given peer.
+    /// Report a unsatisfactory (happy) interaction with the given peer. Used for down time.
     fn report_unsat(&self, peer: &NodePublicKey, weight: Weight);
 
     /// Report a latency which we witnessed from another peer.
     fn report_latency(&self, peer: &NodePublicKey, latency: Duration);
 
     /// Report the number of (healthy) bytes which we received from another peer.
-    fn report_bytes_received(&self, peer: &NodePublicKey, bytes: u64);
+    fn report_bytes_received(&self, peer: &NodePublicKey, bytes: u64, duration: Option<Duration>);
+
+    /// Report the number of (healthy) bytes which we sent from another peer.
+    fn report_bytes_sent(&self, peer: &NodePublicKey, bytes: u64, duration: Option<Duration>);
+
+    /// Report the number of hops we have witnessed to the given peer.
+    fn report_hops(&self, peer: &NodePublicKey, hops: u8);
 }
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq)]
