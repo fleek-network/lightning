@@ -26,6 +26,13 @@ impl ReputationAggregatorInterface for ReputationAggregator {
         todo!()
     }
 
+    /// Called by the scheduler to notify that it is time to submit the aggregation, to do
+    /// so one should use the [`SubmitTxSocket`] that is passed during the initialization
+    /// to submit a transaction to the consensus.
+    fn submit_aggregation(&self) {
+        todo!()
+    }
+
     /// Returns a reputation reporter that can be used to capture interactions that we have
     /// with another peer.
     fn get_reporter(&self) -> Self::ReputationReporter {
@@ -47,7 +54,7 @@ impl ReputationQueryInteface for MyReputationQuery {
     type SyncQuery = QueryRunner;
 
     /// Returns the reputation of the provided node locally.
-    fn get_reputation_of(&self, peer: &NodePublicKey) -> u128 {
+    fn get_reputation_of(&self, peer: &NodePublicKey) -> Option<u128> {
         todo!()
     }
 }
@@ -72,7 +79,17 @@ impl ReputationReporterInterface for MyReputationReporter {
     }
 
     /// Report the number of (healthy) bytes which we received from another peer.
-    fn report_bytes_received(&self, peer: &NodePublicKey, bytes: u64) {
+    fn report_bytes_received(&self, peer: &NodePublicKey, bytes: u64, duration: Option<Duration>) {
+        todo!()
+    }
+
+    /// Report the number of (healthy) bytes which we sent from another peer.
+    fn report_bytes_sent(&self, peer: &NodePublicKey, bytes: u64, duration: Option<Duration>) {
+        todo!()
+    }
+
+    /// Report the number of hops we have witnessed to the given peer.
+    fn report_hops(&self, peer: &NodePublicKey, hops: u8) {
         todo!()
     }
 }
