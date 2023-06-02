@@ -19,6 +19,20 @@ pub struct QueryPerm;
 /// The update permission on an [`Atomo`] which allows mutating the data.
 pub struct UpdatePerm;
 
+/// Atomo is the concurrent query and update execution engine that can allow many queries to
+/// run in parallel while a single update thread takes ownership of mutating the states.
+///
+/// This is achieved using the permission markers [`QueryPerm`] and [`UpdatePerm`]. When a
+/// new [`Atomo`] instance is created that instance is [`Atomo<UpdatePerm>`] and has the
+/// ability to run mutating changes on the database. There can only ever be one mutable
+/// reference to the database (i.e one [`Atomo<UpdatePerm>`]) and if it's lost there is no
+/// way to get it back.
+///
+/// But we allow many parallel access to the same data. An Atomo with update permission
+/// can be downgraded to an [`Atomo<QueryPerm>`] using the [`Atomo::query`] method.
+///
+/// An important note here is that the [`Atomo<QueryPerm>`] implements [`Clone`] so that
+/// you can clone it anytime (and the clone implementation is rather cheap.)
 pub struct Atomo<O, S: SerdeBackend = DefaultSerdeBackend> {
     inner: Arc<AtomoInner<S>>,
     ownership: PhantomData<O>,
@@ -62,19 +76,29 @@ impl<O, S: SerdeBackend> Atomo<O, S> {
 }
 
 impl<S: SerdeBackend> Atomo<QueryPerm, S> {
-    pub fn run<F, R>(&self, _query: F) -> R
+    pub fn run<F, R>(&self, query: F) -> R
     where
         F: Fn(&mut TableSelector<S>) -> R,
     {
-        todo!()
+        let mut selector = TableSelector::new(self.inner.clone());
+        query(&mut selector)
     }
 }
 
 impl<S: SerdeBackend> Atomo<UpdatePerm, S> {
-    pub fn run<F, R>(&mut self, _mutation: F) -> R
+    pub fn run<F, R>(&mut self, mutation: F) -> R
     where
         F: Fn(&mut TableSelector<S>) -> R,
     {
-        todo!()
+        let mut selector = TableSelector::new(self.inner.clone());
+        let response = mutation(&mut selector);
+
+        let batch = selector.into_batch();
+        let inverse = self.inner.compute_inverse(&batch);
+        self.inner.snapshot_list.push(inverse, || {
+            self.inner.perform_batch(batch);
+        });
+
+        response
     }
 }

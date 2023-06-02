@@ -1,3 +1,5 @@
+use std::ops::{Deref, DerefMut};
+
 use fxhash::FxHashMap;
 
 pub type BoxedVec = Box<[u8]>;
@@ -21,7 +23,7 @@ impl VerticalBatch {
     #[inline(always)]
     pub fn new(size: usize) -> Self {
         let mut vec = Vec::with_capacity(size);
-        vec.resize_with(size, || FxHashMap::default());
+        vec.resize_with(size, FxHashMap::default);
         VerticalBatch(vec)
     }
 
@@ -35,6 +37,12 @@ impl VerticalBatch {
     pub fn get(&self, index: usize) -> &BatchHashMap {
         debug_assert!(index < self.0.len());
         &self.0[index]
+    }
+
+    #[inline(always)]
+    pub fn get_mut(&mut self, index: usize) -> &mut BatchHashMap {
+        debug_assert!(index < self.0.len());
+        &mut self.0[index]
     }
 
     /// Return a reference to a single slot in the vertical batch.
@@ -57,7 +65,23 @@ pub struct BatchReference(*mut BatchHashMap);
 
 impl BatchReference {
     #[inline(always)]
-    pub fn as_mut(&self) -> &mut BatchHashMap {
+    pub fn as_mut(&mut self) -> &mut BatchHashMap {
+        unsafe { &mut *self.0 }
+    }
+}
+
+impl Deref for BatchReference {
+    type Target = BatchHashMap;
+
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.0 }
+    }
+}
+
+impl DerefMut for BatchReference {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.0 }
     }
 }

@@ -50,6 +50,10 @@ impl<T> OncePtr<T> {
 
     /// Load the atomic store and return a reference to the underlying data without
     /// checking if it's null.
+    ///
+    /// # Safety
+    ///
+    /// It is up to the caller to ensure that the pointer is not null.
     #[inline]
     pub unsafe fn load_unchecked(&self) -> &T {
         let ptr = self.0.load(std::sync::atomic::Ordering::Relaxed);
@@ -73,6 +77,10 @@ impl<T> OncePtr<T> {
 
     /// Load the atomic store and return a mutable reference to the underlying data
     /// without checking if it's null.
+    ///
+    /// # Safety
+    ///
+    /// It is up to the caller to ensure that the pointer is not null.
     #[inline]
     pub unsafe fn load_mut_unchecked(&mut self) -> &mut T {
         let ptr = *self.0.get_mut();

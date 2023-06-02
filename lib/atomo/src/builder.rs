@@ -67,3 +67,10 @@ impl<S: SerdeBackend> AtomoBuilder<S> {
         Atomo::new(Arc::new(self.atomo))
     }
 }
+
+impl<S: SerdeBackend> Default for AtomoBuilder<S> {
+    #[must_use = "Creating a builder does not perform anything."]
+    fn default() -> Self {
+        Self::new()
+    }
+}

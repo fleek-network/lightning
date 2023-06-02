@@ -41,6 +41,12 @@ pub struct SnapshotList<T> {
     tail: AtomicPtr<Linked<SnapshotInner<T>>>,
 }
 
+impl<T> Default for SnapshotList<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> SnapshotList<T> {
     /// Create a new empty snapshot list.
     pub fn new() -> Self {
