@@ -811,6 +811,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "atomo",
+ "bincode",
  "draco-interfaces",
  "fastcrypto",
  "fleek-crypto",
@@ -871,6 +872,7 @@ dependencies = [
  "atomo",
  "bytes",
  "fleek-crypto",
+ "multiaddr",
  "serde",
  "serde-big-array",
  "thiserror",
@@ -936,7 +938,10 @@ name = "draco-reputation"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "draco-application",
  "draco-interfaces",
+ "fleek-crypto",
  "serde",
 ]
 

@@ -7,5 +7,8 @@ edition = "2021"
 
 [dependencies]
 draco-interfaces = {path="../interfaces"}
+draco-application = {path="../application/"}
 anyhow.workspace = true
 serde.workspace = true
+async-trait.workspace = true
+fleek-crypto.workspace = true
