@@ -1,11 +1,10 @@
 use anyhow::{Context, Result};
+use draco_interfaces::types::{NodeInfo, Worker};
 use fastcrypto::{
     bls12381::min_sig::BLS12381PublicKey, ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64,
 };
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
-
-use crate::state::{NodeInfo, Worker};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Genesis {
@@ -34,7 +33,7 @@ pub struct GenesisAccount {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GenesisService {
-    pub id: u64,
+    pub id: u32,
     pub commodity_price: u64,
 }
 
@@ -101,6 +100,8 @@ impl From<&GenesisCommittee> for NodeInfo {
             network_key: network_key.into(),
             domain,
             workers: [worker].to_vec(),
+            staked_since: todo!(),
+            stake: todo!(),
         }
     }
 }

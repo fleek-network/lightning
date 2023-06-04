@@ -1,3 +1,4 @@
+use affair::{Executor, TokioSpawn};
 use anyhow::Result;
 use async_trait::async_trait;
 use draco_interfaces::{
@@ -6,7 +7,11 @@ use draco_interfaces::{
     config::ConfigConsumer,
 };
 
-use crate::{config::Config, query_runner::QueryRunner};
+use crate::{
+    config::Config,
+    env::{Env, QueryWorker, UpdateWorker},
+    query_runner::QueryRunner,
+};
 
 pub struct Application {
     query_socket: QuerySocket,
@@ -17,13 +22,13 @@ pub struct Application {
 impl WithStartAndShutdown for Application {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
-        todo!()
+        true
     }
 
     /// Start the system, should not do anything if the system is already
     /// started.
     async fn start(&self) {
-        todo!()
+        ()
     }
 
     /// Send the shutdown signal to the system.
@@ -45,7 +50,12 @@ impl ApplicationInterface for Application {
 
     /// Create a new instance of the application layer using the provided configuration.
     async fn init(_config: Self::Config) -> Result<Self> {
-        todo!()
+        let mut env = Env::new();
+        env.genesis();
+        Ok(Self {
+            query_socket: TokioSpawn::spawn_async(QueryWorker::new(env.query())),
+            update_socket: TokioSpawn::spawn(UpdateWorker::new(env)),
+        })
     }
 
     /// Returns a socket that should be used to submit transactions to be executed

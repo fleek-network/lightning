@@ -2,6 +2,7 @@ use fleek_crypto::{
     AccountOwnerPublicKey, ClientPublicKey, NodeNetworkingPublicKey, NodePublicKey,
     TransactionSender, TransactionSignature,
 };
+use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
 
 use crate::{common::ToDigest, pod::DeliveryAcknowledgment};
@@ -21,7 +22,6 @@ pub type ServiceId = u32;
 /// block.
 #[derive(Debug)]
 pub struct Block {
-    pub timestamp: UnixTs,
     pub transactions: Vec<UpdateRequest>,
 }
 
@@ -169,6 +169,38 @@ pub enum QueryMethod {
 /// The serialized response from executing a query.
 pub type QueryResponse = Vec<u8>;
 
+#[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize)]
+pub enum TransactionResponse {
+    Success(ExecutionData),
+    Revert(ExecutionError),
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize)]
+pub enum ExecutionData {
+    None,
+    String(String),
+    UInt(u128),
+    EpochInfo {
+        committee: Vec<NodeInfo>,
+        epoch: Epoch,
+        epoch_end: u64,
+    },
+    EpochChange,
+}
+
+/// Error type for transaction execution on the application layer
+#[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize)]
+pub enum ExecutionError {
+    InvalidSignature,
+    InvalidNonce,
+    InvalidProof,
+    NotNodeOwner,
+    NotCommitteeMember,
+    NodeDoesNotExist,
+    AlreadySignaled,
+    NonExistingService,
+}
+
 /// The account info stored per account on the blockchain
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
 pub struct AccountInfo {
@@ -186,21 +218,33 @@ pub struct Staking {
     pub locked_until: u64,
 }
 
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
 pub struct NodeInfo {
+    /// The owner of this node
+    pub owner: AccountOwnerPublicKey,
     /// The BLS public key of the node which is used for our BFT DAG consensus
     /// multi signatures.
     pub public_key: NodePublicKey,
     /// Public key that is used for fast communication signatures for this node.
-    pub network_public_key: NodeNetworkingPublicKey,
+    pub network_key: NodeNetworkingPublicKey,
     /// The time stamp that this node staked at,
     pub staked_since: u64,
     /// The amount of stake by the node.
     pub stake: u128,
-    /// Services that this node is running.
-    pub services: Vec<ServiceId>,
-    /// Different addresses that points to the same node.
-    pub addresses: Vec<InternetAddress>,
+    /// The nodes primary internet address
+    pub domain: Multiaddr,
+    /// A vec of all of this nodes Narwhal workers
+    pub workers: Vec<Worker>,
+}
+
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
+pub struct Worker {
+    /// The public key of the worker
+    pub public_key: NodeNetworkingPublicKey,
+    /// The workers internet address
+    pub address: Multiaddr,
+    /// The address to the workers mempool
+    pub mempool: Multiaddr,
 }
 
 /// Metadata, state stored in the blockchain that applies to the current block
@@ -231,19 +275,6 @@ pub enum ProtocolParams {
     MinInflation = 7,
     /// The amount of FLK minted per GB they consume.
     ConsumerRebate = 8,
-}
-
-/// Error type for transaction execution on the application layer
-#[derive(Clone, Debug)]
-pub enum ExecutionError {
-    InvalidSignature,
-    InvalidNonce,
-    InvalidProof,
-    NotNodeOwner,
-    NotCommitteeMember,
-    NodeDoesNotExist,
-    AlreadySignaled,
-    NonExistingService,
 }
 
 /// The physical address of a node where it can be reached, the port numbers are

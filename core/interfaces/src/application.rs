@@ -5,7 +5,7 @@ use fleek_crypto::{ClientPublicKey, NodePublicKey};
 use crate::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
-    types::{Block, NodeInfo, QueryRequest, QueryResponse},
+    types::{Block, NodeInfo, QueryRequest, QueryResponse, TransactionResponse},
 };
 
 /// The response generated from executing an entire batch of transactions (aka a block).
@@ -18,6 +18,8 @@ pub struct BlockExecutionResponse {
     pub change_epoch: bool,
     /// The changes to the node registry.
     pub node_registry_delta: Vec<(NodePublicKey, NodeRegistryChange)>,
+    /// Reciepts of all executed transactions
+    pub txn_receipts: Vec<TransactionResponse>,
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Hash, Eq)]

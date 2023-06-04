@@ -1,7 +1,8 @@
 use draco_interfaces::{
     types::{
-        Epoch, Metadata, ProofOfConsensus, ProofOfMisbehavior, ProtocolParams, QueryMethod,
-        QueryRequest, Service, ServiceId, Tokens, UpdateMethod, UpdateRequest,
+        Epoch, Metadata, NodeInfo, ProofOfConsensus, ProofOfMisbehavior, ProtocolParams,
+        QueryMethod, QueryRequest, Service, ServiceId, Tokens, TransactionResponse, UpdateMethod,
+        UpdateRequest,
     },
     DeliveryAcknowledgment,
 };
@@ -58,65 +59,11 @@ pub struct BandwidthInfo {
     pub reward_pool: u128,
 }
 
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
-pub struct NodeInfo {
-    pub owner: AccountOwnerPublicKey,
-    pub public_key: NodePublicKey,
-    pub network_key: NodeNetworkingPublicKey,
-    pub domain: Multiaddr,
-    pub workers: Vec<Worker>,
-}
-
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub struct EpochInfo {
     pub committee: Vec<NodeInfo>,
     pub epoch: Epoch,
     pub epoch_end: u64,
-}
-
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
-pub struct Worker {
-    pub public_key: NodeNetworkingPublicKey,
-    pub address: Multiaddr,
-    pub mempool: Multiaddr,
-}
-
-#[derive(Clone, Debug)]
-pub enum TransactionResponse {
-    Success(ExecutionData),
-    Revert(ExecutionError),
-}
-
-impl TransactionResponse {
-    /// If response contains a Uint will return
-    pub fn to_number(&self) -> Result<u128, TransactionResponse> {
-        if let TransactionResponse::Success(ExecutionData::UInt(num)) = self {
-            Ok(*num)
-        } else {
-            Err(self.clone())
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum ExecutionData {
-    None,
-    String(String),
-    UInt(u128),
-    EpochInfo(EpochInfo),
-    EpochChange,
-}
-
-#[derive(Clone, Debug)]
-pub enum ExecutionError {
-    InvalidSignature,
-    InvalidNonce,
-    InvalidProof,
-    NotNodeOwner,
-    NotCommitteeMember,
-    NodeDoesNotExist,
-    AlreadySignaled,
-    NonExistingService,
 }
 
 impl<B: Backend> State<B> {

@@ -15,6 +15,7 @@ tokio-stream.workspace = true
 bytes.workspace = true
 thiserror.workspace = true
 zeroize.workspace = true
+multiaddr = "0.17.1"
 
 # Our libraries
 affair.workspace = true

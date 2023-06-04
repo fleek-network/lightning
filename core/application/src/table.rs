@@ -1,13 +1,15 @@
-use draco_interfaces::types::{ProofOfConsensus, ProofOfMisbehavior,UpdateRequest, ExecutionError};
-use fleek_crypto::{AccountOwnerPublicKey, NodePublicKey, TransactionSender};
-use atomo::{TableRef as AtomoTableRef, TableSelector};
-use atomo::SerdeBackend;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::{any::Any, cell::RefCell, hash::Hash};
 
+use atomo::{SerdeBackend, TableRef as AtomoTableRef, TableSelector};
+use draco_interfaces::types::{
+    ExecutionError, ProofOfConsensus, ProofOfMisbehavior, UpdateRequest,
+};
+use fleek_crypto::{AccountOwnerPublicKey, NodePublicKey};
+use serde::{de::DeserializeOwned, Serialize};
+
 pub trait Backend {
-    type Ref<K: Eq + Hash + Send + Serialize + DeserializeOwned + 'static, V: Clone + Send + Serialize + DeserializeOwned + 'static>: TableRef<K, V>;
+    type Ref<K: Eq + Hash + Send + Serialize + DeserializeOwned
+     + 'static, V: Clone + Send + Serialize + DeserializeOwned + 'static>: TableRef<K, V>;
 
     fn get_table_reference<
         K: Eq + Hash + Send + Serialize + DeserializeOwned,
@@ -16,8 +18,9 @@ pub trait Backend {
         &self,
         id: &str,
     ) -> Self::Ref<K, V>;
-    /// This function takes in the Transaction and verifies the Signature matches the Sender. It also checks the nonce
-    /// of the sender and makes sure it is equal to the account nonce + 1, to prevent replay attacks and enforce ordering
+    /// This function takes in the Transaction and verifies the Signature matches the Sender. It
+    /// also checks the nonce of the sender and makes sure it is equal to the account nonce + 1,
+    /// to prevent replay attacks and enforce ordering
     fn verify_transaction(&self, txn: &UpdateRequest) -> Result<(), ExecutionError>;
     /// Takes in a zk Proof Of Delivery and returns true if valid
     fn verify_proof_of_delivery(
@@ -44,7 +47,10 @@ pub struct StateTables<'selector, S: SerdeBackend> {
 }
 
 impl<'selector, S: SerdeBackend> Backend for StateTables<'selector, S> {
-    type Ref<K: Eq + Hash + Send + Serialize + DeserializeOwned + 'static, V: Clone + Send + Serialize + DeserializeOwned + 'static> = AtomoTable<'selector, K, V, S>;
+    type Ref<
+        K: Eq + Hash + Send + Serialize + DeserializeOwned + 'static,
+        V: Clone + Send + Serialize + DeserializeOwned + 'static,
+    > = AtomoTable<'selector, K, V, S>;
 
     fn get_table_reference<
         K: Eq + Hash + Send + Serialize + DeserializeOwned,
@@ -88,11 +94,11 @@ pub struct AtomoTable<
 >(RefCell<AtomoTableRef<'selector, K, V, S>>);
 
 impl<
-        'selector,
-        K: Hash + Eq + Serialize + DeserializeOwned + Any,
-        V: Serialize + DeserializeOwned + Any + Clone,
-        S: SerdeBackend,
-    > TableRef<K, V> for AtomoTable<'selector, K, V, S>
+    'selector,
+    K: Hash + Eq + Serialize + DeserializeOwned + Any,
+    V: Serialize + DeserializeOwned + Any + Clone,
+    S: SerdeBackend,
+> TableRef<K, V> for AtomoTable<'selector, K, V, S>
 {
     fn set(&self, key: K, value: V) {
         self.0.borrow_mut().insert(key, value);

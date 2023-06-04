@@ -1,11 +1,18 @@
+use affair::{AsyncWorker, Worker as WorkerTrait};
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
-use draco_interfaces::types::{
-    Epoch, Metadata, ProtocolParams, QueryRequest, Service, ServiceId, UpdateRequest,
+use draco_interfaces::{
+    types::{
+        Block, Epoch, ExecutionData, Metadata, NodeInfo, ProtocolParams, QueryRequest,
+        QueryResponse, Service, ServiceId, TransactionResponse,
+    },
+    BlockExecutionResponse,
 };
+use fastcrypto::{ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{AccountOwnerPublicKey, NodePublicKey};
 
 use crate::{
-    state::{AccountInfo, BandwidthInfo, Committee, NodeInfo, State, TransactionResponse},
+    genesis::Genesis,
+    state::{AccountInfo, BandwidthInfo, Committee, Staking, State},
     table::StateTables,
 };
 
@@ -30,118 +37,141 @@ impl Env<UpdatePerm> {
 }
 
 impl Env<UpdatePerm> {
-    fn run(&mut self, transaction: UpdateRequest) -> TransactionResponse {
+    fn run(&mut self, block: Block) -> BlockExecutionResponse {
         self.inner.run(move |ctx| {
             let backend = StateTables {
                 table_selector: ctx,
             };
 
+            let mut response = BlockExecutionResponse {
+                block_hash: Default::default(),
+                change_epoch: false,
+                node_registry_delta: Vec::new(),
+                txn_receipts: Vec::with_capacity(block.transactions.len()),
+            };
+
             let app = State::new(backend);
 
-            app.execute_txn(transaction.clone())
+            for txn in &block.transactions {
+                let receipt = app.execute_txn(txn.clone());
+                if let TransactionResponse::Success(ExecutionData::EpochChange) = receipt {
+                    response.change_epoch = true;
+                }
+                response.txn_receipts.push(receipt);
+            }
+
+            response
         })
     }
 
-    fn query(&self) -> Env<QueryPerm> {
+    pub fn query(&self) -> Env<QueryPerm> {
         Env {
             inner: self.inner.query(),
         }
     }
 
-    // This function will panic if the genesis file cannot be decoded into the correct types
-    // fn genesis(&mut self) {
-    //     self.atomo.run(|ctx| {
-    //         let genesis = Genesis::load().unwrap();
+    /// This function will panic if the genesis file cannot be decoded into the correct types
+    pub fn genesis(&mut self) {
+        self.inner.run(|ctx| {
+            let genesis = Genesis::load().unwrap();
 
-    //         let mut node_table = ctx.get_table::<PublicKey, NodeInfo>("node");
-    //         let mut account_table = ctx.get_table::<PublicKey, AccountInfo>("account");
-    //         let mut service_table = ctx.get_table::<ServiceId, Service>("service");
-    //         let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
-    //         let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
+            let mut node_table = ctx.get_table::<NodePublicKey, NodeInfo>("node");
+            let mut account_table = ctx.get_table::<AccountOwnerPublicKey, AccountInfo>("account");
+            let mut service_table = ctx.get_table::<ServiceId, Service>("service");
+            let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
+            let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
 
-    //         param_table.insert(ProtocolParams::EpochTime, genesis.epoch_time.into());
-    //         param_table.insert(ProtocolParams::CommitteeSize, genesis.committee_size.into());
-    //         param_table.insert(ProtocolParams::MinimumNodeStake, genesis.min_stake.into());
-    //         param_table.insert(
-    //             ProtocolParams::EligibilityTime,
-    //             genesis.eligibility_time.into(),
-    //         );
-    //         param_table.insert(ProtocolParams::LockTime, genesis.lock_time.into());
-    //         param_table.insert(
-    //             ProtocolParams::ProtocolPercentage,
-    //             genesis.protocol_percentage.into(),
-    //         );
-    //         param_table.insert(ProtocolParams::MaxInflation, genesis.max_inflation.into());
-    //         param_table.insert(ProtocolParams::MinInflation, genesis.min_inflation.into());
-    //         param_table.insert(
-    //             ProtocolParams::ConsumerRebate,
-    //             genesis.consumer_rebate.into(),
-    //         );
+            param_table.insert(ProtocolParams::EpochTime, genesis.epoch_time as u128);
+            param_table.insert(
+                ProtocolParams::CommitteeSize,
+                genesis.committee_size as u128,
+            );
+            param_table.insert(ProtocolParams::MinimumNodeStake, genesis.min_stake as u128);
+            param_table.insert(
+                ProtocolParams::EligibilityTime,
+                genesis.eligibility_time as u128,
+            );
+            param_table.insert(ProtocolParams::LockTime, genesis.lock_time as u128);
+            param_table.insert(
+                ProtocolParams::ProtocolPercentage,
+                genesis.protocol_percentage as u128,
+            );
+            param_table.insert(ProtocolParams::MaxInflation, genesis.max_inflation as u128);
+            param_table.insert(ProtocolParams::MinInflation, genesis.min_inflation as u128);
+            param_table.insert(
+                ProtocolParams::ConsumerRebate,
+                genesis.consumer_rebate as u128,
+            );
 
-    //         let epoch_end = genesis.epoch_time + genesis.epoch_start;
-    //         let mut committee_members = Vec::with_capacity(genesis.committee.len());
+            let epoch_end = genesis.epoch_time + genesis.epoch_start;
+            let mut committee_members = Vec::with_capacity(genesis.committee.len());
 
-    //         for node in &genesis.committee {
-    //             let stake = node.staking;
-    //             let node_info: NodeInfo = node.into();
+            for node in &genesis.committee {
+                let stake = node.staking;
+                let node_info: NodeInfo = node.into();
 
-    //             let owner = node_info.owner.clone();
-    //             committee_members.push(owner.clone());
+                let owner = node_info.owner.clone();
+                committee_members.push(node_info.public_key);
 
-    //             // If stake amount is specified add it to the owner account
-    //             if let Some(stake) = stake {
-    //                 account_table.insert(
-    //                     owner.clone(),
-    //                     AccountInfo {
-    //                         flk_balance: 0,
-    //                         bandwidth_balance: 0,
-    //                         nonce: 0,
-    //                         staking: Staking {
-    //                             staked: stake.into(),
-    //                             locked: 0,
-    //                             locked_until: 0,
-    //                         },
-    //                     },
-    //                 )
-    //             }
-    //             node_table.insert(owner, node_info);
-    //         }
+                // If stake amount is specified add it to the owner account
+                if let Some(stake) = stake {
+                    account_table.insert(
+                        owner.clone(),
+                        AccountInfo {
+                            flk_balance: 0,
+                            bandwidth_balance: 0,
+                            nonce: 0,
+                            staking: Staking {
+                                staked: stake.into(),
+                                locked: 0,
+                                locked_until: 0,
+                            },
+                        },
+                    )
+                }
+                node_table.insert(node_info.public_key, node_info);
+            }
 
-    //         committee_table.insert(
-    //             0,
-    //             Committee {
-    //                 ready_to_change: Vec::with_capacity(committee_members.len()),
-    //                 members: committee_members,
-    //                 epoch_end_timestamp: epoch_end.try_into().unwrap(),
-    //             },
-    //         );
+            committee_table.insert(
+                0,
+                Committee {
+                    ready_to_change: Vec::with_capacity(committee_members.len()),
+                    members: committee_members,
+                    epoch_end_timestamp: epoch_end.try_into().unwrap(),
+                },
+            );
 
-    //         for service in &genesis.service {
-    //             service_table.insert(
-    //                 service.id,
-    //                 Service {
-    //                     commodity_price: service.commodity_price.into(),
-    //                     slashing: (),
-    //                 },
-    //             )
-    //         }
+            for service in &genesis.service {
+                service_table.insert(
+                    service.id,
+                    Service {
+                        commodity_price: service.commodity_price.into(),
+                        slashing: (),
+                    },
+                )
+            }
 
-    //         for account in genesis.account {
-    //             let public_key = PublicKey::decode_base64(&account.public_key).unwrap();
-    //             let info = AccountInfo {
-    //                 flk_balance: account.flk_balance.into(),
-    //                 bandwidth_balance: account.bandwidth_balance.into(),
-    //                 nonce: 0,
-    //                 staking: Staking {
-    //                     staked: account.staked.into(),
-    //                     locked: 0,
-    //                     locked_until: 0,
-    //                 },
-    //             };
-    //             account_table.insert(public_key, info);
-    //         }
-    //     })
-    // }
+            for account in genesis.account {
+                let public_key: AccountOwnerPublicKey =
+                    Ed25519PublicKey::decode_base64(&account.public_key)
+                        .unwrap()
+                        .0
+                        .to_bytes()
+                        .into();
+                let info = AccountInfo {
+                    flk_balance: account.flk_balance.into(),
+                    bandwidth_balance: account.bandwidth_balance.into(),
+                    nonce: 0,
+                    staking: Staking {
+                        staked: account.staked.into(),
+                        locked: 0,
+                        locked_until: 0,
+                    },
+                };
+                account_table.insert(public_key, info);
+            }
+        })
+    }
 }
 
 impl Env<QueryPerm> {
@@ -153,5 +183,50 @@ impl Env<QueryPerm> {
             let app = State::new(backend);
             app.execute_query(transaction.clone())
         })
+    }
+}
+
+pub struct UpdateWorker {
+    env: Env<UpdatePerm>,
+}
+
+impl UpdateWorker {
+    pub fn new(env: Env<UpdatePerm>) -> Self {
+        Self { env }
+    }
+}
+
+impl WorkerTrait for UpdateWorker {
+    type Request = Block;
+    type Response = BlockExecutionResponse;
+    fn handle(&mut self, req: Self::Request) -> Self::Response {
+        // 1. Verify Signature and Nonce
+        // Note(Dalton), this check will probably be moved to execute_txn function, and backend Arc
+        // will probably only be stored there as well if let Err(err) =
+        // self.backend.verify_transaction(&req) {     return
+        // TransactionResponse::Revert(err); }
+        // 2. Execute the transaction based on the transaction type
+        self.env.run(req)
+    }
+}
+
+pub struct QueryWorker {
+    env: Env<QueryPerm>,
+}
+
+impl QueryWorker {
+    pub fn new(env: Env<QueryPerm>) -> Self {
+        Self { env }
+    }
+}
+
+#[async_trait::async_trait]
+impl AsyncWorker for QueryWorker {
+    type Request = QueryRequest;
+    type Response = QueryResponse;
+    async fn handle(&mut self, req: Self::Request) -> Self::Response {
+        // 1. Just execute transaction and return results, no need to do signature verification
+        let response = self.env.run(req);
+        bincode::serialize(&response).unwrap()
     }
 }
