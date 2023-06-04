@@ -1,15 +1,12 @@
 use draco_interfaces::{
     types::{
-        Epoch, Metadata, NodeInfo, ProofOfConsensus, ProofOfMisbehavior, ProtocolParams,
-        QueryMethod, QueryRequest, Service, ServiceId, Tokens, TransactionResponse, UpdateMethod,
-        UpdateRequest,
+        AccountInfo, Epoch, Metadata, NodeInfo, ProofOfConsensus, ProofOfMisbehavior,
+        ProtocolParams, QueryMethod, QueryRequest, Service, ServiceId, Tokens, TransactionResponse,
+        UpdateMethod, UpdateRequest,
     },
     DeliveryAcknowledgment,
 };
-use fleek_crypto::{
-    AccountOwnerPublicKey, NodeNetworkingPublicKey, NodePublicKey, TransactionSender,
-};
-use multiaddr::Multiaddr;
+use fleek_crypto::{AccountOwnerPublicKey, NodePublicKey, TransactionSender};
 use serde::{Deserialize, Serialize};
 
 use crate::table::Backend;
@@ -27,23 +24,6 @@ pub struct State<B: Backend> {
     pub services: B::Ref<ServiceId, Service>,
     pub parameters: B::Ref<ProtocolParams, u128>,
     pub backend: B,
-}
-
-/// The account info stored per account on the blockchain
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
-pub struct AccountInfo {
-    pub flk_balance: u128,
-    pub bandwidth_balance: u128,
-    pub nonce: u128,
-    pub staking: Staking,
-}
-
-/// Struct that stores
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
-pub struct Staking {
-    pub staked: u128,
-    pub locked: u128,
-    pub locked_until: u64,
 }
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
@@ -126,29 +106,19 @@ impl<B: Backend> State<B> {
                 node,
                 proof_of_misbehavior,
             } => self.slash(txn.sender, proof_of_misbehavior, service_id, node),
-            // TransactionType::Query(query) => match query {
-            //     Query::FLK { public_key } => self.get_flk(public_key),
-            //     Query::Locked { public_key } => self.get_locked(public_key),
-            //     Query::Bandwidth { public_key } => self.get_bandwidth(public_key),
-            //     Query::Served { epoch, node } => self.get_node_bandwidth_served(epoch, node),
-            //     Query::RewardPool { epoch } => self.get_reward_pool(epoch),
-            //     Query::TotalServed { epoch } => self.get_total_served(epoch),
-            //     Query::Staked { node } => self.get_staked(node),
-            //     Query::CurrentEpochInfo => self.get_current_epoch_info(),
-            // },
         }
     }
 
     pub fn execute_query(&self, txn: QueryRequest) -> TransactionResponse {
         match txn.query {
-            QueryMethod::Bandwidth { public_key } => todo!(),
-            QueryMethod::FLK { public_key } => todo!(),
-            QueryMethod::Locked { public_key } => todo!(),
-            QueryMethod::Staked { node } => todo!(),
-            QueryMethod::Served { epoch, node } => todo!(),
-            QueryMethod::TotalServed { epoch } => todo!(),
-            QueryMethod::RewardPool { epoch } => todo!(),
-            QueryMethod::CurrentEpochInfo => todo!(),
+            QueryMethod::Bandwidth { public_key } => self.get_bandwidth(public_key),
+            QueryMethod::FLK { public_key } => self.get_flk(public_key),
+            QueryMethod::Locked { public_key } => self.get_locked(public_key),
+            QueryMethod::Staked { node } => self.get_staked(node),
+            QueryMethod::Served { epoch, node } => self.get_node_bandwidth_served(epoch, node),
+            QueryMethod::TotalServed { epoch } => self.get_total_served(epoch),
+            QueryMethod::RewardPool { epoch } => self.get_reward_pool(epoch),
+            QueryMethod::CurrentEpochInfo => self.get_current_epoch_info(),
         }
     }
     /*********** External Update Functions ********** */
@@ -156,75 +126,75 @@ impl<B: Backend> State<B> {
     // through execute_txn() If called in an update txn it will mutate state
     fn submit_pod(
         &self,
-        sender: TransactionSender,
-        commodity: u128,
-        service_id: u64,
-        acknowledgments: Vec<DeliveryAcknowledgment>,
+        _sender: TransactionSender,
+        _commodity: u128,
+        _service_id: u64,
+        _acknowledgments: Vec<DeliveryAcknowledgment>,
     ) -> TransactionResponse {
         todo!()
     }
 
     fn withdraw(
         &self,
-        sender: TransactionSender,
-        reciever: AccountOwnerPublicKey,
-        amount: u128,
-        token: Tokens,
+        _sender: TransactionSender,
+        _reciever: AccountOwnerPublicKey,
+        _amount: u128,
+        _token: Tokens,
     ) -> TransactionResponse {
         todo!()
     }
 
     fn deposit(
         &self,
-        sender: TransactionSender,
-        proof: ProofOfConsensus,
-        amount: u128,
-        token: Tokens,
+        _sender: TransactionSender,
+        _proof: ProofOfConsensus,
+        _amount: u128,
+        _token: Tokens,
     ) -> TransactionResponse {
         todo!()
     }
 
     fn stake(
         &self,
-        sender: TransactionSender,
-        proof: ProofOfConsensus,
-        amount: u128,
-        node: NodePublicKey,
+        _sender: TransactionSender,
+        _proof: ProofOfConsensus,
+        _amount: u128,
+        _node: NodePublicKey,
     ) -> TransactionResponse {
         todo!()
     }
 
-    fn unstake(&self, sender: TransactionSender, amount: u128) -> TransactionResponse {
+    fn unstake(&self, _sender: TransactionSender, _amount: u128) -> TransactionResponse {
         todo!()
     }
 
-    fn change_epoch(&self, sender: TransactionSender) -> TransactionResponse {
+    fn change_epoch(&self, _sender: TransactionSender) -> TransactionResponse {
         todo!()
     }
 
     fn add_service(
         &self,
-        sender: TransactionSender,
-        service: Service,
-        service_id: ServiceId,
+        _sender: TransactionSender,
+        _service: Service,
+        _service_id: ServiceId,
     ) -> TransactionResponse {
         todo!()
     }
 
     fn remove_service(
         &self,
-        sender: TransactionSender,
-        service_id: ServiceId,
+        _sender: TransactionSender,
+        _service_id: ServiceId,
     ) -> TransactionResponse {
         todo!()
     }
 
     fn slash(
         &self,
-        sender: TransactionSender,
-        proof: ProofOfMisbehavior,
-        service_id: ServiceId,
-        node: NodePublicKey,
+        _sender: TransactionSender,
+        _proof: ProofOfMisbehavior,
+        _service_id: ServiceId,
+        _node: NodePublicKey,
     ) -> TransactionResponse {
         todo!()
     }
@@ -235,25 +205,29 @@ impl<B: Backend> State<B> {
     // Will usually only be called through query calls where msg.sender is not checked
     //      so if that is required for the function it should be made a parameter instead
 
-    fn get_flk(&self, account: AccountOwnerPublicKey) -> TransactionResponse {
+    fn get_flk(&self, _account: AccountOwnerPublicKey) -> TransactionResponse {
         todo!()
     }
-    fn get_locked(&self, account: AccountOwnerPublicKey) -> TransactionResponse {
+    fn get_locked(&self, _account: AccountOwnerPublicKey) -> TransactionResponse {
         todo!()
     }
-    fn get_bandwidth(&self, account: AccountOwnerPublicKey) -> TransactionResponse {
+    fn get_bandwidth(&self, _account: AccountOwnerPublicKey) -> TransactionResponse {
         todo!()
     }
-    fn get_staked(&self, node: NodePublicKey) -> TransactionResponse {
+    fn get_staked(&self, _node: NodePublicKey) -> TransactionResponse {
         todo!()
     }
-    fn get_reward_pool(&self, epoch: Epoch) -> TransactionResponse {
+    fn get_reward_pool(&self, _epoch: Epoch) -> TransactionResponse {
         todo!()
     }
-    fn get_total_served(&self, epoch: Epoch) -> TransactionResponse {
+    fn get_total_served(&self, _epoch: Epoch) -> TransactionResponse {
         todo!()
     }
-    fn get_node_bandwidth_served(&self, epoch: Epoch, node: NodePublicKey) -> TransactionResponse {
+    fn get_node_bandwidth_served(
+        &self,
+        _epoch: Epoch,
+        _node: NodePublicKey,
+    ) -> TransactionResponse {
         todo!()
     }
     fn get_current_epoch_info(&self) -> TransactionResponse {
@@ -266,10 +240,10 @@ impl<B: Backend> State<B> {
     // checks should be documented for each function
 
     // This function should be called during signal_epoch_change.
-    fn distribute_rewards(&self) {
+    fn _distribute_rewards(&self) {
         todo!()
     }
-    fn choose_new_committee(&self) -> Vec<NodePublicKey> {
+    fn _choose_new_committee(&self) -> Vec<NodePublicKey> {
         todo!()
     }
 }

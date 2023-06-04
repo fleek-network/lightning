@@ -80,12 +80,12 @@ pub struct QueryRunner {}
 
 impl SyncQueryRunnerInterface for QueryRunner {
     /// Returns the latest balance associated with the given peer.
-    fn get_balance(&self, client: &ClientPublicKey) -> u128 {
+    fn get_balance(&self, _client: &ClientPublicKey) -> u128 {
         todo!()
     }
 
     /// Returns the global reputation of a node.
-    fn get_reputation(&self, node: &NodePublicKey) -> u128 {
+    fn get_reputation(&self, _node: &NodePublicKey) -> u128 {
         todo!()
     }
 
@@ -96,12 +96,12 @@ impl SyncQueryRunnerInterface for QueryRunner {
     /// a relative score between two nodes.
     ///
     /// Existence of this data can allow future optimizations of the network topology.
-    fn get_relative_score(&self, n1: &NodePublicKey, n2: &NodePublicKey) -> u128 {
+    fn get_relative_score(&self, _n1: &NodePublicKey, _n2: &NodePublicKey) -> u128 {
         todo!()
     }
 
     /// Returns information about a single node.
-    fn get_node_info(&self, id: &NodePublicKey) -> Option<NodeInfo> {
+    fn get_node_info(&self, _id: &NodePublicKey) -> Option<NodeInfo> {
         todo!()
     }
 
@@ -112,7 +112,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     /// Returns true if the node is a valid node in the network, with enough stake.
-    fn is_valid_node(&self, id: &NodePublicKey) -> bool {
+    fn is_valid_node(&self, _id: &NodePublicKey) -> bool {
         todo!()
     }
 

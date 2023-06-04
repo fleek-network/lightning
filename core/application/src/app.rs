@@ -27,9 +27,7 @@ impl WithStartAndShutdown for Application {
 
     /// Start the system, should not do anything if the system is already
     /// started.
-    async fn start(&self) {
-        ()
-    }
+    async fn start(&self) {}
 
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {

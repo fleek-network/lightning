@@ -30,18 +30,18 @@ impl WithStartAndShutdown for Indexer {
 
 #[async_trait]
 impl IndexerInterface for Indexer {
-    async fn init(config: Self::Config) -> anyhow::Result<Self> {
+    async fn init(_config: Self::Config) -> anyhow::Result<Self> {
         todo!()
     }
 
     /// Publish to everyone that we have cached a content with the given `cid` successfully.
     // TODO: Put the service that caused this cid to be cached as a param here.
-    fn publish(&self, cid: &Blake3Hash) {
+    fn publish(&self, _cid: &Blake3Hash) {
         todo!()
     }
 
     /// Returns the list of top nodes that should have a content cached.
-    fn get_nodes_for_cid<Q: ReputationQueryInteface>(&self, reputation: &Q) -> Vec<u8> {
+    fn get_nodes_for_cid<Q: ReputationQueryInteface>(&self, _reputation: &Q) -> Vec<u8> {
         todo!()
     }
 }

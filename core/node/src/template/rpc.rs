@@ -31,9 +31,9 @@ impl WithStartAndShutdown for Rpc {
 impl RpcInterface for Rpc {
     /// Initialize the *RPC* server, with the given parameters.
     async fn init(
-        config: Self::Config,
-        mempool: MempoolSocket,
-        query_socket: QuerySocket,
+        _config: Self::Config,
+        _mempool: MempoolSocket,
+        _query_socket: QuerySocket,
     ) -> anyhow::Result<Self> {
         todo!()
     }

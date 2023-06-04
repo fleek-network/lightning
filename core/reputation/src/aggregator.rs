@@ -22,7 +22,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
     type ReputationQuery = MyReputationQuery;
 
     /// Create a new reputation
-    async fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
+    async fn init(_config: Self::Config, _submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
         todo!()
     }
 
@@ -54,7 +54,7 @@ impl ReputationQueryInteface for MyReputationQuery {
     type SyncQuery = QueryRunner;
 
     /// Returns the reputation of the provided node locally.
-    fn get_reputation_of(&self, peer: &NodePublicKey) -> Option<u128> {
+    fn get_reputation_of(&self, _peer: &NodePublicKey) -> Option<u128> {
         todo!()
     }
 }
@@ -64,32 +64,37 @@ pub struct MyReputationReporter {}
 
 impl ReputationReporterInterface for MyReputationReporter {
     /// Report a satisfactory (happy) interaction with the given peer.
-    fn report_sat(&self, peer: &NodePublicKey, weight: Weight) {
+    fn report_sat(&self, _peer: &NodePublicKey, _weight: Weight) {
         todo!()
     }
 
     /// Report a unsatisfactory (happy) interaction with the given peer.
-    fn report_unsat(&self, peer: &NodePublicKey, weight: Weight) {
+    fn report_unsat(&self, _peer: &NodePublicKey, _weight: Weight) {
         todo!()
     }
 
     /// Report a latency which we witnessed from another peer.
-    fn report_latency(&self, peer: &NodePublicKey, latency: Duration) {
+    fn report_latency(&self, _peer: &NodePublicKey, _latency: Duration) {
         todo!()
     }
 
     /// Report the number of (healthy) bytes which we received from another peer.
-    fn report_bytes_received(&self, peer: &NodePublicKey, bytes: u64, duration: Option<Duration>) {
+    fn report_bytes_received(
+        &self,
+        _peer: &NodePublicKey,
+        _bytes: u64,
+        _duration: Option<Duration>,
+    ) {
         todo!()
     }
 
     /// Report the number of (healthy) bytes which we sent from another peer.
-    fn report_bytes_sent(&self, peer: &NodePublicKey, bytes: u64, duration: Option<Duration>) {
+    fn report_bytes_sent(&self, _peer: &NodePublicKey, _bytes: u64, _duration: Option<Duration>) {
         todo!()
     }
 
     /// Report the number of hops we have witnessed to the given peer.
-    fn report_hops(&self, peer: &NodePublicKey, hops: u8) {
+    fn report_hops(&self, _peer: &NodePublicKey, _hops: u8) {
         todo!()
     }
 }

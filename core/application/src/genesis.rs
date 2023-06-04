@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use draco_interfaces::types::{NodeInfo, Worker};
+use draco_interfaces::types::{NodeInfo, Staking, Worker};
 use fastcrypto::{
     bls12381::min_sig::BLS12381PublicKey, ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64,
 };
@@ -28,7 +28,6 @@ pub struct GenesisAccount {
     pub public_key: String,
     pub flk_balance: u64,
     pub bandwidth_balance: u64,
-    pub staked: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -100,8 +99,9 @@ impl From<&GenesisCommittee> for NodeInfo {
             network_key: network_key.into(),
             domain,
             workers: [worker].to_vec(),
-            staked_since: todo!(),
-            stake: todo!(),
+            staked_since: 0,
+            stake: Staking::default(),
+            nonce: 0,
         }
     }
 }

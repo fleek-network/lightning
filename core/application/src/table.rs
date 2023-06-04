@@ -62,26 +62,26 @@ impl<'selector, S: SerdeBackend> Backend for StateTables<'selector, S> {
         AtomoTable(RefCell::new(self.table_selector.get_table(id)))
     }
 
-    fn verify_transaction(&self, txn: &UpdateRequest) -> Result<(), ExecutionError> {
+    fn verify_transaction(&self, _txn: &UpdateRequest) -> Result<(), ExecutionError> {
         Ok(())
     }
 
     fn verify_proof_of_delivery(
         &self,
-        client: &AccountOwnerPublicKey,
-        provider: &NodePublicKey,
-        commodity: &u128,
-        service_id: &u64,
-        proof: (),
+        _client: &AccountOwnerPublicKey,
+        _provider: &NodePublicKey,
+        _commodity: &u128,
+        _service_id: &u64,
+        _proof: (),
     ) -> bool {
         true
     }
 
-    fn verify_proof_of_consensus(&self, proof: ProofOfConsensus) -> bool {
+    fn verify_proof_of_consensus(&self, _proof: ProofOfConsensus) -> bool {
         true
     }
 
-    fn verify_proof_of_misbehavior(&self, proof: ProofOfMisbehavior) -> bool {
+    fn verify_proof_of_misbehavior(&self, _proof: ProofOfMisbehavior) -> bool {
         true
     }
 }
@@ -105,9 +105,6 @@ impl<
     }
 
     fn get(&self, key: &K) -> Option<V> {
-        match self.0.borrow_mut().get(key) {
-            Some(x) => Some(x),
-            None => None,
-        }
+        self.0.borrow_mut().get(key)
     }
 }

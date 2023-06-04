@@ -37,19 +37,19 @@ impl FileSystemInterface for FileSystem {
     /// The indexer used for this file system.
     type Indexer = Indexer;
 
-    fn new(store: &Self::BlockStore, indexer: &Self::Indexer) -> Self {
+    fn new(_store: &Self::BlockStore, _indexer: &Self::Indexer) -> Self {
         todo!()
     }
 
     /// Returns true if the given `cid` is already cached on the node.
-    fn is_cached(&self, cid: &Blake3Hash) {
+    fn is_cached(&self, _cid: &Blake3Hash) {
         todo!()
     }
 
     /// Returns the tree of the provided cid.
     async fn get_tree(
         &self,
-        cid: &Blake3Hash,
+        _cid: &Blake3Hash,
     ) -> Option<<Self::BlockStore as BlockStoreInterface>::SharedPointer<Blake3Tree>> {
         todo!()
     }
@@ -57,14 +57,14 @@ impl FileSystemInterface for FileSystem {
     /// Returns the requested chunk of data.
     async fn get(
         &self,
-        block_counter: u32,
-        block_hash: &Blake3Hash,
-        compression: CompressionAlgoSet,
+        _block_counter: u32,
+        _block_hash: &Blake3Hash,
+        _compression: CompressionAlgoSet,
     ) -> Option<<Self::BlockStore as BlockStoreInterface>::SharedPointer<ContentChunk>> {
         todo!()
     }
 
-    async fn request_download(&self, cid: &Blake3Hash) -> bool {
+    async fn request_download(&self, _cid: &Blake3Hash) -> bool {
         todo!()
     }
 }

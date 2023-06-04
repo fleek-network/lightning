@@ -1,6 +1,6 @@
 use fleek_crypto::{
-    AccountOwnerPublicKey, ClientPublicKey, NodeNetworkingPublicKey, NodePublicKey,
-    TransactionSender, TransactionSignature,
+    AccountOwnerPublicKey, NodeNetworkingPublicKey, NodePublicKey, TransactionSender,
+    TransactionSignature,
 };
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
@@ -148,7 +148,7 @@ pub enum QueryMethod {
     /// Get the balance of locked FLK a public key has
     Locked { public_key: AccountOwnerPublicKey },
     /// Get the amount of prepaid bandwidth a public key has
-    Bandwidth { public_key: ClientPublicKey },
+    Bandwidth { public_key: AccountOwnerPublicKey },
     /// Get the amount of stake a node has
     Staked { node: NodePublicKey },
     /// Get the amount of bandwidth served in an epoch
@@ -202,19 +202,25 @@ pub enum ExecutionError {
 }
 
 /// The account info stored per account on the blockchain
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
 pub struct AccountInfo {
+    /// The accounts FLK balance
     pub flk_balance: u128,
+    /// The accounts stables/bandwidth balance
     pub bandwidth_balance: u128,
+    /// The nonce of the account. Added to each transaction before signed to prevent replays and
+    /// enforce ordering
     pub nonce: u128,
-    pub staking: Staking,
 }
 
 /// Struct that stores
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
 pub struct Staking {
+    /// How much FLK that is currently staked
     pub staked: u128,
+    /// How much FLK is locked pending withdrawl
     pub locked: u128,
+    /// The epoch the locked FLK is elegible to be withdrawn
     pub locked_until: u64,
 }
 
@@ -227,14 +233,17 @@ pub struct NodeInfo {
     pub public_key: NodePublicKey,
     /// Public key that is used for fast communication signatures for this node.
     pub network_key: NodeNetworkingPublicKey,
-    /// The time stamp that this node staked at,
-    pub staked_since: u64,
+    /// The epoch that this node has been staked since,
+    pub staked_since: Epoch,
     /// The amount of stake by the node.
-    pub stake: u128,
+    pub stake: Staking,
     /// The nodes primary internet address
     pub domain: Multiaddr,
     /// A vec of all of this nodes Narwhal workers
     pub workers: Vec<Worker>,
+    /// The nonce of the node. Added to each transaction before signed to prevent replays and
+    /// enforce ordering
+    pub nonce: u128,
 }
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]

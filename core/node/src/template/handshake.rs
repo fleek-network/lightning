@@ -33,15 +33,15 @@ impl HandshakeInterface for Handshake {
     type Sdk = Sdk;
 
     /// Initialize a new delivery acknowledgment aggregator.
-    async fn init(config: Self::Config) -> anyhow::Result<Self> {
+    async fn init(_config: Self::Config) -> anyhow::Result<Self> {
         todo!()
     }
 
     fn register_service_request_handler(
         &mut self,
-        service: ServiceId,
-        sdk: Self::Sdk,
-        handler: HandlerFn<Self::Sdk>,
+        _service: ServiceId,
+        _sdk: Self::Sdk,
+        _handler: HandlerFn<Self::Sdk>,
     ) {
         todo!()
     }

@@ -9,7 +9,7 @@ pub struct TomlConfigProvider {
     /// The [`ConfigProviderInterface`] does not put any constraints on the
     /// format of the document, except that we need a `[key: string]->any`
     /// mapping. The [`Table`] is that map.
-    table: Table,
+    pub table: Table,
 }
 
 impl TomlConfigProvider {

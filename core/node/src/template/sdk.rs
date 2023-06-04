@@ -9,7 +9,7 @@ use draco_interfaces::{
     SdkInterface,
 };
 use fleek_crypto::ClientPublicKey;
-use tokio::io::{AsyncRead, AsyncWrite, Error, ReadBuf, Result};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf, Result};
 
 use super::{
     application::QueryRunner, config::Config, fs::FileSystem, reputation::MyReputationReporter,
@@ -34,10 +34,10 @@ impl SdkInterface for Sdk {
 
     /// Returns a new instance of the SDK object.
     fn new(
-        q: Self::SyncQuery,
-        r: Self::ReputationReporter,
-        f: Self::FileSystem,
-        t: SubmitTxSocket,
+        _q: Self::SyncQuery,
+        _r: Self::ReputationReporter,
+        _f: Self::FileSystem,
+        _t: SubmitTxSocket,
     ) -> Self {
         todo!()
     }
@@ -58,7 +58,7 @@ impl SdkInterface for Sdk {
     }
 
     /// Submit a transaction by the current node.
-    fn submit_transaction(&self, tx: UpdateMethod) {
+    fn submit_transaction(&self, _tx: UpdateMethod) {
         todo!()
     }
 }
@@ -108,11 +108,7 @@ impl ConnectionInterface for MyConnection {
 pub struct MyWriter {}
 
 impl AsyncWrite for MyWriter {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<Result<usize>> {
+    fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, _buf: &[u8]) -> Poll<Result<usize>> {
         // Your implementation for writing to the underlying resource goes here
         // You can use `buf` to access the bytes to write
         // Return `Poll::Ready(Ok(bytes_written))` when writing is complete
@@ -120,7 +116,7 @@ impl AsyncWrite for MyWriter {
         Poll::Ready(Ok(0)) // Dummy implementation, always returns 0 bytes written
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<()>> {
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<()>> {
         // Your implementation for flushing any buffered data goes here
         // Return `Poll::Ready(Ok(()))` when flushing is complete
 
@@ -136,9 +132,9 @@ pub struct MyReader {}
 
 impl AsyncRead for MyReader {
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
+        _buf: &mut ReadBuf<'_>,
     ) -> Poll<Result<()>> {
         // Your implementation for reading from the underlying resource goes here
         // Write the read bytes to the `buf` slice

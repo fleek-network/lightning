@@ -40,9 +40,9 @@ impl ConfigConsumer for Consensus {
 impl ConsensusInterface for Consensus {
     /// Create a new consensus service with the provided config and executor.
     async fn init<S: SignerInterface>(
-        config: Self::Config,
-        signer: &S,
-        executor: ExecutionEngineSocket,
+        _config: Self::Config,
+        _signer: &S,
+        _executor: ExecutionEngineSocket,
     ) -> anyhow::Result<Self> {
         todo!()
     }

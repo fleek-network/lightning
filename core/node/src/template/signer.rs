@@ -36,13 +36,13 @@ impl WithStartAndShutdown for Signer {
 #[async_trait]
 impl SignerInterface for Signer {
     /// Initialize the signature service.
-    async fn init(config: Self::Config) -> anyhow::Result<Self> {
+    async fn init(_config: Self::Config) -> anyhow::Result<Self> {
         todo!()
     }
 
     /// Provide the signer service with the mempool socket after initialization, this function
     /// should only be called once.
-    fn provide_mempool(&mut self, mempool: MempoolSocket) {
+    fn provide_mempool(&mut self, _mempool: MempoolSocket) {
         todo!()
     }
 
@@ -84,7 +84,7 @@ impl SignerInterface for Signer {
     /// This function is unsafe to use without proper reasoning, which is trivial since
     /// this function is responsible for signing arbitrary messages from other parts of
     /// the system.
-    fn sign_raw_digest(&self, digest: &[u8; 32]) -> NodeSignature {
+    fn sign_raw_digest(&self, _digest: &[u8; 32]) -> NodeSignature {
         todo!()
     }
 }

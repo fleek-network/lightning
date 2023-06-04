@@ -34,14 +34,14 @@ pub struct MyPut;
 
 #[async_trait]
 impl IncrementalPutInterface for MyPut {
-    fn feed_proof(&mut self, proof: &[u8]) -> Result<(), draco_interfaces::PutFeedProofError> {
+    fn feed_proof(&mut self, _proof: &[u8]) -> Result<(), draco_interfaces::PutFeedProofError> {
         todo!()
     }
 
     fn write(
         &mut self,
-        content: &[u8],
-        compression: draco_interfaces::CompressionAlgorithm,
+        _content: &[u8],
+        _compression: draco_interfaces::CompressionAlgorithm,
     ) -> Result<(), draco_interfaces::PutWriteError> {
         todo!()
     }
@@ -68,13 +68,13 @@ impl BlockStoreInterface for BlockStore {
     type Put = MyPut;
 
     /// Create a new block store from the given configuration values.
-    async fn init(config: Self::Config) -> anyhow::Result<Self> {
+    async fn init(_config: Self::Config) -> anyhow::Result<Self> {
         todo!()
     }
 
     /// Returns the Blake3 tree associated with the given CID. Returns [`None`] if the content
     /// is not present in our block store.
-    async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
+    async fn get_tree(&self, _cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
         todo!()
     }
 
@@ -89,15 +89,15 @@ impl BlockStoreInterface for BlockStore {
     /// returned.
     async fn get(
         &self,
-        block_counter: u32,
-        block_hash: &Blake3Hash,
-        compression: CompressionAlgoSet,
+        _block_counter: u32,
+        _block_hash: &Blake3Hash,
+        _compression: CompressionAlgoSet,
     ) -> Option<Self::SharedPointer<ContentChunk>> {
         todo!()
     }
 
     /// Create a putter that can be used to write a content into the block store.
-    fn put(&self, cid: Option<Blake3Hash>) -> Self::Put {
+    fn put(&self, _cid: Option<Blake3Hash>) -> Self::Put {
         todo!()
     }
 }

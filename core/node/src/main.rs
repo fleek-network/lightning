@@ -6,9 +6,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use draco_interfaces::{
-    application::ApplicationInterface as _, common::WithStartAndShutdown as _, Node,
-};
+use draco_interfaces::{common::WithStartAndShutdown as _, Node};
 use tokio::macros::support::Pin;
 use tokio_stream::Stream;
 
@@ -26,7 +24,7 @@ pub struct MyStream {}
 impl Stream for MyStream {
     type Item = bytes::BytesMut;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         todo!()
     }
 

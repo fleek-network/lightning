@@ -4,23 +4,23 @@ use draco_interfaces::{application::SyncQueryRunnerInterface, types::NodeInfo};
 pub struct QueryRunner {}
 
 impl SyncQueryRunnerInterface for QueryRunner {
-    fn get_balance(&self, client: &fleek_crypto::ClientPublicKey) -> u128 {
+    fn get_balance(&self, _client: &fleek_crypto::ClientPublicKey) -> u128 {
         todo!()
     }
 
-    fn get_reputation(&self, node: &fleek_crypto::NodePublicKey) -> u128 {
+    fn get_reputation(&self, _node: &fleek_crypto::NodePublicKey) -> u128 {
         todo!()
     }
 
     fn get_relative_score(
         &self,
-        n1: &fleek_crypto::NodePublicKey,
-        n2: &fleek_crypto::NodePublicKey,
+        _n1: &fleek_crypto::NodePublicKey,
+        _n2: &fleek_crypto::NodePublicKey,
     ) -> u128 {
         todo!()
     }
 
-    fn get_node_info(&self, id: &fleek_crypto::NodePublicKey) -> Option<NodeInfo> {
+    fn get_node_info(&self, _id: &fleek_crypto::NodePublicKey) -> Option<NodeInfo> {
         todo!()
     }
 
@@ -28,7 +28,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
         todo!()
     }
 
-    fn is_valid_node(&self, id: &fleek_crypto::NodePublicKey) -> bool {
+    fn is_valid_node(&self, _id: &fleek_crypto::NodePublicKey) -> bool {
         todo!()
     }
 

@@ -2,7 +2,7 @@ use affair::{AsyncWorker, Worker as WorkerTrait};
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use draco_interfaces::{
     types::{
-        Block, Epoch, ExecutionData, Metadata, NodeInfo, ProtocolParams, QueryRequest,
+        AccountInfo, Block, Epoch, ExecutionData, Metadata, NodeInfo, ProtocolParams, QueryRequest,
         QueryResponse, Service, ServiceId, TransactionResponse,
     },
     BlockExecutionResponse,
@@ -12,7 +12,7 @@ use fleek_crypto::{AccountOwnerPublicKey, NodePublicKey};
 
 use crate::{
     genesis::Genesis,
-    state::{AccountInfo, BandwidthInfo, Committee, Staking, State},
+    state::{BandwidthInfo, Committee, State},
     table::StateTables,
 };
 
@@ -34,9 +34,6 @@ impl Env<UpdatePerm> {
 
         Self { inner: atomo }
     }
-}
-
-impl Env<UpdatePerm> {
     fn run(&mut self, block: Block) -> BlockExecutionResponse {
         self.inner.run(move |ctx| {
             let backend = StateTables {
@@ -107,28 +104,10 @@ impl Env<UpdatePerm> {
             let mut committee_members = Vec::with_capacity(genesis.committee.len());
 
             for node in &genesis.committee {
-                let stake = node.staking;
-                let node_info: NodeInfo = node.into();
-
-                let owner = node_info.owner.clone();
+                let mut node_info: NodeInfo = node.into();
+                node_info.stake.staked = genesis.min_stake as u128;
                 committee_members.push(node_info.public_key);
 
-                // If stake amount is specified add it to the owner account
-                if let Some(stake) = stake {
-                    account_table.insert(
-                        owner.clone(),
-                        AccountInfo {
-                            flk_balance: 0,
-                            bandwidth_balance: 0,
-                            nonce: 0,
-                            staking: Staking {
-                                staked: stake.into(),
-                                locked: 0,
-                                locked_until: 0,
-                            },
-                        },
-                    )
-                }
                 node_table.insert(node_info.public_key, node_info);
             }
 
@@ -137,7 +116,7 @@ impl Env<UpdatePerm> {
                 Committee {
                     ready_to_change: Vec::with_capacity(committee_members.len()),
                     members: committee_members,
-                    epoch_end_timestamp: epoch_end.try_into().unwrap(),
+                    epoch_end_timestamp: epoch_end,
                 },
             );
 
@@ -162,15 +141,16 @@ impl Env<UpdatePerm> {
                     flk_balance: account.flk_balance.into(),
                     bandwidth_balance: account.bandwidth_balance.into(),
                     nonce: 0,
-                    staking: Staking {
-                        staked: account.staked.into(),
-                        locked: 0,
-                        locked_until: 0,
-                    },
                 };
                 account_table.insert(public_key, info);
             }
         })
+    }
+}
+
+impl Default for Env<UpdatePerm> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
