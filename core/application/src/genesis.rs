@@ -6,7 +6,7 @@ use fastcrypto::{
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Genesis {
     pub epoch_start: u64,
     pub epoch_time: u64,
@@ -23,20 +23,20 @@ pub struct Genesis {
     pub account: Vec<GenesisAccount>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenesisAccount {
     pub public_key: String,
     pub flk_balance: u64,
     pub bandwidth_balance: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenesisService {
     pub id: u32,
     pub commodity_price: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenesisCommittee {
     owner: String,
     primary_public_key: String,
@@ -71,10 +71,8 @@ impl From<&GenesisCommittee> for NodeInfo {
 
         let public_key = BLS12381PublicKey::decode_base64(&value.primary_public_key)
             .unwrap()
-            .bytes
-            .clone()
-            .into_inner()
-            .unwrap();
+            .pubkey
+            .to_bytes();
 
         let network_key = Ed25519PublicKey::decode_base64(&value.network_key)
             .unwrap()

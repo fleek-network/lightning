@@ -13,7 +13,7 @@ use fleek_crypto::{AccountOwnerPublicKey, NodePublicKey};
 use crate::{
     genesis::Genesis,
     state::{BandwidthInfo, Committee, State},
-    table::StateTables,
+    table::{Backend, StateTables},
 };
 
 pub struct Env<P> {
@@ -36,10 +36,13 @@ impl Env<UpdatePerm> {
     }
     fn run(&mut self, block: Block) -> BlockExecutionResponse {
         self.inner.run(move |ctx| {
+            // Create the app/execution enviroment
             let backend = StateTables {
                 table_selector: ctx,
             };
+            let app = State::new(backend);
 
+            // Create block response
             let mut response = BlockExecutionResponse {
                 block_hash: Default::default(),
                 change_epoch: false,
@@ -47,26 +50,37 @@ impl Env<UpdatePerm> {
                 txn_receipts: Vec::with_capacity(block.transactions.len()),
             };
 
-            let app = State::new(backend);
-
+            // Execute each transaction and add the results to the block response
             for txn in &block.transactions {
-                let receipt = app.execute_txn(txn.clone());
+                // Verify the signature and nonce and then execute the transactions
+                let receipt = if let Err(error) = app.backend.verify_transaction(txn) {
+                    TransactionResponse::Revert(error)
+                } else {
+                    app.execute_txn(txn.clone())
+                };
+                // If the transaction moved the epoch forward, aknowledge that in the block response
                 if let TransactionResponse::Success(ExecutionData::EpochChange) = receipt {
                     response.change_epoch = true;
                 }
+                /* Todo(dalton): Check if the transaction resulted in the committee change(Like a current validator getting slashed)
+                    if so aknowledge that in the block response
+                */
                 response.txn_receipts.push(receipt);
             }
 
+            // Return the response
             response
         })
     }
 
+    /// Returns an identical enviroment but with query permissions
     pub fn query(&self) -> Env<QueryPerm> {
         Env {
             inner: self.inner.query(),
         }
     }
 
+    /// Seeds the application state with the genesis block
     /// This function will panic if the genesis file cannot be decoded into the correct types
     pub fn genesis(&mut self) {
         self.inner.run(|ctx| {
@@ -155,6 +169,7 @@ impl Default for Env<UpdatePerm> {
 }
 
 impl Env<QueryPerm> {
+    /// Runs a query transaction on the application state
     fn run(&self, transaction: QueryRequest) -> TransactionResponse {
         self.inner.run(|ctx| {
             let backend = StateTables {
@@ -166,6 +181,7 @@ impl Env<QueryPerm> {
     }
 }
 
+/// The socket that recieves all update transactions
 pub struct UpdateWorker {
     env: Env<UpdatePerm>,
 }
@@ -180,16 +196,11 @@ impl WorkerTrait for UpdateWorker {
     type Request = Block;
     type Response = BlockExecutionResponse;
     fn handle(&mut self, req: Self::Request) -> Self::Response {
-        // 1. Verify Signature and Nonce
-        // Note(Dalton), this check will probably be moved to execute_txn function, and backend Arc
-        // will probably only be stored there as well if let Err(err) =
-        // self.backend.verify_transaction(&req) {     return
-        // TransactionResponse::Revert(err); }
-        // 2. Execute the transaction based on the transaction type
         self.env.run(req)
     }
 }
 
+/// The socket that handles all querys to the application
 pub struct QueryWorker {
     env: Env<QueryPerm>,
 }
@@ -205,7 +216,6 @@ impl AsyncWorker for QueryWorker {
     type Request = QueryRequest;
     type Response = QueryResponse;
     async fn handle(&mut self, req: Self::Request) -> Self::Response {
-        // 1. Just execute transaction and return results, no need to do signature verification
         let response = self.env.run(req);
         bincode::serialize(&response).unwrap()
     }

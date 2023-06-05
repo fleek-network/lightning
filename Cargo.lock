@@ -817,6 +817,7 @@ dependencies = [
  "fleek-crypto",
  "multiaddr",
  "serde",
+ "tokio",
  "toml 0.7.4",
 ]
 

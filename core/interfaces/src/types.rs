@@ -66,7 +66,7 @@ pub struct QueryRequest {
 #[derive(Debug, Hash, Clone)]
 pub struct UpdatePayload {
     /// The counter or nonce of this request.
-    pub counter: u64,
+    pub nonce: u64,
     /// The transition function (and parameters) for this update request.
     pub method: UpdateMethod,
 }
@@ -107,16 +107,31 @@ pub enum UpdateMethod {
     },
     /// Stake FLK in network
     Stake {
-        /// The proof of the bridge recieved from the L2,
-        proof: ProofOfConsensus,
-        /// Amount bridged
+        /// Amount to stake
         amount: u128,
         /// Node Public Key
-        node: NodePublicKey,
+        node_public_key: NodePublicKey,
+        /// Node networking key for narwhal
+        node_network_key: Option<NodeNetworkingPublicKey>,
+        /// Nodes primary internet address
+        node_domain: Option<String>,
+        /// Worker public Key
+        worker_public_key: Option<NodeNetworkingPublicKey>,
+        /// internet address for the worker
+        worker_domain: Option<String>,
+        /// internet address for workers mempool
+        worker_mempool_address: Option<String>,
     },
     /// Unstake FLK, the tokens will be locked for a set amount of
     /// time(ProtocolParameter::LockTime) before they can be withdrawn
-    Unstake { amount: u128 },
+    Unstake { amount: u128, node: NodePublicKey },
+    /// Withdraw tokens from a node after lock period has passed
+    /// must be submitted by node owner but optionally they can provide a different public key to
+    /// recieve the tokens
+    WithdrawUnstaked {
+        node: NodePublicKey,
+        recipient: Option<AccountOwnerPublicKey>,
+    },
     /// Sent by committee member to signal he is ready to change epoch
     ChangeEpoch,
     /// Adding a new service to the protocol
@@ -146,7 +161,9 @@ pub enum QueryMethod {
     /// Get the balance of unlocked FLK a public key has
     FLK { public_key: AccountOwnerPublicKey },
     /// Get the balance of locked FLK a public key has
-    Locked { public_key: AccountOwnerPublicKey },
+    Locked { public_key: NodePublicKey },
+    /// Get the epoch locked tokens will become unlocked
+    LockedUntil { public_key: NodePublicKey },
     /// Get the amount of prepaid bandwidth a public key has
     Bandwidth { public_key: AccountOwnerPublicKey },
     /// Get the amount of stake a node has
@@ -191,18 +208,25 @@ pub enum ExecutionData {
 /// Error type for transaction execution on the application layer
 #[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize)]
 pub enum ExecutionError {
+    InsufficientBalance,
     InvalidSignature,
     InvalidNonce,
     InvalidProof,
+    InvalidInternetAddress,
+    InsufficientNodeDetails,
+    NoLockedTokens,
+    TokensLocked,
     NotNodeOwner,
     NotCommitteeMember,
     NodeDoesNotExist,
     AlreadySignaled,
     NonExistingService,
+    OnlyAccountOwner,
+    OnlyNode,
 }
 
 /// The account info stored per account on the blockchain
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
 pub struct AccountInfo {
     /// The accounts FLK balance
     pub flk_balance: u128,
