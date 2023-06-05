@@ -125,7 +125,7 @@ pub trait IncrementalPutInterface {
     /// Write the proof for the buffer.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError>;
 
-    /// Write the content. If there has been a call to `write_proof`, an incremental
+    /// Write the content. If there has been a call to `feed_proof`, an incremental
     /// validation will happen.
     fn write(
         &mut self,
