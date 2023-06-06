@@ -10,8 +10,8 @@ use crate::{
 };
 
 /// The request handler of a service.
-pub type HandlerFn<'a, 'b, 'c, S> =
-    fn(&'a S, &'b mut <S as SdkInterface>::Connection) -> Pin<Box<dyn Future<Output = ()> + 'c>>;
+pub type HandlerFn<'a, S> =
+    fn(S, <S as SdkInterface>::Connection) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
 #[async_trait]
 pub trait SdkInterface: Clone + Send + Sync + 'static {
@@ -50,10 +50,17 @@ pub trait SdkInterface: Clone + Send + Sync + 'static {
 
 pub trait ConnectionInterface: Send + Sync {
     /// The writer half of this connection.
-    type Writer: AsyncWrite;
+    type Writer: AsyncWrite + Unpin + Send + Sync;
 
     /// The reader half of this connection.
-    type Reader: AsyncRead;
+    type Reader: AsyncRead + Unpin + Send + Sync;
+
+    fn new(
+        reader: Self::Reader,
+        writer: Self::Writer,
+        lane: u8,
+        client_id: ClientPublicKey,
+    ) -> Self;
 
     /// Split the connection to the `writer` and `reader` half and returns a mutable reference to
     /// both sides.

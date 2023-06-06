@@ -158,7 +158,7 @@ impl<
         }
     }
 
-    pub fn register_service<'a: 'c, 'b: 'c, 'c, S: FnOnce(&Sdk) -> HandlerFn<'a, 'b, 'c, Sdk>>(
+    pub fn register_service<S: FnOnce(Sdk) -> HandlerFn<'static, Sdk>>(
         &mut self,
         id: ServiceId,
         setup: S,
@@ -170,7 +170,7 @@ impl<
             self.signer.get_socket(),
         );
 
-        let handler = setup(&sdk);
+        let handler = setup(sdk.clone());
 
         self.handshake
             .register_service_request_handler(id, sdk, handler);
