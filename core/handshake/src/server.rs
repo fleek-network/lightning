@@ -325,7 +325,10 @@ mod tests {
         },
     };
 
-    use crate::dummy::{FileSystem, MyReputationReporter, QueryRunner, Sdk, Signer};
+    use crate::{
+        client::HandshakeClient,
+        dummy::{FileSystem, MyReputationReporter, QueryRunner, Sdk, Signer},
+    };
 
     struct TcpProvider {
         listener: TcpListener,
@@ -351,7 +354,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn hello_world() -> anyhow::Result<()> {
+    async fn hello_world_service() -> anyhow::Result<()> {
         // server setup
         let signer = TokioSpawn::spawn(Signer {});
         let sdk = Sdk::new(
@@ -375,41 +378,24 @@ mod tests {
             })
         });
 
-        // start the server
         server.start().await;
         assert!(server.is_running());
 
-        // dial the server as a client
+        // dial the server and create a client
         let (read, write) = TcpStream::connect("0.0.0.0:6969").await?.into_split();
-        let mut conn = HandshakeConnection::new(read, write);
-        {
-            // write handshake req
-            conn.write_frame(HandshakeFrame::HandshakeRequest {
-                version: 0,
-                supported_compression_bitmap: 0,
-                pubkey: ClientPublicKey([0u8; 20]),
-                resume_lane: None,
-            })
-            .await?;
+        let mut client = HandshakeClient::new(read, write, ClientPublicKey([0u8; 20]));
 
-            // read handshake res
-            match conn.read_frame(None).await? {
-                Some(HandshakeFrame::HandshakeResponse { .. }) => {},
-                _ => unreachable!(),
-            }
+        // send a handshake
+        client.handshake().await?;
 
-            // request the service from above
-            conn.write_frame(HandshakeFrame::ServiceRequest { service_id: 0 })
-                .await?;
+        // start a service request
+        let (mut r, _) = client.request(0).await?;
 
-            // service subprotocol
-            let (mut r, _) = conn.finish();
-            let mut buf = [0u8; 11];
-            r.read_exact(&mut buf).await?;
-            assert_eq!(String::from_utf8_lossy(&buf), "hello draco");
-        }
+        // service subprotocol
+        let mut buf = [0u8; 11];
+        r.read_exact(&mut buf).await?;
+        assert_eq!(String::from_utf8_lossy(&buf), "hello draco");
 
-        // shutdown the server
         server.shutdown().await;
         assert!(!server.is_running());
 
