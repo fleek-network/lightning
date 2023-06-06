@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use criterion::{measurement::Measurement, *};
 use draco_handshake::connection::{HandshakeConnection, HandshakeFrame, Reason};
+use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
 use futures::executor::block_on;
 use tokio::sync::Mutex;
 
@@ -110,35 +111,34 @@ fn bench_codec_group(c: &mut Criterion) {
     let frame = HandshakeFrame::HandshakeRequest {
         version: 0,
         supported_compression_bitmap: 0,
-        pubkey: [3u8; 48],
+        pubkey: ClientPublicKey([0u8; 20]),
         resume_lane: None,
     };
     bench_frame(&mut g, frame, "handshake_request");
 
     let frame = HandshakeFrame::HandshakeResponse {
-        pubkey: [3u8; 33],
+        pubkey: NodePublicKey([3u8; 96]),
         nonce: 65535,
         lane: 0,
     };
     bench_frame(&mut g, frame, "handshake_response");
 
     let frame = HandshakeFrame::HandshakeResponseUnlock {
-        pubkey: [3u8; 33],
+        pubkey: NodePublicKey([3u8; 96]),
         nonce: 65535,
         lane: 0,
         last_bytes: 420,
-        last_service_id: [0u8; 32],
+        last_service_id: 0,
         last_signature: [3u8; 96],
     };
     bench_frame(&mut g, frame, "handshake_response_unlock");
 
-    let frame = HandshakeFrame::ServiceRequest {
-        service_id: [3u8; 32],
-    };
+    let frame = HandshakeFrame::ServiceRequest { service_id: 0 };
     bench_frame(&mut g, frame, "service_request");
 
     let frame = HandshakeFrame::DeliveryAcknowledgement {
-        signature: [3u8; 96],
+        // TODO: get size for client signature in fleek_crypto
+        signature: ClientSignature,
     };
     bench_frame(&mut g, frame, "delivery_acknowledgement");
 

@@ -6,10 +6,12 @@ use arrayref::array_ref;
 use arrayvec::ArrayVec;
 use bytes::BytesMut;
 use consts::*;
+use draco_interfaces::types::ServiceId;
+use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
 use futures::executor::block_on;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-use crate::types::{BlsPublicKey, BlsSignature, Hash, Nonce, Secp256k1PublicKey};
+use crate::types::{BlsSignature, Nonce};
 
 /// Constant values for the codec.
 pub mod consts {
@@ -17,6 +19,8 @@ pub mod consts {
     pub const NETWORK: [u8; 5] = *b"DRACO";
     /// Maximum size for a frame
     pub const MAX_FRAME_SIZE: usize = 1024;
+    /// Maximum number of lanes for a single client
+    pub const MAX_LANES: usize = 24;
 
     /// [`super::HandshakeFrame::HandshakeRequest`]
     pub const HANDSHAKE_REQ_TAG: u8 = 0x01 << 0;
@@ -26,8 +30,9 @@ pub mod consts {
     pub const HANDSHAKE_RES_UNLOCK_TAG: u8 = 0x01 << 2;
     /// [`super::HandshakeFrame::DeliveryAcknowledgement`]
     pub const DELIVERY_ACK_TAG: u8 = 0x01 << 3;
-    /// [`super::UrsaFrame::ServiceRequest`]
+    /// [`super::HandshakeFrame::ServiceRequest`]
     pub const SERVICE_REQ_TAG: u8 = 0x01 << 4;
+
     /// The bit flag used for termination signals, to gracefully end a connection with a reason.
     pub const TERMINATION_FLAG: u8 = 0b10000000;
 
@@ -114,11 +119,11 @@ impl FrameTag {
     #[inline(always)]
     pub fn size_hint(&self) -> usize {
         match self {
-            FrameTag::HandshakeRequest => 57,
-            FrameTag::HandshakeResponse => 43,
-            FrameTag::HandshakeResponseUnlock => 179,
+            FrameTag::HandshakeRequest => 29,
+            FrameTag::HandshakeResponse => 106,
+            FrameTag::HandshakeResponseUnlock => 214,
             FrameTag::DeliveryAcknowledgement => 97,
-            FrameTag::ServiceRequest => 33,
+            FrameTag::ServiceRequest => 5,
             FrameTag::TerminationSignal => 1,
         }
     }
@@ -135,29 +140,29 @@ pub enum HandshakeFrame {
     HandshakeRequest {
         version: u8,
         supported_compression_bitmap: u8,
-        pubkey: BlsPublicKey,
+        pubkey: ClientPublicKey,
         resume_lane: Option<u8>,
     },
     /// Node response to assign an open lane.
     HandshakeResponse {
         lane: u8,
-        pubkey: Secp256k1PublicKey,
+        pubkey: NodePublicKey,
         nonce: Nonce,
     },
     /// Node response to confirm resuming a lane.
     HandshakeResponseUnlock {
-        pubkey: Secp256k1PublicKey,
+        pubkey: NodePublicKey,
         nonce: Nonce,
         lane: u8,
         last_bytes: u64,
-        last_service_id: [u8; 32],
+        last_service_id: ServiceId,
         last_signature: BlsSignature,
     },
     /// Client acknowledgment that a block was delivered.
     /// These are batched and submitted by the node for rewards
-    DeliveryAcknowledgement { signature: BlsSignature },
+    DeliveryAcknowledgement { signature: ClientSignature },
     /// Client request to start a service subprotocol
-    ServiceRequest { service_id: Hash },
+    ServiceRequest { service_id: ServiceId },
     /// Signal from the node the connection was terminated, with a reason.
     TerminationSignal(Reason),
 }
@@ -239,12 +244,12 @@ where
                 self.writer.write_u8(reason as u8).await?;
             },
             HandshakeFrame::HandshakeRequest {
-                version,
-                pubkey,
-                supported_compression_bitmap,
-                resume_lane: lane,
+                version,                      // 1
+                pubkey,                       // 20
+                supported_compression_bitmap, // 1
+                resume_lane: lane,            // 1
             } => {
-                let mut buf = ArrayVec::<u8, 57>::new_const();
+                let mut buf = ArrayVec::<u8, 30>::new_const();
                 debug_assert_eq!(NETWORK.len(), 5);
 
                 buf.push(FrameTag::HandshakeRequest as u8);
@@ -252,57 +257,58 @@ where
                 buf.push(version);
                 buf.push(supported_compression_bitmap);
                 buf.push(lane.unwrap_or(0xFF));
-                buf.write_all(&pubkey).unwrap();
+                buf.write_all(&pubkey.0).unwrap();
 
                 self.writer.write_all(&buf).await?;
             },
             HandshakeFrame::HandshakeResponse {
-                pubkey,
-                nonce,
-                lane,
+                pubkey, // 96
+                nonce,  // 8
+                lane,   // 1
             } => {
-                let mut buf = ArrayVec::<u8, 43>::new_const();
+                let mut buf = ArrayVec::<u8, 106>::new_const();
 
                 buf.push(FrameTag::HandshakeResponse as u8);
                 buf.push(lane);
-                buf.write_all(&pubkey).unwrap();
+                buf.write_all(&pubkey.0).unwrap();
                 buf.write_all(&nonce.to_be_bytes()).unwrap();
 
                 self.writer.write_all(&buf).await?;
             },
             HandshakeFrame::HandshakeResponseUnlock {
-                pubkey,
-                nonce,
-                lane,
-                last_service_id,
-                last_bytes,
-                last_signature,
+                pubkey,          // 96
+                nonce,           // 8
+                lane,            // 1
+                last_service_id, // 4
+                last_bytes,      // 8
+                last_signature,  // 96
             } => {
-                let mut buf = ArrayVec::<u8, 179>::new_const();
+                let mut buf = ArrayVec::<u8, 214>::new_const();
 
                 buf.push(FrameTag::HandshakeResponseUnlock as u8);
                 buf.push(lane);
-                buf.write_all(&pubkey).unwrap();
+                buf.write_all(&pubkey.0).unwrap();
                 buf.write_all(&nonce.to_be_bytes()).unwrap();
-                buf.write_all(&last_service_id).unwrap();
+                buf.write_all(&last_service_id.to_be_bytes()).unwrap();
                 buf.write_all(&last_bytes.to_be_bytes()).unwrap();
                 buf.write_all(&last_signature).unwrap();
 
                 self.writer.write_all(&buf).await?;
             },
-            HandshakeFrame::DeliveryAcknowledgement { signature } => {
+            HandshakeFrame::DeliveryAcknowledgement { .. } => {
                 let mut buf = ArrayVec::<u8, 97>::new_const();
 
                 buf.push(FrameTag::DeliveryAcknowledgement as u8);
-                buf.write_all(&signature).unwrap();
+                // TODO: Get a size for client signature in fleek-crypto
+                buf.write_all(&[0u8; 96]).unwrap();
 
                 self.writer.write_all(&buf).await?;
             },
             HandshakeFrame::ServiceRequest { service_id } => {
-                let mut buf = ArrayVec::<u8, 33>::new_const();
+                let mut buf = ArrayVec::<u8, 5>::new_const();
 
                 buf.push(FrameTag::ServiceRequest as u8);
-                buf.write_all(&service_id).unwrap();
+                buf.write_all(&service_id.to_be_bytes()).unwrap();
 
                 self.writer.write_all(&buf).await?;
             },
@@ -390,7 +396,7 @@ where
                     0xFF => None,
                     v => Some(v),
                 };
-                let pubkey = *array_ref!(buf, 9, 48);
+                let pubkey = ClientPublicKey(*array_ref!(buf, 9, 20));
 
                 Ok(Some(HandshakeFrame::HandshakeRequest {
                     version,
@@ -402,8 +408,8 @@ where
             FrameTag::HandshakeResponse => {
                 let buf = self.buffer.split_to(size_hint);
                 let lane = buf[1];
-                let pubkey = *array_ref!(buf, 2, 33);
-                let nonce = u64::from_be_bytes(*array_ref!(buf, 35, 8));
+                let pubkey = NodePublicKey(*array_ref!(buf, 2, 96));
+                let nonce = u64::from_be_bytes(*array_ref!(buf, 98, 8));
 
                 Ok(Some(HandshakeFrame::HandshakeResponse {
                     pubkey,
@@ -414,11 +420,11 @@ where
             FrameTag::HandshakeResponseUnlock => {
                 let buf = self.buffer.split_to(size_hint);
                 let lane = buf[1];
-                let pubkey = *array_ref!(buf, 2, 33);
-                let nonce = u64::from_be_bytes(*array_ref!(buf, 35, 8));
-                let last_service_id = *array_ref!(buf, 43, 32);
-                let last_bytes = u64::from_be_bytes(*array_ref!(buf, 75, 8));
-                let last_signature = *array_ref!(buf, 83, 96);
+                let pubkey = NodePublicKey(*array_ref!(buf, 2, 96));
+                let nonce = u64::from_be_bytes(*array_ref!(buf, 98, 8));
+                let last_service_id = u32::from_be_bytes(*array_ref!(buf, 106, 4));
+                let last_bytes = u64::from_be_bytes(*array_ref!(buf, 110, 8));
+                let last_signature = *array_ref!(buf, 118, 96);
 
                 Ok(Some(HandshakeFrame::HandshakeResponseUnlock {
                     pubkey,
@@ -431,13 +437,16 @@ where
             },
             FrameTag::DeliveryAcknowledgement => {
                 let buf = self.buffer.split_to(size_hint);
-                let signature = *array_ref!(buf, 1, 96);
+                let _signature = *array_ref!(buf, 1, 96);
 
-                Ok(Some(HandshakeFrame::DeliveryAcknowledgement { signature }))
+                // TODO: get size for client signature in fleek-crypto
+                Ok(Some(HandshakeFrame::DeliveryAcknowledgement {
+                    signature: ClientSignature,
+                }))
             },
             FrameTag::ServiceRequest => {
                 let buf = self.buffer.split_to(size_hint);
-                let service_id = *array_ref!(buf, 1, 32);
+                let service_id = u32::from_be_bytes(*array_ref!(buf, 1, 4));
 
                 Ok(Some(HandshakeFrame::ServiceRequest { service_id }))
             },
@@ -512,7 +521,7 @@ mod tests {
             version: 0,
             supported_compression_bitmap: 0,
             resume_lane: None,
-            pubkey: [1u8; 48],
+            pubkey: ClientPublicKey([1u8; 20]),
         })
         .await
     }
@@ -522,15 +531,15 @@ mod tests {
         encode_decode(HandshakeFrame::HandshakeResponse {
             lane: 0,
             nonce: 1000,
-            pubkey: [1; 33],
+            pubkey: NodePublicKey([1; 96]),
         })
         .await?;
 
         encode_decode(HandshakeFrame::HandshakeResponseUnlock {
             lane: 0,
             nonce: 1000,
-            pubkey: [2; 33],
-            last_service_id: [0; 32],
+            pubkey: NodePublicKey([2; 96]),
+            last_service_id: 0,
             last_bytes: 1000,
             last_signature: [3; 96],
         })
@@ -539,15 +548,15 @@ mod tests {
 
     #[tokio::test]
     async fn service_req() -> TResult {
-        encode_decode(HandshakeFrame::ServiceRequest {
-            service_id: [0; 32],
-        })
-        .await
+        encode_decode(HandshakeFrame::ServiceRequest { service_id: 0 }).await
     }
 
     #[tokio::test]
     async fn decryption_key_req() -> TResult {
-        encode_decode(HandshakeFrame::DeliveryAcknowledgement { signature: [1; 96] }).await
+        encode_decode(HandshakeFrame::DeliveryAcknowledgement {
+            signature: ClientSignature,
+        })
+        .await
     }
 
     #[tokio::test]

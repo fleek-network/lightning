@@ -15,12 +15,19 @@ bytes = "1.4"
 tokio.workspace = true
 futures = "0.3"
 
+fleek-crypto = { path = "../../lib/fleek-crypto" }
+
+# Server
+draco-interfaces = { path = "../interfaces", optional = true }
+dashmap = { version = "5.4", optional = true }
+
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
+affair.workspace = true
 
 [features]
 default = ["server", "client"]
-server = []
+server = ["draco-interfaces", "dashmap"]
 client = []
 
 [[bench]]
