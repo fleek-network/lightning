@@ -33,10 +33,10 @@ pub struct Node<
     ReputationAggregator: ReputationAggregatorInterface,
     Rpc: RpcInterface,
     Sdk: SdkInterface<
-        SyncQuery = Application::SyncExecutor,
-        ReputationReporter = ReputationAggregator::ReputationReporter,
-        FileSystem = FileSystem,
-    >,
+            SyncQuery = Application::SyncExecutor,
+            ReputationReporter = ReputationAggregator::ReputationReporter,
+            FileSystem = FileSystem,
+        >,
     Handshake: HandshakeInterface<Sdk = Sdk>,
 > {
     pub configuration: ConfigProvider,
@@ -67,10 +67,10 @@ impl<
     ReputationAggregator: ReputationAggregatorInterface,
     Rpc: RpcInterface,
     Sdk: SdkInterface<
-        SyncQuery = Application::SyncExecutor,
-        ReputationReporter = ReputationAggregator::ReputationReporter,
-        FileSystem = FileSystem,
-    >,
+            SyncQuery = Application::SyncExecutor,
+            ReputationReporter = ReputationAggregator::ReputationReporter,
+            FileSystem = FileSystem,
+        >,
     Handshake: HandshakeInterface<Sdk = Sdk>,
 >
     Node<
@@ -200,10 +200,10 @@ impl<
     ReputationAggregator: ReputationAggregatorInterface,
     Rpc: RpcInterface,
     Sdk: SdkInterface<
-        SyncQuery = Application::SyncExecutor,
-        ReputationReporter = ReputationAggregator::ReputationReporter,
-        FileSystem = FileSystem,
-    >,
+            SyncQuery = Application::SyncExecutor,
+            ReputationReporter = ReputationAggregator::ReputationReporter,
+            FileSystem = FileSystem,
+        >,
     Handshake: HandshakeInterface<Sdk = Sdk>,
 > WithStartAndShutdown
     for Node<

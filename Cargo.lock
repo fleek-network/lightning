@@ -939,6 +939,7 @@ dependencies = [
  "draco-interfaces",
  "fleek-crypto",
  "serde",
+ "tokio",
 ]
 
 [[package]]
