@@ -7,60 +7,11 @@ use draco_interfaces::{
     ReputationQueryInteface, ReputationReporterInterface, Weight,
 };
 use fleek_crypto::NodePublicKey;
-use tokio::sync::mpsc;
 
 use crate::config::Config;
 
-#[allow(dead_code)]
-pub struct ReputationAggregator {
-    report_rx: mpsc::Receiver<ReportMessage>,
-    reporter: MyReputationReporter,
-}
-
-#[allow(dead_code)]
-impl ReputationAggregator {
-    async fn start(mut self) -> anyhow::Result<()> {
-        loop {
-            let report_msg = self
-                .report_rx
-                .recv()
-                .await
-                .expect("Failed to receive report message.");
-            self.handle_report(report_msg);
-        }
-    }
-
-    fn handle_report(&mut self, report_msg: ReportMessage) {
-        match report_msg {
-            ReportMessage::Sat {
-                peer: _peer,
-                weight: _weight,
-            } => {},
-            ReportMessage::Unsat {
-                peer: _peer,
-                weight: _weight,
-            } => {},
-            ReportMessage::Latency {
-                peer: _peer,
-                latency: _latency,
-            } => {},
-            ReportMessage::BytesReceived {
-                peer: _peer,
-                bytes: _bytes,
-                duration: _duration,
-            } => {},
-            ReportMessage::BytesSent {
-                peer: _peer,
-                bytes: _bytes,
-                duration: _duration,
-            } => {},
-            ReportMessage::Hops {
-                peer: _peer,
-                hops: _hops,
-            } => {},
-        }
-    }
-}
+#[derive(Clone)]
+pub struct ReputationAggregator {}
 
 #[async_trait]
 impl ReputationAggregatorInterface for ReputationAggregator {
@@ -72,11 +23,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
 
     /// Create a new reputation
     async fn init(_config: Self::Config, _submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
-        let (report_tx, report_rx) = mpsc::channel(2048);
-        Ok(Self {
-            report_rx,
-            reporter: MyReputationReporter::new(report_tx),
-        })
+        todo!()
     }
 
     /// Called by the scheduler to notify that it is time to submit the aggregation, to do
@@ -113,106 +60,43 @@ impl ReputationQueryInteface for MyReputationQuery {
 }
 
 #[derive(Clone)]
-pub struct MyReputationReporter {
-    tx: mpsc::Sender<ReportMessage>,
-}
-
-impl MyReputationReporter {
-    fn new(tx: mpsc::Sender<ReportMessage>) -> Self {
-        Self { tx }
-    }
-
-    fn send_message(&self, message: ReportMessage) {
-        let tx = self.tx.clone();
-        tokio::spawn(async move {
-            tx.send(message).await.unwrap();
-        });
-    }
-}
+pub struct MyReputationReporter {}
 
 impl ReputationReporterInterface for MyReputationReporter {
     /// Report a satisfactory (happy) interaction with the given peer.
-    fn report_sat(&self, peer: &NodePublicKey, weight: Weight) {
-        let message = ReportMessage::Sat {
-            peer: *peer,
-            weight,
-        };
-        self.send_message(message);
+    fn report_sat(&self, _peer: &NodePublicKey, _weight: Weight) {
+        todo!()
     }
 
     /// Report a unsatisfactory (happy) interaction with the given peer.
-    fn report_unsat(&self, peer: &NodePublicKey, weight: Weight) {
-        let message = ReportMessage::Unsat {
-            peer: *peer,
-            weight,
-        };
-        self.send_message(message);
+    fn report_unsat(&self, _peer: &NodePublicKey, _weight: Weight) {
+        todo!()
     }
 
     /// Report a latency which we witnessed from another peer.
-    fn report_latency(&self, peer: &NodePublicKey, latency: Duration) {
-        let message = ReportMessage::Latency {
-            peer: *peer,
-            latency,
-        };
-        self.send_message(message);
+    fn report_latency(&self, _peer: &NodePublicKey, _latency: Duration) {
+        todo!()
     }
 
     /// Report the number of (healthy) bytes which we received from another peer.
-    fn report_bytes_received(&self, peer: &NodePublicKey, bytes: u64, duration: Option<Duration>) {
-        let message = ReportMessage::BytesReceived {
-            peer: *peer,
-            bytes,
-            duration,
-        };
-        self.send_message(message);
+    fn report_bytes_received(
+        &self,
+        _peer: &NodePublicKey,
+        _bytes: u64,
+        _duration: Option<Duration>,
+    ) {
+        todo!()
     }
 
     /// Report the number of (healthy) bytes which we sent from another peer.
-    fn report_bytes_sent(&self, peer: &NodePublicKey, bytes: u64, duration: Option<Duration>) {
-        let message = ReportMessage::BytesSent {
-            peer: *peer,
-            bytes,
-            duration,
-        };
-        self.send_message(message);
+    fn report_bytes_sent(&self, _peer: &NodePublicKey, _bytes: u64, _duration: Option<Duration>) {
+        todo!()
     }
 
     /// Report the number of hops we have witnessed to the given peer.
-    fn report_hops(&self, peer: &NodePublicKey, hops: u8) {
-        let message = ReportMessage::Hops { peer: *peer, hops };
-        self.send_message(message);
+    fn report_hops(&self, _peer: &NodePublicKey, _hops: u8) {
+        todo!()
     }
-}
-
-#[derive(Debug)]
-enum ReportMessage {
-    Sat {
-        peer: NodePublicKey,
-        weight: Weight,
-    },
-    Unsat {
-        peer: NodePublicKey,
-        weight: Weight,
-    },
-    Latency {
-        peer: NodePublicKey,
-        latency: Duration,
-    },
-    BytesReceived {
-        peer: NodePublicKey,
-        bytes: u64,
-        duration: Option<Duration>,
-    },
-    BytesSent {
-        peer: NodePublicKey,
-        bytes: u64,
-        duration: Option<Duration>,
-    },
-    Hops {
-        peer: NodePublicKey,
-        hops: u8,
-    },
 }
 
 #[cfg(test)]

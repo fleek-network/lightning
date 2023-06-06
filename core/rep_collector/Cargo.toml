@@ -12,4 +12,3 @@ anyhow.workspace = true
 serde.workspace = true
 async-trait.workspace = true
 fleek-crypto.workspace = true
-tokio.workspace = true
