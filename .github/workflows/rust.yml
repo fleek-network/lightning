@@ -54,7 +54,7 @@ jobs:
 
     - name: Clippy
       if: env.NEW_COMMIT_COUNT > 0
-      run: cargo clippy
+      run: cargo clippy --all-features --all-targets
 
     - name: Check
       if: env.NEW_COMMIT_COUNT > 0
