@@ -16,6 +16,7 @@ use crate::{
 pub struct Application {
     query_socket: QuerySocket,
     update_socket: ExecutionEngineSocket,
+    query_runner: QueryRunner,
 }
 
 #[async_trait]
@@ -51,7 +52,8 @@ impl ApplicationInterface for Application {
         let mut env = Env::new();
         env.genesis();
         Ok(Self {
-            query_socket: TokioSpawn::spawn_async(QueryWorker::new(env.query())),
+            query_socket: TokioSpawn::spawn_async(QueryWorker::new(env.query_socket())),
+            query_runner: env.query_runner(),
             update_socket: TokioSpawn::spawn(UpdateWorker::new(env)),
         })
     }
@@ -78,6 +80,6 @@ impl ApplicationInterface for Application {
     /// and is the reason why we have `Atomo` to allow us to have the same kind of behavior
     /// without slowing down the system.
     fn sync_query(&self) -> Self::SyncExecutor {
-        todo!()
+        self.query_runner.clone()
     }
 }

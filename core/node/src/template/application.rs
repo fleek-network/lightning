@@ -8,7 +8,7 @@ use draco_interfaces::{
     config::ConfigConsumer,
     types::NodeInfo,
 };
-use fleek_crypto::{ClientPublicKey, NodePublicKey};
+use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 
 use super::config::Config;
 
@@ -79,8 +79,12 @@ impl ApplicationInterface for Application {
 pub struct QueryRunner {}
 
 impl SyncQueryRunnerInterface for QueryRunner {
+    fn get_account_balance(&self, _client: &AccountOwnerPublicKey) -> u128 {
+        todo!()
+    }
+
     /// Returns the latest balance associated with the given peer.
-    fn get_balance(&self, _client: &ClientPublicKey) -> u128 {
+    fn get_client_balance(&self, _client: &ClientPublicKey) -> u128 {
         todo!()
     }
 

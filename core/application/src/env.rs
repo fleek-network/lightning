@@ -8,10 +8,11 @@ use draco_interfaces::{
     BlockExecutionResponse,
 };
 use fastcrypto::{ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64};
-use fleek_crypto::{AccountOwnerPublicKey, NodePublicKey};
+use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 
 use crate::{
     genesis::Genesis,
+    query_runner::QueryRunner,
     state::{BandwidthInfo, Committee, State},
     table::{Backend, StateTables},
 };
@@ -25,6 +26,7 @@ impl Env<UpdatePerm> {
         let atomo = AtomoBuilder::<DefaultSerdeBackend>::new()
             .with_table::<Metadata, u64>("metadata")
             .with_table::<AccountOwnerPublicKey, AccountInfo>("account")
+            .with_table::<ClientPublicKey, AccountOwnerPublicKey>("client_keys")
             .with_table::<NodePublicKey, NodeInfo>("node")
             .with_table::<Epoch, Committee>("committee")
             .with_table::<Epoch, BandwidthInfo>("bandwidth")
@@ -74,10 +76,14 @@ impl Env<UpdatePerm> {
     }
 
     /// Returns an identical enviroment but with query permissions
-    pub fn query(&self) -> Env<QueryPerm> {
+    pub fn query_socket(&self) -> Env<QueryPerm> {
         Env {
             inner: self.inner.query(),
         }
+    }
+
+    pub fn query_runner(&self) -> QueryRunner {
+        QueryRunner::init(self.inner.query())
     }
 
     /// Seeds the application state with the genesis block

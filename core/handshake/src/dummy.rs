@@ -18,8 +18,8 @@ use draco_interfaces::{
     MempoolSocket, ReputationQueryInteface, ReputationReporterInterface, SdkInterface, Weight,
 };
 use fleek_crypto::{
-    ClientPublicKey, NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey,
-    NodeSecretKey, NodeSignature,
+    AccountOwnerPublicKey, ClientPublicKey, NodeNetworkingPublicKey, NodeNetworkingSecretKey,
+    NodePublicKey, NodeSecretKey, NodeSignature,
 };
 use tokio::io::{AsyncRead, AsyncWrite};
 
@@ -488,8 +488,11 @@ impl ApplicationInterface for Application {
 pub struct QueryRunner {}
 
 impl SyncQueryRunnerInterface for QueryRunner {
+    fn get_account_balance(&self, _client: &AccountOwnerPublicKey) -> u128 {
+        todo!()
+    }
     /// Returns the latest balance associated with the given peer.
-    fn get_balance(&self, _client: &ClientPublicKey) -> u128 {
+    fn get_client_balance(&self, _client: &ClientPublicKey) -> u128 {
         todo!()
     }
 

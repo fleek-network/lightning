@@ -7,7 +7,8 @@ use draco_interfaces::{
     DeliveryAcknowledgment,
 };
 use fleek_crypto::{
-    AccountOwnerPublicKey, NodeNetworkingPublicKey, NodePublicKey, TransactionSender,
+    AccountOwnerPublicKey, ClientPublicKey, NodeNetworkingPublicKey, NodePublicKey,
+    TransactionSender,
 };
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
@@ -21,6 +22,7 @@ use crate::table::{Backend, TableRef};
 pub struct State<B: Backend> {
     pub metadata: B::Ref<Metadata, u64>,
     pub account_info: B::Ref<AccountOwnerPublicKey, AccountInfo>,
+    pub client_keys: B::Ref<ClientPublicKey, AccountOwnerPublicKey>,
     pub node_info: B::Ref<NodePublicKey, NodeInfo>,
     pub committee_info: B::Ref<Epoch, Committee>,
     pub bandwidth_info: B::Ref<Epoch, BandwidthInfo>,
@@ -47,6 +49,7 @@ impl<B: Backend> State<B> {
         Self {
             metadata: backend.get_table_reference("metadata"),
             account_info: backend.get_table_reference("account"),
+            client_keys: backend.get_table_reference("client_keys"),
             node_info: backend.get_table_reference("node"),
             committee_info: backend.get_table_reference("committee"),
             bandwidth_info: backend.get_table_reference("bandwidth"),

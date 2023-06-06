@@ -1,6 +1,6 @@
 use affair::Socket;
 use async_trait::async_trait;
-use fleek_crypto::{ClientPublicKey, NodePublicKey};
+use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 
 use crate::{
     common::WithStartAndShutdown,
@@ -81,8 +81,11 @@ pub trait ApplicationInterface:
 }
 
 pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
-    /// Returns the latest balance associated with the given peer.
-    fn get_balance(&self, client: &ClientPublicKey) -> u128;
+    /// Returns the latest balance associated with the given account public key.
+    fn get_account_balance(&self, account: &AccountOwnerPublicKey) -> u128;
+
+    /// Returns the latest balance associated with the given client public key.
+    fn get_client_balance(&self, client: &ClientPublicKey) -> u128;
 
     /// Returns the global reputation of a node.
     fn get_reputation(&self, node: &NodePublicKey) -> u128;
