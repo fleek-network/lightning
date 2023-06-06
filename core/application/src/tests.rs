@@ -59,9 +59,8 @@ async fn test_epoch_change() {
 
     // Have (required_signals - 1) say they are ready to change epoch
     // make sure the epoch doesnt change each time someone signals
-    for i in 0..(required_signals - 1) {
-        let req =
-            get_update_request_node(UpdateMethod::ChangeEpoch, genesis_committee[i].public_key);
+    for node in genesis_committee.iter().take(required_signals - 1) {
+        let req = get_update_request_node(UpdateMethod::ChangeEpoch, node.public_key);
 
         let res = update_socket
             .run(Block {
@@ -70,7 +69,7 @@ async fn test_epoch_change() {
             .await
             .unwrap();
         // Make sure epoch didnt change
-        assert_ne!(res.change_epoch, true)
+        assert!(!res.change_epoch);
     }
     // check that the current epoch is still 0
     let query = get_query(QueryMethod::CurrentEpochInfo);
@@ -152,7 +151,7 @@ async fn test_stake() {
     let update = get_update_request_account(
         UpdateMethod::Stake {
             amount: 100,
-            node_public_key: node_public_key,
+            node_public_key,
             node_network_key: None,
             node_domain: None,
             worker_public_key: None,
@@ -177,7 +176,7 @@ async fn test_stake() {
     let update = get_update_request_account(
         UpdateMethod::Stake {
             amount: 1000,
-            node_public_key: node_public_key,
+            node_public_key,
             node_network_key: Some([0; 32].into()),
             node_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
             worker_public_key: Some([0; 32].into()),
@@ -195,7 +194,7 @@ async fn test_stake() {
         .txn_receipts[0]
         .clone();
     if let TransactionResponse::Revert(error) = res {
-        panic!("Stake reverted: {:?}", error);
+        panic!("Stake reverted: {error:?}");
     }
 
     // Query the new node and make sure he has the proper stake
@@ -210,7 +209,7 @@ async fn test_stake() {
     let update = get_update_request_account(
         UpdateMethod::Stake {
             amount: 1000,
-            node_public_key: node_public_key,
+            node_public_key,
             node_network_key: None,
             node_domain: None,
             worker_public_key: None,
@@ -228,7 +227,7 @@ async fn test_stake() {
         .txn_receipts[0]
         .clone();
     if let TransactionResponse::Revert(error) = res {
-        panic!("Stake reverted: {:?}", error);
+        panic!("Stake reverted: {error:?}");
     }
 
     // Node should now have 2_000 stake
@@ -328,10 +327,7 @@ fn get_update_request_node(method: UpdateMethod, sender: NodePublicKey) -> Updat
     UpdateRequest {
         sender: sender.into(),
         signature: TransactionSignature::Node(NodeSignature([0; 48])),
-        payload: UpdatePayload {
-            nonce: 0,
-            method: method,
-        },
+        payload: UpdatePayload { nonce: 0, method },
     }
 }
 
@@ -342,9 +338,6 @@ fn get_update_request_account(
     UpdateRequest {
         sender: sender.into(),
         signature: TransactionSignature::AccountOwner(AccountOwnerSignature),
-        payload: UpdatePayload {
-            nonce: 0,
-            method: method,
-        },
+        payload: UpdatePayload { nonce: 0, method },
     }
 }

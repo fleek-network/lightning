@@ -58,8 +58,7 @@ impl Genesis {
 
 #[test]
 fn test() {
-    let gen = Genesis::load().unwrap();
-    println!("{:?}", gen);
+    Genesis::load().unwrap();
 }
 
 impl From<&GenesisCommittee> for NodeInfo {
