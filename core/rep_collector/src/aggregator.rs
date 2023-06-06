@@ -7,13 +7,12 @@ use draco_interfaces::{
     ReputationQueryInteface, ReputationReporterInterface, Weight,
 };
 use fleek_crypto::NodePublicKey;
-use tokio::sync::mpsc;
 
-use crate::config::Config;
+use crate::{buffered_mpsc, config::Config};
 
 #[allow(dead_code)]
 pub struct ReputationAggregator {
-    report_rx: mpsc::Receiver<ReportMessage>,
+    report_rx: buffered_mpsc::BufferedReceiver<ReportMessage>,
     reporter: MyReputationReporter,
 }
 
@@ -72,7 +71,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
 
     /// Create a new reputation
     async fn init(_config: Self::Config, _submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
-        let (report_tx, report_rx) = mpsc::channel(2048);
+        let (report_tx, report_rx) = buffered_mpsc::buffered_channel(100, 2048);
         Ok(Self {
             report_rx,
             reporter: MyReputationReporter::new(report_tx),
@@ -114,11 +113,11 @@ impl ReputationQueryInteface for MyReputationQuery {
 
 #[derive(Clone)]
 pub struct MyReputationReporter {
-    tx: mpsc::Sender<ReportMessage>,
+    tx: buffered_mpsc::BufferedSender<ReportMessage>,
 }
 
 impl MyReputationReporter {
-    fn new(tx: mpsc::Sender<ReportMessage>) -> Self {
+    fn new(tx: buffered_mpsc::BufferedSender<ReportMessage>) -> Self {
         Self { tx }
     }
 
