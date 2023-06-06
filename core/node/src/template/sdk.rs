@@ -105,10 +105,10 @@ impl ConnectionInterface for MyConnection {
     }
 
     fn new(
-        reader: Self::Reader,
-        writer: Self::Writer,
-        lane: u8,
-        client_id: ClientPublicKey,
+        _reader: Self::Reader,
+        _writer: Self::Writer,
+        _lane: u8,
+        _client_id: ClientPublicKey,
     ) -> Self {
         todo!()
     }
