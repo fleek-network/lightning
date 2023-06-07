@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 draco-interfaces = {path="../interfaces"}
-draco-rep-collector = {path="../rep_collector"}
+draco-rep-collector = {path="../rep-collector"}
 anyhow.workspace = true
 serde.workspace = true
 toml = "0.7"
