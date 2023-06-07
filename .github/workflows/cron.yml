@@ -1,6 +1,7 @@
 name: Build & Tests
 
 on:
+  workflow_dispatch:
   schedule:
     # Trigger the CI from 7am-7pm EST every 2 hours.
     #
@@ -55,7 +56,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
-        cache-all-crates: "true"
+        with:
+          cache-all-crates: "true"
       - name: Setup Junitify
         run: cargo install junitify
       - name: Cargo Test
