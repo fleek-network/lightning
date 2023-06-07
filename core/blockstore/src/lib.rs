@@ -96,11 +96,4 @@ impl BlockStoreInterface for MemoryBlockStore {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    #[test]
-    fn put_basic() {}
-
-    #[test]
-    fn get_basic() {}
 }
