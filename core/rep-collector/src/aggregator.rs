@@ -92,7 +92,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
     /// Returns a reputation reporter that can be used to capture interactions that we have
     /// with another peer.
     fn get_reporter(&self) -> Self::ReputationReporter {
-        todo!()
+        self.reporter.clone()
     }
 
     /// Returns a reputation query that can be used to answer queries about the local
@@ -103,7 +103,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
 }
 
 impl ConfigConsumer for ReputationAggregator {
-    const KEY: &'static str = "reputation";
+    const KEY: &'static str = "rep-collector";
 
     type Config = Config;
 }
