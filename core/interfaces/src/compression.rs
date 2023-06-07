@@ -43,7 +43,7 @@ impl CompressionAlgoSet {
 
 impl From<u8> for CompressionAlgoSet {
     fn from(val: u8) -> Self {
-        CompressionAlgoSet(val)
+        CompressionAlgoSet(val & ((0x01 << 5) - 1))
     }
 }
 
