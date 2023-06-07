@@ -1,9 +1,13 @@
-use std::{sync::Arc, collections::HashMap};
-use draco_interfaces::{Blake3Hash, Blake3Tree, BlockStoreInterface, CompressionAlgorithm, CompressionAlgoSet, ConfigConsumer, ContentChunk, IncrementalPutInterface, PutFeedProofError, PutFinalizeError, PutWriteError};
-use serde::{Deserialize, Serialize};
-use parking_lot::RwLock;
-use async_trait::async_trait;
+use std::{collections::HashMap, sync::Arc};
 
+use async_trait::async_trait;
+use draco_interfaces::{
+    Blake3Hash, Blake3Tree, BlockStoreInterface, CompressionAlgoSet, CompressionAlgorithm,
+    ConfigConsumer, ContentChunk, IncrementalPutInterface, PutFeedProofError, PutFinalizeError,
+    PutWriteError,
+};
+use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct Config;
@@ -26,7 +30,11 @@ impl IncrementalPutInterface for IncrementalPut {
         todo!()
     }
 
-    fn write(&mut self, _content: &[u8], _compression: CompressionAlgorithm) -> Result<(), PutWriteError> {
+    fn write(
+        &mut self,
+        _content: &[u8],
+        _compression: CompressionAlgorithm,
+    ) -> Result<(), PutWriteError> {
         todo!()
     }
 
@@ -51,7 +59,7 @@ impl BlockStoreInterface for Blockstore {
 
     async fn init(_: Self::Config) -> anyhow::Result<Self> {
         Ok(Self {
-            inner: Default::default()
+            inner: Default::default(),
         })
     }
 
@@ -62,7 +70,12 @@ impl BlockStoreInterface for Blockstore {
         }
     }
 
-    async fn get(&self, _block_counter: u32, block_hash: &Blake3Hash, _compression: CompressionAlgoSet) -> Option<Self::SharedPointer<ContentChunk>> {
+    async fn get(
+        &self,
+        _block_counter: u32,
+        block_hash: &Blake3Hash,
+        _compression: CompressionAlgoSet,
+    ) -> Option<Self::SharedPointer<ContentChunk>> {
         match self.inner.read().get(block_hash)? {
             Block::Chunk(chunk) => Some(chunk.clone()),
             Block::Tree(_) => None,
