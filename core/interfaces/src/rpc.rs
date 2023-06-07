@@ -18,7 +18,7 @@ pub trait RpcInterface: Sized + ConfigConsumer + WithStartAndShutdown {
     ) -> anyhow::Result<Self>;
 }
 #[async_trait]
-pub trait RpcMethods: Sync + Send + 'static  {
+pub trait RpcMethods: Sync + Send + 'static {
     /// ping method for rpc server, for clients to check if server is online
     async fn ping(&self) -> anyhow::Result<String>;
 
@@ -33,10 +33,12 @@ pub trait RpcMethods: Sync + Send + 'static  {
 
     /// This method would allow a client to submit a transaction to the network.
     async fn submit_transaction(&self);
-    
-    /// This method would allow a client to retrieve information about a specific block by its height or hash.
+
+    /// This method would allow a client to retrieve information about a specific block by its
+    /// height or hash.
     async fn get_block(&self);
 
-    /// This endpoint would allow a client to retrieve information about a specific transaction by its hash.
+    /// This endpoint would allow a client to retrieve information about a specific transaction by
+    /// its hash.
     async fn get_transaction(&self);
 }

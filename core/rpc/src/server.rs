@@ -4,10 +4,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use axum::{
-    routing::post,
-    Extension, Router,
-};
+use axum::{routing::post, Extension, Router};
 use draco_interfaces::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
