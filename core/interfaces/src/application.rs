@@ -5,7 +5,7 @@ use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 use crate::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
-    types::{Block, NodeInfo, QueryRequest, QueryResponse, TransactionResponse},
+    types::{Block, EpochInfo, NodeInfo, QueryRequest, QueryResponse, TransactionResponse},
 };
 
 /// The response generated from executing an entire batch of transactions (aka a block).
@@ -117,6 +117,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
 
     /// Returns the committee members of the current epoch.
     fn get_committee_members(&self) -> Vec<NodePublicKey>;
+
+    /// Returns all the information on the current epoch that Narwhal needs to run
+    fn get_epoch_info(&self) -> EpochInfo;
 }
 
 #[derive(Clone, Debug)]

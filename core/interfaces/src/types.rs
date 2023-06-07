@@ -197,11 +197,7 @@ pub enum ExecutionData {
     None,
     String(String),
     UInt(u128),
-    EpochInfo {
-        committee: Vec<NodeInfo>,
-        epoch: Epoch,
-        epoch_end: u64,
-    },
+    EpochInfo(EpochInfo),
     EpochChange,
 }
 
@@ -278,6 +274,17 @@ pub struct Worker {
     pub address: Multiaddr,
     /// The address to the workers mempool
     pub mempool: Multiaddr,
+}
+
+/// Info on a Narwhal epoch
+#[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize)]
+pub struct EpochInfo {
+    /// List of committee members
+    pub committee: Vec<NodeInfo>,
+    /// The current epoch number
+    pub epoch: Epoch,
+    /// Timestamp when the epoch ends
+    pub epoch_end: u64,
 }
 
 /// Metadata, state stored in the blockchain that applies to the current block

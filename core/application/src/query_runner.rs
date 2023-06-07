@@ -1,7 +1,9 @@
 use atomo::{Atomo, QueryPerm, ResolvedTableReference};
 use draco_interfaces::{
     application::SyncQueryRunnerInterface,
-    types::{AccountInfo, Epoch, Metadata, NodeInfo, ProtocolParams, Service, ServiceId},
+    types::{
+        AccountInfo, Epoch, EpochInfo, Metadata, NodeInfo, ProtocolParams, Service, ServiceId,
+    },
 };
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 
@@ -108,6 +110,32 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 .get(epoch)
                 .map(|c| c.members)
                 .unwrap_or_default()
+        })
+    }
+
+    fn get_epoch_info(&self) -> EpochInfo {
+        self.inner.run(|ctx| {
+            let node_table = self.node_table.get(ctx);
+
+            // get current epoch
+            let epoch = self
+                .metadata_table
+                .get(ctx)
+                .get(&Metadata::Epoch)
+                .unwrap_or(0);
+
+            // look up current committee
+            let committee = self.committee_table.get(ctx).get(epoch).unwrap_or_default();
+
+            EpochInfo {
+                committee: committee
+                    .members
+                    .iter()
+                    .filter_map(|member| node_table.get(member))
+                    .collect(),
+                epoch,
+                epoch_end: committee.epoch_end_timestamp,
+            }
         })
     }
 }

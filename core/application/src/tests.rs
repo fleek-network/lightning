@@ -2,7 +2,7 @@ use affair::Socket;
 use draco_interfaces::{
     application::{ExecutionEngineSocket, QuerySocket},
     types::{
-        Block, ExecutionData, ExecutionError, NodeInfo, ProofOfConsensus, QueryMethod,
+        Block, EpochInfo, ExecutionData, ExecutionError, NodeInfo, ProofOfConsensus, QueryMethod,
         QueryRequest, Tokens, TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
     },
     ApplicationInterface,
@@ -74,11 +74,11 @@ async fn test_epoch_change() {
     // check that the current epoch is still 0
     let query = get_query(QueryMethod::CurrentEpochInfo);
     let res = run_query(query.clone(), &query_socket).await;
-    if let TransactionResponse::Success(ExecutionData::EpochInfo {
+    if let TransactionResponse::Success(ExecutionData::EpochInfo(EpochInfo {
         committee: _,
         epoch,
         epoch_end: _,
-    }) = res
+    })) = res
     {
         assert_eq!(epoch, 0);
     }
@@ -98,11 +98,11 @@ async fn test_epoch_change() {
 
     // Query epoch info and make sure it incremented to new epoch
     let res = run_query(query, &query_socket).await;
-    if let TransactionResponse::Success(ExecutionData::EpochInfo {
+    if let TransactionResponse::Success(ExecutionData::EpochInfo(EpochInfo {
         committee: _,
         epoch,
         epoch_end: _,
-    }) = res
+    })) = res
     {
         assert_eq!(epoch, 1);
     }

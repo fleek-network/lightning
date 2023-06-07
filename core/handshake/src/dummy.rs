@@ -542,6 +542,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn get_committee_members(&self) -> Vec<NodePublicKey> {
         todo!()
     }
+
+    fn get_epoch_info(&self) -> draco_interfaces::types::EpochInfo {
+        todo!()
+    }
 }
 
 pub struct Sdk<R, W> {

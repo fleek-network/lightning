@@ -1,8 +1,8 @@
 use draco_interfaces::{
     types::{
-        AccountInfo, Epoch, ExecutionData, ExecutionError, Metadata, NodeInfo, ProofOfConsensus,
-        ProofOfMisbehavior, ProtocolParams, QueryMethod, QueryRequest, Service, ServiceId, Staking,
-        Tokens, TransactionResponse, UpdateMethod, UpdateRequest, Worker,
+        AccountInfo, Epoch, EpochInfo, ExecutionData, ExecutionError, Metadata, NodeInfo,
+        ProofOfConsensus, ProofOfMisbehavior, ProtocolParams, QueryMethod, QueryRequest, Service,
+        ServiceId, Staking, Tokens, TransactionResponse, UpdateMethod, UpdateRequest, Worker,
     },
     DeliveryAcknowledgment,
 };
@@ -578,11 +578,11 @@ impl<B: Backend> State<B> {
             .map(|node| self.node_info.get(node).unwrap())
             .collect();
 
-        TransactionResponse::Success(ExecutionData::EpochInfo {
+        TransactionResponse::Success(ExecutionData::EpochInfo(EpochInfo {
             committee: vec,
             epoch,
             epoch_end: committee.epoch_end_timestamp,
-        })
+        }))
     }
 
     /********Internal Application Functions******** */
