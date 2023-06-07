@@ -7,6 +7,7 @@ use std::{
 };
 
 use draco_interfaces::{common::WithStartAndShutdown as _, Node};
+use draco_rep_collector::ReputationAggregator;
 use tokio::macros::support::Pin;
 use tokio_stream::Stream;
 
@@ -14,8 +15,8 @@ use crate::{
     configuration::TomlConfigProvider,
     template::{
         application::Application, blockstore::BlockStore, consensus::Consensus, fs::FileSystem,
-        handshake::Handshake, indexer::Indexer, pod::DeliveryAcknowledgmentAggregator,
-        reputation::ReputationAggregator, rpc::Rpc, sdk::Sdk, signer::Signer,
+        handshake::Handshake, indexer::Indexer, pod::DeliveryAcknowledgmentAggregator, rpc::Rpc,
+        sdk::Sdk, signer::Signer,
     },
 };
 

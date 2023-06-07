@@ -1237,6 +1237,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "draco-interfaces",
+ "draco-rep-collector",
  "fleek-crypto",
  "mockall",
  "serde",
