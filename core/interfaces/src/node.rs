@@ -98,6 +98,7 @@ impl<
             configuration.get::<Consensus>(),
             &signer,
             application.transaction_executor(),
+            application.sync_query(),
         )
         .await?;
 

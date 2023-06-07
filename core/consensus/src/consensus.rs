@@ -8,12 +8,15 @@ use draco_interfaces::{
     SyncQueryRunnerInterface,
 };
 
-use super::config::Config;
+use crate::config::Config;
 
-pub struct Consensus {}
+pub struct Consensus<Q: SyncQueryRunnerInterface, S: SignerInterface> {
+    _query_runner: Q,
+    _signer: S,
+}
 
 #[async_trait]
-impl WithStartAndShutdown for Consensus {
+impl<Q: SyncQueryRunnerInterface, S: SignerInterface> WithStartAndShutdown for Consensus<Q, S> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         todo!()
@@ -31,14 +34,14 @@ impl WithStartAndShutdown for Consensus {
     }
 }
 
-impl ConfigConsumer for Consensus {
+impl<Q: SyncQueryRunnerInterface, S: SignerInterface> ConfigConsumer for Consensus<Q, S> {
     const KEY: &'static str = "consensus";
 
     type Config = Config;
 }
 
 #[async_trait]
-impl ConsensusInterface for Consensus {
+impl<R: SyncQueryRunnerInterface, I: SignerInterface> ConsensusInterface for Consensus<R, I> {
     /// Create a new consensus service with the provided config and executor.
     async fn init<S: SignerInterface, Q: SyncQueryRunnerInterface>(
         _config: Self::Config,

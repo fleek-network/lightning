@@ -3,7 +3,7 @@ use async_trait::async_trait;
 
 use crate::{
     application::ExecutionEngineSocket, common::WithStartAndShutdown, config::ConfigConsumer,
-    signer::SignerInterface, types::UpdateRequest,
+    signer::SignerInterface, types::UpdateRequest, SyncQueryRunnerInterface,
 };
 
 /// A socket that gives services and other sub-systems the required functionality to
@@ -19,10 +19,11 @@ pub type MempoolSocket = Socket<UpdateRequest, ()>;
 #[async_trait]
 pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
     /// Create a new consensus service with the provided config and executor.
-    async fn init<S: SignerInterface>(
+    async fn init<S: SignerInterface, Q: SyncQueryRunnerInterface>(
         config: Self::Config,
         signer: &S,
         executor: ExecutionEngineSocket,
+        query_runner: Q,
     ) -> anyhow::Result<Self>;
 
     /// Returns a socket that can be used to submit transactions to the consensus,

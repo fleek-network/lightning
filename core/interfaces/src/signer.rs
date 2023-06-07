@@ -14,7 +14,7 @@ pub type SubmitTxSocket = Socket<UpdateMethod, u64>;
 /// The signature provider is responsible for signing messages using the private key of
 /// the node.
 #[async_trait]
-pub trait SignerInterface: ConfigConsumer + Sized {
+pub trait SignerInterface: ConfigConsumer + Sized + Send + Sync {
     /// Initialize the signature service.
     async fn init(config: Self::Config) -> anyhow::Result<Self>;
 
