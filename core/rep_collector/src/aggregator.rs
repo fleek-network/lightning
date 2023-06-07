@@ -32,32 +32,34 @@ impl ReputationAggregator {
 
     fn handle_report(&mut self, report_msg: ReportMessage) {
         match report_msg {
-            ReportMessage::Sat {
-                peer: _peer,
-                weight: _weight,
-            } => {},
-            ReportMessage::Unsat {
-                peer: _peer,
-                weight: _weight,
-            } => {},
-            ReportMessage::Latency {
-                peer: _peer,
-                latency: _latency,
-            } => {},
+            ReportMessage::Sat { peer, weight } => {
+                self.measurement_manager.report_sat(peer, weight);
+            },
+            ReportMessage::Unsat { peer, weight } => {
+                self.measurement_manager.report_unsat(peer, weight);
+            },
+            ReportMessage::Latency { peer, latency } => {
+                self.measurement_manager.report_latency(peer, latency);
+            },
             ReportMessage::BytesReceived {
-                peer: _peer,
-                bytes: _bytes,
-                duration: _duration,
-            } => {},
+                peer,
+                bytes,
+                duration,
+            } => {
+                self.measurement_manager
+                    .report_bytes_received(peer, bytes, duration);
+            },
             ReportMessage::BytesSent {
-                peer: _peer,
-                bytes: _bytes,
-                duration: _duration,
-            } => {},
-            ReportMessage::Hops {
-                peer: _peer,
-                hops: _hops,
-            } => {},
+                peer,
+                bytes,
+                duration,
+            } => {
+                self.measurement_manager
+                    .report_bytes_sent(peer, bytes, duration);
+            },
+            ReportMessage::Hops { peer, hops } => {
+                self.measurement_manager.report_hops(peer, hops);
+            },
         }
     }
 }
