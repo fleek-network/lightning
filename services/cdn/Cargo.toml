@@ -6,6 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow.workspace = true
+serde.workspace = true
+arrayref = "0.3"
+arrayvec = "0.7"
+async-trait = "0.1"
+bytes = "1.4"
+tokio.workspace = true
+futures = "0.3"
+
+fleek-crypto = { path = "../../lib/fleek-crypto" }
 draco-interfaces = {path="../../core/interfaces"}
 draco-sdk = {path="../../core/sdk"}
-anyhow = "1.0"
+

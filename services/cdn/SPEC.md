@@ -93,7 +93,7 @@ If number of blocks is 0, the content should be served up to the last block
 ```
 TAG = 0x01 << 2
 
-[ TAG . compression . schnorr signature . bytes len (u64) . proof len (u64) . proof . bytes ]
+[ TAG . compression . commitment . proof len (u64) . bytes len (u64) . proof . bytes ]
 ```
     
 ### Delivery Acknowledgement: 

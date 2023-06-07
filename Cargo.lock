@@ -1523,8 +1523,16 @@ name = "fleek-cdn"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "arrayref",
+ "arrayvec",
+ "async-trait",
+ "bytes",
  "draco-interfaces",
  "draco-sdk",
+ "fleek-crypto",
+ "futures",
+ "serde",
+ "tokio",
 ]
 
 [[package]]
