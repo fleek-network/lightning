@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use criterion::{measurement::Measurement, *};
 use draco_handshake::connection::{HandshakeConnection, HandshakeFrame, Reason};
+use draco_interfaces::CompressionAlgoSet;
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
 use futures::executor::block_on;
 use tokio::sync::Mutex;
@@ -110,7 +111,7 @@ fn bench_codec_group(c: &mut Criterion) {
 
     let frame = HandshakeFrame::HandshakeRequest {
         version: 0,
-        supported_compression_bitmap: 0,
+        supported_compression_set: CompressionAlgoSet::new(),
         pubkey: ClientPublicKey([0u8; 20]),
         resume_lane: None,
     };

@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use draco_interfaces::types::ServiceId;
+use draco_interfaces::{types::ServiceId, CompressionAlgoSet};
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use tokio::io::{AsyncRead, AsyncWrite};
 
@@ -11,12 +11,22 @@ use crate::connection::{
 pub struct HandshakeClient<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> {
     conn: HandshakeConnection<R, W>,
     pubkey: ClientPublicKey,
+    compression_set: CompressionAlgoSet,
 }
 
 impl<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> HandshakeClient<R, W> {
-    pub fn new(reader: R, writer: W, pubkey: ClientPublicKey) -> Self {
+    pub fn new(
+        reader: R,
+        writer: W,
+        pubkey: ClientPublicKey,
+        compression_set: CompressionAlgoSet,
+    ) -> Self {
         let conn = HandshakeConnection::new(reader, writer);
-        Self { conn, pubkey }
+        Self {
+            conn,
+            pubkey,
+            compression_set,
+        }
     }
 
     /// Handshake with a node
@@ -25,7 +35,7 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> HandshakeClient<R, W> {
         self.conn
             .write_frame(HandshakeFrame::HandshakeRequest {
                 version: 0,
-                supported_compression_bitmap: 0,
+                supported_compression_set: self.compression_set,
                 pubkey: self.pubkey,
                 resume_lane: None,
             })
@@ -43,12 +53,13 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> HandshakeClient<R, W> {
         Ok(())
     }
 
+    /// Handshake with a node, specifying a lane to unlock and a signature to send.
     pub async fn handshake_unlock(&mut self, lane: u8, _signature: ClientSignature) -> Result<()> {
         // Send request
         self.conn
             .write_frame(HandshakeFrame::HandshakeRequest {
                 version: 0,
-                supported_compression_bitmap: 0,
+                supported_compression_set: self.compression_set,
                 pubkey: self.pubkey,
                 resume_lane: Some(lane),
             })

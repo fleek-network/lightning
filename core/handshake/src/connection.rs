@@ -6,7 +6,7 @@ use arrayref::array_ref;
 use arrayvec::ArrayVec;
 use bytes::BytesMut;
 use consts::*;
-use draco_interfaces::types::ServiceId;
+use draco_interfaces::{types::ServiceId, CompressionAlgoSet};
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
 use futures::executor::block_on;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -139,7 +139,7 @@ pub enum HandshakeFrame {
     /// Clients can optionally specify a previous lane to resume in the event of a disconnection.
     HandshakeRequest {
         version: u8,
-        supported_compression_bitmap: u8,
+        supported_compression_set: CompressionAlgoSet,
         pubkey: ClientPublicKey,
         resume_lane: Option<u8>,
     },
@@ -244,10 +244,10 @@ where
                 self.writer.write_u8(reason as u8).await?;
             },
             HandshakeFrame::HandshakeRequest {
-                version,                      // 1
-                pubkey,                       // 20
-                supported_compression_bitmap, // 1
-                resume_lane: lane,            // 1
+                version,                   // 1
+                pubkey,                    // 20
+                supported_compression_set, // 1
+                resume_lane: lane,         // 1
             } => {
                 let mut buf = ArrayVec::<u8, 30>::new_const();
                 debug_assert_eq!(NETWORK.len(), 5);
@@ -255,7 +255,7 @@ where
                 buf.push(FrameTag::HandshakeRequest as u8);
                 buf.write_all(&NETWORK).unwrap();
                 buf.push(version);
-                buf.push(supported_compression_bitmap);
+                buf.push(supported_compression_set.into());
                 buf.push(lane.unwrap_or(0xFF));
                 buf.write_all(&pubkey.0).unwrap();
 
@@ -391,7 +391,7 @@ where
                 }
 
                 let version = buf[6];
-                let supported_compression_bitmap = buf[7];
+                let supported_compression_set = buf[7].into();
                 let lane = match buf[8] {
                     0xFF => None,
                     v => Some(v),
@@ -400,7 +400,7 @@ where
 
                 Ok(Some(HandshakeFrame::HandshakeRequest {
                     version,
-                    supported_compression_bitmap,
+                    supported_compression_set,
                     resume_lane: lane,
                     pubkey,
                 }))
@@ -519,7 +519,7 @@ mod tests {
     async fn handshake_req() -> TResult {
         encode_decode(HandshakeFrame::HandshakeRequest {
             version: 0,
-            supported_compression_bitmap: 0,
+            supported_compression_set: CompressionAlgoSet::new(),
             resume_lane: None,
             pubkey: ClientPublicKey([1u8; 20]),
         })

@@ -8,8 +8,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use draco_interfaces::{
-    handshake::HandshakeInterface, types::ServiceId, ConfigConsumer, ConnectionInterface,
-    HandlerFn, SdkInterface, WithStartAndShutdown,
+    handshake::HandshakeInterface, types::ServiceId, CompressionAlgoSet, ConfigConsumer,
+    ConnectionInterface, HandlerFn, SdkInterface, WithStartAndShutdown,
 };
 use fleek_crypto::{ClientPublicKey, NodePublicKey};
 use serde::{Deserialize, Serialize};
@@ -180,6 +180,7 @@ impl<'a, SDK: SdkInterface> HandshakeServerInner<SDK> {
             Some(HandshakeFrame::HandshakeRequest {
                 resume_lane,
                 pubkey,
+                supported_compression_set,
                 ..
             }) => {
                 let mut user_lanes = inner.lanes.entry(pubkey).or_default();
@@ -238,7 +239,13 @@ impl<'a, SDK: SdkInterface> HandshakeServerInner<SDK> {
                             Some(res) => {
                                 let (sdk, handler) = res.clone();
                                 let (read, write) = conn.finish();
-                                let conn = RawLaneConnection::new(read, write, lane, pubkey);
+                                let conn = RawLaneConnection::new(
+                                    read,
+                                    write,
+                                    lane,
+                                    pubkey,
+                                    supported_compression_set,
+                                );
 
                                 // TODO: Figure out lifetimes to more correctly pass conn as a
                                 //       mutable reference.
@@ -269,15 +276,23 @@ pub struct RawLaneConnection<R: AsyncRead + Send + Sync, W: AsyncWrite + Send + 
     writer: W,
     lane: u8,
     client_id: ClientPublicKey,
+    compression_set: CompressionAlgoSet,
 }
 
 impl<R: AsyncRead + Send + Sync, W: AsyncWrite + Send + Sync> RawLaneConnection<R, W> {
-    pub fn new(reader: R, writer: W, lane: u8, client_id: ClientPublicKey) -> Self {
+    pub fn new(
+        reader: R,
+        writer: W,
+        lane: u8,
+        client_id: ClientPublicKey,
+        compression_set: CompressionAlgoSet,
+    ) -> Self {
         Self {
             reader,
             writer,
             lane,
             client_id,
+            compression_set,
         }
     }
 }
@@ -302,6 +317,9 @@ impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> Co
     }
     fn get_client(&self) -> &ClientPublicKey {
         &self.client_id
+    }
+    fn get_compression_set(&self) -> draco_interfaces::CompressionAlgoSet {
+        self.compression_set
     }
 }
 
@@ -374,7 +392,12 @@ mod tests {
 
         // dial the server and create a client
         let (read, write) = TcpStream::connect("0.0.0.0:6969").await?.into_split();
-        let mut client = HandshakeClient::new(read, write, ClientPublicKey([0u8; 20]));
+        let mut client = HandshakeClient::new(
+            read,
+            write,
+            ClientPublicKey([0u8; 20]),
+            CompressionAlgoSet::new(),
+        );
 
         // send a handshake
         client.handshake().await?;
