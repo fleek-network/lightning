@@ -1,3 +1,5 @@
+mod config;
+
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
@@ -7,10 +9,7 @@ use draco_interfaces::{
     PutWriteError,
 };
 use parking_lot::RwLock;
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, Default)]
-pub struct Config;
+use crate::config::Config;
 
 #[derive(Hash, Eq, PartialEq)]
 pub struct Key<'a>(&'a Blake3Hash, Option<u32>);
