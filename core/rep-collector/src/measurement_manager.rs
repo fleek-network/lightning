@@ -1,17 +1,20 @@
-use std::{collections::HashMap, time::Duration};
+use std::{num::NonZeroUsize, time::Duration};
 
 use draco_interfaces::Weight;
 use fleek_crypto::NodePublicKey;
+use lru::LruCache;
+
+const MAX_CAPACITY: usize = 200;
 
 /// Manages the measurements for all the peers.
 pub struct MeasurementManager {
-    peers: HashMap<NodePublicKey, Measurements>,
+    peers: LruCache<NodePublicKey, Measurements>,
 }
 
 impl MeasurementManager {
     pub fn new() -> Self {
         Self {
-            peers: HashMap::new(),
+            peers: LruCache::new(NonZeroUsize::new(MAX_CAPACITY).unwrap()),
         }
     }
 
@@ -22,22 +25,19 @@ impl MeasurementManager {
 
     pub fn report_sat(&mut self, peer: NodePublicKey, weight: Weight) {
         self.peers
-            .entry(peer)
-            .or_default()
+            .get_or_insert_mut(peer, Measurements::default)
             .register_interaction(true, weight);
     }
 
     pub fn report_unsat(&mut self, peer: NodePublicKey, weight: Weight) {
         self.peers
-            .entry(peer)
-            .or_default()
+            .get_or_insert_mut(peer, Measurements::default)
             .register_interaction(false, weight);
     }
 
     pub fn report_latency(&mut self, peer: NodePublicKey, latency: Duration) {
         self.peers
-            .entry(peer)
-            .or_default()
+            .get_or_insert_mut(peer, Measurements::default)
             .register_latency(latency);
     }
 
@@ -47,7 +47,7 @@ impl MeasurementManager {
         bytes: u64,
         duration: Option<Duration>,
     ) {
-        let measurements = self.peers.entry(peer).or_default();
+        let measurements = self.peers.get_or_insert_mut(peer, Measurements::default);
         measurements.register_bytes_received(bytes);
         if let Some(duration) = duration {
             measurements.register_outbound_bandwidth(bytes, duration);
@@ -60,7 +60,7 @@ impl MeasurementManager {
         bytes: u64,
         duration: Option<Duration>,
     ) {
-        let measurements = self.peers.entry(peer).or_default();
+        let measurements = self.peers.get_or_insert_mut(peer, Measurements::default);
         measurements.register_bytes_sent(bytes);
         if let Some(duration) = duration {
             measurements.register_inbound_bandwidth(bytes, duration);
@@ -68,7 +68,9 @@ impl MeasurementManager {
     }
 
     pub fn report_hops(&mut self, peer: NodePublicKey, hops: u8) {
-        self.peers.entry(peer).or_default().register_hops(hops);
+        self.peers
+            .get_or_insert_mut(peer, Measurements::default)
+            .register_hops(hops);
     }
 }
 
