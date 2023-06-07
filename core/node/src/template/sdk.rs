@@ -4,6 +4,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use draco_application::query_runner::QueryRunner;
 use draco_interfaces::{
     config::ConfigConsumer, signer::SubmitTxSocket, types::UpdateMethod, ConnectionInterface,
     SdkInterface,
@@ -12,7 +13,7 @@ use draco_rep_collector::MyReputationReporter;
 use fleek_crypto::ClientPublicKey;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf, Result};
 
-use super::{application::QueryRunner, config::Config, fs::FileSystem};
+use super::{config::Config, fs::FileSystem};
 
 #[derive(Clone)]
 pub struct Sdk {}

@@ -6,6 +6,7 @@ use std::{
     task::{Context, Poll},
 };
 
+use draco_application::app::Application;
 use draco_interfaces::{common::WithStartAndShutdown as _, Node};
 use draco_rep_collector::ReputationAggregator;
 use tokio::macros::support::Pin;
@@ -14,9 +15,9 @@ use tokio_stream::Stream;
 use crate::{
     configuration::TomlConfigProvider,
     template::{
-        application::Application, blockstore::BlockStore, consensus::Consensus, fs::FileSystem,
-        handshake::Handshake, indexer::Indexer, pod::DeliveryAcknowledgmentAggregator, rpc::Rpc,
-        sdk::Sdk, signer::Signer,
+        blockstore::BlockStore, consensus::Consensus, fs::FileSystem, handshake::Handshake,
+        indexer::Indexer, pod::DeliveryAcknowledgmentAggregator, rpc::Rpc, sdk::Sdk,
+        signer::Signer,
     },
 };
 

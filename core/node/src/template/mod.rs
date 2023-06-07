@@ -1,4 +1,3 @@
-pub mod application;
 pub mod blockstore;
 pub mod config;
 pub mod consensus;
