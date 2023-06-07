@@ -12,9 +12,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Default)]
 pub struct Config;
 
+#[derive(Hash, Eq, PartialEq)]
+pub struct Key<'a>(&'a Blake3Hash, Option<u32>);
+
 #[derive(Clone)]
 struct Blockstore {
-    inner: Arc<RwLock<HashMap<Blake3Hash, Block>>>,
+    inner: Arc<RwLock<HashMap<Key<'static>, Block>>>,
 }
 
 impl ConfigConsumer for Blockstore {
@@ -64,7 +67,7 @@ impl BlockStoreInterface for Blockstore {
     }
 
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
-        match self.inner.read().get(cid)? {
+        match self.inner.read().get(&Key(cid, None))? {
             Block::Tree(tree) => Some(tree.clone()),
             _ => None,
         }
@@ -72,11 +75,15 @@ impl BlockStoreInterface for Blockstore {
 
     async fn get(
         &self,
-        _block_counter: u32,
+        block_counter: u32,
         block_hash: &Blake3Hash,
         _compression: CompressionAlgoSet,
     ) -> Option<Self::SharedPointer<ContentChunk>> {
-        match self.inner.read().get(block_hash)? {
+        match self
+            .inner
+            .read()
+            .get(&Key(block_hash, Some(block_counter)))?
+        {
             Block::Chunk(chunk) => Some(chunk.clone()),
             _ => None,
         }
