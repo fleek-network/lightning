@@ -284,6 +284,12 @@ impl ReputationAggregatorInterface for ReputationAggregator {
         todo!()
     }
 
+    /// Returns a reputation query that can be used to answer queries about the local
+    /// reputation we have of another peer.
+    fn get_query(&self) -> Self::ReputationQuery {
+        todo!()
+    }
+
     fn submit_aggregation(&self) {
         todo!()
     }
