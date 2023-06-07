@@ -16,11 +16,11 @@ pub struct Config;
 pub struct Key<'a>(&'a Blake3Hash, Option<u32>);
 
 #[derive(Clone)]
-struct Blockstore {
+struct MemoryBlockStore {
     inner: Arc<RwLock<HashMap<Key<'static>, Block>>>,
 }
 
-impl ConfigConsumer for Blockstore {
+impl ConfigConsumer for MemoryBlockStore {
     const KEY: &'static str = "blockstore";
     type Config = Config;
 }
@@ -56,7 +56,7 @@ pub enum Block {
 }
 
 #[async_trait]
-impl BlockStoreInterface for Blockstore {
+impl BlockStoreInterface for MemoryBlockStore {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
     type Put = IncrementalPut;
 
