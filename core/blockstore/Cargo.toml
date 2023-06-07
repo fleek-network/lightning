@@ -8,4 +8,6 @@ edition = "2021"
 [dependencies]
 draco-interfaces = {path="../interfaces"}
 anyhow.workspace = true
+async-trait.workspace = true
+parking_lot.workspace = true
 serde.workspace = true

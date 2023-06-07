@@ -1169,7 +1169,9 @@ name = "draco-blockstore"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "draco-interfaces",
+ "parking_lot",
  "serde",
 ]
 
