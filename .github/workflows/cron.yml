@@ -57,5 +57,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: "draco"
+          save-if: "false"
       - name: Test
         run: cargo +stable test --all
