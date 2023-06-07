@@ -1,0 +1,61 @@
+name: Cron
+
+on:
+  schedule:
+    # Trigger the CI from 7am-7pm EST every 2 hours.
+    #
+    # 11:00 UTC = 07:00 EST
+    # 23:00 UTC = 19:00 EST
+    #
+    # The first run of the day is triggered separately because that 
+    # needs to be executed if there is any change in the last 12 hours,
+    # and not 2 hours.
+    - cron: '0 11 * * *'
+    - cron: '0 13,15,17,19,21,23 * * *'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  count_commits:
+    name: Count Commits
+    runs-on: ubuntu-latest
+    outputs:
+      count: ${{ env.COMMIT_COUNT }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          # Required to count the commits
+          fetch-depth: 0 
+      - name: Get new commits (2h)
+        if: github.event.schedule != '0 11 * * *'
+        run: echo "COMMIT_COUNT=$(git log --oneline --since '12 hours ago' | wc -l)" >> $GITHUB_ENV
+      - name: Get new commits (12h)
+        if: github.event.schedule == '0 11 * * *'
+        run: echo "COMMIT_COUNT=$(git log --oneline --since '12 hours ago' | wc -l)" >> $GITHUB_ENV
+
+  build:
+    name: Cargo Build
+    runs-on: ubuntu-latest
+    needs: count_commits
+    if: ${{ needs.count_commits.outputs.count != '0' }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "draco"
+      - name: Build Release
+        run: cargo +stable build --all --release
+
+  test:
+    name: Cargo Test
+    runs-on: ubuntu-latest
+    needs: build 
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "draco"
+          save-if: "false"
+      - name: Test
+        run: cargo +stable test --all
