@@ -1,4 +1,4 @@
-name: Cron
+name: Build & Tests
 
 on:
   schedule:
@@ -29,7 +29,7 @@ jobs:
           fetch-depth: 0 
       - name: Get new commits (2h)
         if: github.event.schedule != '0 11 * * *'
-        run: echo "COMMIT_COUNT=$(git log --oneline --since '12 hours ago' | wc -l)" >> $GITHUB_ENV
+        run: echo "COMMIT_COUNT=$(git log --oneline --since '2 hours ago' | wc -l)" >> $GITHUB_ENV
       - name: Get new commits (12h)
         if: github.event.schedule == '0 11 * * *'
         run: echo "COMMIT_COUNT=$(git log --oneline --since '12 hours ago' | wc -l)" >> $GITHUB_ENV

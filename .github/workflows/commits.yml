@@ -1,4 +1,4 @@
-name: Commits
+name: Lints
 
 on:
   push:
