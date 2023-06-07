@@ -216,8 +216,7 @@ where
         Self {
             reader,
             writer,
-            // The maximum frame size should be available to write at all times.
-            buffer: BytesMut::with_capacity(179),
+            buffer: BytesMut::with_capacity(MAX_FRAME_SIZE),
             take: 0,
         }
     }
