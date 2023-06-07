@@ -2,11 +2,11 @@
 #[repr(u8)]
 pub enum CompressionAlgorithm {
     Uncompressed = 0,
-    Snappy = 1,
-    Gzip = 2,
-    Brotli = 4,
-    Lz4 = 8,
-    Lzma = 16,
+    Snappy = 0x01 << 0,
+    Gzip = 0x01 << 1,
+    Brotli = 0x01 << 2,
+    Lz4 = 0x01 << 3,
+    Lzma = 0x01 << 4,
 }
 
 /// A set of [`CompressionAlgorithm`] values. The [`CompressionAlgorithm::Uncompressed`]
@@ -38,6 +38,12 @@ impl CompressionAlgoSet {
     /// Returns the intersection of this set with another set.
     pub fn intersect(&self, other: &Self) -> Self {
         Self(self.0 & other.0)
+    }
+}
+
+impl From<u8> for CompressionAlgoSet {
+    fn from(val: u8) -> Self {
+        CompressionAlgoSet(val)
     }
 }
 
