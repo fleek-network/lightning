@@ -1,5 +1,8 @@
-use draco_interfaces::{Blake3Hash, CompressionAlgorithm, IncrementalPutInterface, PutFeedProofError, PutFinalizeError, PutWriteError};
 use async_trait::async_trait;
+use draco_interfaces::{
+    Blake3Hash, CompressionAlgorithm, IncrementalPutInterface, PutFeedProofError, PutFinalizeError,
+    PutWriteError,
+};
 
 pub struct IncrementalPut;
 

@@ -1,8 +1,12 @@
 use std::{collections::HashMap, sync::Arc};
+
 use async_trait::async_trait;
+use draco_interfaces::{
+    Blake3Hash, Blake3Tree, BlockStoreInterface, CompressionAlgoSet, ConfigConsumer, ContentChunk,
+};
 use parking_lot::RwLock;
-use draco_interfaces::{Blake3Hash, Blake3Tree, BlockStoreInterface, CompressionAlgoSet, ConfigConsumer, ContentChunk};
-use crate::{config::Config, Block, Key, put::IncrementalPut};
+
+use crate::{config::Config, put::IncrementalPut, Block, Key};
 
 #[derive(Clone)]
 struct MemoryBlockStore {
