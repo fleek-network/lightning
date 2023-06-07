@@ -8,12 +8,13 @@ use draco_interfaces::{
 };
 use fleek_crypto::NodePublicKey;
 
-use crate::{buffered_mpsc, config::Config};
+use crate::{buffered_mpsc, config::Config, measurement_manager::MeasurementManager};
 
 #[allow(dead_code)]
 pub struct ReputationAggregator {
     report_rx: buffered_mpsc::BufferedReceiver<ReportMessage>,
     reporter: MyReputationReporter,
+    measurement_manager: MeasurementManager,
 }
 
 #[allow(dead_code)]
@@ -75,6 +76,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
         Ok(Self {
             report_rx,
             reporter: MyReputationReporter::new(report_tx),
+            measurement_manager: MeasurementManager::new(),
         })
     }
 

@@ -8,7 +8,7 @@ use tokio::sync::mpsc::{channel, error::SendError, Receiver, Sender};
 pub struct BufferedSender<T> {
     inner: Sender<Vec<T>>,
     // The buffer is wrapped in a mutex for interior mutability.
-    // Each new sender clone receives its own buffer, to no one
+    // Each new sender clone receives its own buffer, so no one
     // will ever have to wait to acquire the mutex guard.
     buffer: Arc<Mutex<Vec<T>>>,
     max_buffer_size: usize,

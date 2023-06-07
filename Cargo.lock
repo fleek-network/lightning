@@ -1174,6 +1174,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "draco-consensus"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "draco-interfaces",
+ "serde",
+]
+
+[[package]]
 name = "draco-handshake"
 version = "0.0.0"
 dependencies = [
