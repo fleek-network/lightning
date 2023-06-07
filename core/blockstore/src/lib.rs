@@ -66,7 +66,7 @@ impl BlockStoreInterface for Blockstore {
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
         match self.inner.read().get(cid)? {
             Block::Tree(tree) => Some(tree.clone()),
-            Block::Chunk(_) => None,
+            _ => None,
         }
     }
 
@@ -78,7 +78,7 @@ impl BlockStoreInterface for Blockstore {
     ) -> Option<Self::SharedPointer<ContentChunk>> {
         match self.inner.read().get(block_hash)? {
             Block::Chunk(chunk) => Some(chunk.clone()),
-            Block::Tree(_) => None,
+            _ => None,
         }
     }
 
