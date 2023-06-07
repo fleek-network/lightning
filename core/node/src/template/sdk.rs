@@ -102,6 +102,10 @@ impl ConnectionInterface for MyConnection {
     fn get_client(&self) -> &ClientPublicKey {
         todo!()
     }
+
+    fn get_compression_set(&self) -> draco_interfaces::CompressionAlgoSet {
+        todo!()
+    }
 }
 
 pub struct MyWriter {}

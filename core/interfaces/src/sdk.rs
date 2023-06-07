@@ -7,6 +7,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use crate::{
     application::SyncQueryRunnerInterface, fs::FileSystemInterface,
     reputation::ReputationReporterInterface, signer::SubmitTxSocket, types::UpdateMethod,
+    CompressionAlgoSet,
 };
 
 /// The request handler of a service.
@@ -70,4 +71,6 @@ pub trait ConnectionInterface: Send + Sync {
 
     /// Returns the ID of the client that has established this connection.
     fn get_client(&self) -> &ClientPublicKey;
+
+    fn get_compression_set(&self) -> CompressionAlgoSet;
 }
