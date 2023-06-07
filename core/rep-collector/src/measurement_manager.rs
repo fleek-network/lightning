@@ -120,11 +120,11 @@ impl Measurements {
     }
 
     fn register_bytes_received(&mut self, bytes: u64) {
-        self.bytes_sent.register_bytes_transferred(bytes);
+        self.bytes_received.register_bytes_transferred(bytes);
     }
 
     fn register_bytes_sent(&mut self, bytes: u64) {
-        self.bytes_received.register_bytes_transferred(bytes);
+        self.bytes_sent.register_bytes_transferred(bytes);
     }
 
     fn register_hops(&mut self, hops: u8) {
@@ -166,33 +166,28 @@ impl Latency {
 #[derive(Clone)]
 #[allow(dead_code)]
 struct Interactions {
-    sum: u32,
-    count: u32,
+    sum: Option<i64>,
 }
 
 impl Interactions {
     fn new() -> Self {
-        Self { sum: 0, count: 0 }
+        Self { sum: None }
     }
 
     fn register_interaction(&mut self, sat: bool, weight: Weight) {
         if sat {
-            self.sum += Interactions::get_weight(weight);
+            self.sum = Some(self.sum.unwrap_or(0) + Interactions::get_weight(weight));
         } else {
-            self.sum -= Interactions::get_weight(weight);
+            self.sum = Some(self.sum.unwrap_or(0) - Interactions::get_weight(weight));
         }
     }
 
     #[allow(dead_code)]
-    fn get(&self) -> Option<f32> {
-        if self.count > 0 {
-            Some(self.sum as f32 / self.count as f32)
-        } else {
-            None
-        }
+    fn get(&self) -> Option<i64> {
+        self.sum
     }
 
-    fn get_weight(weight: Weight) -> u32 {
+    fn get_weight(weight: Weight) -> i64 {
         match weight {
             Weight::Weak => 1,
             Weight::Strong => 5,
@@ -269,5 +264,92 @@ impl Hops {
     #[allow(dead_code)]
     fn get(&self) -> Option<u8> {
         self.hops
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use draco_interfaces::Weight;
+    use fleek_crypto::NodePublicKey;
+
+    use super::*;
+
+    #[test]
+    fn test_report_sat() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_sat(peer, Weight::Weak);
+        let measurements = manager.peers.get(&peer).unwrap();
+        assert_eq!(
+            measurements.interactions.get().unwrap(),
+            Interactions::get_weight(Weight::Weak)
+        );
+    }
+
+    #[test]
+    fn test_report_unsat() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_unsat(peer, Weight::Weak);
+        let measurements = manager.peers.get(&peer).unwrap();
+        assert_eq!(
+            measurements.interactions.get().unwrap(),
+            -Interactions::get_weight(Weight::Weak)
+        );
+    }
+
+    #[test]
+    fn test_report_sat_unsat() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_sat(peer, Weight::Weak);
+        manager.report_unsat(peer, Weight::Weak);
+        let measurements = manager.peers.get(&peer).unwrap();
+        assert_eq!(measurements.interactions.get().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_report_latency() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_latency(peer, Duration::from_millis(200));
+        manager.report_latency(peer, Duration::from_millis(100));
+        let measurements = manager.peers.get(&peer).unwrap();
+        assert_eq!(
+            measurements.latency.get().unwrap(),
+            Duration::from_millis(150)
+        );
+    }
+
+    #[test]
+    fn test_report_bytes_received() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_bytes_received(peer, 1024, Some(Duration::from_millis(200)));
+        let measurements = manager.peers.get(&peer).unwrap();
+
+        assert_eq!(measurements.bytes_received.get(), 1024);
+        assert_eq!(measurements.outbound_bandwidth.get().unwrap(), 5.12);
+    }
+
+    #[test]
+    fn test_report_bytes_sent() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_bytes_sent(peer, 1024, Some(Duration::from_millis(200)));
+        let measurements = manager.peers.get(&peer).unwrap();
+
+        assert_eq!(measurements.bytes_sent.get(), 1024);
+        assert_eq!(measurements.inbound_bandwidth.get().unwrap(), 5.12);
+    }
+
+    #[test]
+    fn test_report_hops() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_hops(peer, 10);
+        let measurements = manager.peers.get(&peer).unwrap();
+
+        assert_eq!(measurements.hops.get().unwrap(), 10);
     }
 }
