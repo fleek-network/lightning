@@ -47,6 +47,12 @@ impl From<u8> for CompressionAlgoSet {
     }
 }
 
+impl From<CompressionAlgoSet> for u8 {
+    fn from(value: CompressionAlgoSet) -> Self {
+        value.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
