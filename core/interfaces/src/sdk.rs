@@ -55,13 +55,6 @@ pub trait ConnectionInterface: Send + Sync {
     /// The reader half of this connection.
     type Reader: AsyncRead + Unpin + Send + Sync;
 
-    fn new(
-        reader: Self::Reader,
-        writer: Self::Writer,
-        lane: u8,
-        client_id: ClientPublicKey,
-    ) -> Self;
-
     /// Split the connection to the `writer` and `reader` half and returns a mutable reference to
     /// both sides.
     fn split(&mut self) -> (&mut Self::Writer, &mut Self::Reader);

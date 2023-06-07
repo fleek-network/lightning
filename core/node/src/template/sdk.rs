@@ -103,15 +103,6 @@ impl ConnectionInterface for MyConnection {
     fn get_client(&self) -> &ClientPublicKey {
         todo!()
     }
-
-    fn new(
-        _reader: Self::Reader,
-        _writer: Self::Writer,
-        _lane: u8,
-        _client_id: ClientPublicKey,
-    ) -> Self {
-        todo!()
-    }
 }
 
 pub struct MyWriter {}

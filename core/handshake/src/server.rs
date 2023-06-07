@@ -238,7 +238,7 @@ impl<'a, SDK: SdkInterface> HandshakeServerInner<SDK> {
                             Some(res) => {
                                 let (sdk, handler) = res.clone();
                                 let (read, write) = conn.finish();
-                                let conn = SDK::Connection::new(read, write, lane, pubkey);
+                                let conn = RawLaneConnection::new(read, write, lane, pubkey);
 
                                 // TODO: Figure out lifetimes to more correctly pass conn as a
                                 //       mutable reference.
@@ -287,15 +287,6 @@ impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> Co
 {
     type Writer = W;
     type Reader = R;
-
-    fn new(reader: R, writer: W, lane: u8, client_id: ClientPublicKey) -> Self {
-        Self {
-            reader,
-            writer,
-            lane,
-            client_id,
-        }
-    }
 
     fn split(&mut self) -> (&mut Self::Writer, &mut Self::Reader) {
         (&mut self.writer, &mut self.reader)
