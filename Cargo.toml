@@ -1,6 +1,5 @@
 [workspace]
 members = ["core/*", "lib/*", "services/*"]
-exclude = ["core/consensus", "lib/fleek-crypto"]
 
 [workspace.package]
 version = "0.1.0"
