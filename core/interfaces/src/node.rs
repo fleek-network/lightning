@@ -1,4 +1,4 @@
-use std::{collections::HashMap, marker::PhantomData};
+use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 use async_trait::async_trait;
 
@@ -39,7 +39,7 @@ pub struct Node<
     >,
     Handshake: HandshakeInterface<Sdk = Sdk>,
 > {
-    pub configuration: ConfigProvider,
+    pub configuration: Arc<ConfigProvider>,
     pub consensus: Consensus,
     pub application: Application,
     pub store: BlockStore,
@@ -89,7 +89,7 @@ impl<
         Handshake,
     >
 {
-    pub async fn init(configuration: ConfigProvider) -> anyhow::Result<Self> {
+    pub async fn init(configuration: Arc<ConfigProvider>) -> anyhow::Result<Self> {
         let mut signer = Signer::init(configuration.get::<Signer>()).await?;
 
         let application = Application::init(configuration.get::<Application>()).await?;

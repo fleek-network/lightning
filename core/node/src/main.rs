@@ -2,10 +2,13 @@ mod cli;
 mod configuration;
 mod template;
 
+use std::sync::Arc;
+
+use anyhow::Result;
 use clap::Parser;
 use draco_application::app::Application;
 use draco_handshake::server::{StreamProvider, TcpHandshakeServer, TcpProvider};
-use draco_interfaces::{common::WithStartAndShutdown as _, Node};
+use draco_interfaces::{common::WithStartAndShutdown as _, ConfigProviderInterface, Node};
 use draco_rep_collector::ReputationAggregator;
 
 use crate::{
@@ -37,15 +40,18 @@ pub type ConcreteNode = Node<
 >;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let args = CliArgs::parse();
 
     println!("Hello, Fleek!");
 
-    let config = TomlConfigProvider::open(args.config).unwrap();
-    let node = ConcreteNode::init(config).await.unwrap();
+    let config = Arc::new(TomlConfigProvider::open(args.config.clone())?);
+    let node = ConcreteNode::init(config.clone()).await?;
+    std::fs::write(args.config, config.serialize_config())?;
 
     node.start().await;
 
     // TODO: Await ctrl^c/sigkill and call shutdown
+
+    Ok(())
 }
