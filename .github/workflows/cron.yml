@@ -62,8 +62,9 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "test"
+          shared-key: "build"
           cache-all-crates: "true"
+          save-if: "false"
       - name: Setup junitify
         run: cargo install junitify
       - name: Cargo Test
@@ -84,17 +85,14 @@ jobs:
           paths: 'test_results/*.xml'
   
   coverage:
-    name: coverage
+    name: Code Coverage
     runs-on: ubuntu-latest
     needs: test
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "test"
-          save-if: "false" 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate Code Coverage
