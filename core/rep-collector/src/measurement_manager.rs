@@ -269,6 +269,73 @@ impl Hops {
     }
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Default)]
+struct SummaryStatistics {
+    min: Values,
+    max: Values,
+}
+
+#[allow(dead_code)]
+impl SummaryStatistics {
+    fn update_latency(&mut self, value: Duration) {
+        self.min.latency = Self::update(self.min.latency, value, &std::cmp::min);
+        self.max.latency = Self::update(self.max.latency, value, &std::cmp::max);
+    }
+
+    fn update_interactions(&mut self, value: i64) {
+        self.min.interactions = Self::update(self.min.interactions, value, &std::cmp::min);
+        self.max.interactions = Self::update(self.max.interactions, value, &std::cmp::max);
+    }
+
+    fn update_inbound_bandwidth(&mut self, value: f64) {
+        self.min.inbound_bandwidth = Self::update(self.min.inbound_bandwidth, value, &f64::min);
+        self.max.inbound_bandwidth = Self::update(self.max.inbound_bandwidth, value, &f64::max);
+    }
+
+    fn update_outbound_bandwidth(&mut self, value: f64) {
+        self.min.outbound_bandwidth = Self::update(self.min.outbound_bandwidth, value, &f64::min);
+        self.max.outbound_bandwidth = Self::update(self.max.outbound_bandwidth, value, &f64::max);
+    }
+
+    fn update_bytes_received(&mut self, value: u128) {
+        self.min.bytes_received = Self::update(self.min.bytes_received, value, &std::cmp::min);
+        self.max.bytes_received = Self::update(self.max.bytes_received, value, &std::cmp::max);
+    }
+
+    fn update_bytes_sent(&mut self, value: u128) {
+        self.min.bytes_sent = Self::update(self.min.bytes_sent, value, &std::cmp::min);
+        self.max.bytes_sent = Self::update(self.max.bytes_sent, value, &std::cmp::max);
+    }
+
+    fn update_hops(&mut self, value: u8) {
+        self.min.hops = Self::update(self.min.hops, value, &std::cmp::min);
+        self.max.hops = Self::update(self.max.hops, value, &std::cmp::max);
+    }
+
+    fn update<T: PartialOrd + Copy>(
+        min_val: Option<T>,
+        value: T,
+        cmp: &dyn Fn(T, T) -> T,
+    ) -> Option<T> {
+        match min_val {
+            Some(min_val) => Some(cmp(min_val, value)),
+            None => Some(value),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct Values {
+    latency: Option<Duration>,
+    interactions: Option<i64>,
+    inbound_bandwidth: Option<f64>,
+    outbound_bandwidth: Option<f64>,
+    bytes_received: Option<u128>,
+    bytes_sent: Option<u128>,
+    hops: Option<u8>,
+}
+
 #[cfg(test)]
 mod tests {
     use draco_interfaces::Weight;
