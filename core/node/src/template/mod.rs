@@ -3,6 +3,7 @@ pub mod config;
 pub mod consensus;
 pub mod fs;
 pub mod indexer;
+pub mod origin;
 pub mod pod;
 pub mod rpc;
 pub mod sdk;

@@ -1,40 +1,21 @@
 mod configuration;
 mod template;
 
-use std::{
-    path::Path,
-    task::{Context, Poll},
-};
+use std::path::Path;
 
 use draco_application::app::Application;
 use draco_handshake::server::{StreamProvider, TcpHandshakeServer, TcpProvider};
 use draco_interfaces::{common::WithStartAndShutdown as _, Node};
 use draco_rep_collector::ReputationAggregator;
-use tokio::macros::support::Pin;
-use tokio_stream::Stream;
 
 use crate::{
     configuration::TomlConfigProvider,
     template::{
         blockstore::BlockStore, consensus::Consensus, fs::FileSystem, indexer::Indexer,
-        pod::DeliveryAcknowledgmentAggregator, rpc::Rpc, sdk::Sdk, signer::Signer,
+        origin::MyStream, pod::DeliveryAcknowledgmentAggregator, rpc::Rpc, sdk::Sdk,
+        signer::Signer,
     },
 };
-
-pub struct MyStream {}
-
-impl Stream for MyStream {
-    type Item = bytes::BytesMut;
-
-    fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        todo!()
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, None)
-    }
-}
 
 pub type ConcreteNode = Node<
     TomlConfigProvider,
