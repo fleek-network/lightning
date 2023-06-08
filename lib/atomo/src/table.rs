@@ -22,6 +22,7 @@ pub struct TableMeta {
     pub _name: String,
     pub k_id: TypeId,
     pub v_id: TypeId,
+    pub iter: bool,
 }
 
 /// A resolved table reference can be used to cache the lookup of a table by its string name
@@ -82,7 +83,12 @@ impl TableMeta {
     pub fn new<K: Any, V: Any>(_name: String) -> Self {
         let k_id = TypeId::of::<K>();
         let v_id = TypeId::of::<V>();
-        Self { _name, k_id, v_id }
+        Self {
+            _name,
+            k_id,
+            v_id,
+            iter: false,
+        }
     }
 }
 

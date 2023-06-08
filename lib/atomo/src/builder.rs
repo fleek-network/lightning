@@ -62,6 +62,26 @@ impl<S: SerdeBackend> AtomoBuilder<S> {
         self.atomo.persistence.push(DashMap::default());
     }
 
+    /// Enable the iterator functionality on the provided table. In Atomo by default
+    /// tables do not have a key iterator, to implement a non-blocking iterator over
+    /// keys we currently store all of the keys in memory, this may not be the best
+    /// we can do, but it suffices the needs we have.
+    ///
+    /// So do not enable the iterator on tables that you don't need it on.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the provided table name is not already defined using a prior call
+    /// to `with_table`.
+    #[must_use = "Builder is incomplete."]
+    pub fn enable_iter(mut self, name: &str) -> Self {
+        if let Some(index) = self.atomo.table_name_to_id.get(name) {
+            self.atomo.tables[*index as usize].iter = true;
+        }
+
+        panic!("Table {name} is not defined.");
+    }
+
     #[must_use = "Creating a Atomo without using it is probably a mistake."]
     pub fn build(self) -> Atomo<UpdatePerm, S> {
         Atomo::new(Arc::new(self.atomo))
