@@ -332,13 +332,13 @@ impl SummaryStatistics {
     }
 
     fn update<T: PartialOrd + Copy>(
-        min_val: Option<T>,
-        value: T,
+        summary_val: Option<T>,
+        new_value: T,
         cmp: &dyn Fn(T, T) -> T,
     ) -> Option<T> {
-        match min_val {
-            Some(min_val) => Some(cmp(min_val, value)),
-            None => Some(value),
+        match summary_val {
+            Some(summary_val) => Some(cmp(summary_val, new_value)),
+            None => Some(new_value),
         }
     }
 }
