@@ -20,8 +20,10 @@ jobs:
     needs: fmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: Swatinem/rust-cache@v2
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
         with:
           shared-key: "lints"
       - name: Cargo Clippy 
@@ -31,8 +33,10 @@ jobs:
     needs: clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: Swatinem/rust-cache@v2
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
         with:
           shared-key: "lints"
           save-if: "false"
