@@ -1240,6 +1240,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "draco-application",
+ "draco-handshake",
  "draco-interfaces",
  "draco-rep-collector",
  "fleek-crypto",

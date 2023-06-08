@@ -6,9 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+draco-application = { path = "../application" }
+draco-handshake = { path = "../handshake" }
 draco-interfaces = { path = "../interfaces" }
 draco-rep-collector = { path = "../rep-collector" }
-draco-application = { path = "../application" }
 anyhow.workspace = true
 serde.workspace = true
 toml = "0.7"
