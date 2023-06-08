@@ -439,4 +439,80 @@ mod tests {
 
         assert_eq!(measurements.hops.get().unwrap(), 10);
     }
+
+    #[test]
+    fn test_lateny_min_max() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_latency(peer, Duration::from_millis(200));
+        let peer = NodePublicKey([1; 96]);
+        manager.report_latency(peer, Duration::from_millis(100));
+        assert_eq!(
+            manager.summary_stats.min.latency.unwrap(),
+            Duration::from_millis(100)
+        );
+        assert_eq!(
+            manager.summary_stats.max.latency.unwrap(),
+            Duration::from_millis(200)
+        );
+    }
+
+    #[test]
+    fn test_interactions_min_max() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_sat(peer, Weight::Weak);
+        let peer = NodePublicKey([1; 96]);
+        manager.report_sat(peer, Weight::Strong);
+        assert_eq!(
+            manager.summary_stats.min.interactions.unwrap(),
+            Interactions::get_weight(Weight::Weak)
+        );
+        assert_eq!(
+            manager.summary_stats.max.interactions.unwrap(),
+            Interactions::get_weight(Weight::Strong)
+        );
+    }
+
+    #[test]
+    fn test_bytes_received_min_max() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_bytes_received(peer, 1000, Some(Duration::from_millis(200)));
+        let peer = NodePublicKey([1; 96]);
+        manager.report_bytes_received(peer, 2000, Some(Duration::from_millis(100)));
+
+        assert_eq!(manager.summary_stats.min.bytes_received.unwrap(), 1000);
+        assert_eq!(manager.summary_stats.min.outbound_bandwidth.unwrap(), 5.0);
+
+        assert_eq!(manager.summary_stats.max.bytes_received.unwrap(), 2000);
+        assert_eq!(manager.summary_stats.max.outbound_bandwidth.unwrap(), 20.0);
+    }
+
+    #[test]
+    fn test_bytes_sent_min_max() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_bytes_sent(peer, 1000, Some(Duration::from_millis(200)));
+        let peer = NodePublicKey([1; 96]);
+        manager.report_bytes_sent(peer, 2000, Some(Duration::from_millis(100)));
+
+        assert_eq!(manager.summary_stats.min.bytes_sent.unwrap(), 1000);
+        assert_eq!(manager.summary_stats.min.inbound_bandwidth.unwrap(), 5.0);
+
+        assert_eq!(manager.summary_stats.max.bytes_sent.unwrap(), 2000);
+        assert_eq!(manager.summary_stats.max.inbound_bandwidth.unwrap(), 20.0);
+    }
+
+    #[test]
+    fn test_hops_min_max() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_hops(peer, 10);
+        let peer = NodePublicKey([1; 96]);
+        manager.report_hops(peer, 20);
+
+        assert_eq!(manager.summary_stats.min.hops.unwrap(), 10);
+        assert_eq!(manager.summary_stats.max.hops.unwrap(), 20);
+    }
 }
