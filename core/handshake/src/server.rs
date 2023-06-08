@@ -352,6 +352,8 @@ impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> Co
 #[cfg(test)]
 mod tests {
     use affair::{Executor, TokioSpawn};
+    use draco_application::{app::Application, config::Config};
+    use draco_interfaces::ApplicationInterface;
     use tokio::{
         self,
         io::{AsyncReadExt, AsyncWriteExt},
@@ -361,15 +363,16 @@ mod tests {
     use super::*;
     use crate::{
         client::HandshakeClient,
-        dummy::{FileSystem, MyReputationReporter, QueryRunner, Sdk, Signer},
+        dummy::{FileSystem, MyReputationReporter, Sdk, Signer},
     };
 
     #[tokio::test]
     async fn hello_world_service() -> anyhow::Result<()> {
         // server setup
         let signer = TokioSpawn::spawn(Signer {});
+        let app = Application::init(Config {}).await?;
         let sdk = Sdk::new(
-            QueryRunner {},
+            app.sync_query(),
             MyReputationReporter {},
             FileSystem {},
             signer,

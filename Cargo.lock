@@ -1272,6 +1272,7 @@ dependencies = [
  "bytes",
  "criterion 0.4.0",
  "dashmap",
+ "draco-application",
  "draco-interfaces",
  "fleek-crypto",
  "futures",
