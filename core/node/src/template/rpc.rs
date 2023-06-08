@@ -7,10 +7,13 @@ use draco_interfaces::{
 use super::config::Config;
 
 #[derive(Clone)]
-pub struct Rpc {}
+pub struct Rpc<Q: SyncQueryRunnerInterface> {
+    _mempool_address: MempoolSocket,
+    _query_runner: Q,
+}
 
 #[async_trait]
-impl WithStartAndShutdown for Rpc {
+impl<Q: SyncQueryRunnerInterface> WithStartAndShutdown for Rpc<Q> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         todo!()
@@ -29,18 +32,22 @@ impl WithStartAndShutdown for Rpc {
 }
 
 #[async_trait]
-impl RpcInterface for Rpc {
+impl<Q: SyncQueryRunnerInterface> RpcInterface<Q> for Rpc<Q> {
     /// Initialize the *RPC* server, with the given parameters.
-    async fn init<Q: SyncQueryRunnerInterface>(
+    async fn init(
         _config: Self::Config,
         _mempool: MempoolSocket,
         _query_runner: Q,
     ) -> anyhow::Result<Self> {
         todo!()
     }
+
+    fn query_runner(&self) -> Q {
+        todo!()
+    }
 }
 
-impl ConfigConsumer for Rpc {
+impl<Q: SyncQueryRunnerInterface> ConfigConsumer for Rpc<Q> {
     const KEY: &'static str = "rpc";
 
     type Config = Config;

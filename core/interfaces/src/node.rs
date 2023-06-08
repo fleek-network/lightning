@@ -31,7 +31,7 @@ pub struct Node<
     Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
     DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
     ReputationAggregator: ReputationAggregatorInterface,
-    Rpc: RpcInterface,
+    Rpc: RpcInterface<Application::SyncExecutor>,
     Sdk: SdkInterface<
         SyncQuery = Application::SyncExecutor,
         ReputationReporter = ReputationAggregator::ReputationReporter,
@@ -65,7 +65,7 @@ impl<
     Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
     DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
     ReputationAggregator: ReputationAggregatorInterface,
-    Rpc: RpcInterface,
+    Rpc: RpcInterface<Application::SyncExecutor>,
     Sdk: SdkInterface<
         SyncQuery = Application::SyncExecutor,
         ReputationReporter = ReputationAggregator::ReputationReporter,
@@ -199,7 +199,7 @@ impl<
     Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
     DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
     ReputationAggregator: ReputationAggregatorInterface,
-    Rpc: RpcInterface,
+    Rpc: RpcInterface<Application::SyncExecutor>,
     Sdk: SdkInterface<
         SyncQuery = Application::SyncExecutor,
         ReputationReporter = ReputationAggregator::ReputationReporter,

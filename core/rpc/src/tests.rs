@@ -2,7 +2,7 @@ use std::{thread, time::Duration};
 
 use affair::{Executor, TokioSpawn, Worker};
 use anyhow::Result;
-use draco_application::{app::Application, config::Config as AppConfig};
+use draco_application::{app::Application, config::Config as AppConfig, query_runner::QueryRunner};
 use draco_interfaces::{
     types::{Block, ProofOfConsensus, Tokens, UpdateMethod, UpdatePayload, UpdateRequest},
     ApplicationInterface, ExecutionEngineSocket, MempoolSocket, RpcInterface, WithStartAndShutdown,
@@ -41,26 +41,26 @@ impl Worker for MockWorker {
     fn handle(&mut self, _req: Self::Request) -> Self::Response {}
 }
 
-async fn init_rpc_without_consensus() -> Result<Rpc> {
+async fn init_rpc_without_consensus() -> Result<Rpc<QueryRunner>> {
     let app = Application::init(AppConfig {}).await.unwrap();
 
     let rpc = Rpc::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
-        app.query_socket(),
+        app.sync_query(),
     )
     .await?;
 
     Ok(rpc)
 }
 
-async fn init_rpc_with_execution_socket() -> Result<(Rpc, ExecutionEngineSocket)> {
+async fn init_rpc_with_execution_socket() -> Result<(Rpc<QueryRunner>, ExecutionEngineSocket)> {
     let app = Application::init(AppConfig {}).await.unwrap();
 
     let rpc = Rpc::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
-        app.query_socket(),
+        app.sync_query(),
     )
     .await?;
 
