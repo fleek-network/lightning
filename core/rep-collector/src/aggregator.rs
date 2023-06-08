@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use draco_application::query_runner::QueryRunner;
@@ -14,6 +14,7 @@ use crate::{buffered_mpsc, config::Config, measurement_manager::MeasurementManag
 pub struct ReputationAggregator {
     report_rx: buffered_mpsc::BufferedReceiver<ReportMessage>,
     reporter: MyReputationReporter,
+    query: MyReputationQuery,
     measurement_manager: MeasurementManager,
 }
 
@@ -75,9 +76,12 @@ impl ReputationAggregatorInterface for ReputationAggregator {
     /// Create a new reputation
     async fn init(_config: Self::Config, _submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
         let (report_tx, report_rx) = buffered_mpsc::buffered_channel(100, 2048);
+        let measurement_manager = MeasurementManager::new();
+        let local_reputation_ref = measurement_manager.get_local_reputation_ref();
         Ok(Self {
             report_rx,
             reporter: MyReputationReporter::new(report_tx),
+            query: MyReputationQuery::new(local_reputation_ref),
             measurement_manager: MeasurementManager::new(),
         })
     }
@@ -98,7 +102,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
     /// Returns a reputation query that can be used to answer queries about the local
     /// reputation we have of another peer.
     fn get_query(&self) -> Self::ReputationQuery {
-        todo!()
+        self.query.clone()
     }
 }
 
@@ -109,15 +113,23 @@ impl ConfigConsumer for ReputationAggregator {
 }
 
 #[derive(Clone)]
-pub struct MyReputationQuery {}
+pub struct MyReputationQuery {
+    local_reputation: Arc<scc::HashMap<NodePublicKey, u128>>,
+}
+
+impl MyReputationQuery {
+    fn new(local_reputation: Arc<scc::HashMap<NodePublicKey, u128>>) -> Self {
+        Self { local_reputation }
+    }
+}
 
 impl ReputationQueryInteface for MyReputationQuery {
     /// The application layer's synchronize query runner.
     type SyncQuery = QueryRunner;
 
     /// Returns the reputation of the provided node locally.
-    fn get_reputation_of(&self, _peer: &NodePublicKey) -> Option<u128> {
-        todo!()
+    fn get_reputation_of(&self, peer: &NodePublicKey) -> Option<u128> {
+        self.local_reputation.get(peer).map(|entry| *entry.get())
     }
 }
 

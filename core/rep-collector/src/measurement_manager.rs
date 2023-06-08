@@ -1,4 +1,4 @@
-use std::{num::NonZeroUsize, time::Duration};
+use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
 use draco_interfaces::Weight;
 use fleek_crypto::NodePublicKey;
@@ -6,21 +6,23 @@ use lru::LruCache;
 
 const MAX_CAPACITY: usize = 200;
 
+#[allow(dead_code)]
 /// Manages the measurements for all the peers.
 pub struct MeasurementManager {
     peers: LruCache<NodePublicKey, Measurements>,
+    local_reputation: Arc<scc::HashMap<NodePublicKey, u128>>,
 }
 
 impl MeasurementManager {
     pub fn new() -> Self {
         Self {
             peers: LruCache::new(NonZeroUsize::new(MAX_CAPACITY).unwrap()),
+            local_reputation: Arc::new(scc::HashMap::new()),
         }
     }
 
-    #[allow(dead_code)]
-    pub fn get_reputation_of(&self, _peer: &NodePublicKey) -> Option<u128> {
-        todo!()
+    pub fn get_local_reputation_ref(&self) -> Arc<scc::HashMap<NodePublicKey, u128>> {
+        self.local_reputation.clone()
     }
 
     pub fn report_sat(&mut self, peer: NodePublicKey, weight: Weight) {

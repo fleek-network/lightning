@@ -1374,6 +1374,7 @@ dependencies = [
  "draco-interfaces",
  "fleek-crypto",
  "lru",
+ "scc",
  "serde",
  "tokio",
 ]
@@ -2911,6 +2912,12 @@ checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
 ]
+
+[[package]]
+name = "scc"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89b4bac3d959fa84320a2a61a27db0fd2afa3e2b3ea0dcea170ec8b820b9697c"
 
 [[package]]
 name = "schannel"
