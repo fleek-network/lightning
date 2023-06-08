@@ -16,6 +16,7 @@ use crate::{
     inner::AtomoInner,
     serder::SerdeBackend,
     snapshot::Snapshot,
+    KeyIterator,
 };
 
 pub struct TableMeta {
@@ -194,15 +195,6 @@ where
     K: Hash + Eq + Serialize + DeserializeOwned + Any,
     V: Serialize + DeserializeOwned + Any,
 {
-    // /// Returns an iterator of the keys in this table.
-    // pub fn keys<'iter, 'table>(&'table self) -> KeyIterator<'iter, K, V, S>
-    // where
-    //     'selector: 'iter,
-    //     'iter: 'table,
-    // {
-    //     todo!()
-    // }
-
     /// Insert a new `key` and `value` pair into the table.
     pub fn insert(&mut self, key: impl Borrow<K>, value: impl Borrow<V>) {
         let k = S::serialize(key.borrow()).into_boxed_slice();
@@ -265,5 +257,20 @@ where
         }
 
         self.selector.atomo.contains_key(self.tid, &k)
+    }
+
+    /// Returns an iterator of the keys in this table.
+    ///
+    /// # Panics
+    ///
+    /// If the current table is not opened with iterator support when opening the
+    /// Atomo instance. See the documentation for [`crate::AtomoBuilder::enable_iter`]
+    /// for more information.
+    pub fn keys<'iter, 'table>(&'table self) -> KeyIterator<'iter, K, S>
+    where
+        'selector: 'iter,
+        'iter: 'table,
+    {
+        todo!()
     }
 }
