@@ -1,4 +1,3 @@
-use draco_interfaces::ConfigProviderInterface;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -7,15 +6,6 @@ pub struct Config {
     pub addr: String,
     /// Port to listen on
     pub port: u16,
-}
-impl ConfigProviderInterface for Config {
-    fn get<S: draco_interfaces::ConfigConsumer>(&self) -> S::Config {
-        todo!()
-    }
-
-    fn serialize_config(&self) -> String {
-        todo!()
-    }
 }
 
 impl Default for Config {

@@ -4,14 +4,20 @@ use std::{
 };
 
 use async_trait::async_trait;
-use axum::{routing::post, Extension, Router};
+use axum::{
+    routing::{get, post},
+    Extension, Router,
+};
 use draco_interfaces::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
     types::{QueryMethod, QueryRequest, TransactionResponse},
     MempoolSocket, QuerySocket, RpcInterface, RpcMethods,
 };
-use fleek_crypto::{AccountOwnerPublicKey, TransactionSender::AccountOwner};
+use fleek_crypto::{
+    AccountOwnerPublicKey, NodePublicKey,
+    TransactionSender::{AccountOwner, Node},
+};
 
 use super::config::Config;
 use crate::handlers::{rpc_handler, RpcServer};
@@ -20,8 +26,8 @@ use crate::handlers::{rpc_handler, RpcServer};
 pub struct Rpc {
     _mempool_address: MempoolSocket,
     query_socket: QuerySocket,
-    config: Config,
     server_running: Arc<RwLock<bool>>,
+    pub config: Config,
 }
 
 impl Rpc {
@@ -43,16 +49,18 @@ impl WithStartAndShutdown for Rpc {
     /// started.
     async fn start(&self) {
         if !self.is_running() {
-            println!("server starting up");
+            println!("RPC server starting up");
             let rpc = Arc::new(self.clone());
             let server = RpcServer::new(Arc::clone(&rpc));
 
             let app = Router::new()
+                .route("/health", get(|| async { "OK" }))
                 .route("/rpc/v0", post(rpc_handler))
                 .layer(Extension(server.clone()));
 
             self.set_running(true);
             let http_address = SocketAddr::from(([127, 0, 0, 1], self.config.port));
+            println!("listening on {http_address}");
             axum::Server::bind(&http_address)
                 .serve(app.into_make_service())
                 .await
@@ -90,12 +98,45 @@ impl RpcMethods for Rpc {
     async fn ping(&self) -> anyhow::Result<String> {
         Ok("pong".to_string())
     }
-
+    // TODO: refactor QueryRequest with QueryRunner
     /// this method would fetch the account balance of a particular address or account.
     async fn get_balance(&self, public_key: AccountOwnerPublicKey) -> TransactionResponse {
         let query = QueryRequest {
             sender: AccountOwner(public_key),
             query: QueryMethod::FLK { public_key },
+        };
+        let res = self.query_socket.run(query).await.unwrap();
+        bincode::deserialize(&res).unwrap()
+    }
+
+    // TODO: refactor these methods to avoid duplicate code
+    /// this method would fetch the bandwidth balance of a particular address or account.
+    async fn get_bandwidth(&self, public_key: AccountOwnerPublicKey) -> TransactionResponse {
+        let query = QueryRequest {
+            sender: AccountOwner(public_key),
+            query: QueryMethod::Bandwidth { public_key },
+        };
+        let res = self.query_socket.run(query).await.unwrap();
+        bincode::deserialize(&res).unwrap()
+    }
+
+    /// this method would fetch the locked token balance of a particular node.
+    async fn get_locked(&self, node_key: NodePublicKey) -> TransactionResponse {
+        let query = QueryRequest {
+            sender: Node(node_key),
+            query: QueryMethod::Locked {
+                public_key: node_key,
+            },
+        };
+        let res = self.query_socket.run(query).await.unwrap();
+        bincode::deserialize(&res).unwrap()
+    }
+
+    /// this method would fetch the staked token balance of a particular node.
+    async fn get_staked(&self, node_key: NodePublicKey) -> TransactionResponse {
+        let query = QueryRequest {
+            sender: Node(node_key),
+            query: QueryMethod::Staked { node: node_key },
         };
         let res = self.query_socket.run(query).await.unwrap();
         bincode::deserialize(&res).unwrap()

@@ -7,8 +7,6 @@ edition = "2021"
 
 [dependencies]
 draco-interfaces = {path="../interfaces"}
-draco-application = {path="../application"}
-#draco-consensus = {path="../consensus"}
 axum.workspace = true
 anyhow.workspace = true
 jsonrpc-v2.workspace = true
@@ -22,4 +20,6 @@ fleek-crypto.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true
-reqwest.workspace = true
+reqwest = {workspace = true, features = ["json"]}
+draco-application = {path="../application"}
+#draco-consensus = {path="../consensus"}

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use fleek_crypto::AccountOwnerPublicKey;
+use fleek_crypto::{AccountOwnerPublicKey, NodePublicKey};
 
 use crate::{
     application::QuerySocket, common::WithStartAndShutdown, config::ConfigConsumer,
@@ -24,6 +24,15 @@ pub trait RpcMethods: Sync + Send + 'static {
 
     /// this method would fetch the account balance of a particular address or account.
     async fn get_balance(&self, public_key: AccountOwnerPublicKey) -> TransactionResponse;
+
+    /// this method would fetch the bandwidth balance of a particular address or account.
+    async fn get_bandwidth(&self, public_key: AccountOwnerPublicKey) -> TransactionResponse;
+
+    /// this method would fetch the locked token balance of a particular node.
+    async fn get_locked(&self, node_key: NodePublicKey) -> TransactionResponse;
+
+    /// this method would fetch the staked token balance of a particular node.
+    async fn get_staked(&self, node_key: NodePublicKey) -> TransactionResponse;
 
     /// This method would return information about a specific node.
     async fn get_node_info(&self);
