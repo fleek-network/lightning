@@ -36,9 +36,11 @@ impl TomlConfigProvider {
 
 impl ConfigProviderInterface for TomlConfigProvider {
     fn get<S: draco_interfaces::config::ConfigConsumer>(&self) -> S::Config {
-        let _key = S::KEY;
-
-        todo!()
+        let key = S::KEY;
+        self.table
+            .get(key)
+            .and_then(|v| v.clone().try_into().ok())
+            .unwrap_or_default()
     }
 
     fn serialize_config(&self) -> String {
