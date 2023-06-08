@@ -10,6 +10,7 @@ const MAX_CAPACITY: usize = 200;
 /// Manages the measurements for all the peers.
 pub struct MeasurementManager {
     peers: LruCache<NodePublicKey, Measurements>,
+    summary_stats: SummaryStatistics,
     local_reputation: Arc<scc::HashMap<NodePublicKey, u128>>,
 }
 
@@ -17,6 +18,7 @@ impl MeasurementManager {
     pub fn new() -> Self {
         Self {
             peers: LruCache::new(NonZeroUsize::new(MAX_CAPACITY).unwrap()),
+            summary_stats: SummaryStatistics::default(),
             local_reputation: Arc::new(scc::HashMap::new()),
         }
     }
@@ -29,18 +31,24 @@ impl MeasurementManager {
         self.peers
             .get_or_insert_mut(peer, Measurements::default)
             .register_interaction(true, weight);
+        let value = self.peers.get(&peer).unwrap().interactions.get().unwrap();
+        self.summary_stats.update_interactions(value);
     }
 
     pub fn report_unsat(&mut self, peer: NodePublicKey, weight: Weight) {
         self.peers
             .get_or_insert_mut(peer, Measurements::default)
             .register_interaction(false, weight);
+        let value = self.peers.get(&peer).unwrap().interactions.get().unwrap();
+        self.summary_stats.update_interactions(value);
     }
 
     pub fn report_latency(&mut self, peer: NodePublicKey, latency: Duration) {
         self.peers
             .get_or_insert_mut(peer, Measurements::default)
             .register_latency(latency);
+        let value = self.peers.get(&peer).unwrap().latency.get().unwrap();
+        self.summary_stats.update_latency(value);
     }
 
     pub fn report_bytes_received(
@@ -51,8 +59,12 @@ impl MeasurementManager {
     ) {
         let measurements = self.peers.get_or_insert_mut(peer, Measurements::default);
         measurements.register_bytes_received(bytes);
+        let value = measurements.bytes_received.get();
+        self.summary_stats.update_bytes_received(value);
         if let Some(duration) = duration {
             measurements.register_outbound_bandwidth(bytes, duration);
+            let value = measurements.outbound_bandwidth.get().unwrap();
+            self.summary_stats.update_outbound_bandwidth(value);
         }
     }
 
@@ -64,8 +76,12 @@ impl MeasurementManager {
     ) {
         let measurements = self.peers.get_or_insert_mut(peer, Measurements::default);
         measurements.register_bytes_sent(bytes);
+        let value = measurements.bytes_sent.get();
+        self.summary_stats.update_bytes_sent(value);
         if let Some(duration) = duration {
             measurements.register_inbound_bandwidth(bytes, duration);
+            let value = measurements.inbound_bandwidth.get().unwrap();
+            self.summary_stats.update_inbound_bandwidth(value);
         }
     }
 
@@ -73,6 +89,8 @@ impl MeasurementManager {
         self.peers
             .get_or_insert_mut(peer, Measurements::default)
             .register_hops(hops);
+        let value = self.peers.get(&peer).unwrap().hops.get().unwrap();
+        self.summary_stats.update_hops(value);
     }
 }
 
