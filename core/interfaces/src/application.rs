@@ -5,7 +5,7 @@ use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 use crate::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
-    types::{Block, EpochInfo, NodeInfo, QueryRequest, QueryResponse, TransactionResponse},
+    types::{Block, Epoch, EpochInfo, NodeInfo, TransactionResponse},
 };
 
 /// The response generated from executing an entire batch of transactions (aka a block).
@@ -39,17 +39,6 @@ pub enum NodeRegistryChange {
 /// it is created.
 pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
 
-/// The socket that is handled by the application layer and fed by consensus (or other
-/// synchronization systems in place) which executes and persists transactions that
-/// are put into it.
-///
-/// # Safety
-///
-/// This socket should be used with as much caution as possible, for all intend and purposes
-/// this socket should be sealed and preferably not accessible out side of the scope in which
-/// it is created.
-pub type QuerySocket = Socket<QueryRequest, QueryResponse>;
-
 #[async_trait]
 pub trait ApplicationInterface:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
@@ -68,10 +57,6 @@ pub trait ApplicationInterface:
     /// See the safety document for the [`ExecutionEngineSocket`].
     fn transaction_executor(&self) -> ExecutionEngineSocket;
 
-    /// Returns a socket that can be used to execute queries on the application layer. This
-    /// socket can be passed to the *RPC* as an example.
-    fn query_socket(&self) -> QuerySocket;
-
     /// Returns the instance of a sync query runner which can be used to run queries without
     /// blocking or awaiting. A naive (& blocking) implementation can achieve this by simply
     /// putting the entire application state in an `Arc<RwLock<T>>`, but that is not optimal
@@ -81,11 +66,23 @@ pub trait ApplicationInterface:
 }
 
 pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
-    /// Returns the latest balance associated with the given account public key.
+    /// Returns the latest bandwidth balance associated with the given account public key.
     fn get_account_balance(&self, account: &AccountOwnerPublicKey) -> u128;
 
-    /// Returns the latest balance associated with the given client public key.
+    /// Returns the latest bandwidth balance associated with the given client public key.
     fn get_client_balance(&self, client: &ClientPublicKey) -> u128;
+
+    /// Returns the latest FLK balance of an account
+    fn get_flk_balance(&self, account: &AccountOwnerPublicKey) -> u128;
+
+    /// Returns the amount of flk a node has staked
+    fn get_staked(&self, node: &NodePublicKey) -> u128;
+
+    /// Returns the amount of locked tokens a node has
+    fn get_locked(&self, node: &NodePublicKey) -> u128;
+
+    /// Returns the epoch a nodes tokens are unlocked at
+    fn get_locked_time(&self, node: &NodePublicKey) -> Epoch;
 
     /// Returns the global reputation of a node.
     fn get_reputation(&self, node: &NodePublicKey) -> u128;

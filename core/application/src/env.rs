@@ -1,9 +1,9 @@
-use affair::{AsyncWorker, Worker as WorkerTrait};
+use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use draco_interfaces::{
     types::{
-        AccountInfo, Block, Epoch, ExecutionData, Metadata, NodeInfo, ProtocolParams, QueryRequest,
-        QueryResponse, Service, ServiceId, TransactionResponse,
+        AccountInfo, Block, Epoch, ExecutionData, Metadata, NodeInfo, ProtocolParams, Service,
+        ServiceId, TransactionResponse,
     },
     BlockExecutionResponse,
 };
@@ -174,19 +174,6 @@ impl Default for Env<UpdatePerm> {
     }
 }
 
-impl Env<QueryPerm> {
-    /// Runs a query transaction on the application state
-    fn run(&self, transaction: QueryRequest) -> TransactionResponse {
-        self.inner.run(|ctx| {
-            let backend = StateTables {
-                table_selector: ctx,
-            };
-            let app = State::new(backend);
-            app.execute_query(transaction.clone())
-        })
-    }
-}
-
 /// The socket that recieves all update transactions
 pub struct UpdateWorker {
     env: Env<UpdatePerm>,
@@ -203,26 +190,5 @@ impl WorkerTrait for UpdateWorker {
     type Response = BlockExecutionResponse;
     fn handle(&mut self, req: Self::Request) -> Self::Response {
         self.env.run(req)
-    }
-}
-
-/// The socket that handles all querys to the application
-pub struct QueryWorker {
-    env: Env<QueryPerm>,
-}
-
-impl QueryWorker {
-    pub fn new(env: Env<QueryPerm>) -> Self {
-        Self { env }
-    }
-}
-
-#[async_trait::async_trait]
-impl AsyncWorker for QueryWorker {
-    type Request = QueryRequest;
-    type Response = QueryResponse;
-    async fn handle(&mut self, req: Self::Request) -> Self::Response {
-        let response = self.env.run(req);
-        bincode::serialize(&response).unwrap()
     }
 }

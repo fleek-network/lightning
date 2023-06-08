@@ -1,11 +1,10 @@
-use affair::Socket;
 use draco_interfaces::{
-    application::{ExecutionEngineSocket, QuerySocket},
+    application::ExecutionEngineSocket,
     types::{
-        Block, EpochInfo, ExecutionData, ExecutionError, NodeInfo, ProofOfConsensus, QueryMethod,
-        QueryRequest, Tokens, TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
+        Block, ExecutionError, NodeInfo, ProofOfConsensus, Tokens, TransactionResponse,
+        UpdateMethod, UpdatePayload, UpdateRequest,
     },
-    ApplicationInterface,
+    ApplicationInterface, SyncQueryRunnerInterface,
 };
 use fastcrypto::{bls12381::min_sig::BLS12381PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{
@@ -14,23 +13,23 @@ use fleek_crypto::{
 };
 use tokio::test;
 
-use crate::{app::Application, config::Config, genesis::Genesis};
+use crate::{app::Application, config::Config, genesis::Genesis, query_runner::QueryRunner};
 
 const ACCOUNT_ONE: AccountOwnerPublicKey = AccountOwnerPublicKey([0; 32]);
 const NODE_ONE: &str = "k7XAk/1z4rXf1QHyMPHZ1cgyeX2T3bsCCopNpFV6v8hInZfjyti79w3raEa3YwFADM2BnX+/o49k1HQjKZIYlGDszEZ/zUaK3kn3MfT5BEWkKgP+TFMPJoBxenV33XEZ";
 
 // Init the app and return the execution engine socket that would go to narwhal and the query socket
 // that could go to anyone
-async fn init_app() -> (ExecutionEngineSocket, QuerySocket) {
+async fn init_app() -> (ExecutionEngineSocket, QueryRunner) {
     let app = Application::init(Config {}).await.unwrap();
 
-    (app.transaction_executor(), app.query_socket())
+    (app.transaction_executor(), app.sync_query())
 }
 
 #[test]
 async fn test_genesis() {
     // Init application + get the query and update socket
-    let (_, query_socket) = init_app().await;
+    let (_, query_runner) = init_app().await;
 
     // Get the genesis paramaters plus the initial committee
     let (genesis, genesis_committee) = get_genesis();
@@ -38,21 +37,15 @@ async fn test_genesis() {
     // For every member of the genesis committee they should have an initial stake of the min stake
     // Query to make sure that holds true
     for node in genesis_committee {
-        let query = get_query(QueryMethod::Staked {
-            node: node.public_key,
-        });
-        let res = run_query(query, &query_socket).await;
-        assert_eq!(
-            TransactionResponse::Success(ExecutionData::UInt(genesis.min_stake as u128)),
-            res
-        );
+        let balance = query_runner.get_staked(&node.public_key);
+        assert_eq!(genesis.min_stake as u128, balance);
     }
 }
 
 #[test]
 async fn test_epoch_change() {
     // Init application + get the query and update socket
-    let (update_socket, query_socket) = init_app().await;
+    let (update_socket, query_runner) = init_app().await;
     let (_, genesis_committee) = get_genesis();
 
     let required_signals = genesis_committee.len() / 2 + 1;
@@ -72,16 +65,7 @@ async fn test_epoch_change() {
         assert!(!res.change_epoch);
     }
     // check that the current epoch is still 0
-    let query = get_query(QueryMethod::CurrentEpochInfo);
-    let res = run_query(query.clone(), &query_socket).await;
-    if let TransactionResponse::Success(ExecutionData::EpochInfo(EpochInfo {
-        committee: _,
-        epoch,
-        epoch_end: _,
-    })) = res
-    {
-        assert_eq!(epoch, 0);
-    }
+    assert_eq!(query_runner.get_epoch_info().epoch, 0);
 
     // Have the last needed committee member signal the epoch change and make sure it changes
     let req = get_update_request_node(
@@ -97,20 +81,12 @@ async fn test_epoch_change() {
     assert!(res.change_epoch);
 
     // Query epoch info and make sure it incremented to new epoch
-    let res = run_query(query, &query_socket).await;
-    if let TransactionResponse::Success(ExecutionData::EpochInfo(EpochInfo {
-        committee: _,
-        epoch,
-        epoch_end: _,
-    })) = res
-    {
-        assert_eq!(epoch, 1);
-    }
+    assert_eq!(query_runner.get_epoch_info().epoch, 1);
 }
 
 #[test]
 async fn test_stake() {
-    let (update_socket, query_socket) = init_app().await;
+    let (update_socket, query_runner) = init_app().await;
     let (genesis, _) = get_genesis();
     let node_public_key: NodePublicKey = BLS12381PublicKey::decode_base64(NODE_ONE)
         .unwrap()
@@ -136,14 +112,7 @@ async fn test_stake() {
         .unwrap();
 
     // check that he has 2_000 flk balance
-    let query = get_query(QueryMethod::FLK {
-        public_key: ACCOUNT_ONE,
-    });
-    let res = run_query(query, &query_socket).await;
-    assert_eq!(
-        TransactionResponse::Success(ExecutionData::UInt(2_000)),
-        res
-    );
+    assert_eq!(query_runner.get_flk_balance(&ACCOUNT_ONE), 2_000);
 
     // Test staking on a new node
 
@@ -198,11 +167,7 @@ async fn test_stake() {
     }
 
     // Query the new node and make sure he has the proper stake
-    let query = get_query(QueryMethod::Staked {
-        node: node_public_key,
-    });
-    let res = run_query(query.clone(), &query_socket).await;
-    assert_eq!(TransactionResponse::Success(ExecutionData::UInt(1000)), res);
+    assert_eq!(query_runner.get_staked(&node_public_key), 1000);
 
     // Stake 1000 more but since it is not a new node we should be able to leave the optional
     // paramaters out without a revert
@@ -231,8 +196,7 @@ async fn test_stake() {
     }
 
     // Node should now have 2_000 stake
-    let res = run_query(query.clone(), &query_socket).await;
-    assert_eq!(TransactionResponse::Success(ExecutionData::UInt(2000)), res);
+    assert_eq!(query_runner.get_staked(&node_public_key), 2000);
 
     // Now test unstake and make sure it moves the tokens to locked status
     let update = get_update_request_account(
@@ -250,28 +214,12 @@ async fn test_stake() {
         .unwrap();
 
     // Check that his locked is 1000 and his remaining stake is 1000
-
-    let locked_query = get_query(QueryMethod::Locked {
-        public_key: node_public_key,
-    });
-    let locked_until_query = get_query(QueryMethod::LockedUntil {
-        public_key: node_public_key,
-    });
-    let res_staked = run_query(query, &query_socket).await;
-    let res_locked = run_query(locked_query, &query_socket).await;
-    let res_locked_until = run_query(locked_until_query, &query_socket).await;
-    assert_eq!(
-        TransactionResponse::Success(ExecutionData::UInt(1000)),
-        res_staked
-    );
-    assert_eq!(
-        TransactionResponse::Success(ExecutionData::UInt(1000)),
-        res_locked
-    );
+    assert_eq!(query_runner.get_staked(&node_public_key), 1000);
+    assert_eq!(query_runner.get_locked(&node_public_key), 1000);
     // Since this test starts at epoch 0 locked_until will be == lock_time
     assert_eq!(
-        TransactionResponse::Success(ExecutionData::UInt(genesis.lock_time as u128)),
-        res_locked_until
+        query_runner.get_locked_time(&node_public_key),
+        genesis.lock_time
     );
 
     // Try to withdraw the locked tokens and it should revery
@@ -303,21 +251,6 @@ fn get_genesis() -> (Genesis, Vec<NodeInfo>) {
         genesis.clone(),
         genesis.committee.iter().map(|node| node.into()).collect(),
     )
-}
-
-fn get_query(method: QueryMethod) -> QueryRequest {
-    QueryRequest {
-        sender: ACCOUNT_ONE.into(),
-        query: method,
-    }
-}
-
-async fn run_query(
-    req: QueryRequest,
-    socket: &Socket<QueryRequest, Vec<u8>>,
-) -> TransactionResponse {
-    let res = socket.run(req).await.unwrap();
-    bincode::deserialize(&res).unwrap()
 }
 
 // Helper method to get a transaction update request from a node

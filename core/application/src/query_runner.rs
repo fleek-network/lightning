@@ -62,6 +62,46 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
+    fn get_flk_balance(&self, account: &AccountOwnerPublicKey) -> u128 {
+        self.inner.run(|ctx| {
+            self.account_table
+                .get(ctx)
+                .get(account)
+                .map(|account| account.flk_balance)
+                .unwrap_or(0)
+        })
+    }
+
+    fn get_staked(&self, node: &NodePublicKey) -> u128 {
+        self.inner.run(|ctx| {
+            self.node_table
+                .get(ctx)
+                .get(node)
+                .map(|node| node.stake.staked)
+                .unwrap_or(0)
+        })
+    }
+
+    fn get_locked(&self, node: &NodePublicKey) -> u128 {
+        self.inner.run(|ctx| {
+            self.node_table
+                .get(ctx)
+                .get(node)
+                .map(|node| node.stake.locked)
+                .unwrap_or(0)
+        })
+    }
+
+    fn get_locked_time(&self, node: &NodePublicKey) -> Epoch {
+        self.inner.run(|ctx| {
+            self.node_table
+                .get(ctx)
+                .get(node)
+                .map(|node| node.stake.locked_until)
+                .unwrap_or(0)
+        })
+    }
+
     fn get_reputation(&self, _node: &NodePublicKey) -> u128 {
         todo!()
     }

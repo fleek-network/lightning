@@ -53,15 +53,6 @@ pub struct UpdateRequest {
     pub payload: UpdatePayload,
 }
 
-/// A query request, which is still signed and submitted by a user.
-#[derive(Debug, Hash, Clone)]
-pub struct QueryRequest {
-    /// The sender of this query request.
-    pub sender: TransactionSender,
-    /// The query function.
-    pub query: QueryMethod,
-}
-
 /// The payload data of an update request.
 #[derive(Debug, Hash, Clone)]
 pub struct UpdatePayload {
@@ -154,37 +145,6 @@ pub enum UpdateMethod {
         proof_of_misbehavior: ProofOfMisbehavior,
     },
 }
-
-/// All of the query functions in our logic, along their parameters.
-#[derive(Debug, Hash, Clone)]
-pub enum QueryMethod {
-    /// Get the balance of unlocked FLK a public key has
-    FLK { public_key: AccountOwnerPublicKey },
-    /// Get the balance of locked FLK a public key has
-    Locked { public_key: NodePublicKey },
-    /// Get the epoch locked tokens will become unlocked
-    LockedUntil { public_key: NodePublicKey },
-    /// Get the amount of prepaid bandwidth a public key has
-    Bandwidth { public_key: AccountOwnerPublicKey },
-    /// Get the amount of stake a node has
-    Staked { node: NodePublicKey },
-    /// Get the amount of bandwidth served in an epoch
-    Served {
-        /// the epoch
-        epoch: Epoch,
-        /// The node public Key
-        node: NodePublicKey,
-    },
-    /// Get the total served for all nodes in an epoch
-    TotalServed { epoch: Epoch },
-    /// Get the amount in the reward pool for an epoch
-    RewardPool { epoch: Epoch },
-    /// Get the current epoch information
-    CurrentEpochInfo,
-}
-
-/// The serialized response from executing a query.
-pub type QueryResponse = Vec<u8>;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize)]
 pub enum TransactionResponse {
@@ -347,13 +307,6 @@ impl ToDigest for UpdatePayload {
     /// This function must take all of the data into account, including the
     /// nonce, the name of all of the update method names along with the value
     /// for all of the parameters.
-    fn to_digest(&self) -> [u8; 32] {
-        todo!()
-    }
-}
-
-impl ToDigest for QueryMethod {
-    /// Computes the hash of this query request and returns a 32-byte hash.
     fn to_digest(&self) -> [u8; 32] {
         todo!()
     }

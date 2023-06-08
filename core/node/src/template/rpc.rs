@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use draco_interfaces::{
-    common::WithStartAndShutdown, config::ConfigConsumer, MempoolSocket, QuerySocket, RpcInterface,
+    common::WithStartAndShutdown, config::ConfigConsumer, MempoolSocket, RpcInterface,
+    SyncQueryRunnerInterface,
 };
 
 use super::config::Config;
@@ -30,10 +31,10 @@ impl WithStartAndShutdown for Rpc {
 #[async_trait]
 impl RpcInterface for Rpc {
     /// Initialize the *RPC* server, with the given parameters.
-    async fn init(
+    async fn init<Q: SyncQueryRunnerInterface>(
         _config: Self::Config,
         _mempool: MempoolSocket,
-        _query_socket: QuerySocket,
+        _query_runner: Q,
     ) -> anyhow::Result<Self> {
         todo!()
     }

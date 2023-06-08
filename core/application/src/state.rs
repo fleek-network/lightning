@@ -1,8 +1,8 @@
 use draco_interfaces::{
     types::{
-        AccountInfo, Epoch, EpochInfo, ExecutionData, ExecutionError, Metadata, NodeInfo,
-        ProofOfConsensus, ProofOfMisbehavior, ProtocolParams, QueryMethod, QueryRequest, Service,
-        ServiceId, Staking, Tokens, TransactionResponse, UpdateMethod, UpdateRequest, Worker,
+        AccountInfo, Epoch, ExecutionData, ExecutionError, Metadata, NodeInfo, ProofOfConsensus,
+        ProofOfMisbehavior, ProtocolParams, Service, ServiceId, Staking, Tokens,
+        TransactionResponse, UpdateMethod, UpdateRequest, Worker,
     },
     DeliveryAcknowledgment,
 };
@@ -130,19 +130,6 @@ impl<B: Backend> State<B> {
         response
     }
 
-    pub fn execute_query(&self, txn: QueryRequest) -> TransactionResponse {
-        match txn.query {
-            QueryMethod::Bandwidth { public_key } => self.get_bandwidth(public_key),
-            QueryMethod::FLK { public_key } => self.get_flk(public_key),
-            QueryMethod::Locked { public_key } => self.get_locked(public_key),
-            QueryMethod::LockedUntil { public_key } => self.get_locked_until(public_key),
-            QueryMethod::Staked { node } => self.get_staked(node),
-            QueryMethod::Served { epoch, node } => self.get_node_bandwidth_served(epoch, node),
-            QueryMethod::TotalServed { epoch } => self.get_total_served(epoch),
-            QueryMethod::RewardPool { epoch } => self.get_reward_pool(epoch),
-            QueryMethod::CurrentEpochInfo => self.get_current_epoch_info(),
-        }
-    }
     /*********** External Update Functions ********** */
     // The following functions should only be called in the result of a query or update transaction
     // through execute_txn() If called in an update txn it will mutate state
@@ -503,86 +490,6 @@ impl<B: Backend> State<B> {
         _node: NodePublicKey,
     ) -> TransactionResponse {
         todo!()
-    }
-
-    /*******External View Functions****** */
-    // The following functions should be called through execute_txn as the result of a txn
-    // They will never change state even if called through update
-    // Will usually only be called through query calls where msg.sender is not checked
-    //      so if that is required for the function it should be made a parameter instead
-
-    fn get_flk(&self, account: AccountOwnerPublicKey) -> TransactionResponse {
-        let balance = self
-            .account_info
-            .get(&account)
-            .unwrap_or_default()
-            .flk_balance;
-        TransactionResponse::Success(ExecutionData::UInt(balance))
-    }
-    fn get_locked(&self, node: NodePublicKey) -> TransactionResponse {
-        let balance = if let Some(node) = self.node_info.get(&node) {
-            node.stake.locked
-        } else {
-            0
-        };
-        TransactionResponse::Success(ExecutionData::UInt(balance))
-    }
-
-    fn get_locked_until(&self, node: NodePublicKey) -> TransactionResponse {
-        let until = if let Some(node) = self.node_info.get(&node) {
-            node.stake.locked_until
-        } else {
-            0
-        };
-        TransactionResponse::Success(ExecutionData::UInt(until as u128))
-    }
-
-    fn get_bandwidth(&self, account: AccountOwnerPublicKey) -> TransactionResponse {
-        let balance = self
-            .account_info
-            .get(&account)
-            .unwrap_or_default()
-            .bandwidth_balance;
-        TransactionResponse::Success(ExecutionData::UInt(balance))
-    }
-    fn get_staked(&self, node: NodePublicKey) -> TransactionResponse {
-        let balance = if let Some(node) = self.node_info.get(&node) {
-            node.stake.staked
-        } else {
-            0
-        };
-        TransactionResponse::Success(ExecutionData::UInt(balance))
-    }
-    fn get_reward_pool(&self, _epoch: Epoch) -> TransactionResponse {
-        todo!()
-    }
-    fn get_total_served(&self, _epoch: Epoch) -> TransactionResponse {
-        todo!()
-    }
-    fn get_node_bandwidth_served(
-        &self,
-        _epoch: Epoch,
-        _node: NodePublicKey,
-    ) -> TransactionResponse {
-        todo!()
-    }
-    fn get_current_epoch_info(&self) -> TransactionResponse {
-        let epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
-        let committee = self.committee_info.get(&epoch).unwrap_or_default();
-
-        let vec = committee
-            .members
-            .iter()
-            // Safe unwrap, a node should never be added to committee unless we have all data
-            // These checks should be done when adding to the committee and to the whitelist.
-            .map(|node| self.node_info.get(node).unwrap())
-            .collect();
-
-        TransactionResponse::Success(ExecutionData::EpochInfo(EpochInfo {
-            committee: vec,
-            epoch,
-            epoch_end: committee.epoch_end_timestamp,
-        }))
     }
 
     /********Internal Application Functions******** */

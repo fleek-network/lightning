@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use fleek_crypto::{AccountOwnerPublicKey, NodePublicKey};
 
 use crate::{
-    application::QuerySocket, common::WithStartAndShutdown, config::ConfigConsumer,
-    consensus::MempoolSocket, types::TransactionResponse,
+    common::WithStartAndShutdown, config::ConfigConsumer, consensus::MempoolSocket,
+    types::TransactionResponse, SyncQueryRunnerInterface,
 };
 
 /// The interface for the *RPC* server. Which is supposed to be opening a public
@@ -11,10 +11,10 @@ use crate::{
 #[async_trait]
 pub trait RpcInterface: Sized + ConfigConsumer + WithStartAndShutdown {
     /// Initialize the *RPC* server, with the given parameters.
-    async fn init(
+    async fn init<Q: SyncQueryRunnerInterface>(
         config: Self::Config,
         mempool: MempoolSocket,
-        query_socket: QuerySocket,
+        query_runner: Q,
     ) -> anyhow::Result<Self>;
 }
 #[async_trait]

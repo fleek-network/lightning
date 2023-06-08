@@ -126,7 +126,7 @@ impl<
         let rpc = Rpc::init(
             configuration.get::<Rpc>(),
             consensus.mempool(),
-            application.query_socket(),
+            application.sync_query(),
         )
         .await?;
 

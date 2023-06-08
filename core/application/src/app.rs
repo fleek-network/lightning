@@ -2,19 +2,18 @@ use affair::{Executor, TokioSpawn};
 use anyhow::Result;
 use async_trait::async_trait;
 use draco_interfaces::{
-    application::{ApplicationInterface, ExecutionEngineSocket, QuerySocket},
+    application::{ApplicationInterface, ExecutionEngineSocket},
     common::WithStartAndShutdown,
     config::ConfigConsumer,
 };
 
 use crate::{
     config::Config,
-    env::{Env, QueryWorker, UpdateWorker},
+    env::{Env, UpdateWorker},
     query_runner::QueryRunner,
 };
 
 pub struct Application {
-    query_socket: QuerySocket,
     update_socket: ExecutionEngineSocket,
     query_runner: QueryRunner,
 }
@@ -52,7 +51,6 @@ impl ApplicationInterface for Application {
         let mut env = Env::new();
         env.genesis();
         Ok(Self {
-            query_socket: TokioSpawn::spawn_async(QueryWorker::new(env.query_socket())),
             query_runner: env.query_runner(),
             update_socket: TokioSpawn::spawn(UpdateWorker::new(env)),
         })
@@ -66,12 +64,6 @@ impl ApplicationInterface for Application {
     /// See the safety document for the [`ExecutionEngineSocket`].
     fn transaction_executor(&self) -> ExecutionEngineSocket {
         self.update_socket.clone()
-    }
-
-    /// Returns a socket that can be used to execute queries on the application layer. This
-    /// socket can be passed to the *RPC* as an example.
-    fn query_socket(&self) -> QuerySocket {
-        self.query_socket.clone()
     }
 
     /// Returns the instance of a sync query runner which can be used to run queries without
