@@ -1,5 +1,5 @@
 mod cli;
-mod configuration;
+mod config;
 mod template;
 
 use std::sync::Arc;
@@ -13,7 +13,7 @@ use draco_rep_collector::ReputationAggregator;
 
 use crate::{
     cli::CliArgs,
-    configuration::TomlConfigProvider,
+    config::TomlConfigProvider,
     template::{
         blockstore::BlockStore, consensus::Consensus, fs::FileSystem, indexer::Indexer,
         origin::MyStream, pod::DeliveryAcknowledgmentAggregator, rpc::Rpc, sdk::Sdk,
