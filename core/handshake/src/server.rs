@@ -15,7 +15,10 @@ use fleek_crypto::{ClientPublicKey, NodePublicKey};
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncRead, AsyncWrite},
-    net::ToSocketAddrs,
+    net::{
+        tcp::{OwnedReadHalf, OwnedWriteHalf},
+        TcpListener, ToSocketAddrs,
+    },
     select,
     sync::oneshot::{channel, Sender},
     task,
@@ -35,6 +38,27 @@ pub trait StreamProvider: Sync + Send + Sized {
 
     async fn new<A: ToSocketAddrs + Send>(listen_addr: A) -> Result<Self>;
     async fn accept(&self) -> Result<Option<(Self::Reader, Self::Writer)>>;
+}
+
+pub struct TcpProvider {
+    listener: TcpListener,
+}
+
+#[async_trait]
+impl StreamProvider for TcpProvider {
+    type Reader = OwnedReadHalf;
+    type Writer = OwnedWriteHalf;
+
+    async fn new<A: ToSocketAddrs + Send>(listen_addr: A) -> Result<Self> {
+        Ok(Self {
+            listener: TcpListener::bind(listen_addr).await?,
+        })
+    }
+
+    async fn accept(&self) -> Result<Option<(Self::Reader, Self::Writer)>> {
+        let conn = self.listener.accept().await?.0.into_split();
+        Ok(Some(conn))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -57,6 +81,8 @@ pub enum LaneState {
     Active,
     Disconnected,
 }
+
+pub type TcpHandshakeServer<SDK> = HandshakeServer<SDK, TcpProvider>;
 
 pub struct HandshakeServer<
     SDK: SdkInterface<Connection = RawLaneConnection<L::Reader, L::Writer>>,
@@ -327,40 +353,16 @@ impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> Co
 mod tests {
     use affair::{Executor, TokioSpawn};
     use tokio::{
+        self,
         io::{AsyncReadExt, AsyncWriteExt},
-        net::{
-            tcp::{OwnedReadHalf, OwnedWriteHalf},
-            TcpListener, TcpStream,
-        },
+        net::TcpStream,
     };
 
+    use super::*;
     use crate::{
         client::HandshakeClient,
         dummy::{FileSystem, MyReputationReporter, QueryRunner, Sdk, Signer},
     };
-
-    struct TcpProvider {
-        listener: TcpListener,
-    }
-
-    #[async_trait]
-    impl StreamProvider for TcpProvider {
-        type Reader = OwnedReadHalf;
-        type Writer = OwnedWriteHalf;
-
-        async fn new<A: ToSocketAddrs + Send>(listen_addr: A) -> Result<Self> {
-            Ok(Self {
-                listener: TcpListener::bind(listen_addr).await?,
-            })
-        }
-
-        async fn accept(&self) -> Result<Option<(Self::Reader, Self::Writer)>> {
-            let conn = self.listener.accept().await?.0.into_split();
-            Ok(Some(conn))
-        }
-    }
-
-    use super::*;
 
     #[tokio::test]
     async fn hello_world_service() -> anyhow::Result<()> {
