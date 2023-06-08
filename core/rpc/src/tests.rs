@@ -38,9 +38,7 @@ impl Worker for MockWorker {
     type Request = UpdateRequest;
     type Response = ();
 
-    fn handle(&mut self, _req: Self::Request) -> Self::Response {
-        ()
-    }
+    fn handle(&mut self, _req: Self::Request) -> Self::Response {}
 }
 
 async fn init_rpc_without_consensus() -> Result<Rpc> {
@@ -75,7 +73,7 @@ async fn wait_for_server_start(port: u16) -> Result<()> {
 
     while retries > 0 {
         let response = client
-            .get(format!("http://127.0.0.1:{}/health", port))
+            .get(format!("http://127.0.0.1:{port}/health"))
             .send()
             .await;
         match response {
@@ -101,7 +99,7 @@ async fn wait_for_server_start(port: u16) -> Result<()> {
 async fn make_request(port: u16, req: String) -> Result<Response> {
     let client = Client::new();
     Ok(client
-        .post(format!("http://127.0.0.1:{}/rpc/v0", port))
+        .post(format!("http://127.0.0.1:{port}/rpc/v0"))
         .header("Content-Type", "application/json")
         .body(req)
         .send()
@@ -129,7 +127,7 @@ async fn test_rpc_ping() -> Result<()> {
 
     if response.status().is_success() {
         let response_body = response.text().await?;
-        println!("Response body: {}", response_body);
+        println!("Response body: {response_body}");
     } else {
         panic!("Request failed with status: {}", response.status());
     }
@@ -186,7 +184,7 @@ async fn test_rpc_get_balance() -> Result<()> {
             let success_response: RpcSuccessResponse = serde_json::from_value(value)?;
             assert_eq!(1000, success_response.result);
         } else {
-            panic!("Rpc Error: {}", value)
+            panic!("Rpc Error: {value}")
         }
     } else {
         panic!("Request failed with status: {}", response.status());
