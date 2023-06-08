@@ -2,6 +2,7 @@
 name = "draco-node"
 version = "0.1.0"
 edition = "2021"
+default-run = "draco-node"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -11,6 +12,7 @@ draco-handshake = { path = "../handshake" }
 draco-interfaces = { path = "../interfaces" }
 draco-rep-collector = { path = "../rep-collector" }
 anyhow.workspace = true
+clap = { version = "4.2", features = [ "derive" ] }
 serde.workspace = true
 toml = "0.7"
 async-trait.workspace = true

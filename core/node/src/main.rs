@@ -1,14 +1,15 @@
+mod cli;
 mod configuration;
 mod template;
 
-use std::path::Path;
-
+use clap::Parser;
 use draco_application::app::Application;
 use draco_handshake::server::{StreamProvider, TcpHandshakeServer, TcpProvider};
 use draco_interfaces::{common::WithStartAndShutdown as _, Node};
 use draco_rep_collector::ReputationAggregator;
 
 use crate::{
+    cli::CliArgs,
     configuration::TomlConfigProvider,
     template::{
         blockstore::BlockStore, consensus::Consensus, fs::FileSystem, indexer::Indexer,
@@ -37,11 +38,11 @@ pub type ConcreteNode = Node<
 
 #[tokio::main]
 async fn main() {
+    let args = CliArgs::parse();
+
     println!("Hello, Fleek!");
 
-    let path_str: String = String::from("node.toml");
-    let from_string = Path::new(&path_str);
-    let config: TomlConfigProvider = TomlConfigProvider::open(from_string).unwrap();
+    let config = TomlConfigProvider::open(args.config).unwrap();
     let node = ConcreteNode::init(config).await.unwrap();
 
     node.start().await;
