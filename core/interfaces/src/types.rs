@@ -322,3 +322,16 @@ pub struct ProofOfMisbehavior {}
 /// This is the proof used to operate our PoC bridges
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash)]
 pub struct ProofOfConsensus {}
+
+/// Contains the peer measurements that node A has about node B, that
+/// will be taken into account when computing B's reputation score.
+#[derive(Debug, Default)]
+pub struct ReputationMeasurements {
+    pub latency: Option<std::time::Duration>,
+    pub interactions: Option<i64>,
+    pub inbound_bandwidth: Option<f64>,
+    pub outbound_bandwidth: Option<f64>,
+    pub bytes_received: Option<u128>,
+    pub bytes_sent: Option<u128>,
+    pub hops: Option<u8>,
+}

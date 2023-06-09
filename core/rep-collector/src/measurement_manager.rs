@@ -1,6 +1,6 @@
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
-use draco_interfaces::Weight;
+use draco_interfaces::{types::ReputationMeasurements, Weight};
 use draco_reputation::statistics::min_max_normalize_value;
 use fleek_crypto::NodePublicKey;
 use lru::LruCache;
@@ -9,7 +9,7 @@ const MAX_CAPACITY: usize = 200;
 
 /// Manages the measurements for all the peers.
 pub struct MeasurementManager {
-    peers: LruCache<NodePublicKey, Measurements>,
+    peers: LruCache<NodePublicKey, MeasurementStore>,
     summary_stats: SummaryStatistics,
     local_reputation: Arc<scc::HashMap<NodePublicKey, u128>>,
 }
@@ -29,7 +29,7 @@ impl MeasurementManager {
 
     pub fn report_sat(&mut self, peer: NodePublicKey, weight: Weight) {
         self.peers
-            .get_or_insert_mut(peer, Measurements::default)
+            .get_or_insert_mut(peer, MeasurementStore::default)
             .register_interaction(true, weight);
         let value = self.peers.get(&peer).unwrap().interactions.get().unwrap();
         self.summary_stats.update_interactions(value);
@@ -38,7 +38,7 @@ impl MeasurementManager {
 
     pub fn report_unsat(&mut self, peer: NodePublicKey, weight: Weight) {
         self.peers
-            .get_or_insert_mut(peer, Measurements::default)
+            .get_or_insert_mut(peer, MeasurementStore::default)
             .register_interaction(false, weight);
         let value = self.peers.get(&peer).unwrap().interactions.get().unwrap();
         self.summary_stats.update_interactions(value);
@@ -47,7 +47,7 @@ impl MeasurementManager {
 
     pub fn report_latency(&mut self, peer: NodePublicKey, latency: Duration) {
         self.peers
-            .get_or_insert_mut(peer, Measurements::default)
+            .get_or_insert_mut(peer, MeasurementStore::default)
             .register_latency(latency);
         let value = self.peers.get(&peer).unwrap().latency.get().unwrap();
         self.summary_stats.update_latency(value);
@@ -60,7 +60,9 @@ impl MeasurementManager {
         bytes: u64,
         duration: Option<Duration>,
     ) {
-        let measurements = self.peers.get_or_insert_mut(peer, Measurements::default);
+        let measurements = self
+            .peers
+            .get_or_insert_mut(peer, MeasurementStore::default);
         measurements.register_bytes_received(bytes);
         let value = measurements.bytes_received.get();
         self.summary_stats.update_bytes_received(value);
@@ -78,7 +80,9 @@ impl MeasurementManager {
         bytes: u64,
         duration: Option<Duration>,
     ) {
-        let measurements = self.peers.get_or_insert_mut(peer, Measurements::default);
+        let measurements = self
+            .peers
+            .get_or_insert_mut(peer, MeasurementStore::default);
         measurements.register_bytes_sent(bytes);
         let value = measurements.bytes_sent.get();
         self.summary_stats.update_bytes_sent(value);
@@ -92,7 +96,7 @@ impl MeasurementManager {
 
     pub fn report_hops(&mut self, peer: NodePublicKey, hops: u8) {
         self.peers
-            .get_or_insert_mut(peer, Measurements::default)
+            .get_or_insert_mut(peer, MeasurementStore::default)
             .register_hops(hops);
         let value = self.peers.get(&peer).unwrap().hops.get().unwrap();
         self.summary_stats.update_hops(value);
@@ -100,31 +104,31 @@ impl MeasurementManager {
 
     fn update_local_reputation_score(&mut self, peer: NodePublicKey) {
         if let Some(measurements) = self.peers.get(&peer) {
-            let values: Values = measurements.into();
-            let norm_values = NormalizedValues::new(values, &self.summary_stats);
+            let measurements: ReputationMeasurements = measurements.into();
+            let norm_measurements = NormalizedMeasurements::new(measurements, &self.summary_stats);
             let mut score = 0.0;
             let mut count = 0;
-            if let Some(latency) = norm_values.latency {
+            if let Some(latency) = norm_measurements.latency {
                 score += 1.0 - latency;
                 count += 1;
             }
-            if let Some(interactions) = norm_values.interactions {
+            if let Some(interactions) = norm_measurements.interactions {
                 score += interactions;
                 count += 1;
             }
-            if let Some(inbound_bandwidth) = norm_values.inbound_bandwidth {
+            if let Some(inbound_bandwidth) = norm_measurements.inbound_bandwidth {
                 score += inbound_bandwidth;
                 count += 1;
             }
-            if let Some(outbound_bandwidth) = norm_values.outbound_bandwidth {
+            if let Some(outbound_bandwidth) = norm_measurements.outbound_bandwidth {
                 score += outbound_bandwidth;
                 count += 1;
             }
-            if let Some(bytes_received) = norm_values.bytes_received {
+            if let Some(bytes_received) = norm_measurements.bytes_received {
                 score += bytes_received;
                 count += 1;
             }
-            if let Some(bytes_sent) = norm_values.bytes_sent {
+            if let Some(bytes_sent) = norm_measurements.bytes_sent {
                 score += bytes_sent;
                 count += 1;
             }
@@ -140,7 +144,7 @@ impl MeasurementManager {
 
 /// Holds all the current measurements for a particular peer.
 #[derive(Clone)]
-struct Measurements {
+struct MeasurementStore {
     latency: Latency,
     interactions: Interactions,
     inbound_bandwidth: Bandwidth,
@@ -150,7 +154,7 @@ struct Measurements {
     hops: Hops,
 }
 
-impl Default for Measurements {
+impl Default for MeasurementStore {
     fn default() -> Self {
         Self {
             latency: Latency::new(),
@@ -164,7 +168,7 @@ impl Default for Measurements {
     }
 }
 
-impl Measurements {
+impl MeasurementStore {
     fn register_latency(&mut self, latency: Duration) {
         self.latency.register_latency(latency);
     }
@@ -334,8 +338,8 @@ impl Hops {
 #[allow(dead_code)]
 #[derive(Debug, Default)]
 struct SummaryStatistics {
-    min: Values,
-    max: Values,
+    min: ReputationMeasurements,
+    max: ReputationMeasurements,
 }
 
 #[allow(dead_code)]
@@ -387,8 +391,8 @@ impl SummaryStatistics {
     }
 }
 
-impl From<&Measurements> for Values {
-    fn from(value: &Measurements) -> Self {
+impl From<&MeasurementStore> for ReputationMeasurements {
+    fn from(value: &MeasurementStore) -> Self {
         Self {
             latency: value.latency.get(),
             interactions: value.interactions.get(),
@@ -401,19 +405,8 @@ impl From<&Measurements> for Values {
     }
 }
 
-#[derive(Debug, Default)]
-struct Values {
-    latency: Option<Duration>,
-    interactions: Option<i64>,
-    inbound_bandwidth: Option<f64>,
-    outbound_bandwidth: Option<f64>,
-    bytes_received: Option<u128>,
-    bytes_sent: Option<u128>,
-    hops: Option<u8>,
-}
-
 #[derive(Debug)]
-struct NormalizedValues {
+struct NormalizedMeasurements {
     latency: Option<f64>,
     interactions: Option<f64>,
     inbound_bandwidth: Option<f64>,
@@ -422,8 +415,8 @@ struct NormalizedValues {
     bytes_sent: Option<f64>,
 }
 
-impl NormalizedValues {
-    fn new(values: Values, summary_stats: &SummaryStatistics) -> Self {
+impl NormalizedMeasurements {
+    fn new(values: ReputationMeasurements, summary_stats: &SummaryStatistics) -> Self {
         let latency = if let (Some(min_val), Some(max_val)) =
             (summary_stats.min.latency, summary_stats.max.latency)
         {
