@@ -6,7 +6,6 @@ use lru::LruCache;
 
 const MAX_CAPACITY: usize = 200;
 
-#[allow(dead_code)]
 /// Manages the measurements for all the peers.
 pub struct MeasurementManager {
     peers: LruCache<NodePublicKey, Measurements>,
