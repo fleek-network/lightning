@@ -1,7 +1,8 @@
 # Fleek Network
 
 [![Commits](https://github.com/fleek-network/draco/actions/workflows/commits.yml/badge.svg)](https://github.com/fleek-network/draco/actions/workflows/commits.yml)
-[![Cron](https://github.com/fleek-network/draco/actions/workflows/cron.yml/badge.svg)](https://github.com/fleek-network/draco/actions/workflows/cron.yml)
+[![Build & Tests](https://github.com/fleek-network/draco/actions/workflows/cron.yml/badge.svg)](https://github.com/fleek-network/draco/actions/workflows/cron.yml)
+[![Code Coverage](https://codecov.io/github/fleek-network/draco/branch/main/graph/badge.svg?token=7SN9432OHC)](https://codecov.io/github/fleek-network/draco)
 
 This repository contains the source code for the implementation of the *Fleek Network*. A
 multi-service edge network.
