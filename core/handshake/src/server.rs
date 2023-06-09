@@ -217,10 +217,15 @@ impl<'a, SDK: SdkInterface> HandshakeServerInner<SDK> {
                         let state = &mut user_lanes[lane as usize];
                         if *state == LaneState::Disconnected {
                             // 2. send response w last info
-                            conn.write_frame(HandshakeFrame::HandshakeResponse {
+                            conn.write_frame(HandshakeFrame::HandshakeResponseUnlock {
                                 pubkey: NodePublicKey([0u8; 96]),
                                 nonce: 1000,
                                 lane,
+                                // TODO: When exiting, services should return if the session was
+                                // pending a delivery acknowledgement.
+                                last_bytes: 0,
+                                last_service_id: 0,
+                                last_signature: [0; 96],
                             })
                             .await?;
                             // todo: read delivery acknowledgment
@@ -354,6 +359,7 @@ mod tests {
     use affair::{Executor, TokioSpawn};
     use draco_application::{app::Application, config::Config};
     use draco_interfaces::ApplicationInterface;
+    use fleek_crypto::ClientSignature;
     use tokio::{
         self,
         io::{AsyncReadExt, AsyncWriteExt},
@@ -366,23 +372,30 @@ mod tests {
         dummy::{FileSystem, MyReputationReporter, Sdk, Signer},
     };
 
-    #[tokio::test]
-    async fn hello_world_service() -> anyhow::Result<()> {
-        // server setup
+    async fn hello_world_server(
+        port: u16,
+    ) -> Result<(
+        TcpHandshakeServer<Sdk<OwnedReadHalf, OwnedWriteHalf>>,
+        Sdk<OwnedReadHalf, OwnedWriteHalf>,
+    )> {
         let signer = TokioSpawn::spawn(Signer {});
         let app = Application::init(Config {}).await?;
-        let sdk = Sdk::new(
+        let sdk = Sdk::<OwnedReadHalf, OwnedWriteHalf>::new(
             app.sync_query(),
             MyReputationReporter {},
             FileSystem {},
             signer,
         );
-        let config = HandshakeServerConfig::default();
-        let mut server = HandshakeServer::<
-            Sdk<<TcpProvider as StreamProvider>::Reader, <TcpProvider as StreamProvider>::Writer>,
-            TcpProvider,
-        >::init(config)
-        .await?;
+        let config = HandshakeServerConfig {
+            listen_addr: ([0; 4], port).into(),
+        };
+        Ok((HandshakeServer::init(config).await?, sdk))
+    }
+
+    #[tokio::test]
+    async fn handshake_e2e() -> anyhow::Result<()> {
+        // server setup
+        let (mut server, sdk) = hello_world_server(6969).await?;
 
         // service setup
         server.register_service_request_handler(0, sdk, |_, mut conn| {
@@ -406,6 +419,56 @@ mod tests {
 
         // send a handshake
         client.handshake().await?;
+
+        // start a service request
+        let (mut r, _) = client.request(0).await?;
+
+        // service subprotocol
+        let mut buf = [0u8; 11];
+        r.read_exact(&mut buf).await?;
+        assert_eq!(String::from_utf8_lossy(&buf), "hello draco");
+
+        server.shutdown().await;
+        assert!(!server.is_running());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn handshake_unlock_e2e() -> anyhow::Result<()> {
+        // server setup
+        let (mut server, sdk) = hello_world_server(6970).await?;
+
+        let mut lanes = server
+            .inner
+            .lanes
+            .entry(ClientPublicKey([0u8; 20]))
+            .or_default();
+        lanes[0] = LaneState::Disconnected;
+        drop(lanes);
+
+        // service setup
+        server.register_service_request_handler(0, sdk, |_, mut conn| {
+            Box::pin(async move {
+                let writer = conn.writer();
+                writer.write_all(b"hello draco").await.unwrap();
+            })
+        });
+
+        server.start().await;
+        assert!(server.is_running());
+
+        // dial the server and create a client
+        let (read, write) = TcpStream::connect("0.0.0.0:6970").await?.into_split();
+        let mut client = HandshakeClient::new(
+            read,
+            write,
+            ClientPublicKey([0u8; 20]),
+            CompressionAlgoSet::new(),
+        );
+
+        // send a handshake
+        client.handshake_unlock(0, ClientSignature).await?;
 
         // start a service request
         let (mut r, _) = client.request(0).await?;
