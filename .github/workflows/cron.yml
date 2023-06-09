@@ -22,6 +22,7 @@ jobs:
   count_commits:
     name: Count Commits
     runs-on: ubuntu-latest
+    if: github.event.schedule != ''
     outputs:
       count: ${{ env.COMMIT_COUNT }}
     steps:
@@ -41,7 +42,7 @@ jobs:
     name: Cargo Build
     runs-on: ubuntu-latest
     needs: count_commits
-    if: ${{ needs.count_commits.outputs.count != '0' }}
+    if: ${{ always() && needs.count_commits.outputs.count != '0' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
