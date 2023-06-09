@@ -177,7 +177,7 @@ impl<
             .register_service_request_handler(id, sdk, handler);
     }
 
-    /// Returns true if the node is in a healthy.
+    /// Returns true if the node is in a healthy state.
     pub fn is_healthy(&self) -> bool {
         let application_status = self.application.is_running();
         let consensus_status = self.consensus.is_running();
