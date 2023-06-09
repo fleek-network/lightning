@@ -1,3 +1,5 @@
+use std::{collections::BTreeMap, time::Duration};
+
 use fleek_crypto::{
     AccountOwnerPublicKey, NodeNetworkingPublicKey, NodePublicKey, TransactionSender,
     TransactionSignature,
@@ -143,6 +145,9 @@ pub enum UpdateMethod {
         node: NodePublicKey,
         /// Zk proof to be provided to the slash circuit
         proof_of_misbehavior: ProofOfMisbehavior,
+    },
+    SubmitReputationMeasurements {
+        measurements: BTreeMap<NodePublicKey, ReputationMeasurements>,
     },
 }
 
@@ -325,12 +330,12 @@ pub struct ProofOfConsensus {}
 
 /// Contains the peer measurements that node A has about node B, that
 /// will be taken into account when computing B's reputation score.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default, Hash)]
 pub struct ReputationMeasurements {
-    pub latency: Option<std::time::Duration>,
+    pub latency: Option<Duration>,
     pub interactions: Option<i64>,
-    pub inbound_bandwidth: Option<f64>,
-    pub outbound_bandwidth: Option<f64>,
+    pub inbound_bandwidth: Option<u128>,
+    pub outbound_bandwidth: Option<u128>,
     pub bytes_received: Option<u128>,
     pub bytes_sent: Option<u128>,
     pub hops: Option<u8>,

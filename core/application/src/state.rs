@@ -123,6 +123,10 @@ impl<B: Backend> State<B> {
                 node,
                 proof_of_misbehavior,
             } => self.slash(txn.sender, proof_of_misbehavior, service_id, node),
+
+            UpdateMethod::SubmitReputationMeasurements { measurements: _ } => {
+                todo!()
+            },
         };
         // Increment nonce of the sender
         self.increment_nonce(txn.sender);

@@ -286,9 +286,9 @@ impl Bandwidth {
     }
 
     #[allow(dead_code)]
-    fn get(&self) -> Option<f64> {
+    fn get(&self) -> Option<u128> {
         if self.count > 0 {
-            Some(self.bytes_per_ms_sum / (self.count as f64))
+            Some((self.bytes_per_ms_sum / (self.count as f64)) as u128)
         } else {
             None
         }
@@ -354,14 +354,18 @@ impl SummaryStatistics {
         self.max.interactions = Self::update(self.max.interactions, value, &std::cmp::max);
     }
 
-    fn update_inbound_bandwidth(&mut self, value: f64) {
-        self.min.inbound_bandwidth = Self::update(self.min.inbound_bandwidth, value, &f64::min);
-        self.max.inbound_bandwidth = Self::update(self.max.inbound_bandwidth, value, &f64::max);
+    fn update_inbound_bandwidth(&mut self, value: u128) {
+        self.min.inbound_bandwidth =
+            Self::update(self.min.inbound_bandwidth, value, &std::cmp::min);
+        self.max.inbound_bandwidth =
+            Self::update(self.max.inbound_bandwidth, value, &std::cmp::max);
     }
 
-    fn update_outbound_bandwidth(&mut self, value: f64) {
-        self.min.outbound_bandwidth = Self::update(self.min.outbound_bandwidth, value, &f64::min);
-        self.max.outbound_bandwidth = Self::update(self.max.outbound_bandwidth, value, &f64::max);
+    fn update_outbound_bandwidth(&mut self, value: u128) {
+        self.min.outbound_bandwidth =
+            Self::update(self.min.outbound_bandwidth, value, &std::cmp::min);
+        self.max.outbound_bandwidth =
+            Self::update(self.max.outbound_bandwidth, value, &std::cmp::max);
     }
 
     fn update_bytes_received(&mut self, value: u128) {
@@ -446,7 +450,7 @@ impl NormalizedMeasurements {
         ) {
             values
                 .inbound_bandwidth
-                .map(|x| min_max_normalize_value(x, min_val, max_val))
+                .map(|x| min_max_normalize_value(x as f64, min_val as f64, max_val as f64))
         } else {
             None
         };
@@ -456,7 +460,7 @@ impl NormalizedMeasurements {
         ) {
             values
                 .outbound_bandwidth
-                .map(|x| min_max_normalize_value(x, min_val, max_val))
+                .map(|x| min_max_normalize_value(x as f64, min_val as f64, max_val as f64))
         } else {
             None
         };
@@ -552,7 +556,7 @@ mod tests {
         let measurements = manager.peers.get(&peer).unwrap();
 
         assert_eq!(measurements.bytes_received.get(), 1024);
-        assert_eq!(measurements.outbound_bandwidth.get().unwrap(), 5.12);
+        assert_eq!(measurements.outbound_bandwidth.get().unwrap(), 5);
     }
 
     #[test]
@@ -563,7 +567,7 @@ mod tests {
         let measurements = manager.peers.get(&peer).unwrap();
 
         assert_eq!(measurements.bytes_sent.get(), 1024);
-        assert_eq!(measurements.inbound_bandwidth.get().unwrap(), 5.12);
+        assert_eq!(measurements.inbound_bandwidth.get().unwrap(), 5);
     }
 
     #[test]
@@ -619,10 +623,10 @@ mod tests {
         manager.report_bytes_received(peer, 2000, Some(Duration::from_millis(100)));
 
         assert_eq!(manager.summary_stats.min.bytes_received.unwrap(), 1000);
-        assert_eq!(manager.summary_stats.min.outbound_bandwidth.unwrap(), 5.0);
+        assert_eq!(manager.summary_stats.min.outbound_bandwidth.unwrap(), 5);
 
         assert_eq!(manager.summary_stats.max.bytes_received.unwrap(), 2000);
-        assert_eq!(manager.summary_stats.max.outbound_bandwidth.unwrap(), 20.0);
+        assert_eq!(manager.summary_stats.max.outbound_bandwidth.unwrap(), 20);
     }
 
     #[test]
@@ -634,10 +638,10 @@ mod tests {
         manager.report_bytes_sent(peer, 2000, Some(Duration::from_millis(100)));
 
         assert_eq!(manager.summary_stats.min.bytes_sent.unwrap(), 1000);
-        assert_eq!(manager.summary_stats.min.inbound_bandwidth.unwrap(), 5.0);
+        assert_eq!(manager.summary_stats.min.inbound_bandwidth.unwrap(), 5);
 
         assert_eq!(manager.summary_stats.max.bytes_sent.unwrap(), 2000);
-        assert_eq!(manager.summary_stats.max.inbound_bandwidth.unwrap(), 20.0);
+        assert_eq!(manager.summary_stats.max.inbound_bandwidth.unwrap(), 20);
     }
 
     #[test]
