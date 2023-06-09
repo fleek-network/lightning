@@ -1,4 +1,4 @@
-pub fn min_max_normalization(
+pub fn min_max_normalize_values(
     values: &[f64],
     min_val: Option<f64>,
     max_val: Option<f64>,
@@ -17,9 +17,13 @@ pub fn min_max_normalization(
     } else {
         values
             .iter()
-            .map(|&x| ((x - min_val) / (max_val - min_val)))
+            .map(|&x| min_max_normalize_value(x, min_val, max_val))
             .collect()
     }
+}
+
+pub fn min_max_normalize_value(value: f64, min_val: f64, max_val: f64) -> f64 {
+    (value - min_val) / (max_val - min_val)
 }
 
 #[cfg(test)]
@@ -27,25 +31,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_min_max_normalization_empty() {
+    fn test_min_max_normalize_values_empty() {
         let values = [];
-        assert_eq!(min_max_normalization(&values, None, None), vec![]);
+        assert_eq!(min_max_normalize_values(&values, None, None), vec![]);
     }
 
     #[test]
-    fn test_min_max_normalization_same() {
+    fn test_min_max_normalize_values_same() {
         let values = [1.0, 1.0, 1.0];
         assert_eq!(
-            min_max_normalization(&values, None, None),
+            min_max_normalize_values(&values, None, None),
             vec![0.0, 0.0, 0.0]
         );
     }
 
     #[test]
-    fn test_min_max_normalization_basic() {
+    fn test_min_max_normalize_values_basic() {
         let values = [1234.0, 23123.0, 1.0, 1003.0, 84624.0, 123.0];
         assert_eq!(
-            min_max_normalization(&values, None, None),
+            min_max_normalize_values(&values, None, None),
             vec![
                 0.014570506836202923,
                 0.2732354088132068,
@@ -58,10 +62,10 @@ mod tests {
     }
 
     #[test]
-    fn test_min_max_normalization_provided() {
+    fn test_min_max_normalize_values_provided() {
         let values = [1234.0, 23123.0, 1.0, 1003.0, 84624.0, 123.0];
         assert_eq!(
-            min_max_normalization(&values, Some(1.0), Some(84624.0)),
+            min_max_normalize_values(&values, Some(1.0), Some(84624.0)),
             vec![
                 0.014570506836202923,
                 0.2732354088132068,

@@ -1,6 +1,7 @@
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
 use draco_interfaces::Weight;
+use draco_reputation::statistics::min_max_normalize_value;
 use fleek_crypto::NodePublicKey;
 use lru::LruCache;
 
@@ -90,6 +91,45 @@ impl MeasurementManager {
             .register_hops(hops);
         let value = self.peers.get(&peer).unwrap().hops.get().unwrap();
         self.summary_stats.update_hops(value);
+    }
+
+    #[allow(dead_code)]
+    fn update_local_reputation_score(&mut self, peer: NodePublicKey) {
+        if let Some(measurements) = self.peers.get(&peer) {
+            let values: Values = measurements.into();
+            let norm_values = NormalizedValues::new(values, &self.summary_stats);
+            let mut score = 0.0;
+            let mut count = 0;
+            if let Some(latency) = norm_values.latency {
+                score += 1.0 - latency;
+                count += 1;
+            }
+            if let Some(interactions) = norm_values.interactions {
+                score += interactions;
+                count += 1;
+            }
+            if let Some(inbound_bandwidth) = norm_values.inbound_bandwidth {
+                score += inbound_bandwidth;
+                count += 1;
+            }
+            if let Some(outbound_bandwidth) = norm_values.outbound_bandwidth {
+                score += outbound_bandwidth;
+                count += 1;
+            }
+            if let Some(bytes_received) = norm_values.bytes_received {
+                score += bytes_received;
+                count += 1;
+            }
+            if let Some(bytes_sent) = norm_values.bytes_sent {
+                score += bytes_sent;
+                count += 1;
+            }
+            score /= count as f64;
+            let score = (score * 100.0) as u128;
+            self.local_reputation
+                .insert(peer, score)
+                .expect("Failed to insert local reputation");
+        }
     }
 }
 
@@ -342,6 +382,20 @@ impl SummaryStatistics {
     }
 }
 
+impl From<&Measurements> for Values {
+    fn from(value: &Measurements) -> Self {
+        Self {
+            latency: value.latency.get(),
+            interactions: value.interactions.get(),
+            inbound_bandwidth: value.inbound_bandwidth.get(),
+            outbound_bandwidth: value.outbound_bandwidth.get(),
+            bytes_received: Some(value.bytes_received.get()),
+            bytes_sent: Some(value.bytes_sent.get()),
+            hops: value.hops.get(),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 struct Values {
     latency: Option<Duration>,
@@ -351,6 +405,103 @@ struct Values {
     bytes_received: Option<u128>,
     bytes_sent: Option<u128>,
     hops: Option<u8>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug)]
+struct NormalizedValues {
+    latency: Option<f64>,
+    interactions: Option<f64>,
+    inbound_bandwidth: Option<f64>,
+    outbound_bandwidth: Option<f64>,
+    bytes_received: Option<f64>,
+    bytes_sent: Option<f64>,
+    hops: Option<f64>,
+}
+
+impl NormalizedValues {
+    fn new(values: Values, summary_stats: &SummaryStatistics) -> Self {
+        let latency = if let (Some(min_val), Some(max_val)) =
+            (summary_stats.min.latency, summary_stats.max.latency)
+        {
+            values.latency.map(|x| {
+                min_max_normalize_value(
+                    x.as_millis() as f64,
+                    min_val.as_millis() as f64,
+                    max_val.as_millis() as f64,
+                )
+            })
+        } else {
+            None
+        };
+        let interactions = if let (Some(min_val), Some(max_val)) = (
+            summary_stats.min.interactions,
+            summary_stats.max.interactions,
+        ) {
+            values
+                .interactions
+                .map(|x| min_max_normalize_value(x as f64, min_val as f64, max_val as f64))
+        } else {
+            None
+        };
+        let inbound_bandwidth = if let (Some(min_val), Some(max_val)) = (
+            summary_stats.min.inbound_bandwidth,
+            summary_stats.max.inbound_bandwidth,
+        ) {
+            values
+                .inbound_bandwidth
+                .map(|x| min_max_normalize_value(x, min_val, max_val))
+        } else {
+            None
+        };
+        let outbound_bandwidth = if let (Some(min_val), Some(max_val)) = (
+            summary_stats.min.outbound_bandwidth,
+            summary_stats.max.outbound_bandwidth,
+        ) {
+            values
+                .outbound_bandwidth
+                .map(|x| min_max_normalize_value(x, min_val, max_val))
+        } else {
+            None
+        };
+        let bytes_received = if let (Some(min_val), Some(max_val)) = (
+            summary_stats.min.bytes_received,
+            summary_stats.max.bytes_received,
+        ) {
+            values
+                .bytes_received
+                .map(|x| min_max_normalize_value(x as f64, min_val as f64, max_val as f64))
+        } else {
+            None
+        };
+        let bytes_sent = if let (Some(min_val), Some(max_val)) =
+            (summary_stats.min.bytes_sent, summary_stats.max.bytes_sent)
+        {
+            values
+                .bytes_sent
+                .map(|x| min_max_normalize_value(x as f64, min_val as f64, max_val as f64))
+        } else {
+            None
+        };
+        let hops = if let (Some(min_val), Some(max_val)) =
+            (summary_stats.min.hops, summary_stats.max.hops)
+        {
+            values
+                .hops
+                .map(|x| min_max_normalize_value(x as f64, min_val as f64, max_val as f64))
+        } else {
+            None
+        };
+        Self {
+            latency,
+            interactions,
+            inbound_bandwidth,
+            outbound_bandwidth,
+            bytes_received,
+            bytes_sent,
+            hops,
+        }
+    }
 }
 
 #[cfg(test)]

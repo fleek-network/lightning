@@ -1372,6 +1372,7 @@ dependencies = [
  "async-trait",
  "draco-application",
  "draco-interfaces",
+ "draco-reputation",
  "fleek-crypto",
  "lru",
  "scc",

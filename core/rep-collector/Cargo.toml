@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 draco-interfaces = {path="../interfaces"}
 draco-application = {path="../application/"}
+draco-reputation = {path="../reputation/"}
 anyhow.workspace = true
 serde.workspace = true
 async-trait.workspace = true
