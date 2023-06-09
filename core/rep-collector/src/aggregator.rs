@@ -16,6 +16,8 @@ pub struct ReputationAggregator {
     reporter: MyReputationReporter,
     query: MyReputationQuery,
     measurement_manager: MeasurementManager,
+    submit_tx: SubmitTxSocket,
+    config: Config,
 }
 
 #[allow(dead_code)]
@@ -74,7 +76,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
     type ReputationQuery = MyReputationQuery;
 
     /// Create a new reputation
-    async fn init(_config: Self::Config, _submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
+    async fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
         let (report_tx, report_rx) = buffered_mpsc::buffered_channel(100, 2048);
         let measurement_manager = MeasurementManager::new();
         let local_reputation_ref = measurement_manager.get_local_reputation_ref();
@@ -83,6 +85,8 @@ impl ReputationAggregatorInterface for ReputationAggregator {
             reporter: MyReputationReporter::new(report_tx),
             query: MyReputationQuery::new(local_reputation_ref),
             measurement_manager: MeasurementManager::new(),
+            submit_tx,
+            config,
         })
     }
 
