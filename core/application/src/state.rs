@@ -1,8 +1,9 @@
 use draco_interfaces::{
     types::{
-        AccountInfo, Epoch, ExecutionData, ExecutionError, Metadata, NodeInfo, ProofOfConsensus,
-        ProofOfMisbehavior, ProtocolParams, ReportedReputationMeasurements, Service, ServiceId,
-        Staking, Tokens, TransactionResponse, UpdateMethod, UpdateRequest, Worker,
+        AccountInfo, CommodityTypes, Epoch, ExecutionData, ExecutionError, Metadata, NodeInfo,
+        ProofOfConsensus, ProofOfMisbehavior, ProtocolParams, ReportedReputationMeasurements,
+        Service, ServiceId, Staking, Tokens, TransactionResponse, UpdateMethod, UpdateRequest,
+        Worker,
     },
     DeliveryAcknowledgment,
 };
@@ -29,6 +30,8 @@ pub struct State<B: Backend> {
     pub services: B::Ref<ServiceId, Service>,
     pub parameters: B::Ref<ProtocolParams, u128>,
     pub rep_measurements: B::Ref<NodePublicKey, Vec<ReportedReputationMeasurements>>,
+    pub current_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
+    pub last_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
     pub backend: B,
 }
 
@@ -45,6 +48,14 @@ pub struct BandwidthInfo {
     pub reward_pool: u128,
 }
 
+/// This commodities served by different services in Fleek Network
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub struct CommodityServed {
+    bandwidth: u128,
+    compute: u128,
+    gpu: u128,
+}
+
 impl<B: Backend> State<B> {
     pub fn new(backend: B) -> Self {
         Self {
@@ -57,6 +68,8 @@ impl<B: Backend> State<B> {
             services: backend.get_table_reference("service"),
             parameters: backend.get_table_reference("parameter"),
             rep_measurements: backend.get_table_reference("rep_measurements"),
+            last_epoch_served: backend.get_table_reference("last_epoch_served"),
+            current_epoch_served: backend.get_table_reference("current_epoch_served"),
             backend,
         }
     }
@@ -141,12 +154,50 @@ impl<B: Backend> State<B> {
     // through execute_txn() If called in an update txn it will mutate state
     fn submit_pod(
         &self,
-        _sender: TransactionSender,
-        _commodity: u128,
-        _service_id: u64,
+        sender: TransactionSender,
+        commodity: u128,
+        service_id: u32,
         _acknowledgments: Vec<DeliveryAcknowledgment>,
     ) -> TransactionResponse {
-        todo!()
+        let sender: NodePublicKey = match self.only_node(sender) {
+            Ok(node) => node,
+            Err(e) => return e,
+        };
+        let account_owner = match self.node_info.get(&sender) {
+            Some(node_info) => node_info.owner,
+            None => return TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
+        };
+
+        if self.services.get(&service_id).is_none() {
+            return TransactionResponse::Revert(ExecutionError::InvalidServiceId);
+        }
+        // TODO: build proof based on delivery acks
+        if !self.backend.verify_proof_of_delivery(
+            &account_owner,
+            &sender,
+            &commodity,
+            &service_id,
+            (),
+        ) {
+            return TransactionResponse::Revert(ExecutionError::InvalidProof);
+        }
+
+        let commodity_type = self
+            .services
+            .get(&service_id)
+            .map(|s| s.commodity_type)
+            .unwrap();
+
+        let mut commodity_served = self.current_epoch_served.get(&sender).unwrap_or_default();
+
+        match commodity_type {
+            CommodityTypes::Bandwidth => commodity_served.bandwidth += commodity,
+            CommodityTypes::Compute => commodity_served.bandwidth += commodity,
+            CommodityTypes::Gpu => commodity_served.gpu += commodity,
+        }
+        // TODO: handle cases where epoch change is happening
+        self.current_epoch_served.set(sender, commodity_served);
+        TransactionResponse::Success(ExecutionData::None)
     }
 
     fn withdraw(
@@ -544,7 +595,7 @@ impl<B: Backend> State<B> {
             )),
         }
     }
-    // Useful for transaction that nodes cann call but an account owner cant
+    // Useful for transaction that nodes can call but an account owner cant
     // Does not panic
     fn only_node(&self, sender: TransactionSender) -> Result<NodePublicKey, TransactionResponse> {
         match sender {

@@ -7,7 +7,7 @@ use draco_interfaces::{
 };
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 
-use crate::state::{BandwidthInfo, Committee};
+use crate::state::{BandwidthInfo, Committee, CommodityServed};
 
 #[derive(Clone)]
 pub struct QueryRunner {
@@ -20,6 +20,8 @@ pub struct QueryRunner {
     _bandwidth_table: ResolvedTableReference<Epoch, BandwidthInfo>,
     _services_table: ResolvedTableReference<ServiceId, Service>,
     param_table: ResolvedTableReference<ProtocolParams, u128>,
+    _current_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
+    _last_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
 }
 
 impl QueryRunner {
@@ -33,6 +35,10 @@ impl QueryRunner {
             _bandwidth_table: atomo.resolve::<Epoch, BandwidthInfo>("bandwidth"),
             _services_table: atomo.resolve::<ServiceId, Service>("service"),
             param_table: atomo.resolve::<ProtocolParams, u128>("parameter"),
+            _current_epoch_served: atomo
+                .resolve::<NodePublicKey, CommodityServed>("current_epoch_served"),
+            _last_epoch_served: atomo
+                .resolve::<NodePublicKey, CommodityServed>("last_epoch_served"),
             inner: atomo,
         }
     }

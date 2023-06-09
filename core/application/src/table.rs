@@ -28,7 +28,7 @@ pub trait Backend {
         client: &AccountOwnerPublicKey,
         provider: &NodePublicKey,
         commodity: &u128,
-        service_id: &u64,
+        service_id: &u32,
         proof: (),
     ) -> bool;
     /// Takes in a zk Proof Of Consensus and returns true if valid
@@ -71,7 +71,7 @@ impl<'selector, S: SerdeBackend> Backend for StateTables<'selector, S> {
         _client: &AccountOwnerPublicKey,
         _provider: &NodePublicKey,
         _commodity: &u128,
-        _service_id: &u64,
+        _service_id: &u32,
         _proof: (),
     ) -> bool {
         true

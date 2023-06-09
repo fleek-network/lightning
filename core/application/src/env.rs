@@ -13,7 +13,7 @@ use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 use crate::{
     genesis::Genesis,
     query_runner::QueryRunner,
-    state::{BandwidthInfo, Committee, State},
+    state::{BandwidthInfo, Committee, CommodityServed, State},
     table::{Backend, StateTables},
 };
 
@@ -33,6 +33,8 @@ impl Env<UpdatePerm> {
             .with_table::<ServiceId, Service>("service")
             .with_table::<ProtocolParams, u128>("parameter")
             .with_table::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements")
+            .with_table::<NodePublicKey, CommodityServed>("current_epoch_served")
+            .with_table::<NodePublicKey, CommodityServed>("current_epoch_served")
             .build();
 
         Self { inner: atomo }
@@ -145,6 +147,7 @@ impl Env<UpdatePerm> {
                 service_table.insert(
                     service.id,
                     Service {
+                        commodity_type: service.commodity_type,
                         commodity_price: service.commodity_price.into(),
                         slashing: (),
                     },

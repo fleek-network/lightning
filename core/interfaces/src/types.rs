@@ -33,10 +33,19 @@ pub enum Tokens {
     FLK,
 }
 
+/// This commodities served by different services in Fleek Network
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CommodityTypes {
+    Bandwidth,
+    Compute,
+    Gpu,
+}
+
 /// Placeholder
 /// Information about the services
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash)]
 pub struct Service {
+    pub commodity_type: CommodityTypes,
     pub commodity_price: u128,
     /// TODO: List of circuits to prove a node should be slashed
     pub slashing: (),
@@ -74,7 +83,7 @@ pub enum UpdateMethod {
         /// How much of the commodity was served
         commodity: u128,
         /// The service id of the service this was provided through(CDN, compute, ect.)
-        service_id: u64,
+        service_id: u32,
         /// The PoD of delivery in bytes
         proofs: Vec<DeliveryAcknowledgment>,
         /// Optional metadata to provide information additional information about this batch
@@ -184,6 +193,7 @@ pub enum ExecutionError {
     NonExistingService,
     OnlyAccountOwner,
     OnlyNode,
+    InvalidServiceId,
 }
 
 /// The account info stored per account on the blockchain
@@ -274,12 +284,16 @@ pub enum ProtocolParams {
     LockTime = 4,
     /// The percentage of the reward pool the protocol gets
     ProtocolPercentage = 5,
+    /// The percentage of the reward pool the shared amongst the committe of validators
+    ValidatorPercentage = 6,
     /// The maximum targed inflation rate in a year
-    MaxInflation = 6,
+    MaxInflation = 7,
     /// The minimum targeted inflation rate in a year
-    MinInflation = 7,
+    MinInflation = 8,
     /// The amount of FLK minted per GB they consume.
-    ConsumerRebate = 8,
+    ConsumerRebate = 9,
+    /// The max multiplier on rewards for locking
+    MaxBoost = 10,
 }
 
 /// The physical address of a node where it can be reached, the port numbers are
@@ -325,7 +339,7 @@ pub struct ProofOfMisbehavior {}
 
 /// Placeholder
 /// This is the proof used to operate our PoC bridges
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct ProofOfConsensus {}
 
 /// Contains the peer measurements that node A has about node B, that

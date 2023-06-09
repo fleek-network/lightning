@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use draco_interfaces::types::{NodeInfo, Staking, Worker};
+use draco_interfaces::types::{CommodityTypes, NodeInfo, Staking, Worker};
 use fastcrypto::{
     bls12381::min_sig::BLS12381PublicKey, ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64,
 };
@@ -33,6 +33,7 @@ pub struct GenesisAccount {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenesisService {
     pub id: u32,
+    pub commodity_type: CommodityTypes,
     pub commodity_price: u64,
 }
 
