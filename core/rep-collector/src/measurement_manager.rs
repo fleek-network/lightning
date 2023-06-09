@@ -33,6 +33,7 @@ impl MeasurementManager {
             .register_interaction(true, weight);
         let value = self.peers.get(&peer).unwrap().interactions.get().unwrap();
         self.summary_stats.update_interactions(value);
+        self.update_local_reputation_score(peer);
     }
 
     pub fn report_unsat(&mut self, peer: NodePublicKey, weight: Weight) {
@@ -41,6 +42,7 @@ impl MeasurementManager {
             .register_interaction(false, weight);
         let value = self.peers.get(&peer).unwrap().interactions.get().unwrap();
         self.summary_stats.update_interactions(value);
+        self.update_local_reputation_score(peer);
     }
 
     pub fn report_latency(&mut self, peer: NodePublicKey, latency: Duration) {
@@ -49,6 +51,7 @@ impl MeasurementManager {
             .register_latency(latency);
         let value = self.peers.get(&peer).unwrap().latency.get().unwrap();
         self.summary_stats.update_latency(value);
+        self.update_local_reputation_score(peer);
     }
 
     pub fn report_bytes_received(
@@ -66,6 +69,7 @@ impl MeasurementManager {
             let value = measurements.outbound_bandwidth.get().unwrap();
             self.summary_stats.update_outbound_bandwidth(value);
         }
+        self.update_local_reputation_score(peer);
     }
 
     pub fn report_bytes_sent(
@@ -83,6 +87,7 @@ impl MeasurementManager {
             let value = measurements.inbound_bandwidth.get().unwrap();
             self.summary_stats.update_inbound_bandwidth(value);
         }
+        self.update_local_reputation_score(peer);
     }
 
     pub fn report_hops(&mut self, peer: NodePublicKey, hops: u8) {
@@ -93,7 +98,6 @@ impl MeasurementManager {
         self.summary_stats.update_hops(value);
     }
 
-    #[allow(dead_code)]
     fn update_local_reputation_score(&mut self, peer: NodePublicKey) {
         if let Some(measurements) = self.peers.get(&peer) {
             let values: Values = measurements.into();
@@ -127,8 +131,9 @@ impl MeasurementManager {
             score /= count as f64;
             let score = (score * 100.0) as u128;
             self.local_reputation
-                .insert(peer, score)
-                .expect("Failed to insert local reputation");
+                .entry(peer)
+                .and_modify(|s| *s = score)
+                .or_insert(score);
         }
     }
 }
@@ -407,7 +412,6 @@ struct Values {
     hops: Option<u8>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 struct NormalizedValues {
     latency: Option<f64>,
@@ -416,7 +420,6 @@ struct NormalizedValues {
     outbound_bandwidth: Option<f64>,
     bytes_received: Option<f64>,
     bytes_sent: Option<f64>,
-    hops: Option<f64>,
 }
 
 impl NormalizedValues {
@@ -483,15 +486,6 @@ impl NormalizedValues {
         } else {
             None
         };
-        let hops = if let (Some(min_val), Some(max_val)) =
-            (summary_stats.min.hops, summary_stats.max.hops)
-        {
-            values
-                .hops
-                .map(|x| min_max_normalize_value(x as f64, min_val as f64, max_val as f64))
-        } else {
-            None
-        };
         Self {
             latency,
             interactions,
@@ -499,7 +493,6 @@ impl NormalizedValues {
             outbound_bandwidth,
             bytes_received,
             bytes_sent,
-            hops,
         }
     }
 }
