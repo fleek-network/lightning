@@ -48,11 +48,6 @@ fn is_termination_signal(byte: u8) -> bool {
     byte & TERMINATION_FLAG == TERMINATION_FLAG
 }
 
-#[test]
-fn term() {
-    assert!(is_termination_signal(0xFF))
-}
-
 /// Termination reasons
 #[repr(u8)]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -486,6 +481,16 @@ mod tests {
 
     type TResult = Result<(), HandshakeCodecError>;
 
+    #[test]
+    fn is_termination_signal() {
+        for b in 0x00..0x79 {
+            assert!(!super::is_termination_signal(b))
+        }
+        for b in 0x80..0xFF {
+            assert!(super::is_termination_signal(b))
+        }
+    }
+
     async fn encode_decode(frame: HandshakeFrame) -> TResult {
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let addr = listener.local_addr()?;
@@ -561,6 +566,9 @@ mod tests {
 
     #[tokio::test]
     async fn termination_signal() -> TResult {
+        encode_decode(HandshakeFrame::TerminationSignal(Reason::OutOfLanes)).await?;
+        encode_decode(HandshakeFrame::TerminationSignal(Reason::CodecViolation)).await?;
+        encode_decode(HandshakeFrame::TerminationSignal(Reason::ServiceNotFound)).await?;
         encode_decode(HandshakeFrame::TerminationSignal(Reason::Unknown)).await
     }
 }
