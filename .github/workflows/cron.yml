@@ -62,9 +62,7 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "build"
           cache-all-crates: "true"
-          save-if: "false"
       - name: Setup junitify
         run: cargo install junitify
       - name: Cargo Test
@@ -87,7 +85,7 @@ jobs:
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
-    needs: test
+    needs: count_commits
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
