@@ -330,7 +330,7 @@ pub struct ProofOfConsensus {}
 
 /// Contains the peer measurements that node A has about node B, that
 /// will be taken into account when computing B's reputation score.
-#[derive(Clone, Debug, Default, Hash)]
+#[derive(Clone, Debug, Default, Hash, Serialize, Deserialize)]
 pub struct ReputationMeasurements {
     pub latency: Option<Duration>,
     pub interactions: Option<i64>,
@@ -339,4 +339,10 @@ pub struct ReputationMeasurements {
     pub bytes_received: Option<u128>,
     pub bytes_sent: Option<u128>,
     pub hops: Option<u8>,
+}
+
+#[derive(Clone, Debug, Hash, Serialize, Deserialize)]
+pub struct ReportedReputationMeasurements {
+    pub reporting_node: NodePublicKey,
+    pub measurements: ReputationMeasurements,
 }

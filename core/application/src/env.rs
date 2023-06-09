@@ -2,8 +2,8 @@ use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use draco_interfaces::{
     types::{
-        AccountInfo, Block, Epoch, ExecutionData, Metadata, NodeInfo, ProtocolParams, Service,
-        ServiceId, TransactionResponse,
+        AccountInfo, Block, Epoch, ExecutionData, Metadata, NodeInfo, ProtocolParams,
+        ReportedReputationMeasurements, Service, ServiceId, TransactionResponse,
     },
     BlockExecutionResponse,
 };
@@ -32,6 +32,7 @@ impl Env<UpdatePerm> {
             .with_table::<Epoch, BandwidthInfo>("bandwidth")
             .with_table::<ServiceId, Service>("service")
             .with_table::<ProtocolParams, u128>("parameter")
+            .with_table::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements")
             .build();
 
         Self { inner: atomo }

@@ -1,8 +1,8 @@
 use draco_interfaces::{
     types::{
         AccountInfo, Epoch, ExecutionData, ExecutionError, Metadata, NodeInfo, ProofOfConsensus,
-        ProofOfMisbehavior, ProtocolParams, Service, ServiceId, Staking, Tokens,
-        TransactionResponse, UpdateMethod, UpdateRequest, Worker,
+        ProofOfMisbehavior, ProtocolParams, ReportedReputationMeasurements, Service, ServiceId,
+        Staking, Tokens, TransactionResponse, UpdateMethod, UpdateRequest, Worker,
     },
     DeliveryAcknowledgment,
 };
@@ -28,6 +28,7 @@ pub struct State<B: Backend> {
     pub bandwidth_info: B::Ref<Epoch, BandwidthInfo>,
     pub services: B::Ref<ServiceId, Service>,
     pub parameters: B::Ref<ProtocolParams, u128>,
+    pub rep_measurements: B::Ref<NodePublicKey, Vec<ReportedReputationMeasurements>>,
     pub backend: B,
 }
 
@@ -55,6 +56,7 @@ impl<B: Backend> State<B> {
             bandwidth_info: backend.get_table_reference("bandwidth"),
             services: backend.get_table_reference("service"),
             parameters: backend.get_table_reference("parameter"),
+            rep_measurements: backend.get_table_reference("rep_measurements"),
             backend,
         }
     }
