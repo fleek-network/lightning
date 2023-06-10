@@ -1245,6 +1245,8 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "blake3-tree",
+ "bytes",
  "draco-interfaces",
  "parking_lot",
  "serde",

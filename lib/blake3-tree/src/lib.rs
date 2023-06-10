@@ -393,7 +393,7 @@ impl IncrementalVerifier {
 
     /// Returns true if the current cursor is pointing to the root of the tree.
     #[inline(always)]
-    fn is_root(&self) -> bool {
+    pub fn is_root(&self) -> bool {
         debug_assert!(!self.cursor.is_null(), "cursor is null");
         // SAFETY: Dereferencing cursor is safe since we never set it a null value.
         unsafe { (*self.cursor).parent.is_null() }
