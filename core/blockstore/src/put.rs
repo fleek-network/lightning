@@ -7,7 +7,7 @@ use blake3_tree::{
 };
 use bytes::{BufMut, BytesMut};
 use draco_interfaces::{
-    Blake3Hash, BlockStoreInterface, CompressionAlgorithm, ContentChunk, IncrementalPutInterface,
+    Blake3Hash, Blake3Tree, CompressionAlgorithm, ContentChunk, IncrementalPutInterface,
     PutFeedProofError, PutFinalizeError, PutWriteError,
 };
 
@@ -18,9 +18,9 @@ struct Chunk {
     content: ContentChunk,
 }
 
-pub struct IncrementalPut<B> {
-    store: MemoryBlockStore<B>,
-    proof: Option<ProofBuf>,
+pub struct IncrementalPut {
+    store: MemoryBlockStore,
+    proof: Option<Vec<Blake3Hash>>,
     root: Option<Blake3Hash>,
     tree_builder: Option<HashTreeBuilder>,
     stack: Vec<Chunk>,
@@ -28,11 +28,8 @@ pub struct IncrementalPut<B> {
     buf: BytesMut,
 }
 
-impl<B> IncrementalPut<B>
-where
-    B: BlockStoreInterface,
-{
-    pub fn new(root: Option<Blake3Hash>, store: MemoryBlockStore<B>) -> Self {
+impl IncrementalPut {
+    pub fn new(root: Option<Blake3Hash>, store: MemoryBlockStore) -> Self {
         Self {
             store,
             root,
@@ -46,10 +43,7 @@ where
 }
 
 #[async_trait]
-impl<B> IncrementalPutInterface for IncrementalPut<B>
-where
-    B: BlockStoreInterface + Send,
-{
+impl IncrementalPutInterface for IncrementalPut {
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError> {
         if (self.buf.len() > 0 || self.block_counter > 0) && self.proof.is_none() {
             return Err(PutFeedProofError::UnexpectedCall);
@@ -60,7 +54,8 @@ where
         match self.store.inner.read().get(&Key(root, None)) {
             None | Some(Block::Chunk(_)) => Err(PutFeedProofError::InvalidProof),
             Some(Block::Tree(tree)) => {
-                self.proof = Some(ProofBuf::new(&(tree.clone().0), 0));
+                println!("TREE being fetched {:?}", &(tree.clone().0));
+                self.proof = Some(tree.clone().0.clone());
                 self.root = Some(root);
                 Ok(())
             },
@@ -78,23 +73,22 @@ where
             let content = self.buf.split_to(256 * 1024);
             let block = {
                 let mut block = BlockHasher::new();
+                block.set_block(self.block_counter as usize);
                 block.update(content.as_ref());
                 block
             };
 
             let chunk = match self.proof.as_ref() {
                 Some(proof) => {
+                    self.tree_builder = None;
                     let root = self.root.clone().expect("Root hash to have been provided");
-                    // Verify.
                     let mut verifier = IncrementalVerifier::new(root, self.block_counter as usize);
+                    let proof_buf = ProofBuf::new(proof, self.block_counter as usize);
                     verifier
-                        .feed_proof(proof.as_slice())
+                        .feed_proof(proof_buf.as_slice())
                         .map_err(|_| PutWriteError::InvalidContent)?;
-                    verifier
-                        .verify(block.clone())
-                        .map_err(|_| PutWriteError::InvalidContent)?;
-                    let is_root = verifier.is_root();
-                    let hash = block.finalize(is_root); // Is this always true?
+                    verifier.verify(block.clone()).unwrap();
+                    let hash = block.finalize(true); // Is this arg always true?
                     Chunk {
                         hash,
                         content: ContentChunk {
@@ -104,11 +98,12 @@ where
                     }
                 },
                 None => {
-                    let hash = block.finalize(true); // Is this always true?
+                    let hash = block.finalize(true); // Is this arg always true?
                     let tree_builder = self
                         .tree_builder
                         .as_mut()
                         .expect("There to be a tree builder");
+                    println!("NOT VERIFYING: Content {:?} len {:?}", content[0], content.len());
                     tree_builder.update(content.as_ref());
                     Chunk {
                         hash,
@@ -139,7 +134,13 @@ where
             );
         }
         if let Some(tree_builder) = self.tree_builder {
-            Ok(Blake3Hash::from(tree_builder.finalize().hash))
+            let hash_tree = tree_builder.finalize();
+            println!("TREE being saved {:?}", hash_tree.tree);
+            self.store.inner.write().insert(
+                Key(Blake3Hash::from(hash_tree.hash), None),
+                Block::Tree(Arc::new(Blake3Tree(hash_tree.tree))),
+            );
+            Ok(Blake3Hash::from(hash_tree.hash))
         } else {
             self.root.ok_or_else(|| PutFinalizeError::PartialContent)
         }

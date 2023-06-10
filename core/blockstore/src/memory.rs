@@ -1,4 +1,4 @@
-use std::{collections::HashMap, marker::PhantomData, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use draco_interfaces::{
@@ -8,26 +8,24 @@ use parking_lot::RwLock;
 
 use crate::{config::Config, put::IncrementalPut, Block, Key};
 
-#[derive(Clone)]
-pub struct MemoryBlockStore<B> {
+#[derive(Clone, Default)]
+pub struct MemoryBlockStore {
     pub(crate) inner: Arc<RwLock<HashMap<Key, Block>>>,
-    data: PhantomData<B>,
 }
 
-impl<B> ConfigConsumer for MemoryBlockStore<B> {
+impl ConfigConsumer for MemoryBlockStore {
     const KEY: &'static str = "blockstore";
     type Config = Config;
 }
 
 #[async_trait]
-impl<B: BlockStoreInterface> BlockStoreInterface for MemoryBlockStore<B> {
+impl BlockStoreInterface for MemoryBlockStore {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
-    type Put = IncrementalPut<B>;
+    type Put = IncrementalPut;
 
     async fn init(_: Self::Config) -> anyhow::Result<Self> {
         Ok(Self {
             inner: Default::default(),
-            data: PhantomData,
         })
     }
 

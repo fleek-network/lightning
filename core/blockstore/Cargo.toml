@@ -13,3 +13,4 @@ async-trait.workspace = true
 bytes.workspace = true
 parking_lot.workspace = true
 serde.workspace = true
+tokio.workspace = true
