@@ -54,7 +54,7 @@ impl<B: BlockStoreInterface> BlockStoreInterface for MemoryBlockStore<B> {
         }
     }
 
-    fn put(&self, _cid: Option<Blake3Hash>) -> Self::Put {
-        todo!()
+    fn put(&self, cid: Option<Blake3Hash>) -> Self::Put {
+        IncrementalPut::new(cid, self.clone())
     }
 }

@@ -28,6 +28,23 @@ pub struct IncrementalPut<B> {
     buf: BytesMut,
 }
 
+impl<B> IncrementalPut<B>
+where
+    B: BlockStoreInterface,
+{
+    pub fn new(root: Option<Blake3Hash>, store: MemoryBlockStore<B>) -> Self {
+        Self {
+            store,
+            root,
+            proof: None,
+            tree_builder: Some(HashTreeBuilder::new()),
+            stack: Vec::new(),
+            block_counter: 0,
+            buf: BytesMut::new(),
+        }
+    }
+}
+
 #[async_trait]
 impl<B> IncrementalPutInterface for IncrementalPut<B>
 where
@@ -88,7 +105,10 @@ where
                 },
                 None => {
                     let hash = block.finalize(true); // Is this always true?
-                    let tree_builder = self.tree_builder.as_mut().expect("There to be a tree builder");
+                    let tree_builder = self
+                        .tree_builder
+                        .as_mut()
+                        .expect("There to be a tree builder");
                     tree_builder.update(content.as_ref());
                     Chunk {
                         hash,
