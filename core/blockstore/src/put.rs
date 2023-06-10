@@ -5,7 +5,7 @@ use blake3_tree::{
     blake3::tree::{BlockHasher, HashTreeBuilder},
     IncrementalVerifier, ProofBuf,
 };
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 use draco_interfaces::{
     Blake3Hash, BlockStoreInterface, CompressionAlgorithm, ContentChunk, IncrementalPutInterface,
     PutFeedProofError, PutFinalizeError, PutWriteError,
@@ -13,9 +13,16 @@ use draco_interfaces::{
 
 use crate::{memory::MemoryBlockStore, Block, Key};
 
+struct Chunk {
+    hash: Blake3Hash,
+    content: ContentChunk,
+}
+
 pub struct IncrementalPut<B> {
     store: MemoryBlockStore<B>,
-    proof: Option<(ProofBuf, Blake3Hash)>,
+    proof: Option<ProofBuf>,
+    root: Option<Blake3Hash>,
+    stack: Vec<Chunk>,
     block_counter: u32,
     buf: BytesMut,
 }
@@ -29,21 +36,14 @@ where
         if (self.buf.len() > 0 || self.block_counter > 0) && self.proof.is_none() {
             return Err(PutFeedProofError::UnexpectedCall);
         }
-        match self.store.inner.read().get(&Key(
-            proof
-                .try_into()
-                .map_err(|_| PutFeedProofError::InvalidProof)?,
-            None,
-        )) {
+        let root = proof
+            .try_into()
+            .map_err(|_| PutFeedProofError::InvalidProof)?;
+        match self.store.inner.read().get(&Key(root, None)) {
             None | Some(Block::Chunk(_)) => Err(PutFeedProofError::InvalidProof),
             Some(Block::Tree(tree)) => {
-                self.proof = Some((
-                    ProofBuf::new(&(tree.clone().0), 0),
-                    *tree
-                        .0
-                        .last()
-                        .ok_or_else(|| PutFeedProofError::InvalidProof)?,
-                ));
+                self.proof = Some(ProofBuf::new(&(tree.clone().0), 0));
+                self.root = Some(root);
                 Ok(())
             },
         }
@@ -58,38 +58,35 @@ where
 
         while self.buf.len() >= 256 * 1024 {
             let content = self.buf.split_to(256 * 1024);
-            let chunk = ContentChunk {
-                compression,
-                content: content.to_vec(),
-            };
             let block = {
                 let mut block = BlockHasher::new();
                 block.update(content.as_ref());
                 block
             };
-            if let Some((proof, root)) = self.proof.as_ref() {
-                // Verify.
-                let mut verifier = IncrementalVerifier::new(*root, self.block_counter as usize);
-                let is_root = verifier.is_root();
-                verifier
-                    .verify(block.clone())
-                    .map_err(|_| PutWriteError::InvalidContent)?;
 
-                let cv = {
-                    let mut block = BlockHasher::new();
-                    block.update(content.as_ref());
-                    block.finalize(is_root)
-                };
-                // let content = content.to_vec();
-                self.store.inner.write().insert(
-                    Key(
-                        cv,
-                        Some(self.block_counter),
-                    ),
-                    Block::Chunk(Arc::new(chunk)),
-                );
-            } else {
-                // Build tree.
+            match self.proof.as_ref() {
+                Some(proof) => {
+                    let root = self.root.clone().expect("Root hash to have been provided");
+                    // Verify.
+                    let mut verifier = IncrementalVerifier::new(root, self.block_counter as usize);
+                    verifier
+                        .feed_proof(proof.as_slice())
+                        .map_err(|_| PutWriteError::InvalidContent)?;
+                    verifier
+                        .verify(block.clone())
+                        .map_err(|_| PutWriteError::InvalidContent)?;
+                    let is_root = verifier.is_root();
+                    let hash = block.finalize(is_root);
+                    self.stack.push(Chunk {
+                        hash,
+                        content: ContentChunk {
+                            compression,
+                            content: content.to_vec(),
+                        },
+                    });
+                    self.block_counter += 1
+                },
+                None => {},
             }
         }
 
@@ -101,6 +98,12 @@ where
     }
 
     async fn finalize(self) -> Result<Blake3Hash, PutFinalizeError> {
-        todo!()
+        for (count, chunk) in self.stack.into_iter().enumerate() {
+            self.store.inner.write().insert(
+                Key(chunk.hash, Some(count as u32)),
+                Block::Chunk(Arc::new(chunk.content)),
+            );
+        }
+        self.root.ok_or_else(|| PutFinalizeError::PartialContent)
     }
 }
