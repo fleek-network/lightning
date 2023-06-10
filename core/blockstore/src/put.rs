@@ -103,7 +103,11 @@ impl IncrementalPutInterface for IncrementalPut {
                         .tree_builder
                         .as_mut()
                         .expect("There to be a tree builder");
-                    println!("NOT VERIFYING: Content {:?} len {:?}", content[0], content.len());
+                    println!(
+                        "NOT VERIFYING: Content {:?} len {:?}",
+                        content[0],
+                        content.len()
+                    );
                     tree_builder.update(content.as_ref());
                     Chunk {
                         hash,
