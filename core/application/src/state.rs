@@ -32,6 +32,7 @@ pub struct State<B: Backend> {
     pub rep_measurements: B::Ref<NodePublicKey, Vec<ReportedReputationMeasurements>>,
     pub current_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
     pub last_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
+    pub total_served: B::Ref<Epoch, TotalServed>,
     pub backend: B,
 }
 
@@ -48,8 +49,14 @@ pub struct BandwidthInfo {
     pub reward_pool: u128,
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, Serialize, Deserialize, Clone, Default)]
+pub struct TotalServed {
+    pub served: CommodityServed,
+    pub reward_pool: u128,
+}
+
 /// This commodities served by different services in Fleek Network
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default, Debug)]
 pub struct CommodityServed {
     bandwidth: u128,
     compute: u128,
@@ -70,6 +77,7 @@ impl<B: Backend> State<B> {
             rep_measurements: backend.get_table_reference("rep_measurements"),
             last_epoch_served: backend.get_table_reference("last_epoch_served"),
             current_epoch_served: backend.get_table_reference("current_epoch_served"),
+            total_served: backend.get_table_reference("total_served"),
             backend,
         }
     }
@@ -159,6 +167,7 @@ impl<B: Backend> State<B> {
         service_id: u32,
         _acknowledgments: Vec<DeliveryAcknowledgment>,
     ) -> TransactionResponse {
+        // Todo: function not done
         let sender: NodePublicKey = match self.only_node(sender) {
             Ok(node) => node,
             Err(e) => return e,
@@ -171,7 +180,7 @@ impl<B: Backend> State<B> {
         if self.services.get(&service_id).is_none() {
             return TransactionResponse::Revert(ExecutionError::InvalidServiceId);
         }
-        // TODO: build proof based on delivery acks
+        // Todo: build proof based on delivery acks
         if !self.backend.verify_proof_of_delivery(
             &account_owner,
             &sender,
@@ -188,14 +197,28 @@ impl<B: Backend> State<B> {
             .map(|s| s.commodity_type)
             .unwrap();
 
+        let current_epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
+
         let mut commodity_served = self.current_epoch_served.get(&sender).unwrap_or_default();
+        let mut total_served = self.total_served.get(&current_epoch).unwrap_or_default();
 
         match commodity_type {
-            CommodityTypes::Bandwidth => commodity_served.bandwidth += commodity,
-            CommodityTypes::Compute => commodity_served.bandwidth += commodity,
-            CommodityTypes::Gpu => commodity_served.gpu += commodity,
+            CommodityTypes::Bandwidth => {
+                commodity_served.bandwidth += commodity;
+                total_served.served.bandwidth += commodity;
+            },
+            CommodityTypes::Compute => {
+                commodity_served.compute += commodity;
+                total_served.served.compute += commodity;
+            },
+            CommodityTypes::Gpu => {
+                commodity_served.gpu += commodity;
+                total_served.served.gpu += commodity;
+            },
         }
-        // TODO: handle cases where epoch change is happening
+        // Todo: caculate total reward pool based on the commodity price, should each node
+        // reward pool be calculated here as well?
+        // Todo: handle cases where epoch change is happening
         self.current_epoch_served.set(sender, commodity_served);
         TransactionResponse::Success(ExecutionData::None)
     }
@@ -557,6 +580,33 @@ impl<B: Backend> State<B> {
 
     // This function should be called during signal_epoch_change.
     fn _distribute_rewards(&self) {
+        // Todo: function not done
+
+        // distribute usdc rewards per unit of commodity served
+        // usdc rewards are just simply unit served per commodity * commodity price
+
+        //distribute inflation rewards per unit of usdc earned
+        // formula for rewards distribution per node
+
+        let inflation = self
+            .parameters
+            .get(&ProtocolParams::MaxInflation)
+            .unwrap_or_default();
+        let max_boost = self.parameters.get(&ProtocolParams::MaxBoost).unwrap_or(1);
+
+        let epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
+        let reward_pool = self
+            .total_served
+            .get(&epoch)
+            .unwrap_or_default()
+            .reward_pool;
+
+        let _flk_per_revenue_unit: f64 =
+            (inflation as f64/* * current_supply */) / (max_boost as f64 * reward_pool as f64);
+
+        // Todo: iterate over last_epoch_served table
+        // distribute flk based on units served
+
         todo!()
     }
 

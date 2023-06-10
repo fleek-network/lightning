@@ -13,7 +13,7 @@ use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 use crate::{
     genesis::Genesis,
     query_runner::QueryRunner,
-    state::{BandwidthInfo, Committee, CommodityServed, State},
+    state::{BandwidthInfo, Committee, CommodityServed, State, TotalServed},
     table::{Backend, StateTables},
 };
 
@@ -34,7 +34,9 @@ impl Env<UpdatePerm> {
             .with_table::<ProtocolParams, u128>("parameter")
             .with_table::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements")
             .with_table::<NodePublicKey, CommodityServed>("current_epoch_served")
-            .with_table::<NodePublicKey, CommodityServed>("current_epoch_served")
+            .with_table::<NodePublicKey, CommodityServed>("last_epoch_served")
+            .with_table::<Epoch, TotalServed>("total_served")
+            .enable_iter("current_epoch_served")
             .build();
 
         Self { inner: atomo }
