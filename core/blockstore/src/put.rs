@@ -22,6 +22,7 @@ pub struct IncrementalPut<B> {
     store: MemoryBlockStore<B>,
     proof: Option<ProofBuf>,
     root: Option<Blake3Hash>,
+    tree_builder: Option<HashTreeBuilder>,
     stack: Vec<Chunk>,
     block_counter: u32,
     buf: BytesMut,
@@ -87,7 +88,7 @@ where
                 },
                 None => {
                     let hash = block.finalize(true); // Is this always true?
-                    let mut tree_builder = HashTreeBuilder::new();
+                    let tree_builder = self.tree_builder.as_mut().expect("There to be a tree builder");
                     tree_builder.update(content.as_ref());
                     Chunk {
                         hash,
@@ -110,14 +111,17 @@ where
         false
     }
 
-    async fn finalize(self) -> Result<Blake3Hash, PutFinalizeError> {
-        // let output = tree_builder.finalize();
+    async fn finalize(mut self) -> Result<Blake3Hash, PutFinalizeError> {
         for (count, chunk) in self.stack.into_iter().enumerate() {
             self.store.inner.write().insert(
                 Key(chunk.hash, Some(count as u32)),
                 Block::Chunk(Arc::new(chunk.content)),
             );
         }
-        self.root.ok_or_else(|| PutFinalizeError::PartialContent)
+        if let Some(tree_builder) = self.tree_builder {
+            Ok(Blake3Hash::from(tree_builder.finalize().hash))
+        } else {
+            self.root.ok_or_else(|| PutFinalizeError::PartialContent)
+        }
     }
 }
