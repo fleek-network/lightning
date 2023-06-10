@@ -106,7 +106,8 @@ where
     }
 
     fn is_finished(&self) -> bool {
-        todo!()
+        // Since self is consumed when calling `finalize`, this would always return false.
+        false
     }
 
     async fn finalize(self) -> Result<Blake3Hash, PutFinalizeError> {
