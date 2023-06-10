@@ -64,7 +64,7 @@ where
                 block
             };
 
-            match self.proof.as_ref() {
+            let chunk = match self.proof.as_ref() {
                 Some(proof) => {
                     let root = self.root.clone().expect("Root hash to have been provided");
                     // Verify.
@@ -76,18 +76,30 @@ where
                         .verify(block.clone())
                         .map_err(|_| PutWriteError::InvalidContent)?;
                     let is_root = verifier.is_root();
-                    let hash = block.finalize(is_root);
-                    self.stack.push(Chunk {
+                    let hash = block.finalize(is_root); // Is this always true?
+                    Chunk {
                         hash,
                         content: ContentChunk {
                             compression,
                             content: content.to_vec(),
                         },
-                    });
-                    self.block_counter += 1
+                    }
                 },
-                None => {},
-            }
+                None => {
+                    let hash = block.finalize(true); // Is this always true?
+                    let mut tree_builder = HashTreeBuilder::new();
+                    tree_builder.update(content.as_ref());
+                    Chunk {
+                        hash,
+                        content: ContentChunk {
+                            compression,
+                            content: content.to_vec(),
+                        },
+                    }
+                },
+            };
+            self.stack.push(chunk);
+            self.block_counter += 1
         }
 
         Ok(())
@@ -98,6 +110,7 @@ where
     }
 
     async fn finalize(self) -> Result<Blake3Hash, PutFinalizeError> {
+        // let output = tree_builder.finalize();
         for (count, chunk) in self.stack.into_iter().enumerate() {
             self.store.inner.write().insert(
                 Key(chunk.hash, Some(count as u32)),
