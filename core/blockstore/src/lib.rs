@@ -101,4 +101,40 @@ mod tests {
 
         assert_eq!(root, Blake3Hash::from(output.hash));
     }
+
+    #[test]
+    async fn test_put_chunks_verify() {
+        let content = (0..4)
+            .map(|i| Vec::from([i; 256 * 1024]))
+            .flat_map(|a| a.into_iter())
+            .collect::<Vec<_>>();
+
+        let blockstore = MemoryBlockStore::init(Config).await.unwrap();
+        let mut putter = blockstore.put(None);
+        putter
+            .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
+            .unwrap();
+
+        let root = putter.finalize().await.unwrap();
+        let mut tree_builder = HashTreeBuilder::new();
+        (0..4).for_each(|i| tree_builder.update(&[i; 256 * 1024]));
+        let output = tree_builder.finalize();
+        assert_eq!(root, Blake3Hash::from(output.hash));
+
+        let content = (0..4)
+            .map(|i| Vec::from([i; 256 * 1024]))
+            .flat_map(|a| a.into_iter())
+            .collect::<Vec<_>>();
+
+        let mut putter = blockstore.put(None);
+        putter.feed_proof(output.hash.as_bytes()).unwrap();
+
+        for chunk in content.chunks(128) {
+            putter
+                .write(chunk, CompressionAlgorithm::Uncompressed)
+                .unwrap();
+        }
+        let root = putter.finalize().await.unwrap();
+        assert_eq!(root, Blake3Hash::from(output.hash));
+    }
 }
