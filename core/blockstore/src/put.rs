@@ -48,6 +48,7 @@ impl IncrementalPut {
 
 #[async_trait]
 impl IncrementalPutInterface for IncrementalPut {
+    // TODO: This needs to handle a proof and not cid.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError> {
         if self.buf.len() > 0 || self.stack.len() > 0 {
             return Err(PutFeedProofError::UnexpectedCall);

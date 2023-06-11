@@ -2,7 +2,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use draco_interfaces::{
-    Blake3Hash, Blake3Tree, BlockStoreInterface, CompressionAlgoSet, ConfigConsumer, ContentChunk,
+    Blake3Hash, Blake3Tree, BlockStoreInterface, CompressionAlgoSet, CompressionAlgorithm,
+    ConfigConsumer, ContentChunk,
 };
 use parking_lot::RwLock;
 use thiserror::Error;
@@ -23,7 +24,10 @@ impl MemoryBlockStore {
         match bincode::deserialize::<BlockContent>(self.inner.read().get(key)?)
             .expect("Stored content to be serialized properly")
         {
-            BlockContent::Chunk(chunk) => Some(chunk),
+            BlockContent::Chunk(content) => Some(ContentChunk {
+                compression: CompressionAlgorithm::Uncompressed,
+                content,
+            }),
             _ => None,
         }
     }
@@ -32,7 +36,7 @@ impl MemoryBlockStore {
         match bincode::deserialize::<BlockContent>(self.inner.read().get(key)?)
             .expect("Stored content to be serialized properly")
         {
-            BlockContent::Tree(tree) => Some(tree),
+            BlockContent::Tree(tree) => Some(Blake3Tree(tree)),
             _ => None,
         }
     }
@@ -43,7 +47,7 @@ impl MemoryBlockStore {
         tree: Blake3Tree,
     ) -> Result<Option<Block>, SerializationError> {
         let block =
-            bincode::serialize(&BlockContent::Tree(tree)).map_err(|_| SerializationError)?;
+            bincode::serialize(&BlockContent::Tree(tree.0)).map_err(|_| SerializationError)?;
         Ok(self.inner.write().insert(key, block))
     }
 
@@ -52,8 +56,8 @@ impl MemoryBlockStore {
         key: Key,
         chunk: ContentChunk,
     ) -> Result<Option<Block>, SerializationError> {
-        let block =
-            bincode::serialize(&BlockContent::Chunk(chunk)).map_err(|_| SerializationError)?;
+        let block = bincode::serialize(&BlockContent::Chunk(chunk.content))
+            .map_err(|_| SerializationError)?;
         Ok(self.inner.write().insert(key, block))
     }
 }

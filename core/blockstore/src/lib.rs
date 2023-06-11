@@ -4,7 +4,7 @@ mod config;
 mod memory;
 mod put;
 
-use draco_interfaces::{Blake3Hash, Blake3Tree, ContentChunk};
+use draco_interfaces::Blake3Hash;
 use serde::{Deserialize, Serialize};
 
 const BLAKE3_CHUNK_SIZE: usize = 256 * 1024;
@@ -24,10 +24,11 @@ impl Key {
     }
 }
 
+// TODO: Should we derive serialize/deserialize for ContentChunk and Blake3Tree?
 #[derive(Serialize, Deserialize)]
 pub enum BlockContent {
-    Tree(Blake3Tree),
-    Chunk(ContentChunk),
+    Tree(Vec<Blake3Hash>),
+    Chunk(Vec<u8>),
 }
 
 #[cfg(test)]
