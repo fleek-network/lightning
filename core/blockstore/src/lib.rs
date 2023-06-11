@@ -4,18 +4,18 @@ mod config;
 mod memory;
 mod put;
 
-use std::sync::Arc;
-
 use draco_interfaces::{Blake3Hash, Blake3Tree, ContentChunk};
+use serde::{Deserialize, Serialize};
 
 const BLAKE3_CHUNK_SIZE: usize = 256 * 1024;
 
 #[derive(Hash, Eq, PartialEq, Debug)]
 pub struct Key(Blake3Hash, Option<u32>);
 
+#[derive(Serialize, Deserialize)]
 pub enum Block {
-    Tree(Arc<Blake3Tree>),
-    Chunk(Arc<ContentChunk>),
+    Tree(Blake3Tree),
+    Chunk(ContentChunk),
 }
 
 #[cfg(test)]

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use blake3_tree::{
     blake3::tree::{BlockHasher, HashTreeBuilder},
@@ -119,7 +117,7 @@ impl IncrementalPutInterface for IncrementalPut {
         for (count, chunk) in self.stack.into_iter().enumerate() {
             self.store.inner.write().insert(
                 Key(chunk.hash, Some(count as u32)),
-                Block::Chunk(Arc::new(chunk.content)),
+                Block::Chunk(chunk.content),
             );
         }
 
@@ -129,7 +127,7 @@ impl IncrementalPutInterface for IncrementalPut {
                 let hash_tree = tree_builder.finalize();
                 self.store.inner.write().insert(
                     Key(Blake3Hash::from(hash_tree.hash), None),
-                    Block::Tree(Arc::new(Blake3Tree(hash_tree.tree))),
+                    Block::Tree(Blake3Tree(hash_tree.tree)),
                 );
                 Ok(Blake3Hash::from(hash_tree.hash))
             },
