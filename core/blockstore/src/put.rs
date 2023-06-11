@@ -22,7 +22,6 @@ pub struct IncrementalPut {
     buf: BytesMut,
     stack: Vec<Chunk>,
     store: MemoryBlockStore,
-    block_counter: u32,
     mode: Mode,
 }
 
@@ -44,7 +43,6 @@ impl IncrementalPut {
                 tree_builder: HashTreeBuilder::new(),
             },
             stack: Vec::new(),
-            block_counter: 0,
             buf: BytesMut::new(),
         }
     }
@@ -79,16 +77,16 @@ impl IncrementalPutInterface for IncrementalPut {
         self.buf.put(content);
 
         while self.buf.len() >= 256 * 1024 {
+            let block_count = self.stack.len();
             let chunk = self.buf.split_to(256 * 1024);
             let mut block = BlockHasher::new();
-            block.set_block(self.block_counter as usize);
+            block.set_block(block_count);
             block.update(chunk.as_ref());
 
             match &mut self.mode {
                 Mode::Verify { proof, root } => {
-                    let mut verifier =
-                        IncrementalVerifier::new(root.clone(), self.block_counter as usize);
-                    let proof_buf = ProofBuf::new(proof, self.block_counter as usize);
+                    let mut verifier = IncrementalVerifier::new(root.clone(), block_count);
+                    let proof_buf = ProofBuf::new(proof, block_count);
                     verifier
                         .feed_proof(proof_buf.as_slice())
                         .map_err(|_| PutWriteError::InvalidContent)?;
@@ -98,40 +96,6 @@ impl IncrementalPutInterface for IncrementalPut {
             }
 
             let hash = block.finalize(true); // Is this arg always true?
-            // let chunk = match self.proof.as_ref() {
-            //     Some(proof) => {
-            //         let root = self.root.clone().expect("Root hash to have been provided");
-            //         let mut verifier = IncrementalVerifier::new(root, self.block_counter as
-            // usize);         let proof_buf = ProofBuf::new(proof, self.block_counter
-            // as usize);         verifier
-            //             .feed_proof(proof_buf.as_slice())
-            //             .map_err(|_| PutWriteError::InvalidContent)?;
-            //         verifier.verify(block.clone()).unwrap();
-            //         let hash = block.finalize(true); // Is this arg always true?
-            //         Chunk {
-            //             hash,
-            //             content: ContentChunk {
-            //                 compression,
-            //                 content: content.to_vec(),
-            //             },
-            //         }
-            //     },
-            //     None => {
-            //         let hash = block.finalize(true); // Is this arg always true?
-            //         let tree_builder = self
-            //             .tree_builder
-            //             .as_mut()
-            //             .expect("There to be a tree builder");
-            //         tree_builder.update(content.as_ref());
-            //         Chunk {
-            //             hash,
-            //             content: ContentChunk {
-            //                 compression,
-            //                 content: content.to_vec(),
-            //             },
-            //         }
-            //     },
-            // };
             self.stack.push(Chunk {
                 hash,
                 content: ContentChunk {
@@ -139,7 +103,6 @@ impl IncrementalPutInterface for IncrementalPut {
                     content: chunk.to_vec(),
                 },
             });
-            self.block_counter += 1
         }
 
         Ok(())
