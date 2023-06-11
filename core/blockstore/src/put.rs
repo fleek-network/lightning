@@ -19,30 +19,19 @@ struct Chunk {
 }
 
 pub struct IncrementalPut {
-    // Proof.
-    // proof: Option<Vec<Blake3Hash>>,
-    // TRee builder.
-    // tree_builder: Option<HashTreeBuilder>,
-
-    // Needed.
     buf: BytesMut,
     stack: Vec<Chunk>,
     store: MemoryBlockStore,
-    // root: Option<Blake3Hash>,
-
-    // We might be able to just use the length of the stack.
     block_counter: u32,
-
     mode: Mode,
 }
 
 enum Mode {
-    // Both need to return root.
     Verify {
         proof: Vec<Blake3Hash>,
         root: Blake3Hash,
     },
-    Trust {
+    BuildHashTree {
         tree_builder: HashTreeBuilder,
     },
 }
@@ -51,7 +40,7 @@ impl IncrementalPut {
     pub fn new(store: MemoryBlockStore) -> Self {
         Self {
             store,
-            mode: Mode::Trust {
+            mode: Mode::BuildHashTree {
                 tree_builder: HashTreeBuilder::new(),
             },
             stack: Vec::new(),
@@ -105,7 +94,7 @@ impl IncrementalPutInterface for IncrementalPut {
                         .map_err(|_| PutWriteError::InvalidContent)?;
                     verifier.verify(block.clone()).unwrap();
                 },
-                Mode::Trust { tree_builder } => tree_builder.update(chunk.as_ref()),
+                Mode::BuildHashTree { tree_builder } => tree_builder.update(chunk.as_ref()),
             }
 
             let hash = block.finalize(true); // Is this arg always true?
@@ -171,7 +160,7 @@ impl IncrementalPutInterface for IncrementalPut {
 
         match self.mode {
             Mode::Verify { root, .. } => Ok(root),
-            Mode::Trust { tree_builder } => {
+            Mode::BuildHashTree { tree_builder } => {
                 let hash_tree = tree_builder.finalize();
                 self.store.inner.write().insert(
                     Key(Blake3Hash::from(hash_tree.hash), None),
