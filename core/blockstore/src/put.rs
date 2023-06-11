@@ -11,7 +11,7 @@ use draco_interfaces::{
     PutFeedProofError, PutFinalizeError, PutWriteError,
 };
 
-use crate::{memory::MemoryBlockStore, Block, Key};
+use crate::{memory::MemoryBlockStore, Block, Key, BLAKE3_CHUNK_SIZE};
 
 struct Chunk {
     hash: Blake3Hash,
@@ -76,9 +76,9 @@ impl IncrementalPutInterface for IncrementalPut {
     ) -> Result<(), PutWriteError> {
         self.buf.put(content);
 
-        while self.buf.len() >= 256 * 1024 {
+        while self.buf.len() >= BLAKE3_CHUNK_SIZE {
             let block_count = self.stack.len();
-            let chunk = self.buf.split_to(256 * 1024);
+            let chunk = self.buf.split_to(BLAKE3_CHUNK_SIZE);
             let mut block = BlockHasher::new();
             block.set_block(block_count);
             block.update(chunk.as_ref());

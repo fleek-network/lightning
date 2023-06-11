@@ -8,6 +8,8 @@ use std::sync::Arc;
 
 use draco_interfaces::{Blake3Hash, Blake3Tree, ContentChunk};
 
+const BLAKE3_CHUNK_SIZE: usize = 256 * 1024;
+
 #[derive(Hash, Eq, PartialEq, Debug)]
 pub struct Key(Blake3Hash, Option<u32>);
 
@@ -25,11 +27,11 @@ mod tests {
     };
     use tokio::test;
 
-    use crate::{config::Config, memory::MemoryBlockStore};
+    use crate::{config::Config, memory::MemoryBlockStore, BLAKE3_CHUNK_SIZE};
 
     fn create_content() -> Vec<u8> {
         (0..4)
-            .map(|i| Vec::from([i; 256 * 1024]))
+            .map(|i| Vec::from([i; BLAKE3_CHUNK_SIZE]))
             .flat_map(|a| a.into_iter())
             .collect()
     }
@@ -140,7 +142,7 @@ mod tests {
             .unwrap();
         putter.finalize().await.unwrap();
         // When: we query the block store for our blocks using their hashes.
-        for (count, chunk) in content.chunks(256 * 1024).enumerate() {
+        for (count, chunk) in content.chunks(BLAKE3_CHUNK_SIZE).enumerate() {
             let mut block = BlockHasher::new();
             block.set_block(count);
             block.update(chunk);
