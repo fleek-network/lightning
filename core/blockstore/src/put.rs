@@ -48,7 +48,7 @@ enum Mode {
 }
 
 impl IncrementalPut {
-    pub fn new(root: Option<Blake3Hash>, store: MemoryBlockStore) -> Self {
+    pub fn new(store: MemoryBlockStore) -> Self {
         Self {
             store,
             mode: Mode::Trust {
