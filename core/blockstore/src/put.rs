@@ -54,7 +54,6 @@ impl IncrementalPutInterface for IncrementalPut {
         match self.store.inner.read().get(&Key(root, None)) {
             None | Some(Block::Chunk(_)) => Err(PutFeedProofError::InvalidProof),
             Some(Block::Tree(tree)) => {
-                println!("TREE being fetched {:?}", &(tree.clone().0));
                 self.proof = Some(tree.clone().0.clone());
                 self.root = Some(root);
                 Ok(())
@@ -103,11 +102,6 @@ impl IncrementalPutInterface for IncrementalPut {
                         .tree_builder
                         .as_mut()
                         .expect("There to be a tree builder");
-                    println!(
-                        "NOT VERIFYING: Content {:?} len {:?}",
-                        content[0],
-                        content.len()
-                    );
                     tree_builder.update(content.as_ref());
                     Chunk {
                         hash,
@@ -139,7 +133,6 @@ impl IncrementalPutInterface for IncrementalPut {
         }
         if let Some(tree_builder) = self.tree_builder {
             let hash_tree = tree_builder.finalize();
-            println!("TREE being saved {:?}", hash_tree.tree);
             self.store.inner.write().insert(
                 Key(Blake3Hash::from(hash_tree.hash), None),
                 Block::Tree(Arc::new(Blake3Tree(hash_tree.tree))),
