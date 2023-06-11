@@ -75,7 +75,7 @@ impl BlockStoreInterface for MemoryBlockStore {
     }
 
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
-        self.basic_get_tree(&Key(*cid, None)).map(Arc::new)
+        self.basic_get_tree(&Key::tree_key(*cid)).map(Arc::new)
     }
 
     async fn get(
@@ -84,7 +84,7 @@ impl BlockStoreInterface for MemoryBlockStore {
         block_hash: &Blake3Hash,
         _compression: CompressionAlgoSet,
     ) -> Option<Self::SharedPointer<ContentChunk>> {
-        self.basic_get(&Key(*block_hash, Some(block_counter)))
+        self.basic_get(&Key::chunk_key(*block_hash, block_counter))
             .map(Arc::new)
     }
 

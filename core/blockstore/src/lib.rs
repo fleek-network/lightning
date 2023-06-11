@@ -14,6 +14,16 @@ type Block = Vec<u8>;
 #[derive(Hash, Eq, PartialEq, Debug)]
 pub struct Key(Blake3Hash, Option<u32>);
 
+impl Key {
+    pub fn chunk_key(hash: Blake3Hash, counter: u32) -> Self {
+        Self(hash, Some(counter))
+    }
+
+    pub fn tree_key(hash: Blake3Hash) -> Self {
+        Self(hash, None)
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub enum BlockContent {
     Tree(Blake3Tree),

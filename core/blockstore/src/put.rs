@@ -55,7 +55,7 @@ impl IncrementalPutInterface for IncrementalPut {
         let root = proof
             .try_into()
             .map_err(|_| PutFeedProofError::InvalidProof)?;
-        match self.store.basic_get_tree(&Key(root, None)) {
+        match self.store.basic_get_tree(&Key::tree_key(root)) {
             Some(tree) => {
                 self.mode = Mode::Verify {
                     proof: tree.0,
@@ -117,7 +117,7 @@ impl IncrementalPutInterface for IncrementalPut {
         for (count, chunk) in self.stack.into_iter().enumerate() {
             self.store
                 .basic_put(
-                    Key(chunk.hash, Some(count as u32)),
+                    Key::chunk_key(chunk.hash, count as u32),
                     // TODO: We need a more descriptive error for serialization-related errors.
                     chunk.content,
                 )
@@ -130,7 +130,7 @@ impl IncrementalPutInterface for IncrementalPut {
                 let hash_tree = tree_builder.finalize();
                 self.store
                     .basic_put_tree(
-                        Key(Blake3Hash::from(hash_tree.hash), None),
+                        Key::tree_key(Blake3Hash::from(hash_tree.hash)),
                         // TODO: We need a more descriptive error for serialization-related errors.
                         Blake3Tree(hash_tree.tree),
                     )
