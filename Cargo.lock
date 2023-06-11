@@ -1251,6 +1251,7 @@ dependencies = [
  "draco-interfaces",
  "parking_lot",
  "serde",
+ "thiserror",
  "tokio",
 ]
 

@@ -55,17 +55,15 @@ impl IncrementalPutInterface for IncrementalPut {
         let root = proof
             .try_into()
             .map_err(|_| PutFeedProofError::InvalidProof)?;
-        match self.store.inner.read().get(&Key(root, None)) {
-            Some(block) => {
-                let tree = bincode::deserialize::<Blake3Tree>(block)
-                    .map_err(|_| PutFeedProofError::InvalidProof)?;
+        match self.store.basic_get_tree(&Key(root, None)) {
+            Some(tree) => {
                 self.mode = Mode::Verify {
                     proof: tree.0,
                     root,
                 };
                 Ok(())
             },
-            _ => Err(PutFeedProofError::InvalidProof),
+            None => Err(PutFeedProofError::InvalidProof),
         }
     }
 
@@ -117,23 +115,26 @@ impl IncrementalPutInterface for IncrementalPut {
 
     async fn finalize(mut self) -> Result<Blake3Hash, PutFinalizeError> {
         for (count, chunk) in self.stack.into_iter().enumerate() {
-            self.store.inner.write().insert(
-                Key(chunk.hash, Some(count as u32)),
-                // TODO: We need a more descriptive error for serialization-related errors.
-                bincode::serialize(&chunk.content).map_err(|_| PutFinalizeError::InvalidCID)?,
-            );
+            self.store
+                .basic_put(
+                    Key(chunk.hash, Some(count as u32)),
+                    // TODO: We need a more descriptive error for serialization-related errors.
+                    chunk.content,
+                )
+                .map_err(|_| PutFinalizeError::InvalidCID)?;
         }
 
         match self.mode {
             Mode::Verify { root, .. } => Ok(root),
             Mode::BuildHashTree { tree_builder } => {
                 let hash_tree = tree_builder.finalize();
-                self.store.inner.write().insert(
-                    Key(Blake3Hash::from(hash_tree.hash), None),
-                    // TODO: We need a more descriptive error for serialization-related errors.
-                    bincode::serialize(&Blake3Tree(hash_tree.tree))
-                        .map_err(|_| PutFinalizeError::InvalidCID)?,
-                );
+                self.store
+                    .basic_put_tree(
+                        Key(Blake3Hash::from(hash_tree.hash), None),
+                        // TODO: We need a more descriptive error for serialization-related errors.
+                        Blake3Tree(hash_tree.tree),
+                    )
+                    .map_err(|_| PutFinalizeError::InvalidCID)?;
                 Ok(Blake3Hash::from(hash_tree.hash))
             },
         }

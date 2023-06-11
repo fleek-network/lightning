@@ -5,12 +5,57 @@ use draco_interfaces::{
     Blake3Hash, Blake3Tree, BlockStoreInterface, CompressionAlgoSet, ConfigConsumer, ContentChunk,
 };
 use parking_lot::RwLock;
+use thiserror::Error;
 
-use crate::{config::Config, put::IncrementalPut, Block, Key};
+use crate::{config::Config, put::IncrementalPut, Block, BlockContent, Key};
+
+#[derive(Error, Debug)]
+#[error("Serialization failed")]
+pub struct SerializationError;
 
 #[derive(Clone, Default)]
 pub struct MemoryBlockStore {
-    pub(crate) inner: Arc<RwLock<HashMap<Key, Block>>>,
+    inner: Arc<RwLock<HashMap<Key, Block>>>,
+}
+
+impl MemoryBlockStore {
+    pub fn basic_get(&self, key: &Key) -> Option<ContentChunk> {
+        match bincode::deserialize::<BlockContent>(self.inner.read().get(key)?)
+            .expect("Stored content to be serialized properly")
+        {
+            BlockContent::Chunk(chunk) => Some(chunk),
+            _ => None,
+        }
+    }
+
+    pub fn basic_get_tree(&self, key: &Key) -> Option<Blake3Tree> {
+        match bincode::deserialize::<BlockContent>(self.inner.read().get(key)?)
+            .expect("Stored content to be serialized properly")
+        {
+            BlockContent::Tree(tree) => Some(tree),
+            _ => None,
+        }
+    }
+
+    pub fn basic_put_tree(
+        &self,
+        key: Key,
+        tree: Blake3Tree,
+    ) -> Result<Option<Block>, SerializationError> {
+        let block =
+            bincode::serialize(&BlockContent::Tree(tree)).map_err(|_| SerializationError)?;
+        Ok(self.inner.write().insert(key, block))
+    }
+
+    pub fn basic_put(
+        &self,
+        key: Key,
+        chunk: ContentChunk,
+    ) -> Result<Option<Block>, SerializationError> {
+        let block =
+            bincode::serialize(&BlockContent::Chunk(chunk)).map_err(|_| SerializationError)?;
+        Ok(self.inner.write().insert(key, block))
+    }
 }
 
 impl ConfigConsumer for MemoryBlockStore {
@@ -30,10 +75,7 @@ impl BlockStoreInterface for MemoryBlockStore {
     }
 
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
-        Some(Arc::new(
-            bincode::deserialize(self.inner.read().get(&Key(*cid, None))?)
-                .expect("Stored tree to be valid"),
-        ))
+        self.basic_get_tree(&Key(*cid, None)).map(Arc::new)
     }
 
     async fn get(
@@ -42,14 +84,8 @@ impl BlockStoreInterface for MemoryBlockStore {
         block_hash: &Blake3Hash,
         _compression: CompressionAlgoSet,
     ) -> Option<Self::SharedPointer<ContentChunk>> {
-        Some(Arc::new(
-            bincode::deserialize(
-                self.inner
-                    .read()
-                    .get(&Key(*block_hash, Some(block_counter)))?,
-            )
-            .expect("Stored tree to be valid"),
-        ))
+        self.basic_get(&Key(*block_hash, Some(block_counter)))
+            .map(Arc::new)
     }
 
     fn put(&self, _: Option<Blake3Hash>) -> Self::Put {
