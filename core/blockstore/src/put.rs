@@ -114,6 +114,8 @@ impl IncrementalPutInterface for IncrementalPut {
     }
 
     async fn finalize(mut self) -> Result<Blake3Hash, PutFinalizeError> {
+        // TODO: put methods use a non-async lock so these calls could
+        // block the thread. Maybe let's use the worker pattern.
         for (count, chunk) in self.stack.into_iter().enumerate() {
             self.store
                 .basic_put(
