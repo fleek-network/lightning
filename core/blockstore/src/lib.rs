@@ -1,3 +1,5 @@
+extern crate core;
+
 mod config;
 mod memory;
 mod put;
@@ -16,7 +18,7 @@ pub enum Block {
 
 #[cfg(test)]
 mod tests {
-    use blake3_tree::blake3::tree::HashTreeBuilder;
+    use blake3_tree::blake3::{tree::HashTreeBuilder, Hash};
     use draco_interfaces::{
         Blake3Hash, BlockStoreInterface, CompressionAlgorithm, IncrementalPutInterface,
     };
@@ -24,117 +26,105 @@ mod tests {
 
     use crate::{config::Config, memory::MemoryBlockStore};
 
-    #[test]
-    async fn test_put() {
-        let content = (0..4)
+    fn create_content() -> Vec<u8> {
+        (0..4)
             .map(|i| Vec::from([i; 256 * 1024]))
             .flat_map(|a| a.into_iter())
-            .collect::<Vec<_>>();
+            .collect()
+    }
 
+    fn root_hash(content: &[u8]) -> Hash {
+        let mut tree_builder = HashTreeBuilder::new();
+        tree_builder.update(content);
+        let tree_hash = tree_builder.finalize();
+        tree_hash.hash
+    }
+
+    #[test]
+    async fn test_put() {
+        // Given: some content.
+        let content = create_content();
+        // Given: a block store.
         let blockstore = MemoryBlockStore::init(Config).await.unwrap();
+        // When: we create a putter and write some content.
         let mut putter = blockstore.put(None);
         putter
             .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
             .unwrap();
+        // Then: the putter returns the appropriate root hash.
         let root = putter.finalize().await.unwrap();
-
-        let mut tree_builder = HashTreeBuilder::new();
-        (0..4).for_each(|i| tree_builder.update(&[i; 256 * 1024]));
-        let output = tree_builder.finalize();
-
-        assert_eq!(root, Blake3Hash::from(output.hash));
+        let expected_root = root_hash(content.as_slice());
+        assert_eq!(root, Blake3Hash::from(expected_root));
     }
 
     #[test]
     async fn test_put_verify() {
-        let content = (0..4)
-            .map(|i| Vec::from([i; 256 * 1024]))
-            .flat_map(|a| a.into_iter())
-            .collect::<Vec<_>>();
-
+        // Given: some content.
+        let content = create_content();
+        // Given: a block store.
         let blockstore = MemoryBlockStore::init(Config).await.unwrap();
+        // Given: we put the content in the block store.
         let mut putter = blockstore.put(None);
         putter
             .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
             .unwrap();
-
-        let root = putter.finalize().await.unwrap();
-        let mut tree_builder = HashTreeBuilder::new();
-        (0..4).for_each(|i| tree_builder.update(&[i; 256 * 1024]));
-        let output = tree_builder.finalize();
-        assert_eq!(root, Blake3Hash::from(output.hash));
-
-        let content = (0..4)
-            .map(|i| Vec::from([i; 256 * 1024]))
-            .flat_map(|a| a.into_iter())
-            .collect::<Vec<_>>();
-
+        putter.finalize().await.unwrap();
+        // When: we put the same content and feed the proof to verify it.
         let mut putter = blockstore.put(None);
-        putter.feed_proof(output.hash.as_bytes()).unwrap();
+        let root = root_hash(content.as_slice());
+        putter.feed_proof(root.as_bytes()).unwrap();
         putter
             .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
             .unwrap();
+        // Then: the putter returns the appropriate root hash and no errors.
         let root = putter.finalize().await.unwrap();
-        assert_eq!(root, Blake3Hash::from(output.hash));
+        let expected_root = root_hash(content.as_slice());
+        assert_eq!(root, Blake3Hash::from(expected_root));
     }
 
     #[test]
     async fn test_put_chunks() {
-        // 262144
-        let content = (0..4)
-            .map(|i| Vec::from([i; 256 * 1024]))
-            .flat_map(|a| a.into_iter())
-            .collect::<Vec<_>>();
-
+        // Given: some content.
+        let content = create_content();
+        // Given: a block store.
         let blockstore = MemoryBlockStore::init(Config).await.unwrap();
+        // When: we create a putter and write some content in chunks smaller than blake3 chunks.
         let mut putter = blockstore.put(None);
         for chunk in content.chunks(128) {
             putter
                 .write(chunk, CompressionAlgorithm::Uncompressed)
                 .unwrap();
         }
+        // Then: the putter returns the appropriate root hash.
         let root = putter.finalize().await.unwrap();
-
-        let mut tree_builder = HashTreeBuilder::new();
-        (0..4).for_each(|i| tree_builder.update(&[i; 256 * 1024]));
-        let output = tree_builder.finalize();
-
-        assert_eq!(root, Blake3Hash::from(output.hash));
+        let expected_root = root_hash(content.as_slice());
+        assert_eq!(root, Blake3Hash::from(expected_root));
     }
 
     #[test]
     async fn test_put_chunks_verify() {
-        let content = (0..4)
-            .map(|i| Vec::from([i; 256 * 1024]))
-            .flat_map(|a| a.into_iter())
-            .collect::<Vec<_>>();
-
+        // Given: some content.
+        let content = create_content();
+        // Given: a block store.
         let blockstore = MemoryBlockStore::init(Config).await.unwrap();
+        // Given: we put the content in the block store.
         let mut putter = blockstore.put(None);
         putter
             .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
             .unwrap();
-
-        let root = putter.finalize().await.unwrap();
-        let mut tree_builder = HashTreeBuilder::new();
-        (0..4).for_each(|i| tree_builder.update(&[i; 256 * 1024]));
-        let output = tree_builder.finalize();
-        assert_eq!(root, Blake3Hash::from(output.hash));
-
-        let content = (0..4)
-            .map(|i| Vec::from([i; 256 * 1024]))
-            .flat_map(|a| a.into_iter())
-            .collect::<Vec<_>>();
-
+        putter.finalize().await.unwrap();
+        // When: feed the proof to verify it our content and pass the content in chunks.
         let mut putter = blockstore.put(None);
-        putter.feed_proof(output.hash.as_bytes()).unwrap();
-
+        let root = root_hash(content.as_slice());
+        putter.feed_proof(root.as_bytes()).unwrap();
         for chunk in content.chunks(128) {
             putter
                 .write(chunk, CompressionAlgorithm::Uncompressed)
                 .unwrap();
         }
+        // Then: the putter returns the appropriate root hash and no errors.
         let root = putter.finalize().await.unwrap();
-        assert_eq!(root, Blake3Hash::from(output.hash));
+        let expected_root = root_hash(content.as_slice());
+        assert_eq!(root, Blake3Hash::from(expected_root));
     }
 }
