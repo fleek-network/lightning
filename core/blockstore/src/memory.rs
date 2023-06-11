@@ -30,10 +30,10 @@ impl BlockStoreInterface for MemoryBlockStore {
     }
 
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
-        match self.inner.read().get(&Key(cid.clone(), None))? {
-            Block::Tree(tree) => Some(Arc::new(tree.clone())),
-            _ => None,
-        }
+        Some(Arc::new(
+            bincode::deserialize(self.inner.read().get(&Key(*cid, None))?)
+                .expect("Stored tree to be valid"),
+        ))
     }
 
     async fn get(
@@ -42,14 +42,14 @@ impl BlockStoreInterface for MemoryBlockStore {
         block_hash: &Blake3Hash,
         _compression: CompressionAlgoSet,
     ) -> Option<Self::SharedPointer<ContentChunk>> {
-        match self
-            .inner
-            .read()
-            .get(&Key(*block_hash, Some(block_counter)))?
-        {
-            Block::Chunk(chunk) => Some(Arc::new(chunk.clone())),
-            _ => None,
-        }
+        Some(Arc::new(
+            bincode::deserialize(
+                self.inner
+                    .read()
+                    .get(&Key(*block_hash, Some(block_counter)))?,
+            )
+            .expect("Stored tree to be valid"),
+        ))
     }
 
     fn put(&self, _: Option<Blake3Hash>) -> Self::Put {

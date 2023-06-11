@@ -9,11 +9,13 @@ use serde::{Deserialize, Serialize};
 
 const BLAKE3_CHUNK_SIZE: usize = 256 * 1024;
 
+type Block = Vec<u8>;
+
 #[derive(Hash, Eq, PartialEq, Debug)]
 pub struct Key(Blake3Hash, Option<u32>);
 
 #[derive(Serialize, Deserialize)]
-pub enum Block {
+pub enum BlockContent {
     Tree(Blake3Tree),
     Chunk(ContentChunk),
 }

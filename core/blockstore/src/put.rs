@@ -9,7 +9,7 @@ use draco_interfaces::{
     PutFeedProofError, PutFinalizeError, PutWriteError,
 };
 
-use crate::{memory::MemoryBlockStore, Block, Key, BLAKE3_CHUNK_SIZE};
+use crate::{memory::MemoryBlockStore, Key, BLAKE3_CHUNK_SIZE};
 
 struct Chunk {
     hash: Blake3Hash,
@@ -56,9 +56,11 @@ impl IncrementalPutInterface for IncrementalPut {
             .try_into()
             .map_err(|_| PutFeedProofError::InvalidProof)?;
         match self.store.inner.read().get(&Key(root, None)) {
-            Some(Block::Tree(tree)) => {
+            Some(block) => {
+                let tree = bincode::deserialize::<Blake3Tree>(block)
+                    .map_err(|_| PutFeedProofError::InvalidProof)?;
                 self.mode = Mode::Verify {
-                    proof: tree.clone().0.clone(),
+                    proof: tree.0,
                     root,
                 };
                 Ok(())
@@ -117,7 +119,8 @@ impl IncrementalPutInterface for IncrementalPut {
         for (count, chunk) in self.stack.into_iter().enumerate() {
             self.store.inner.write().insert(
                 Key(chunk.hash, Some(count as u32)),
-                Block::Chunk(chunk.content),
+                // TODO: We need a more descriptive error for serialization-related errors.
+                bincode::serialize(&chunk.content).map_err(|_| PutFinalizeError::InvalidCID)?,
             );
         }
 
@@ -127,7 +130,9 @@ impl IncrementalPutInterface for IncrementalPut {
                 let hash_tree = tree_builder.finalize();
                 self.store.inner.write().insert(
                     Key(Blake3Hash::from(hash_tree.hash), None),
-                    Block::Tree(Blake3Tree(hash_tree.tree)),
+                    // TODO: We need a more descriptive error for serialization-related errors.
+                    bincode::serialize(&Blake3Tree(hash_tree.tree))
+                        .map_err(|_| PutFinalizeError::InvalidCID)?,
                 );
                 Ok(Blake3Hash::from(hash_tree.hash))
             },

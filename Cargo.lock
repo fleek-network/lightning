@@ -1245,6 +1245,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bincode",
  "blake3-tree",
  "bytes",
  "draco-interfaces",
