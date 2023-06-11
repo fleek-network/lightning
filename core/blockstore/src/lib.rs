@@ -130,6 +130,29 @@ mod tests {
     }
 
     #[test]
+    async fn test_put_verify_invalid_content() {
+        // Given: some content.
+        let mut content = create_content();
+        // Given: a block store.
+        let blockstore = MemoryBlockStore::init(Config).await.unwrap();
+        // Given: we put the content in the block store and feed the proof to verify it.
+        let mut putter = blockstore.put(None);
+        putter
+            .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
+            .unwrap();
+        putter.finalize().await.unwrap();
+        let expected_root = hash_tree(content.as_slice()).hash;
+        let mut putter = blockstore.put(None);
+        putter.feed_proof(expected_root.as_bytes()).unwrap();
+        // Given: make a change to the content.
+        content[10] = 69;
+        // When: we put the modified content.
+        let write_result = putter.write(content.as_slice(), CompressionAlgorithm::Uncompressed);
+        // Then: the putter returns the appropriate root hash and no errors.
+        assert!(write_result.is_err());
+    }
+
+    #[test]
     async fn test_get() {
         // Given: some content.
         let content = create_content();

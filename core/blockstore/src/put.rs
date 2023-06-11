@@ -90,7 +90,9 @@ impl IncrementalPutInterface for IncrementalPut {
                     verifier
                         .feed_proof(proof_buf.as_slice())
                         .map_err(|_| PutWriteError::InvalidContent)?;
-                    verifier.verify(block.clone()).unwrap();
+                    verifier
+                        .verify(block.clone())
+                        .map_err(|_| PutWriteError::InvalidContent)?;
                 },
                 Mode::BuildHashTree { tree_builder } => tree_builder.update(chunk.as_ref()),
             }
