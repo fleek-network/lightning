@@ -53,9 +53,9 @@ mod tests {
             .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
             .unwrap();
         // Then: the putter returns the appropriate root hash.
+        let hash_tree = hash_tree(content.as_slice());
         let root = putter.finalize().await.unwrap();
-        let expected_root = hash_tree(content.as_slice()).hash;
-        assert_eq!(root, Blake3Hash::from(expected_root));
+        assert_eq!(root, Blake3Hash::from(hash_tree.hash));
     }
 
     #[test]
@@ -152,5 +152,15 @@ mod tests {
             // Then: we get our content as expected.
             assert_eq!(content_from_store.content, chunk);
         }
+        // Then: our tree is stored as expected.
+        let hash_tree = hash_tree(content.as_slice());
+        assert_eq!(
+            hash_tree.tree,
+            blockstore
+                .get_tree(&Blake3Hash::from(hash_tree.hash))
+                .await
+                .unwrap()
+                .0
+        )
     }
 }
