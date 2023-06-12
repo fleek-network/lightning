@@ -29,7 +29,7 @@ enum Mode {
         root: Blake3Hash,
     },
     BuildHashTree {
-        tree_builder: HashTreeBuilder,
+        tree_builder: Box<HashTreeBuilder>,
     },
 }
 
@@ -38,7 +38,7 @@ impl IncrementalPut {
         Self {
             store,
             mode: Mode::BuildHashTree {
-                tree_builder: HashTreeBuilder::new(),
+                tree_builder: Box::new(HashTreeBuilder::new()),
             },
             stack: Vec::new(),
             buf: BytesMut::new(),
@@ -50,7 +50,7 @@ impl IncrementalPut {
 impl IncrementalPutInterface for IncrementalPut {
     // TODO: This needs to handle a proof and not cid.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError> {
-        if self.buf.len() > 0 || self.stack.len() > 0 {
+        if !self.buf.is_empty() || !self.stack.is_empty() {
             return Err(PutFeedProofError::UnexpectedCall);
         }
         let root = proof
@@ -84,7 +84,7 @@ impl IncrementalPutInterface for IncrementalPut {
 
             match &mut self.mode {
                 Mode::Verify { proof, root } => {
-                    let mut verifier = IncrementalVerifier::new(root.clone(), block_count);
+                    let mut verifier = IncrementalVerifier::new(*root, block_count);
                     let proof_buf = ProofBuf::new(proof, block_count);
                     verifier
                         .feed_proof(proof_buf.as_slice())
