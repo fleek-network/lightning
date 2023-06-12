@@ -1,4 +1,4 @@
-use std::{num::NonZeroUsize, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, num::NonZeroUsize, sync::Arc, time::Duration};
 
 use draco_interfaces::{types::ReputationMeasurements, Weight};
 use draco_reputation::statistics::min_max_normalize_value;
@@ -21,6 +21,14 @@ impl MeasurementManager {
             summary_stats: SummaryStatistics::default(),
             local_reputation: Arc::new(scc::HashMap::new()),
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn get_measurements(&self) -> BTreeMap<NodePublicKey, ReputationMeasurements> {
+        self.peers
+            .iter()
+            .map(|(peer, measurement_store)| (*peer, measurement_store.into()))
+            .collect()
     }
 
     pub fn get_local_reputation_ref(&self) -> Arc<scc::HashMap<NodePublicKey, u128>> {
@@ -663,5 +671,32 @@ mod tests {
         manager.report_sat(peer, Weight::Weak);
         let reputation_map = manager.get_local_reputation_ref();
         assert!(reputation_map.contains(&peer));
+    }
+
+    #[test]
+    fn test_get_measurements_contains() {
+        let mut manager = MeasurementManager::new();
+        let peer1 = NodePublicKey([0; 96]);
+        manager.report_sat(peer1, Weight::Weak);
+        let peer2 = NodePublicKey([1; 96]);
+        manager.report_sat(peer2, Weight::Weak);
+        let peer_measurements = manager.get_measurements();
+        assert!(peer_measurements.contains_key(&peer1));
+        assert!(peer_measurements.contains_key(&peer2));
+    }
+
+    #[test]
+    fn test_get_measurements_equals() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_sat(peer, Weight::Weak);
+        manager.report_latency(peer, Duration::from_millis(200));
+        let peer_measurements = manager.get_measurements();
+        let measurements = peer_measurements.get(&peer).unwrap();
+        assert_eq!(
+            measurements.interactions.unwrap(),
+            Interactions::get_weight(Weight::Weak)
+        );
+        assert_eq!(measurements.latency.unwrap(), Duration::from_millis(200));
     }
 }
