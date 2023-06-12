@@ -655,4 +655,13 @@ mod tests {
         assert_eq!(manager.summary_stats.min.hops.unwrap(), 10);
         assert_eq!(manager.summary_stats.max.hops.unwrap(), 20);
     }
+
+    #[test]
+    fn test_get_local_reputation_ref() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_sat(peer, Weight::Weak);
+        let reputation_map = manager.get_local_reputation_ref();
+        assert!(reputation_map.contains(&peer));
+    }
 }
