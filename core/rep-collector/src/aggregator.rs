@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use draco_application::query_runner::QueryRunner;
 use draco_interfaces::{
     config::ConfigConsumer, reputation::ReputationAggregatorInterface, signer::SubmitTxSocket,
-    ReputationQueryInteface, ReputationReporterInterface, Weight,
+    types::UpdateMethod, ReputationQueryInteface, ReputationReporterInterface, Weight,
 };
 use fleek_crypto::NodePublicKey;
 
@@ -94,7 +94,14 @@ impl ReputationAggregatorInterface for ReputationAggregator {
     /// so one should use the [`SubmitTxSocket`] that is passed during the initialization
     /// to submit a transaction to the consensus.
     fn submit_aggregation(&self) {
-        todo!()
+        let measurements = self.measurement_manager.get_measurements();
+        let submit_tx = self.submit_tx.clone();
+        tokio::spawn(async move {
+            submit_tx
+                .run(UpdateMethod::SubmitReputationMeasurements { measurements })
+                .await
+                .expect("SubmitReputationMeasurements transaction failed.");
+        });
     }
 
     /// Returns a reputation reporter that can be used to capture interactions that we have
