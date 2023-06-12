@@ -36,7 +36,7 @@ impl Env<UpdatePerm> {
             .with_table::<NodePublicKey, CommodityServed>("current_epoch_served")
             .with_table::<NodePublicKey, CommodityServed>("last_epoch_served")
             .with_table::<Epoch, TotalServed>("total_served")
-            //.enable_iter("current_epoch_served")
+            .enable_iter("current_epoch_served")
             .build();
 
         Self { inner: atomo }
