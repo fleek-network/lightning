@@ -162,14 +162,17 @@ mod tests {
             .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
             .unwrap();
         putter.finalize().await.unwrap();
-        let expected_root = hash_tree(content.as_slice()).hash;
-        let mut putter = blockstore.put(None);
-        putter.feed_proof(expected_root.as_bytes()).unwrap();
+        // Given: the full tree.
+        let hash_tree = hash_tree(content.as_slice());
         // Given: make a change to the content.
         content[10] = 69;
-        // When: we put the modified content.
-        let write_result = putter.write(content.as_slice(), CompressionAlgorithm::Uncompressed);
-        // Then: the putter returns the appropriate root hash and no errors.
+        // When: we put a block with modified content and feed the proof to verify it.
+        let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
+        let mut blocks = content.chunks(BLAKE3_CHUNK_SIZE);
+        let proof = ProofBuf::new(&hash_tree.tree, 0);
+        putter.feed_proof(proof.as_slice()).unwrap();
+        let write_result = putter.write(blocks.next().unwrap(), CompressionAlgorithm::Uncompressed);
+        // Then: the putter returns the appropriate errors.
         assert!(write_result.is_err());
     }
 
