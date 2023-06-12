@@ -132,18 +132,22 @@ mod tests {
             .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
             .unwrap();
         putter.finalize().await.unwrap();
-        // When: feed the proof to verify our content and pass the content in chunks.
-        let mut putter = blockstore.put(None);
-        let expected_root = hash_tree(content.as_slice()).hash;
-        putter.feed_proof(expected_root.as_bytes()).unwrap();
-        for chunk in content.chunks(128) {
-            putter
-                .write(chunk, CompressionAlgorithm::Uncompressed)
-                .unwrap();
+        // Given: the full tree.
+        let hash_tree = hash_tree(content.as_slice());
+        // When: we put the content by block and feed the proof to verify it.
+        let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
+        for (i, block) in content.chunks(BLAKE3_CHUNK_SIZE).enumerate() {
+            let proof = ProofBuf::new(&hash_tree.tree, i);
+            putter.feed_proof(proof.as_slice()).unwrap();
+            for chunk in block.chunks(128) {
+                putter
+                    .write(chunk, CompressionAlgorithm::Uncompressed)
+                    .unwrap();
+            }
         }
         // Then: the putter returns the appropriate root hash and no errors.
         let root = putter.finalize().await.unwrap();
-        assert_eq!(root, Blake3Hash::from(expected_root));
+        assert_eq!(root, Blake3Hash::from(hash_tree.hash));
     }
 
     #[test]

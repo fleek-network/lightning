@@ -119,8 +119,11 @@ impl IncrementalPutInterface for IncrementalPut {
         }
 
         // Remove this proof so it's ready for next block.
-        if let Mode::Verify { proof, .. } = &mut self.mode {
-            proof.take();
+        match &mut self.mode {
+            Mode::Verify { proof, .. } if self.buf.is_empty() => {
+                proof.take();
+            },
+            _ => {},
         }
 
         Ok(())
