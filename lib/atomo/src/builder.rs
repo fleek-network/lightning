@@ -77,6 +77,7 @@ impl<S: SerdeBackend> AtomoBuilder<S> {
     pub fn enable_iter(mut self, name: &str) -> Self {
         if let Some(index) = self.atomo.table_name_to_id.get(name) {
             self.atomo.tables[*index as usize].iter = true;
+            return self;
         }
 
         panic!("Table {name} is not defined.");
