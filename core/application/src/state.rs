@@ -579,11 +579,9 @@ impl<B: Backend> State<B> {
         sender: TransactionSender,
         measurements: BTreeMap<NodePublicKey, ReputationMeasurements>,
     ) -> TransactionResponse {
-        let reporting_node = match sender {
-            TransactionSender::Node(node_pubkey) => node_pubkey,
-            TransactionSender::AccountOwner(_) => {
-                return TransactionResponse::Revert(ExecutionError::OnlyNode);
-            },
+        let reporting_node = match self.only_node(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
         };
         measurements.into_iter().for_each(|(peer, measurements)| {
             let mut node_measurements = match self.rep_measurements.get(&peer) {
