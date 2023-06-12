@@ -2,8 +2,9 @@ use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use draco_interfaces::{
     types::{
-        AccountInfo, Block, Epoch, ExecutionData, Metadata, NodeInfo, ProtocolParams,
-        ReportedReputationMeasurements, Service, ServiceId, TransactionResponse,
+        AccountInfo, Block, CommodityServed, CommodityTypes, Epoch, ExecutionData, Metadata,
+        NodeInfo, ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, TotalServed,
+        TransactionResponse,
     },
     BlockExecutionResponse,
 };
@@ -11,9 +12,9 @@ use fastcrypto::{ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 
 use crate::{
-    genesis::Genesis,
+    genesis::{Genesis, GenesisPrices},
     query_runner::QueryRunner,
-    state::{BandwidthInfo, Committee, CommodityServed, State, TotalServed},
+    state::{Committee, State},
     table::{Backend, StateTables},
 };
 
@@ -29,13 +30,13 @@ impl Env<UpdatePerm> {
             .with_table::<ClientPublicKey, AccountOwnerPublicKey>("client_keys")
             .with_table::<NodePublicKey, NodeInfo>("node")
             .with_table::<Epoch, Committee>("committee")
-            .with_table::<Epoch, BandwidthInfo>("bandwidth")
             .with_table::<ServiceId, Service>("service")
             .with_table::<ProtocolParams, u128>("parameter")
             .with_table::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements")
             .with_table::<NodePublicKey, CommodityServed>("current_epoch_served")
             .with_table::<NodePublicKey, CommodityServed>("last_epoch_served")
             .with_table::<Epoch, TotalServed>("total_served")
+            .with_table::<CommodityTypes, f64>("commodity_prices")
             .enable_iter("current_epoch_served")
             .build();
 
@@ -102,6 +103,8 @@ impl Env<UpdatePerm> {
             let mut service_table = ctx.get_table::<ServiceId, Service>("service");
             let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
             let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
+            let mut commodity_prices_table =
+                ctx.get_table::<CommodityTypes, f64>("commodity_prices");
 
             param_table.insert(ProtocolParams::EpochTime, genesis.epoch_time as u128);
             param_table.insert(
@@ -150,7 +153,6 @@ impl Env<UpdatePerm> {
                     service.id,
                     Service {
                         commodity_type: service.commodity_type,
-                        commodity_price: service.commodity_price.into(),
                         slashing: (),
                     },
                 )
@@ -169,6 +171,12 @@ impl Env<UpdatePerm> {
                     nonce: 0,
                 };
                 account_table.insert(public_key, info);
+            }
+
+            // add commodity prices
+            for commodity_price in genesis.commodity_prices {
+                let GenesisPrices { commodity, price } = commodity_price;
+                commodity_prices_table.insert(commodity, price);
             }
         })
     }

@@ -33,12 +33,23 @@ pub enum Tokens {
     FLK,
 }
 
-/// This commodities served by different services in Fleek Network
+/// This is commodities served by different services in Fleek Network
+/// C-like enums here to future proof for state, if we add more commodity types
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum CommodityTypes {
-    Bandwidth,
-    Compute,
-    Gpu,
+    Bandwidth = 0,
+    Compute = 1,
+    Gpu = 2,
+}
+
+/// This is commodity served by each of the commodity types
+pub type CommodityServed = Vec<u128>;
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
+pub struct TotalServed {
+    pub served: CommodityServed,
+    pub reward_pool: f64,
 }
 
 /// Placeholder
@@ -46,7 +57,6 @@ pub enum CommodityTypes {
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash)]
 pub struct Service {
     pub commodity_type: CommodityTypes,
-    pub commodity_price: u128,
     /// TODO: List of circuits to prove a node should be slashed
     pub slashing: (),
 }

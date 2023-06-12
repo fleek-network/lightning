@@ -47,10 +47,23 @@ worker_mempool = "/ip4/127.0.0.1/tcp/8102/http"
 
 [[service]]
 id = 0
-commodity_price = 1
 commodity_type = "Bandwidth"
+
+[[service]]
+id = 1
+commodity_type = "Compute"
+
 
 [[account]]
 public_key = "J4OBdUiRNpm5vpDYP+cgAapgCFTcfLxOnDNsTunTeoc="
 flk_balance = 100
 bandwidth_balance = 100
+
+[[commodity_prices]]
+commodity = "Bandwidth"
+price = 0.1
+
+[[commodity_prices]]
+commodity = "Compute"
+price = 0.2
+

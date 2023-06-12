@@ -5,7 +5,7 @@ use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 use crate::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
-    types::{Block, Epoch, EpochInfo, NodeInfo, TransactionResponse},
+    types::{Block, CommodityServed, Epoch, EpochInfo, NodeInfo, TotalServed, TransactionResponse},
 };
 
 /// The response generated from executing an entire batch of transactions (aka a block).
@@ -117,6 +117,12 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
 
     /// Returns all the information on the current epoch that Narwhal needs to run
     fn get_epoch_info(&self) -> EpochInfo;
+
+    /// Returns total served for all commodites from the state for a given epoch
+    fn get_total_served(&self, epoch: Epoch) -> TotalServed;
+
+    /// Return all commodity served for a give node for current epoch
+    fn get_commodity_served(&self, node: &NodePublicKey) -> CommodityServed;
 }
 
 #[derive(Clone, Debug)]

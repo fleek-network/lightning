@@ -25,5 +25,5 @@ pub trait LaneManager {}
 #[derive(Serialize, Deserialize, Debug, Hash)]
 pub struct DeliveryAcknowledgmentBatch;
 
-#[derive(Serialize, Deserialize, Debug, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, Hash, Clone, Default)]
 pub struct DeliveryAcknowledgment;

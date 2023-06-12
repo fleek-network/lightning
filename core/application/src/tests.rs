@@ -1,10 +1,12 @@
+use std::vec;
+
 use draco_interfaces::{
     application::ExecutionEngineSocket,
     types::{
-        Block, ExecutionError, NodeInfo, ProofOfConsensus, Tokens, TransactionResponse,
-        UpdateMethod, UpdatePayload, UpdateRequest,
+        Block, ExecutionError, NodeInfo, ProofOfConsensus, Tokens, TotalServed,
+        TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
     },
-    ApplicationInterface, SyncQueryRunnerInterface,
+    ApplicationInterface, DeliveryAcknowledgment, SyncQueryRunnerInterface,
 };
 use fastcrypto::{bls12381::min_sig::BLS12381PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{
@@ -244,6 +246,57 @@ async fn test_stake() {
     );
 }
 
+#[test]
+async fn test_pod_without_proof() {
+    let (update_socket, query_runner) = init_app().await;
+
+    // use a node from a genesis committee for testing
+    let node_key = "l0Jel6KEFG7H6sV2nWKOQxDaMKWMeiUBqK5VHKcStWrLPHAANRB+dt7gp0jQ7ooxEaI7ukOQZk6U5vcL7ESHA1J/iAWQ7YNO/ZCvR1pfWfcTNBONIzeiUWAN+iyKfV10";
+    let node_public_key: NodePublicKey = BLS12381PublicKey::decode_base64(node_key)
+        .unwrap()
+        .pubkey
+        .to_bytes()
+        .into();
+
+    let bandwidth_pod = get_update_request_node(
+        UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+            commodity: 1000, // 1000 units
+            service_id: 0,   // service 0 serving bandwidth
+            proofs: vec![DeliveryAcknowledgment::default()],
+            metadata: None,
+        },
+        node_public_key,
+    );
+
+    let compute_pod = get_update_request_node(
+        UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+            commodity: 2000, // 2000 units
+            service_id: 1,   // service 1 serving compute
+            proofs: vec![DeliveryAcknowledgment::default()],
+            metadata: None,
+        },
+        node_public_key,
+    );
+    // run the delivery ack transaction
+    update_socket
+        .run(Block {
+            transactions: [bandwidth_pod, compute_pod].into(),
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        query_runner.get_commodity_served(&node_public_key),
+        vec![1000, 2000]
+    );
+
+    assert_eq!(
+        query_runner.get_total_served(0),
+        TotalServed {
+            served: vec![1000, 2000],
+            reward_pool: (0.1 * 1000_f64 + 0.2 * 2000_f64)
+        }
+    );
+}
 fn get_genesis() -> (Genesis, Vec<NodeInfo>) {
     let genesis = Genesis::load().unwrap();
 

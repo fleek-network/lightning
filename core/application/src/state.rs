@@ -2,10 +2,10 @@ use std::collections::BTreeMap;
 
 use draco_interfaces::{
     types::{
-        AccountInfo, CommodityTypes, Epoch, ExecutionData, ExecutionError, Metadata, NodeInfo,
-        ProofOfConsensus, ProofOfMisbehavior, ProtocolParams, ReportedReputationMeasurements,
-        ReputationMeasurements, Service, ServiceId, Staking, Tokens, TransactionResponse,
-        UpdateMethod, UpdateRequest, Worker,
+        AccountInfo, CommodityServed, CommodityTypes, Epoch, ExecutionData, ExecutionError,
+        Metadata, NodeInfo, ProofOfConsensus, ProofOfMisbehavior, ProtocolParams,
+        ReportedReputationMeasurements, ReputationMeasurements, Service, ServiceId, Staking,
+        Tokens, TotalServed, TransactionResponse, UpdateMethod, UpdateRequest, Worker,
     },
     DeliveryAcknowledgment,
 };
@@ -28,13 +28,13 @@ pub struct State<B: Backend> {
     pub client_keys: B::Ref<ClientPublicKey, AccountOwnerPublicKey>,
     pub node_info: B::Ref<NodePublicKey, NodeInfo>,
     pub committee_info: B::Ref<Epoch, Committee>,
-    pub bandwidth_info: B::Ref<Epoch, BandwidthInfo>,
     pub services: B::Ref<ServiceId, Service>,
     pub parameters: B::Ref<ProtocolParams, u128>,
     pub rep_measurements: B::Ref<NodePublicKey, Vec<ReportedReputationMeasurements>>,
     pub current_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
     pub last_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
     pub total_served: B::Ref<Epoch, TotalServed>,
+    pub commodity_prices: B::Ref<CommodityTypes, f64>,
     pub backend: B,
 }
 
@@ -45,26 +45,6 @@ pub struct Committee {
     pub epoch_end_timestamp: u64,
 }
 
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
-pub struct BandwidthInfo {
-    pub total_served: u128,
-    pub reward_pool: u128,
-}
-
-#[derive(Debug, Hash, PartialEq, Eq, Serialize, Deserialize, Clone, Default)]
-pub struct TotalServed {
-    pub served: CommodityServed,
-    pub reward_pool: u128,
-}
-
-/// This commodities served by different services in Fleek Network
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default, Debug)]
-pub struct CommodityServed {
-    bandwidth: u128,
-    compute: u128,
-    gpu: u128,
-}
-
 impl<B: Backend> State<B> {
     pub fn new(backend: B) -> Self {
         Self {
@@ -73,13 +53,13 @@ impl<B: Backend> State<B> {
             client_keys: backend.get_table_reference("client_keys"),
             node_info: backend.get_table_reference("node"),
             committee_info: backend.get_table_reference("committee"),
-            bandwidth_info: backend.get_table_reference("bandwidth"),
             services: backend.get_table_reference("service"),
             parameters: backend.get_table_reference("parameter"),
             rep_measurements: backend.get_table_reference("rep_measurements"),
             last_epoch_served: backend.get_table_reference("last_epoch_served"),
             current_epoch_served: backend.get_table_reference("current_epoch_served"),
             total_served: backend.get_table_reference("total_served"),
+            commodity_prices: backend.get_table_reference("commodity_prices"),
             backend,
         }
     }
@@ -203,25 +183,27 @@ impl<B: Backend> State<B> {
 
         let mut commodity_served = self.current_epoch_served.get(&sender).unwrap_or_default();
         let mut total_served = self.total_served.get(&current_epoch).unwrap_or_default();
+        let commodity_prices = self
+            .commodity_prices
+            .get(&commodity_type)
+            .expect("Commodity price should always be set");
 
-        match commodity_type {
-            CommodityTypes::Bandwidth => {
-                commodity_served.bandwidth += commodity;
-                total_served.served.bandwidth += commodity;
-            },
-            CommodityTypes::Compute => {
-                commodity_served.compute += commodity;
-                total_served.served.compute += commodity;
-            },
-            CommodityTypes::Gpu => {
-                commodity_served.gpu += commodity;
-                total_served.served.gpu += commodity;
-            },
+        let commodity_index = commodity_type as usize;
+        for i in 0..=commodity_index {
+            if i >= commodity_served.len() {
+                commodity_served.push(0);
+            }
+            if i >= total_served.served.len() {
+                total_served.served.push(0);
+            }
         }
-        // Todo: caculate total reward pool based on the commodity price, should each node
-        // reward pool be calculated here as well?
-        // Todo: handle cases where epoch change is happening
+        commodity_served[commodity_index] += commodity;
+        total_served.served[commodity_index] += commodity;
+        total_served.reward_pool += commodity as f64 * commodity_prices;
+
         self.current_epoch_served.set(sender, commodity_served);
+        self.total_served.set(current_epoch, total_served);
+
         TransactionResponse::Success(ExecutionData::None)
     }
 
@@ -627,7 +609,7 @@ impl<B: Backend> State<B> {
             .reward_pool;
 
         let _flk_per_revenue_unit: f64 =
-            (inflation as f64/* * current_supply */) / (max_boost as f64 * reward_pool as f64);
+            (inflation as f64/* * current_supply */) / (max_boost as f64 * reward_pool);
 
         // Todo: iterate over last_epoch_served table
         // distribute flk based on units served

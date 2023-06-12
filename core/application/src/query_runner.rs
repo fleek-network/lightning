@@ -2,12 +2,13 @@ use atomo::{Atomo, QueryPerm, ResolvedTableReference};
 use draco_interfaces::{
     application::SyncQueryRunnerInterface,
     types::{
-        AccountInfo, Epoch, EpochInfo, Metadata, NodeInfo, ProtocolParams, Service, ServiceId,
+        AccountInfo, CommodityServed, CommodityTypes, Epoch, EpochInfo, Metadata, NodeInfo,
+        ProtocolParams, Service, ServiceId, TotalServed,
     },
 };
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 
-use crate::state::{BandwidthInfo, Committee, CommodityServed, TotalServed};
+use crate::state::Committee;
 
 #[derive(Clone)]
 pub struct QueryRunner {
@@ -17,12 +18,12 @@ pub struct QueryRunner {
     client_table: ResolvedTableReference<ClientPublicKey, AccountOwnerPublicKey>,
     node_table: ResolvedTableReference<NodePublicKey, NodeInfo>,
     committee_table: ResolvedTableReference<Epoch, Committee>,
-    _bandwidth_table: ResolvedTableReference<Epoch, BandwidthInfo>,
     _services_table: ResolvedTableReference<ServiceId, Service>,
     param_table: ResolvedTableReference<ProtocolParams, u128>,
-    _current_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
+    current_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
     _last_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
-    _total_served_table: ResolvedTableReference<Epoch, TotalServed>,
+    total_served_table: ResolvedTableReference<Epoch, TotalServed>,
+    _commodity_price: ResolvedTableReference<CommodityTypes, f64>,
 }
 
 impl QueryRunner {
@@ -33,14 +34,14 @@ impl QueryRunner {
             client_table: atomo.resolve::<ClientPublicKey, AccountOwnerPublicKey>("client_keys"),
             node_table: atomo.resolve::<NodePublicKey, NodeInfo>("node"),
             committee_table: atomo.resolve::<Epoch, Committee>("committee"),
-            _bandwidth_table: atomo.resolve::<Epoch, BandwidthInfo>("bandwidth"),
             _services_table: atomo.resolve::<ServiceId, Service>("service"),
             param_table: atomo.resolve::<ProtocolParams, u128>("parameter"),
-            _current_epoch_served: atomo
+            current_epoch_served: atomo
                 .resolve::<NodePublicKey, CommodityServed>("current_epoch_served"),
             _last_epoch_served: atomo
                 .resolve::<NodePublicKey, CommodityServed>("last_epoch_served"),
-            _total_served_table: atomo.resolve::<Epoch, TotalServed>("total_served"),
+            total_served_table: atomo.resolve::<Epoch, TotalServed>("total_served"),
+            _commodity_price: atomo.resolve::<CommodityTypes, f64>("commodity_prices"),
             inner: atomo,
         }
     }
@@ -184,6 +185,24 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 epoch,
                 epoch_end: committee.epoch_end_timestamp,
             }
+        })
+    }
+
+    fn get_total_served(&self, epoch: Epoch) -> TotalServed {
+        self.inner.run(|ctx| {
+            self.total_served_table
+                .get(ctx)
+                .get(epoch)
+                .unwrap_or_default()
+        })
+    }
+
+    fn get_commodity_served(&self, node: &NodePublicKey) -> CommodityServed {
+        self.inner.run(|ctx| {
+            self.current_epoch_served
+                .get(ctx)
+                .get(node)
+                .unwrap_or_default()
         })
     }
 }

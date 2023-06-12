@@ -21,6 +21,7 @@ pub struct Genesis {
     pub committee: Vec<GenesisCommittee>,
     pub service: Vec<GenesisService>,
     pub account: Vec<GenesisAccount>,
+    pub commodity_prices: Vec<GenesisPrices>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -34,7 +35,6 @@ pub struct GenesisAccount {
 pub struct GenesisService {
     pub id: u32,
     pub commodity_type: CommodityTypes,
-    pub commodity_price: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -47,6 +47,12 @@ pub struct GenesisCommittee {
     worker_public_key: String,
     worker_mempool: String,
     pub staking: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GenesisPrices {
+    pub commodity: CommodityTypes,
+    pub price: f64,
 }
 
 impl Genesis {
