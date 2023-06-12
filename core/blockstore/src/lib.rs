@@ -52,8 +52,7 @@ mod tests {
     fn hash_tree(content: &[u8]) -> HashTree {
         let mut tree_builder = HashTreeBuilder::new();
         tree_builder.update(content);
-        let tree_hash = tree_builder.finalize();
-        tree_hash
+        tree_builder.finalize()
     }
 
     #[test]
