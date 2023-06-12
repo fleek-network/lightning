@@ -1,5 +1,3 @@
-extern crate core;
-
 mod config;
 mod memory;
 mod put;

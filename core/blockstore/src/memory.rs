@@ -92,7 +92,10 @@ impl BlockStoreInterface for MemoryBlockStore {
             .map(Arc::new)
     }
 
-    fn put(&self, _: Option<Blake3Hash>) -> Self::Put {
-        IncrementalPut::new(self.clone())
+    fn put(&self, root: Option<Blake3Hash>) -> Self::Put {
+        match root {
+            Some(root) => IncrementalPut::verifier(self.clone(), root),
+            None => IncrementalPut::trust(self.clone()),
+        }
     }
 }

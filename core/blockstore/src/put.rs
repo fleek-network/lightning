@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use blake3_tree::{
     blake3::tree::{BlockHasher, HashTreeBuilder},
-    IncrementalVerifier, ProofBuf,
+    IncrementalVerifier,
 };
-use bytes::{BufMut, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use draco_interfaces::{
     Blake3Hash, Blake3Tree, CompressionAlgorithm, ContentChunk, IncrementalPutInterface,
     PutFeedProofError, PutFinalizeError, PutWriteError,
@@ -25,21 +25,32 @@ pub struct IncrementalPut {
 
 enum Mode {
     Verify {
-        proof: Vec<Blake3Hash>,
+        proof: Option<Bytes>,
         root: Blake3Hash,
     },
-    BuildHashTree {
+    Trust {
         tree_builder: Box<HashTreeBuilder>,
     },
 }
 
 impl IncrementalPut {
-    pub fn new(store: MemoryBlockStore) -> Self {
-        Self {
+    pub fn verifier(store: MemoryBlockStore, root: Blake3Hash) -> Self {
+        Self::internal_new(store, Mode::Verify { proof: None, root })
+    }
+
+    pub fn trust(store: MemoryBlockStore) -> Self {
+        Self::internal_new(
             store,
-            mode: Mode::BuildHashTree {
+            Mode::Trust {
                 tree_builder: Box::new(HashTreeBuilder::new()),
             },
+        )
+    }
+
+    fn internal_new(store: MemoryBlockStore, mode: Mode) -> Self {
+        Self {
+            store,
+            mode,
             stack: Vec::new(),
             buf: BytesMut::new(),
         }
@@ -48,24 +59,21 @@ impl IncrementalPut {
 
 #[async_trait]
 impl IncrementalPutInterface for IncrementalPut {
-    // TODO: This needs to handle a proof and not cid.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError> {
-        if !self.buf.is_empty() || !self.stack.is_empty() {
-            return Err(PutFeedProofError::UnexpectedCall);
-        }
-        let root = proof
-            .try_into()
-            .map_err(|_| PutFeedProofError::InvalidProof)?;
-        match self.store.basic_get_tree(&Key::tree_key(root)) {
-            Some(tree) => {
-                self.mode = Mode::Verify {
-                    proof: tree.0,
-                    root,
-                };
-                Ok(())
+        match &mut self.mode {
+            Mode::Verify {
+                proof: inner_proof, ..
+            } => match inner_proof {
+                Some(_) => return Err(PutFeedProofError::UnexpectedCall),
+                None => {
+                    inner_proof.replace(Bytes::copy_from_slice(proof));
+                },
             },
-            None => Err(PutFeedProofError::InvalidProof),
+            Mode::Trust { .. } => {
+                return Err(PutFeedProofError::UnexpectedCall);
+            },
         }
+        Ok(())
     }
 
     fn write(
@@ -85,15 +93,19 @@ impl IncrementalPutInterface for IncrementalPut {
             match &mut self.mode {
                 Mode::Verify { proof, root } => {
                     let mut verifier = IncrementalVerifier::new(*root, block_count);
-                    let proof_buf = ProofBuf::new(proof, block_count);
                     verifier
-                        .feed_proof(proof_buf.as_slice())
+                        .feed_proof(
+                            proof
+                                .as_ref()
+                                // TODO: We need a better error here.
+                                .ok_or_else(|| PutWriteError::InvalidContent)?,
+                        )
                         .map_err(|_| PutWriteError::InvalidContent)?;
                     verifier
                         .verify(block.clone())
                         .map_err(|_| PutWriteError::InvalidContent)?;
                 },
-                Mode::BuildHashTree { tree_builder } => tree_builder.update(chunk.as_ref()),
+                Mode::Trust { tree_builder } => tree_builder.update(chunk.as_ref()),
             }
 
             let hash = block.finalize(true); // Is this arg always true?
@@ -129,7 +141,7 @@ impl IncrementalPutInterface for IncrementalPut {
 
         match self.mode {
             Mode::Verify { root, .. } => Ok(root),
-            Mode::BuildHashTree { tree_builder } => {
+            Mode::Trust { tree_builder } => {
                 let hash_tree = tree_builder.finalize();
                 self.store
                     .basic_put_tree(
