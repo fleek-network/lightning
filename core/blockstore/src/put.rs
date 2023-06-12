@@ -98,7 +98,7 @@ impl IncrementalPutInterface for IncrementalPut {
                             proof
                                 .as_ref()
                                 // TODO: We need a better error here.
-                                .ok_or_else(|| PutWriteError::InvalidContent)?,
+                                .ok_or(PutWriteError::InvalidContent)?,
                         )
                         .map_err(|_| PutWriteError::InvalidContent)?;
                     verifier
