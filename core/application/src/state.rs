@@ -1,9 +1,11 @@
+use std::collections::BTreeMap;
+
 use draco_interfaces::{
     types::{
         AccountInfo, CommodityTypes, Epoch, ExecutionData, ExecutionError, Metadata, NodeInfo,
         ProofOfConsensus, ProofOfMisbehavior, ProtocolParams, ReportedReputationMeasurements,
-        Service, ServiceId, Staking, Tokens, TransactionResponse, UpdateMethod, UpdateRequest,
-        Worker,
+        ReputationMeasurements, Service, ServiceId, Staking, Tokens, TransactionResponse,
+        UpdateMethod, UpdateRequest, Worker,
     },
     DeliveryAcknowledgment,
 };
@@ -147,8 +149,8 @@ impl<B: Backend> State<B> {
                 proof_of_misbehavior,
             } => self.slash(txn.sender, proof_of_misbehavior, service_id, node),
 
-            UpdateMethod::SubmitReputationMeasurements { measurements: _ } => {
-                todo!()
+            UpdateMethod::SubmitReputationMeasurements { measurements } => {
+                self.submit_reputation_measurements(txn.sender, measurements)
             },
         };
         // Increment nonce of the sender
@@ -570,6 +572,31 @@ impl<B: Backend> State<B> {
         _node: NodePublicKey,
     ) -> TransactionResponse {
         todo!()
+    }
+
+    fn submit_reputation_measurements(
+        &self,
+        sender: TransactionSender,
+        measurements: BTreeMap<NodePublicKey, ReputationMeasurements>,
+    ) -> TransactionResponse {
+        let reporting_node = match sender {
+            TransactionSender::Node(node_pubkey) => node_pubkey,
+            TransactionSender::AccountOwner(_) => {
+                return TransactionResponse::Revert(ExecutionError::OnlyNode);
+            },
+        };
+        measurements.into_iter().for_each(|(peer, measurements)| {
+            let mut node_measurements = match self.rep_measurements.get(&peer) {
+                Some(node_measurements) => node_measurements,
+                None => Vec::new(),
+            };
+            node_measurements.push(ReportedReputationMeasurements {
+                reporting_node,
+                measurements,
+            });
+            self.rep_measurements.set(peer, node_measurements);
+        });
+        TransactionResponse::Success(ExecutionData::None)
     }
 
     /********Internal Application Functions******** */
