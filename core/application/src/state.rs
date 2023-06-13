@@ -1,5 +1,6 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 
+use bigdecimal::{self, BigDecimal};
 use draco_interfaces::{
     types::{
         AccountInfo, CommodityServed, CommodityTypes, Epoch, ExecutionData, ExecutionError,
@@ -605,6 +606,11 @@ impl<B: Backend> State<B> {
                     epoch_end_timestamp: new_epoch_end,
                 },
             );
+
+            // todo: move contents of current_epoch_served to last_epoch_served
+            // reset the current_epoch_served
+            self.distribute_rewards();
+
             self.metadata
                 .set(Metadata::Epoch, current_epoch.to_biguint().unwrap());
             TransactionResponse::Success(ExecutionData::EpochChange)
@@ -671,7 +677,7 @@ impl<B: Backend> State<B> {
     // checks should be documented for each function
 
     // This function should be called during signal_epoch_change.
-    fn _distribute_rewards(&self) {
+    fn distribute_rewards(&self) {
         // Todo: function not done
 
         // distribute usdc rewards per unit of commodity served
@@ -679,6 +685,23 @@ impl<B: Backend> State<B> {
 
         //distribute inflation rewards per unit of usdc earned
         // formula for rewards distribution per node
+        let epoch = self
+            .metadata
+            .get(&Metadata::Epoch)
+            .unwrap_or_default()
+            .to_u64()
+            .unwrap();
+
+        let reward_pool = self
+            .total_served
+            .get(&epoch)
+            .unwrap_or_default()
+            .reward_pool;
+
+        // check if there is any service, 0 reward pools mean no service
+        if reward_pool == 0_f64 {
+            return;
+        }
 
         let inflation = self
             .parameters
@@ -686,25 +709,20 @@ impl<B: Backend> State<B> {
             .unwrap_or_default();
         let max_boost = self.parameters.get(&ProtocolParams::MaxBoost).unwrap_or(1);
 
-        let epoch = self
+        let supply_at_year_start = self
             .metadata
-            .get(&Metadata::Epoch)
-            .unwrap_or_default()
-            .to_u64()
-            .unwrap();
-        let reward_pool = self
-            .total_served
-            .get(&epoch)
-            .unwrap_or_default()
-            .reward_pool;
+            .get(&Metadata::SupplyYearStart)
+            .unwrap_or_default();
 
-        let _flk_per_revenue_unit: f64 =
+        let emission_per_revenue_unit: f64 =
             (inflation as f64/* * current_supply */) / (max_boost as f64 * reward_pool);
+        let big_emmission = BigDecimal::from_str(&emission_per_revenue_unit.to_string()).unwrap();
+        let big_supply = BigDecimal::from_str(&supply_at_year_start.to_str_radix(10)).unwrap();
+
+        let _flk_per_revenue_unit = big_emmission * big_supply;
 
         // Todo: iterate over last_epoch_served table
         // distribute flk based on units served
-
-        todo!()
     }
 
     fn choose_new_committee(&self) -> Vec<NodePublicKey> {

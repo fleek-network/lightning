@@ -16,6 +16,7 @@ num-bigint = {workspace = true, features=["serde"]}
 draco-interfaces = { path = "../interfaces" }
 fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "9fbe55e9d477eac6a6d13e872e1dee19b0c83f53" }
 num-traits.workspace = true
+bigdecimal = {workspace = true, features=["serde"]}
 
 # Our libraries
 affair.workspace = true
