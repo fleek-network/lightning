@@ -10,6 +10,7 @@ use draco_interfaces::{
 };
 use fastcrypto::{ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
+use num_bigint::BigUint;
 
 use crate::{
     genesis::{Genesis, GenesisPrices},
@@ -25,7 +26,7 @@ pub struct Env<P> {
 impl Env<UpdatePerm> {
     pub fn new() -> Self {
         let atomo = AtomoBuilder::<DefaultSerdeBackend>::new()
-            .with_table::<Metadata, u64>("metadata")
+            .with_table::<Metadata, BigUint>("metadata")
             .with_table::<AccountOwnerPublicKey, AccountInfo>("account")
             .with_table::<ClientPublicKey, AccountOwnerPublicKey>("client_keys")
             .with_table::<NodePublicKey, NodeInfo>("node")

@@ -10,15 +10,18 @@ anyhow.workspace = true
 async-trait.workspace = true
 bincode.workspace = true
 serde.workspace = true
-draco-interfaces = { path = "../interfaces" }
 toml = "0.7.4"
 multiaddr = "0.17.1"
+num-bigint = {workspace = true, features=["serde"]}
+draco-interfaces = { path = "../interfaces" }
 fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "9fbe55e9d477eac6a6d13e872e1dee19b0c83f53" }
+num-traits.workspace = true
 
 # Our libraries
 affair.workspace = true
 atomo.workspace = true
 fleek-crypto.workspace = true
+
 
 [dev-dependencies]
 tokio.workspace = true

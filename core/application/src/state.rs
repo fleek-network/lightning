@@ -14,6 +14,8 @@ use fleek_crypto::{
     TransactionSender,
 };
 use multiaddr::Multiaddr;
+use num_bigint::{BigUint, ToBigUint};
+use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
 
 use crate::table::{Backend, TableRef};
@@ -23,7 +25,7 @@ use crate::table::{Backend, TableRef};
 /// The functions implemented on this struct are the "Smart Contracts" of the application layer
 /// All state changes come from Transactions and start at execute_txn
 pub struct State<B: Backend> {
-    pub metadata: B::Ref<Metadata, u64>,
+    pub metadata: B::Ref<Metadata, BigUint>,
     pub account_info: B::Ref<AccountOwnerPublicKey, AccountInfo>,
     pub client_keys: B::Ref<ClientPublicKey, AccountOwnerPublicKey>,
     pub node_info: B::Ref<NodePublicKey, NodeInfo>,
@@ -179,7 +181,12 @@ impl<B: Backend> State<B> {
             .map(|s| s.commodity_type)
             .unwrap();
 
-        let current_epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
+        let current_epoch = self
+            .metadata
+            .get(&Metadata::Epoch)
+            .unwrap_or_default()
+            .to_u64()
+            .unwrap();
 
         let mut commodity_served = self.current_epoch_served.get(&sender).unwrap_or_default();
         let mut total_served = self.total_served.get(&current_epoch).unwrap_or_default();
@@ -354,7 +361,12 @@ impl<B: Backend> State<B> {
                         owner: sender,
                         public_key: node_public_key,
                         network_key,
-                        staked_since: self.metadata.get(&Metadata::Epoch).unwrap_or_default(),
+                        staked_since: self
+                            .metadata
+                            .get(&Metadata::Epoch)
+                            .unwrap_or_default()
+                            .to_u64()
+                            .unwrap(),
                         stake: Staking {
                             staked: amount,
                             ..Default::default()
@@ -422,7 +434,7 @@ impl<B: Backend> State<B> {
         // list so we can have multiple locked stakes with dif lock times
         node.stake.staked -= amount;
         node.stake.locked += amount;
-        node.stake.locked_until = current_epoch + lock_time as u64;
+        node.stake.locked_until = current_epoch.to_u64().unwrap() + lock_time as u64;
 
         // Save the changed node state and return success
         self.node_info.set(node_public_key, node);
@@ -457,7 +469,7 @@ impl<B: Backend> State<B> {
         if node.stake.locked == 0 {
             return TransactionResponse::Revert(ExecutionError::NoLockedTokens);
         }
-        if node.stake.locked_until > current_epoch {
+        if node.stake.locked_until > current_epoch.to_u64().unwrap() {
             return TransactionResponse::Revert(ExecutionError::TokensLocked);
         }
 
@@ -487,7 +499,12 @@ impl<B: Backend> State<B> {
             Err(e) => return e,
         };
 
-        let mut current_epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
+        let mut current_epoch = self
+            .metadata
+            .get(&Metadata::Epoch)
+            .unwrap_or_default()
+            .to_u64()
+            .unwrap();
         let mut current_committee = self.committee_info.get(&current_epoch).unwrap_or_default();
 
         // If sender is not on the current committee revert early, or if they have already signaled;
@@ -521,7 +538,8 @@ impl<B: Backend> State<B> {
                     epoch_end_timestamp: new_epoch_end,
                 },
             );
-            self.metadata.set(Metadata::Epoch, current_epoch);
+            self.metadata
+                .set(Metadata::Epoch, current_epoch.to_biguint().unwrap());
             TransactionResponse::Success(ExecutionData::EpochChange)
         } else {
             self.committee_info.set(current_epoch, current_committee);
@@ -601,7 +619,12 @@ impl<B: Backend> State<B> {
             .unwrap_or_default();
         let max_boost = self.parameters.get(&ProtocolParams::MaxBoost).unwrap_or(1);
 
-        let epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
+        let epoch = self
+            .metadata
+            .get(&Metadata::Epoch)
+            .unwrap_or_default()
+            .to_u64()
+            .unwrap();
         let reward_pool = self
             .total_served
             .get(&epoch)
@@ -621,7 +644,12 @@ impl<B: Backend> State<B> {
         // Todo: function not done
         // we need true randomness here, for now we will return the same committee as before to be
         // able to run tests
-        let epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
+        let epoch = self
+            .metadata
+            .get(&Metadata::Epoch)
+            .unwrap_or_default()
+            .to_u64()
+            .unwrap();
         self.committee_info.get(&epoch).unwrap_or_default().members
     }
 

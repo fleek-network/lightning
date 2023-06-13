@@ -7,13 +7,15 @@ use draco_interfaces::{
     },
 };
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
+use num_bigint::BigUint;
+use num_traits::ToPrimitive;
 
 use crate::state::Committee;
 
 #[derive(Clone)]
 pub struct QueryRunner {
     inner: Atomo<QueryPerm>,
-    metadata_table: ResolvedTableReference<Metadata, u64>,
+    metadata_table: ResolvedTableReference<Metadata, BigUint>,
     account_table: ResolvedTableReference<AccountOwnerPublicKey, AccountInfo>,
     client_table: ResolvedTableReference<ClientPublicKey, AccountOwnerPublicKey>,
     node_table: ResolvedTableReference<NodePublicKey, NodeInfo>,
@@ -29,7 +31,7 @@ pub struct QueryRunner {
 impl QueryRunner {
     pub fn init(atomo: Atomo<QueryPerm>) -> Self {
         Self {
-            metadata_table: atomo.resolve::<Metadata, u64>("metadata"),
+            metadata_table: atomo.resolve::<Metadata, BigUint>("metadata"),
             account_table: atomo.resolve::<AccountOwnerPublicKey, AccountInfo>("account"),
             client_table: atomo.resolve::<ClientPublicKey, AccountOwnerPublicKey>("client_keys"),
             node_table: atomo.resolve::<NodePublicKey, NodeInfo>("node"),
@@ -151,13 +153,15 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 .metadata_table
                 .get(ctx)
                 .get(&Metadata::Epoch)
-                .unwrap_or(0);
+                .unwrap_or_default()
+                .to_u64()
+                .unwrap();
 
             // look up current committee
             self.committee_table
                 .get(ctx)
                 .get(epoch)
-                .map(|c| c.members)
+                .map(|c: Committee| c.members)
                 .unwrap_or_default()
         })
     }
@@ -171,7 +175,9 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 .metadata_table
                 .get(ctx)
                 .get(&Metadata::Epoch)
-                .unwrap_or(0);
+                .unwrap_or_default()
+                .to_u64()
+                .unwrap();
 
             // look up current committee
             let committee = self.committee_table.get(ctx).get(epoch).unwrap_or_default();

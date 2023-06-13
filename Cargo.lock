@@ -1234,6 +1234,8 @@ dependencies = [
  "fastcrypto",
  "fleek-crypto",
  "multiaddr",
+ "num-bigint",
+ "num-traits",
  "serde",
  "tokio",
  "toml 0.7.4",
@@ -1305,6 +1307,7 @@ dependencies = [
  "bytes",
  "fleek-crypto",
  "multiaddr",
+ "num-bigint",
  "serde",
  "serde-big-array",
  "thiserror",
@@ -2413,6 +2416,28 @@ name = "normalize-line-endings"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
+
+[[package]]
+name = "num-bigint"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f93ab6289c7b344a8a9f60f88d80aa20032336fe78da341afc91c8a2341fc75f"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
+name = "num-integer"
+version = "0.1.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "225d3389fb3509a24c93f5c29eb6bde2586b98d9f016636dff58d7c6f7569cd9"
+dependencies = [
+ "autocfg",
+ "num-traits",
+]
 
 [[package]]
 name = "num-traits"

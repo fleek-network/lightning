@@ -276,6 +276,8 @@ pub struct EpochInfo {
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Metadata {
     Epoch,
+    SupplyYearStart,
+    TotalSupply,
 }
 
 /// Adjustable paramaters that are stored in the blockchain

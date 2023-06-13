@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use draco_interfaces::types::{CommodityTypes, NodeInfo, Staking, Worker};
+use draco_interfaces::types::{CommodityTypes, Epoch, NodeInfo, Staking, Worker};
 use fastcrypto::{
     bls12381::min_sig::BLS12381PublicKey, ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64,
 };
@@ -13,7 +13,7 @@ pub struct Genesis {
     pub committee_size: u64,
     pub min_stake: u64,
     pub eligibility_time: u64,
-    pub lock_time: u64,
+    pub lock_time: Epoch,
     pub protocol_percentage: u64,
     pub max_inflation: u64,
     pub min_inflation: u64,
