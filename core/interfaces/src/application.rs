@@ -81,6 +81,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
     /// Returns the amount of locked tokens a node has
     fn get_locked(&self, node: &NodePublicKey) -> u128;
 
+    /// Returns the epoch number until which the stakes are locked
+    fn get_stake_locked_until(&self, node: &NodePublicKey) -> Epoch;
+
     /// Returns the epoch a nodes tokens are unlocked at
     fn get_locked_time(&self, node: &NodePublicKey) -> Epoch;
 

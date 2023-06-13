@@ -107,6 +107,9 @@ impl<B: Backend> State<B> {
                 worker_domain,
                 worker_mempool_address,
             ),
+            UpdateMethod::StakeLock { node, locked_for } => {
+                self.stake_lock(txn.sender, node, locked_for)
+            },
 
             UpdateMethod::Unstake { amount, node } => self.unstake(txn.sender, amount, node),
 
@@ -396,6 +399,58 @@ impl<B: Backend> State<B> {
         TransactionResponse::Success(ExecutionData::None)
     }
 
+    fn stake_lock(
+        &self,
+        sender: TransactionSender,
+        node_public_key: NodePublicKey,
+        locked_for: u64,
+    ) -> TransactionResponse {
+        // This transaction is only callable by AccountOwners and not nodes
+        // So revert if the sender is a node public key
+        let sender = match self.only_account_owner(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+
+        let mut node = match self.node_info.get(&node_public_key) {
+            Some(node) => node,
+            None => return TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
+        };
+
+        // Make sure the caller is the owner of the node
+        if node.owner != sender {
+            return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
+        }
+        // check if node has stakes to be locked
+        if node.stake.staked == 0 {
+            return TransactionResponse::Revert(ExecutionError::InsufficientStakesToLock);
+        }
+
+        let epoch = self
+            .metadata
+            .get(&Metadata::Epoch)
+            .unwrap_or_default()
+            .to_u64()
+            .unwrap();
+        let current_lock = node.stake.stake_locked_until.saturating_sub(epoch);
+
+        let max_lock_time = self
+            .parameters
+            .get(&ProtocolParams::MaxLockTime)
+            .unwrap_or_default() as u64;
+
+        // check if total locking is greater than max locking
+        if current_lock + locked_for > max_lock_time {
+            return TransactionResponse::Revert(ExecutionError::LockExceededMaxLockTime);
+        }
+
+        node.stake.stake_locked_until += locked_for;
+
+        // Save the changed node state and return success
+        self.node_info.set(node_public_key, node);
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
     fn unstake(
         &self,
         sender: TransactionSender,
@@ -418,12 +473,24 @@ impl<B: Backend> State<B> {
         if node.owner != sender {
             return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
         }
+
+        let current_epoch = self
+            .metadata
+            .get(&Metadata::Epoch)
+            .unwrap_or_default()
+            .to_u64()
+            .unwrap();
+
+        // Make sure the stakes are not locked
+        if node.stake.stake_locked_until > current_epoch {
+            return TransactionResponse::Revert(ExecutionError::LockedTokensUnstakeForbidden);
+        }
+
         // Make sure the node has atleast that much staked
         if node.stake.staked < amount {
             return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
         }
 
-        let current_epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
         let lock_time = self
             .parameters
             .get(&ProtocolParams::LockTime)
@@ -434,7 +501,7 @@ impl<B: Backend> State<B> {
         // list so we can have multiple locked stakes with dif lock times
         node.stake.staked -= amount;
         node.stake.locked += amount;
-        node.stake.locked_until = current_epoch.to_u64().unwrap() + lock_time as u64;
+        node.stake.locked_until = current_epoch + lock_time as u64;
 
         // Save the changed node state and return success
         self.node_info.set(node_public_key, node);

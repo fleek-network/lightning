@@ -103,6 +103,16 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
+    fn get_stake_locked_until(&self, node: &NodePublicKey) -> Epoch {
+        self.inner.run(|ctx| {
+            self.node_table
+                .get(ctx)
+                .get(node)
+                .map(|node| node.stake.stake_locked_until)
+                .unwrap_or(0)
+        })
+    }
+
     fn get_locked_time(&self, node: &NodePublicKey) -> Epoch {
         self.inner.run(|ctx| {
             self.node_table
@@ -161,7 +171,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
             self.committee_table
                 .get(ctx)
                 .get(epoch)
-                .map(|c: Committee| c.members)
+                .map(|c| c.members)
                 .unwrap_or_default()
         })
     }

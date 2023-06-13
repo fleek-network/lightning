@@ -134,6 +134,12 @@ pub enum UpdateMethod {
         /// internet address for workers mempool
         worker_mempool_address: Option<String>,
     },
+    /// Lock the current stakes to get boosted inflation rewards
+    /// this is different than unstake and withdrawl lock
+    StakeLock {
+        node: NodePublicKey,
+        locked_for: u64,
+    },
     /// Unstake FLK, the tokens will be locked for a set amount of
     /// time(ProtocolParameter::LockTime) before they can be withdrawn
     Unstake { amount: u128, node: NodePublicKey },
@@ -204,6 +210,9 @@ pub enum ExecutionError {
     OnlyAccountOwner,
     OnlyNode,
     InvalidServiceId,
+    InsufficientStakesToLock,
+    LockExceededMaxLockTime,
+    LockedTokensUnstakeForbidden,
 }
 
 /// The account info stored per account on the blockchain
@@ -223,6 +232,8 @@ pub struct AccountInfo {
 pub struct Staking {
     /// How much FLK that is currently staked
     pub staked: u128,
+    /// The epoch until all stakes are locked for boosting rewards
+    pub stake_locked_until: u64,
     /// How much FLK is locked pending withdrawl
     pub locked: u128,
     /// The epoch the locked FLK is elegible to be withdrawn
@@ -306,6 +317,8 @@ pub enum ProtocolParams {
     ConsumerRebate = 9,
     /// The max multiplier on rewards for locking
     MaxBoost = 10,
+    /// The max amount of time tokens can be locked
+    MaxLockTime = 11,
 }
 
 /// The physical address of a node where it can be reached, the port numbers are

@@ -1,12 +1,13 @@
 use std::vec;
 
+use affair::Socket;
 use draco_interfaces::{
     application::ExecutionEngineSocket,
     types::{
         Block, ExecutionError, NodeInfo, ProofOfConsensus, Tokens, TotalServed,
         TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
     },
-    ApplicationInterface, DeliveryAcknowledgment, SyncQueryRunnerInterface,
+    ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
 };
 use fastcrypto::{bls12381::min_sig::BLS12381PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{
@@ -26,6 +27,60 @@ async fn init_app() -> (ExecutionEngineSocket, QueryRunner) {
     let app = Application::init(Config {}).await.unwrap();
 
     (app.transaction_executor(), app.sync_query())
+}
+
+async fn deposit(
+    amount: u128,
+    token: Tokens,
+    update_socket: Socket<Block, BlockExecutionResponse>,
+) {
+    // Deposit some FLK into account 1
+    let req = get_update_request_account(
+        UpdateMethod::Deposit {
+            proof: ProofOfConsensus {},
+            token,
+            amount,
+        },
+        ACCOUNT_ONE,
+    );
+    // Put 2 of the transaction in the block just to also test block exucution a bit
+    update_socket
+        .run(Block {
+            transactions: [req].into(),
+        })
+        .await
+        .unwrap();
+}
+
+async fn stake(
+    amount: u128,
+    update_socket: Socket<Block, BlockExecutionResponse>,
+    node_public_key: NodePublicKey,
+) {
+    // Now try with the correct details for a new node
+    let update = get_update_request_account(
+        UpdateMethod::Stake {
+            amount,
+            node_public_key,
+            node_network_key: Some([0; 32].into()),
+            node_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
+            worker_public_key: Some([0; 32].into()),
+            worker_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
+            worker_mempool_address: Some("/ip4/127.0.0.1/udp/38000".to_string()),
+        },
+        ACCOUNT_ONE,
+    );
+    let res = update_socket
+        .run(Block {
+            transactions: [update].into(),
+        })
+        .await
+        .unwrap()
+        .txn_receipts[0]
+        .clone();
+    if let TransactionResponse::Revert(error) = res {
+        panic!("Stake reverted: {error:?}");
+    }
 }
 
 #[test]
@@ -243,6 +298,63 @@ async fn test_stake() {
     assert_eq!(
         TransactionResponse::Revert(ExecutionError::TokensLocked),
         res
+    );
+}
+
+#[test]
+async fn test_stake_lock() {
+    let (update_socket, query_runner) = init_app().await;
+    let node_public_key: NodePublicKey = BLS12381PublicKey::decode_base64(NODE_ONE)
+        .unwrap()
+        .pubkey
+        .to_bytes()
+        .into();
+
+    deposit(1_000, Tokens::FLK, update_socket.clone()).await;
+    assert_eq!(query_runner.get_flk_balance(&ACCOUNT_ONE), 1_000);
+
+    stake(1_000, update_socket.clone(), node_public_key).await;
+    assert_eq!(query_runner.get_staked(&node_public_key), 1_000);
+
+    let stake_lock_req = get_update_request_account(
+        UpdateMethod::StakeLock {
+            node: node_public_key,
+            locked_for: 365,
+        },
+        ACCOUNT_ONE,
+    );
+
+    let res = update_socket
+        .run(Block {
+            transactions: [stake_lock_req].into(),
+        })
+        .await
+        .unwrap()
+        .txn_receipts[0]
+        .clone();
+    if let TransactionResponse::Revert(error) = res {
+        panic!("Stake locking reverted: {error:?}");
+    }
+    assert_eq!(query_runner.get_stake_locked_until(&node_public_key), 365);
+
+    let unstake_req = get_update_request_account(
+        UpdateMethod::Unstake {
+            amount: 1000,
+            node: node_public_key,
+        },
+        ACCOUNT_ONE,
+    );
+    let res = update_socket
+        .run(Block {
+            transactions: [unstake_req].into(),
+        })
+        .await
+        .unwrap()
+        .txn_receipts[0]
+        .clone();
+    assert_eq!(
+        res,
+        TransactionResponse::Revert(ExecutionError::LockedTokensUnstakeForbidden)
     );
 }
 

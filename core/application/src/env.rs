@@ -129,6 +129,8 @@ impl Env<UpdatePerm> {
                 ProtocolParams::ConsumerRebate,
                 genesis.consumer_rebate as u128,
             );
+            param_table.insert(ProtocolParams::MaxBoost, genesis.max_boost as u128);
+            param_table.insert(ProtocolParams::MaxLockTime, genesis.max_lock_time as u128);
 
             let epoch_end = genesis.epoch_time + genesis.epoch_start;
             let mut committee_members = Vec::with_capacity(genesis.committee.len());

@@ -16,7 +16,6 @@ bytes.workspace = true
 thiserror.workspace = true
 zeroize.workspace = true
 multiaddr = "0.17.1"
-num-bigint = {workspace = true, features=["serde"]}
 
 # Our libraries
 affair.workspace = true

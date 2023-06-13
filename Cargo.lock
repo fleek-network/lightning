@@ -1307,7 +1307,6 @@ dependencies = [
  "bytes",
  "fleek-crypto",
  "multiaddr",
- "num-bigint",
  "serde",
  "serde-big-array",
  "thiserror",

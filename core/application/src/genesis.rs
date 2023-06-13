@@ -18,6 +18,8 @@ pub struct Genesis {
     pub max_inflation: u64,
     pub min_inflation: u64,
     pub consumer_rebate: u64,
+    pub max_boost: u64,
+    pub max_lock_time: u64,
     pub committee: Vec<GenesisCommittee>,
     pub service: Vec<GenesisService>,
     pub account: Vec<GenesisAccount>,
