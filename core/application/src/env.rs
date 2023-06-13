@@ -39,6 +39,7 @@ impl Env<UpdatePerm> {
             .with_table::<Epoch, TotalServed>("total_served")
             .with_table::<CommodityTypes, f64>("commodity_prices")
             .enable_iter("current_epoch_served")
+            .enable_iter("rep_measurements")
             .build();
 
         Self { inner: atomo }
