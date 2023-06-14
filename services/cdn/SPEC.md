@@ -75,7 +75,12 @@ sequenceDiagram
 ```
 TAG = 0x01 << 0
 
-[ TAG . blake3 hash ]
+[ TAG . service mode (u8) . blake3 hash ]
+
+Service Modes:
+0: Tentative 
+1: Optimistic 
+2: Raw
 ```
     
 ### Content Range Request
@@ -93,7 +98,7 @@ If number of blocks is 0, the content should be served up to the last block
 ```
 TAG = 0x01 << 2
 
-[ TAG . compression . commitment . proof len (u64) . bytes len (u64) . proof . bytes ]
+[ TAG . compression (u8) . proof len (u64) . bytes len (u64) . proof . bytes ]
 ```
     
 ### Delivery Acknowledgement: 
@@ -133,6 +138,12 @@ Signal Ids:
 
 Termination Reasons:
 0000: Codec Violation
-0001: InsufficientBalance
+0001: Invalid Compression
+0010: Invalid Mode
+0011: Invalid Proof 
+0100: Invalid Block 
+0101: Invalid Delivery Acknowledgement 
+0111: Invalid Decryption Key 
+1000: InsufficientBalance
 1111: Unknown
 ```
