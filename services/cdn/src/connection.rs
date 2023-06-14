@@ -249,7 +249,7 @@ where
     pub async fn write_frame(&mut self, frame: CdnFrame) -> std::io::Result<()> {
         match frame {
             CdnFrame::Request { service_mode, hash } => {
-                let mut buf = ArrayVec::<u8, 33>::new_const();
+                let mut buf = ArrayVec::<u8, 34>::new_const();
 
                 buf.push(FrameTag::Request as u8);
                 buf.push(service_mode as u8);
