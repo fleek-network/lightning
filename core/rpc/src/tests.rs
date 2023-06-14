@@ -8,6 +8,7 @@ use draco_interfaces::{
     ApplicationInterface, ExecutionEngineSocket, MempoolSocket, RpcInterface, WithStartAndShutdown,
 };
 use fleek_crypto::{AccountOwnerPublicKey, AccountOwnerSignature, TransactionSignature};
+use num_bigint::BigUint;
 use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -21,7 +22,7 @@ const ACCOUNT_ONE: AccountOwnerPublicKey = AccountOwnerPublicKey([0; 32]);
 struct RpcSuccessResponse {
     jsonrpc: String,
     id: usize,
-    result: u128,
+    result: BigUint,
 }
 
 /// get mempool socket for test cases that do not require consensus
@@ -148,7 +149,7 @@ async fn test_rpc_get_balance() -> Result<()> {
     let deposit_method = UpdateMethod::Deposit {
         proof: ProofOfConsensus {},
         token: Tokens::FLK,
-        amount: 1_000,
+        amount: BigUint::from(1_000_u32),
     };
 
     // deposit FLK to test get balance
@@ -182,7 +183,7 @@ async fn test_rpc_get_balance() -> Result<()> {
         if value.get("result").is_some() {
             // Parse the response as a successful response
             let success_response: RpcSuccessResponse = serde_json::from_value(value)?;
-            assert_eq!(1000, success_response.result);
+            assert_eq!(BigUint::from(1_000_u32), success_response.result);
         } else {
             panic!("Rpc Error: {value}")
         }

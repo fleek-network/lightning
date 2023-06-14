@@ -5,6 +5,7 @@ use fleek_crypto::{
     TransactionSignature,
 };
 use multiaddr::Multiaddr;
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 use crate::{common::ToDigest, pod::DeliveryAcknowledgment};
@@ -102,7 +103,7 @@ pub enum UpdateMethod {
     /// Withdraw tokens from the network back to the L2
     Withdraw {
         /// The amount to withdrawl
-        amount: u128,
+        amount: BigUint,
         /// Which token to withdrawl
         token: Tokens,
         /// The address to recieve these tokens on the L2
@@ -115,12 +116,12 @@ pub enum UpdateMethod {
         /// Which token was bridged
         token: Tokens,
         /// Amount bridged
-        amount: u128,
+        amount: BigUint,
     },
     /// Stake FLK in network
     Stake {
         /// Amount to stake
-        amount: u128,
+        amount: BigUint,
         /// Node Public Key
         node_public_key: NodePublicKey,
         /// Node networking key for narwhal
@@ -142,7 +143,10 @@ pub enum UpdateMethod {
     },
     /// Unstake FLK, the tokens will be locked for a set amount of
     /// time(ProtocolParameter::LockTime) before they can be withdrawn
-    Unstake { amount: u128, node: NodePublicKey },
+    Unstake {
+        amount: BigUint,
+        node: NodePublicKey,
+    },
     /// Withdraw tokens from a node after lock period has passed
     /// must be submitted by node owner but optionally they can provide a different public key to
     /// recieve the tokens
@@ -219,7 +223,7 @@ pub enum ExecutionError {
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
 pub struct AccountInfo {
     /// The accounts FLK balance
-    pub flk_balance: u128,
+    pub flk_balance: BigUint,
     /// The accounts stables/bandwidth balance
     pub bandwidth_balance: u128,
     /// The nonce of the account. Added to each transaction before signed to prevent replays and
@@ -231,11 +235,11 @@ pub struct AccountInfo {
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
 pub struct Staking {
     /// How much FLK that is currently staked
-    pub staked: u128,
+    pub staked: BigUint,
     /// The epoch until all stakes are locked for boosting rewards
     pub stake_locked_until: u64,
     /// How much FLK is locked pending withdrawl
-    pub locked: u128,
+    pub locked: BigUint,
     /// The epoch the locked FLK is elegible to be withdrawn
     pub locked_until: u64,
 }

@@ -10,7 +10,7 @@ use draco_interfaces::{
 };
 use fastcrypto::{ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
-use num_bigint::BigUint;
+use num_bigint::{BigUint, ToBigUint};
 
 use crate::{
     genesis::{Genesis, GenesisPrices},
@@ -137,7 +137,7 @@ impl Env<UpdatePerm> {
 
             for node in &genesis.committee {
                 let mut node_info: NodeInfo = node.into();
-                node_info.stake.staked = genesis.min_stake as u128;
+                node_info.stake.staked = genesis.min_stake.to_biguint().unwrap();
                 committee_members.push(node_info.public_key);
 
                 node_table.insert(node_info.public_key, node_info);

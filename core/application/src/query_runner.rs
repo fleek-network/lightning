@@ -8,7 +8,7 @@ use draco_interfaces::{
 };
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 use num_bigint::BigUint;
-use num_traits::ToPrimitive;
+use num_traits::{ToPrimitive, Zero};
 
 use crate::state::Committee;
 
@@ -73,33 +73,33 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn get_flk_balance(&self, account: &AccountOwnerPublicKey) -> u128 {
+    fn get_flk_balance(&self, account: &AccountOwnerPublicKey) -> BigUint {
         self.inner.run(|ctx| {
             self.account_table
                 .get(ctx)
                 .get(account)
                 .map(|account| account.flk_balance)
-                .unwrap_or(0)
+                .unwrap_or(Zero::zero())
         })
     }
 
-    fn get_staked(&self, node: &NodePublicKey) -> u128 {
+    fn get_staked(&self, node: &NodePublicKey) -> BigUint {
         self.inner.run(|ctx| {
             self.node_table
                 .get(ctx)
                 .get(node)
                 .map(|node| node.stake.staked)
-                .unwrap_or(0)
+                .unwrap_or(Zero::zero())
         })
     }
 
-    fn get_locked(&self, node: &NodePublicKey) -> u128 {
+    fn get_locked(&self, node: &NodePublicKey) -> BigUint {
         self.inner.run(|ctx| {
             self.node_table
                 .get(ctx)
                 .get(node)
                 .map(|node| node.stake.locked)
-                .unwrap_or(0)
+                .unwrap_or(Zero::zero())
         })
     }
 

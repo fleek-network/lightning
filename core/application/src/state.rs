@@ -16,7 +16,7 @@ use fleek_crypto::{
 };
 use multiaddr::Multiaddr;
 use num_bigint::{BigUint, ToBigUint};
-use num_traits::ToPrimitive;
+use num_traits::{ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
 
 use crate::table::{Backend, TableRef};
@@ -222,7 +222,7 @@ impl<B: Backend> State<B> {
         &self,
         _sender: TransactionSender,
         _reciever: AccountOwnerPublicKey,
-        _amount: u128,
+        _amount: BigUint,
         _token: Tokens,
     ) -> TransactionResponse {
         todo!()
@@ -232,7 +232,7 @@ impl<B: Backend> State<B> {
         &self,
         sender: TransactionSender,
         proof: ProofOfConsensus,
-        amount: u128,
+        amount: BigUint,
         token: Tokens,
     ) -> TransactionResponse {
         // This transaction is only callable by AccountOwners and not nodes
@@ -252,7 +252,7 @@ impl<B: Backend> State<B> {
         // Check the token bridged and increment that amount
         match token {
             Tokens::FLK => account.flk_balance += amount,
-            Tokens::USDC => account.bandwidth_balance += amount,
+            Tokens::USDC => account.bandwidth_balance += amount.to_u128().unwrap(),
         }
 
         self.account_info.set(sender, account);
@@ -263,7 +263,7 @@ impl<B: Backend> State<B> {
     fn stake(
         &self,
         sender: TransactionSender,
-        amount: u128,
+        amount: BigUint,
         node_public_key: NodePublicKey,
         node_network_key: Option<NodeNetworkingPublicKey>,
         node_domain: Option<String>,
@@ -341,7 +341,7 @@ impl<B: Backend> State<B> {
                 }
 
                 // Increase the nodes stake by the amount being staked
-                node.stake.staked += amount;
+                node.stake.staked += amount.clone();
 
                 node
             },
@@ -372,7 +372,7 @@ impl<B: Backend> State<B> {
                             .to_u64()
                             .unwrap(),
                         stake: Staking {
-                            staked: amount,
+                            staked: amount.clone(),
                             ..Default::default()
                         },
                         domain: primary_domain,
@@ -423,7 +423,7 @@ impl<B: Backend> State<B> {
             return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
         }
         // check if node has stakes to be locked
-        if node.stake.staked == 0 {
+        if node.stake.staked == Zero::zero() {
             return TransactionResponse::Revert(ExecutionError::InsufficientStakesToLock);
         }
 
@@ -455,7 +455,7 @@ impl<B: Backend> State<B> {
     fn unstake(
         &self,
         sender: TransactionSender,
-        amount: u128,
+        amount: BigUint,
         node_public_key: NodePublicKey,
     ) -> TransactionResponse {
         // This transaction is only callable by AccountOwners and not nodes
@@ -500,7 +500,7 @@ impl<B: Backend> State<B> {
         // decrease the stake, add to the locked amount, and set the locked time for the withdrawl
         // current epoch + lock time todo(dalton): we should be storing unstaked tokens in a
         // list so we can have multiple locked stakes with dif lock times
-        node.stake.staked -= amount;
+        node.stake.staked -= amount.clone();
         node.stake.locked += amount;
         node.stake.locked_until = current_epoch + lock_time as u64;
 
@@ -534,7 +534,7 @@ impl<B: Backend> State<B> {
 
         let current_epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
         // Make sure the node has locked tokens and that the lock time is passed
-        if node.stake.locked == 0 {
+        if node.stake.locked == Zero::zero() {
             return TransactionResponse::Revert(ExecutionError::NoLockedTokens);
         }
         if node.stake.locked_until > current_epoch.to_u64().unwrap() {
@@ -549,7 +549,7 @@ impl<B: Backend> State<B> {
         // no need to reset locked_until on the node because that will get adjusted the next time
         // the node unstakes
         reciever.flk_balance += node.stake.locked;
-        node.stake.locked = 0;
+        node.stake.locked = Zero::zero();
 
         // Todo(dalton): if the nodes stake+locked are equal to 0 here should we remove him from the
         // state tables completly?
@@ -679,12 +679,11 @@ impl<B: Backend> State<B> {
     // This function should be called during signal_epoch_change.
     fn distribute_rewards(&self) {
         // Todo: function not done
-
+        // Todo: iterate over last_epoch_served table
+        // distribute inflation rewards per unit of usdc earned
+        // formula for rewards distribution per node
         // distribute usdc rewards per unit of commodity served
         // usdc rewards are just simply unit served per commodity * commodity price
-
-        //distribute inflation rewards per unit of usdc earned
-        // formula for rewards distribution per node
         let epoch = self
             .metadata
             .get(&Metadata::Epoch)
@@ -714,15 +713,11 @@ impl<B: Backend> State<B> {
             .get(&Metadata::SupplyYearStart)
             .unwrap_or_default();
 
-        let emission_per_revenue_unit: f64 =
-            (inflation as f64/* * current_supply */) / (max_boost as f64 * reward_pool);
+        let emission_per_revenue_unit = inflation as f64 / (max_boost as f64 * reward_pool);
         let big_emmission = BigDecimal::from_str(&emission_per_revenue_unit.to_string()).unwrap();
         let big_supply = BigDecimal::from_str(&supply_at_year_start.to_str_radix(10)).unwrap();
 
         let _flk_per_revenue_unit = big_emmission * big_supply;
-
-        // Todo: iterate over last_epoch_served table
-        // distribute flk based on units served
     }
 
     fn choose_new_committee(&self) -> Vec<NodePublicKey> {

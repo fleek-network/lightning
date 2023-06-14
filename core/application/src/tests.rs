@@ -14,6 +14,7 @@ use fleek_crypto::{
     AccountOwnerPublicKey, AccountOwnerSignature, NodePublicKey, NodeSignature,
     TransactionSignature,
 };
+use num_bigint::{BigUint, ToBigUint};
 use tokio::test;
 
 use crate::{app::Application, config::Config, genesis::Genesis, query_runner::QueryRunner};
@@ -30,7 +31,7 @@ async fn init_app() -> (ExecutionEngineSocket, QueryRunner) {
 }
 
 async fn deposit(
-    amount: u128,
+    amount: BigUint,
     token: Tokens,
     update_socket: Socket<Block, BlockExecutionResponse>,
 ) {
@@ -53,7 +54,7 @@ async fn deposit(
 }
 
 async fn stake(
-    amount: u128,
+    amount: BigUint,
     update_socket: Socket<Block, BlockExecutionResponse>,
     node_public_key: NodePublicKey,
 ) {
@@ -95,7 +96,7 @@ async fn test_genesis() {
     // Query to make sure that holds true
     for node in genesis_committee {
         let balance = query_runner.get_staked(&node.public_key);
-        assert_eq!(genesis.min_stake as u128, balance);
+        assert_eq!(genesis.min_stake.to_biguint().unwrap(), balance);
     }
 }
 
@@ -156,7 +157,7 @@ async fn test_stake() {
         UpdateMethod::Deposit {
             proof: ProofOfConsensus {},
             token: Tokens::FLK,
-            amount: 1_000,
+            amount: BigUint::from(1_000_u32),
         },
         ACCOUNT_ONE,
     );
@@ -169,14 +170,17 @@ async fn test_stake() {
         .unwrap();
 
     // check that he has 2_000 flk balance
-    assert_eq!(query_runner.get_flk_balance(&ACCOUNT_ONE), 2_000);
+    assert_eq!(
+        query_runner.get_flk_balance(&ACCOUNT_ONE),
+        BigUint::from(2_000_u32)
+    );
 
     // Test staking on a new node
 
     // First check that trying to stake without providing all the node info reverts
     let update = get_update_request_account(
         UpdateMethod::Stake {
-            amount: 100,
+            amount: BigUint::from(1_000_u32),
             node_public_key,
             node_network_key: None,
             node_domain: None,
@@ -201,7 +205,7 @@ async fn test_stake() {
     // Now try with the correct details for a new node
     let update = get_update_request_account(
         UpdateMethod::Stake {
-            amount: 1000,
+            amount: BigUint::from(1_000_u32),
             node_public_key,
             node_network_key: Some([0; 32].into()),
             node_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
@@ -224,13 +228,16 @@ async fn test_stake() {
     }
 
     // Query the new node and make sure he has the proper stake
-    assert_eq!(query_runner.get_staked(&node_public_key), 1000);
+    assert_eq!(
+        query_runner.get_staked(&node_public_key),
+        BigUint::from(1_000_u32)
+    );
 
     // Stake 1000 more but since it is not a new node we should be able to leave the optional
     // paramaters out without a revert
     let update = get_update_request_account(
         UpdateMethod::Stake {
-            amount: 1000,
+            amount: BigUint::from(1_000_u32),
             node_public_key,
             node_network_key: None,
             node_domain: None,
@@ -253,12 +260,15 @@ async fn test_stake() {
     }
 
     // Node should now have 2_000 stake
-    assert_eq!(query_runner.get_staked(&node_public_key), 2000);
+    assert_eq!(
+        query_runner.get_staked(&node_public_key),
+        BigUint::from(2_000_u32)
+    );
 
     // Now test unstake and make sure it moves the tokens to locked status
     let update = get_update_request_account(
         UpdateMethod::Unstake {
-            amount: 1000,
+            amount: BigUint::from(1_000_u32),
             node: node_public_key,
         },
         ACCOUNT_ONE,
@@ -271,8 +281,14 @@ async fn test_stake() {
         .unwrap();
 
     // Check that his locked is 1000 and his remaining stake is 1000
-    assert_eq!(query_runner.get_staked(&node_public_key), 1000);
-    assert_eq!(query_runner.get_locked(&node_public_key), 1000);
+    assert_eq!(
+        query_runner.get_staked(&node_public_key),
+        BigUint::from(1_000_u32)
+    );
+    assert_eq!(
+        query_runner.get_locked(&node_public_key),
+        BigUint::from(1_000_u32)
+    );
     // Since this test starts at epoch 0 locked_until will be == lock_time
     assert_eq!(
         query_runner.get_locked_time(&node_public_key),
@@ -310,11 +326,22 @@ async fn test_stake_lock() {
         .to_bytes()
         .into();
 
-    deposit(1_000, Tokens::FLK, update_socket.clone()).await;
-    assert_eq!(query_runner.get_flk_balance(&ACCOUNT_ONE), 1_000);
+    deposit(BigUint::from(1_000_u32), Tokens::FLK, update_socket.clone()).await;
+    assert_eq!(
+        query_runner.get_flk_balance(&ACCOUNT_ONE),
+        BigUint::from(1_000_u32)
+    );
 
-    stake(1_000, update_socket.clone(), node_public_key).await;
-    assert_eq!(query_runner.get_staked(&node_public_key), 1_000);
+    stake(
+        BigUint::from(1_000_u32),
+        update_socket.clone(),
+        node_public_key,
+    )
+    .await;
+    assert_eq!(
+        query_runner.get_staked(&node_public_key),
+        BigUint::from(1_000_u32)
+    );
 
     let stake_lock_req = get_update_request_account(
         UpdateMethod::StakeLock {
@@ -339,7 +366,7 @@ async fn test_stake_lock() {
 
     let unstake_req = get_update_request_account(
         UpdateMethod::Unstake {
-            amount: 1000,
+            amount: BigUint::from(1_000_u32),
             node: node_public_key,
         },
         ACCOUNT_ONE,
