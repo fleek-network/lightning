@@ -16,7 +16,7 @@ use fleek_crypto::{
 };
 use multiaddr::Multiaddr;
 use num_bigint::{BigUint, ToBigUint};
-use num_traits::{ToPrimitive, Zero};
+use num_traits::{One, ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
 
 use crate::table::{Backend, TableRef};
@@ -718,6 +718,37 @@ impl<B: Backend> State<B> {
         let big_supply = BigDecimal::from_str(&supply_at_year_start.to_str_radix(10)).unwrap();
 
         let _flk_per_revenue_unit = big_emmission * big_supply;
+    }
+
+    fn _mint_and_transfer(&self, amount: BigUint, node: NodePublicKey) {
+        let owner = self.node_info.get(&node).unwrap().owner;
+        let mut account = self.account_info.get(&owner).unwrap();
+        account.flk_balance += amount.clone();
+
+        self.account_info.set(owner, account);
+
+        let mut current_supply = self
+            .metadata
+            .get(&Metadata::TotalSupply)
+            .unwrap_or_default();
+
+        current_supply += amount;
+        self.metadata
+            .set(Metadata::TotalSupply, current_supply.clone());
+
+        let current_epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
+
+        let days_in_year = BigUint::from(365u32);
+        if current_epoch.modpow(&BigUint::one(), &days_in_year) == BigUint::zero() {
+            let mut supply_start_year = self
+                .metadata
+                .get(&Metadata::SupplyYearStart)
+                .unwrap_or_default();
+
+            supply_start_year += current_supply;
+            self.metadata
+                .set(Metadata::SupplyYearStart, supply_start_year);
+        }
     }
 
     fn choose_new_committee(&self) -> Vec<NodePublicKey> {
