@@ -1632,6 +1632,7 @@ dependencies = [
  "arrayref",
  "arrayvec",
  "async-trait",
+ "blake3-tree",
  "bytes",
  "draco-interfaces",
  "draco-sdk",

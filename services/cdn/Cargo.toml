@@ -16,6 +16,7 @@ tokio.workspace = true
 futures = "0.3"
 
 fleek-crypto = { path = "../../lib/fleek-crypto" }
+blake3-tree = { path = "../../lib/blake3-tree" }
 draco-interfaces = {path="../../core/interfaces"}
 draco-sdk = {path="../../core/sdk"}
 
