@@ -111,7 +111,7 @@ async fn test_epoch_change() {
     // Have (required_signals - 1) say they are ready to change epoch
     // make sure the epoch doesnt change each time someone signals
     for node in genesis_committee.iter().take(required_signals - 1) {
-        let req = get_update_request_node(UpdateMethod::ChangeEpoch, node.public_key);
+        let req = get_update_request_node(UpdateMethod::ChangeEpoch { epoch: 0 }, node.public_key);
 
         let res = update_socket
             .run(Block {
@@ -127,7 +127,7 @@ async fn test_epoch_change() {
 
     // Have the last needed committee member signal the epoch change and make sure it changes
     let req = get_update_request_node(
-        UpdateMethod::ChangeEpoch,
+        UpdateMethod::ChangeEpoch { epoch: 0 },
         genesis_committee[required_signals].public_key,
     );
     let res = update_socket

@@ -22,7 +22,7 @@ use crate::{
 
 pub struct Node<
     ConfigProvider: ConfigProviderInterface,
-    Consensus: ConsensusInterface,
+    Consensus: ConsensusInterface<QueryRunner = Application::SyncExecutor>,
     Application: ApplicationInterface,
     BlockStore: BlockStoreInterface,
     Indexer: IndexerInterface,
@@ -56,7 +56,7 @@ pub struct Node<
 
 impl<
     ConfigProvider: ConfigProviderInterface,
-    Consensus: ConsensusInterface,
+    Consensus: ConsensusInterface<QueryRunner = Application::SyncExecutor>,
     Application: ApplicationInterface,
     BlockStore: BlockStoreInterface,
     Indexer: IndexerInterface,
@@ -190,7 +190,7 @@ impl<
 #[async_trait]
 impl<
     ConfigProvider: ConfigProviderInterface,
-    Consensus: ConsensusInterface,
+    Consensus: ConsensusInterface<QueryRunner = Application::SyncExecutor>,
     Application: ApplicationInterface,
     BlockStore: BlockStoreInterface,
     Indexer: IndexerInterface,

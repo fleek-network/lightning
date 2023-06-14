@@ -1,15 +1,16 @@
+use fastcrypto::{bls12381::min_sig::BLS12381PrivateKey, ed25519::Ed25519PrivateKey};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct NodePublicKey(#[serde(with = "BigArray")] pub [u8; 96]);
-pub struct NodeSecretKey([u8; 48]);
+pub type NodeSecretKey = BLS12381PrivateKey;
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct NodeSignature(#[serde(with = "BigArray")] pub [u8; 48]);
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct NodeNetworkingPublicKey(pub [u8; 32]);
-pub struct NodeNetworkingSecretKey;
+pub type NodeNetworkingSecretKey = Ed25519PrivateKey;
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct NodeNetworkingSignature;
 

@@ -64,7 +64,7 @@ pub struct Service {
 
 /// An update transaction, sent from users to the consensus to migrate the application
 /// from one state to the next state.
-#[derive(Debug, Hash, Clone)]
+#[derive(Debug, Hash, Clone, Serialize, Deserialize)]
 pub struct UpdateRequest {
     /// The sender of the transaction.
     pub sender: TransactionSender,
@@ -76,7 +76,7 @@ pub struct UpdateRequest {
 }
 
 /// The payload data of an update request.
-#[derive(Debug, Hash, Clone)]
+#[derive(Debug, Hash, Clone, Serialize, Deserialize)]
 pub struct UpdatePayload {
     /// The counter or nonce of this request.
     pub nonce: u64,
@@ -85,7 +85,7 @@ pub struct UpdatePayload {
 }
 
 /// All of the update functions in our logic, along their parameters.
-#[derive(Debug, Hash, Clone)]
+#[derive(Debug, Hash, Clone, Serialize, Deserialize)]
 pub enum UpdateMethod {
     /// The main function of the application layer. After aggregating ProofOfAcknowledgements a
     /// node will submit this     transaction to get paid.
@@ -155,7 +155,7 @@ pub enum UpdateMethod {
         recipient: Option<AccountOwnerPublicKey>,
     },
     /// Sent by committee member to signal he is ready to change epoch
-    ChangeEpoch,
+    ChangeEpoch { epoch: Epoch },
     /// Adding a new service to the protocol
     AddService {
         service: Service,
@@ -217,6 +217,8 @@ pub enum ExecutionError {
     InsufficientStakesToLock,
     LockExceededMaxLockTime,
     LockedTokensUnstakeForbidden,
+    EpochAlreadyChanged,
+    EpochHasNotStarted,
 }
 
 /// The account info stored per account on the blockchain

@@ -12,11 +12,11 @@ bincode.workspace = true
 serde.workspace = true
 toml = "0.7.4"
 multiaddr = "0.17.1"
-num-bigint = {workspace = true, features=["serde"]}
+num-bigint = { workspace = true, features = ["serde"] }
 draco-interfaces = { path = "../interfaces" }
-fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "9fbe55e9d477eac6a6d13e872e1dee19b0c83f53" }
 num-traits.workspace = true
-bigdecimal = {workspace = true, features=["serde"]}
+bigdecimal = { workspace = true, features = ["serde"] }
+fastcrypto = "0.1.5"
 
 # Our libraries
 affair.workspace = true

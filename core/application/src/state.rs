@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, str::FromStr};
+use std::{cmp::Ordering, collections::BTreeMap, str::FromStr};
 
 use bigdecimal::{self, BigDecimal};
 use draco_interfaces::{
@@ -118,7 +118,7 @@ impl<B: Backend> State<B> {
                 self.withdrawl_unstaked(txn.sender, node, recipient)
             },
 
-            UpdateMethod::ChangeEpoch => self.change_epoch(txn.sender),
+            UpdateMethod::ChangeEpoch { epoch } => self.change_epoch(txn.sender, epoch),
 
             UpdateMethod::AddService {
                 service,
@@ -560,7 +560,7 @@ impl<B: Backend> State<B> {
         TransactionResponse::Success(ExecutionData::None)
     }
 
-    fn change_epoch(&self, sender: TransactionSender) -> TransactionResponse {
+    fn change_epoch(&self, sender: TransactionSender, epoch: Epoch) -> TransactionResponse {
         // Only Nodes can call this function
         let sender = match self.only_node(sender) {
             Ok(account) => account,
@@ -573,6 +573,17 @@ impl<B: Backend> State<B> {
             .unwrap_or_default()
             .to_u64()
             .unwrap();
+
+        match epoch.cmp(&current_epoch) {
+            Ordering::Less => {
+                return TransactionResponse::Revert(ExecutionError::EpochAlreadyChanged);
+            },
+            Ordering::Greater => {
+                return TransactionResponse::Revert(ExecutionError::EpochHasNotStarted);
+            },
+            _ => (),
+        }
+
         let mut current_committee = self.committee_info.get(&current_epoch).unwrap_or_default();
 
         // If sender is not on the current committee revert early, or if they have already signaled;

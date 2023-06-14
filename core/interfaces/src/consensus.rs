@@ -18,12 +18,14 @@ pub type MempoolSocket = Socket<UpdateRequest, ()>;
 
 #[async_trait]
 pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
+    type QueryRunner: SyncQueryRunnerInterface;
+
     /// Create a new consensus service with the provided config and executor.
-    async fn init<S: SignerInterface, Q: SyncQueryRunnerInterface>(
+    async fn init<S: SignerInterface>(
         config: Self::Config,
         signer: &S,
         executor: ExecutionEngineSocket,
-        query_runner: Q,
+        query_runner: Self::QueryRunner,
     ) -> anyhow::Result<Self>;
 
     /// Returns a socket that can be used to submit transactions to the consensus,

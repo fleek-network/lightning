@@ -11,8 +11,9 @@ draco-application = { path = "../application" }
 draco-handshake = { path = "../handshake" }
 draco-interfaces = { path = "../interfaces" }
 draco-rep-collector = { path = "../rep-collector" }
+draco-consensus = { path = "../consensus" }
 anyhow.workspace = true
-clap = { version = "4.2", features = [ "derive" ] }
+clap = { version = "4.2", features = ["derive"] }
 serde.workspace = true
 toml = "0.7"
 async-trait.workspace = true
