@@ -6,7 +6,7 @@ use arrayref::array_ref;
 use arrayvec::ArrayVec;
 use bytes::BytesMut;
 use consts::*;
-use fleek_crypto::{ClientSignature, NodeSignature};
+use fleek_crypto::ClientSignature;
 use futures::executor::block_on;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -43,7 +43,7 @@ fn is_termination_signal(byte: u8) -> bool {
 
 /// Termination reasons
 #[repr(u8)]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reason {
     CodecViolation = TERMINATION_FLAG,
     OutOfLanes,
@@ -64,6 +64,25 @@ impl Reason {
             0x82 => Some(Self::ServiceNotFound),
             0x83 => Some(Self::InsufficientBalance),
             _ => Some(Self::Unknown),
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ServiceMode {
+    Tentative = 0x00,
+    Optimistic = 0x01,
+    Raw = 0x02,
+}
+
+impl ServiceMode {
+    fn from_u8(byte: u8) -> Option<Self> {
+        match byte {
+            0x00 => Some(Self::Tentative),
+            0x01 => Some(Self::Optimistic),
+            0x02 => Some(Self::Raw),
+            _ => None,
         }
     }
 }
@@ -100,9 +119,9 @@ impl FrameTag {
     #[inline(always)]
     pub fn size_hint(&self) -> usize {
         match self {
-            FrameTag::Request => 33,
+            FrameTag::Request => 34,
             FrameTag::RangeRequest => 43,
-            FrameTag::ResponseBlock => 66,
+            FrameTag::ResponseBlock => 18,
             FrameTag::DeliveryAcknowledgement => 33,
             FrameTag::DecryptionKey => 34,
             FrameTag::TerminationSignal => 1,
@@ -116,6 +135,7 @@ impl FrameTag {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CdnFrame {
     Request {
+        service_mode: ServiceMode,
         hash: [u8; 32],
     },
     RangeRequest {
@@ -126,7 +146,6 @@ pub enum CdnFrame {
     /// Node response to confirm resuming a lane.
     ResponseBlock {
         compression: u8,
-        commitment: NodeSignature,
         bytes_len: u64,
         proof_len: u64,
     },
@@ -134,13 +153,9 @@ pub enum CdnFrame {
     Buffer(BytesMut),
     /// Client acknowledgment that a block was delivered.
     /// These are batched and submitted by the node for rewards
-    DeliveryAcknowledgement {
-        signature: ClientSignature,
-    },
+    DeliveryAcknowledgement { signature: ClientSignature },
     /// Client request to start a service subprotocol
-    DecryptionKey {
-        key: [u8; 33],
-    },
+    DecryptionKey { key: [u8; 33] },
     /// Signal from the node the connection was terminated, with a reason.
     TerminationSignal(Reason),
 }
@@ -233,10 +248,11 @@ where
     #[inline(always)]
     pub async fn write_frame(&mut self, frame: CdnFrame) -> std::io::Result<()> {
         match frame {
-            CdnFrame::Request { hash } => {
+            CdnFrame::Request { service_mode, hash } => {
                 let mut buf = ArrayVec::<u8, 33>::new_const();
 
                 buf.push(FrameTag::Request as u8);
+                buf.push(service_mode as u8);
                 buf.write_all(&hash).unwrap();
 
                 self.writer.write_all(&buf).await?;
@@ -257,15 +273,13 @@ where
             },
             CdnFrame::ResponseBlock {
                 compression,
-                commitment,
                 bytes_len,
                 proof_len,
             } => {
-                let mut buf = ArrayVec::<u8, 66>::new_const();
+                let mut buf = ArrayVec::<u8, 18>::new_const();
 
                 buf.push(FrameTag::ResponseBlock as u8);
                 buf.push(compression);
-                buf.write_all(&commitment.0).unwrap();
                 buf.write_all(&proof_len.to_be_bytes()).unwrap();
                 buf.write_all(&bytes_len.to_be_bytes()).unwrap();
 
@@ -377,8 +391,12 @@ where
         match tag {
             FrameTag::Request => {
                 let buf = self.buffer.split_to(size_hint);
-                let hash = *array_ref!(buf, 1, 32);
-                Ok(Some(CdnFrame::Request { hash }))
+                let service_mode = match ServiceMode::from_u8(buf[1]) {
+                    Some(mode) => mode,
+                    None => return Err(Error::new(ErrorKind::InvalidData, "Unknown frame tag")),
+                };
+                let hash = *array_ref!(buf, 2, 32);
+                Ok(Some(CdnFrame::Request { service_mode, hash }))
             },
             FrameTag::RangeRequest => {
                 let buf = self.buffer.split_to(size_hint);
@@ -397,13 +415,11 @@ where
                 let buf = self.buffer.split_to(size_hint);
 
                 let compression = buf[1];
-                let commitment = NodeSignature(*array_ref!(buf, 2, 48));
-                let proof_len = u64::from_be_bytes(*array_ref!(buf, 50, 8));
-                let bytes_len = u64::from_be_bytes(*array_ref!(buf, 58, 8));
+                let proof_len = u64::from_be_bytes(*array_ref!(buf, 2, 8));
+                let bytes_len = u64::from_be_bytes(*array_ref!(buf, 10, 8));
 
                 Ok(Some(CdnFrame::ResponseBlock {
                     compression,
-                    commitment,
                     bytes_len,
                     proof_len,
                 }))
@@ -489,7 +505,11 @@ mod tests {
 
     #[tokio::test]
     async fn request() -> TResult {
-        encode_decode(CdnFrame::Request { hash: [0u8; 32] }).await
+        encode_decode(CdnFrame::Request {
+            service_mode: ServiceMode::Tentative,
+            hash: [0u8; 32],
+        })
+        .await
     }
 
     #[tokio::test]
@@ -506,7 +526,6 @@ mod tests {
     async fn response_block() -> TResult {
         encode_decode(CdnFrame::ResponseBlock {
             compression: 0,
-            commitment: NodeSignature([0u8; 48]),
             proof_len: 0,
             bytes_len: 0,
         })
