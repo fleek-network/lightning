@@ -584,7 +584,7 @@ impl<B: Backend> State<B> {
         current_committee.ready_to_change.push(sender);
 
         // If more than 2/3rds of the committee have signaled, start the epoch change process
-        if current_committee.ready_to_change.len() > (current_committee.members.len() / 2) {
+        if current_committee.ready_to_change.len() > (2 * current_committee.members.len() / 3) {
             // Todo: Reward nodes, calculate rep?, choose new committee, increment epoch.
 
             // calculate the next epoch endstamp

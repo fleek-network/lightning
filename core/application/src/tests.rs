@@ -106,7 +106,7 @@ async fn test_epoch_change() {
     let (update_socket, query_runner) = init_app().await;
     let (_, genesis_committee) = get_genesis();
 
-    let required_signals = genesis_committee.len() / 2 + 1;
+    let required_signals = 2 * genesis_committee.len() / 3 + 1;
 
     // Have (required_signals - 1) say they are ready to change epoch
     // make sure the epoch doesnt change each time someone signals
