@@ -1,5 +1,5 @@
 [package]
-name = "draco-rep-collector"
+name = "draco-notifier"
 version = "0.0.0"
 edition = "2021"
 
@@ -8,12 +8,5 @@ edition = "2021"
 [dependencies]
 draco-interfaces = {path="../interfaces"}
 draco-application = {path="../application"}
-draco-reputation = {path="../reputation"}
-draco-notifier = {path="../notifier"}
-anyhow.workspace = true
-serde.workspace = true
-async-trait.workspace = true
-fleek-crypto.workspace = true
 tokio.workspace = true
-lru.workspace = true
-scc.workspace = true
+async-trait = "0.1"

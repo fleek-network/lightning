@@ -11,6 +11,7 @@ use crate::{
     fs::FileSystemInterface,
     handshake::HandshakeInterface,
     indexer::IndexerInterface,
+    notifier::NotifierInterface,
     origin::OriginProviderInterface,
     pod::DeliveryAcknowledgmentAggregatorInterface,
     reputation::ReputationAggregatorInterface,
@@ -30,6 +31,7 @@ pub struct Node<
     Signer: SignerInterface,
     Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
     DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
+    Notifier: NotifierInterface<SyncQuery = Application::SyncExecutor>,
     ReputationAggregator: ReputationAggregatorInterface,
     Rpc: RpcInterface<Application::SyncExecutor>,
     Sdk: SdkInterface<
@@ -52,6 +54,7 @@ pub struct Node<
     pub reputation_aggregator: ReputationAggregator,
     pub handshake: Handshake,
     pub sdk: PhantomData<Sdk>,
+    pub notifier: PhantomData<Notifier>,
 }
 
 impl<
@@ -64,7 +67,8 @@ impl<
     Signer: SignerInterface,
     Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
     DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
-    ReputationAggregator: ReputationAggregatorInterface,
+    Notifier: NotifierInterface<SyncQuery = Application::SyncExecutor>,
+    ReputationAggregator: ReputationAggregatorInterface<Notifier = Notifier>,
     Rpc: RpcInterface<Application::SyncExecutor>,
     Sdk: SdkInterface<
         SyncQuery = Application::SyncExecutor,
@@ -83,6 +87,7 @@ impl<
         Signer,
         Stream,
         DeliveryAcknowledgmentAggregator,
+        Notifier,
         ReputationAggregator,
         Rpc,
         Sdk,
@@ -117,9 +122,12 @@ impl<
         )
         .await?;
 
+        let notifier = Notifier::init(application.sync_query());
+
         let reputation_aggregator = ReputationAggregator::init(
             configuration.get::<ReputationAggregator>(),
             signer.get_socket(),
+            notifier,
         )
         .await?;
 
@@ -146,6 +154,7 @@ impl<
             reputation_aggregator,
             handshake,
             sdk: PhantomData,
+            notifier: PhantomData,
         })
     }
 
@@ -198,6 +207,7 @@ impl<
     Signer: SignerInterface,
     Stream: tokio_stream::Stream<Item = bytes::BytesMut>,
     DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface,
+    Notifier: NotifierInterface<SyncQuery = Application::SyncExecutor>,
     ReputationAggregator: ReputationAggregatorInterface,
     Rpc: RpcInterface<Application::SyncExecutor>,
     Sdk: SdkInterface<
@@ -217,6 +227,7 @@ impl<
         Signer,
         Stream,
         DeliveryAcknowledgmentAggregator,
+        Notifier,
         ReputationAggregator,
         Rpc,
         Sdk,

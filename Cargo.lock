@@ -2948,6 +2948,7 @@ dependencies = [
  "dashmap",
  "draco-application",
  "draco-interfaces",
+ "draco-notifier",
  "fleek-crypto",
  "futures",
  "serde 1.0.164",
@@ -2997,6 +2998,7 @@ dependencies = [
  "draco-consensus",
  "draco-handshake",
  "draco-interfaces",
+ "draco-notifier",
  "draco-rep-collector",
  "fleek-crypto",
  "mockall",
@@ -3004,6 +3006,16 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "toml 0.7.4",
+]
+
+[[package]]
+name = "draco-notifier"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "draco-application",
+ "draco-interfaces",
+ "tokio",
 ]
 
 [[package]]
@@ -3050,6 +3062,7 @@ dependencies = [
  "async-trait",
  "draco-application",
  "draco-interfaces",
+ "draco-notifier",
  "draco-reputation",
  "fleek-crypto",
  "lru",

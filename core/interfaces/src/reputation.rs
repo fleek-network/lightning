@@ -4,7 +4,8 @@ use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
 
 use crate::{
-    application::SyncQueryRunnerInterface, config::ConfigConsumer, signer::SubmitTxSocket,
+    application::SyncQueryRunnerInterface, config::ConfigConsumer, notifier::NotifierInterface,
+    signer::SubmitTxSocket,
 };
 
 #[async_trait]
@@ -15,8 +16,15 @@ pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
     /// The query runner can be used to query the local reputation of other nodes.
     type ReputationQuery: ReputationQueryInteface;
 
+    /// The notifier can be used to receive notifications on and before epoch changes.
+    type Notifier: NotifierInterface;
+
     /// Create a new reputation
-    async fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self>;
+    async fn init(
+        config: Self::Config,
+        submit_tx: SubmitTxSocket,
+        notifier: Self::Notifier,
+    ) -> anyhow::Result<Self>;
 
     /// Called by the scheduler to notify that it is time to submit the aggregation, to do
     /// so one should use the [`SubmitTxSocket`] that is passed during the initialization

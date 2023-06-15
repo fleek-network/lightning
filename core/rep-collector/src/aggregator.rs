@@ -3,10 +3,13 @@ use std::{sync::Arc, time::Duration};
 use async_trait::async_trait;
 use draco_application::query_runner::QueryRunner;
 use draco_interfaces::{
-    config::ConfigConsumer, reputation::ReputationAggregatorInterface, signer::SubmitTxSocket,
-    types::UpdateMethod, ReputationQueryInteface, ReputationReporterInterface, Weight,
+    config::ConfigConsumer, notifier::Notification, reputation::ReputationAggregatorInterface,
+    signer::SubmitTxSocket, types::UpdateMethod, ReputationQueryInteface,
+    ReputationReporterInterface, Weight,
 };
+use draco_notifier::Notifier;
 use fleek_crypto::NodePublicKey;
+use tokio::sync::mpsc;
 
 use crate::{buffered_mpsc, config::Config, measurement_manager::MeasurementManager};
 
@@ -17,6 +20,9 @@ pub struct ReputationAggregator {
     query: MyReputationQuery,
     measurement_manager: MeasurementManager,
     submit_tx: SubmitTxSocket,
+    notifier: Notifier,
+    notify_rx: mpsc::Receiver<Notification>,
+    notify_tx: mpsc::Sender<Notification>,
     config: Config,
 }
 
@@ -75,9 +81,17 @@ impl ReputationAggregatorInterface for ReputationAggregator {
     /// The query runner can be used to query the local reputation of other nodes.
     type ReputationQuery = MyReputationQuery;
 
+    /// The notifier can be used to receive notifications on and before epoch changes.
+    type Notifier = Notifier;
+
     /// Create a new reputation
-    async fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
+    async fn init(
+        config: Self::Config,
+        submit_tx: SubmitTxSocket,
+        notifier: Self::Notifier,
+    ) -> anyhow::Result<Self> {
         let (report_tx, report_rx) = buffered_mpsc::buffered_channel(100, 2048);
+        let (notify_tx, notify_rx) = mpsc::channel(2048);
         let measurement_manager = MeasurementManager::new();
         let local_reputation_ref = measurement_manager.get_local_reputation_ref();
         Ok(Self {
@@ -86,6 +100,9 @@ impl ReputationAggregatorInterface for ReputationAggregator {
             query: MyReputationQuery::new(local_reputation_ref),
             measurement_manager: MeasurementManager::new(),
             submit_tx,
+            notifier,
+            notify_rx,
+            notify_tx,
             config,
         })
     }

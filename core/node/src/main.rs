@@ -10,6 +10,7 @@ use draco_application::{app::Application, query_runner::QueryRunner};
 use draco_consensus::consensus::Consensus;
 use draco_handshake::server::{StreamProvider, TcpHandshakeServer, TcpProvider};
 use draco_interfaces::{common::WithStartAndShutdown as _, ConfigProviderInterface, Node};
+use draco_notifier::Notifier;
 use draco_rep_collector::ReputationAggregator;
 
 use crate::{
@@ -31,6 +32,7 @@ pub type ConcreteNode = Node<
     Signer,
     MyStream,
     DeliveryAcknowledgmentAggregator,
+    Notifier,
     ReputationAggregator,
     Rpc<QueryRunner>,
     Sdk<<TcpProvider as StreamProvider>::Reader, <TcpProvider as StreamProvider>::Writer>,

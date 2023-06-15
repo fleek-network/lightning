@@ -15,6 +15,7 @@ use draco_interfaces::{
     Blake3Hash, Blake3Tree, CompressionAlgoSet, ContentChunk, IncrementalPutInterface,
     MempoolSocket, ReputationQueryInteface, ReputationReporterInterface, SdkInterface, Weight,
 };
+use draco_notifier::Notifier;
 use fleek_crypto::{
     NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
@@ -273,8 +274,15 @@ impl ReputationAggregatorInterface for ReputationAggregator {
     /// The query runner can be used to query the local reputation of other nodes.
     type ReputationQuery = MyReputationQuery;
 
+    /// The notifier can be used to receive notifications on and before epoch changes.
+    type Notifier = Notifier;
+
     /// Create a new reputation
-    async fn init(_config: Self::Config, _submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
+    async fn init(
+        _config: Self::Config,
+        _submit_tx: SubmitTxSocket,
+        _notifier: Self::Notifier,
+    ) -> anyhow::Result<Self> {
         todo!()
     }
 
