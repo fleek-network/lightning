@@ -23,7 +23,10 @@ impl MeasurementManager {
         }
     }
 
-    #[allow(dead_code)]
+    pub fn clear_measurements(&mut self) {
+        self.peers.clear();
+    }
+
     pub fn get_measurements(&self) -> BTreeMap<NodePublicKey, ReputationMeasurements> {
         self.peers
             .iter()
@@ -698,5 +701,17 @@ mod tests {
             Interactions::get_weight(Weight::Weak)
         );
         assert_eq!(measurements.latency.unwrap(), Duration::from_millis(200));
+    }
+
+    #[test]
+    fn test_clear_measurements() {
+        let mut manager = MeasurementManager::new();
+        let peer = NodePublicKey([0; 96]);
+        manager.report_sat(peer, Weight::Weak);
+        let peer_measurements = manager.get_measurements();
+        assert!(peer_measurements.contains_key(&peer));
+        manager.clear_measurements();
+        let peer_measurements = manager.get_measurements();
+        assert!(!peer_measurements.contains_key(&peer));
     }
 }

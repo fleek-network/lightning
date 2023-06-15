@@ -44,6 +44,7 @@ impl ReputationAggregator {
                     if let Notification::BeforeEpochChange = notification.expect("Failed to receive notification.") {
                         self.submit_aggregation();
                         self.notifier.notify_before_epoch_change(hour, self.notify_tx.clone());
+                        self.measurement_manager.clear_measurements();
                     }
                 }
             }
