@@ -1,6 +1,6 @@
-mod config;
-mod memory;
-mod put;
+pub mod config;
+pub mod memory;
+pub mod put;
 
 use draco_interfaces::Blake3Hash;
 use serde::{Deserialize, Serialize};
