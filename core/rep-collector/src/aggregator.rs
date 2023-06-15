@@ -3,9 +3,12 @@ use std::{sync::Arc, time::Duration};
 use async_trait::async_trait;
 use draco_application::query_runner::QueryRunner;
 use draco_interfaces::{
-    config::ConfigConsumer, notifier::Notification, reputation::ReputationAggregatorInterface,
-    signer::SubmitTxSocket, types::UpdateMethod, ReputationQueryInteface,
-    ReputationReporterInterface, Weight,
+    config::ConfigConsumer,
+    notifier::{Notification, NotifierInterface},
+    reputation::ReputationAggregatorInterface,
+    signer::SubmitTxSocket,
+    types::UpdateMethod,
+    ReputationQueryInteface, ReputationReporterInterface, Weight,
 };
 use draco_notifier::Notifier;
 use fleek_crypto::NodePublicKey;
@@ -29,13 +32,21 @@ pub struct ReputationAggregator {
 #[allow(dead_code)]
 impl ReputationAggregator {
     async fn start(mut self) -> anyhow::Result<()> {
+        let hour = Duration::from_secs(3600);
+        self.notifier
+            .notify_before_epoch_change(hour, self.notify_tx.clone());
         loop {
-            let report_msg = self
-                .report_rx
-                .recv()
-                .await
-                .expect("Failed to receive report message.");
-            self.handle_report(report_msg);
+            tokio::select! {
+                report_msg = self.report_rx.recv() => {
+                    self.handle_report(report_msg.expect("Failed to receive message."));
+                }
+                notification = self.notify_rx.recv() => {
+                    if let Notification::BeforeEpochChange = notification.expect("Failed to receive notification.") {
+                        self.submit_aggregation();
+                        self.notifier.notify_before_epoch_change(hour, self.notify_tx.clone());
+                    }
+                }
+            }
         }
     }
 
