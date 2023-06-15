@@ -17,6 +17,8 @@ thiserror.workspace = true
 zeroize.workspace = true
 multiaddr = "0.17.1"
 num-bigint = { workspace = true, features=["serde"]}
+num-traits.workspace = true
+num-derive.workspace = true
 
 # Our libraries
 affair.workspace = true

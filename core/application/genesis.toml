@@ -59,6 +59,7 @@ commodity_type = "Compute"
 [[account]]
 public_key = "J4OBdUiRNpm5vpDYP+cgAapgCFTcfLxOnDNsTunTeoc="
 flk_balance = 100
+stables_balance = 100
 bandwidth_balance = 100
 
 [[commodity_prices]]

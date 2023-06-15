@@ -30,6 +30,7 @@ pub struct Genesis {
 pub struct GenesisAccount {
     pub public_key: String,
     pub flk_balance: u64,
+    pub stables_balance: u64,
     pub bandwidth_balance: u64,
 }
 

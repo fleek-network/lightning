@@ -6,6 +6,7 @@ use fleek_crypto::{
 };
 use multiaddr::Multiaddr;
 use num_bigint::BigUint;
+use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
 use crate::{common::ToDigest, pod::DeliveryAcknowledgment};
@@ -36,7 +37,7 @@ pub enum Tokens {
 
 /// This is commodities served by different services in Fleek Network
 /// C-like enums here to future proof for state, if we add more commodity types
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, FromPrimitive)]
 #[repr(u8)]
 pub enum CommodityTypes {
     Bandwidth = 0,
@@ -226,6 +227,8 @@ pub enum ExecutionError {
 pub struct AccountInfo {
     /// The accounts FLK balance
     pub flk_balance: BigUint,
+    /// the accounts stable coin balance
+    pub stables_balance: BigUint,
     /// The accounts stables/bandwidth balance
     pub bandwidth_balance: u128,
     /// The nonce of the account. Added to each transaction before signed to prevent replays and

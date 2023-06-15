@@ -1,6 +1,6 @@
 use std::{any::Any, cell::RefCell, hash::Hash};
 
-use atomo::{SerdeBackend, TableRef as AtomoTableRef, TableSelector};
+use atomo::{KeyIterator, SerdeBackend, TableRef as AtomoTableRef, TableSelector};
 use draco_interfaces::types::{
     ExecutionError, ProofOfConsensus, ProofOfMisbehavior, UpdateRequest,
 };
@@ -40,6 +40,7 @@ pub trait Backend {
 pub trait TableRef<K, V> {
     fn set(&self, key: K, value: V);
     fn get(&self, key: &K) -> Option<V>;
+    fn keys(&self) -> KeyIterator<'_, K>;
 }
 
 pub struct StateTables<'selector, S: SerdeBackend> {
@@ -106,5 +107,9 @@ impl<
 
     fn get(&self, key: &K) -> Option<V> {
         self.0.borrow_mut().get(key)
+    }
+
+    fn keys(&self) -> KeyIterator<'_, K> {
+        todo!()
     }
 }

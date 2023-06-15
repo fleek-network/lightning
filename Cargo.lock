@@ -2883,6 +2883,7 @@ dependencies = [
  "num-bigint",
  "num-traits 0.2.15",
  "serde 1.0.164",
+ "num-derive",
  "tokio",
  "toml 0.7.4",
 ]
@@ -2975,6 +2976,8 @@ dependencies = [
  "multiaddr",
  "num-bigint",
  "serde 1.0.164",
+ "num-derive",
+ "num-traits",
  "serde-big-array",
  "thiserror",
  "tokio",
@@ -6893,6 +6896,17 @@ checksum = "a652d9771a63711fd3c3deb670acfbe5c30a4072e664d7a3bf5a9e1056ac72c3"
 dependencies = [
  "arrayvec 0.7.3",
  "itoa",
+]
+
+[[package]]
+name = "num-derive"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "876a53fff98e03a936a674b29568b0e605f06b29372c2489ff4de23f1949743d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]

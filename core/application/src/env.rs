@@ -171,6 +171,7 @@ impl Env<UpdatePerm> {
                         .into();
                 let info = AccountInfo {
                     flk_balance: account.flk_balance.into(),
+                    stables_balance: account.stables_balance.into(),
                     bandwidth_balance: account.bandwidth_balance.into(),
                     nonce: 0,
                 };

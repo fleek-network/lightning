@@ -15,8 +15,9 @@ multiaddr = "0.17.1"
 num-bigint = { workspace = true, features = ["serde"] }
 draco-interfaces = { path = "../interfaces" }
 num-traits.workspace = true
-bigdecimal = { workspace = true, features = ["serde"] }
 fastcrypto = "0.1.5"
+num-derive.workspace = true
+bigdecimal = {workspace = true, features=["serde"]}
 
 # Our libraries
 affair.workspace = true

@@ -15,11 +15,13 @@ use fleek_crypto::{
     TransactionSender,
 };
 use multiaddr::Multiaddr;
-use num_bigint::{BigUint, ToBigUint};
-use num_traits::{One, ToPrimitive, Zero};
+use num_bigint::{BigUint, ToBigInt, ToBigUint};
+use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
 
 use crate::table::{Backend, TableRef};
+
+const MULTIPLIER: u128 = 10u128.pow(18);
 
 /// The state of the Application
 ///
@@ -690,11 +692,6 @@ impl<B: Backend> State<B> {
     // This function should be called during signal_epoch_change.
     fn distribute_rewards(&self) {
         // Todo: function not done
-        // Todo: iterate over last_epoch_served table
-        // distribute inflation rewards per unit of usdc earned
-        // formula for rewards distribution per node
-        // distribute usdc rewards per unit of commodity served
-        // usdc rewards are just simply unit served per commodity * commodity price
         let epoch = self
             .metadata
             .get(&Metadata::Epoch)
@@ -712,7 +709,6 @@ impl<B: Backend> State<B> {
         if reward_pool == 0_f64 {
             return;
         }
-
         let inflation = self
             .parameters
             .get(&ProtocolParams::MaxInflation)
@@ -724,41 +720,85 @@ impl<B: Backend> State<B> {
             .get(&Metadata::SupplyYearStart)
             .unwrap_or_default();
 
+        // todo: refactor this into our own struct of BigDecimal
         let emission_per_revenue_unit = inflation as f64 / (max_boost as f64 * reward_pool);
-        let big_emmission = BigDecimal::from_str(&emission_per_revenue_unit.to_string()).unwrap();
-        let big_supply = BigDecimal::from_str(&supply_at_year_start.to_str_radix(10)).unwrap();
+        let bd_multiplier = BigDecimal::from_u128(MULTIPLIER).unwrap();
+        let big_emmission = BigDecimal::from_str(&emission_per_revenue_unit.to_string()).unwrap()
+            * bd_multiplier.clone();
+        let big_uint_emission = big_emmission.to_bigint().unwrap().to_biguint().unwrap();
 
-        let _flk_per_revenue_unit = big_emmission * big_supply;
+        let flk_per_stable_revenue_unit = big_uint_emission * supply_at_year_start;
+
+        // Todo: iterate over last_epoch_served table
+        // distribute inflation rewards per unit of usdc earned
+        // formula for rewards distribution per node
+        // distribute usdc rewards per unit of commodity served
+        // usdc rewards are just simply unit served per commodity * commodity price
+        let nodes = self.current_epoch_served.keys();
+        for node in nodes {
+            let served = self.current_epoch_served.get(&node).unwrap_or_default();
+            let mut stable_revenue: f64 = 0.0;
+            // Iterate over the quantities and their corresponding commodity type
+            for (commodity_type, &quantity) in served.iter().enumerate() {
+                // Convert the index to CommodityTypes
+                if let Some(commodity) = CommodityTypes::from_u8(commodity_type as u8) {
+                    // Get the price for the commodity
+                    if let Some(price) = self.commodity_prices.get(&commodity) {
+                        // Calculate the total price for this quantity of commodity
+                        stable_revenue += price * quantity as f64;
+                    }
+                }
+            }
+            let big_stable_revenue =
+                BigDecimal::from_str(&stable_revenue.to_string()).unwrap() * bd_multiplier.clone();
+            let big_stable_revenue = big_stable_revenue
+                .to_bigint()
+                .unwrap()
+                .to_biguint()
+                .unwrap();
+            self.mint_and_transfer(big_stable_revenue.clone(), node, Tokens::USDC);
+            self.mint_and_transfer(
+                big_stable_revenue * flk_per_stable_revenue_unit.clone(),
+                node,
+                Tokens::FLK,
+            )
+        }
     }
 
-    fn _mint_and_transfer(&self, amount: BigUint, node: NodePublicKey) {
+    fn mint_and_transfer(&self, amount: BigUint, node: NodePublicKey, token: Tokens) {
         let owner = self.node_info.get(&node).unwrap().owner;
         let mut account = self.account_info.get(&owner).unwrap();
-        account.flk_balance += amount.clone();
 
-        self.account_info.set(owner, account);
+        match token {
+            Tokens::USDC => account.stables_balance += amount,
+            Tokens::FLK => {
+                account.flk_balance += amount.clone();
 
-        let mut current_supply = self
-            .metadata
-            .get(&Metadata::TotalSupply)
-            .unwrap_or_default();
+                self.account_info.set(owner, account);
 
-        current_supply += amount;
-        self.metadata
-            .set(Metadata::TotalSupply, current_supply.clone());
+                let mut current_supply = self
+                    .metadata
+                    .get(&Metadata::TotalSupply)
+                    .unwrap_or_default();
 
-        let current_epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
+                current_supply += amount;
+                self.metadata
+                    .set(Metadata::TotalSupply, current_supply.clone());
 
-        let days_in_year = BigUint::from(365u32);
-        if current_epoch.modpow(&BigUint::one(), &days_in_year) == BigUint::zero() {
-            let mut supply_start_year = self
-                .metadata
-                .get(&Metadata::SupplyYearStart)
-                .unwrap_or_default();
+                let current_epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
 
-            supply_start_year += current_supply;
-            self.metadata
-                .set(Metadata::SupplyYearStart, supply_start_year);
+                let days_in_year = BigUint::from(365u32);
+                if current_epoch.modpow(&BigUint::one(), &days_in_year) == BigUint::zero() {
+                    let mut supply_start_year = self
+                        .metadata
+                        .get(&Metadata::SupplyYearStart)
+                        .unwrap_or_default();
+
+                    supply_start_year += current_supply;
+                    self.metadata
+                        .set(Metadata::SupplyYearStart, supply_start_year);
+                }
+            },
         }
     }
 
