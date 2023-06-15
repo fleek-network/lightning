@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, num::NonZeroUsize, sync::Arc, time::Duration};
 
 use draco_interfaces::{types::ReputationMeasurements, Weight};
-use draco_reputation::statistics::min_max_normalize_value;
+use draco_reputation::statistics::min_max_normalize;
 use fleek_crypto::NodePublicKey;
 use lru::LruCache;
 
@@ -436,7 +436,7 @@ impl NormalizedMeasurements {
             (summary_stats.min.latency, summary_stats.max.latency)
         {
             values.latency.map(|x| {
-                min_max_normalize_value(
+                min_max_normalize(
                     x.as_millis() as f64,
                     min_val.as_millis() as f64,
                     max_val.as_millis() as f64,
@@ -451,7 +451,7 @@ impl NormalizedMeasurements {
         ) {
             values
                 .interactions
-                .map(|x| min_max_normalize_value(x as f64, min_val as f64, max_val as f64))
+                .map(|x| min_max_normalize(x as f64, min_val as f64, max_val as f64))
         } else {
             None
         };
@@ -461,7 +461,7 @@ impl NormalizedMeasurements {
         ) {
             values
                 .inbound_bandwidth
-                .map(|x| min_max_normalize_value(x as f64, min_val as f64, max_val as f64))
+                .map(|x| min_max_normalize(x as f64, min_val as f64, max_val as f64))
         } else {
             None
         };
@@ -471,7 +471,7 @@ impl NormalizedMeasurements {
         ) {
             values
                 .outbound_bandwidth
-                .map(|x| min_max_normalize_value(x as f64, min_val as f64, max_val as f64))
+                .map(|x| min_max_normalize(x as f64, min_val as f64, max_val as f64))
         } else {
             None
         };
@@ -481,7 +481,7 @@ impl NormalizedMeasurements {
         ) {
             values
                 .bytes_received
-                .map(|x| min_max_normalize_value(x as f64, min_val as f64, max_val as f64))
+                .map(|x| min_max_normalize(x as f64, min_val as f64, max_val as f64))
         } else {
             None
         };
@@ -490,7 +490,7 @@ impl NormalizedMeasurements {
         {
             values
                 .bytes_sent
-                .map(|x| min_max_normalize_value(x as f64, min_val as f64, max_val as f64))
+                .map(|x| min_max_normalize(x as f64, min_val as f64, max_val as f64))
         } else {
             None
         };

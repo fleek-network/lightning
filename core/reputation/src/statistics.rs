@@ -1,5 +1,12 @@
-pub fn min_max_normalize_value(value: f64, min_val: f64, max_val: f64) -> f64 {
+pub fn min_max_normalize(value: f64, min_val: f64, max_val: f64) -> f64 {
     (value - min_val) / (max_val - min_val)
+}
+
+pub fn try_min_max_normalize(value: f64, min_value: f64, max_value: f64) -> Option<f64> {
+    if (max_value - min_value).abs() < f64::EPSILON {
+        return None;
+    }
+    Some((value - min_value) / (max_value - min_value))
 }
 
 pub fn calculate_normalized_mean(mut values: Vec<f64>) -> f64 {
