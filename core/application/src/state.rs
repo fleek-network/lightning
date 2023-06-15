@@ -1,4 +1,7 @@
-use std::{cmp::Ordering, collections::BTreeMap};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, HashMap},
+};
 
 // use bigdecimal::{self, BigDecimal};
 use draco_interfaces::{
@@ -24,6 +27,10 @@ use crate::{
     table::{Backend, TableRef},
 };
 
+/// Minimum number of reported measurements that have to be available for a node.
+/// If less measurements have been reported, no reputation score will be computed in that epoch.
+const MIN_NUM_MEASUREMENTS: usize = 10;
+
 /// The state of the Application
 ///
 /// The functions implemented on this struct are the "Smart Contracts" of the application layer
@@ -37,6 +44,7 @@ pub struct State<B: Backend> {
     pub services: B::Ref<ServiceId, Service>,
     pub parameters: B::Ref<ProtocolParams, u128>,
     pub rep_measurements: B::Ref<NodePublicKey, Vec<ReportedReputationMeasurements>>,
+    pub rep_scores: B::Ref<NodePublicKey, u8>,
     pub current_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
     pub last_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
     pub total_served: B::Ref<Epoch, TotalServed>,
@@ -62,6 +70,7 @@ impl<B: Backend> State<B> {
             services: backend.get_table_reference("service"),
             parameters: backend.get_table_reference("parameter"),
             rep_measurements: backend.get_table_reference("rep_measurements"),
+            rep_scores: backend.get_table_reference("rep_scores"),
             last_epoch_served: backend.get_table_reference("last_epoch_served"),
             current_epoch_served: backend.get_table_reference("current_epoch_served"),
             total_served: backend.get_table_reference("total_served"),
@@ -600,6 +609,7 @@ impl<B: Backend> State<B> {
         // If more than 2/3rds of the committee have signaled, start the epoch change process
         if current_committee.ready_to_change.len() > (2 * current_committee.members.len() / 3) {
             // Todo: Reward nodes, calculate rep?, choose new committee, increment epoch.
+            // self.calculate_reputation_scores();
 
             // calculate the next epoch endstamp
             let epoch_duration = self.parameters.get(&ProtocolParams::EpochTime).unwrap();
@@ -632,6 +642,24 @@ impl<B: Backend> State<B> {
             self.committee_info.set(current_epoch, current_committee);
             TransactionResponse::Success(ExecutionData::None)
         }
+    }
+
+    #[allow(dead_code)]
+    fn calculate_reputation_scores(&self) {
+        let mut map = HashMap::new();
+        for node in self.rep_measurements.keys() {
+            if let Some(reported_measurements) = self.rep_measurements.get(&node) {
+                if reported_measurements.len() > MIN_NUM_MEASUREMENTS {
+                    // Only compute reputation score for node if enough measurements have been
+                    // reported
+                    map.insert(node, reported_measurements);
+                }
+            }
+        }
+        let rep_scores = draco_reputation::calculate_reputation_scores(map);
+        rep_scores
+            .into_iter()
+            .for_each(|(node, score)| self.rep_scores.set(node, score));
     }
 
     fn add_service(

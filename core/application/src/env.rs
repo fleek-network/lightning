@@ -34,6 +34,7 @@ impl Env<UpdatePerm> {
             .with_table::<ServiceId, Service>("service")
             .with_table::<ProtocolParams, u128>("parameter")
             .with_table::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements")
+            .with_table::<NodePublicKey, u8>("rep_scores")
             .with_table::<NodePublicKey, CommodityServed>("current_epoch_served")
             .with_table::<NodePublicKey, CommodityServed>("last_epoch_served")
             .with_table::<Epoch, TotalServed>("total_served")
