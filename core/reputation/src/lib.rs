@@ -242,7 +242,7 @@ impl NormalizedMeasurements {
         }
     }
 
-    fn calculate_score(&self) -> f64 {
+    fn calculate_score(&self) -> Option<u8> {
         let mut score = 0.0;
         let mut count = 0;
         if let Some(latency) = self.latency {
@@ -270,7 +270,12 @@ impl NormalizedMeasurements {
             count += 1;
         }
 
-        score / count as f64
+        if count == 0 {
+            return None;
+        }
+        // This value will be in the range [0, 1]
+        score /= count as f64;
+        Some((score * 100.0) as u8)
     }
 }
 
@@ -294,6 +299,6 @@ pub fn calculate_reputation_scores(
 
     normalized_measurements_map
         .iter()
-        .map(|(node, m)| (*node, (m.calculate_score() * 100.0) as u8))
+        .filter_map(|(node, m)| m.calculate_score().map(|score| (*node, score)))
         .collect()
 }
