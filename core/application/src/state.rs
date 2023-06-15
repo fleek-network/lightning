@@ -1,6 +1,6 @@
-use std::{cmp::Ordering, collections::BTreeMap, str::FromStr};
+use std::{cmp::Ordering, collections::BTreeMap};
 
-use bigdecimal::{self, BigDecimal};
+// use bigdecimal::{self, BigDecimal};
 use draco_interfaces::{
     types::{
         AccountInfo, CommodityServed, CommodityTypes, Epoch, ExecutionData, ExecutionError,
@@ -15,13 +15,14 @@ use fleek_crypto::{
     TransactionSender,
 };
 use multiaddr::Multiaddr;
-use num_bigint::{BigUint, ToBigInt, ToBigUint};
+use num_bigint::{BigUint, ToBigUint};
 use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
 
-use crate::table::{Backend, TableRef};
-
-const MULTIPLIER: u128 = 10u128.pow(18);
+use crate::{
+    big_decimal::BigDecimal,
+    table::{Backend, TableRef},
+};
 
 /// The state of the Application
 ///
@@ -722,12 +723,9 @@ impl<B: Backend> State<B> {
 
         // todo: refactor this into our own struct of BigDecimal
         let emission_per_revenue_unit = inflation as f64 / (max_boost as f64 * reward_pool);
-        let bd_multiplier = BigDecimal::from_u128(MULTIPLIER).unwrap();
-        let big_emmission = BigDecimal::from_str(&emission_per_revenue_unit.to_string()).unwrap()
-            * bd_multiplier.clone();
-        let big_uint_emission = big_emmission.to_bigint().unwrap().to_biguint().unwrap();
+        let bd_emission = BigDecimal::from_f64(emission_per_revenue_unit, 18);
 
-        let flk_per_stable_revenue_unit = big_uint_emission * supply_at_year_start;
+        let flk_per_stable_revenue_unit = bd_emission.value * supply_at_year_start;
 
         // Todo: iterate over last_epoch_served table
         // distribute inflation rewards per unit of usdc earned
@@ -749,16 +747,10 @@ impl<B: Backend> State<B> {
                     }
                 }
             }
-            let big_stable_revenue =
-                BigDecimal::from_str(&stable_revenue.to_string()).unwrap() * bd_multiplier.clone();
-            let big_stable_revenue = big_stable_revenue
-                .to_bigint()
-                .unwrap()
-                .to_biguint()
-                .unwrap();
-            self.mint_and_transfer(big_stable_revenue.clone(), node, Tokens::USDC);
+            let big_stable_revenue = BigDecimal::from_f64(stable_revenue, 18);
+            self.mint_and_transfer(big_stable_revenue.value.clone(), node, Tokens::USDC);
             self.mint_and_transfer(
-                big_stable_revenue * flk_per_stable_revenue_unit.clone(),
+                big_stable_revenue.value.clone() * flk_per_stable_revenue_unit.clone(),
                 node,
                 Tokens::FLK,
             )

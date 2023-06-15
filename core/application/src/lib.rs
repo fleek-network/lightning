@@ -1,4 +1,5 @@
 pub mod app;
+pub mod big_decimal;
 pub mod config;
 pub mod env;
 pub mod genesis;
