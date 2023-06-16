@@ -2785,13 +2785,20 @@ dependencies = [
 name = "fleek-cdn"
 version = "0.0.0"
 dependencies = [
+ "affair",
  "anyhow",
  "arrayref",
  "arrayvec",
  "async-trait",
  "blake3-tree",
  "bytes",
+ "criterion 0.4.0",
+ "draco-application",
+ "draco-blockstore",
+ "draco-handshake",
  "draco-interfaces",
+ "draco-notifier",
+ "draco-rep-collector",
  "draco-sdk",
  "fleek-crypto",
  "futures",

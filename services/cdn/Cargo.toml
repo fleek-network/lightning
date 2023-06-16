@@ -17,6 +17,14 @@ futures = "0.3"
 
 fleek-crypto = { path = "../../lib/fleek-crypto" }
 blake3-tree = { path = "../../lib/blake3-tree" }
-draco-interfaces = {path="../../core/interfaces"}
+draco-interfaces = { path="../../core/interfaces" }
+draco-handshake = { path = "../../core/handshake" }
 draco-sdk = {path="../../core/sdk"}
 
+[dev-dependencies]
+criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
+affair.workspace = true
+draco-application = { path = "../../core/application" }
+draco-blockstore = { path = "../../core/blockstore" }
+draco-rep-collector = { path = "../../core/rep-collector" }
+draco-notifier = { path = "../../core/notifier" }
