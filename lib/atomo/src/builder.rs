@@ -76,7 +76,10 @@ impl<S: SerdeBackend> AtomoBuilder<S> {
     #[must_use = "Builder is incomplete."]
     pub fn enable_iter(mut self, name: &str) -> Self {
         if let Some(index) = self.atomo.table_name_to_id.get(name) {
-            self.atomo.tables[*index as usize].iter = true;
+            self.atomo
+                .snapshot_list
+                .get_metadata_mut()
+                .enable(*index as usize);
             return self;
         }
 

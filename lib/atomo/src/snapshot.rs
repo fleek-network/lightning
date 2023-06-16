@@ -140,6 +140,16 @@ impl<T, U> SnapshotList<T, U> {
         let head_ptr = guard.protect(&self.head, Ordering::Acquire);
         Snapshot::new(head_ptr)
     }
+
+    /// Returns a mutable reference to the head's meta data.
+    pub fn get_metadata_mut(&mut self) -> &mut U {
+        let head_ptr = self.head.load(Ordering::Relaxed);
+        // Safety: We have a `&mut` reference to self, meaning that this snapshot list
+        // is still under construction and there is only one thread accessing it, we
+        // are at the `builder` stage of the process.
+        let head = unsafe { &mut *head_ptr };
+        &mut head.metadata
+    }
 }
 
 /// The snapshot object.
