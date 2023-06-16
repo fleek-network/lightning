@@ -108,7 +108,7 @@ impl IncrementalPutInterface for IncrementalPut {
                 Mode::Trust { tree_builder } => tree_builder.update(chunk.as_ref()),
             }
 
-            let hash = block.finalize(true); // Is this arg always true?
+            let hash = block.finalize(false); // TODO: Look into how to dynamically pass the proper value.
             self.stack.push(Chunk {
                 hash,
                 content: ContentChunk {
