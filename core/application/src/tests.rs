@@ -25,7 +25,7 @@ const NODE_ONE: &str = "k7XAk/1z4rXf1QHyMPHZ1cgyeX2T3bsCCopNpFV6v8hInZfjyti79w3r
 // Init the app and return the execution engine socket that would go to narwhal and the query socket
 // that could go to anyone
 async fn init_app() -> (ExecutionEngineSocket, QueryRunner) {
-    let app = Application::init(Config {}).await.unwrap();
+    let app = Application::init(Config::default()).await.unwrap();
 
     (app.transaction_executor(), app.sync_query())
 }

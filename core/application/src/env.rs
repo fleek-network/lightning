@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use draco_interfaces::{
@@ -13,6 +15,7 @@ use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 use num_bigint::{BigUint, ToBigUint};
 
 use crate::{
+    config::{Config, Mode},
     genesis::{Genesis, GenesisPrices},
     query_runner::QueryRunner,
     state::{Committee, State},
@@ -97,9 +100,24 @@ impl Env<UpdatePerm> {
 
     /// Seeds the application state with the genesis block
     /// This function will panic if the genesis file cannot be decoded into the correct types
-    pub fn genesis(&mut self) {
+    pub fn genesis(&mut self, config: Config) {
         self.inner.run(|ctx| {
-            let genesis = Genesis::load().unwrap();
+            let mut genesis = Genesis::load().unwrap();
+
+            match &config.mode {
+                Mode::Dev => {
+                    genesis.epoch_start = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64;
+                },
+                Mode::Test => {
+                    if let Some(config_genesis) = &config.genesis {
+                        genesis = config_genesis.clone();
+                    }
+                },
+                Mode::Prod => (),
+            }
 
             let mut node_table = ctx.get_table::<NodePublicKey, NodeInfo>("node");
             let mut account_table = ctx.get_table::<AccountOwnerPublicKey, AccountInfo>("account");

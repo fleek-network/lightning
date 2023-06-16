@@ -43,7 +43,7 @@ impl Worker for MockWorker {
 }
 
 async fn init_rpc_without_consensus() -> Result<Rpc<QueryRunner>> {
-    let app = Application::init(AppConfig {}).await.unwrap();
+    let app = Application::init(AppConfig::default()).await.unwrap();
 
     let rpc = Rpc::init(
         RpcConfig::default(),
@@ -56,7 +56,7 @@ async fn init_rpc_without_consensus() -> Result<Rpc<QueryRunner>> {
 }
 
 async fn init_rpc_with_execution_socket() -> Result<(Rpc<QueryRunner>, ExecutionEngineSocket)> {
-    let app = Application::init(AppConfig {}).await.unwrap();
+    let app = Application::init(AppConfig::default()).await.unwrap();
 
     let rpc = Rpc::init(
         RpcConfig::default(),

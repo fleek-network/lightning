@@ -379,7 +379,7 @@ mod tests {
         Sdk<OwnedReadHalf, OwnedWriteHalf>,
     )> {
         let signer = TokioSpawn::spawn(Signer {});
-        let app = Application::init(Config {}).await?;
+        let app = Application::init(Config::default()).await?;
         let sdk = Sdk::<OwnedReadHalf, OwnedWriteHalf>::new(
             app.sync_query(),
             MyReputationReporter {},
