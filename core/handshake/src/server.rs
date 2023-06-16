@@ -63,7 +63,7 @@ impl StreamProvider for TcpProvider {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HandshakeServerConfig {
-    listen_addr: SocketAddr,
+    pub listen_addr: SocketAddr,
 }
 
 impl Default for HandshakeServerConfig {
