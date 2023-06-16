@@ -1,12 +1,14 @@
-pub fn min_max_normalize(value: f64, min_val: f64, max_val: f64) -> f64 {
-    (value - min_val) / (max_val - min_val)
-}
+const EPSILON: f64 = 1e-8;
 
 pub fn try_min_max_normalize(value: f64, min_value: f64, max_value: f64) -> Option<f64> {
-    if (max_value - min_value).abs() < f64::EPSILON {
+    if (max_value - min_value).abs() < EPSILON {
         return None;
     }
-    Some((value - min_value) / (max_value - min_value))
+    Some(min_max_normalize(value, min_value, max_value))
+}
+
+pub fn min_max_normalize(value: f64, min_value: f64, max_value: f64) -> f64 {
+    (value - min_value) / (max_value - min_value)
 }
 
 pub fn calculate_normalized_mean(mut values: Vec<f64>) -> f64 {
@@ -40,12 +42,12 @@ fn calculate_std_dev(values: &[f64]) -> Option<f64> {
 }
 
 fn calculate_z_score(x: f64, mean: f64, std_dev: f64) -> f64 {
-    ((x - mean) / (std_dev + f64::EPSILON)).abs()
+    ((x - mean) / (std_dev + EPSILON)).abs()
 }
 
 fn z_score_normalize_filter(values: &mut Vec<f64>) {
     let std_dev = calculate_std_dev(values).unwrap();
-    if std_dev.abs() > f64::EPSILON {
+    if std_dev.abs() > EPSILON {
         let mean = calculate_mean(values).unwrap();
         values.retain(|&x| calculate_z_score(x, mean, std_dev) < 3.0);
     }
@@ -133,5 +135,18 @@ mod tests {
     fn test_std_dev_empty() {
         let values = [];
         assert!(calculate_std_dev(&values).is_none());
+    }
+
+    #[test]
+    fn test_min_max_normalize() {
+        assert_eq!(min_max_normalize(80.0, 20.0, 100.0), 0.75);
+        assert_eq!(min_max_normalize(100.0, 20.0, 100.0), 1.0);
+        assert_eq!(min_max_normalize(20.0, 20.0, 100.0), 0.0);
+    }
+
+    #[test]
+    fn test_try_min_max_normalize() {
+        assert_eq!(try_min_max_normalize(50.0, 50.0, 50.0), None);
+        assert_eq!(try_min_max_normalize(50.0, 10.0, 90.0), Some(0.5));
     }
 }

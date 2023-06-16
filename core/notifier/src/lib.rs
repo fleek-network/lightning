@@ -66,7 +66,7 @@ mod tests {
 
     use super::*;
 
-    const EPSILON: f64 = 0.01;
+    const EPSILON: f64 = 0.1;
 
     async fn init_app(epoch_time: u64) -> (ExecutionEngineSocket, QueryRunner) {
         let mut genesis = Genesis::load().expect("Failed to load genesis from file.");

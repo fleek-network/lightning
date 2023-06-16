@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 draco-interfaces = {path="../interfaces"}
 fleek-crypto.workspace = true
+
+[dev-dependencies]
+rand.workspace = true
