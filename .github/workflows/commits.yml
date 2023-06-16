@@ -27,22 +27,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+        # Enable caching of the 'librocksdb-sys' crate by additionally caching the
+        # 'librocksdb-sys' src directory which is managed by cargo
+        uses: bmwill/rust-cache@v1 # Fork of 'Swatinem/rust-cache' which allows caching additional paths
         with:
+          path: ~/.cargo/registry/src/**/librocksdb-sys-*
           shared-key: "lints"
       - name: Cargo Clippy 
         run: cargo clippy --all-features --all-targets -- -Dclippy::all
 
   check:
     name: Check
-    needs: clippy
+    needs: fmt
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+        # Enable caching of the 'librocksdb-sys' crate by additionally caching the
+        # 'librocksdb-sys' src directory which is managed by cargo
+        uses: bmwill/rust-cache@v1 # Fork of 'Swatinem/rust-cache' which allows caching additional paths
         with:
+          path: ~/.cargo/registry/src/**/librocksdb-sys-*
           shared-key: "lints"
           save-if: "false"
       - name: Cargo Check

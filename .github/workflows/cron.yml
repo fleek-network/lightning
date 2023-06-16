@@ -46,7 +46,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+        # Enable caching of the 'librocksdb-sys' crate by additionally caching the
+        # 'librocksdb-sys' src directory which is managed by cargo
+        uses: bmwill/rust-cache@v1 # Fork of 'Swatinem/rust-cache' which allows caching additional paths
+        with:
+          path: ~/.cargo/registry/src/**/librocksdb-sys-*
+          cache-all-crates: "true"
       - name: Build Release
         run: cargo +stable build --all --release
 
@@ -60,8 +65,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+        # Enable caching of the 'librocksdb-sys' crate by additionally caching the
+        # 'librocksdb-sys' src directory which is managed by cargo
+        uses: bmwill/rust-cache@v1 # Fork of 'Swatinem/rust-cache' which allows caching additional paths
         with:
+          path: ~/.cargo/registry/src/**/librocksdb-sys-*
           cache-all-crates: "true"
       - name: Setup junitify
         run: cargo install junitify
@@ -91,7 +99,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+        # Enable caching of the 'librocksdb-sys' crate by additionally caching the
+        # 'librocksdb-sys' src directory which is managed by cargo
+        uses: bmwill/rust-cache@v1 # Fork of 'Swatinem/rust-cache' which allows caching additional paths
+        with:
+          path: ~/.cargo/registry/src/**/librocksdb-sys-*
+          cache-all-crates: "true"
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate Code Coverage
