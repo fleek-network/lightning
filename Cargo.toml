@@ -34,6 +34,13 @@ affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
 fleek-crypto = { path = "lib/fleek-crypto" }
 
+# Since MystenLabs uses Hakari in the sui repository, and we bring narwhal in from there, this
+# results into all of their dependencies and packages to be listed in their workspace-hack crate.
+# That adds a huge amount of unwanted dependencies to our crate. The `empty-workspace-hack` is an
+# empty crate which only depends on `strum` which is the only dependency narwhal cared about.
+[patch.'https://github.com/MystenLabs/sui.git']
+workspace-hack = { git = "https://github.com/fleek-network/empty-workspace-hack.git", rev = "c07eb1e343a455d57a5481b50eada03c62b4f2c6"}
+
 [profile.release]
 # 2 full, 0 nothing, 1 good enough.
 debug = 1
