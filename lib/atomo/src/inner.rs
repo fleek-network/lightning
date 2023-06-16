@@ -12,6 +12,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::{
     batch::{Operation, VerticalBatch},
     db::TableId,
+    keys::VerticalKeys,
     serder::SerdeBackend,
     snapshot::SnapshotList,
     table::{ResolvedTableReference, TableMeta},
@@ -31,7 +32,7 @@ pub struct AtomoInner<S: SerdeBackend> {
     /// Map each table name to its index.
     pub table_name_to_id: FxHashMap<String, TableId>,
     /// The linked list of the old-snapshots.
-    pub snapshot_list: SnapshotList<VerticalBatch>,
+    pub snapshot_list: SnapshotList<VerticalBatch, VerticalKeys>,
     serde: PhantomData<S>,
 }
 
@@ -43,7 +44,7 @@ impl<S: SerdeBackend> AtomoInner<S> {
             persistence: Vec::new(),
             tables: Vec::new(),
             table_name_to_id: FxHashMap::default(),
-            snapshot_list: SnapshotList::new(),
+            snapshot_list: SnapshotList::default(),
             serde: PhantomData,
         }
     }

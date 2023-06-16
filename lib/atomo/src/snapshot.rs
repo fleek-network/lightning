@@ -35,21 +35,24 @@ use crate::once_ptr::OncePtr;
 /// removing them.
 // TODO: This can even further improved since seize is an overkill. What we really need
 // is a much simpler reclamation.
-pub struct SnapshotList<T> {
+pub struct SnapshotList<T, U> {
     collector: Collector,
-    head: AtomicPtr<Linked<SnapshotInner<T>>>,
-    tail: AtomicPtr<Linked<SnapshotInner<T>>>,
+    head: AtomicPtr<Linked<SnapshotInner<T, U>>>,
+    tail: AtomicPtr<Linked<SnapshotInner<T, U>>>,
 }
 
-impl<T> Default for SnapshotList<T> {
+impl<T, U> Default for SnapshotList<T, U>
+where
+    U: Default,
+{
     fn default() -> Self {
-        Self::new()
+        Self::new(U::default())
     }
 }
 
-impl<T> SnapshotList<T> {
+impl<T, U> SnapshotList<T, U> {
     /// Create a new empty snapshot list.
-    pub fn new() -> Self {
+    pub fn new(metadata: U) -> Self {
         let collector = Collector::new()
             // By default `seize` waits for 120 objects to get retired before it attempts
             // to remove things. But that's too much for us since batches might not be
@@ -61,7 +64,7 @@ impl<T> SnapshotList<T> {
             // for the purposes of this linked-list.
             .epoch_frequency(NonZeroU64::new(10));
 
-        let node = collector.link_boxed(SnapshotInner::empty());
+        let node = collector.link_boxed(SnapshotInner::empty(metadata));
 
         SnapshotList {
             collector,
@@ -77,14 +80,14 @@ impl<T> SnapshotList<T> {
     /// # Safety
     ///
     /// This function can not be called concurrently. Only one thread can access it at a time.
-    pub fn push<F>(&self, data: T, transition: F)
+    pub fn push<F>(&self, data: T, metadata: U, transition: F)
     where
         F: FnOnce(),
     {
         let guard = self.collector.enter();
 
         // Create the new head.
-        let new_head = self.collector.link_boxed(SnapshotInner::empty());
+        let new_head = self.collector.link_boxed(SnapshotInner::empty(metadata));
 
         // Update the previous head's inner data.
         let prev_head_ptr = guard.protect(&self.head, Ordering::Acquire);
@@ -119,7 +122,7 @@ impl<T> SnapshotList<T> {
 
             unsafe {
                 self.collector
-                    .retire(tail, reclaim::boxed::<SnapshotInner<T>>);
+                    .retire(tail, reclaim::boxed::<SnapshotInner<T, U>>);
             }
 
             // move to the next node and loop again.
@@ -132,7 +135,7 @@ impl<T> SnapshotList<T> {
     }
 
     /// Returns the current snapshot for the data.
-    pub fn current(&self) -> Snapshot<T> {
+    pub fn current(&self) -> Snapshot<T, U> {
         let guard = self.collector.enter();
         let head_ptr = guard.protect(&self.head, Ordering::Acquire);
         Snapshot::new(head_ptr)
@@ -140,37 +143,45 @@ impl<T> SnapshotList<T> {
 }
 
 /// The snapshot object.
-pub struct Snapshot<T> {
-    inner: *mut Linked<SnapshotInner<T>>,
+pub struct Snapshot<T, U> {
+    inner: *mut Linked<SnapshotInner<T, U>>,
 }
 
-struct SnapshotInner<T> {
+struct SnapshotInner<T, U> {
     counter: AtomicUsize,
-    next: AtomicPtr<Linked<SnapshotInner<T>>>,
+    next: AtomicPtr<Linked<SnapshotInner<T, U>>>,
     data: OncePtr<T>,
+    metadata: U,
 }
 
-impl<T> SnapshotInner<T> {
+impl<T, U> SnapshotInner<T, U> {
     /// Create a new empty snapshot inner with everything set to null
     /// and the reference counter set to zero.
     #[inline(always)]
-    pub fn empty() -> Self {
+    pub fn empty(metadata: U) -> Self {
         SnapshotInner {
             counter: AtomicUsize::new(0),
             next: AtomicPtr::new(null_mut()),
             data: OncePtr::null(),
+            metadata,
         }
     }
 }
 
-impl<T> Snapshot<T> {
+impl<T, U> Snapshot<T, U> {
     /// Create a new snapshot.
     #[inline(always)]
-    fn new(inner_ptr: *mut Linked<SnapshotInner<T>>) -> Self {
+    fn new(inner_ptr: *mut Linked<SnapshotInner<T, U>>) -> Self {
         debug_assert!(!inner_ptr.is_null());
         let inner = unsafe { &*inner_ptr };
         inner.counter.fetch_add(1, Ordering::Relaxed);
         Self { inner: inner_ptr }
+    }
+
+    /// Returns the meta data associated with the current snapshot.
+    pub fn get_metadata(&self) -> &U {
+        let inner = unsafe { &*self.inner };
+        &inner.metadata
     }
 
     /// Run the given `predicate` on each node on the snapshot list starting from
@@ -206,7 +217,7 @@ impl<T> Snapshot<T> {
     }
 }
 
-impl<T> Drop for Snapshot<T> {
+impl<T, U> Drop for Snapshot<T, U> {
     fn drop(&mut self) {
         debug_assert!(!self.inner.is_null());
         let inner = unsafe { &*self.inner };
@@ -214,7 +225,7 @@ impl<T> Drop for Snapshot<T> {
     }
 }
 
-impl<T> Drop for SnapshotList<T> {
+impl<T, U> Drop for SnapshotList<T, U> {
     fn drop(&mut self) {
         let mut tail = self.tail.load(Ordering::Relaxed);
 
@@ -228,7 +239,7 @@ impl<T> Drop for SnapshotList<T> {
 
             unsafe {
                 self.collector
-                    .retire(tail, reclaim::boxed::<SnapshotInner<T>>);
+                    .retire(tail, reclaim::boxed::<SnapshotInner<T, U>>);
             }
 
             // move to the next node.

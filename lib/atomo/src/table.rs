@@ -14,6 +14,7 @@ use crate::{
     batch::{BatchReference, Operation, VerticalBatch},
     db::TableId,
     inner::AtomoInner,
+    keys::VerticalKeys,
     serder::SerdeBackend,
     snapshot::Snapshot,
     KeyIterator,
@@ -57,7 +58,7 @@ pub struct TableSelector<S: SerdeBackend> {
     /// The [`Atomo`] instance.
     atomo: Arc<AtomoInner<S>>,
     /// The current version of the data.
-    snapshot: Snapshot<VerticalBatch>,
+    snapshot: Snapshot<VerticalBatch, VerticalKeys>,
     /// A set of already claimed tables.
     // TODO(qti3e): Replace this with a UnsafeCell or a `SingleThreadedBoolVec`.
     selected: RefCell<FxHashSet<TableId>>,
