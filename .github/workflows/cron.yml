@@ -48,10 +48,11 @@ jobs:
       - name: Rust Cache
         # Enable caching of the 'librocksdb-sys' crate by additionally caching the
         # 'librocksdb-sys' src directory which is managed by cargo
-        uses: bmwill/rust-cache@v1 # Fork of 'Swatinem/rust-cache' which allows caching additional paths
+        uses: bmwill/rust-cache@v2 # Fork of 'Swatinem/rust-cache' which allows caching additional paths
         with:
           path: ~/.cargo/registry/src/**/librocksdb-sys-*
           cache-all-crates: "true"
+          shared-key: "build"
       - name: Build Release
         run: cargo +stable build --all --release
 
@@ -65,12 +66,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Rust Cache
-        # Enable caching of the 'librocksdb-sys' crate by additionally caching the
-        # 'librocksdb-sys' src directory which is managed by cargo
-        uses: bmwill/rust-cache@v1 # Fork of 'Swatinem/rust-cache' which allows caching additional paths
+        uses: Swatinem/rust-cache@v2
         with:
-          path: ~/.cargo/registry/src/**/librocksdb-sys-*
+          cache-directories: ~/.cargo/registry/src/**/librocksdb-sys-*
           cache-all-crates: "true"
+          shared-key: "test"
       - name: Setup junitify
         run: cargo install junitify
       - name: Cargo Test
@@ -99,12 +99,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Rust Cache
-        # Enable caching of the 'librocksdb-sys' crate by additionally caching the
-        # 'librocksdb-sys' src directory which is managed by cargo
-        uses: bmwill/rust-cache@v1 # Fork of 'Swatinem/rust-cache' which allows caching additional paths
+        uses: Swatinem/rust-cache@v2
         with:
-          path: ~/.cargo/registry/src/**/librocksdb-sys-*
+          cache-directories: ~/.cargo/registry/src/**/librocksdb-sys-*
           cache-all-crates: "true"
+          shared-key: "coverage"
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate Code Coverage
