@@ -41,6 +41,7 @@ pub trait TableRef<K, V> {
     fn set(&self, key: K, value: V);
     fn get(&self, key: &K) -> Option<V>;
     fn keys(&self) -> KeyIterator<'_, K>;
+    fn remove(&self, key: &K);
 }
 
 pub struct StateTables<'selector, S: SerdeBackend> {
@@ -111,5 +112,9 @@ impl<
 
     fn keys(&self) -> KeyIterator<'_, K> {
         todo!()
+    }
+
+    fn remove(&self, key: &K) {
+        self.0.borrow_mut().remove(key)
     }
 }

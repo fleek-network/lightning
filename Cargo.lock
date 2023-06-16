@@ -960,13 +960,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "bigdecimal"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6773ddc0eafc0e509fb60e48dff7f450f8e674a0686ae8605e8d9901bd5eefa"
+name = "big-decimal"
+version = "0.1.0"
 dependencies = [
  "num-bigint",
- "num-integer",
  "num-traits",
  "serde",
 ]
@@ -2105,15 +2102,13 @@ dependencies = [
  "anyhow",
  "async-trait",
  "atomo",
- "bigdecimal",
+ "big-decimal",
  "bincode",
  "draco-interfaces",
  "draco-reputation",
  "fastcrypto 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "fleek-crypto",
  "multiaddr",
- "num-bigint",
- "num-derive",
  "num-traits",
  "serde",
  "tokio",
@@ -2204,6 +2199,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "atomo",
+ "big-decimal",
  "bytes",
  "fleek-crypto",
  "multiaddr",
@@ -2320,12 +2316,12 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum",
+ "big-decimal",
  "bincode",
  "draco-application",
  "draco-interfaces",
  "fleek-crypto",
  "jsonrpc-v2",
- "num-bigint",
  "reqwest",
  "serde",
  "serde_json",

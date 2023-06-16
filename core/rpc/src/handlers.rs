@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use axum::{Extension, Json};
+use big_decimal::BigDecimal;
 use draco_interfaces::{RpcInterface, SyncQueryRunnerInterface};
 use jsonrpc_v2::{Data, Error, MapRouter, Params, RequestObject, ResponseObjects, Server};
-use num_bigint::BigUint;
 
 use crate::types::{NodeKeyParam, PublicKeyParam};
 
@@ -47,7 +47,7 @@ pub async fn ping_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>>() -> 
 pub async fn get_balance_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>>(
     data: Data<Arc<I>>,
     Params(params): Params<PublicKeyParam>,
-) -> Result<BigUint> {
+) -> Result<BigDecimal<18>> {
     Ok(data.0.query_runner().get_flk_balance(&params.public_key))
 }
 
@@ -64,13 +64,13 @@ pub async fn get_bandwidth_balance_handler<Q: SyncQueryRunnerInterface, I: RpcIn
 pub async fn get_locked_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>>(
     data: Data<Arc<I>>,
     Params(params): Params<NodeKeyParam>,
-) -> Result<BigUint> {
+) -> Result<BigDecimal<18>> {
     Ok(data.0.query_runner().get_locked(&params.public_key))
 }
 
 pub async fn get_staked_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>>(
     data: Data<Arc<I>>,
     Params(params): Params<NodeKeyParam>,
-) -> Result<BigUint> {
+) -> Result<BigDecimal<18>> {
     Ok(data.0.query_runner().get_locked(&params.public_key))
 }

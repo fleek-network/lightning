@@ -1,4 +1,5 @@
 use atomo::{Atomo, QueryPerm, ResolvedTableReference};
+use big_decimal::BigDecimal;
 use draco_interfaces::{
     application::SyncQueryRunnerInterface,
     types::{
@@ -7,15 +8,13 @@ use draco_interfaces::{
     },
 };
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
-use num_bigint::BigUint;
-use num_traits::{ToPrimitive, Zero};
 
 use crate::state::Committee;
 
 #[derive(Clone)]
 pub struct QueryRunner {
     inner: Atomo<QueryPerm>,
-    metadata_table: ResolvedTableReference<Metadata, BigUint>,
+    metadata_table: ResolvedTableReference<Metadata, BigDecimal<18>>,
     account_table: ResolvedTableReference<AccountOwnerPublicKey, AccountInfo>,
     client_table: ResolvedTableReference<ClientPublicKey, AccountOwnerPublicKey>,
     node_table: ResolvedTableReference<NodePublicKey, NodeInfo>,
@@ -31,7 +30,7 @@ pub struct QueryRunner {
 impl QueryRunner {
     pub fn init(atomo: Atomo<QueryPerm>) -> Self {
         Self {
-            metadata_table: atomo.resolve::<Metadata, BigUint>("metadata"),
+            metadata_table: atomo.resolve::<Metadata, BigDecimal<18>>("metadata"),
             account_table: atomo.resolve::<AccountOwnerPublicKey, AccountInfo>("account"),
             client_table: atomo.resolve::<ClientPublicKey, AccountOwnerPublicKey>("client_keys"),
             node_table: atomo.resolve::<NodePublicKey, NodeInfo>("node"),
@@ -73,33 +72,33 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn get_flk_balance(&self, account: &AccountOwnerPublicKey) -> BigUint {
+    fn get_flk_balance(&self, account: &AccountOwnerPublicKey) -> BigDecimal<18> {
         self.inner.run(|ctx| {
             self.account_table
                 .get(ctx)
                 .get(account)
                 .map(|account| account.flk_balance)
-                .unwrap_or(Zero::zero())
+                .unwrap_or(BigDecimal::<18>::zero())
         })
     }
 
-    fn get_staked(&self, node: &NodePublicKey) -> BigUint {
+    fn get_staked(&self, node: &NodePublicKey) -> BigDecimal<18> {
         self.inner.run(|ctx| {
             self.node_table
                 .get(ctx)
                 .get(node)
                 .map(|node| node.stake.staked)
-                .unwrap_or(Zero::zero())
+                .unwrap_or(BigDecimal::zero())
         })
     }
 
-    fn get_locked(&self, node: &NodePublicKey) -> BigUint {
+    fn get_locked(&self, node: &NodePublicKey) -> BigDecimal<18> {
         self.inner.run(|ctx| {
             self.node_table
                 .get(ctx)
                 .get(node)
                 .map(|node| node.stake.locked)
-                .unwrap_or(Zero::zero())
+                .unwrap_or(BigDecimal::zero())
         })
     }
 
@@ -159,13 +158,12 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn get_committee_members(&self) -> Vec<NodePublicKey> {
         self.inner.run(|ctx| {
             // get current epoch first
-            let epoch = self
+            let epoch: u64 = self
                 .metadata_table
                 .get(ctx)
                 .get(&Metadata::Epoch)
                 .unwrap_or_default()
-                .to_u64()
-                .unwrap();
+                .into();
 
             // look up current committee
             self.committee_table
@@ -186,8 +184,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 .get(ctx)
                 .get(&Metadata::Epoch)
                 .unwrap_or_default()
-                .to_u64()
-                .unwrap();
+                .into();
 
             // look up current committee
             let committee = self.committee_table.get(ctx).get(epoch).unwrap_or_default();

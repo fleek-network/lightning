@@ -1,11 +1,11 @@
 use std::{collections::BTreeMap, time::Duration};
 
+use big_decimal::BigDecimal;
 use fleek_crypto::{
     AccountOwnerPublicKey, NodeNetworkingPublicKey, NodePublicKey, TransactionSender,
     TransactionSignature,
 };
 use multiaddr::Multiaddr;
-use num_bigint::BigUint;
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
@@ -104,7 +104,7 @@ pub enum UpdateMethod {
     /// Withdraw tokens from the network back to the L2
     Withdraw {
         /// The amount to withdrawl
-        amount: BigUint,
+        amount: BigDecimal<18>,
         /// Which token to withdrawl
         token: Tokens,
         /// The address to recieve these tokens on the L2
@@ -117,12 +117,12 @@ pub enum UpdateMethod {
         /// Which token was bridged
         token: Tokens,
         /// Amount bridged
-        amount: BigUint,
+        amount: BigDecimal<18>,
     },
     /// Stake FLK in network
     Stake {
         /// Amount to stake
-        amount: BigUint,
+        amount: BigDecimal<18>,
         /// Node Public Key
         node_public_key: NodePublicKey,
         /// Node networking key for narwhal
@@ -145,7 +145,7 @@ pub enum UpdateMethod {
     /// Unstake FLK, the tokens will be locked for a set amount of
     /// time(ProtocolParameter::LockTime) before they can be withdrawn
     Unstake {
-        amount: BigUint,
+        amount: BigDecimal<18>,
         node: NodePublicKey,
     },
     /// Withdraw tokens from a node after lock period has passed
@@ -226,9 +226,9 @@ pub enum ExecutionError {
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
 pub struct AccountInfo {
     /// The accounts FLK balance
-    pub flk_balance: BigUint,
+    pub flk_balance: BigDecimal<18>,
     /// the accounts stable coin balance
-    pub stables_balance: BigUint,
+    pub stables_balance: BigDecimal<6>,
     /// The accounts stables/bandwidth balance
     pub bandwidth_balance: u128,
     /// The nonce of the account. Added to each transaction before signed to prevent replays and
@@ -240,11 +240,11 @@ pub struct AccountInfo {
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
 pub struct Staking {
     /// How much FLK that is currently staked
-    pub staked: BigUint,
+    pub staked: BigDecimal<18>,
     /// The epoch until all stakes are locked for boosting rewards
     pub stake_locked_until: u64,
     /// How much FLK is locked pending withdrawl
-    pub locked: BigUint,
+    pub locked: BigDecimal<18>,
     /// The epoch the locked FLK is elegible to be withdrawn
     pub locked_until: u64,
 }

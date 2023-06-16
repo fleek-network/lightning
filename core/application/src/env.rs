@@ -2,6 +2,7 @@ use std::time::SystemTime;
 
 use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
+use big_decimal::BigDecimal;
 use draco_interfaces::{
     types::{
         AccountInfo, Block, CommodityServed, CommodityTypes, Epoch, ExecutionData, Metadata,
@@ -12,7 +13,6 @@ use draco_interfaces::{
 };
 use fastcrypto::{ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
-use num_bigint::{BigUint, ToBigUint};
 
 use crate::{
     config::{Config, Mode},
@@ -29,7 +29,7 @@ pub struct Env<P> {
 impl Env<UpdatePerm> {
     pub fn new() -> Self {
         let atomo = AtomoBuilder::<DefaultSerdeBackend>::new()
-            .with_table::<Metadata, BigUint>("metadata")
+            .with_table::<Metadata, BigDecimal<18>>("metadata")
             .with_table::<AccountOwnerPublicKey, AccountInfo>("account")
             .with_table::<ClientPublicKey, AccountOwnerPublicKey>("client_keys")
             .with_table::<NodePublicKey, NodeInfo>("node")
@@ -132,7 +132,10 @@ impl Env<UpdatePerm> {
                 ProtocolParams::CommitteeSize,
                 genesis.committee_size as u128,
             );
-            param_table.insert(ProtocolParams::MinimumNodeStake, genesis.min_stake as u128);
+            param_table.insert(
+                ProtocolParams::MinimumNodeStake,
+                Into::<u128>::into(genesis.min_stake),
+            );
             param_table.insert(
                 ProtocolParams::EligibilityTime,
                 genesis.eligibility_time as u128,
@@ -156,7 +159,7 @@ impl Env<UpdatePerm> {
 
             for node in &genesis.committee {
                 let mut node_info: NodeInfo = node.into();
-                node_info.stake.staked = genesis.min_stake.to_biguint().unwrap();
+                node_info.stake.staked = genesis.min_stake.into();
                 committee_members.push(node_info.public_key);
 
                 node_table.insert(node_info.public_key, node_info);

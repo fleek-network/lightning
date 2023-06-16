@@ -3,7 +3,7 @@ use std::{
     collections::{BTreeMap, HashMap},
 };
 
-// use bigdecimal::{self, BigDecimal};
+use big_decimal::BigDecimal;
 use draco_interfaces::{
     types::{
         AccountInfo, CommodityServed, CommodityTypes, Epoch, ExecutionData, ExecutionError,
@@ -18,14 +18,10 @@ use fleek_crypto::{
     TransactionSender,
 };
 use multiaddr::Multiaddr;
-use num_bigint::{BigUint, ToBigUint};
-use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
+use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    big_decimal::BigDecimal,
-    table::{Backend, TableRef},
-};
+use crate::table::{Backend, TableRef};
 
 /// Minimum number of reported measurements that have to be available for a node.
 /// If less measurements have been reported, no reputation score will be computed in that epoch.
@@ -36,7 +32,7 @@ const MIN_NUM_MEASUREMENTS: usize = 10;
 /// The functions implemented on this struct are the "Smart Contracts" of the application layer
 /// All state changes come from Transactions and start at execute_txn
 pub struct State<B: Backend> {
-    pub metadata: B::Ref<Metadata, BigUint>,
+    pub metadata: B::Ref<Metadata, BigDecimal<18>>,
     pub account_info: B::Ref<AccountOwnerPublicKey, AccountInfo>,
     pub client_keys: B::Ref<ClientPublicKey, AccountOwnerPublicKey>,
     pub node_info: B::Ref<NodePublicKey, NodeInfo>,
@@ -201,8 +197,7 @@ impl<B: Backend> State<B> {
             .metadata
             .get(&Metadata::Epoch)
             .unwrap_or_default()
-            .to_u64()
-            .unwrap();
+            .into();
 
         let mut commodity_served = self.current_epoch_served.get(&sender).unwrap_or_default();
         let mut total_served = self.total_served.get(&current_epoch).unwrap_or_default();
@@ -234,7 +229,7 @@ impl<B: Backend> State<B> {
         &self,
         _sender: TransactionSender,
         _reciever: AccountOwnerPublicKey,
-        _amount: BigUint,
+        _amount: BigDecimal<18>,
         _token: Tokens,
     ) -> TransactionResponse {
         todo!()
@@ -244,7 +239,7 @@ impl<B: Backend> State<B> {
         &self,
         sender: TransactionSender,
         proof: ProofOfConsensus,
-        amount: BigUint,
+        amount: BigDecimal<18>,
         token: Tokens,
     ) -> TransactionResponse {
         // This transaction is only callable by AccountOwners and not nodes
@@ -264,7 +259,7 @@ impl<B: Backend> State<B> {
         // Check the token bridged and increment that amount
         match token {
             Tokens::FLK => account.flk_balance += amount,
-            Tokens::USDC => account.bandwidth_balance += amount.to_u128().unwrap(),
+            Tokens::USDC => account.bandwidth_balance += Into::<u128>::into(amount),
         }
 
         self.account_info.set(sender, account);
@@ -275,7 +270,7 @@ impl<B: Backend> State<B> {
     fn stake(
         &self,
         sender: TransactionSender,
-        amount: BigUint,
+        amount: BigDecimal<18>,
         node_public_key: NodePublicKey,
         node_network_key: Option<NodeNetworkingPublicKey>,
         node_domain: Option<String>,
@@ -381,8 +376,7 @@ impl<B: Backend> State<B> {
                             .metadata
                             .get(&Metadata::Epoch)
                             .unwrap_or_default()
-                            .to_u64()
-                            .unwrap(),
+                            .into(),
                         stake: Staking {
                             staked: amount.clone(),
                             ..Default::default()
@@ -435,7 +429,7 @@ impl<B: Backend> State<B> {
             return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
         }
         // check if node has stakes to be locked
-        if node.stake.staked == Zero::zero() {
+        if node.stake.staked == BigDecimal::zero() {
             return TransactionResponse::Revert(ExecutionError::InsufficientStakesToLock);
         }
 
@@ -443,8 +437,7 @@ impl<B: Backend> State<B> {
             .metadata
             .get(&Metadata::Epoch)
             .unwrap_or_default()
-            .to_u64()
-            .unwrap();
+            .into();
         let current_lock = node.stake.stake_locked_until.saturating_sub(epoch);
 
         let max_lock_time = self
@@ -467,7 +460,7 @@ impl<B: Backend> State<B> {
     fn unstake(
         &self,
         sender: TransactionSender,
-        amount: BigUint,
+        amount: BigDecimal<18>,
         node_public_key: NodePublicKey,
     ) -> TransactionResponse {
         // This transaction is only callable by AccountOwners and not nodes
@@ -491,8 +484,7 @@ impl<B: Backend> State<B> {
             .metadata
             .get(&Metadata::Epoch)
             .unwrap_or_default()
-            .to_u64()
-            .unwrap();
+            .into();
 
         // Make sure the stakes are not locked
         if node.stake.stake_locked_until > current_epoch {
@@ -546,10 +538,10 @@ impl<B: Backend> State<B> {
 
         let current_epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
         // Make sure the node has locked tokens and that the lock time is passed
-        if node.stake.locked == Zero::zero() {
+        if node.stake.locked == BigDecimal::zero() {
             return TransactionResponse::Revert(ExecutionError::NoLockedTokens);
         }
-        if node.stake.locked_until > current_epoch.to_u64().unwrap() {
+        if node.stake.locked_until > current_epoch.into() {
             return TransactionResponse::Revert(ExecutionError::TokensLocked);
         }
 
@@ -561,7 +553,7 @@ impl<B: Backend> State<B> {
         // no need to reset locked_until on the node because that will get adjusted the next time
         // the node unstakes
         reciever.flk_balance += node.stake.locked;
-        node.stake.locked = Zero::zero();
+        node.stake.locked = BigDecimal::zero();
 
         // Todo(dalton): if the nodes stake+locked are equal to 0 here should we remove him from the
         // state tables completly?
@@ -583,8 +575,7 @@ impl<B: Backend> State<B> {
             .metadata
             .get(&Metadata::Epoch)
             .unwrap_or_default()
-            .to_u64()
-            .unwrap();
+            .into();
 
         match epoch.cmp(&current_epoch) {
             Ordering::Less => {
@@ -635,8 +626,7 @@ impl<B: Backend> State<B> {
             // reset the current_epoch_served
             self.distribute_rewards();
 
-            self.metadata
-                .set(Metadata::Epoch, current_epoch.to_biguint().unwrap());
+            self.metadata.set(Metadata::Epoch, current_epoch.into());
             TransactionResponse::Success(ExecutionData::EpochChange)
         } else {
             self.committee_info.set(current_epoch, current_committee);
@@ -725,8 +715,7 @@ impl<B: Backend> State<B> {
             .metadata
             .get(&Metadata::Epoch)
             .unwrap_or_default()
-            .to_u64()
-            .unwrap();
+            .into();
 
         let reward_pool = self
             .total_served
@@ -751,9 +740,9 @@ impl<B: Backend> State<B> {
 
         // todo: refactor this into our own struct of BigDecimal
         let emission_per_revenue_unit = inflation as f64 / (max_boost as f64 * reward_pool);
-        let bd_emission = BigDecimal::from_f64(emission_per_revenue_unit, 18);
+        let big_emissions = BigDecimal::<18>::from(emission_per_revenue_unit);
 
-        let flk_per_stable_revenue_unit = bd_emission.value * supply_at_year_start;
+        let flk_per_stable_revenue_unit = big_emissions.mul(&supply_at_year_start);
 
         // Todo: iterate over last_epoch_served table
         // distribute inflation rewards per unit of usdc earned
@@ -763,7 +752,7 @@ impl<B: Backend> State<B> {
         let nodes = self.current_epoch_served.keys();
         for node in nodes {
             let served = self.current_epoch_served.get(&node).unwrap_or_default();
-            let mut stable_revenue: f64 = 0.0;
+            let mut stables_revenue: f64 = 0.0;
             // Iterate over the quantities and their corresponding commodity type
             for (commodity_type, &quantity) in served.iter().enumerate() {
                 // Convert the index to CommodityTypes
@@ -771,54 +760,59 @@ impl<B: Backend> State<B> {
                     // Get the price for the commodity
                     if let Some(price) = self.commodity_prices.get(&commodity) {
                         // Calculate the total price for this quantity of commodity
-                        stable_revenue += price * quantity as f64;
+                        stables_revenue += price * quantity as f64;
                     }
                 }
             }
-            let big_stable_revenue = BigDecimal::from_f64(stable_revenue, 18);
-            self.mint_and_transfer(big_stable_revenue.value.clone(), node, Tokens::USDC);
-            self.mint_and_transfer(
-                big_stable_revenue.value.clone() * flk_per_stable_revenue_unit.clone(),
-                node,
-                Tokens::FLK,
-            )
+
+            let big_stables_revenue_6: BigDecimal<6> = BigDecimal::<6>::from(stables_revenue);
+            self.mint_and_transfer_stables(big_stables_revenue_6, node);
+
+            let big_stables_revenue = BigDecimal::<18>::from(stables_revenue);
+            self.mint_and_transfer_flk(big_stables_revenue.mul(&flk_per_stable_revenue_unit), node);
+            self.current_epoch_served.remove(&node);
         }
     }
 
-    fn mint_and_transfer(&self, amount: BigUint, node: NodePublicKey, token: Tokens) {
+    fn mint_and_transfer_stables(&self, amount: BigDecimal<6>, node: NodePublicKey) {
         let owner = self.node_info.get(&node).unwrap().owner;
         let mut account = self.account_info.get(&owner).unwrap();
 
-        match token {
-            Tokens::USDC => account.stables_balance += amount,
-            Tokens::FLK => {
-                account.flk_balance += amount.clone();
+        account.stables_balance += amount;
+        self.account_info.set(owner, account);
+    }
 
-                self.account_info.set(owner, account);
+    fn mint_and_transfer_flk(&self, amount: BigDecimal<18>, node: NodePublicKey) {
+        let owner = self.node_info.get(&node).unwrap().owner;
+        let mut account = self.account_info.get(&owner).unwrap();
+        account.flk_balance += amount.clone();
 
-                let mut current_supply = self
-                    .metadata
-                    .get(&Metadata::TotalSupply)
-                    .unwrap_or_default();
+        self.account_info.set(owner, account);
 
-                current_supply += amount;
-                self.metadata
-                    .set(Metadata::TotalSupply, current_supply.clone());
+        let mut current_supply = self
+            .metadata
+            .get(&Metadata::TotalSupply)
+            .unwrap_or_default();
 
-                let current_epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
+        current_supply += amount;
+        self.metadata
+            .set(Metadata::TotalSupply, current_supply.clone());
 
-                let days_in_year = BigUint::from(365u32);
-                if current_epoch.modpow(&BigUint::one(), &days_in_year) == BigUint::zero() {
-                    let mut supply_start_year = self
-                        .metadata
-                        .get(&Metadata::SupplyYearStart)
-                        .unwrap_or_default();
+        let current_epoch: u128 = self
+            .metadata
+            .get(&Metadata::Epoch)
+            .unwrap_or_default()
+            .into();
 
-                    supply_start_year += current_supply;
-                    self.metadata
-                        .set(Metadata::SupplyYearStart, supply_start_year);
-                }
-            },
+        if current_epoch % 365_u128 == 0_u128 {
+            let mut supply_start_year = self
+                .metadata
+                .get(&Metadata::SupplyYearStart)
+                .unwrap_or_default();
+
+            supply_start_year += current_supply;
+            self.metadata
+                .set(Metadata::SupplyYearStart, supply_start_year);
         }
     }
 
@@ -830,8 +824,7 @@ impl<B: Backend> State<B> {
             .metadata
             .get(&Metadata::Epoch)
             .unwrap_or_default()
-            .to_u64()
-            .unwrap();
+            .into();
         self.committee_info.get(&epoch).unwrap_or_default().members
     }
 

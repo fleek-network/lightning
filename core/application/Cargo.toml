@@ -12,18 +12,16 @@ bincode.workspace = true
 serde.workspace = true
 toml = "0.7.4"
 multiaddr = "0.17.1"
-num-bigint = { workspace = true, features = ["serde"] }
 draco-interfaces = { path = "../interfaces" }
 draco-reputation = { path = "../reputation" }
 num-traits.workspace = true
 fastcrypto = "0.1.5"
-num-derive.workspace = true
-bigdecimal = {workspace = true, features=["serde"]}
 
 # Our libraries
 affair.workspace = true
 atomo.workspace = true
 fleek-crypto.workspace = true
+big-decimal.workspace = true
 
 
 [dev-dependencies]
