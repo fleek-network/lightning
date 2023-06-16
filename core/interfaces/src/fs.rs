@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[async_trait]
-pub trait FileSystemInterface: Clone {
+pub trait FileSystemInterface: Send + Sync + Clone {
     /// The block store used for this file system.
     type BlockStore: BlockStoreInterface;
 
