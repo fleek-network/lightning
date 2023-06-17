@@ -124,6 +124,7 @@ impl Env<UpdatePerm> {
             let mut service_table = ctx.get_table::<ServiceId, Service>("service");
             let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
             let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
+            let mut metadata_table = ctx.get_table::<Metadata, BigDecimal<18>>("metadata");
             let mut commodity_prices_table =
                 ctx.get_table::<CommodityTypes, f64>("commodity_prices");
 
@@ -153,6 +154,10 @@ impl Env<UpdatePerm> {
             );
             param_table.insert(ProtocolParams::MaxBoost, genesis.max_boost as u128);
             param_table.insert(ProtocolParams::MaxLockTime, genesis.max_lock_time as u128);
+
+            let supply_at_genesis: BigDecimal<18> = genesis.supply_at_genesis.into();
+            metadata_table.insert(Metadata::SupplyYearStart, supply_at_genesis.clone());
+            metadata_table.insert(Metadata::TotalSupply, supply_at_genesis);
 
             let epoch_end = genesis.epoch_time + genesis.epoch_start;
             let mut committee_members = Vec::with_capacity(genesis.committee.len());

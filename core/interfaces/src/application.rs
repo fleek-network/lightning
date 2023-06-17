@@ -6,7 +6,10 @@ use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 use crate::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
-    types::{Block, CommodityServed, Epoch, EpochInfo, NodeInfo, TotalServed, TransactionResponse},
+    types::{
+        Block, CommodityServed, Epoch, EpochInfo, NodeInfo, ProtocolParams, TotalServed,
+        TransactionResponse,
+    },
 };
 
 /// The response generated from executing an entire batch of transactions (aka a block).
@@ -76,6 +79,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
     /// Returns the latest FLK balance of an account
     fn get_flk_balance(&self, account: &AccountOwnerPublicKey) -> BigDecimal<18>;
 
+    /// Returns the latest stables balance of an account
+    fn get_stables_balance(&self, account: &AccountOwnerPublicKey) -> BigDecimal<6>;
+
     /// Returns the amount of flk a node has staked
     fn get_staked(&self, node: &NodePublicKey) -> BigDecimal<18>;
 
@@ -127,6 +133,15 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
 
     /// Return all commodity served for a give node for current epoch
     fn get_commodity_served(&self, node: &NodePublicKey) -> CommodityServed;
+
+    /// Return the current total supply of FLK tokens
+    fn get_total_supply(&self) -> BigDecimal<18>;
+
+    /// Return the total supply at year start point used for inflation
+    fn get_year_start_supply(&self) -> BigDecimal<18>;
+
+    /// Returns the passed in protocol parameter
+    fn get_protocol_params(&self, param: ProtocolParams) -> u128;
 }
 
 #[derive(Clone, Debug)]

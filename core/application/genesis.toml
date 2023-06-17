@@ -10,6 +10,7 @@ min_inflation = 10
 consumer_rebate = 0
 max_boost = 4
 max_lock_time = 1460        # 1460 days(epoch) meaning 4 years
+supply_at_genesis = 1000000 # set to 1 million for testing, to be determined when initial allocations are set
 
 [[committee]]
 owner = "EfP5ha4KNRu/qkfIuF3lWK7GPeP5IqPKP8esnM0mo2s="

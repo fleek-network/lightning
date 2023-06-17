@@ -1,16 +1,19 @@
 use std::vec;
 
 use affair::Socket;
+use anyhow::{anyhow, Result};
 use big_decimal::BigDecimal;
 use draco_interfaces::{
     application::ExecutionEngineSocket,
     types::{
-        Block, ExecutionError, NodeInfo, ProofOfConsensus, Tokens, TotalServed,
+        Block, ExecutionError, NodeInfo, ProofOfConsensus, ProtocolParams, Tokens, TotalServed,
         TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
     },
     ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
 };
-use fastcrypto::{bls12381::min_sig::BLS12381PublicKey, traits::EncodeDecodeBase64};
+use fastcrypto::{
+    bls12381::min_sig::BLS12381PublicKey, ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64,
+};
 use fleek_crypto::{
     AccountOwnerPublicKey, AccountOwnerSignature, NodePublicKey, NodeSignature,
     TransactionSignature,
@@ -30,6 +33,62 @@ async fn init_app() -> (ExecutionEngineSocket, QueryRunner) {
     (app.transaction_executor(), app.sync_query())
 }
 
+// Helper method to get a transaction update request from a node
+// This is just putting a default signature+ nonce so will need to be updated
+// when transaction verification is implemented
+fn get_update_request_node(method: UpdateMethod, sender: NodePublicKey) -> UpdateRequest {
+    UpdateRequest {
+        sender: sender.into(),
+        signature: TransactionSignature::Node(NodeSignature([0; 48])),
+        payload: UpdatePayload { nonce: 0, method },
+    }
+}
+
+fn get_update_request_account(
+    method: UpdateMethod,
+    sender: AccountOwnerPublicKey,
+) -> UpdateRequest {
+    UpdateRequest {
+        sender: sender.into(),
+        signature: TransactionSignature::AccountOwner(AccountOwnerSignature),
+        payload: UpdatePayload { nonce: 0, method },
+    }
+}
+
+fn get_genesis() -> (Genesis, Vec<NodeInfo>) {
+    let genesis = Genesis::load().unwrap();
+
+    (
+        genesis.clone(),
+        genesis.committee.iter().map(|node| node.into()).collect(),
+    )
+}
+// Helper methods for tests
+fn pod_request(node: NodePublicKey, commodity: u128, service_id: u32) -> UpdateRequest {
+    get_update_request_node(
+        UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+            commodity,  // units of data served
+            service_id, // service 0 serving bandwidth
+            proofs: vec![DeliveryAcknowledgment::default()],
+            metadata: None,
+        },
+        node,
+    )
+}
+
+async fn run_transaction(
+    requests: Vec<UpdateRequest>,
+    update_socket: &Socket<Block, BlockExecutionResponse>,
+) -> Result<BlockExecutionResponse> {
+    let res = update_socket
+        .run(Block {
+            transactions: requests,
+        })
+        .await
+        .map_err(|r| anyhow!(format!("{r:?}")))?;
+    Ok(res)
+}
+
 async fn deposit(
     amount: BigDecimal<18>,
     token: Tokens,
@@ -44,13 +103,7 @@ async fn deposit(
         },
         ACCOUNT_ONE,
     );
-    // Put 2 of the transaction in the block just to also test block exucution a bit
-    update_socket
-        .run(Block {
-            transactions: [req].into(),
-        })
-        .await
-        .unwrap();
+    run_transaction(vec![req], &update_socket).await.unwrap();
 }
 
 async fn stake(
@@ -71,15 +124,12 @@ async fn stake(
         },
         ACCOUNT_ONE,
     );
-    let res = update_socket
-        .run(Block {
-            transactions: [update].into(),
-        })
+    if let TransactionResponse::Revert(error) = run_transaction(vec![update], &update_socket)
         .await
         .unwrap()
         .txn_receipts[0]
-        .clone();
-    if let TransactionResponse::Revert(error) = res {
+        .clone()
+    {
         panic!("Stake reverted: {error:?}");
     }
 }
@@ -113,12 +163,7 @@ async fn test_epoch_change() {
     for node in genesis_committee.iter().take(required_signals - 1) {
         let req = get_update_request_node(UpdateMethod::ChangeEpoch { epoch: 0 }, node.public_key);
 
-        let res = update_socket
-            .run(Block {
-                transactions: [req].into(),
-            })
-            .await
-            .unwrap();
+        let res = run_transaction(vec![req], &update_socket).await.unwrap();
         // Make sure epoch didnt change
         assert!(!res.change_epoch);
     }
@@ -130,12 +175,7 @@ async fn test_epoch_change() {
         UpdateMethod::ChangeEpoch { epoch: 0 },
         genesis_committee[required_signals].public_key,
     );
-    let res = update_socket
-        .run(Block {
-            transactions: [req].into(),
-        })
-        .await
-        .unwrap();
+    let res = run_transaction(vec![req], &update_socket).await.unwrap();
     assert!(res.change_epoch);
 
     // Query epoch info and make sure it incremented to new epoch
@@ -162,10 +202,7 @@ async fn test_stake() {
         ACCOUNT_ONE,
     );
     // Put 2 of the transaction in the block just to also test block exucution a bit
-    update_socket
-        .run(Block {
-            transactions: [update.clone(), update].into(),
-        })
+    run_transaction(vec![update.clone(), update], &update_socket)
         .await
         .unwrap();
 
@@ -187,12 +224,7 @@ async fn test_stake() {
         },
         ACCOUNT_ONE,
     );
-    let res = update_socket
-        .run(Block {
-            transactions: [update].into(),
-        })
-        .await
-        .unwrap();
+    let res = run_transaction(vec![update], &update_socket).await.unwrap();
 
     assert_eq!(
         TransactionResponse::Revert(ExecutionError::InsufficientNodeDetails),
@@ -212,15 +244,12 @@ async fn test_stake() {
         },
         ACCOUNT_ONE,
     );
-    let res = update_socket
-        .run(Block {
-            transactions: [update].into(),
-        })
+    if let TransactionResponse::Revert(error) = run_transaction(vec![update], &update_socket)
         .await
         .unwrap()
         .txn_receipts[0]
-        .clone();
-    if let TransactionResponse::Revert(error) = res {
+        .clone()
+    {
         panic!("Stake reverted: {error:?}");
     }
 
@@ -241,15 +270,12 @@ async fn test_stake() {
         },
         ACCOUNT_ONE,
     );
-    let res = update_socket
-        .run(Block {
-            transactions: [update].into(),
-        })
+    if let TransactionResponse::Revert(error) = run_transaction(vec![update], &update_socket)
         .await
         .unwrap()
         .txn_receipts[0]
-        .clone();
-    if let TransactionResponse::Revert(error) = res {
+        .clone()
+    {
         panic!("Stake reverted: {error:?}");
     }
 
@@ -264,12 +290,7 @@ async fn test_stake() {
         },
         ACCOUNT_ONE,
     );
-    update_socket
-        .run(Block {
-            transactions: [update].into(),
-        })
-        .await
-        .unwrap();
+    run_transaction(vec![update], &update_socket).await.unwrap();
 
     // Check that his locked is 1000 and his remaining stake is 1000
     assert_eq!(query_runner.get_staked(&node_public_key), 1_000_u64.into());
@@ -288,10 +309,7 @@ async fn test_stake() {
         },
         ACCOUNT_ONE,
     );
-    let res = update_socket
-        .run(Block {
-            transactions: [update].into(),
-        })
+    let res = run_transaction(vec![update], &update_socket)
         .await
         .unwrap()
         .txn_receipts[0]
@@ -325,15 +343,13 @@ async fn test_stake_lock() {
         ACCOUNT_ONE,
     );
 
-    let res = update_socket
-        .run(Block {
-            transactions: [stake_lock_req].into(),
-        })
-        .await
-        .unwrap()
-        .txn_receipts[0]
-        .clone();
-    if let TransactionResponse::Revert(error) = res {
+    if let TransactionResponse::Revert(error) =
+        run_transaction(vec![stake_lock_req], &update_socket)
+            .await
+            .unwrap()
+            .txn_receipts[0]
+            .clone()
+    {
         panic!("Stake locking reverted: {error:?}");
     }
     assert_eq!(query_runner.get_stake_locked_until(&node_public_key), 365);
@@ -345,14 +361,12 @@ async fn test_stake_lock() {
         },
         ACCOUNT_ONE,
     );
-    let res = update_socket
-        .run(Block {
-            transactions: [unstake_req].into(),
-        })
+    let res = run_transaction(vec![unstake_req], &update_socket)
         .await
         .unwrap()
         .txn_receipts[0]
         .clone();
+
     assert_eq!(
         res,
         TransactionResponse::Revert(ExecutionError::LockedTokensUnstakeForbidden)
@@ -371,32 +385,14 @@ async fn test_pod_without_proof() {
         .to_bytes()
         .into();
 
-    let bandwidth_pod = get_update_request_node(
-        UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
-            commodity: 1000, // 1000 units
-            service_id: 0,   // service 0 serving bandwidth
-            proofs: vec![DeliveryAcknowledgment::default()],
-            metadata: None,
-        },
-        node_public_key,
-    );
+    let bandwidth_pod = pod_request(node_public_key, 1000, 0);
+    let compute_pod = pod_request(node_public_key, 2000, 1);
 
-    let compute_pod = get_update_request_node(
-        UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
-            commodity: 2000, // 2000 units
-            service_id: 1,   // service 1 serving compute
-            proofs: vec![DeliveryAcknowledgment::default()],
-            metadata: None,
-        },
-        node_public_key,
-    );
     // run the delivery ack transaction
-    update_socket
-        .run(Block {
-            transactions: [bandwidth_pod, compute_pod].into(),
-        })
-        .await
-        .unwrap();
+    if let Err(e) = run_transaction(vec![bandwidth_pod, compute_pod], &update_socket).await {
+        panic!("{e}");
+    }
+
     assert_eq!(
         query_runner.get_commodity_served(&node_public_key),
         vec![1000, 2000]
@@ -410,33 +406,77 @@ async fn test_pod_without_proof() {
         }
     );
 }
-fn get_genesis() -> (Genesis, Vec<NodeInfo>) {
-    let genesis = Genesis::load().unwrap();
 
-    (
-        genesis.clone(),
-        genesis.committee.iter().map(|node| node.into()).collect(),
-    )
-}
+#[test]
+#[ignore = "uses some 'todo' implementations"]
+async fn test_distribute_rewards() {
+    let (update_socket, query_runner) = init_app().await;
+    let (_, genesis_committee) = get_genesis();
+    // use a node from a genesis committee for testing
+    let owner_key = "EfP5ha4KNRu/qkfIuF3lWK7GPeP5IqPKP8esnM0mo2s=";
+    let owner: AccountOwnerPublicKey = AccountOwnerPublicKey(
+        Ed25519PublicKey::decode_base64(owner_key)
+            .unwrap()
+            .0
+            .to_bytes(),
+    );
 
-// Helper method to get a transaction update request from a node
-// This is just putting a default signature+ nonce so will need to be updated
-// when transaction verification is implemented
-fn get_update_request_node(method: UpdateMethod, sender: NodePublicKey) -> UpdateRequest {
-    UpdateRequest {
-        sender: sender.into(),
-        signature: TransactionSignature::Node(NodeSignature([0; 48])),
-        payload: UpdatePayload { nonce: 0, method },
+    let node_key = "l0Jel6KEFG7H6sV2nWKOQxDaMKWMeiUBqK5VHKcStWrLPHAANRB+dt7gp0jQ7ooxEaI7ukOQZk6U5vcL7ESHA1J/iAWQ7YNO/ZCvR1pfWfcTNBONIzeiUWAN+iyKfV10";
+    let node_public_key: NodePublicKey = BLS12381PublicKey::decode_base64(node_key)
+        .unwrap()
+        .pubkey
+        .to_bytes()
+        .into();
+
+    let node_key_2 = "qipezx5pzmPFWICevMx+SL5+bIjG4yw3A9ieYKKwf2wTEvK0gMRYOln9+KmbNRB3FRbVQBLuCEWIHT0V9GxATT9VeJ+HT88vh/B/6dj7CbWBdWbZ4QXzo0q+uyGchopl";
+    let node_public_key_2: NodePublicKey = BLS12381PublicKey::decode_base64(node_key_2)
+        .unwrap()
+        .pubkey
+        .to_bytes()
+        .into();
+
+    // set the current supply to some number
+
+    // submit pods for usage
+    let pod_10 = pod_request(node_public_key, 10000, 0);
+    let pod11 = pod_request(node_public_key, 5000, 1);
+    let pod_21 = pod_request(node_public_key_2, 5000, 1);
+
+    // run the delivery ack transaction
+    if let Err(e) = run_transaction(vec![pod_10, pod11, pod_21], &update_socket).await {
+        panic!("{e}");
     }
-}
 
-fn get_update_request_account(
-    method: UpdateMethod,
-    sender: AccountOwnerPublicKey,
-) -> UpdateRequest {
-    UpdateRequest {
-        sender: sender.into(),
-        signature: TransactionSignature::AccountOwner(AccountOwnerSignature),
-        payload: UpdatePayload { nonce: 0, method },
+    // call epoch change that will trigger distribute rewards
+    let required_signals = 2 * genesis_committee.len() / 3 + 1;
+    // make call epoch change for 2/3rd committe members
+    for (index, node) in genesis_committee.iter().enumerate().take(required_signals) {
+        let req = get_update_request_node(UpdateMethod::ChangeEpoch { epoch: 0 }, node.public_key);
+        let res = run_transaction(vec![req], &update_socket).await.unwrap();
+        // check epoch change
+        if index == required_signals - 1 {
+            assert!(res.change_epoch);
+        }
     }
+
+    // check account balances for FLK and usdc
+    let max_boost = query_runner.get_protocol_params(ProtocolParams::MaxBoost);
+    let supply_for_inflation = query_runner.get_year_start_supply();
+    let max_inflation = query_runner.get_protocol_params(ProtocolParams::MaxInflation);
+
+    let emissions_per_day = supply_for_inflation.mul(&(max_inflation / (365 * 100)).into());
+    let min_emission = emissions_per_day.div(&max_boost.into());
+
+    let node_1_usd = 0.1 * 10000_f64 + 0.2 * 5000_f64;
+    let node_2_usd = 0.2 * 5000_f64;
+
+    let node_1_proportion = node_1_usd / (node_2_usd + node_1_usd);
+    // Todo: add locking when locking is added to distribute_rewards
+    let node_1_flk: BigDecimal<18> = min_emission.mul(&node_1_proportion.into());
+
+    let flk_balance = query_runner.get_flk_balance(&owner);
+    let stables_balance = query_runner.get_stables_balance(&owner);
+
+    assert_eq!(flk_balance, node_1_flk);
+    assert_eq!(stables_balance, node_1_usd.into());
 }

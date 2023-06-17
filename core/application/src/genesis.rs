@@ -24,6 +24,7 @@ pub struct Genesis {
     pub service: Vec<GenesisService>,
     pub account: Vec<GenesisAccount>,
     pub commodity_prices: Vec<GenesisPrices>,
+    pub supply_at_genesis: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

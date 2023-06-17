@@ -82,6 +82,16 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
+    fn get_stables_balance(&self, account: &AccountOwnerPublicKey) -> BigDecimal<6> {
+        self.inner.run(|ctx| {
+            self.account_table
+                .get(ctx)
+                .get(account)
+                .map(|account| account.stables_balance)
+                .unwrap_or(BigDecimal::<6>::zero())
+        })
+    }
+
     fn get_staked(&self, node: &NodePublicKey) -> BigDecimal<18> {
         self.inner.run(|ctx| {
             self.node_table
@@ -216,6 +226,30 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 .get(ctx)
                 .get(node)
                 .unwrap_or_default()
+        })
+    }
+
+    fn get_total_supply(&self) -> BigDecimal<18> {
+        self.inner.run(|ctx| {
+            self.metadata_table
+                .get(ctx)
+                .get(Metadata::TotalSupply)
+                .unwrap_or_default()
+        })
+    }
+    fn get_year_start_supply(&self) -> BigDecimal<18> {
+        self.inner.run(|ctx| {
+            self.metadata_table
+                .get(ctx)
+                .get(Metadata::SupplyYearStart)
+                .unwrap_or_default()
+        })
+    }
+
+    fn get_protocol_params(&self, param: ProtocolParams) -> u128 {
+        self.inner.run(|ctx| {
+            let param = &param;
+            self.param_table.get(ctx).get(param).unwrap_or_default()
         })
     }
 }

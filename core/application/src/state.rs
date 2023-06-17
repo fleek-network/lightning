@@ -622,8 +622,6 @@ impl<B: Backend> State<B> {
                 },
             );
 
-            // todo: move contents of current_epoch_served to last_epoch_served
-            // reset the current_epoch_served
             self.distribute_rewards();
 
             self.metadata.set(Metadata::Epoch, current_epoch.into());
@@ -739,8 +737,11 @@ impl<B: Backend> State<B> {
             .unwrap_or_default();
 
         // todo: refactor this into our own struct of BigDecimal
-        let emission_per_revenue_unit = inflation as f64 / (max_boost as f64 * reward_pool);
+        let emission_per_revenue_unit = inflation as f64 / (max_boost as f64 * reward_pool * 365.0);
         let big_emissions = BigDecimal::<18>::from(emission_per_revenue_unit);
+
+        // Todo: distribute emission rewards to other stakeholders(validators and foundation
+        // address)
 
         let flk_per_stable_revenue_unit = big_emissions.mul(&supply_at_year_start);
 
@@ -769,6 +770,7 @@ impl<B: Backend> State<B> {
             self.mint_and_transfer_stables(big_stables_revenue_6, node);
 
             let big_stables_revenue = BigDecimal::<18>::from(stables_revenue);
+            // todo: add locking factor into this
             self.mint_and_transfer_flk(big_stables_revenue.mul(&flk_per_stable_revenue_unit), node);
             self.current_epoch_served.remove(&node);
         }
