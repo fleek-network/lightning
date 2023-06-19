@@ -110,8 +110,8 @@ impl<
         self.0.borrow_mut().get(key)
     }
 
-    fn keys(&self) -> KeyIterator<'_, K> {
-        todo!()
+    fn keys(&self) -> KeyIterator<'selector, K> {
+        self.0.borrow_mut().keys()
     }
 
     fn remove(&self, key: &K) {
