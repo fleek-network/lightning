@@ -26,13 +26,20 @@ impl VerticalKeys {
     where
         F: FnOnce(&mut ImKeyCollection),
     {
-        if let Some(data) = &mut self.0[tid as usize] {
-            closure(data);
+        let tid = tid as usize;
+        if tid < self.0.len() {
+            if let Some(data) = &mut self.0[tid] {
+                closure(data);
+            }
         }
     }
 
     #[inline(always)]
     pub fn get(&self, tid: TableId) -> &MaybeImKeyCollection {
-        &self.0[tid as usize]
+        let tid = tid as usize;
+        if tid >= self.0.len() {
+            return &None;
+        }
+        &self.0[tid]
     }
 }
