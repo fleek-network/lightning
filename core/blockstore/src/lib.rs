@@ -32,12 +32,11 @@ pub enum BlockContent {
 #[cfg(test)]
 mod tests {
     use blake3_tree::{
-        blake3::tree::{BlockHasher, HashTree, HashTreeBuilder},
+        blake3::tree::{HashTree, HashTreeBuilder},
         ProofBuf,
     };
     use draco_interfaces::{
-        Blake3Hash, BlockStoreInterface, CompressionAlgoSet, CompressionAlgorithm,
-        IncrementalPutInterface,
+        Blake3Hash, BlockStoreInterface, CompressionAlgorithm, IncrementalPutInterface,
     };
     use tokio::test;
 
