@@ -5,6 +5,7 @@ use draco_interfaces::config::ConfigProviderInterface;
 use toml::{Table, Value};
 
 /// The implementation of a configuration loader that uses the `toml` backend.
+#[derive(Default)]
 pub struct TomlConfigProvider {
     /// The [`ConfigProviderInterface`] does not put any constraints on the
     /// format of the document, except that we need a `[key: string]->any`

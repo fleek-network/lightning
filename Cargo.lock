@@ -2234,6 +2234,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "toml 0.7.4",
+ "tracing",
 ]
 
 [[package]]

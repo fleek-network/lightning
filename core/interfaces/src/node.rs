@@ -194,6 +194,19 @@ impl<
 
         (application_status == consensus_status) && (consensus_status == aggregator_status)
     }
+
+    /// An associated function that consumes every
+    pub fn fill_configuration(configuration: &ConfigProvider) {
+        configuration.get::<Consensus>();
+        configuration.get::<Application>();
+        configuration.get::<BlockStore>();
+        configuration.get::<Indexer>();
+        configuration.get::<Signer>();
+        configuration.get::<DeliveryAcknowledgmentAggregator>();
+        configuration.get::<ReputationAggregator>();
+        configuration.get::<Rpc>();
+        configuration.get::<Handshake>();
+    }
 }
 
 #[async_trait]

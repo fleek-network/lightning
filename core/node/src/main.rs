@@ -3,7 +3,7 @@ mod config;
 mod shutdown;
 mod template;
 
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use clap::Parser;
@@ -15,7 +15,7 @@ use draco_notifier::Notifier;
 use draco_rep_collector::ReputationAggregator;
 
 use crate::{
-    cli::CliArgs,
+    cli::{CliArgs, Command},
     config::TomlConfigProvider,
     shutdown::ShutdownController,
     template::{
@@ -45,16 +45,22 @@ pub type ConcreteNode = Node<
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let args = CliArgs::parse();
+
+    match args.cmd {
+        Command::Run => run(args.config).await,
+        Command::PrintConfig { default } if default => print_default_config().await,
+        Command::PrintConfig { .. } => print_config(args.config).await,
+    }
+}
+
+/// Run the node with the provided configuration path.
+async fn run(config_path: PathBuf) -> Result<()> {
     let shutdown_controller = ShutdownController::default();
     shutdown_controller.install_ctrl_c_handler();
 
-    let args = CliArgs::parse();
-
-    println!("Hello, Fleek!");
-
-    let config = Arc::new(TomlConfigProvider::open(args.config.clone())?);
-    let node = ConcreteNode::init(config.clone()).await?;
-    std::fs::write(args.config, config.serialize_config())?;
+    let config = Arc::new(load_or_write_config(config_path).await?);
+    let node = ConcreteNode::init(config).await?;
 
     node.start().await;
 
@@ -62,4 +68,32 @@ async fn main() -> Result<()> {
     node.shutdown().await;
 
     Ok(())
+}
+
+/// Print the default configuration for the node, this function does not
+/// create a new file.
+async fn print_default_config() -> Result<()> {
+    let config = TomlConfigProvider::default();
+    ConcreteNode::fill_configuration(&config);
+    println!("{}", config.serialize_config());
+    Ok(())
+}
+
+/// Print the configuration from the given path.
+async fn print_config(config_path: PathBuf) -> Result<()> {
+    let config = load_or_write_config(config_path).await?;
+    println!("{}", config.serialize_config());
+    Ok(())
+}
+
+/// Load the configuration file and write the default to the disk.
+async fn load_or_write_config(config_path: PathBuf) -> Result<TomlConfigProvider> {
+    let config = TomlConfigProvider::open(&config_path)?;
+    ConcreteNode::fill_configuration(&config);
+
+    if !config_path.exists() {
+        std::fs::write(&config_path, config.serialize_config())?;
+    }
+
+    Ok(config)
 }
