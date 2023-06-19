@@ -284,7 +284,7 @@ where
     /// If the current table is not opened with iterator support when opening the
     /// Atomo instance. See the documentation for [`crate::AtomoBuilder::enable_iter`]
     /// for more information.
-    pub fn keys(&self) -> KeyIterator<'selector, K> {
+    pub fn keys(&self) -> KeyIterator<K> {
         let keys = self
             .selector
             .keys

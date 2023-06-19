@@ -40,7 +40,7 @@ pub trait Backend {
 pub trait TableRef<K, V> {
     fn set(&self, key: K, value: V);
     fn get(&self, key: &K) -> Option<V>;
-    fn keys(&self) -> KeyIterator<'_, K>;
+    fn keys(&self) -> KeyIterator<K>;
     fn remove(&self, key: &K);
 }
 
@@ -110,7 +110,7 @@ impl<
         self.0.borrow_mut().get(key)
     }
 
-    fn keys(&self) -> KeyIterator<'selector, K> {
+    fn keys(&self) -> KeyIterator<K> {
         self.0.borrow_mut().keys()
     }
 
