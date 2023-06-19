@@ -1,4 +1,4 @@
-use crate::batch::BoxedVec;
+use crate::{batch::BoxedVec, db::TableId};
 
 pub type ImKeyCollection = im::HashSet<BoxedVec, fxhash::FxBuildHasher>;
 
@@ -7,7 +7,7 @@ pub type MaybeImKeyCollection = Option<ImKeyCollection>;
 /// Analogues to the [`VerticalBatch`] this data structure is responsible for
 /// holding an immutable data containing all of the keys for each table, given
 /// that the iterator functionality is enabled for the table.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct VerticalKeys(Vec<MaybeImKeyCollection>);
 
 impl VerticalKeys {
@@ -19,5 +19,20 @@ impl VerticalKeys {
             self.0.resize(index, None);
             self.0.push(Some(ImKeyCollection::default()));
         }
+    }
+
+    #[inline(always)]
+    pub fn update<F>(&mut self, tid: TableId, closure: F)
+    where
+        F: FnOnce(&mut ImKeyCollection),
+    {
+        if let Some(data) = &mut self.0[tid as usize] {
+            closure(data);
+        }
+    }
+
+    #[inline(always)]
+    pub fn get(&self, tid: TableId) -> &MaybeImKeyCollection {
+        &self.0[tid as usize]
     }
 }

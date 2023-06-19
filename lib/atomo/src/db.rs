@@ -4,7 +4,6 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     inner::AtomoInner,
-    keys::VerticalKeys,
     serder::SerdeBackend,
     table::{ResolvedTableReference, TableSelector},
     DefaultSerdeBackend,
@@ -94,10 +93,8 @@ impl<S: SerdeBackend> Atomo<UpdatePerm, S> {
         let mut selector = TableSelector::new(self.inner.clone());
         let response = mutation(&mut selector);
 
-        let batch = selector.into_batch();
+        let (batch, keys) = selector.into_raw();
         let inverse = self.inner.compute_inverse(&batch);
-        // TODO(qti3e): Compute keys properly.
-        let keys = VerticalKeys::default();
         self.inner.snapshot_list.push(inverse, keys, || {
             self.inner.perform_batch(batch);
         });

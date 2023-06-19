@@ -2,33 +2,31 @@ use std::{hash::Hash, marker::PhantomData};
 
 use serde::de::DeserializeOwned;
 
-use crate::{batch::BoxedVec, DefaultSerdeBackend, SerdeBackend};
-
-pub type ImKeyCollection = im::HashSet<BoxedVec, fxhash::FxBuildHasher>;
+use crate::{batch::BoxedVec, keys::ImKeyCollection, DefaultSerdeBackend, SerdeBackend};
 
 /// An iterator over the keys of the table.
-pub struct KeyIterator<'iter, K, S: SerdeBackend = DefaultSerdeBackend> {
-    inner: im::hashset::Iter<'iter, BoxedVec>,
+pub struct KeyIterator<K, S: SerdeBackend = DefaultSerdeBackend> {
+    inner: im::hashset::ConsumingIter<BoxedVec>,
     phantom: PhantomData<(K, S)>,
 }
 
-impl<'iter, K> KeyIterator<'iter, K> {
-    pub fn new(keys: &'iter ImKeyCollection) -> Self {
+impl<K, S: SerdeBackend> KeyIterator<K, S> {
+    pub(crate) fn new(keys: ImKeyCollection) -> Self {
         Self {
-            inner: keys.iter(),
+            inner: keys.into_iter(),
             phantom: PhantomData,
         }
     }
 }
 
-impl<'iter, K, S: SerdeBackend> Iterator for KeyIterator<'iter, K, S>
+impl<K, S: SerdeBackend> Iterator for KeyIterator<K, S>
 where
     K: Hash + Eq + DeserializeOwned,
 {
     type Item = K;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|x| S::deserialize(x))
+        self.inner.next().map(|x| S::deserialize(&x))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

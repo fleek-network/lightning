@@ -63,6 +63,8 @@ pub struct TableSelector<S: SerdeBackend> {
     selected: RefCell<FxHashSet<TableId>>,
     /// The *hot* changes happening here in this run.
     batch: VerticalBatch,
+    /// The new version of the keys.
+    keys: RefCell<VerticalKeys>,
 }
 
 /// A reference to a table inside an execution context (i.e [`TableSelector`]). A table reference
@@ -106,18 +108,20 @@ impl<S: SerdeBackend> TableSelector<S> {
         let num_tables = atomo.tables.len();
         let batch = VerticalBatch::new(num_tables);
         let snapshot = atomo.snapshot_list.current();
+        let keys = snapshot.get_metadata().clone();
 
         Self {
             atomo,
             snapshot,
             selected: RefCell::new(FxHashSet::default()),
             batch,
+            keys: RefCell::new(keys),
         }
     }
 
     #[inline]
-    pub(crate) fn into_batch(self) -> VerticalBatch {
-        self.batch
+    pub(crate) fn into_raw(self) -> (VerticalBatch, VerticalKeys) {
+        (self.batch, self.keys.into_inner())
     }
 
     /// Return the table reference for the table with the provided name and K, V type.
@@ -194,12 +198,24 @@ where
     pub fn insert(&mut self, key: impl Borrow<K>, value: impl Borrow<V>) {
         let k = S::serialize(key.borrow()).into_boxed_slice();
         let v = S::serialize(value.borrow()).into_boxed_slice();
+        self.selector
+            .keys
+            .borrow_mut()
+            .update(self.tid, |collection| {
+                collection.insert(k.clone());
+            });
         self.batch.as_mut().insert(k, Operation::Insert(v));
     }
 
     /// Remove the given key from the table.
     pub fn remove(&mut self, key: impl Borrow<K>) {
         let k = S::serialize(key.borrow()).into_boxed_slice();
+        self.selector
+            .keys
+            .borrow_mut()
+            .update(self.tid, |collection| {
+                collection.remove(&k);
+            });
         self.batch.as_mut().insert(k, Operation::Remove);
     }
 
@@ -233,6 +249,13 @@ where
     pub fn contains_key(&self, key: impl Borrow<K>) -> bool {
         let k = S::serialize(key.borrow()).into_boxed_slice();
 
+        {
+            let keys_ref = self.selector.keys.borrow();
+            if let Some(im) = keys_ref.get(self.tid) {
+                return im.contains(&k);
+            }
+        }
+
         match self.batch.get(&k) {
             Some(Operation::Insert(_)) => return true,
             Some(Operation::Remove) => return false,
@@ -261,11 +284,15 @@ where
     /// If the current table is not opened with iterator support when opening the
     /// Atomo instance. See the documentation for [`crate::AtomoBuilder::enable_iter`]
     /// for more information.
-    pub fn keys<'iter, 'table>(&'table self) -> KeyIterator<'iter, K, S>
-    where
-        'selector: 'iter,
-        'iter: 'table,
-    {
-        todo!()
+    pub fn keys(&self) -> KeyIterator<K, S> {
+        let keys = self
+            .selector
+            .keys
+            .borrow()
+            .get(self.tid)
+            .clone()
+            .expect("Iterator functionality is not enabled for the table.");
+
+        KeyIterator::new(keys)
     }
 }
