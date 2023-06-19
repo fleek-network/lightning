@@ -14,7 +14,6 @@ pub mod pod;
 pub mod reputation;
 pub mod rpc;
 pub mod sdk;
-pub mod sdk_v2;
 pub mod types;
 
 pub mod signer;
