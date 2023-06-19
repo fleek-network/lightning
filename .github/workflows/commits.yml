@@ -33,5 +33,5 @@ jobs:
           cache-all-crates: "true"
           shared-key: "clippy"
       - name: Cargo Clippy 
-        run: cargo clippy --all-features --all-targets -- -Dclippy::all
+        run: cargo clippy --all-features --all-targets -- -Dclippy::all -Dwarnings
 
