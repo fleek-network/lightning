@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+mod shutdown;
 mod template;
 
 use std::sync::Arc;
@@ -16,6 +17,7 @@ use draco_rep_collector::ReputationAggregator;
 use crate::{
     cli::CliArgs,
     config::TomlConfigProvider,
+    shutdown::ShutdownController,
     template::{
         blockstore::BlockStore, fs::FileSystem, indexer::Indexer, origin::MyStream,
         pod::DeliveryAcknowledgmentAggregator, rpc::Rpc, sdk::Sdk, signer::Signer,
@@ -43,6 +45,9 @@ pub type ConcreteNode = Node<
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let shutdown_controller = ShutdownController::default();
+    shutdown_controller.install_ctrl_c_handler();
+
     let args = CliArgs::parse();
 
     println!("Hello, Fleek!");
@@ -53,7 +58,8 @@ async fn main() -> Result<()> {
 
     node.start().await;
 
-    // TODO: Await ctrl^c/sigkill and call shutdown
+    shutdown_controller.wait_for_shutdown().await;
+    node.shutdown().await;
 
     Ok(())
 }
