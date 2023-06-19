@@ -648,6 +648,8 @@ impl<B: Backend> State<B> {
         rep_scores
             .into_iter()
             .for_each(|(node, score)| self.rep_scores.set(node, score));
+        let nodes = self.rep_measurements.keys();
+        nodes.for_each(|node| self.rep_measurements.remove(&node));
     }
 
     fn add_service(
