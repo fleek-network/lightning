@@ -600,7 +600,7 @@ impl<B: Backend> State<B> {
         // If more than 2/3rds of the committee have signaled, start the epoch change process
         if current_committee.ready_to_change.len() > (2 * current_committee.members.len() / 3) {
             // Todo: Reward nodes, calculate rep?, choose new committee, increment epoch.
-            // self.calculate_reputation_scores();
+            self.calculate_reputation_scores();
 
             // calculate the next epoch endstamp
             let epoch_duration = self.parameters.get(&ProtocolParams::EpochTime).unwrap();
