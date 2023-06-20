@@ -3,9 +3,8 @@
 use simulon::scene::ServerId;
 
 fn node(_id: ServerId, ctx: &simulon::context::Context) {
-    simulon::spawn::spawn(async {
-        loop {
-            let conn = ctx.accept(69).await;
+    ctx.spawn(async {
+        while let Some(conn) = ctx.accept(69).await {
             handle_connection(conn);
         }
     });
@@ -13,7 +12,7 @@ fn node(_id: ServerId, ctx: &simulon::context::Context) {
     todo!()
 }
 
-fn handle_connection(_conn: simulon::context::Connection) {
+fn handle_connection(_conn: simulon::connection::Connection) {
     todo!()
 }
 
