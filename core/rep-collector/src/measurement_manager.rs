@@ -5,7 +5,14 @@ use draco_reputation::statistics::min_max_normalize;
 use fleek_crypto::NodePublicKey;
 use lru::LruCache;
 
+/// Maximum capacity for the lru cache that stores the peer measurements.
 const MAX_CAPACITY: usize = 200;
+
+/// The rep score of a node is the exponentially weighted moving average of its rep scores over the
+/// past epochs.
+/// For example, `REP_EWMA_WEIGHT=0.7` means that 70% of the current rep score is based on past
+/// epochs and 30% is based on the current epoch.
+const REP_EWMA_WEIGHT: f64 = 0.7;
 
 /// Manages the measurements for all the peers.
 pub struct MeasurementManager {
@@ -144,11 +151,13 @@ impl MeasurementManager {
                 count += 1;
             }
             score /= count as f64;
-            let score = (score * 100.0) as u128;
+            let score = score * 100.0;
             self.local_reputation
                 .entry(peer)
-                .and_modify(|s| *s = score)
-                .or_insert(score);
+                .and_modify(|s| {
+                    *s = (*s as f64 * REP_EWMA_WEIGHT + (1.0 - REP_EWMA_WEIGHT) * score) as u128
+                })
+                .or_insert(score as u128);
         }
     }
 }
