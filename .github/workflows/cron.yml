@@ -45,14 +45,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Setup Rust Toolchain
+        run: |
+          rm rust-toolchain
+          rustup toolchain install stable --profile minimal
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-directories: ~/.cargo/registry/src/**/librocksdb-sys-*
           cache-all-crates: "true"
-          shared-key: "build"
       - name: Build Release
-        run: cargo +stable build --all --release
+        run: cargo build --all --release
 
   test:
     name: Cargo Test
@@ -63,12 +66,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Setup Rust Toolchain
+        run: |
+          rm rust-toolchain
+          rustup toolchain install stable --profile minimal
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-directories: ~/.cargo/registry/src/**/librocksdb-sys-*
           cache-all-crates: "true"
-          shared-key: "test"
       - name: Setup junitify
         run: cargo install junitify
       - name: Cargo Test
@@ -79,12 +85,15 @@ jobs:
         # - https://github.com/johnterickson/cargo2junit/issues/79
         run: |
           RUSTC_BOOTSTRAP=1 \
-          cargo +stable test --all -- \
+          cargo test --all -- \
           --format=json -Z unstable-options --report-time \
-          | junitify -i --out test_results/
-      - name: Publish Test Results
+          > tests.out
+      - name: Parse Test Output
+        if: always()
+        run: cat tests.out | junitify -i --out test_results/
+      - name: Publish Test Summary
         uses: test-summary/action@v2
-        if: always() # run even if previous step failed
+        if: always()
         with:
           paths: 'test_results/*.xml'
   
@@ -96,12 +105,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+      - name: Setup Rust Toolchain
+        run: 
+          rm rust-toolchain
+          rustup toolchain install stable --profile minimal --component llvm-tools-preview
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-directories: ~/.cargo/registry/src/**/librocksdb-sys-*
           cache-all-crates: "true"
-          shared-key: "coverage"
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate Code Coverage
