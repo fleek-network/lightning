@@ -34,16 +34,16 @@
 //! not to be trusted by service creators and if a service requires to store something
 //! for persistence purposes there may be some valid path forward:
 //!
-//!     1. Building a fault-tolerant storage on Fleek Network utilizing many nodes.
-//!     2. Integration with FIL/Arwave or other potential storage protocols.
-//!     3. Use of one pinning service that is built on Fleek Network as a building-block
-//!         by other services.
+//! 1. Building a fault-tolerant storage on Fleek Network utilizing many nodes.
+//! 2. Integration with FIL/Arwave or other potential storage protocols.
+//! 3. Use of one pinning service that is built on Fleek Network as a building-block
+//!   by other services.
 //!
 //! Requirements:
-//!     - Arbitrary 'pure-function' commitments.
-//!     - Efficient message passing to core.
-//!     - Direct resource pipelines.
-//!     - Secure service specific quorum slashing.
-//!     - Node clustering and group compute helpers.
-//!     - 'Fleek Network File System' read access. (aka blockstore)
-//!     - Disk space for persistence.
+//!  - Arbitrary 'pure-function' commitments.
+//!  - Efficient message passing to core.
+//!  - Direct resource pipelines.
+//!  - Secure service specific quorum slashing.
+//!  - Node clustering and group compute helpers.
+//!  - 'Fleek Network File System' read access. (aka blockstore)
+//!  - Disk space for persistence.
