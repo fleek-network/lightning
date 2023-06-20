@@ -708,7 +708,21 @@ impl<B: Backend> State<B> {
     // external function that calls it The functions that should call this and the required
     // checks should be documented for each function
 
-    // This function should be called during signal_epoch_change.
+    /// Distributes rewards among the nodes in a network.
+    ///
+    /// This function should be invoked during the `signal_epoch_change` to distribute rewards for
+    /// the new epoch. It distributes rewards based on the amount of service provided by each node.
+    /// It also takes into account the locked stake of each node to provide boosted rewards.
+    /// This boost increases the longer the stake is locked. The rewards are distributed based on
+    /// emissions per unit revenue to account for inflation and max boost parameters.
+    ///
+    /// This function calculates the rewards for each node that has served commodities in the
+    /// current epoch. The rewards are given in two forms: 1) A "stable" currency that is
+    /// proportional to the revenue earned by selling the commodities. 2) "FLK" token that is
+    /// proportional to the "stable" currency rewards, but also depends on a "boost" factor.
+    ///     FLk emission per unit of stable earned is given by:
+    ///
+    /// emission = (inflation * supply) / (maxBoost * rewardPool * 365.0)
     fn distribute_rewards(&self) {
         // Todo: function not done
         let epoch = self
@@ -723,35 +737,34 @@ impl<B: Backend> State<B> {
             .unwrap_or_default()
             .reward_pool;
 
-        // check if there is any service, 0 reward pools mean no service
+        // if reward is 0, no commodity under any service was served
         if reward_pool == 0_f64 {
             return;
         }
-        let inflation = self
+        let inflation: BigDecimal<18> = (self
             .parameters
             .get(&ProtocolParams::MaxInflation)
-            .unwrap_or_default();
-        let max_boost = self.parameters.get(&ProtocolParams::MaxBoost).unwrap_or(1);
+            .unwrap_or_default() as f64
+            / 100.0)
+            .into();
+        let max_boost: BigDecimal<18> = self
+            .parameters
+            .get(&ProtocolParams::MaxBoost)
+            .unwrap_or(1)
+            .into();
 
         let supply_at_year_start = self
             .metadata
             .get(&Metadata::SupplyYearStart)
             .unwrap_or_default();
 
-        // todo: refactor this into our own struct of BigDecimal
-        let emission_per_revenue_unit = inflation as f64 / (max_boost as f64 * reward_pool * 365.0);
-        let big_emissions = BigDecimal::<18>::from(emission_per_revenue_unit);
-
+        let total_emissions: BigDecimal<18> =
+            (inflation * supply_at_year_start) / (max_boost * 365.0.into());
         // Todo: distribute emission rewards to other stakeholders(validators and foundation
         // address)
 
-        let flk_per_stable_revenue_unit = big_emissions.mul(&supply_at_year_start);
+        let flk_per_stable_revenue_unit = total_emissions / reward_pool.into();
 
-        // Todo: iterate over last_epoch_served table
-        // distribute inflation rewards per unit of usdc earned
-        // formula for rewards distribution per node
-        // distribute usdc rewards per unit of commodity served
-        // usdc rewards are just simply unit served per commodity * commodity price
         let nodes = self.current_epoch_served.keys();
         for node in nodes {
             let served = self.current_epoch_served.get(&node).unwrap_or_default();
@@ -767,20 +780,23 @@ impl<B: Backend> State<B> {
                     }
                 }
             }
-
             let big_stables_revenue_6: BigDecimal<6> = BigDecimal::<6>::from(stables_revenue);
             self.mint_and_transfer_stables(big_stables_revenue_6, node);
 
+            // safe to unwrap since all the nodes in current_epoch_served table are in node info
+            // this is checked in submit_pod contract/function
+            let locked_until = self.node_info.get(&node).unwrap().stake.stake_locked_until;
+            let boost: BigDecimal<18> = self.get_boost(locked_until, epoch).into();
             let big_stables_revenue = BigDecimal::<18>::from(stables_revenue);
-            // todo: add locking factor into this
-            self.mint_and_transfer_flk(big_stables_revenue.mul(&flk_per_stable_revenue_unit), node);
+            let flk_rewards = big_stables_revenue * flk_per_stable_revenue_unit.clone() * boost;
+            self.mint_and_transfer_flk(flk_rewards, node);
             self.current_epoch_served.remove(&node);
         }
     }
 
     fn mint_and_transfer_stables(&self, amount: BigDecimal<6>, node: NodePublicKey) {
         let owner = self.node_info.get(&node).unwrap().owner;
-        let mut account = self.account_info.get(&owner).unwrap();
+        let mut account = self.account_info.get(&owner).unwrap_or_default();
 
         account.stables_balance += amount;
         self.account_info.set(owner, account);
@@ -788,7 +804,7 @@ impl<B: Backend> State<B> {
 
     fn mint_and_transfer_flk(&self, amount: BigDecimal<18>, node: NodePublicKey) {
         let owner = self.node_info.get(&node).unwrap().owner;
-        let mut account = self.account_info.get(&owner).unwrap();
+        let mut account = self.account_info.get(&owner).unwrap_or_default();
         account.flk_balance += amount.clone();
 
         self.account_info.set(owner, account);
@@ -808,16 +824,44 @@ impl<B: Backend> State<B> {
             .unwrap_or_default()
             .into();
 
-        if current_epoch % 365_u128 == 0_u128 {
-            let mut supply_start_year = self
-                .metadata
-                .get(&Metadata::SupplyYearStart)
-                .unwrap_or_default();
-
-            supply_start_year += current_supply;
-            self.metadata
-                .set(Metadata::SupplyYearStart, supply_start_year);
+        if (current_epoch + 1) % 365_u128 == 0_u128 {
+            self.metadata.set(Metadata::SupplyYearStart, current_supply);
         }
+    }
+
+    /// The `get_boost` method calculates a reward boost factor based on the locked staking period.
+    ///
+    /// This function follows a power-law growth model, where the boost increases with the power of
+    /// the elapsed time. The locked period is determined by the difference between the current
+    /// epoch and the 'locked_until' parameter, signifying the epoch until which the stake is
+    /// locked.
+    ///
+    /// As the stake nears its expiry, the reward boost decreases according to the function.
+    ///
+    /// The calculated boost value is capped at `maxBoost`, a parameter set by the protocol, to
+    /// prevent excessive boosts. The boost formula is as follows:
+    ///
+    /// boost(t) = min(maxBoost, minBoost + (maxBoost - minBoost) * (t/max_T)^n)
+    ///
+    /// The `minBoost` value is consistently set at 1, as we aim to avoid penalizing nodes that are
+    /// not participating in staking lockups.
+    ///
+    /// Parameters:
+    /// * `locked_until`: The epoch number when the node's stake will be unlocked.
+    /// * `current_epoch`: The current epoch number.
+    ///
+    /// Returns:
+    /// - The calculated boost factor for the current rewards.
+    fn get_boost(&self, locked_until: u64, current_epoch: u64) -> f64 {
+        let max_boost = self.parameters.get(&ProtocolParams::MaxBoost).unwrap_or(1);
+        let max_lock_time = self
+            .parameters
+            .get(&ProtocolParams::MaxLockTime)
+            .unwrap_or_default() as f64;
+        let locking_period = locked_until.saturating_sub(current_epoch) as f64;
+        let boost: f64 =
+            1.0 + (max_boost as f64 - 1.0) * (locking_period / max_lock_time).powf(1.2);
+        f64::min(max_boost as f64, boost)
     }
 
     fn choose_new_committee(&self) -> Vec<NodePublicKey> {

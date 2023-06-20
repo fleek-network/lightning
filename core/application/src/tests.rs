@@ -6,7 +6,7 @@ use big_decimal::BigDecimal;
 use draco_interfaces::{
     application::ExecutionEngineSocket,
     types::{
-        Block, ExecutionError, NodeInfo, ProofOfConsensus, ProtocolParams, Tokens, TotalServed,
+        Block, ExecutionError, NodeInfo, ProofOfConsensus, Tokens, TotalServed,
         TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
     },
     ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
@@ -92,7 +92,8 @@ async fn run_transaction(
 async fn deposit(
     amount: BigDecimal<18>,
     token: Tokens,
-    update_socket: Socket<Block, BlockExecutionResponse>,
+    sender: AccountOwnerPublicKey,
+    update_socket: &Socket<Block, BlockExecutionResponse>,
 ) {
     // Deposit some FLK into account 1
     let req = get_update_request_account(
@@ -101,15 +102,27 @@ async fn deposit(
             token,
             amount,
         },
-        ACCOUNT_ONE,
+        sender,
     );
-    run_transaction(vec![req], &update_socket).await.unwrap();
+    run_transaction(vec![req], update_socket).await.unwrap();
+}
+
+async fn stake_lock(
+    locked_for: u64,
+    node: NodePublicKey,
+    sender: AccountOwnerPublicKey,
+    update_socket: &Socket<Block, BlockExecutionResponse>,
+) {
+    // Deposit some FLK into account 1
+    let req = get_update_request_account(UpdateMethod::StakeLock { node, locked_for }, sender);
+    run_transaction(vec![req], update_socket).await.unwrap();
 }
 
 async fn stake(
     amount: BigDecimal<18>,
-    update_socket: Socket<Block, BlockExecutionResponse>,
     node_public_key: NodePublicKey,
+    sender: AccountOwnerPublicKey,
+    update_socket: &Socket<Block, BlockExecutionResponse>,
 ) {
     // Now try with the correct details for a new node
     let update = get_update_request_account(
@@ -122,9 +135,9 @@ async fn stake(
             worker_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
             worker_mempool_address: Some("/ip4/127.0.0.1/udp/38000".to_string()),
         },
-        ACCOUNT_ONE,
+        sender,
     );
-    if let TransactionResponse::Revert(error) = run_transaction(vec![update], &update_socket)
+    if let TransactionResponse::Revert(error) = run_transaction(vec![update], update_socket)
         .await
         .unwrap()
         .txn_receipts[0]
@@ -329,10 +342,16 @@ async fn test_stake_lock() {
         .to_bytes()
         .into();
 
-    deposit(1_000_u64.into(), Tokens::FLK, update_socket.clone()).await;
+    deposit(1_000_u64.into(), Tokens::FLK, ACCOUNT_ONE, &update_socket).await;
     assert_eq!(query_runner.get_flk_balance(&ACCOUNT_ONE), 1_000_u64.into());
 
-    stake(1_000_u64.into(), update_socket.clone(), node_public_key).await;
+    stake(
+        1_000_u64.into(),
+        node_public_key,
+        ACCOUNT_ONE,
+        &update_socket,
+    )
+    .await;
     assert_eq!(query_runner.get_staked(&node_public_key), 1_000_u64.into());
 
     let stake_lock_req = get_update_request_account(
@@ -408,7 +427,6 @@ async fn test_pod_without_proof() {
 }
 
 #[test]
-#[ignore = "uses some 'todo' implementations"]
 async fn test_distribute_rewards() {
     let (update_socket, query_runner) = init_app().await;
     let (_, genesis_committee) = get_genesis();
@@ -435,11 +453,15 @@ async fn test_distribute_rewards() {
         .to_bytes()
         .into();
 
-    // set the current supply to some number
+    // deposit some stakes and lock it
+    deposit(10_000_u64.into(), Tokens::FLK, owner, &update_socket).await;
+    stake(10_000_u64.into(), node_public_key, owner, &update_socket).await;
+    // staking locking for four year to get max boosts
+    stake_lock(1460, node_public_key, owner, &update_socket).await;
 
     // submit pods for usage
     let pod_10 = pod_request(node_public_key, 10000, 0);
-    let pod11 = pod_request(node_public_key, 5000, 1);
+    let pod11 = pod_request(node_public_key, 6767, 1);
     let pod_21 = pod_request(node_public_key_2, 5000, 1);
 
     // run the delivery ack transaction
@@ -459,24 +481,26 @@ async fn test_distribute_rewards() {
         }
     }
 
-    // check account balances for FLK and usdc
-    let max_boost = query_runner.get_protocol_params(ProtocolParams::MaxBoost);
-    let supply_for_inflation = query_runner.get_year_start_supply();
-    let max_inflation = query_runner.get_protocol_params(ProtocolParams::MaxInflation);
-
-    let emissions_per_day = supply_for_inflation.mul(&(max_inflation / (365 * 100)).into());
-    let min_emission = emissions_per_day.div(&max_boost.into());
-
-    let node_1_usd = 0.1 * 10000_f64 + 0.2 * 5000_f64;
+    let node_1_usd = 0.1 * 10000_f64 + 0.2 * 6767_f64;
     let node_2_usd = 0.2 * 5000_f64;
 
-    let node_1_proportion = node_1_usd / (node_2_usd + node_1_usd);
+    let reward_pool: BigDecimal<18> = (node_2_usd + node_1_usd).into();
+
+    // check account balances for FLK and usdc
+    let max_boost = BigDecimal::<18>::from(4.0);
+    let supply_at_year_start = BigDecimal::<18>::from(1_000_000_u64);
+    let inflation = BigDecimal::<18>::from(0.2);
+
+    let total_emissions: BigDecimal<18> =
+        (inflation * supply_at_year_start) / (max_boost * 365.0.into() * reward_pool);
+
     // Todo: add locking when locking is added to distribute_rewards
-    let node_1_flk: BigDecimal<18> = min_emission.mul(&node_1_proportion.into());
+    let flk_rewards: BigDecimal<18> = total_emissions * node_1_usd.into();
+    let boosted_flk_rewards: BigDecimal<18> = flk_rewards * 4_u64.into();
 
     let flk_balance = query_runner.get_flk_balance(&owner);
     let stables_balance = query_runner.get_stables_balance(&owner);
 
-    assert_eq!(flk_balance, node_1_flk);
     assert_eq!(stables_balance, node_1_usd.into());
+    assert_eq!(flk_balance, boosted_flk_rewards);
 }
