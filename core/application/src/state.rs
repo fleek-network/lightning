@@ -35,6 +35,12 @@ const MIN_NUM_MEASUREMENTS: usize = 10;
 /// than 30% of scores and lower than 70% of scores.
 const DEFAULT_REP_QUANTILE: f64 = 0.3;
 
+/// The rep score of a node is the exponentially weighted moving average of its rep scores over the
+/// past epochs.
+/// For example, `REP_EWMA_WEIGHT=0.7` means that 70% of the current rep score is based on past
+/// epochs and 30% is based on the current epoch.
+const REP_EWMA_WEIGHT: f64 = 0.7;
+
 /// The state of the Application
 ///
 /// The functions implemented on this struct are the "Smart Contracts" of the application layer
@@ -678,9 +684,16 @@ impl<B: Backend> State<B> {
         }
         let new_rep_scores = draco_reputation::calculate_reputation_scores(map);
 
-        new_rep_scores
-            .iter()
-            .for_each(|(node, score)| self.rep_scores.set(*node, *score));
+        // Store new scores in application state.
+        new_rep_scores.iter().for_each(|(node, new_score)| {
+            if let Some(old_score) = rep_scores.get(node) {
+                let score = *old_score as f64 * REP_EWMA_WEIGHT
+                    + (1.0 - REP_EWMA_WEIGHT) * *new_score as f64;
+                self.rep_scores.set(*node, score as u8)
+            } else {
+                self.rep_scores.set(*node, *new_score);
+            }
+        });
 
         // Remove outdated rep scores.
         let nodes = self.rep_scores.keys();
