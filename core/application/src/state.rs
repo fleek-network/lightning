@@ -13,6 +13,7 @@ use draco_interfaces::{
     },
     DeliveryAcknowledgment,
 };
+use draco_reputation::{statistics, WeightedReputationMeasurements};
 use fleek_crypto::{
     AccountOwnerPublicKey, ClientPublicKey, NodeNetworkingPublicKey, NodePublicKey,
     TransactionSender,
@@ -26,6 +27,13 @@ use crate::table::{Backend, TableRef};
 /// Minimum number of reported measurements that have to be available for a node.
 /// If less measurements have been reported, no reputation score will be computed in that epoch.
 const MIN_NUM_MEASUREMENTS: usize = 10;
+
+/// Reported measurements are weighted by the reputation score of the reporting node.
+/// If there is no reputation score for the reporting node, we use a quantile from the array
+/// of all reputation scores.
+/// For example, if `DEFAULT_REP_QUANTILE = 0.3`, then we use the reputation score that is higher
+/// than 30% of scores and lower than 70% of scores.
+const DEFAULT_REP_QUANTILE: f64 = 0.3;
 
 /// The state of the Application
 ///
@@ -632,22 +640,49 @@ impl<B: Backend> State<B> {
         }
     }
 
-    #[allow(dead_code)]
     fn calculate_reputation_scores(&self) {
+        let mut rep_scores = HashMap::new();
+        self.rep_scores.keys().for_each(|node| {
+            if let Some(score) = self.rep_scores.get(&node) {
+                rep_scores.insert(node, score);
+            }
+        });
+        let default_score = statistics::approx_quantile(
+            rep_scores.values().copied().collect(),
+            DEFAULT_REP_QUANTILE,
+        )
+        .unwrap_or(0);
+
         let mut map = HashMap::new();
         for node in self.rep_measurements.keys() {
             if let Some(reported_measurements) = self.rep_measurements.get(&node) {
                 if reported_measurements.len() > MIN_NUM_MEASUREMENTS {
                     // Only compute reputation score for node if enough measurements have been
                     // reported
-                    map.insert(node, reported_measurements);
+                    let weighted_measurements = reported_measurements
+                        .into_iter()
+                        .map(|m| {
+                            let weight = self
+                                .rep_scores
+                                .get(&m.reporting_node)
+                                .unwrap_or(default_score);
+                            WeightedReputationMeasurements {
+                                measurements: m.measurements,
+                                weight,
+                            }
+                        })
+                        .collect();
+                    map.insert(node, weighted_measurements);
                 }
             }
         }
-        let rep_scores = draco_reputation::calculate_reputation_scores(map);
-        rep_scores
+        let new_rep_scores = draco_reputation::calculate_reputation_scores(map);
+
+        new_rep_scores
             .into_iter()
             .for_each(|(node, score)| self.rep_scores.set(node, score));
+
+        // Remove measurements from this epoch once we ccalculated the rep scores.
         let nodes = self.rep_measurements.keys();
         nodes.for_each(|node| self.rep_measurements.remove(&node));
     }

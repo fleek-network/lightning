@@ -1,56 +1,144 @@
+use std::ops::{Add, Div, Mul, Sub};
+
+use crate::types::WeightedValue;
+
 const EPSILON: f64 = 1e-8;
 
-pub fn try_min_max_normalize(value: f64, min_value: f64, max_value: f64) -> Option<f64> {
-    if (max_value - min_value).abs() < EPSILON {
-        return None;
-    }
-    Some(min_max_normalize(value, min_value, max_value))
-}
-
-pub fn min_max_normalize(value: f64, min_value: f64, max_value: f64) -> f64 {
-    (value - min_value) / (max_value - min_value)
-}
-
-pub fn calculate_normalized_mean(mut values: Vec<f64>) -> f64 {
-    z_score_normalize_filter(&mut values);
-    calculate_mean(&values).unwrap()
-}
-
-fn calculate_mean(values: &[f64]) -> Option<f64> {
-    if !values.is_empty() {
-        let sum: f64 = values.iter().sum();
-        let n = values.len() as f64;
-        Some(sum / n)
+pub fn approx_quantile<T: Ord + PartialOrd + Copy>(mut values: Vec<T>, q: f64) -> Option<T> {
+    if (0.0..=0.99).contains(&q) && !values.is_empty() {
+        values.sort();
+        let index = (q * values.len() as f64).floor() as usize;
+        Some(values[index])
     } else {
         None
     }
 }
 
-fn calculate_variance(values: &[f64]) -> Option<f64> {
-    calculate_mean(values).map(|values_mean| {
+pub fn try_min_max_normalize<T>(value: T, min_value: T, max_value: T) -> Option<T>
+where
+    T: Sub<T, Output = T> + PartialOrd<T> + Div<Output = T> + From<f64> + Copy,
+{
+    if abs_difference(min_value, max_value) < EPSILON.into() {
+        return None;
+    }
+    Some(min_max_normalize(value, min_value, max_value))
+}
+
+pub fn min_max_normalize<T>(value: T, min_value: T, max_value: T) -> T
+where
+    T: Sub<T, Output = T> + Div<Output = T> + Copy,
+{
+    (value - min_value) / (max_value - min_value)
+}
+
+fn abs_difference<T>(a: T, b: T) -> T
+where
+    T: Sub<T, Output = T> + PartialOrd<T>,
+{
+    if a > b { a - b } else { b - a }
+}
+
+fn calculate_mean<T>(values: &[T]) -> Option<T>
+where
+    T: Default + Add<T, Output = T> + Div<Output = T> + From<f64> + Mul<T, Output = T> + Copy,
+{
+    if !values.is_empty() {
+        let sum = values.iter().copied().fold(T::default(), |acc, x| acc + x);
         let n = values.len() as f64;
+        Some(sum / n.into())
+    } else {
+        None
+    }
+}
+
+fn calculate_variance<T>(values: &[T]) -> Option<T>
+where
+    T: Default
+        + Add<T, Output = T>
+        + Div<Output = T>
+        + Mul<T, Output = T>
+        + From<f64>
+        + Sub<T, Output = T>
+        + Copy,
+{
+    calculate_mean(values).map(|values_mean| {
+        let n: T = (values.len() as f64).into();
         values
             .iter()
-            .map(|v| (v - values_mean).powi(2))
-            .sum::<f64>()
-            / (n - 1.0)
+            .copied()
+            .map(|v| (v - values_mean) * (v - values_mean))
+            .fold(T::default(), |acc, x| acc + x)
+            / (n - 1.0.into())
     })
 }
 
-fn calculate_std_dev(values: &[f64]) -> Option<f64> {
-    calculate_variance(values).map(|variance| variance.sqrt())
+fn calculate_z_score<T>(x: T, mean: T, variance: T) -> T
+where
+    T: Add<T, Output = T>
+        + Mul<T, Output = T>
+        + From<f64>
+        + Sub<T, Output = T>
+        + Div<T, Output = T>
+        + Copy,
+{
+    ((x - mean) * (x - mean)) / (variance + EPSILON.into())
 }
 
-fn calculate_z_score(x: f64, mean: f64, std_dev: f64) -> f64 {
-    ((x - mean) / (std_dev + EPSILON)).abs()
-}
-
-fn z_score_normalize_filter(values: &mut Vec<f64>) {
-    let std_dev = calculate_std_dev(values).unwrap();
-    if std_dev.abs() > EPSILON {
-        let mean = calculate_mean(values).unwrap();
-        values.retain(|&x| calculate_z_score(x, mean, std_dev) < 3.0);
+fn z_score_normalize_filter<T>(values: &mut Vec<T>)
+where
+    T: Default
+        + Add<T, Output = T>
+        + Div<Output = T>
+        + Mul<T, Output = T>
+        + From<f64>
+        + Sub<T, Output = T>
+        + PartialOrd<T>
+        + Copy,
+{
+    if let Some(variance) = calculate_variance(values) {
+        if variance > EPSILON.into() {
+            if let Some(mean) = calculate_mean(values) {
+                values.retain(|&x| calculate_z_score(x, mean, variance) < 9.0.into());
+            }
+        }
     }
+}
+
+fn calculate_weighted_mean<T>(values: &[T]) -> Option<f64>
+where
+    T: Default
+        + WeightedValue
+        + Add<T, Output = T>
+        + Div<Output = T>
+        + From<f64>
+        + Mul<T, Output = T>
+        + Copy,
+{
+    if !values.is_empty() {
+        let mean = values
+            .iter()
+            .copied()
+            .fold(0.0, |acc, v| acc + v.get_weighted_value());
+        Some(mean)
+    } else {
+        None
+    }
+}
+
+pub fn calculate_z_normalized_weighted_mean<T>(mut values: Vec<T>) -> Option<f64>
+where
+    T: Default
+        + WeightedValue
+        + Add<T, Output = T>
+        + Div<Output = T>
+        + Mul<T, Output = T>
+        + From<f64>
+        + Sub<T, Output = T>
+        + PartialOrd<T>
+        + Copy,
+{
+    z_score_normalize_filter(&mut values);
+    calculate_weighted_mean(&values)
 }
 
 #[cfg(test)]
@@ -79,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_mean_empty() {
-        let values = [];
+        let values: Vec<f64> = vec![];
         assert!(calculate_mean(&values).is_none());
     }
 
@@ -106,35 +194,8 @@ mod tests {
 
     #[test]
     fn test_variance_empty() {
-        let values = [];
+        let values: Vec<f64> = vec![];
         assert!(calculate_variance(&values).is_none());
-    }
-
-    #[test]
-    fn test_std_dev_basic() {
-        let values = [2.0, 4.0, 6.0];
-        let std_dev = calculate_std_dev(&values).unwrap();
-        assert_eq!(std_dev, 2.0);
-    }
-
-    #[test]
-    fn test_std_dev() {
-        let values = [
-            7777777777.0,
-            554343434.0,
-            123.0,
-            3434343434.0,
-            9988776661.0,
-            6543.0,
-        ];
-        let std_dev = calculate_std_dev(&values).unwrap();
-        assert!((std_dev - 4324111363.27575).abs() <= f64::EPSILON);
-    }
-
-    #[test]
-    fn test_std_dev_empty() {
-        let values = [];
-        assert!(calculate_std_dev(&values).is_none());
     }
 
     #[test]
@@ -148,5 +209,19 @@ mod tests {
     fn test_try_min_max_normalize() {
         assert_eq!(try_min_max_normalize(50.0, 50.0, 50.0), None);
         assert_eq!(try_min_max_normalize(50.0, 10.0, 90.0), Some(0.5));
+    }
+
+    #[test]
+    fn test_approx_quantile() {
+        let values = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        assert_eq!(approx_quantile(values, 0.1).unwrap(), 2);
+        let values = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        assert_eq!(approx_quantile(values, 0.0).unwrap(), 1);
+        let values = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        assert_eq!(approx_quantile(values, 1.0), None);
+        let values = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        assert_eq!(approx_quantile(values, 0.9999), None);
+        let values: Vec<u32> = Vec::new();
+        assert_eq!(approx_quantile(values, 0.5), None);
     }
 }

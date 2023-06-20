@@ -1,18 +1,27 @@
 use std::collections::HashMap;
 
-use draco_interfaces::types::ReportedReputationMeasurements;
+use draco_interfaces::types::ReputationMeasurements;
 use fleek_crypto::NodePublicKey;
 
 pub mod statistics;
+mod types;
+
+use types::WeightedFloat;
+
+#[derive(Debug, Clone, Default)]
+pub struct WeightedReputationMeasurements {
+    pub measurements: ReputationMeasurements,
+    pub weight: u8,
+}
 
 #[derive(Debug, Clone, Default)]
 struct CollectedMeasurements {
-    latency: Vec<f64>,
-    interactions: Vec<f64>,
-    inbound_bandwidth: Vec<f64>,
-    outbound_bandwidth: Vec<f64>,
-    bytes_received: Vec<f64>,
-    bytes_sent: Vec<f64>,
+    latency: Vec<WeightedFloat>,
+    interactions: Vec<WeightedFloat>,
+    inbound_bandwidth: Vec<WeightedFloat>,
+    outbound_bandwidth: Vec<WeightedFloat>,
+    bytes_received: Vec<WeightedFloat>,
+    bytes_sent: Vec<WeightedFloat>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -41,33 +50,131 @@ struct MinMaxValues {
     max_values: Values,
 }
 
-impl From<Vec<ReportedReputationMeasurements>> for CollectedMeasurements {
-    fn from(reported_measurements: Vec<ReportedReputationMeasurements>) -> Self {
-        let mut measurements = Self::default();
-        reported_measurements.into_iter().for_each(|rm| {
-            if let Some(latency) = rm.measurements.latency {
-                measurements.latency.push(latency.as_millis() as f64);
+impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
+    fn from(weighted_measurements: Vec<WeightedReputationMeasurements>) -> Self {
+        let mut weight_sum_latency = 0.0;
+        let mut weight_sum_interactions = 0.0;
+        let mut weight_sum_inbound_bandwidth = 0.0;
+        let mut weight_sum_outbound_bandwidth = 0.0;
+        let mut weight_sum_bytes_received = 0.0;
+        let mut weight_sum_bytes_sent = 0.0;
+
+        let mut count_latency = 0;
+        let mut count_interactions = 0;
+        let mut count_inbound_bandwidth = 0;
+        let mut count_outbound_bandwidth = 0;
+        let mut count_bytes_received = 0;
+        let mut count_bytes_sent = 0;
+        weighted_measurements.iter().for_each(|m| {
+            if m.measurements.latency.is_some() {
+                weight_sum_latency += m.weight as f64;
+                count_latency += 1;
             }
-            if let Some(interactions) = rm.measurements.interactions {
-                measurements.interactions.push(interactions as f64);
+            if m.measurements.interactions.is_some() {
+                weight_sum_interactions += m.weight as f64;
+                count_interactions += 1;
             }
-            if let Some(inbound_bandwidth) = rm.measurements.inbound_bandwidth {
-                measurements
-                    .inbound_bandwidth
-                    .push(inbound_bandwidth as f64);
+            if m.measurements.inbound_bandwidth.is_some() {
+                weight_sum_inbound_bandwidth += m.weight as f64;
+                count_inbound_bandwidth += 1;
             }
-            if let Some(outbound_bandwidth) = rm.measurements.outbound_bandwidth {
-                measurements
-                    .outbound_bandwidth
-                    .push(outbound_bandwidth as f64);
+            if m.measurements.outbound_bandwidth.is_some() {
+                weight_sum_outbound_bandwidth += m.weight as f64;
+                count_outbound_bandwidth += 1;
             }
-            if let Some(bytes_received) = rm.measurements.bytes_received {
-                measurements.bytes_received.push(bytes_received as f64);
+            if m.measurements.bytes_received.is_some() {
+                weight_sum_bytes_received += m.weight as f64;
+                count_bytes_received += 1;
             }
-            if let Some(bytes_sent) = rm.measurements.bytes_sent {
-                measurements.bytes_sent.push(bytes_sent as f64);
+            if m.measurements.bytes_sent.is_some() {
+                weight_sum_bytes_sent += m.weight as f64;
+                count_bytes_sent += 1;
             }
         });
+        let mut measurements = Self::default();
+        weighted_measurements.into_iter().for_each(|m| {
+            if let Some(latency) = m.measurements.latency {
+                let weight = if weight_sum_latency == 0.0 {
+                    1.0 / count_latency as f64
+                } else {
+                    m.weight as f64 / weight_sum_latency
+                };
+                measurements.latency.push(WeightedFloat {
+                    value: latency.as_millis() as f64,
+                    weight,
+                });
+            }
+            if let Some(interactions) = m.measurements.interactions {
+                let weight = if weight_sum_interactions == 0.0 {
+                    1.0 / count_interactions as f64
+                } else {
+                    m.weight as f64 / weight_sum_interactions
+                };
+                measurements.interactions.push(WeightedFloat {
+                    value: interactions as f64,
+                    weight,
+                });
+            }
+            if let Some(inbound_bandwidth) = m.measurements.inbound_bandwidth {
+                let weight = if weight_sum_inbound_bandwidth == 0.0 {
+                    1.0 / count_inbound_bandwidth as f64
+                } else {
+                    m.weight as f64 / weight_sum_inbound_bandwidth
+                };
+                measurements.inbound_bandwidth.push(WeightedFloat {
+                    value: inbound_bandwidth as f64,
+                    weight,
+                });
+            }
+            if let Some(outbound_bandwidth) = m.measurements.outbound_bandwidth {
+                let weight = if weight_sum_outbound_bandwidth == 0.0 {
+                    1.0 / count_outbound_bandwidth as f64
+                } else {
+                    m.weight as f64 / weight_sum_outbound_bandwidth
+                };
+                measurements.outbound_bandwidth.push(WeightedFloat {
+                    value: outbound_bandwidth as f64,
+                    weight,
+                });
+            }
+            if let Some(bytes_received) = m.measurements.bytes_received {
+                let weight = if weight_sum_bytes_received == 0.0 {
+                    1.0 / count_bytes_received as f64
+                } else {
+                    m.weight as f64 / weight_sum_bytes_received
+                };
+                measurements.bytes_received.push(WeightedFloat {
+                    value: bytes_received as f64,
+                    weight,
+                });
+            }
+            if let Some(bytes_sent) = m.measurements.bytes_sent {
+                let weight = if weight_sum_bytes_sent == 0.0 {
+                    1.0 / count_bytes_sent as f64
+                } else {
+                    m.weight as f64 / weight_sum_bytes_sent
+                };
+                measurements.bytes_sent.push(WeightedFloat {
+                    value: bytes_sent as f64,
+                    weight,
+                });
+            }
+        });
+        // For latency measurements, the lower the value, the better. Therefore, if we simply weight
+        // the reported measurements by the reputation of the reporting node, we would put
+        // more weight on latency measurements that were reported by nodes with lower
+        // reputation scores.
+        // To prevent this, we invert the weights that were derived from the reputation score for
+        // latency measurements.
+        if weight_sum_latency != 0.0 {
+            let inverse_weight_sum = measurements
+                .latency
+                .iter()
+                .fold(0.0, |acc, w| acc + (1.0 - w.weight));
+            measurements.latency.iter_mut().for_each(|w| {
+                w.weight = (1.0 - w.weight) / inverse_weight_sum;
+            });
+        }
         measurements
     }
 }
@@ -97,44 +204,46 @@ impl From<&HashMap<NodePublicKey, NormalizedMeasurements>> for MinMaxValues {
 
         normalized_measurements.iter().for_each(|(_, m)| {
             if let Some(latency) = m.latency {
-                min_max_vals.min_values.latency =
-                    f64::min(min_max_vals.min_values.latency, latency);
-                min_max_vals.max_values.latency =
-                    f64::max(min_max_vals.max_values.latency, latency);
+                min_max_vals.min_values.latency = min_max_vals.min_values.latency.min(latency);
+                min_max_vals.max_values.latency = min_max_vals.max_values.latency.max(latency);
             }
             if let Some(interactions) = m.interactions {
                 min_max_vals.min_values.interactions =
-                    f64::min(min_max_vals.min_values.interactions, interactions);
+                    min_max_vals.min_values.interactions.min(interactions);
                 min_max_vals.max_values.interactions =
-                    f64::max(min_max_vals.max_values.interactions, interactions);
+                    min_max_vals.max_values.interactions.max(interactions);
             }
             if let Some(inbound_bandwidth) = m.inbound_bandwidth {
-                min_max_vals.min_values.inbound_bandwidth =
-                    f64::min(min_max_vals.min_values.inbound_bandwidth, inbound_bandwidth);
-                min_max_vals.max_values.inbound_bandwidth =
-                    f64::max(min_max_vals.max_values.inbound_bandwidth, inbound_bandwidth);
+                min_max_vals.min_values.inbound_bandwidth = min_max_vals
+                    .min_values
+                    .inbound_bandwidth
+                    .min(inbound_bandwidth);
+                min_max_vals.max_values.inbound_bandwidth = min_max_vals
+                    .max_values
+                    .inbound_bandwidth
+                    .max(inbound_bandwidth);
             }
             if let Some(outbound_bandwidth) = m.outbound_bandwidth {
-                min_max_vals.min_values.outbound_bandwidth = f64::min(
-                    min_max_vals.min_values.outbound_bandwidth,
-                    outbound_bandwidth,
-                );
-                min_max_vals.max_values.outbound_bandwidth = f64::max(
-                    min_max_vals.max_values.outbound_bandwidth,
-                    outbound_bandwidth,
-                );
+                min_max_vals.min_values.outbound_bandwidth = min_max_vals
+                    .min_values
+                    .outbound_bandwidth
+                    .min(outbound_bandwidth);
+                min_max_vals.max_values.outbound_bandwidth = min_max_vals
+                    .max_values
+                    .outbound_bandwidth
+                    .max(outbound_bandwidth);
             }
             if let Some(bytes_received) = m.bytes_received {
                 min_max_vals.min_values.bytes_received =
-                    f64::min(min_max_vals.min_values.bytes_received, bytes_received);
+                    min_max_vals.min_values.bytes_received.min(bytes_received);
                 min_max_vals.max_values.bytes_received =
-                    f64::max(min_max_vals.max_values.bytes_received, bytes_received);
+                    min_max_vals.max_values.bytes_received.max(bytes_received);
             }
             if let Some(bytes_sent) = m.bytes_sent {
                 min_max_vals.min_values.bytes_sent =
-                    f64::min(min_max_vals.min_values.bytes_sent, bytes_sent);
+                    min_max_vals.min_values.bytes_sent.min(bytes_sent);
                 min_max_vals.max_values.bytes_sent =
-                    f64::max(min_max_vals.max_values.bytes_sent, bytes_sent);
+                    min_max_vals.max_values.bytes_sent.max(bytes_sent);
             }
         });
         min_max_vals
@@ -143,48 +252,20 @@ impl From<&HashMap<NodePublicKey, NormalizedMeasurements>> for MinMaxValues {
 
 impl From<CollectedMeasurements> for NormalizedMeasurements {
     fn from(collected_measurements: CollectedMeasurements) -> Self {
-        let latency = if collected_measurements.latency.is_empty() {
-            None
-        } else {
-            Some(statistics::calculate_normalized_mean(
-                collected_measurements.latency,
-            ))
-        };
-        let interactions = if collected_measurements.interactions.is_empty() {
-            None
-        } else {
-            Some(statistics::calculate_normalized_mean(
-                collected_measurements.interactions,
-            ))
-        };
-        let inbound_bandwidth = if collected_measurements.inbound_bandwidth.is_empty() {
-            None
-        } else {
-            Some(statistics::calculate_normalized_mean(
-                collected_measurements.inbound_bandwidth,
-            ))
-        };
-        let outbound_bandwidth = if collected_measurements.outbound_bandwidth.is_empty() {
-            None
-        } else {
-            Some(statistics::calculate_normalized_mean(
-                collected_measurements.outbound_bandwidth,
-            ))
-        };
-        let bytes_received = if collected_measurements.bytes_received.is_empty() {
-            None
-        } else {
-            Some(statistics::calculate_normalized_mean(
-                collected_measurements.bytes_received,
-            ))
-        };
-        let bytes_sent = if collected_measurements.bytes_sent.is_empty() {
-            None
-        } else {
-            Some(statistics::calculate_normalized_mean(
-                collected_measurements.bytes_sent,
-            ))
-        };
+        let latency =
+            statistics::calculate_z_normalized_weighted_mean(collected_measurements.latency);
+        let interactions =
+            statistics::calculate_z_normalized_weighted_mean(collected_measurements.interactions);
+        let inbound_bandwidth = statistics::calculate_z_normalized_weighted_mean(
+            collected_measurements.inbound_bandwidth,
+        );
+        let outbound_bandwidth = statistics::calculate_z_normalized_weighted_mean(
+            collected_measurements.outbound_bandwidth,
+        );
+        let bytes_received =
+            statistics::calculate_z_normalized_weighted_mean(collected_measurements.bytes_received);
+        let bytes_sent =
+            statistics::calculate_z_normalized_weighted_mean(collected_measurements.bytes_sent);
         Self {
             latency,
             interactions,
@@ -280,9 +361,9 @@ impl NormalizedMeasurements {
 }
 
 fn calculate_normalized_measurements(
-    reported_measurements_map: HashMap<NodePublicKey, Vec<ReportedReputationMeasurements>>,
+    weighted_measurements_map: HashMap<NodePublicKey, Vec<WeightedReputationMeasurements>>,
 ) -> HashMap<NodePublicKey, NormalizedMeasurements> {
-    reported_measurements_map
+    weighted_measurements_map
         .into_iter()
         .map(|(node, rm)| {
             let collected_measurements: CollectedMeasurements = rm.into();
@@ -293,10 +374,10 @@ fn calculate_normalized_measurements(
 }
 
 pub fn calculate_reputation_scores(
-    reported_measurements_map: HashMap<NodePublicKey, Vec<ReportedReputationMeasurements>>,
+    weighted_measurements_map: HashMap<NodePublicKey, Vec<WeightedReputationMeasurements>>,
 ) -> HashMap<NodePublicKey, u8> {
     let mut normalized_measurements_map =
-        calculate_normalized_measurements(reported_measurements_map);
+        calculate_normalized_measurements(weighted_measurements_map);
 
     let min_max_vals: MinMaxValues = (&normalized_measurements_map).into();
 
@@ -319,6 +400,7 @@ mod tests {
 
     use super::*;
 
+    const EPSILON: f64 = 1e-8;
     const PROB_MEASUREMENT_PRESENT: f64 = 0.1;
 
     fn get_seedable_rng() -> StdRng {
@@ -326,9 +408,9 @@ mod tests {
         SeedableRng::from_seed(seed)
     }
 
-    fn generate_reported_measurements_map(
+    fn generate_weighted_measurements_map(
         map_size: usize,
-    ) -> HashMap<NodePublicKey, Vec<ReportedReputationMeasurements>> {
+    ) -> HashMap<NodePublicKey, Vec<WeightedReputationMeasurements>> {
         let mut map = HashMap::with_capacity(map_size);
         let mut rng = get_seedable_rng();
         for _ in 0..map_size {
@@ -336,14 +418,14 @@ mod tests {
             (0..96).for_each(|i| array[i] = rng.gen_range(0..=255));
             let node = NodePublicKey(array);
             let num_measurements = rng.gen_range(1..20);
-            map.insert(node, generate_reported_measurements(num_measurements));
+            map.insert(node, generate_weighted_measurements(num_measurements));
         }
         map
     }
 
-    fn generate_reported_measurements(
+    fn generate_weighted_measurements(
         num_measurements: usize,
-    ) -> Vec<ReportedReputationMeasurements> {
+    ) -> Vec<WeightedReputationMeasurements> {
         let mut rng = get_seedable_rng();
 
         let mut reported_measurements = Vec::with_capacity(num_measurements);
@@ -390,17 +472,14 @@ mod tests {
                 bytes_sent,
                 hops: None,
             };
-            let mut array = [0; 96];
-            (0..96).for_each(|i| array[i] = rng.gen_range(0..=255));
-            let reporting_node = NodePublicKey(array);
+            let weight = rng.gen_range(0..=100);
 
-            let reported_measurement = ReportedReputationMeasurements {
-                reporting_node,
+            let reported_measurement = WeightedReputationMeasurements {
                 measurements,
+                weight,
             };
             reported_measurements.push(reported_measurement);
         }
-
         reported_measurements
     }
 
@@ -457,15 +536,15 @@ mod tests {
     }
 
     #[test]
-    fn test_from_reported_measurements_for_collected_measurements_counts() {
-        let reported_measurements = generate_reported_measurements(10);
+    fn test_from_weighted_measurements_for_collected_measurements_counts() {
+        let weighted_measurements = generate_weighted_measurements(10);
         let mut latency_count = 0;
         let mut interactions_count = 0;
         let mut inbound_bandwidth_count = 0;
         let mut outbound_bandwidth_count = 0;
         let mut bytes_received_count = 0;
         let mut bytes_sent_count = 0;
-        for rm in &reported_measurements {
+        for rm in &weighted_measurements {
             if rm.measurements.latency.is_some() {
                 latency_count += 1;
             }
@@ -485,7 +564,7 @@ mod tests {
                 bytes_sent_count += 1;
             }
         }
-        let collected_measurements: CollectedMeasurements = reported_measurements.into();
+        let collected_measurements: CollectedMeasurements = weighted_measurements.into();
         assert_eq!(collected_measurements.latency.len(), latency_count);
         assert_eq!(
             collected_measurements.interactions.len(),
@@ -507,45 +586,105 @@ mod tests {
     }
 
     #[test]
-    fn test_from_reported_measurements_for_collected_measurements_values() {
-        let reported_measurements = generate_reported_measurements(1);
-        let collected_measurements: CollectedMeasurements = reported_measurements.clone().into();
-        if let Some(latency) = reported_measurements[0].measurements.latency {
+    fn test_from_weighted_measurements_for_collected_measurements_weights_sum_to_1() {
+        let weighted_measurements = generate_weighted_measurements(10);
+        let collected_measurements: CollectedMeasurements = weighted_measurements.into();
+
+        let mut weight_sum = 0.0;
+        collected_measurements.latency.iter().for_each(|w| {
+            assert!((0.0..=1.0).contains(&w.weight));
+            weight_sum += w.weight;
+        });
+        assert!((weight_sum - 1.0).abs() < EPSILON);
+
+        let mut weight_sum = 0.0;
+        collected_measurements.latency.iter().for_each(|w| {
+            assert!((0.0..=1.0).contains(&w.weight));
+            weight_sum += w.weight;
+        });
+        assert!((weight_sum - 1.0).abs() < EPSILON);
+
+        let mut weight_sum = 0.0;
+        collected_measurements
+            .inbound_bandwidth
+            .iter()
+            .for_each(|w| {
+                assert!((0.0..=1.0).contains(&w.weight));
+                weight_sum += w.weight;
+            });
+        assert!((weight_sum - 1.0).abs() < EPSILON);
+
+        let mut weight_sum = 0.0;
+        collected_measurements
+            .outbound_bandwidth
+            .iter()
+            .for_each(|w| {
+                assert!((0.0..=1.0).contains(&w.weight));
+                weight_sum += w.weight;
+            });
+        assert!((weight_sum - 1.0).abs() < EPSILON);
+
+        let mut weight_sum = 0.0;
+        collected_measurements.bytes_received.iter().for_each(|w| {
+            assert!((0.0..=1.0).contains(&w.weight));
+            weight_sum += w.weight;
+        });
+        assert!((weight_sum - 1.0).abs() < EPSILON);
+
+        let mut weight_sum = 0.0;
+        collected_measurements.bytes_sent.iter().for_each(|w| {
+            assert!((0.0..=1.0).contains(&w.weight));
+            weight_sum += w.weight;
+        });
+        assert!((weight_sum - 1.0).abs() < EPSILON);
+    }
+
+    #[test]
+    fn test_from_weighted_measurements_for_collected_measurements_values() {
+        let weighted_measurements = generate_weighted_measurements(1);
+        let collected_measurements: CollectedMeasurements = weighted_measurements.clone().into();
+        if let Some(latency) = weighted_measurements[0].measurements.latency {
             assert_eq!(
                 latency.as_millis() as f64,
-                collected_measurements.latency[0]
+                collected_measurements.latency[0].value
             );
         }
-        if let Some(interactions) = reported_measurements[0].measurements.interactions {
-            assert_eq!(interactions as f64, collected_measurements.interactions[0]);
+        if let Some(interactions) = weighted_measurements[0].measurements.interactions {
+            assert_eq!(
+                interactions as f64,
+                collected_measurements.interactions[0].value
+            );
         }
-        if let Some(inbound_bandwidth) = reported_measurements[0].measurements.inbound_bandwidth {
+        if let Some(inbound_bandwidth) = weighted_measurements[0].measurements.inbound_bandwidth {
             assert_eq!(
                 inbound_bandwidth as f64,
-                collected_measurements.inbound_bandwidth[0]
+                collected_measurements.inbound_bandwidth[0].value
             );
         }
-        if let Some(outbound_bandwidth) = reported_measurements[0].measurements.outbound_bandwidth {
+        if let Some(outbound_bandwidth) = weighted_measurements[0].measurements.outbound_bandwidth {
             assert_eq!(
                 outbound_bandwidth as f64,
-                collected_measurements.outbound_bandwidth[0]
+                collected_measurements.outbound_bandwidth[0].value
             );
         }
-        if let Some(bytes_received) = reported_measurements[0].measurements.bytes_received {
+        if let Some(bytes_received) = weighted_measurements[0].measurements.bytes_received {
             assert_eq!(
                 bytes_received as f64,
-                collected_measurements.bytes_received[0]
+                collected_measurements.bytes_received[0].value
             );
         }
-        if let Some(bytes_sent) = reported_measurements[0].measurements.bytes_sent {
-            assert_eq!(bytes_sent as f64, collected_measurements.bytes_sent[0]);
+        if let Some(bytes_sent) = weighted_measurements[0].measurements.bytes_sent {
+            assert_eq!(
+                bytes_sent as f64,
+                collected_measurements.bytes_sent[0].value
+            );
         }
     }
 
     #[test]
     fn test_from_collected_measurements_for_normalized_measurements() {
-        let reported_measurements = generate_reported_measurements(10);
-        let mut collected_measurements: CollectedMeasurements = reported_measurements.into();
+        let weighted_measurements = generate_weighted_measurements(10);
+        let mut collected_measurements: CollectedMeasurements = weighted_measurements.into();
         collected_measurements.outbound_bandwidth = Vec::new();
 
         let normalized_measurements: NormalizedMeasurements = collected_measurements.clone().into();
@@ -583,9 +722,9 @@ mod tests {
 
     #[test]
     fn test_normalized_measurements_min_max_normalize() {
-        let reported_measurements_map = generate_reported_measurements_map(10);
+        let weighted_measurements_map = generate_weighted_measurements_map(10);
         let mut normalized_measurements_map =
-            calculate_normalized_measurements(reported_measurements_map);
+            calculate_normalized_measurements(weighted_measurements_map);
 
         let min_max_vals: MinMaxValues = (&normalized_measurements_map).into();
 
