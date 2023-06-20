@@ -30,6 +30,7 @@ jobs:
         run: |
           rm rust-toolchain
           rustup override set nightly-2023-01-24
+          rustup component add clippy
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
