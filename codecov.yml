@@ -1,0 +1,4 @@
+# Ignore dummy implementations in coverage reports
+ignore:
+  - "core/node/src/template"
+  - "**/dummy.rs"
