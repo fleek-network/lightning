@@ -8,3 +8,4 @@ license = "MIT"
 repository = "https://github.com/fleek-network/draco"
 
 [dependencies]
+num = "0.4"

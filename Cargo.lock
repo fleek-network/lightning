@@ -6448,6 +6448,9 @@ dependencies = [
 [[package]]
 name = "simulon"
 version = "0.0.1"
+dependencies = [
+ "num",
+]
 
 [[package]]
 name = "sized-chunks"
