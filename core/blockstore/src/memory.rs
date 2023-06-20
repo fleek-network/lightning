@@ -6,60 +6,12 @@ use draco_interfaces::{
     ConfigConsumer, ContentChunk,
 };
 use parking_lot::RwLock;
-use thiserror::Error;
 
-use crate::{config::Config, put::IncrementalPut, Block, BlockContent, Key};
-
-#[derive(Error, Debug)]
-#[error("Serialization failed")]
-pub struct SerializationError;
+use crate::{config::Config, put::IncrementalPut, store::Store, Block, BlockContent, Key};
 
 #[derive(Clone, Default)]
 pub struct MemoryBlockStore {
     inner: Arc<RwLock<HashMap<Key, Block>>>,
-}
-
-impl MemoryBlockStore {
-    pub fn basic_get(&self, key: &Key) -> Option<ContentChunk> {
-        match bincode::deserialize::<BlockContent>(self.inner.read().get(key)?)
-            .expect("Stored content to be serialized properly")
-        {
-            BlockContent::Chunk(content) => Some(ContentChunk {
-                compression: CompressionAlgorithm::Uncompressed,
-                content,
-            }),
-            _ => None,
-        }
-    }
-
-    pub fn basic_get_tree(&self, key: &Key) -> Option<Blake3Tree> {
-        match bincode::deserialize::<BlockContent>(self.inner.read().get(key)?)
-            .expect("Stored content to be serialized properly")
-        {
-            BlockContent::Tree(tree) => Some(Blake3Tree(tree)),
-            _ => None,
-        }
-    }
-
-    pub fn basic_put_tree(
-        &self,
-        key: Key,
-        tree: Blake3Tree,
-    ) -> Result<Option<Block>, SerializationError> {
-        let block =
-            bincode::serialize(&BlockContent::Tree(tree.0)).map_err(|_| SerializationError)?;
-        Ok(self.inner.write().insert(key, block))
-    }
-
-    pub fn basic_put(
-        &self,
-        key: Key,
-        chunk: ContentChunk,
-    ) -> Result<Option<Block>, SerializationError> {
-        let block = bincode::serialize(&BlockContent::Chunk(chunk.content))
-            .map_err(|_| SerializationError)?;
-        Ok(self.inner.write().insert(key, block))
-    }
 }
 
 impl ConfigConsumer for MemoryBlockStore {
@@ -70,7 +22,7 @@ impl ConfigConsumer for MemoryBlockStore {
 #[async_trait]
 impl BlockStoreInterface for MemoryBlockStore {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
-    type Put = IncrementalPut;
+    type Put = IncrementalPut<Self>;
 
     async fn init(_: Self::Config) -> anyhow::Result<Self> {
         Ok(Self {
@@ -79,7 +31,12 @@ impl BlockStoreInterface for MemoryBlockStore {
     }
 
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
-        self.basic_get_tree(&Key::tree_key(*cid)).map(Arc::new)
+        match bincode::deserialize::<BlockContent>(self.store_get(&Key::tree_key(*cid))?.as_slice())
+            .expect("Stored content to be serialized properly")
+        {
+            BlockContent::Tree(tree) => Some(Arc::new(Blake3Tree(tree))),
+            _ => None,
+        }
     }
 
     async fn get(
@@ -88,8 +45,18 @@ impl BlockStoreInterface for MemoryBlockStore {
         block_hash: &Blake3Hash,
         _compression: CompressionAlgoSet,
     ) -> Option<Self::SharedPointer<ContentChunk>> {
-        self.basic_get(&Key::chunk_key(*block_hash, block_counter))
-            .map(Arc::new)
+        match bincode::deserialize::<BlockContent>(
+            self.store_get(&Key::chunk_key(*block_hash, block_counter))?
+                .as_slice(),
+        )
+        .expect("Stored content to be serialized properly")
+        {
+            BlockContent::Chunk(content) => Some(Arc::new(ContentChunk {
+                compression: CompressionAlgorithm::Uncompressed,
+                content,
+            })),
+            _ => None,
+        }
     }
 
     fn put(&self, root: Option<Blake3Hash>) -> Self::Put {
@@ -97,5 +64,15 @@ impl BlockStoreInterface for MemoryBlockStore {
             Some(root) => IncrementalPut::verifier(self.clone(), root),
             None => IncrementalPut::trust(self.clone()),
         }
+    }
+}
+
+impl Store for MemoryBlockStore {
+    fn store_get(&self, key: &Key) -> Option<Block> {
+        self.inner.read().get(key).cloned()
+    }
+
+    fn store_put(&mut self, key: Key, block: Block) {
+        self.inner.write().insert(key, block);
     }
 }

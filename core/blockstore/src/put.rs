@@ -5,21 +5,21 @@ use blake3_tree::{
 };
 use bytes::{BufMut, Bytes, BytesMut};
 use draco_interfaces::{
-    Blake3Hash, Blake3Tree, CompressionAlgorithm, ContentChunk, IncrementalPutInterface,
-    PutFeedProofError, PutFinalizeError, PutWriteError,
+    Blake3Hash, CompressionAlgorithm, ContentChunk, IncrementalPutInterface, PutFeedProofError,
+    PutFinalizeError, PutWriteError,
 };
 
-use crate::{memory::MemoryBlockStore, Key, BLAKE3_CHUNK_SIZE};
+use crate::{store::Store, BlockContent, Key, BLAKE3_CHUNK_SIZE};
 
 struct Chunk {
     hash: Blake3Hash,
     content: ContentChunk,
 }
 
-pub struct IncrementalPut {
+pub struct IncrementalPut<S> {
     buf: BytesMut,
     stack: Vec<Chunk>,
-    store: MemoryBlockStore,
+    store: S,
     mode: Mode,
 }
 
@@ -33,12 +33,15 @@ enum Mode {
     },
 }
 
-impl IncrementalPut {
-    pub fn verifier(store: MemoryBlockStore, root: Blake3Hash) -> Self {
+impl<S> IncrementalPut<S>
+where
+    S: Store,
+{
+    pub fn verifier(store: S, root: Blake3Hash) -> Self {
         Self::internal_new(store, Mode::Verify { proof: None, root })
     }
 
-    pub fn trust(store: MemoryBlockStore) -> Self {
+    pub fn trust(store: S) -> Self {
         Self::internal_new(
             store,
             Mode::Trust {
@@ -47,7 +50,7 @@ impl IncrementalPut {
         )
     }
 
-    fn internal_new(store: MemoryBlockStore, mode: Mode) -> Self {
+    fn internal_new(store: S, mode: Mode) -> Self {
         Self {
             store,
             mode,
@@ -58,7 +61,10 @@ impl IncrementalPut {
 }
 
 #[async_trait]
-impl IncrementalPutInterface for IncrementalPut {
+impl<S> IncrementalPutInterface for IncrementalPut<S>
+where
+    S: Store + Send,
+{
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError> {
         match &mut self.mode {
             Mode::Verify {
@@ -138,26 +144,23 @@ impl IncrementalPutInterface for IncrementalPut {
         // TODO: put methods use a non-async lock so these calls could
         // block the thread. Maybe let's use the worker pattern.
         for (count, chunk) in self.stack.into_iter().enumerate() {
+            let block = bincode::serialize(&BlockContent::Chunk(chunk.content.content))
+                .map_err(|_| PutFinalizeError::PartialContent)?;
             self.store
-                .basic_put(
-                    Key::chunk_key(chunk.hash, count as u32),
-                    // TODO: We need a more descriptive error for serialization-related errors.
-                    chunk.content,
-                )
-                .map_err(|_| PutFinalizeError::InvalidCID)?;
+                .store_put(Key::chunk_key(chunk.hash, count as u32), block);
         }
 
         match self.mode {
             Mode::Verify { root, .. } => Ok(root),
             Mode::Trust { tree_builder } => {
                 let hash_tree = tree_builder.finalize();
-                self.store
-                    .basic_put_tree(
-                        Key::tree_key(Blake3Hash::from(hash_tree.hash)),
-                        // TODO: We need a more descriptive error for serialization-related errors.
-                        Blake3Tree(hash_tree.tree),
-                    )
-                    .map_err(|_| PutFinalizeError::InvalidCID)?;
+                let block = bincode::serialize(&BlockContent::Tree(hash_tree.tree))
+                    .map_err(|_| PutFinalizeError::PartialContent)?;
+                self.store.store_put(
+                    Key::tree_key(Blake3Hash::from(hash_tree.hash)),
+                    // TODO: We need a more descriptive error for serialization-related errors.
+                    block,
+                );
                 Ok(Blake3Hash::from(hash_tree.hash))
             },
         }

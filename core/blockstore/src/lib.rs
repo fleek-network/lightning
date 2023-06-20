@@ -1,6 +1,7 @@
 pub mod config;
 pub mod memory;
 pub mod put;
+mod store;
 
 use draco_interfaces::Blake3Hash;
 use serde::{Deserialize, Serialize};
