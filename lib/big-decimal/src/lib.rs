@@ -1,4 +1,7 @@
-use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
+use std::{
+    fmt,
+    ops::{Add, AddAssign, Div, Mul, Sub, SubAssign},
+};
 
 use num_bigint::BigUint;
 use num_traits::{zero, FromPrimitive, Num, ToPrimitive, Zero};
@@ -38,6 +41,27 @@ impl<const P: usize> BigDecimal<P> {
 
     pub fn zero() -> BigDecimal<P> {
         BigDecimal::new(zero())
+    }
+}
+
+impl<const P: usize> fmt::Display for BigDecimal<P> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value_str = self.0.to_string();
+        let chars: Vec<char> = value_str.chars().collect();
+
+        let mut formatted = String::new();
+        let mut count = 0;
+
+        for i in (0..chars.len()).rev() {
+            formatted.push(chars[i]);
+            count += 1;
+
+            if count % 3 == 0 && i != 0 {
+                formatted.push('_');
+            }
+        }
+        formatted = formatted.chars().rev().collect();
+        write!(f, "BigDecimal<{P}>({formatted})")
     }
 }
 
@@ -113,6 +137,13 @@ impl<const P: usize> From<BigUint> for BigDecimal<P> {
     }
 }
 
+impl<const P: usize> From<u64> for BigDecimal<P> {
+    fn from(value: u64) -> Self {
+        let value_to_big: BigUint = BigUint::from_u64(value).unwrap();
+        BigDecimal(value_to_big * BigUint::from(10u32).pow(P.try_into().unwrap()))
+    }
+}
+
 impl<const P: usize> From<u128> for BigDecimal<P> {
     fn from(value: u128) -> Self {
         let value_to_big: BigUint = BigUint::from_u128(value).unwrap();
@@ -120,9 +151,9 @@ impl<const P: usize> From<u128> for BigDecimal<P> {
     }
 }
 
-impl<const P: usize> From<u64> for BigDecimal<P> {
-    fn from(value: u64) -> Self {
-        let value_to_big: BigUint = BigUint::from_u64(value).unwrap();
+impl<const P: usize> From<usize> for BigDecimal<P> {
+    fn from(value: usize) -> Self {
+        let value_to_big: BigUint = BigUint::from_usize(value).unwrap();
         BigDecimal(value_to_big * BigUint::from(10u32).pow(P.try_into().unwrap()))
     }
 }
@@ -152,6 +183,13 @@ impl<const P: usize> From<BigDecimal<P>> for u128 {
     fn from(value: BigDecimal<P>) -> Self {
         let divisor = BigUint::from(10u64).pow(P.try_into().unwrap());
         value.0.to_u128().unwrap_or_default() / divisor.to_u128().unwrap()
+    }
+}
+
+impl<const P: usize> From<BigDecimal<P>> for usize {
+    fn from(value: BigDecimal<P>) -> Self {
+        let divisor = BigUint::from(10u64).pow(P.try_into().unwrap());
+        value.0.to_usize().unwrap_or_default() / divisor.to_usize().unwrap()
     }
 }
 

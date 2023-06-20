@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use draco_interfaces::types::{CommodityTypes, Epoch, NodeInfo, Staking, Worker};
+use draco_interfaces::types::{CommodityTypes, NodeInfo, Staking, Worker};
 use fastcrypto::{
     bls12381::min_sig::BLS12381PublicKey, ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64,
 };
@@ -8,23 +8,25 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Genesis {
-    pub epoch_start: u64,
-    pub epoch_time: u64,
-    pub committee_size: u64,
-    pub min_stake: u64,
-    pub eligibility_time: u64,
-    pub lock_time: Epoch,
-    pub protocol_percentage: u8,
-    pub max_inflation: u8,
-    pub min_inflation: u8,
-    pub consumer_rebate: u64,
-    pub max_boost: u64,
-    pub max_lock_time: u64,
+    pub epoch_start: String,
+    pub epoch_time: String,
+    pub committee_size: String,
+    pub min_stake: String,
+    pub eligibility_time: String,
+    pub lock_time: String,
+    pub protocol_share: String,
+    pub validator_share: String,
+    pub node_share: String,
+    pub max_inflation: String,
+    pub consumer_rebate: String,
+    pub max_boost: String,
+    pub max_lock_time: String,
     pub committee: Vec<GenesisCommittee>,
     pub service: Vec<GenesisService>,
     pub account: Vec<GenesisAccount>,
     pub commodity_prices: Vec<GenesisPrices>,
-    pub supply_at_genesis: u64,
+    pub supply_at_genesis: String,
+    pub protocol_fund_address: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

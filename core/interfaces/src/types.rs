@@ -315,19 +315,21 @@ pub enum ProtocolParams {
     /// The time in epochs a node has to wait to withdraw after unstaking
     LockTime = 4,
     /// The percentage of the reward pool the protocol gets
-    ProtocolPercentage = 5,
+    ProtocolShare = 5,
     /// The percentage of the reward pool the shared amongst the committe of validators
-    ValidatorPercentage = 6,
+    ValidatorShare = 6,
+    /// The percentage of the FLK emissions per unit that goes to service nodes
+    NodeShare = 7,
     /// The maximum targed inflation rate in a year
-    MaxInflation = 7,
-    /// The minimum targeted inflation rate in a year
-    MinInflation = 8,
+    MaxInflation = 8,
     /// The amount of FLK minted per GB they consume.
     ConsumerRebate = 9,
     /// The max multiplier on rewards for locking
     MaxBoost = 10,
     /// The max amount of time tokens can be locked
     MaxLockTime = 11,
+    /// The protocol funds address to receive share from emission
+    ProtocolFundAddress = 12,
 }
 
 /// The physical address of a node where it can be reached, the port numbers are

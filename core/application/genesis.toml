@@ -1,16 +1,18 @@
-epoch_start = 1684276288383
-epoch_time = 120000
-committee_size = 10
-min_stake = 1000
-eligibility_time = 1
-lock_time = 5
-protocol_percentage = 10
-max_inflation = 20
-min_inflation = 10
-consumer_rebate = 0
-max_boost = 4
-max_lock_time = 1460        # 1460 days(epoch) meaning 4 years
-supply_at_genesis = 1000000 # set to 1 million for testing, to be determined when initial allocations are set
+epoch_start = "1684276288383"
+epoch_time = "120000"
+committee_size = "10"
+min_stake = "1000"
+eligibility_time = "1"
+lock_time = "5"
+protocol_share = "10"
+validator_share = "0"
+node_share = "90"
+max_inflation = "10"
+consumer_rebate = "0"
+max_boost = "4"
+max_lock_time = "1460"        # 1460 days(epoch) meaning 4 years
+supply_at_genesis = "1000000" # set to 1 million for testing, to be determined when initial allocations are set
+protocol_fund_address = "ypOsFwUYcHHWe4PH/w7+gQjo7EUwV113JoeTM9vavnw="
 
 [[committee]]
 owner = "EfP5ha4KNRu/qkfIuF3lWK7GPeP5IqPKP8esnM0mo2s="

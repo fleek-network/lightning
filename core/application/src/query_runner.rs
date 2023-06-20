@@ -20,7 +20,7 @@ pub struct QueryRunner {
     node_table: ResolvedTableReference<NodePublicKey, NodeInfo>,
     committee_table: ResolvedTableReference<Epoch, Committee>,
     _services_table: ResolvedTableReference<ServiceId, Service>,
-    param_table: ResolvedTableReference<ProtocolParams, u128>,
+    param_table: ResolvedTableReference<ProtocolParams, String>,
     current_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
     _last_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
     total_served_table: ResolvedTableReference<Epoch, TotalServed>,
@@ -36,7 +36,7 @@ impl QueryRunner {
             node_table: atomo.resolve::<NodePublicKey, NodeInfo>("node"),
             committee_table: atomo.resolve::<Epoch, Committee>("committee"),
             _services_table: atomo.resolve::<ServiceId, Service>("service"),
-            param_table: atomo.resolve::<ProtocolParams, u128>("parameter"),
+            param_table: atomo.resolve::<ProtocolParams, String>("parameter"),
             current_epoch_served: atomo
                 .resolve::<NodePublicKey, CommodityServed>("current_epoch_served"),
             _last_epoch_served: atomo
@@ -157,6 +157,8 @@ impl SyncQueryRunnerInterface for QueryRunner {
             self.param_table
                 .get(ctx)
                 .get(&ProtocolParams::MinimumNodeStake)
+                .unwrap_or("0".to_owned())
+                .parse()
                 .unwrap_or(0)
         })
     }
@@ -249,7 +251,12 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn get_protocol_params(&self, param: ProtocolParams) -> u128 {
         self.inner.run(|ctx| {
             let param = &param;
-            self.param_table.get(ctx).get(param).unwrap_or_default()
+            self.param_table
+                .get(ctx)
+                .get(param)
+                .unwrap_or("0".to_owned())
+                .parse()
+                .unwrap_or(0)
         })
     }
 }

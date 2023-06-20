@@ -151,15 +151,16 @@ async fn stake(
 async fn test_genesis() {
     // Init application + get the query and update socket
     let (_, query_runner) = init_app().await;
-
     // Get the genesis paramaters plus the initial committee
     let (genesis, genesis_committee) = get_genesis();
-
     // For every member of the genesis committee they should have an initial stake of the min stake
     // Query to make sure that holds true
     for node in genesis_committee {
         let balance = query_runner.get_staked(&node.public_key);
-        assert_eq!(BigDecimal::<18>::from(genesis.min_stake), balance);
+        assert_eq!(
+            BigDecimal::<18>::from(genesis.min_stake.parse::<u128>().unwrap()),
+            balance
+        );
     }
 }
 
@@ -311,7 +312,7 @@ async fn test_stake() {
     // Since this test starts at epoch 0 locked_until will be == lock_time
     assert_eq!(
         query_runner.get_locked_time(&node_public_key),
-        genesis.lock_time
+        genesis.lock_time.parse::<u64>().unwrap()
     );
 
     // Try to withdraw the locked tokens and it should revery
@@ -489,14 +490,14 @@ async fn test_distribute_rewards() {
     // check account balances for FLK and usdc
     let max_boost = BigDecimal::<18>::from(4.0);
     let supply_at_year_start = BigDecimal::<18>::from(1_000_000_u64);
-    let inflation = BigDecimal::<18>::from(0.2);
+    let inflation = BigDecimal::<18>::from(0.1);
 
     let total_emissions: BigDecimal<18> =
         (inflation * supply_at_year_start) / (max_boost * 365.0.into() * reward_pool);
 
     // Todo: add locking when locking is added to distribute_rewards
     let flk_rewards: BigDecimal<18> = total_emissions * node_1_usd.into();
-    let boosted_flk_rewards: BigDecimal<18> = flk_rewards * 4_u64.into();
+    let boosted_flk_rewards: BigDecimal<18> = flk_rewards * 4_u64.into() * 0.9.into();
 
     let flk_balance = query_runner.get_flk_balance(&owner);
     let stables_balance = query_runner.get_stables_balance(&owner);

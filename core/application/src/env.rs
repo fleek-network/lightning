@@ -35,7 +35,7 @@ impl Env<UpdatePerm> {
             .with_table::<NodePublicKey, NodeInfo>("node")
             .with_table::<Epoch, Committee>("committee")
             .with_table::<ServiceId, Service>("service")
-            .with_table::<ProtocolParams, u128>("parameter")
+            .with_table::<ProtocolParams, String>("parameter")
             .with_table::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements")
             .with_table::<NodePublicKey, u8>("rep_scores")
             .with_table::<NodePublicKey, CommodityServed>("current_epoch_served")
@@ -110,7 +110,8 @@ impl Env<UpdatePerm> {
                     genesis.epoch_start = SystemTime::now()
                         .duration_since(SystemTime::UNIX_EPOCH)
                         .unwrap()
-                        .as_millis() as u64;
+                        .as_millis()
+                        .to_string();
                 },
                 Mode::Test => {
                     if let Some(config_genesis) = &config.genesis {
@@ -123,49 +124,41 @@ impl Env<UpdatePerm> {
             let mut node_table = ctx.get_table::<NodePublicKey, NodeInfo>("node");
             let mut account_table = ctx.get_table::<AccountOwnerPublicKey, AccountInfo>("account");
             let mut service_table = ctx.get_table::<ServiceId, Service>("service");
-            let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
+            let mut param_table = ctx.get_table::<ProtocolParams, String>("parameter");
             let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
             let mut metadata_table = ctx.get_table::<Metadata, BigDecimal<18>>("metadata");
             let mut commodity_prices_table =
                 ctx.get_table::<CommodityTypes, f64>("commodity_prices");
 
-            param_table.insert(ProtocolParams::EpochTime, genesis.epoch_time as u128);
+            param_table.insert(ProtocolParams::EpochTime, genesis.epoch_time.clone());
+            param_table.insert(ProtocolParams::CommitteeSize, genesis.committee_size);
+            param_table.insert(ProtocolParams::MinimumNodeStake, genesis.min_stake.clone());
+            param_table.insert(ProtocolParams::EligibilityTime, genesis.eligibility_time);
+            param_table.insert(ProtocolParams::LockTime, genesis.lock_time);
+            param_table.insert(ProtocolParams::ProtocolShare, genesis.protocol_share);
+            param_table.insert(ProtocolParams::ValidatorShare, genesis.validator_share);
+            param_table.insert(ProtocolParams::NodeShare, genesis.node_share);
+            param_table.insert(ProtocolParams::MaxInflation, genesis.max_inflation);
+            param_table.insert(ProtocolParams::ConsumerRebate, genesis.consumer_rebate);
+            param_table.insert(ProtocolParams::MaxBoost, genesis.max_boost);
+            param_table.insert(ProtocolParams::MaxLockTime, genesis.max_lock_time);
             param_table.insert(
-                ProtocolParams::CommitteeSize,
-                genesis.committee_size as u128,
+                ProtocolParams::ProtocolFundAddress,
+                genesis.protocol_fund_address,
             );
-            param_table.insert(
-                ProtocolParams::MinimumNodeStake,
-                Into::<u128>::into(genesis.min_stake),
-            );
-            param_table.insert(
-                ProtocolParams::EligibilityTime,
-                genesis.eligibility_time as u128,
-            );
-            param_table.insert(ProtocolParams::LockTime, genesis.lock_time as u128);
-            param_table.insert(
-                ProtocolParams::ProtocolPercentage,
-                genesis.protocol_percentage as u128,
-            );
-            param_table.insert(ProtocolParams::MaxInflation, genesis.max_inflation as u128);
-            param_table.insert(ProtocolParams::MinInflation, genesis.min_inflation as u128);
-            param_table.insert(
-                ProtocolParams::ConsumerRebate,
-                genesis.consumer_rebate as u128,
-            );
-            param_table.insert(ProtocolParams::MaxBoost, genesis.max_boost as u128);
-            param_table.insert(ProtocolParams::MaxLockTime, genesis.max_lock_time as u128);
 
-            let supply_at_genesis: BigDecimal<18> = genesis.supply_at_genesis.into();
+            let supply_at_genesis: BigDecimal<18> =
+                genesis.supply_at_genesis.parse::<u128>().unwrap().into();
             metadata_table.insert(Metadata::SupplyYearStart, supply_at_genesis.clone());
             metadata_table.insert(Metadata::TotalSupply, supply_at_genesis);
 
-            let epoch_end = genesis.epoch_time + genesis.epoch_start;
+            let epoch_end: u64 = genesis.epoch_time.parse::<u64>().unwrap()
+                + genesis.epoch_start.parse::<u64>().unwrap();
             let mut committee_members = Vec::with_capacity(genesis.committee.len());
 
             for node in &genesis.committee {
                 let mut node_info: NodeInfo = node.into();
-                node_info.stake.staked = genesis.min_stake.into();
+                node_info.stake.staked = genesis.min_stake.parse::<u128>().unwrap().into();
                 committee_members.push(node_info.public_key);
 
                 node_table.insert(node_info.public_key, node_info);
