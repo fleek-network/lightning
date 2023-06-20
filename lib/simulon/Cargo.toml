@@ -9,3 +9,6 @@ repository = "https://github.com/fleek-network/draco"
 
 [dependencies]
 num = "0.4"
+rand = "0.8"
+rand_core = "0.6"
+rand_distr = "0.4"
