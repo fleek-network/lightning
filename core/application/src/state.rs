@@ -679,8 +679,16 @@ impl<B: Backend> State<B> {
         let new_rep_scores = draco_reputation::calculate_reputation_scores(map);
 
         new_rep_scores
-            .into_iter()
-            .for_each(|(node, score)| self.rep_scores.set(node, score));
+            .iter()
+            .for_each(|(node, score)| self.rep_scores.set(*node, *score));
+
+        // Remove outdated rep scores.
+        let nodes = self.rep_scores.keys();
+        nodes.for_each(|node| {
+            if !new_rep_scores.contains_key(&node) {
+                self.rep_scores.remove(&node);
+            }
+        });
 
         // Remove measurements from this epoch once we ccalculated the rep scores.
         let nodes = self.rep_measurements.keys();
