@@ -26,15 +26,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+      - name: Rust Cache (custom)
+        uses: actions/cache@v3
+        continue-on-error: false
         with:
-          cache-directories: |
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
             ~/.cargo/registry/src/**/librocksdb-sys-*
+            ~/.cargo/git/db/
             target/
+          key: custom-rust-clippy-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: custom-rust-clippy-
       - name: Cargo Clippy 
         run: cargo clippy --all-features --all-targets --timings -- -Dclippy::all -Dwarnings
       - name: Upload Timings
         uses: actions/upload-artifact@v3
         with:
-          path: target/cargo-timings/cargo-timing.html 
+          path: target/cargo-timings/cargo-timing.html
