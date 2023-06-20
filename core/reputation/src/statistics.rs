@@ -144,6 +144,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::WeightedFloat;
 
     #[test]
     fn test_mean_basic() {
@@ -223,5 +224,143 @@ mod tests {
         assert_eq!(approx_quantile(values, 0.9999), None);
         let values: Vec<u32> = Vec::new();
         assert_eq!(approx_quantile(values, 0.5), None);
+    }
+
+    #[test]
+    fn test_z_score_normalize_filter() {
+        let mut values = vec![
+            1.0, 4.0, 6.0, 3.0, 4.0, 7.0, 4.0, 5.0, 6.0, 7.0, 8.0, 3.0, 80.0,
+        ];
+        z_score_normalize_filter(&mut values);
+        assert_eq!(
+            values,
+            vec![1.0, 4.0, 6.0, 3.0, 4.0, 7.0, 4.0, 5.0, 6.0, 7.0, 8.0, 3.0]
+        )
+    }
+
+    #[test]
+    fn test_z_score_normalize_filter_empty() {
+        let mut values: Vec<f64> = vec![];
+        z_score_normalize_filter(&mut values);
+        assert_eq!(values, Vec::<f64>::new())
+    }
+
+    #[test]
+    fn test_z_score_normalize_filter_one_element() {
+        let mut values = vec![1.0];
+        z_score_normalize_filter(&mut values);
+        assert_eq!(values, vec![1.0])
+    }
+
+    #[test]
+    fn test_z_score_normalize_filter_two_elements() {
+        let mut values = vec![1.0, 2.0];
+        z_score_normalize_filter(&mut values);
+        assert_eq!(values, vec![1.0, 2.0])
+    }
+
+    #[test]
+    fn test_calculate_weighted_mean() {
+        let values = vec![
+            WeightedFloat {
+                value: 1.0,
+                weight: 0.2,
+            },
+            WeightedFloat {
+                value: 2.0,
+                weight: 0.1,
+            },
+            WeightedFloat {
+                value: 3.0,
+                weight: 0.1,
+            },
+            WeightedFloat {
+                value: 4.0,
+                weight: 0.3,
+            },
+            WeightedFloat {
+                value: 5.0,
+                weight: 0.1,
+            },
+            WeightedFloat {
+                value: 6.0,
+                weight: 0.2,
+            },
+        ];
+        let weighted_mean = calculate_weighted_mean(&values);
+        assert_eq!(weighted_mean, Some(3.6));
+    }
+
+    #[test]
+    fn test_calculate_weighted_mean_empty() {
+        let values: Vec<WeightedFloat> = vec![];
+        let weighted_mean = calculate_weighted_mean(&values);
+        assert_eq!(weighted_mean, None);
+    }
+
+    #[test]
+    fn test_z_score_normalize_filter_more() {
+        let mut values = vec![4.0, 6.0, 3.0, 4.0, 5.0, 2.0, 2.0, 1.0, 3.0, 2.0, 4.0, 50.0];
+        z_score_normalize_filter(&mut values);
+        assert_eq!(
+            values,
+            vec![4.0, 6.0, 3.0, 4.0, 5.0, 2.0, 2.0, 1.0, 3.0, 2.0, 4.0]
+        );
+    }
+
+    #[test]
+    fn test_calculate_z_normalized_weighted_mean() {
+        let values = vec![
+            WeightedFloat {
+                value: 4.0,
+                weight: 0.1,
+            },
+            WeightedFloat {
+                value: 6.0,
+                weight: 0.01,
+            },
+            WeightedFloat {
+                value: 3.0,
+                weight: 0.01,
+            },
+            WeightedFloat {
+                value: 4.0,
+                weight: 0.18,
+            },
+            WeightedFloat {
+                value: 5.0,
+                weight: 0.1,
+            },
+            WeightedFloat {
+                value: 2.0,
+                weight: 0.1,
+            },
+            WeightedFloat {
+                value: 2.0,
+                weight: 0.1,
+            },
+            WeightedFloat {
+                value: 1.0,
+                weight: 0.1,
+            },
+            WeightedFloat {
+                value: 3.0,
+                weight: 0.1,
+            },
+            WeightedFloat {
+                value: 2.0,
+                weight: 0.1,
+            },
+            WeightedFloat {
+                value: 4.0,
+                weight: 0.05,
+            },
+            WeightedFloat {
+                value: 50.0,
+                weight: 0.05,
+            },
+        ];
+        let weighted_mean = calculate_z_normalized_weighted_mean(values);
+        assert_eq!(weighted_mean, Some(2.91));
     }
 }
