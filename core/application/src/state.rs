@@ -13,7 +13,7 @@ use draco_interfaces::{
     },
     DeliveryAcknowledgment,
 };
-use draco_reputation::{statistics, WeightedReputationMeasurements};
+use draco_reputation::{statistics, types::WeightedReputationMeasurements};
 use fastcrypto::{ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{
     AccountOwnerPublicKey, ClientPublicKey, NodeNetworkingPublicKey, NodePublicKey,
