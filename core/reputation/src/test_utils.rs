@@ -8,7 +8,7 @@ use crate::{NormalizedMeasurements, WeightedReputationMeasurements};
 
 const PROB_MEASUREMENT_PRESENT: f64 = 0.1;
 
-fn get_seedable_rng() -> StdRng {
+pub(crate) fn get_seedable_rng() -> StdRng {
     let seed: [u8; 32] = (0..32).collect::<Vec<u8>>().try_into().unwrap();
     SeedableRng::from_seed(seed)
 }
@@ -64,23 +64,36 @@ pub(crate) fn generate_reputation_measurements(rng: Option<StdRng>) -> Reputatio
 
 pub(crate) fn generate_weighted_measurements_map(
     map_size: usize,
+    rng: Option<StdRng>,
 ) -> HashMap<NodePublicKey, Vec<WeightedReputationMeasurements>> {
+    let mut rng = if let Some(rng) = rng {
+        rng
+    } else {
+        get_seedable_rng()
+    };
     let mut map = HashMap::with_capacity(map_size);
-    let mut rng = get_seedable_rng();
     for _ in 0..map_size {
         let mut array = [0; 96];
         (0..96).for_each(|i| array[i] = rng.gen_range(0..=255));
         let node = NodePublicKey(array);
         let num_measurements = rng.gen_range(1..20);
-        map.insert(node, generate_weighted_measurements(num_measurements));
+        map.insert(
+            node,
+            generate_weighted_measurements(num_measurements, Some(rng.clone())),
+        );
     }
     map
 }
 
 pub(crate) fn generate_weighted_measurements(
     num_measurements: usize,
+    rng: Option<StdRng>,
 ) -> Vec<WeightedReputationMeasurements> {
-    let mut rng = get_seedable_rng();
+    let mut rng = if let Some(rng) = rng {
+        rng
+    } else {
+        get_seedable_rng()
+    };
 
     let mut reported_measurements = Vec::with_capacity(num_measurements);
     for _ in 0..num_measurements {

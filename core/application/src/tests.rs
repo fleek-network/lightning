@@ -99,14 +99,9 @@ fn get_seedable_rng() -> StdRng {
 }
 
 fn generate_reputation_measurements(
-    rng: Option<StdRng>,
+    rng: &mut StdRng,
     prob_measurement_present: f64,
 ) -> ReputationMeasurements {
-    let mut rng = if let Some(rng) = rng {
-        rng
-    } else {
-        get_seedable_rng()
-    };
     let latency = if rng.gen_bool(prob_measurement_present) {
         None
     } else {
@@ -602,7 +597,7 @@ async fn test_submit_rep_measurements() {
     let (update_socket, query_runner) = init_app().await;
 
     let mut map = BTreeMap::new();
-    let rng = get_seedable_rng();
+    let mut rng = get_seedable_rng();
 
     let node_public_key: NodePublicKey = BLS12381PublicKey::decode_base64(NODE_ONE)
         .unwrap()
@@ -619,15 +614,11 @@ async fn test_submit_rep_measurements() {
     )
     .await;
 
-    let measurements1 = generate_reputation_measurements(Some(rng.clone()), 0.1);
+    let measurements1 = generate_reputation_measurements(&mut rng, 0.1);
     let peer1 = NodePublicKey([0; 96]);
     map.insert(peer1, measurements1.clone());
 
-    let measurements2 = generate_reputation_measurements(Some(rng.clone()), 0.1);
-    //let rep_measurements = ReportedReputationMeasurements {
-    //    reporting_node,
-    //    measurements,
-    //};
+    let measurements2 = generate_reputation_measurements(&mut rng, 0.1);
     let peer2 = NodePublicKey([1; 96]);
     map.insert(peer2, measurements2.clone());
 
@@ -635,8 +626,6 @@ async fn test_submit_rep_measurements() {
         UpdateMethod::SubmitReputationMeasurements { measurements: map },
         node_public_key,
     );
-    //run_transaction(vec![req], &update_socket).await.unwrap();
-
     if let Err(e) = run_transaction(vec![req], &update_socket).await {
         panic!("{e}");
     }
@@ -648,6 +637,85 @@ async fn test_submit_rep_measurements() {
 
     let rep_measurements2 = query_runner.get_rep_measurements(peer2);
     assert_eq!(rep_measurements2.len(), 1);
-    assert_eq!(rep_measurements1[0].reporting_node, node_public_key);
-    assert_eq!(rep_measurements1[0].measurements, measurements2);
+    assert_eq!(rep_measurements2[0].reporting_node, node_public_key);
+    assert_eq!(rep_measurements2[0].measurements, measurements2);
+}
+
+#[test]
+async fn test_rep_scores() {
+    // Init application + get the query and update socket
+    let (update_socket, query_runner) = init_app().await;
+    let (_, genesis_committee) = get_genesis();
+    let required_signals = 2 * genesis_committee.len() / 3 + 1;
+
+    let mut rng = get_seedable_rng();
+
+    let mut array = [0; 96];
+    (0..96).for_each(|i| array[i] = rng.gen_range(0..=255));
+    let node_public_key1 = NodePublicKey(array);
+
+    let mut array = [0; 96];
+    (0..96).for_each(|i| array[i] = rng.gen_range(0..=255));
+    let node_public_key2 = NodePublicKey(array);
+
+    deposit(2_000_u64.into(), Tokens::FLK, ACCOUNT_ONE, &update_socket).await;
+    stake(
+        1_000_u64.into(),
+        node_public_key1,
+        ACCOUNT_ONE,
+        &update_socket,
+    )
+    .await;
+    stake(
+        1_000_u64.into(),
+        node_public_key2,
+        ACCOUNT_ONE,
+        &update_socket,
+    )
+    .await;
+
+    let mut map = BTreeMap::new();
+    let measurements = generate_reputation_measurements(&mut rng, 0.1);
+    let peer1 = NodePublicKey([0; 96]);
+    map.insert(peer1, measurements.clone());
+
+    let measurements = generate_reputation_measurements(&mut rng, 0.1);
+    let peer2 = NodePublicKey([1; 96]);
+    map.insert(peer2, measurements.clone());
+
+    let req = get_update_request_node(
+        UpdateMethod::SubmitReputationMeasurements { measurements: map },
+        node_public_key1,
+    );
+
+    if let Err(e) = run_transaction(vec![req], &update_socket).await {
+        panic!("{e}");
+    }
+
+    let mut map = BTreeMap::new();
+    let measurements = generate_reputation_measurements(&mut rng, 0.1);
+    let peer1 = NodePublicKey([0; 96]);
+    map.insert(peer1, measurements.clone());
+
+    let measurements = generate_reputation_measurements(&mut rng, 0.1);
+    let peer2 = NodePublicKey([1; 96]);
+    map.insert(peer2, measurements.clone());
+
+    let req = get_update_request_node(
+        UpdateMethod::SubmitReputationMeasurements { measurements: map },
+        node_public_key2,
+    );
+
+    if let Err(e) = run_transaction(vec![req], &update_socket).await {
+        panic!("{e}");
+    }
+
+    // Change epoch so that rep scores will be calculated from the measurements.
+    for node in genesis_committee.iter().take(required_signals) {
+        let req = get_update_request_node(UpdateMethod::ChangeEpoch { epoch: 0 }, node.public_key);
+        run_transaction(vec![req], &update_socket).await.unwrap();
+    }
+
+    assert!(query_runner.get_reputation(&peer1).is_some());
+    assert!(query_runner.get_reputation(&peer2).is_some());
 }

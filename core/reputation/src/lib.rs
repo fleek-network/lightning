@@ -45,6 +45,8 @@ fn calculate_normalized_measurements(
 #[cfg(test)]
 mod tests {
 
+    use rand::Rng;
+
     use super::*;
     use crate::{test_utils::*, types::*};
 
@@ -52,7 +54,8 @@ mod tests {
 
     #[test]
     fn test_from_weighted_measurements_for_collected_measurements_counts() {
-        let weighted_measurements = generate_weighted_measurements(10);
+        let rng = get_seedable_rng();
+        let weighted_measurements = generate_weighted_measurements(10, Some(rng));
         let mut latency_count = 0;
         let mut interactions_count = 0;
         let mut inbound_bandwidth_count = 0;
@@ -102,7 +105,8 @@ mod tests {
 
     #[test]
     fn test_from_weighted_measurements_for_collected_measurements_weights_sum_to_1() {
-        let weighted_measurements = generate_weighted_measurements(10);
+        let rng = get_seedable_rng();
+        let weighted_measurements = generate_weighted_measurements(10, Some(rng));
         let collected_measurements: CollectedMeasurements = weighted_measurements.into();
 
         let mut weight_sum = 0.0;
@@ -156,7 +160,8 @@ mod tests {
 
     #[test]
     fn test_from_weighted_measurements_for_collected_measurements_values() {
-        let weighted_measurements = generate_weighted_measurements(1);
+        let rng = get_seedable_rng();
+        let weighted_measurements = generate_weighted_measurements(1, Some(rng));
         let collected_measurements: CollectedMeasurements = weighted_measurements.clone().into();
         if let Some(latency) = weighted_measurements[0].measurements.latency {
             assert_eq!(
@@ -198,7 +203,8 @@ mod tests {
 
     #[test]
     fn test_from_collected_measurements_for_normalized_measurements() {
-        let weighted_measurements = generate_weighted_measurements(10);
+        let rng = get_seedable_rng();
+        let weighted_measurements = generate_weighted_measurements(10, Some(rng));
         let mut collected_measurements: CollectedMeasurements = weighted_measurements.into();
         collected_measurements.outbound_bandwidth = Vec::new();
 
@@ -237,7 +243,8 @@ mod tests {
 
     #[test]
     fn test_normalized_measurements_min_max_normalize() {
-        let weighted_measurements_map = generate_weighted_measurements_map(10);
+        let rng = get_seedable_rng();
+        let weighted_measurements_map = generate_weighted_measurements_map(10, Some(rng));
         let mut normalized_measurements_map =
             calculate_normalized_measurements(weighted_measurements_map);
 
@@ -274,5 +281,25 @@ mod tests {
                 assert!((0u8..=100u8).contains(score));
             }
         })
+    }
+
+    #[test]
+    fn test_calculate_reputation_scores() {
+        let mut rng = get_seedable_rng();
+
+        let mut map = HashMap::new();
+        let mut array = [0; 96];
+        (0..96).for_each(|i| array[i] = rng.gen_range(0..=255));
+        let node1 = NodePublicKey(array);
+        map.insert(node1, generate_weighted_measurements(10, Some(rng.clone())));
+
+        let mut array = [0; 96];
+        (0..96).for_each(|i| array[i] = rng.gen_range(0..=255));
+        let node2 = NodePublicKey(array);
+        map.insert(node2, generate_weighted_measurements(10, Some(rng)));
+
+        let rep_scores = calculate_reputation_scores(map);
+        assert!(rep_scores.contains_key(&node1));
+        assert!(rep_scores.contains_key(&node2));
     }
 }
