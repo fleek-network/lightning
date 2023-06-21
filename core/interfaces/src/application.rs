@@ -98,7 +98,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
     fn get_rep_measurements(&self, node: NodePublicKey) -> Vec<ReportedReputationMeasurements>;
 
     /// Returns the global reputation of a node.
-    fn get_reputation(&self, node: &NodePublicKey) -> u128;
+    fn get_reputation(&self, node: &NodePublicKey) -> Option<u8>;
 
     /// Returns the relative score between two nodes, this score should measure how much two
     /// nodes `n1` and `n2` trust each other. Of course in real world a direct measurement

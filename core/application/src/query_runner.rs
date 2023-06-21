@@ -23,6 +23,7 @@ pub struct QueryRunner {
     param_table: ResolvedTableReference<ProtocolParams, String>,
     current_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
     rep_measurements: ResolvedTableReference<NodePublicKey, Vec<ReportedReputationMeasurements>>,
+    rep_scores: ResolvedTableReference<NodePublicKey, u8>,
     _last_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
     total_served_table: ResolvedTableReference<Epoch, TotalServed>,
     _commodity_price: ResolvedTableReference<CommodityTypes, f64>,
@@ -42,6 +43,7 @@ impl QueryRunner {
                 .resolve::<NodePublicKey, CommodityServed>("current_epoch_served"),
             rep_measurements: atomo
                 .resolve::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements"),
+            rep_scores: atomo.resolve::<NodePublicKey, u8>("rep_scores"),
             _last_epoch_served: atomo
                 .resolve::<NodePublicKey, CommodityServed>("last_epoch_served"),
             total_served_table: atomo.resolve::<Epoch, TotalServed>("total_served"),
@@ -140,8 +142,8 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .run(|ctx| self.rep_measurements.get(ctx).get(node).unwrap_or(vec![]))
     }
 
-    fn get_reputation(&self, _node: &NodePublicKey) -> u128 {
-        todo!()
+    fn get_reputation(&self, node: &NodePublicKey) -> Option<u8> {
+        self.inner.run(|ctx| self.rep_scores.get(ctx).get(node))
     }
 
     fn get_relative_score(&self, _n1: &NodePublicKey, _n2: &NodePublicKey) -> u128 {
