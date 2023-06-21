@@ -258,15 +258,13 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn get_protocol_params(&self, param: ProtocolParams) -> u128 {
+    fn get_protocol_params(&self, param: ProtocolParams) -> String {
         self.inner.run(|ctx| {
             let param = &param;
             self.param_table
                 .get(ctx)
                 .get(param)
                 .unwrap_or("0".to_owned())
-                .parse()
-                .unwrap_or(0)
         })
     }
 }

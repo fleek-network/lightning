@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, time::Duration, vec};
+use std::{
+    collections::BTreeMap,
+    time::{Duration, SystemTime},
+    vec,
+};
 
 use affair::Socket;
 use anyhow::{anyhow, Result};
@@ -33,11 +37,26 @@ const NODE_ONE: &str = "k7XAk/1z4rXf1QHyMPHZ1cgyeX2T3bsCCopNpFV6v8hInZfjyti79w3r
 
 // Init the app and return the execution engine socket that would go to narwhal and the query socket
 // that could go to anyone
-async fn init_app() -> (ExecutionEngineSocket, QueryRunner) {
+async fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
+    let config = config.or_else(|| Some(Config::default()));
+    let app = Application::init(config.unwrap()).await.unwrap();
+
+    (app.transaction_executor(), app.sync_query())
+}
+
+async fn init_app_with_config() -> (ExecutionEngineSocket, QueryRunner) {
     let mut genesis = Genesis::load().expect("Failed to load genesis from file.");
+
+    genesis.epoch_start = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis()
+        .to_string();
+    genesis.epoch_time = "10000".to_string();
     genesis.max_inflation = "10".to_owned();
     genesis.protocol_share = "15".to_owned();
-    genesis.node_share = "85".to_owned();
+    genesis.node_share = "80".to_owned();
+    genesis.validator_share = "5".to_owned();
     genesis.max_boost = "4".to_owned();
     genesis.supply_at_genesis = "1000000".to_owned();
     let config = Config {
@@ -45,9 +64,14 @@ async fn init_app() -> (ExecutionEngineSocket, QueryRunner) {
         mode: Mode::Test,
     };
 
-    let app = Application::init(config).await.unwrap();
+    init_app(Some(config)).await
+}
 
-    (app.transaction_executor(), app.sync_query())
+fn node_and_account_key(value: u8) -> (AccountOwnerPublicKey, NodePublicKey) {
+    (
+        AccountOwnerPublicKey([value; 32]),
+        NodePublicKey([value; 96]),
+    )
 }
 
 // Helper method to get a transaction update request from a node
@@ -193,7 +217,6 @@ async fn stake(
     sender: AccountOwnerPublicKey,
     update_socket: &Socket<Block, BlockExecutionResponse>,
 ) {
-    // Now try with the correct details for a new node
     let update = get_update_request_account(
         UpdateMethod::Stake {
             amount,
@@ -219,7 +242,7 @@ async fn stake(
 #[test]
 async fn test_genesis() {
     // Init application + get the query and update socket
-    let (_, query_runner) = init_app().await;
+    let (_, query_runner) = init_app(None).await;
     // Get the genesis paramaters plus the initial committee
     let (genesis, genesis_committee) = get_genesis();
     // For every member of the genesis committee they should have an initial stake of the min stake
@@ -236,7 +259,7 @@ async fn test_genesis() {
 #[test]
 async fn test_epoch_change() {
     // Init application + get the query and update socket
-    let (update_socket, query_runner) = init_app().await;
+    let (update_socket, query_runner) = init_app(None).await;
     let (_, genesis_committee) = get_genesis();
 
     let required_signals = 2 * genesis_committee.len() / 3 + 1;
@@ -267,7 +290,7 @@ async fn test_epoch_change() {
 
 #[test]
 async fn test_stake() {
-    let (update_socket, query_runner) = init_app().await;
+    let (update_socket, query_runner) = init_app(None).await;
     let (genesis, _) = get_genesis();
     let node_public_key: NodePublicKey = BLS12381PublicKey::decode_base64(NODE_ONE)
         .unwrap()
@@ -405,7 +428,7 @@ async fn test_stake() {
 
 #[test]
 async fn test_stake_lock() {
-    let (update_socket, query_runner) = init_app().await;
+    let (update_socket, query_runner) = init_app(None).await;
     let node_public_key: NodePublicKey = BLS12381PublicKey::decode_base64(NODE_ONE)
         .unwrap()
         .pubkey
@@ -464,11 +487,11 @@ async fn test_stake_lock() {
 
 #[test]
 async fn test_pod_without_proof() {
-    let (update_socket, query_runner) = init_app().await;
+    let (update_socket, query_runner) = init_app(None).await;
 
     // use a node from a genesis committee for testing
     let node_key = "l0Jel6KEFG7H6sV2nWKOQxDaMKWMeiUBqK5VHKcStWrLPHAANRB+dt7gp0jQ7ooxEaI7ukOQZk6U5vcL7ESHA1J/iAWQ7YNO/ZCvR1pfWfcTNBONIzeiUWAN+iyKfV10";
-    let node_public_key: NodePublicKey = BLS12381PublicKey::decode_base64(node_key)
+    let node_public_key = BLS12381PublicKey::decode_base64(node_key)
         .unwrap()
         .pubkey
         .to_bytes()
@@ -498,46 +521,31 @@ async fn test_pod_without_proof() {
 
 #[test]
 async fn test_distribute_rewards() {
-    let (update_socket, query_runner) = init_app().await;
+    let (update_socket, query_runner) = init_app_with_config().await;
     let (_, genesis_committee) = get_genesis();
     // use a node from a genesis committee for testing
-    let owner_key = "EfP5ha4KNRu/qkfIuF3lWK7GPeP5IqPKP8esnM0mo2s=";
-    let owner: AccountOwnerPublicKey = AccountOwnerPublicKey(
-        Ed25519PublicKey::decode_base64(owner_key)
-            .unwrap()
-            .0
-            .to_bytes(),
-    );
+    let (owner_key1, node_key1) = node_and_account_key(3);
+    let (owner_key2, node_key2) = node_and_account_key(4);
 
-    let node_key = "l0Jel6KEFG7H6sV2nWKOQxDaMKWMeiUBqK5VHKcStWrLPHAANRB+dt7gp0jQ7ooxEaI7ukOQZk6U5vcL7ESHA1J/iAWQ7YNO/ZCvR1pfWfcTNBONIzeiUWAN+iyKfV10";
-    let node_public_key: NodePublicKey = BLS12381PublicKey::decode_base64(node_key)
-        .unwrap()
-        .pubkey
-        .to_bytes()
-        .into();
-
-    let node_key_2 = "qipezx5pzmPFWICevMx+SL5+bIjG4yw3A9ieYKKwf2wTEvK0gMRYOln9+KmbNRB3FRbVQBLuCEWIHT0V9GxATT9VeJ+HT88vh/B/6dj7CbWBdWbZ4QXzo0q+uyGchopl";
-    let node_public_key_2: NodePublicKey = BLS12381PublicKey::decode_base64(node_key_2)
-        .unwrap()
-        .pubkey
-        .to_bytes()
-        .into();
-
-    // deposit some stakes and lock it
-    deposit(10_000_u64.into(), Tokens::FLK, owner, &update_socket).await;
-    stake(10_000_u64.into(), node_public_key, owner, &update_socket).await;
+    // deposit FLK tokens and stake it
+    deposit(10_000_u64.into(), Tokens::FLK, owner_key1, &update_socket).await;
+    stake(10_000_u64.into(), node_key1, owner_key1, &update_socket).await;
+    deposit(10_000_u64.into(), Tokens::FLK, owner_key2, &update_socket).await;
+    stake(10_000_u64.into(), node_key2, owner_key2, &update_socket).await;
     // staking locking for four year to get max boosts
-    stake_lock(1460, node_public_key, owner, &update_socket).await;
+    stake_lock(1460, node_key1, owner_key1, &update_socket).await;
 
     let max_boost: BigDecimal<18> = query_runner
         .get_protocol_params(ProtocolParams::MaxBoost)
+        .parse()
+        .unwrap_or(0.0)
         .into();
     let node_1_boost = max_boost.clone();
 
     // submit pods for usage
-    let pod_10 = pod_request(node_public_key, 10000, 0);
-    let pod11 = pod_request(node_public_key, 6767, 1);
-    let pod_21 = pod_request(node_public_key_2, 5000, 1);
+    let pod_10 = pod_request(node_key1, 10000, 0);
+    let pod11 = pod_request(node_key1, 6767, 1);
+    let pod_21 = pod_request(node_key2, 5000, 1);
 
     // run the delivery ack transaction
     if let Err(e) = run_transaction(vec![pod_10, pod11, pod_21], &update_socket).await {
@@ -559,42 +567,72 @@ async fn test_distribute_rewards() {
     let node_1_usd = 0.1 * 10000_f64 + 0.2 * 6767_f64;
     let node_2_usd = 0.2 * 5000_f64;
 
-    let reward_pool: BigDecimal<18> = (node_2_usd + node_1_usd).into();
+    // assert stable balances
+    let stables_balance = query_runner.get_stables_balance(&owner_key1);
+    assert_eq!(stables_balance, node_1_usd.into());
 
-    // check account balances for FLK and usdc
+    // get params for emission calculations
+    let reward_pool: BigDecimal<18> = (node_2_usd + node_1_usd).into();
     let supply_at_year_start: BigDecimal<18> = query_runner.get_year_start_supply();
     let inflation: BigDecimal<18> = query_runner
         .get_protocol_params(ProtocolParams::MaxInflation)
+        .parse()
+        .unwrap_or(0.0)
         .into();
-
     let node_share: BigDecimal<18> = query_runner
         .get_protocol_params(ProtocolParams::NodeShare)
-        .into();
-    let _protocol_share: BigDecimal<18> = query_runner
-        .get_protocol_params(ProtocolParams::ProtocolShare)
-        .into();
-    let _validator_share: BigDecimal<18> = query_runner
-        .get_protocol_params(ProtocolParams::ValidatorShare)
+        .parse()
+        .unwrap_or(0.0)
         .into();
 
     let max_emissions: BigDecimal<18> = (inflation * supply_at_year_start) / 36500.0.into();
+    let emissions_per_unit = max_emissions.clone() / (reward_pool * max_boost);
 
-    let emissions_per_unit = max_emissions / (reward_pool * max_boost);
-
-    let flk_rewards: BigDecimal<18> =
+    let node_flk_rewards: BigDecimal<18> =
         emissions_per_unit * node_1_boost * (node_share / 100.0.into()) * node_1_usd.into();
+    let node_flk_balance = query_runner.get_flk_balance(&owner_key1);
+    assert_eq!(node_flk_balance, node_flk_rewards);
 
-    let flk_balance = query_runner.get_flk_balance(&owner);
-    let stables_balance = query_runner.get_stables_balance(&owner);
+    let protocol_share: BigDecimal<18> = query_runner
+        .get_protocol_params(ProtocolParams::ProtocolShare)
+        .parse()
+        .unwrap_or(0.0)
+        .into();
 
-    assert_eq!(stables_balance, node_1_usd.into());
-    assert_eq!(flk_balance, flk_rewards);
+    let protocol_address = query_runner.get_protocol_params(ProtocolParams::ProtocolFundAddress);
+    let protocol_account: AccountOwnerPublicKey = AccountOwnerPublicKey(
+        Ed25519PublicKey::decode_base64(&protocol_address)
+            .unwrap()
+            .0
+            .to_bytes(),
+    );
+
+    let protocol_rewards = max_emissions.clone() * protocol_share;
+    let protocol_balance = query_runner.get_flk_balance(&protocol_account);
+
+    assert_eq!(protocol_balance, protocol_rewards);
+
+    let validator_share: BigDecimal<18> = query_runner
+        .get_protocol_params(ProtocolParams::ValidatorShare)
+        .parse()
+        .unwrap_or(0.0)
+        .into();
+
+    let committee_members = query_runner.get_committee_members();
+    let committee_account1 = query_runner
+        .get_node_info(&committee_members[0])
+        .unwrap()
+        .owner;
+
+    let validator_balance = query_runner.get_flk_balance(&committee_account1);
+    let validator_rewards = max_emissions * (validator_share / committee_members.len().into());
+    assert_eq!(validator_balance, validator_rewards);
 }
 
 #[test]
 async fn test_submit_rep_measurements() {
     // Init application + get the query and update socket
-    let (update_socket, query_runner) = init_app().await;
+    let (update_socket, query_runner) = init_app(None).await;
 
     let mut map = BTreeMap::new();
     let mut rng = get_seedable_rng();
@@ -644,7 +682,7 @@ async fn test_submit_rep_measurements() {
 #[test]
 async fn test_rep_scores() {
     // Init application + get the query and update socket
-    let (update_socket, query_runner) = init_app().await;
+    let (update_socket, query_runner) = init_app(None).await;
     let (_, genesis_committee) = get_genesis();
     let required_signals = 2 * genesis_committee.len() / 3 + 1;
 

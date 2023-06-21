@@ -144,7 +144,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
     fn get_year_start_supply(&self) -> BigDecimal<18>;
 
     /// Returns the passed in protocol parameter
-    fn get_protocol_params(&self, param: ProtocolParams) -> u128;
+    fn get_protocol_params(&self, param: ProtocolParams) -> String;
 }
 
 #[derive(Clone, Debug)]
