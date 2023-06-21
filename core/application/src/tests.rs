@@ -6,8 +6,8 @@ use big_decimal::BigDecimal;
 use draco_interfaces::{
     application::ExecutionEngineSocket,
     types::{
-        Block, ExecutionError, NodeInfo, ProofOfConsensus, ProtocolParams, Tokens,
-        TotalServed, TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
+        Block, ExecutionError, NodeInfo, ProofOfConsensus, ProtocolParams, Tokens, TotalServed,
+        TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
     },
     ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
 };

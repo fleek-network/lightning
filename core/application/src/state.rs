@@ -860,10 +860,7 @@ impl<B: Backend> State<B> {
                 .0
                 .to_bytes()
                 .into();
-        self.mint_and_transfer_flk(
-            max_emissions * protocol_share.into(),
-            protocol_owner,
-        );
+        self.mint_and_transfer_flk(max_emissions * protocol_share.into(), protocol_owner);
     }
 
     fn calculate_node_revenue(&self, node: &NodePublicKey) -> f64 {
@@ -881,11 +878,7 @@ impl<B: Backend> State<B> {
     }
 
     fn calculate_emissions(&self, epoch: &Epoch) -> (BigDecimal<18>, BigDecimal<18>) {
-        let reward_pool = self
-            .total_served
-            .get(epoch)
-            .unwrap_or_default()
-            .reward_pool;
+        let reward_pool = self.total_served.get(epoch).unwrap_or_default().reward_pool;
 
         // if reward is 0, no commodity under any service was served
         if reward_pool == 0_f64 {
