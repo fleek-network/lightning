@@ -87,38 +87,6 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> CdnClient<R, W> {
                                 })
                                 .await?;
                         },
-                        ServiceMode::Raw => {
-                            // Receive proof
-                            if proof_len != 0 {
-                                self.conn.read_buffer(proof_len as usize);
-                                match self.conn.read_frame(None).await? {
-                                    Some(CdnFrame::Buffer(bytes)) => {
-                                        // Feed the verifier the proof
-                                        if let Err(e) = verifier.feed_proof(&bytes) {
-                                            return Err(anyhow!("error feeding proof: {e:?}"));
-                                        }
-                                    },
-                                    Some(_) => unreachable!(), // Guaranteed by read_buffer()
-                                    None => return Err(anyhow!("connection disconnected")),
-                                }
-                            }
-
-                            // Recieve block
-                            self.conn.read_buffer(bytes_len as usize);
-                            match self.conn.read_frame(None).await? {
-                                Some(CdnFrame::Buffer(bytes)) => {
-                                    // Verify raw data chunk
-                                    let mut hasher = BlockHasher::new();
-                                    hasher.set_block(block);
-                                    hasher.update(&bytes);
-                                    if let Err(e) = verifier.verify(hasher) {
-                                        return Err(anyhow!("error verifying content: {e:?}"));
-                                    }
-                                },
-                                Some(_) => unreachable!(), // Guaranteed by read_buffer()
-                                None => return Err(anyhow!("connection disconnected")),
-                            }
-                        },
                     }
 
                     if verifier.is_done() {

@@ -73,7 +73,6 @@ impl Reason {
 pub enum ServiceMode {
     Tentative = 0x00,
     Optimistic = 0x01,
-    Raw = 0x02,
 }
 
 impl ServiceMode {
@@ -81,7 +80,6 @@ impl ServiceMode {
         match byte {
             0x00 => Some(Self::Tentative),
             0x01 => Some(Self::Optimistic),
-            0x02 => Some(Self::Raw),
             _ => None,
         }
     }

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use blake3_tree::ProofBuf;
 use draco_handshake::server::RawLaneConnection;
 use draco_interfaces::{ConnectionInterface, FileSystemInterface, HandlerFn, SdkInterface};
@@ -6,7 +6,7 @@ use futures::FutureExt;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::connection::{
-    consts::{RANGE_REQUEST_TAG, REQUEST_TAG},
+    consts::{DELIVERY_ACK_TAG, RANGE_REQUEST_TAG, REQUEST_TAG},
     CdnConnection, CdnFrame, ServiceMode,
 };
 
@@ -61,8 +61,7 @@ pub async fn handle_session<
 
                 match service_mode {
                     ServiceMode::Tentative => todo!(),
-                    ServiceMode::Optimistic => todo!(),
-                    ServiceMode::Raw => {
+                    ServiceMode::Optimistic => {
                         let mut proof = ProofBuf::new(&tree.0, 0);
                         let mut proof_len = proof.len() as u64;
 
@@ -91,6 +90,19 @@ pub async fn handle_session<
                             }
                             conn.write_frame(CdnFrame::Buffer(chunk.content.as_slice().into()))
                                 .await?;
+
+                            // read delivery ack
+                            match conn.read_frame(Some(DELIVERY_ACK_TAG)).await? {
+                                Some(CdnFrame::DeliveryAcknowledgement { signature: _ }) => {
+                                    // TODO: verify and store delivery acks
+                                },
+                                Some(_) => unreachable!(),
+                                None => {
+                                    return Err(anyhow!(
+                                        "client disconnected while waiting for delivery ack"
+                                    ));
+                                },
+                            }
 
                             block_counter += 1;
                             tree_idx = (block_counter * 2 - block_counter.count_ones()) as usize;
@@ -197,7 +209,7 @@ mod tests {
             .unwrap();
 
         // request some content
-        client.request(ServiceMode::Raw, hash).await.unwrap();
+        client.request(ServiceMode::Optimistic, hash).await.unwrap();
 
         // Cleanup client and server
         // TODO: cleaner finish method which returns the raw streams back
