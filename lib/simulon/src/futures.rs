@@ -1,4 +1,4 @@
-use std::{future::Future, marker::PhantomData};
+use std::{future::Future, time::Duration};
 
 use crate::connection::Connection;
 
@@ -41,17 +41,46 @@ impl Future for SleepFuture {
     }
 }
 
-pub struct RecvFuture<T> {
-    p: PhantomData<T>,
+#[derive(Default)]
+pub struct RecvFuture {
+    is_ready: bool,
 }
 
-impl<T> Future for RecvFuture<T> {
-    type Output = Option<T>;
+impl Future for RecvFuture {
+    type Output = Option<Vec<u8>>;
 
     fn poll(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        todo!()
+        println!("poll {}", self.is_ready);
+
+        if !self.is_ready {
+            self.is_ready = true;
+
+            let waker = cx.waker().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::new(5, 0));
+                println!("after sleep");
+                waker.wake();
+            });
+
+            std::task::Poll::Pending
+        } else {
+            std::task::Poll::Ready(Some(vec![0, 1]))
+        }
     }
+}
+
+#[test]
+fn x() {
+    let future = async {
+        println!("A");
+
+        let x = RecvFuture::default().await;
+
+        println!("{x:?}");
+    };
+
+    futures::executor::block_on(future);
 }

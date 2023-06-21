@@ -3,10 +3,17 @@ use std::time::Duration;
 pub struct Engine {
     /// The current time in this simulation.
     time: Duration,
-    /// The next resource id.
-    next_rid: u64,
 }
 
 pub struct Rid(u64);
 
-struct RawConnection {}
+pub struct Message {
+    buffer: Vec<u8>,
+    transmitted: usize,
+}
+
+impl Engine {
+    fn init() {}
+
+    fn render_frame(&mut self) {}
+}
