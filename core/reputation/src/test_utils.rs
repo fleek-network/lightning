@@ -13,6 +13,55 @@ fn get_seedable_rng() -> StdRng {
     SeedableRng::from_seed(seed)
 }
 
+pub(crate) fn generate_reputation_measurements(rng: Option<StdRng>) -> ReputationMeasurements {
+    let mut rng = if let Some(rng) = rng {
+        rng
+    } else {
+        get_seedable_rng()
+    };
+    let latency = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
+        None
+    } else {
+        Some(Duration::from_millis(rng.gen_range(100..=400)))
+    };
+    let interactions = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
+        None
+    } else {
+        Some(rng.gen_range(-20..=100))
+    };
+    let inbound_bandwidth = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
+        None
+    } else {
+        // bytes per milliseconds: 50 Mbps to 250 Mbps
+        Some(rng.gen_range(6250..31250))
+    };
+    let outbound_bandwidth = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
+        None
+    } else {
+        // bytes per milliseconds: 50 Mbps to 250 Mbps
+        Some(rng.gen_range(6250..31250))
+    };
+    let bytes_received = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
+        None
+    } else {
+        Some(rng.gen_range(100_000..1_000_000_000))
+    };
+    let bytes_sent = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
+        None
+    } else {
+        Some(rng.gen_range(100_000..1_000_000_000))
+    };
+    ReputationMeasurements {
+        latency,
+        interactions,
+        inbound_bandwidth,
+        outbound_bandwidth,
+        bytes_received,
+        bytes_sent,
+        hops: None,
+    }
+}
+
 pub(crate) fn generate_weighted_measurements_map(
     map_size: usize,
 ) -> HashMap<NodePublicKey, Vec<WeightedReputationMeasurements>> {
@@ -35,48 +84,7 @@ pub(crate) fn generate_weighted_measurements(
 
     let mut reported_measurements = Vec::with_capacity(num_measurements);
     for _ in 0..num_measurements {
-        let latency = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
-            None
-        } else {
-            Some(Duration::from_millis(rng.gen_range(100..=400)))
-        };
-        let interactions = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
-            None
-        } else {
-            Some(rng.gen_range(-20..=100))
-        };
-        let inbound_bandwidth = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
-            None
-        } else {
-            // bytes per milliseconds: 50 Mbps to 250 Mbps
-            Some(rng.gen_range(6250..31250))
-        };
-        let outbound_bandwidth = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
-            None
-        } else {
-            // bytes per milliseconds: 50 Mbps to 250 Mbps
-            Some(rng.gen_range(6250..31250))
-        };
-        let bytes_received = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
-            None
-        } else {
-            Some(rng.gen_range(100_000..1_000_000_000))
-        };
-        let bytes_sent = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
-            None
-        } else {
-            Some(rng.gen_range(100_000..1_000_000_000))
-        };
-
-        let measurements = ReputationMeasurements {
-            latency,
-            interactions,
-            inbound_bandwidth,
-            outbound_bandwidth,
-            bytes_received,
-            bytes_sent,
-            hops: None,
-        };
+        let measurements = generate_reputation_measurements(Some(rng.clone()));
         let weight = rng.gen_range(0..=100);
 
         let reported_measurement = WeightedReputationMeasurements {

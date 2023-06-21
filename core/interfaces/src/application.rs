@@ -7,8 +7,8 @@ use crate::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
     types::{
-        Block, CommodityServed, Epoch, EpochInfo, NodeInfo, ProtocolParams, TotalServed,
-        TransactionResponse,
+        Block, CommodityServed, Epoch, EpochInfo, NodeInfo, ProtocolParams,
+        ReportedReputationMeasurements, TotalServed, TransactionResponse,
     },
 };
 
@@ -93,6 +93,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
 
     /// Returns the epoch a nodes tokens are unlocked at
     fn get_locked_time(&self, node: &NodePublicKey) -> Epoch;
+
+    /// Returns the reported reputation measurements for a node.
+    fn get_rep_measurements(&self, node: NodePublicKey) -> Vec<ReportedReputationMeasurements>;
 
     /// Returns the global reputation of a node.
     fn get_reputation(&self, node: &NodePublicKey) -> u128;

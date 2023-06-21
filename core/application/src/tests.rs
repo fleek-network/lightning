@@ -1,4 +1,4 @@
-use std::vec;
+use std::{collections::BTreeMap, time::Duration, vec};
 
 use affair::Socket;
 use anyhow::{anyhow, Result};
@@ -6,8 +6,8 @@ use big_decimal::BigDecimal;
 use draco_interfaces::{
     application::ExecutionEngineSocket,
     types::{
-        Block, ExecutionError, NodeInfo, ProofOfConsensus, ProtocolParams, Tokens, TotalServed,
-        TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
+        Block, ExecutionError, NodeInfo, ProofOfConsensus, ProtocolParams, ReputationMeasurements,
+        Tokens, TotalServed, TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
     },
     ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
 };
@@ -18,6 +18,7 @@ use fleek_crypto::{
     AccountOwnerPublicKey, AccountOwnerSignature, NodePublicKey, NodeSignature,
     TransactionSignature,
 };
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use tokio::test;
 
 use crate::{
@@ -90,6 +91,63 @@ fn pod_request(node: NodePublicKey, commodity: u128, service_id: u32) -> UpdateR
         },
         node,
     )
+}
+
+fn get_seedable_rng() -> StdRng {
+    let seed: [u8; 32] = (0..32).collect::<Vec<u8>>().try_into().unwrap();
+    SeedableRng::from_seed(seed)
+}
+
+fn generate_reputation_measurements(
+    rng: Option<StdRng>,
+    prob_measurement_present: f64,
+) -> ReputationMeasurements {
+    let mut rng = if let Some(rng) = rng {
+        rng
+    } else {
+        get_seedable_rng()
+    };
+    let latency = if rng.gen_bool(prob_measurement_present) {
+        None
+    } else {
+        Some(Duration::from_millis(rng.gen_range(100..=400)))
+    };
+    let interactions = if rng.gen_bool(prob_measurement_present) {
+        None
+    } else {
+        Some(rng.gen_range(-20..=100))
+    };
+    let inbound_bandwidth = if rng.gen_bool(prob_measurement_present) {
+        None
+    } else {
+        // bytes per milliseconds: 50 Mbps to 250 Mbps
+        Some(rng.gen_range(6250..31250))
+    };
+    let outbound_bandwidth = if rng.gen_bool(prob_measurement_present) {
+        None
+    } else {
+        // bytes per milliseconds: 50 Mbps to 250 Mbps
+        Some(rng.gen_range(6250..31250))
+    };
+    let bytes_received = if rng.gen_bool(prob_measurement_present) {
+        None
+    } else {
+        Some(rng.gen_range(100_000..1_000_000_000))
+    };
+    let bytes_sent = if rng.gen_bool(prob_measurement_present) {
+        None
+    } else {
+        Some(rng.gen_range(100_000..1_000_000_000))
+    };
+    ReputationMeasurements {
+        latency,
+        interactions,
+        inbound_bandwidth,
+        outbound_bandwidth,
+        bytes_received,
+        bytes_sent,
+        hops: None,
+    }
 }
 
 async fn run_transaction(
@@ -536,4 +594,60 @@ async fn test_distribute_rewards() {
 
     assert_eq!(stables_balance, node_1_usd.into());
     assert_eq!(flk_balance, flk_rewards);
+}
+
+#[test]
+async fn test_submit_rep_measurements() {
+    // Init application + get the query and update socket
+    let (update_socket, query_runner) = init_app().await;
+
+    let mut map = BTreeMap::new();
+    let rng = get_seedable_rng();
+
+    let node_public_key: NodePublicKey = BLS12381PublicKey::decode_base64(NODE_ONE)
+        .unwrap()
+        .pubkey
+        .to_bytes()
+        .into();
+
+    deposit(1_000_u64.into(), Tokens::FLK, ACCOUNT_ONE, &update_socket).await;
+    stake(
+        1_000_u64.into(),
+        node_public_key,
+        ACCOUNT_ONE,
+        &update_socket,
+    )
+    .await;
+
+    let measurements1 = generate_reputation_measurements(Some(rng.clone()), 0.1);
+    let peer1 = NodePublicKey([0; 96]);
+    map.insert(peer1, measurements1.clone());
+
+    let measurements2 = generate_reputation_measurements(Some(rng.clone()), 0.1);
+    //let rep_measurements = ReportedReputationMeasurements {
+    //    reporting_node,
+    //    measurements,
+    //};
+    let peer2 = NodePublicKey([1; 96]);
+    map.insert(peer2, measurements2.clone());
+
+    let req = get_update_request_node(
+        UpdateMethod::SubmitReputationMeasurements { measurements: map },
+        node_public_key,
+    );
+    //run_transaction(vec![req], &update_socket).await.unwrap();
+
+    if let Err(e) = run_transaction(vec![req], &update_socket).await {
+        panic!("{e}");
+    }
+
+    let rep_measurements1 = query_runner.get_rep_measurements(peer1);
+    assert_eq!(rep_measurements1.len(), 1);
+    assert_eq!(rep_measurements1[0].reporting_node, node_public_key);
+    assert_eq!(rep_measurements1[0].measurements, measurements1);
+
+    let rep_measurements2 = query_runner.get_rep_measurements(peer2);
+    assert_eq!(rep_measurements2.len(), 1);
+    assert_eq!(rep_measurements1[0].reporting_node, node_public_key);
+    assert_eq!(rep_measurements1[0].measurements, measurements2);
 }

@@ -2110,6 +2110,7 @@ dependencies = [
  "fleek-crypto",
  "multiaddr",
  "num-traits",
+ "rand 0.8.5",
  "serde",
  "tokio",
  "toml 0.7.4",

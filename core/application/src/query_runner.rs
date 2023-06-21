@@ -4,7 +4,7 @@ use draco_interfaces::{
     application::SyncQueryRunnerInterface,
     types::{
         AccountInfo, CommodityServed, CommodityTypes, Epoch, EpochInfo, Metadata, NodeInfo,
-        ProtocolParams, Service, ServiceId, TotalServed,
+        ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, TotalServed,
     },
 };
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
@@ -22,6 +22,7 @@ pub struct QueryRunner {
     _services_table: ResolvedTableReference<ServiceId, Service>,
     param_table: ResolvedTableReference<ProtocolParams, String>,
     current_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
+    rep_measurements: ResolvedTableReference<NodePublicKey, Vec<ReportedReputationMeasurements>>,
     _last_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
     total_served_table: ResolvedTableReference<Epoch, TotalServed>,
     _commodity_price: ResolvedTableReference<CommodityTypes, f64>,
@@ -39,6 +40,8 @@ impl QueryRunner {
             param_table: atomo.resolve::<ProtocolParams, String>("parameter"),
             current_epoch_served: atomo
                 .resolve::<NodePublicKey, CommodityServed>("current_epoch_served"),
+            rep_measurements: atomo
+                .resolve::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements"),
             _last_epoch_served: atomo
                 .resolve::<NodePublicKey, CommodityServed>("last_epoch_served"),
             total_served_table: atomo.resolve::<Epoch, TotalServed>("total_served"),
@@ -130,6 +133,11 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 .map(|node| node.stake.locked_until)
                 .unwrap_or(0)
         })
+    }
+
+    fn get_rep_measurements(&self, node: NodePublicKey) -> Vec<ReportedReputationMeasurements> {
+        self.inner
+            .run(|ctx| self.rep_measurements.get(ctx).get(node).unwrap_or(vec![]))
     }
 
     fn get_reputation(&self, _node: &NodePublicKey) -> u128 {
