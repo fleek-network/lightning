@@ -18,7 +18,7 @@ const REP_EWMA_WEIGHT: f64 = 0.7;
 pub struct MeasurementManager {
     peers: LruCache<NodePublicKey, MeasurementStore>,
     summary_stats: SummaryStatistics,
-    local_reputation: Arc<scc::HashMap<NodePublicKey, u128>>,
+    local_reputation: Arc<scc::HashMap<NodePublicKey, u8>>,
 }
 
 impl MeasurementManager {
@@ -41,7 +41,7 @@ impl MeasurementManager {
             .collect()
     }
 
-    pub fn get_local_reputation_ref(&self) -> Arc<scc::HashMap<NodePublicKey, u128>> {
+    pub fn get_local_reputation_ref(&self) -> Arc<scc::HashMap<NodePublicKey, u8>> {
         self.local_reputation.clone()
     }
 
@@ -155,9 +155,9 @@ impl MeasurementManager {
             self.local_reputation
                 .entry(peer)
                 .and_modify(|s| {
-                    *s = (*s as f64 * REP_EWMA_WEIGHT + (1.0 - REP_EWMA_WEIGHT) * score) as u128
+                    *s = (*s as f64 * REP_EWMA_WEIGHT + (1.0 - REP_EWMA_WEIGHT) * score) as u8
                 })
-                .or_insert(score as u128);
+                .or_insert(score as u8);
         }
     }
 }

@@ -154,11 +154,11 @@ impl ConfigConsumer for ReputationAggregator {
 
 #[derive(Clone)]
 pub struct MyReputationQuery {
-    local_reputation: Arc<scc::HashMap<NodePublicKey, u128>>,
+    local_reputation: Arc<scc::HashMap<NodePublicKey, u8>>,
 }
 
 impl MyReputationQuery {
-    fn new(local_reputation: Arc<scc::HashMap<NodePublicKey, u128>>) -> Self {
+    fn new(local_reputation: Arc<scc::HashMap<NodePublicKey, u8>>) -> Self {
         Self { local_reputation }
     }
 }
@@ -168,7 +168,7 @@ impl ReputationQueryInteface for MyReputationQuery {
     type SyncQuery = QueryRunner;
 
     /// Returns the reputation of the provided node locally.
-    fn get_reputation_of(&self, peer: &NodePublicKey) -> Option<u128> {
+    fn get_reputation_of(&self, peer: &NodePublicKey) -> Option<u8> {
         self.local_reputation.get(peer).map(|entry| *entry.get())
     }
 }

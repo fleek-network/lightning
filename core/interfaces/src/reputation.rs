@@ -48,7 +48,7 @@ pub trait ReputationQueryInteface: Clone {
     type SyncQuery: SyncQueryRunnerInterface;
 
     /// Returns the reputation of the provided node locally.
-    fn get_reputation_of(&self, peer: &NodePublicKey) -> Option<u128>;
+    fn get_reputation_of(&self, peer: &NodePublicKey) -> Option<u8>;
 }
 
 /// Reputation reporter is a cheaply cleanable object which can be used to report the interactions

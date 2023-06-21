@@ -218,7 +218,7 @@ impl ReputationQueryInteface for MyReputationQuery {
     type SyncQuery = QueryRunner;
 
     /// Returns the reputation of the provided node locally.
-    fn get_reputation_of(&self, _peer: &NodePublicKey) -> Option<u128> {
+    fn get_reputation_of(&self, _peer: &NodePublicKey) -> Option<u8> {
         todo!()
     }
 }
