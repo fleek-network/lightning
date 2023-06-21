@@ -17,3 +17,6 @@ fleek-crypto.workspace = true
 tokio.workspace = true
 lru.workspace = true
 scc.workspace = true
+
+[dev-dependencies]
+rand.workspace = true

@@ -2295,6 +2295,7 @@ dependencies = [
  "draco-reputation",
  "fleek-crypto",
  "lru",
+ "rand 0.8.5",
  "scc",
  "serde",
  "tokio",

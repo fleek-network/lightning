@@ -252,7 +252,6 @@ impl Latency {
 }
 
 #[derive(Clone)]
-#[allow(dead_code)]
 struct Interactions {
     sum: Option<i64>,
 }
@@ -355,14 +354,12 @@ impl Hops {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Default)]
 struct SummaryStatistics {
     min: ReputationMeasurements,
     max: ReputationMeasurements,
 }
 
-#[allow(dead_code)]
 impl SummaryStatistics {
     fn update_latency(&mut self, value: Duration) {
         self.min.latency = Self::update(self.min.latency, value, &std::cmp::min);
@@ -516,10 +513,70 @@ impl NormalizedMeasurements {
 
 #[cfg(test)]
 mod tests {
-    use draco_interfaces::Weight;
+    use draco_interfaces::{types::ReputationMeasurements, Weight};
     use fleek_crypto::NodePublicKey;
+    use rand::{rngs::StdRng, Rng, SeedableRng};
 
     use super::*;
+
+    const PROB_MEASUREMENT_PRESENT: f64 = 0.1;
+
+    fn get_seedable_rng() -> StdRng {
+        let seed: [u8; 32] = (0..32).collect::<Vec<u8>>().try_into().unwrap();
+        SeedableRng::from_seed(seed)
+    }
+
+    fn generate_weighted_measurements(num_measurements: usize) -> Vec<ReputationMeasurements> {
+        let mut rng = get_seedable_rng();
+
+        let mut rep_measurements = Vec::with_capacity(num_measurements);
+        for _ in 0..num_measurements {
+            let latency = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
+                None
+            } else {
+                Some(Duration::from_millis(rng.gen_range(100..=400)))
+            };
+            let interactions = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
+                None
+            } else {
+                Some(rng.gen_range(-20..=100))
+            };
+            let inbound_bandwidth = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
+                None
+            } else {
+                // bytes per milliseconds: 50 Mbps to 250 Mbps
+                Some(rng.gen_range(6250..31250))
+            };
+            let outbound_bandwidth = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
+                None
+            } else {
+                // bytes per milliseconds: 50 Mbps to 250 Mbps
+                Some(rng.gen_range(6250..31250))
+            };
+            let bytes_received = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
+                None
+            } else {
+                Some(rng.gen_range(100_000..1_000_000_000))
+            };
+            let bytes_sent = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
+                None
+            } else {
+                Some(rng.gen_range(100_000..1_000_000_000))
+            };
+
+            let measurements = ReputationMeasurements {
+                latency,
+                interactions,
+                inbound_bandwidth,
+                outbound_bandwidth,
+                bytes_received,
+                bytes_sent,
+                hops: None,
+            };
+            rep_measurements.push(measurements);
+        }
+        rep_measurements
+    }
 
     #[test]
     fn test_report_sat() {
@@ -722,5 +779,55 @@ mod tests {
         manager.clear_measurements();
         let peer_measurements = manager.get_measurements();
         assert!(!peer_measurements.contains_key(&peer));
+    }
+
+    #[test]
+    fn test_normalized_measurements_in_range() {
+        let mut summary_stats = SummaryStatistics::default();
+        let rep_measurements = generate_weighted_measurements(20);
+        rep_measurements.iter().for_each(|m| {
+            if let Some(latency) = m.latency {
+                summary_stats.update_latency(latency);
+            }
+            if let Some(interactions) = m.interactions {
+                summary_stats.update_interactions(interactions);
+            }
+            if let Some(inbound_bandwidth) = m.inbound_bandwidth {
+                summary_stats.update_inbound_bandwidth(inbound_bandwidth);
+            }
+            if let Some(outbound_bandwidth) = m.outbound_bandwidth {
+                summary_stats.update_outbound_bandwidth(outbound_bandwidth);
+            }
+            if let Some(bytes_received) = m.bytes_received {
+                summary_stats.update_bytes_received(bytes_received);
+            }
+            if let Some(bytes_sent) = m.bytes_sent {
+                summary_stats.update_bytes_sent(bytes_sent);
+            }
+            if let Some(hops) = m.hops {
+                summary_stats.update_hops(hops);
+            }
+        });
+        for rm in rep_measurements {
+            let normalized_measurements = NormalizedMeasurements::new(rm, &summary_stats);
+            if let Some(latency) = normalized_measurements.latency {
+                assert!((0.0..=1.0).contains(&latency));
+            }
+            if let Some(interactions) = normalized_measurements.interactions {
+                assert!((0.0..=1.0).contains(&interactions));
+            }
+            if let Some(inbound_bandwidth) = normalized_measurements.inbound_bandwidth {
+                assert!((0.0..=1.0).contains(&inbound_bandwidth));
+            }
+            if let Some(outbound_bandwidth) = normalized_measurements.outbound_bandwidth {
+                assert!((0.0..=1.0).contains(&outbound_bandwidth));
+            }
+            if let Some(bytes_received) = normalized_measurements.bytes_received {
+                assert!((0.0..=1.0).contains(&bytes_received));
+            }
+            if let Some(bytes_sent) = normalized_measurements.bytes_sent {
+                assert!((0.0..=1.0).contains(&bytes_sent));
+            }
+        }
     }
 }
