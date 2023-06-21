@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use blake3_tree::{blake3::tree::BlockHasher, IncrementalVerifier};
+use bytes::{BufMut, Bytes, BytesMut};
 use draco_handshake::client::HandshakeClient;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -19,7 +20,7 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> CdnClient<R, W> {
         Ok(Self { conn })
     }
 
-    pub async fn request(&mut self, service_mode: ServiceMode, hash: [u8; 32]) -> Result<()> {
+    pub async fn request(&mut self, service_mode: ServiceMode, hash: [u8; 32]) -> Result<Bytes> {
         // Send request
         self.conn
             .write_frame(CdnFrame::Request { service_mode, hash })
@@ -27,6 +28,10 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> CdnClient<R, W> {
 
         let mut verifier = IncrementalVerifier::new(hash, 0);
         let mut block = 0;
+
+        // reserve space for one block
+        // TODO: Use a Header frame to get the total length
+        let mut buf = BytesMut::with_capacity(256 * 1024);
 
         // response loop
         loop {
@@ -71,6 +76,8 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> CdnClient<R, W> {
                                     if let Err(e) = verifier.verify(hasher) {
                                         return Err(anyhow!("error verifying content: {e:?}"));
                                     }
+
+                                    buf.put(bytes);
                                 },
                                 Some(_) => unreachable!(), // Guaranteed by read_buffer()
                                 None => {
@@ -92,6 +99,8 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> CdnClient<R, W> {
                     if verifier.is_done() {
                         break;
                     } else {
+                        // reserve another 256KiB for the next block
+                        buf.reserve(256 * 1024);
                         block += 1;
                     }
                 },
@@ -104,6 +113,6 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> CdnClient<R, W> {
             }
         }
 
-        Ok(())
+        Ok(buf.into())
     }
 }

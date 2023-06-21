@@ -209,7 +209,8 @@ mod tests {
             .unwrap();
 
         // request some content
-        client.request(ServiceMode::Optimistic, hash).await.unwrap();
+        let bytes = client.request(ServiceMode::Optimistic, hash).await.unwrap();
+        assert_eq!(bytes.len(), 256 * 1024 * 4);
 
         // Cleanup client and server
         // TODO: cleaner finish method which returns the raw streams back
