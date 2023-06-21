@@ -798,19 +798,99 @@ impl<B: Backend> State<B> {
             .unwrap_or_default()
             .into();
 
+        let node_share: BigDecimal<18> = (self
+            .parameters
+            .get(&ProtocolParams::NodeShare)
+            .unwrap_or("0".to_owned())
+            .parse()
+            .unwrap_or(1.0)
+            / 100.0)
+            .into();
+        let (max_emissions, flk_per_stable_revenue_unit) = self.calculate_emissions(&epoch);
+        let nodes = self.current_epoch_served.keys();
+        for node in nodes {
+            let stables_revenue: f64 = self.calculate_node_revenue(&node);
+
+            let node_owner = self.node_info.get(&node).unwrap().owner;
+            let node_stables_revenue_6: BigDecimal<6> = BigDecimal::<6>::from(stables_revenue);
+            self.mint_and_transfer_stables(node_stables_revenue_6, node_owner);
+
+            // safe to unwrap since all the nodes in current_epoch_served table are in node info
+            // this is checked in submit_pod contract/function
+            let locked_until = self.node_info.get(&node).unwrap().stake.stake_locked_until;
+            let boost: BigDecimal<18> = self.get_boost(locked_until, &epoch).into();
+            let node_stables_revenue = BigDecimal::<18>::from(stables_revenue);
+            let flk_rewards = node_stables_revenue * flk_per_stable_revenue_unit.clone() * boost;
+            let node_owner = self.node_info.get(&node).unwrap().owner;
+            self.mint_and_transfer_flk(flk_rewards * node_share.clone(), node_owner);
+            self.current_epoch_served.remove(&node);
+        }
+
+        // distribute rewards to validators
+        let validator_share = self
+            .parameters
+            .get(&ProtocolParams::ValidatorShare)
+            .unwrap_or("0.0".to_owned())
+            .parse()
+            .unwrap_or(0.0);
+
+        let committee_members = self.committee_info.get(&epoch).unwrap().members;
+        let committee_size = committee_members.len();
+
+        for node in committee_members {
+            let node_owner = self.node_info.get(&node).unwrap().owner;
+            let validator_rewards =
+                (max_emissions.clone() * validator_share.into()) / committee_size.into();
+            self.mint_and_transfer_flk(validator_rewards, node_owner);
+        }
+
+        let protocol_share = self
+            .parameters
+            .get(&ProtocolParams::ProtocolShare)
+            .unwrap_or("0.0".to_string())
+            .parse()
+            .unwrap_or(0.0);
+        let protocol_address = self
+            .parameters
+            .get(&ProtocolParams::ProtocolFundAddress)
+            .unwrap();
+        let protocol_owner: AccountOwnerPublicKey =
+            Ed25519PublicKey::decode_base64(&protocol_address)
+                .unwrap()
+                .0
+                .to_bytes()
+                .into();
+        self.mint_and_transfer_flk(
+            max_emissions * protocol_share.into(),
+            protocol_owner,
+        );
+    }
+
+    fn calculate_node_revenue(&self, node: &NodePublicKey) -> f64 {
+        let served = self.current_epoch_served.get(node).unwrap_or_default();
+        served
+            .iter()
+            .enumerate()
+            .fold(0.0, |stables_revenue, (commodity_type, &quantity)| {
+                CommodityTypes::from_u8(commodity_type as u8)
+                    .and_then(|commodity| self.commodity_prices.get(&commodity))
+                    .map_or(stables_revenue, |price| {
+                        stables_revenue + price * quantity as f64
+                    })
+            })
+    }
+
+    fn calculate_emissions(&self, epoch: &Epoch) -> (BigDecimal<18>, BigDecimal<18>) {
         let reward_pool = self
             .total_served
-            .get(&epoch)
+            .get(epoch)
             .unwrap_or_default()
             .reward_pool;
 
         // if reward is 0, no commodity under any service was served
         if reward_pool == 0_f64 {
-            return;
+            return (BigDecimal::zero(), BigDecimal::zero());
         }
-
-        let committee_members = self.committee_info.get(&epoch).unwrap().members;
-        let committee_size = committee_members.len();
 
         let inflation: BigDecimal<18> = (self
             .parameters
@@ -833,84 +913,14 @@ impl<B: Backend> State<B> {
             .get(&Metadata::SupplyYearStart)
             .unwrap_or_default();
 
-        let min_emissions: BigDecimal<18> =
-            (inflation * supply_at_year_start) / (max_boost * 365.0.into());
-        // Todo: distribute emission rewards to other stakeholders(validators and foundation
-        // address)
+        let max_emissions: BigDecimal<18> = (inflation * supply_at_year_start) / 365.0.into();
 
-        let flk_per_stable_revenue_unit = min_emissions / reward_pool.into();
-        let mut total_emissions = BigDecimal::<18>::zero();
+        let min_emissions = max_emissions.clone() / max_boost;
 
-        let nodes = self.current_epoch_served.keys();
-        for node in nodes {
-            let served = self.current_epoch_served.get(&node).unwrap_or_default();
-            let mut stables_revenue: f64 = 0.0;
-            // Iterate over the quantities and their corresponding commodity type
-            for (commodity_type, &quantity) in served.iter().enumerate() {
-                // Convert the index to CommodityTypes
-                if let Some(commodity) = CommodityTypes::from_u8(commodity_type as u8) {
-                    // Get the price for the commodity
-                    if let Some(price) = self.commodity_prices.get(&commodity) {
-                        // Calculate the total price for this quantity of commodity
-                        stables_revenue += price * quantity as f64;
-                    }
-                }
-            }
-            let node_stables_revenue_6: BigDecimal<6> = BigDecimal::<6>::from(stables_revenue);
-            self.mint_and_transfer_stables(node_stables_revenue_6, node);
-
-            // safe to unwrap since all the nodes in current_epoch_served table are in node info
-            // this is checked in submit_pod contract/function
-            let locked_until = self.node_info.get(&node).unwrap().stake.stake_locked_until;
-            let boost: BigDecimal<18> = self.get_boost(locked_until, epoch).into();
-            let node_stables_revenue = BigDecimal::<18>::from(stables_revenue);
-            let flk_rewards = node_stables_revenue * flk_per_stable_revenue_unit.clone() * boost;
-            total_emissions += flk_rewards.clone();
-            let node_owner = self.node_info.get(&node).unwrap().owner;
-            self.mint_and_transfer_flk(flk_rewards * 0.9.into(), node_owner);
-            self.current_epoch_served.remove(&node);
-        }
-
-        // distribute rewards to validators
-        let validator_share = self
-            .parameters
-            .get(&ProtocolParams::ValidatorShare)
-            .unwrap_or("0.0".to_owned())
-            .parse()
-            .unwrap_or(0.0);
-
-        for node in committee_members {
-            let node_owner = self.node_info.get(&node).unwrap().owner;
-            let validator_rewards =
-                (total_emissions.clone() * validator_share.into()) / committee_size.into();
-            self.mint_and_transfer_flk(validator_rewards, node_owner);
-        }
-
-        let protocol_share = self
-            .parameters
-            .get(&ProtocolParams::ProtocolShare)
-            .unwrap_or("0.0".to_string())
-            .parse()
-            .unwrap_or(0.0);
-        let protocol_address = self
-            .parameters
-            .get(&ProtocolParams::ProtocolFundAddress)
-            .unwrap();
-        println!("{protocol_address}");
-        let protocol_owner: AccountOwnerPublicKey =
-            Ed25519PublicKey::decode_base64(&protocol_address)
-                .unwrap()
-                .0
-                .to_bytes()
-                .into();
-        self.mint_and_transfer_flk(
-            total_emissions.clone() * protocol_share.into(),
-            protocol_owner,
-        )
+        (max_emissions, min_emissions / reward_pool.into())
     }
 
-    fn mint_and_transfer_stables(&self, amount: BigDecimal<6>, node: NodePublicKey) {
-        let owner = self.node_info.get(&node).unwrap().owner;
+    fn mint_and_transfer_stables(&self, amount: BigDecimal<6>, owner: AccountOwnerPublicKey) {
         let mut account = self.account_info.get(&owner).unwrap_or_default();
 
         account.stables_balance += amount;
@@ -967,7 +977,7 @@ impl<B: Backend> State<B> {
     ///
     /// Returns:
     /// - The calculated boost factor for the current rewards.
-    fn get_boost(&self, locked_until: u64, current_epoch: u64) -> f64 {
+    fn get_boost(&self, locked_until: u64, current_epoch: &Epoch) -> f64 {
         let max_boost = self
             .parameters
             .get(&ProtocolParams::MaxBoost)
@@ -980,7 +990,7 @@ impl<B: Backend> State<B> {
             .unwrap_or("1.0".to_owned())
             .parse()
             .unwrap_or(1.0);
-        let locking_period = locked_until.saturating_sub(current_epoch) as f64;
+        let locking_period = locked_until.saturating_sub(*current_epoch) as f64;
         let boost: f64 = 1.0 + (max_boost - 1.0) * (locking_period / max_lock_time).powf(1.2);
         f64::min(max_boost, boost)
     }

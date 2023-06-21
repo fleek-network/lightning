@@ -6,8 +6,8 @@ use big_decimal::BigDecimal;
 use draco_interfaces::{
     application::ExecutionEngineSocket,
     types::{
-        Block, ExecutionError, NodeInfo, ProofOfConsensus, Tokens, TotalServed,
-        TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
+        Block, ExecutionError, NodeInfo, ProofOfConsensus, ProtocolParams, Tokens,
+        TotalServed, TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
     },
     ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
 };
@@ -20,7 +20,12 @@ use fleek_crypto::{
 };
 use tokio::test;
 
-use crate::{app::Application, config::Config, genesis::Genesis, query_runner::QueryRunner};
+use crate::{
+    app::Application,
+    config::{Config, Mode},
+    genesis::Genesis,
+    query_runner::QueryRunner,
+};
 
 const ACCOUNT_ONE: AccountOwnerPublicKey = AccountOwnerPublicKey([0; 32]);
 const NODE_ONE: &str = "k7XAk/1z4rXf1QHyMPHZ1cgyeX2T3bsCCopNpFV6v8hInZfjyti79w3raEa3YwFADM2BnX+/o49k1HQjKZIYlGDszEZ/zUaK3kn3MfT5BEWkKgP+TFMPJoBxenV33XEZ";
@@ -28,7 +33,18 @@ const NODE_ONE: &str = "k7XAk/1z4rXf1QHyMPHZ1cgyeX2T3bsCCopNpFV6v8hInZfjyti79w3r
 // Init the app and return the execution engine socket that would go to narwhal and the query socket
 // that could go to anyone
 async fn init_app() -> (ExecutionEngineSocket, QueryRunner) {
-    let app = Application::init(Config::default()).await.unwrap();
+    let mut genesis = Genesis::load().expect("Failed to load genesis from file.");
+    genesis.max_inflation = "10".to_owned();
+    genesis.protocol_share = "15".to_owned();
+    genesis.node_share = "85".to_owned();
+    genesis.max_boost = "4".to_owned();
+    genesis.supply_at_genesis = "1000000".to_owned();
+    let config = Config {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+    };
+
+    let app = Application::init(config).await.unwrap();
 
     (app.transaction_executor(), app.sync_query())
 }
@@ -460,6 +476,11 @@ async fn test_distribute_rewards() {
     // staking locking for four year to get max boosts
     stake_lock(1460, node_public_key, owner, &update_socket).await;
 
+    let max_boost: BigDecimal<18> = query_runner
+        .get_protocol_params(ProtocolParams::MaxBoost)
+        .into();
+    let node_1_boost = max_boost.clone();
+
     // submit pods for usage
     let pod_10 = pod_request(node_public_key, 10000, 0);
     let pod11 = pod_request(node_public_key, 6767, 1);
@@ -488,20 +509,31 @@ async fn test_distribute_rewards() {
     let reward_pool: BigDecimal<18> = (node_2_usd + node_1_usd).into();
 
     // check account balances for FLK and usdc
-    let max_boost = BigDecimal::<18>::from(4.0);
-    let supply_at_year_start = BigDecimal::<18>::from(1_000_000_u64);
-    let inflation = BigDecimal::<18>::from(0.1);
+    let supply_at_year_start: BigDecimal<18> = query_runner.get_year_start_supply();
+    let inflation: BigDecimal<18> = query_runner
+        .get_protocol_params(ProtocolParams::MaxInflation)
+        .into();
 
-    let total_emissions: BigDecimal<18> =
-        (inflation * supply_at_year_start) / (max_boost * 365.0.into() * reward_pool);
+    let node_share: BigDecimal<18> = query_runner
+        .get_protocol_params(ProtocolParams::NodeShare)
+        .into();
+    let _protocol_share: BigDecimal<18> = query_runner
+        .get_protocol_params(ProtocolParams::ProtocolShare)
+        .into();
+    let _validator_share: BigDecimal<18> = query_runner
+        .get_protocol_params(ProtocolParams::ValidatorShare)
+        .into();
 
-    // Todo: add locking when locking is added to distribute_rewards
-    let flk_rewards: BigDecimal<18> = total_emissions * node_1_usd.into();
-    let boosted_flk_rewards: BigDecimal<18> = flk_rewards * 4_u64.into() * 0.9.into();
+    let max_emissions: BigDecimal<18> = (inflation * supply_at_year_start) / 36500.0.into();
+
+    let emissions_per_unit = max_emissions / (reward_pool * max_boost);
+
+    let flk_rewards: BigDecimal<18> =
+        emissions_per_unit * node_1_boost * (node_share / 100.0.into()) * node_1_usd.into();
 
     let flk_balance = query_runner.get_flk_balance(&owner);
     let stables_balance = query_runner.get_stables_balance(&owner);
 
     assert_eq!(stables_balance, node_1_usd.into());
-    assert_eq!(flk_balance, boosted_flk_rewards);
+    assert_eq!(flk_balance, flk_rewards);
 }
