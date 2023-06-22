@@ -191,7 +191,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn raw_mode_multi_block() -> Result<()> {
+    async fn optimistic_mode_multi_block() -> Result<()> {
         let server_addr: SocketAddr = ([0; 4], 6969).into();
 
         // setup server
