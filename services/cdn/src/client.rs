@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use blake3_tree::{blake3::tree::BlockHasher, IncrementalVerifier};
 use bytes::{BufMut, Bytes, BytesMut};
 use draco_handshake::client::HandshakeClient;
+use draco_interfaces::Blake3Hash;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use tokio::io::{AsyncRead, AsyncWrite};
 
@@ -20,99 +21,121 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> CdnClient<R, W> {
         Ok(Self { conn })
     }
 
-    pub async fn request(&mut self, service_mode: ServiceMode, hash: [u8; 32]) -> Result<Bytes> {
+    pub async fn request(
+        &mut self,
+        service_mode: ServiceMode,
+        hash: [u8; 32],
+    ) -> Result<ResponseIterator<'_, R, W>> {
         // Send request
         self.conn
             .write_frame(CdnFrame::Request { service_mode, hash })
             .await?;
 
-        let mut verifier = IncrementalVerifier::new(hash, 0);
-        let mut block = 0;
+        Ok(ResponseIterator::new(&mut self.conn, service_mode, hash, 0))
+    }
+}
 
-        // reserve space for one block
-        // TODO: Use a Header frame to get the total length
+pub struct ResponseIterator<'a, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> {
+    conn: &'a mut CdnConnection<R, W>,
+    verifier: IncrementalVerifier,
+    block: usize,
+    mode: ServiceMode,
+}
+
+impl<'a, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> ResponseIterator<'a, R, W> {
+    #[inline(always)]
+    fn new(
+        conn: &'a mut CdnConnection<R, W>,
+        mode: ServiceMode,
+        root_hash: Blake3Hash,
+        start_block: usize,
+    ) -> Self {
+        Self {
+            conn,
+            mode,
+            verifier: IncrementalVerifier::new(root_hash, start_block),
+            block: start_block,
+        }
+    }
+
+    pub async fn next(&mut self) -> Result<Option<Bytes>> {
+        if self.verifier.is_done() {
+            return Ok(None);
+        }
+
         let mut buf = BytesMut::with_capacity(256 * 1024);
 
-        // response loop
-        loop {
-            // Recieve response
-            match self.conn.read_frame(Some(RESPONSE_BLOCK_TAG)).await? {
-                Some(CdnFrame::ResponseBlock {
-                    // TODO: Implement compression support
-                    compression: _,
-                    bytes_len,
-                    proof_len,
-                }) => {
-                    match service_mode {
-                        ServiceMode::Tentative => todo!(),
-                        ServiceMode::Optimistic => {
-                            // Receive proof
-                            if proof_len != 0 {
-                                self.conn.read_buffer(proof_len as usize);
-                                match self.conn.read_frame(None).await? {
-                                    Some(CdnFrame::Buffer(bytes)) => {
-                                        // Feed the verifier the proof
-                                        if let Err(e) = verifier.feed_proof(&bytes) {
-                                            return Err(anyhow!("error feeding proof: {e:?}"));
-                                        }
-                                    },
-                                    Some(_) => unreachable!(), // Guaranteed by read_buffer()
-                                    None => {
-                                        return Err(anyhow!(
-                                            "connection disconnected waiting for proof buffer"
-                                        ));
-                                    },
-                                }
-                            }
-
-                            // Recieve block
-                            self.conn.read_buffer(bytes_len as usize);
+        // Recieve response
+        match self.conn.read_frame(Some(RESPONSE_BLOCK_TAG)).await? {
+            Some(CdnFrame::ResponseBlock {
+                // TODO: Implement compression support
+                compression: _,
+                bytes_len,
+                proof_len,
+            }) => {
+                match self.mode {
+                    ServiceMode::Tentative => todo!(),
+                    ServiceMode::Optimistic => {
+                        // Receive proof
+                        if proof_len != 0 {
+                            self.conn.read_buffer(proof_len as usize);
                             match self.conn.read_frame(None).await? {
                                 Some(CdnFrame::Buffer(bytes)) => {
-                                    // Verify raw data chunk
-                                    let mut hasher = BlockHasher::new();
-                                    hasher.set_block(block);
-                                    hasher.update(&bytes);
-                                    if let Err(e) = verifier.verify(hasher) {
-                                        return Err(anyhow!("error verifying content: {e:?}"));
+                                    // Feed the verifier the proof
+                                    if let Err(e) = self.verifier.feed_proof(&bytes) {
+                                        return Err(anyhow!("error feeding proof: {e:?}"));
                                     }
-
-                                    buf.put(bytes);
                                 },
                                 Some(_) => unreachable!(), // Guaranteed by read_buffer()
                                 None => {
                                     return Err(anyhow!(
-                                        "connection disconnected waiting for byte buffer"
+                                        "connection disconnected waiting for proof buffer"
                                     ));
                                 },
                             }
+                        }
 
-                            // Send delivery acknowledgement
-                            self.conn
-                                .write_frame(CdnFrame::DeliveryAcknowledgement {
-                                    signature: ClientSignature,
-                                })
-                                .await?;
-                        },
-                    }
+                        // Recieve block
+                        self.conn.read_buffer(bytes_len as usize);
+                        match self.conn.read_frame(None).await? {
+                            Some(CdnFrame::Buffer(bytes)) => {
+                                // Verify raw data chunk
+                                let mut hasher = BlockHasher::new();
+                                hasher.set_block(self.block);
+                                hasher.update(&bytes);
+                                if let Err(e) = self.verifier.verify(hasher) {
+                                    return Err(anyhow!("error verifying content: {e:?}"));
+                                }
 
-                    if verifier.is_done() {
-                        break;
-                    } else {
-                        // reserve another 256KiB for the next block
-                        buf.reserve(256 * 1024);
-                        block += 1;
-                    }
-                },
-                Some(_) => unreachable!(),
-                None => {
-                    return Err(anyhow!(
-                        "connection disconnected waiting for response block"
-                    ));
-                },
-            }
+                                buf.put(bytes);
+                            },
+                            Some(_) => unreachable!(), // Guaranteed by read_buffer()
+                            None => {
+                                return Err(anyhow!(
+                                    "connection disconnected waiting for byte buffer"
+                                ));
+                            },
+                        }
+
+                        // Send delivery acknowledgement
+                        self.conn
+                            .write_frame(CdnFrame::DeliveryAcknowledgement {
+                                signature: ClientSignature,
+                            })
+                            .await?;
+                    },
+                }
+
+                self.block += 1;
+            },
+            Some(_) => unreachable!(),
+            None => {
+                return Err(anyhow!(
+                    "connection disconnected waiting for response block"
+                ));
+            },
         }
 
-        Ok(buf.into())
+        Ok(Some(buf.into()))
     }
 }
