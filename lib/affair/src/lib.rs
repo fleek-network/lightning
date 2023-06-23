@@ -127,9 +127,18 @@ pub trait Executor {
     fn spawn_async<H: AsyncWorker>(handler: H) -> Socket<H::Request, H::Response>;
 }
 
-struct Task<Req, Res> {
-    request: Req,
+pub struct Task<Req, Res> {
+    pub request: Req,
     respond: Option<oneshot::Sender<Res>>,
+}
+
+impl<Req, Res> Task<Req, Res> {
+    /// Respond to this task with the provided response.
+    pub fn respond(self, response: Res) {
+        if let Some(tx) = self.respond {
+            let _ = tx.send(response);
+        }
+    }
 }
 
 /// An executor that provides the worker with its dedicated std::thread.
@@ -217,6 +226,18 @@ async fn run_non_blocking_async<Req, Res, H: AsyncWorker<Request = Req, Response
 }
 
 impl<Req, Res> Socket<Req, Res> {
+    /// Returns a raw instance of [`Socket`] without a worker. The receiver is returned to
+    /// the caller to handle the tasks.
+    ///
+    /// Once a task is received it is important to always use [`Task::respond`] in order to
+    /// resolve the future returned to the caller in order to send the response back to the
+    /// caller.
+    pub fn raw_bounded(bound: usize) -> (Self, mpsc::Receiver<Task<Req, Res>>) {
+        let (tx, rx) = mpsc::channel(bound);
+        let socket = Socket { sender: tx };
+        (socket, rx)
+    }
+
     /// Downgrade this [`Socket`] into a [`WeakPort`] which does not keep the worker around if
     /// there are no [`Socket`]s anymore.
     pub fn downgrade(&self) -> WeakSocket<Req, Res> {
