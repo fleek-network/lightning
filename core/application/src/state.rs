@@ -827,10 +827,10 @@ impl<B: Backend> State<B> {
             let locked_until = self.node_info.get(&node).unwrap().stake.stake_locked_until;
             let boost: BigDecimal<18> = self.get_boost(locked_until, &epoch).into();
             let node_stables_revenue = stables_revenue.convert_precision::<18>();
-            let flk_rewards = node_stables_revenue * flk_per_stable_revenue_unit.clone() * boost;
+            let flk_rewards = &node_stables_revenue * &flk_per_stable_revenue_unit * &boost;
             total_emissions += flk_rewards.clone();
             let node_owner = self.node_info.get(&node).unwrap().owner;
-            self.mint_and_transfer_flk(flk_rewards * node_share.clone(), node_owner);
+            self.mint_and_transfer_flk(&flk_rewards * &node_share, node_owner);
             self.current_epoch_served.remove(&node);
         }
 
@@ -849,7 +849,7 @@ impl<B: Backend> State<B> {
         for node in committee_members {
             let node_owner = self.node_info.get(&node).unwrap().owner;
             let validator_rewards =
-                (total_emissions.clone() * validator_share.into()) / committee_size.into();
+                (&total_emissions * &validator_share.into()) / &committee_size.into();
             self.mint_and_transfer_flk(validator_rewards, node_owner);
         }
 
@@ -870,7 +870,7 @@ impl<B: Backend> State<B> {
                 .0
                 .to_bytes()
                 .into();
-        self.mint_and_transfer_flk(total_emissions * protocol_share.into(), protocol_owner);
+        self.mint_and_transfer_flk(&total_emissions * &protocol_share.into(), protocol_owner);
     }
 
     fn calculate_node_revenue(&self, node: &NodePublicKey) -> BigDecimal<6> {
@@ -920,11 +920,11 @@ impl<B: Backend> State<B> {
             .get(&Metadata::SupplyYearStart)
             .unwrap_or_default();
 
-        let max_emissions: BigDecimal<18> = (inflation * supply_at_year_start) / 365.0.into();
+        let max_emissions: BigDecimal<18> = (&inflation * &supply_at_year_start) / &365.0.into();
 
-        let min_emissions = max_emissions.clone() / max_boost;
+        let min_emissions = &max_emissions / &max_boost;
 
-        (max_emissions, min_emissions / reward_pool.into())
+        (max_emissions, min_emissions / &reward_pool.into())
     }
 
     fn mint_and_transfer_stables(&self, amount: BigDecimal<6>, owner: AccountOwnerPublicKey) {

@@ -118,7 +118,6 @@ async fn simple_epoch_change(
         // check epoch change
 
         if index == required_signals - 1 {
-            // println!("{res:?}");
             assert!(res.change_epoch);
         }
     }
@@ -595,9 +594,9 @@ async fn test_distribute_rewards() {
     // get params for emission calculations
     let supply_at_year_start: BigDecimal<18> = supply_at_genesis.parse().unwrap_or(0.0).into();
     let inflation: BigDecimal<18> = max_inflation.parse().unwrap_or(0.0).into();
-    let node_share = node_part.parse().unwrap_or(0.0) / 100.0;
-    let validator_share = validator_part.parse().unwrap_or(0.0) / 100.0;
-    let protocol_share = protocol_part.parse().unwrap_or(0.0) / 100.0;
+    let node_share = BigDecimal::from(node_part.parse().unwrap_or(0.0) / 100.0);
+    let validator_share = BigDecimal::from(validator_part.parse().unwrap_or(0.0) / 100.0);
+    let protocol_share = BigDecimal::from(protocol_part.parse().unwrap_or(0.0) / 100.0);
     let max_boost: BigDecimal<18> = boost.parse().unwrap_or(0.0).into();
 
     // deposit FLK tokens and stake it
@@ -607,7 +606,7 @@ async fn test_distribute_rewards() {
     stake(10_000_u64.into(), node_key2, owner_key2, &update_socket).await;
     // staking locking for four year to get max boosts
     stake_lock(1460, node_key1, owner_key1, &update_socket).await;
-    let node_1_boost = max_boost.clone();
+    let node_1_boost = &max_boost;
 
     // submit pods for usage
     let pod_10 = pod_request(node_key1, 10000, 0);
@@ -632,25 +631,23 @@ async fn test_distribute_rewards() {
     assert_eq!(stables_balance, node_1_usd.into());
 
     // calculate emissions per unit
-    let max_emissions: BigDecimal<18> = (inflation * supply_at_year_start) / 36500.0.into();
-    let emissions_per_unit = max_emissions / (reward_pool * max_boost);
+    let max_emissions: BigDecimal<18> = (inflation * supply_at_year_start) / &36500.0.into();
+    let emissions_per_unit = &max_emissions / (&reward_pool * &max_boost);
 
     // assert flk balances node 1
     let node_flk_balance1 = query_runner.get_flk_balance(&owner_key1);
     let node_flk_rewards1: BigDecimal<18> =
-        emissions_per_unit.clone() * node_1_boost * node_share.into() * node_1_usd.into();
+        &emissions_per_unit * &node_share * node_1_boost * &node_1_usd.into();
     assert_eq!(node_flk_balance1, node_flk_rewards1);
 
     // assert flk balances node 2
     let node_flk_balance2 = query_runner.get_flk_balance(&owner_key2);
-    let node_flk_rewards2: BigDecimal<18> =
-        emissions_per_unit * node_share.into() * node_2_usd.into();
+    let node_flk_rewards2: BigDecimal<18> = &emissions_per_unit * &node_share * &node_2_usd.into();
     assert_eq!(node_flk_balance2, node_flk_rewards2);
 
     // calculate total emissions based on total emissions for node which is equal to node share. the
     // rest goes to other validators(maybe) and protocol
-    let total_emissions: BigDecimal<18> =
-        (node_flk_rewards1 + node_flk_rewards2) / node_share.into();
+    let total_emissions: BigDecimal<18> = (&node_flk_rewards1 + &node_flk_rewards2) / &node_share;
 
     // assert protocols share
     let protocol_address = query_runner.get_protocol_params(ProtocolParams::ProtocolFundAddress);
@@ -661,7 +658,7 @@ async fn test_distribute_rewards() {
             .to_bytes(),
     );
     let protocol_balance = query_runner.get_flk_balance(&protocol_account);
-    let protocol_rewards = total_emissions.clone() * protocol_share.into();
+    let protocol_rewards = &total_emissions * &protocol_share;
     assert_eq!(protocol_balance, protocol_rewards);
 
     // assert validaots share
@@ -671,8 +668,7 @@ async fn test_distribute_rewards() {
         .owner;
 
     let validator_balance = query_runner.get_flk_balance(&committee_account1);
-    let validator_rewards =
-        total_emissions * validator_share.into() / committee_members.len().into();
+    let validator_rewards = (&total_emissions * &validator_share) / &committee_members.len().into();
     assert_eq!(validator_balance, validator_rewards);
 }
 
@@ -844,9 +840,9 @@ async fn test_supply_across_epoch() {
     let _node_1_usd = 0.1 * 10000_f64;
 
     // calculate emissions per unit
-    let max_emissions: BigDecimal<18> = (inflation * supply_at_year_start.clone()) / 36500.0.into();
+    let max_emissions: BigDecimal<18> = (&inflation * &supply_at_year_start) / &36500.0.into();
 
-    let emissions_per_epoch = max_emissions.clone() / (max_boost.clone());
+    let emissions_per_epoch = &max_emissions / &max_boost;
     let mut supply = supply_at_year_start;
 
     // 365 epoch changes to see if the current supply and year start suppply are ok
@@ -862,22 +858,22 @@ async fn test_supply_across_epoch() {
         }
         println!(
             "{}\n{}\n{}\n{}\n{}\n{}\n",
-            (emissions_per_epoch.clone() * node_share.into()),
-            (emissions_per_epoch.clone() * validator_share.into()),
-            (emissions_per_epoch.clone() * validator_share.into()),
-            (emissions_per_epoch.clone() * validator_share.into()),
-            (emissions_per_epoch.clone() * validator_share.into()),
-            (emissions_per_epoch.clone() * protocol_share.into())
+            (&emissions_per_epoch * &node_share.into()),
+            (&emissions_per_epoch * &validator_share.into()),
+            (&emissions_per_epoch * &validator_share.into()),
+            (&emissions_per_epoch * &validator_share.into()),
+            (&emissions_per_epoch * &validator_share.into()),
+            (&emissions_per_epoch * &protocol_share.into())
         );
         println!(
             "{}\n",
-            (emissions_per_epoch.clone() * node_share.into())
-                + (emissions_per_epoch.clone() * validator_share.into())
-                + (emissions_per_epoch.clone() * validator_share.into())
-                + (emissions_per_epoch.clone() * validator_share.into())
-                + (emissions_per_epoch.clone() * validator_share.into())
-                + (emissions_per_epoch.clone() * protocol_share.into())
-                + (1_000_000_u128.into())
+            (&emissions_per_epoch * &node_share.into())
+                + (&emissions_per_epoch * &validator_share.into())
+                + (&emissions_per_epoch * &validator_share.into())
+                + (&emissions_per_epoch * &validator_share.into())
+                + (&emissions_per_epoch * &validator_share.into())
+                + (&emissions_per_epoch * &protocol_share.into())
+                + (&1_000_000_u128.into())
         );
         let epoch = query_runner.get_epoch_info().epoch;
         let total_supply = query_runner.get_total_supply();

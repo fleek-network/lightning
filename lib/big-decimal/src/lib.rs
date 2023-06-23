@@ -86,35 +86,125 @@ impl<const P: usize> fmt::Display for BigDecimal<P> {
     }
 }
 
-impl<const P: usize> Add for BigDecimal<P> {
+impl<const P: usize> Add<BigDecimal<P>> for BigDecimal<P> {
     type Output = BigDecimal<P>;
 
-    fn add(self, other: BigDecimal<P>) -> Self::Output {
-        BigDecimal::<P>(&self.0 + &other.0)
+    fn add(self, rhs: BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>(&self.0 + &rhs.0)
     }
 }
 
-impl<const P: usize> Sub for BigDecimal<P> {
+impl<const P: usize> Add<BigDecimal<P>> for &BigDecimal<P> {
     type Output = BigDecimal<P>;
 
-    fn sub(self, other: BigDecimal<P>) -> Self::Output {
-        BigDecimal::<P>(&self.0 - &other.0)
+    fn add(self, rhs: BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>(&self.0 + &rhs.0)
     }
 }
 
-impl<const P: usize> Mul for BigDecimal<P> {
+impl<const P: usize> Add<&BigDecimal<P>> for BigDecimal<P> {
     type Output = BigDecimal<P>;
 
-    fn mul(self, other: BigDecimal<P>) -> Self::Output {
-        BigDecimal::<P>((&self.0 * &other.0) / BigUint::from(10u32).pow(P.try_into().unwrap()))
+    fn add(self, rhs: &BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>(&self.0 + &rhs.0)
     }
 }
 
-impl<const P: usize> Div for BigDecimal<P> {
+impl<const P: usize> Add<&BigDecimal<P>> for &BigDecimal<P> {
     type Output = BigDecimal<P>;
 
-    fn div(self, other: BigDecimal<P>) -> Self::Output {
-        BigDecimal::<P>((&self.0 * BigUint::from(10u32).pow(P.try_into().unwrap())) / &other.0)
+    fn add(self, rhs: &BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>(&self.0 + &rhs.0)
+    }
+}
+
+impl<const P: usize> Sub<BigDecimal<P>> for BigDecimal<P> {
+    type Output = BigDecimal<P>;
+
+    fn sub(self, rhs: BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>(&self.0 - &rhs.0)
+    }
+}
+
+impl<const P: usize> Sub<BigDecimal<P>> for &BigDecimal<P> {
+    type Output = BigDecimal<P>;
+
+    fn sub(self, rhs: BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>(&self.0 - &rhs.0)
+    }
+}
+
+impl<const P: usize> Sub<&BigDecimal<P>> for BigDecimal<P> {
+    type Output = BigDecimal<P>;
+
+    fn sub(self, rhs: &BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>(&self.0 - &rhs.0)
+    }
+}
+
+impl<const P: usize> Sub<&BigDecimal<P>> for &BigDecimal<P> {
+    type Output = BigDecimal<P>;
+
+    fn sub(self, rhs: &BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>(&self.0 - &rhs.0)
+    }
+}
+
+impl<const P: usize> Mul<BigDecimal<P>> for BigDecimal<P> {
+    type Output = BigDecimal<P>;
+
+    fn mul(self, rhs: BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>((&self.0 * &rhs.0) / BigUint::from(10u32).pow(P.try_into().unwrap()))
+    }
+}
+impl<const P: usize> Mul<BigDecimal<P>> for &BigDecimal<P> {
+    type Output = BigDecimal<P>;
+
+    fn mul(self, rhs: BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>((&self.0 * &rhs.0) / BigUint::from(10u32).pow(P.try_into().unwrap()))
+    }
+}
+impl<const P: usize> Mul<&BigDecimal<P>> for BigDecimal<P> {
+    type Output = BigDecimal<P>;
+
+    fn mul(self, rhs: &BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>((&self.0 * &rhs.0) / BigUint::from(10u32).pow(P.try_into().unwrap()))
+    }
+}
+impl<const P: usize> Mul<&BigDecimal<P>> for &BigDecimal<P> {
+    type Output = BigDecimal<P>;
+
+    fn mul(self, rhs: &BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>((&self.0 * &rhs.0) / BigUint::from(10u32).pow(P.try_into().unwrap()))
+    }
+}
+
+impl<const P: usize> Div<BigDecimal<P>> for BigDecimal<P> {
+    type Output = BigDecimal<P>;
+
+    fn div(self, rhs: BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>((&self.0 * BigUint::from(10u32).pow(P.try_into().unwrap())) / &rhs.0)
+    }
+}
+impl<const P: usize> Div<BigDecimal<P>> for &BigDecimal<P> {
+    type Output = BigDecimal<P>;
+
+    fn div(self, rhs: BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>((&self.0 * BigUint::from(10u32).pow(P.try_into().unwrap())) / &rhs.0)
+    }
+}
+impl<const P: usize> Div<&BigDecimal<P>> for BigDecimal<P> {
+    type Output = BigDecimal<P>;
+
+    fn div(self, rhs: &BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>((&self.0 * BigUint::from(10u32).pow(P.try_into().unwrap())) / &rhs.0)
+    }
+}
+impl<const P: usize> Div<&BigDecimal<P>> for &BigDecimal<P> {
+    type Output = BigDecimal<P>;
+
+    fn div(self, rhs: &BigDecimal<P>) -> Self::Output {
+        BigDecimal::<P>((&self.0 * BigUint::from(10u32).pow(P.try_into().unwrap())) / &rhs.0)
     }
 }
 
@@ -341,7 +431,7 @@ mod tests {
             std::u16::MAX as u32 + 1
         );
 
-        let small_by_2 = small / 200_u64.try_into().unwrap();
+        let small_by_2 = &small / &200_u64.try_into().unwrap();
         let small_float: f64 = small_by_2.try_into().unwrap();
         // small_float = 65536(small) / 200   = 327.68
         assert_eq!(327.68, small_float);
@@ -352,41 +442,64 @@ mod tests {
     fn test_big_decimal_add() {
         let decimal1: BigDecimal<18> = 1_000_000_000_000_000_000u64.into();
         let decimal2: BigDecimal<18> = 2_000_000_000_000_000_000u64.into();
-        let sum = decimal1 + decimal2;
-        assert_eq!(
-            sum.0,
-            BigUint::from(3_000_000_000_000_000_000_000_000_000_000_000_000u128)
-        );
+        let res = BigUint::from(3_000_000_000_000_000_000_000_000_000_000_000_000u128);
+
+        let both_ref = &decimal1 + &decimal2;
+        assert_eq!(both_ref.0, res);
+        let second_ref = decimal1.clone() + &decimal2;
+        assert_eq!(second_ref.0, res);
+        let first_ref = &decimal1 + decimal2.clone();
+        assert_eq!(first_ref.0, res);
+        let both_owned = decimal1 + decimal2;
+        assert_eq!(both_owned.0, res);
     }
 
     #[test]
     fn test_big_decimal_sub() {
         let decimal1: BigDecimal<18> = 5_000_000_000_000_000_000u64.into();
         let decimal2: BigDecimal<18> = 2_000_000_000_000_000_000u64.into();
-        let sum = decimal1 - decimal2;
-        assert_eq!(
-            sum.0,
-            BigUint::from(3_000_000_000_000_000_000_000_000_000_000_000_000u128)
-        );
+        let res = BigUint::from(3_000_000_000_000_000_000_000_000_000_000_000_000u128);
+
+        let both_ref = &decimal1 - &decimal2;
+        assert_eq!(both_ref.0, res);
+        let second_ref = decimal1.clone() - &decimal2;
+        assert_eq!(second_ref.0, res);
+        let first_ref = &decimal1 - decimal2.clone();
+        assert_eq!(first_ref.0, res);
+        let both_owned = decimal1 - decimal2;
+        assert_eq!(both_owned.0, res);
     }
 
     #[test]
     fn test_big_decimal_mul() {
         let decimal1: BigDecimal<18> = 5_000_000u64.into();
         let decimal2: BigDecimal<18> = 2_000_000u64.into();
-        let result = decimal1 * decimal2;
-        assert_eq!(
-            result.0,
-            BigUint::from(10_000_000_000_000_000_000_000_000_000_000u128)
-        );
+        let res = BigUint::from(10_000_000_000_000_000_000_000_000_000_000u128);
+
+        let both_ref = &decimal1 * &decimal2;
+        assert_eq!(both_ref.0, res);
+        let second_ref = decimal1.clone() * &decimal2;
+        assert_eq!(second_ref.0, res);
+        let first_ref = &decimal1 * decimal2.clone();
+        assert_eq!(first_ref.0, res);
+        let both_owned = decimal1 * decimal2;
+        assert_eq!(both_owned.0, res);
     }
 
     #[test]
     fn test_big_decimal_div() {
         let decimal1: BigDecimal<18> = 1u64.into();
         let decimal2: BigDecimal<18> = 50u64.into();
-        let result = decimal1 / decimal2;
-        assert_eq!(result.0, BigUint::from(20_000_000_000_000_000u128));
+        let res = BigUint::from(20_000_000_000_000_000u128);
+
+        let both_ref = &decimal1 / &decimal2;
+        assert_eq!(both_ref.0, res);
+        let second_ref = decimal1.clone() / &decimal2;
+        assert_eq!(second_ref.0, res);
+        let first_ref = &decimal1 / decimal2.clone();
+        assert_eq!(first_ref.0, res);
+        let both_owned = decimal1 / decimal2;
+        assert_eq!(both_owned.0, res);
     }
 
     #[test]
