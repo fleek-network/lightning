@@ -9,4 +9,3 @@ pub mod engine;
 pub mod futures;
 pub mod peer;
 pub mod ping;
-pub mod scene;

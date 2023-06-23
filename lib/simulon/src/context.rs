@@ -1,15 +1,15 @@
 use std::{future::Future, time::Duration};
 
-use crate::{connection::Connection, scene::ServerId};
+use crate::{connection::Connection, peer::PeerId};
 
 pub struct Context {}
 
 impl Context {
-    pub fn peer_list(&self) -> &Vec<ServerId> {
+    pub fn peer_list(&self) -> &Vec<PeerId> {
         todo!()
     }
 
-    pub async fn dial(&self, _peer: &ServerId, _port: u8) -> Option<Connection> {
+    pub async fn dial(&self, _peer: &PeerId, _port: u8) -> Option<Connection> {
         todo!()
     }
 
@@ -18,6 +18,10 @@ impl Context {
     }
 
     pub async fn sleep(&self, _duration: Duration) {
+        todo!()
+    }
+
+    pub async fn yield_execution() {
         todo!()
     }
 
