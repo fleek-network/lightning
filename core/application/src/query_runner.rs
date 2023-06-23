@@ -4,7 +4,7 @@ use draco_interfaces::{
     application::SyncQueryRunnerInterface,
     types::{
         AccountInfo, CommodityServed, CommodityTypes, Epoch, EpochInfo, Metadata, NodeInfo,
-        ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, TotalServed,
+        ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, TotalServed, Value,
     },
 };
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
@@ -14,7 +14,7 @@ use crate::state::Committee;
 #[derive(Clone)]
 pub struct QueryRunner {
     inner: Atomo<QueryPerm>,
-    metadata_table: ResolvedTableReference<Metadata, BigDecimal<18>>,
+    metadata_table: ResolvedTableReference<Metadata, Value>,
     account_table: ResolvedTableReference<AccountOwnerPublicKey, AccountInfo>,
     client_table: ResolvedTableReference<ClientPublicKey, AccountOwnerPublicKey>,
     node_table: ResolvedTableReference<NodePublicKey, NodeInfo>,
@@ -32,7 +32,7 @@ pub struct QueryRunner {
 impl QueryRunner {
     pub fn init(atomo: Atomo<QueryPerm>) -> Self {
         Self {
-            metadata_table: atomo.resolve::<Metadata, BigDecimal<18>>("metadata"),
+            metadata_table: atomo.resolve::<Metadata, Value>("metadata"),
             account_table: atomo.resolve::<AccountOwnerPublicKey, AccountInfo>("account"),
             client_table: atomo.resolve::<ClientPublicKey, AccountOwnerPublicKey>("client_keys"),
             node_table: atomo.resolve::<NodePublicKey, NodeInfo>("node"),
@@ -180,13 +180,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn get_committee_members(&self) -> Vec<NodePublicKey> {
         self.inner.run(|ctx| {
             // get current epoch first
-            let epoch: u64 = self
-                .metadata_table
-                .get(ctx)
-                .get(&Metadata::Epoch)
-                .unwrap_or_default()
-                .try_into()
-                .unwrap();
+            let epoch = match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
+                Some(Value::Epoch(epoch)) => epoch,
+                _ => 0,
+            };
 
             // look up current committee
             self.committee_table
@@ -202,13 +199,11 @@ impl SyncQueryRunnerInterface for QueryRunner {
             let node_table = self.node_table.get(ctx);
 
             // get current epoch
-            let epoch = self
-                .metadata_table
-                .get(ctx)
-                .get(&Metadata::Epoch)
-                .unwrap_or_default()
-                .try_into()
-                .unwrap();
+            let epoch = match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
+                Some(Value::Epoch(epoch)) => epoch,
+                _ => 0,
+            };
+
             // look up current committee
             let committee = self.committee_table.get(ctx).get(epoch).unwrap_or_default();
 
@@ -244,18 +239,20 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     fn get_total_supply(&self) -> BigDecimal<18> {
         self.inner.run(|ctx| {
-            self.metadata_table
-                .get(ctx)
-                .get(Metadata::TotalSupply)
-                .unwrap_or_default()
+            let supply = match self.metadata_table.get(ctx).get(&Metadata::TotalSupply) {
+                Some(Value::BigDecimal(s)) => s,
+                _ => panic!("TotalSupply is set genesis and should never be empty"),
+            };
+            supply
         })
     }
     fn get_year_start_supply(&self) -> BigDecimal<18> {
         self.inner.run(|ctx| {
-            self.metadata_table
-                .get(ctx)
-                .get(Metadata::SupplyYearStart)
-                .unwrap_or_default()
+            let supply = match self.metadata_table.get(ctx).get(&Metadata::SupplyYearStart) {
+                Some(Value::BigDecimal(s)) => s,
+                _ => panic!("SupplyYearStart is set genesis and should never be empty"),
+            };
+            supply
         })
     }
 

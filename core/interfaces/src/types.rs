@@ -35,6 +35,13 @@ pub enum Tokens {
     FLK,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Value {
+    Epoch(u64),
+    String(String),
+    BigDecimal(BigDecimal<18>),
+}
+
 /// This is commodities served by different services in Fleek Network
 /// C-like enums here to future proof for state, if we add more commodity types
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, FromPrimitive)]

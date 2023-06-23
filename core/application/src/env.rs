@@ -7,7 +7,7 @@ use draco_interfaces::{
     types::{
         AccountInfo, Block, CommodityServed, CommodityTypes, Epoch, ExecutionData, Metadata,
         NodeInfo, ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, TotalServed,
-        TransactionResponse,
+        TransactionResponse, Value,
     },
     BlockExecutionResponse,
 };
@@ -29,7 +29,7 @@ pub struct Env<P> {
 impl Env<UpdatePerm> {
     pub fn new() -> Self {
         let atomo = AtomoBuilder::<DefaultSerdeBackend>::new()
-            .with_table::<Metadata, BigDecimal<18>>("metadata")
+            .with_table::<Metadata, Value>("metadata")
             .with_table::<AccountOwnerPublicKey, AccountInfo>("account")
             .with_table::<ClientPublicKey, AccountOwnerPublicKey>("client_keys")
             .with_table::<NodePublicKey, NodeInfo>("node")
@@ -126,7 +126,7 @@ impl Env<UpdatePerm> {
             let mut service_table = ctx.get_table::<ServiceId, Service>("service");
             let mut param_table = ctx.get_table::<ProtocolParams, String>("parameter");
             let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
-            let mut metadata_table = ctx.get_table::<Metadata, BigDecimal<18>>("metadata");
+            let mut metadata_table = ctx.get_table::<Metadata, Value>("metadata");
             let mut commodity_prices_table =
                 ctx.get_table::<CommodityTypes, f64>("commodity_prices");
 
@@ -149,8 +149,11 @@ impl Env<UpdatePerm> {
 
             let supply_at_genesis: BigDecimal<18> =
                 genesis.supply_at_genesis.parse::<u128>().unwrap().into();
-            metadata_table.insert(Metadata::SupplyYearStart, supply_at_genesis.clone());
-            metadata_table.insert(Metadata::TotalSupply, supply_at_genesis);
+            metadata_table.insert(
+                Metadata::SupplyYearStart,
+                Value::BigDecimal(supply_at_genesis.clone()),
+            );
+            metadata_table.insert(Metadata::TotalSupply, Value::BigDecimal(supply_at_genesis));
 
             let epoch_end: u64 = genesis.epoch_time.parse::<u64>().unwrap()
                 + genesis.epoch_start.parse::<u64>().unwrap();

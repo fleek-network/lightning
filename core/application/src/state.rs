@@ -9,7 +9,7 @@ use draco_interfaces::{
         AccountInfo, CommodityServed, CommodityTypes, Epoch, ExecutionData, ExecutionError,
         Metadata, NodeInfo, ProofOfConsensus, ProofOfMisbehavior, ProtocolParams,
         ReportedReputationMeasurements, ReputationMeasurements, Service, ServiceId, Staking,
-        Tokens, TotalServed, TransactionResponse, UpdateMethod, UpdateRequest, Worker,
+        Tokens, TotalServed, TransactionResponse, UpdateMethod, UpdateRequest, Value, Worker,
     },
     DeliveryAcknowledgment,
 };
@@ -50,7 +50,7 @@ const REP_EWMA_WEIGHT: f64 = 0.7;
 /// The functions implemented on this struct are the "Smart Contracts" of the application layer
 /// All state changes come from Transactions and start at execute_txn
 pub struct State<B: Backend> {
-    pub metadata: B::Ref<Metadata, BigDecimal<18>>,
+    pub metadata: B::Ref<Metadata, Value>,
     pub account_info: B::Ref<AccountOwnerPublicKey, AccountInfo>,
     pub client_keys: B::Ref<ClientPublicKey, AccountOwnerPublicKey>,
     pub node_info: B::Ref<NodePublicKey, NodeInfo>,
@@ -211,12 +211,10 @@ impl<B: Backend> State<B> {
             .map(|s| s.commodity_type)
             .unwrap();
 
-        let current_epoch = self
-            .metadata
-            .get(&Metadata::Epoch)
-            .unwrap_or_default()
-            .try_into()
-            .unwrap();
+        let current_epoch = match self.metadata.get(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        };
 
         let mut commodity_served = self.current_epoch_served.get(&sender).unwrap_or_default();
         let mut total_served = self.total_served.get(&current_epoch).unwrap_or_default();
@@ -302,6 +300,11 @@ impl<B: Backend> State<B> {
         let sender = match self.only_account_owner(sender) {
             Ok(account) => account,
             Err(e) => return e,
+        };
+
+        let current_epoch = match self.metadata.get(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
         };
 
         let mut owner = self.account_info.get(&sender).unwrap_or_default();
@@ -391,12 +394,7 @@ impl<B: Backend> State<B> {
                         owner: sender,
                         public_key: node_public_key,
                         network_key,
-                        staked_since: self
-                            .metadata
-                            .get(&Metadata::Epoch)
-                            .unwrap_or_default()
-                            .try_into()
-                            .unwrap(),
+                        staked_since: current_epoch,
                         stake: Staking {
                             staked: amount.clone(),
                             ..Default::default()
@@ -453,12 +451,10 @@ impl<B: Backend> State<B> {
             return TransactionResponse::Revert(ExecutionError::InsufficientStakesToLock);
         }
 
-        let epoch = self
-            .metadata
-            .get(&Metadata::Epoch)
-            .unwrap_or_default()
-            .try_into()
-            .unwrap();
+        let epoch = match self.metadata.get(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        };
         let current_lock = node.stake.stake_locked_until.saturating_sub(epoch);
 
         let max_lock_time = self
@@ -503,12 +499,10 @@ impl<B: Backend> State<B> {
             return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
         }
 
-        let current_epoch = self
-            .metadata
-            .get(&Metadata::Epoch)
-            .unwrap_or_default()
-            .try_into()
-            .unwrap();
+        let current_epoch = match self.metadata.get(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        };
 
         // Make sure the stakes are not locked
         if node.stake.stake_locked_until > current_epoch {
@@ -562,12 +556,15 @@ impl<B: Backend> State<B> {
             return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
         }
 
-        let current_epoch = self.metadata.get(&Metadata::Epoch).unwrap_or_default();
+        let current_epoch = match self.metadata.get(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        };
         // Make sure the node has locked tokens and that the lock time is passed
         if node.stake.locked == BigDecimal::zero() {
             return TransactionResponse::Revert(ExecutionError::NoLockedTokens);
         }
-        if node.stake.locked_until > current_epoch.try_into().unwrap() {
+        if node.stake.locked_until > current_epoch {
             return TransactionResponse::Revert(ExecutionError::TokensLocked);
         }
 
@@ -596,12 +593,10 @@ impl<B: Backend> State<B> {
             Ok(account) => account,
             Err(e) => return e,
         };
-        let mut current_epoch = self
-            .metadata
-            .get(&Metadata::Epoch)
-            .unwrap_or_default()
-            .try_into()
-            .unwrap();
+        let mut current_epoch = match self.metadata.get(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        };
 
         match epoch.cmp(&current_epoch) {
             Ordering::Less => {
@@ -653,8 +648,9 @@ impl<B: Backend> State<B> {
                     epoch_end_timestamp: new_epoch_end,
                 },
             );
-            let updated_epoch: BigDecimal<18> = current_epoch.into();
-            self.metadata.set(Metadata::Epoch, updated_epoch);
+
+            self.metadata
+                .set(Metadata::Epoch, Value::Epoch(current_epoch));
             TransactionResponse::Success(ExecutionData::EpochChange)
         } else {
             self.committee_info.set(current_epoch, current_committee);
@@ -797,13 +793,10 @@ impl<B: Backend> State<B> {
     ///
     /// `emission = (inflation * supply) / (maxBoost * rewardPool * daysInYear=365.0)`
     fn distribute_rewards(&self) {
-        // Todo: function not done
-        let epoch = self
-            .metadata
-            .get(&Metadata::Epoch)
-            .unwrap_or_default()
-            .try_into()
-            .unwrap();
+        let epoch = match self.metadata.get(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        };
 
         let node_share: BigDecimal<18> = (self
             .parameters
@@ -915,10 +908,10 @@ impl<B: Backend> State<B> {
             .unwrap_or(1.0)
             .into();
 
-        let supply_at_year_start = self
-            .metadata
-            .get(&Metadata::SupplyYearStart)
-            .unwrap_or_default();
+        let supply_at_year_start = match self.metadata.get(&Metadata::SupplyYearStart) {
+            Some(Value::BigDecimal(supply)) => supply,
+            _ => panic!("SupplyYearStart is set genesis and should never be empty"),
+        };
 
         let max_emissions: BigDecimal<18> = (&inflation * &supply_at_year_start) / &365.0.into();
 
@@ -940,24 +933,25 @@ impl<B: Backend> State<B> {
 
         self.account_info.set(owner, account);
 
-        let mut current_supply = self
-            .metadata
-            .get(&Metadata::TotalSupply)
-            .unwrap_or_default();
+        let mut current_supply = match self.metadata.get(&Metadata::TotalSupply) {
+            Some(Value::BigDecimal(supply)) => supply,
+            _ => panic!("TotalSupply is set genesis and should never be empty"),
+        };
 
         current_supply += amount;
-        self.metadata
-            .set(Metadata::TotalSupply, current_supply.clone());
+        self.metadata.set(
+            Metadata::TotalSupply,
+            Value::BigDecimal(current_supply.clone()),
+        );
 
-        let current_epoch: u128 = self
-            .metadata
-            .get(&Metadata::Epoch)
-            .unwrap_or_default()
-            .try_into()
-            .unwrap();
+        let current_epoch = match self.metadata.get(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        };
 
-        if (current_epoch + 1) % 365_u128 == 0_u128 {
-            self.metadata.set(Metadata::SupplyYearStart, current_supply);
+        if (current_epoch + 1) % 365_u64 == 0_u64 {
+            self.metadata
+                .set(Metadata::SupplyYearStart, Value::BigDecimal(current_supply));
         }
     }
 
@@ -1007,12 +1001,10 @@ impl<B: Backend> State<B> {
         // Todo: function not done
         // we need true randomness here, for now we will return the same committee as before to be
         // able to run tests
-        let epoch = self
-            .metadata
-            .get(&Metadata::Epoch)
-            .unwrap_or_default()
-            .try_into()
-            .unwrap();
+        let epoch = match self.metadata.get(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        };
         self.committee_info.get(&epoch).unwrap_or_default().members
     }
 
