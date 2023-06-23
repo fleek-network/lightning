@@ -3,7 +3,7 @@ use fastcrypto::{
     bls12381::min_sig::{
         BLS12381KeyPair, BLS12381PrivateKey, BLS12381PublicKey, BLS12381Signature,
     },
-    ed25519::Ed25519PrivateKey,
+    ed25519::{Ed25519KeyPair, Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     traits::{KeyPair, Signer, ToFromBytes, VerifyingKey},
 };
 use rand::rngs::ThreadRng;
@@ -46,7 +46,7 @@ impl PublicKey for NodePublicKey {
 
     fn verify(&self, signature: &Self::Signature, digest: &[u8; 32]) -> bool {
         let pubkey: BLS12381PublicKey = self.into();
-        let signature = BLS12381Signature::from_bytes(&signature.0).unwrap();
+        let signature: BLS12381Signature = signature.into();
         pubkey.verify(digest, &signature).is_ok()
     }
 }
@@ -110,11 +110,94 @@ impl From<&NodeSignature> for BLS12381Signature {
     }
 }
 
+/// A node's ed25519 networking public key
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct NodeNetworkingPublicKey(pub [u8; 32]);
-pub type NodeNetworkingSecretKey = Ed25519PrivateKey;
+
+impl From<Ed25519PublicKey> for NodeNetworkingPublicKey {
+    fn from(value: Ed25519PublicKey) -> Self {
+        let bytes = value.as_ref();
+        NodeNetworkingPublicKey(*array_ref!(bytes, 0, 32))
+    }
+}
+
+impl From<&NodeNetworkingPublicKey> for Ed25519PublicKey {
+    fn from(value: &NodeNetworkingPublicKey) -> Self {
+        Ed25519PublicKey::from_bytes(&value.0).unwrap()
+    }
+}
+
+impl PublicKey for NodeNetworkingPublicKey {
+    type Signature = NodeNetworkingSignature;
+
+    fn verify(&self, signature: &Self::Signature, digest: &[u8; 32]) -> bool {
+        let pubkey: Ed25519PublicKey = self.into();
+        let signature: Ed25519Signature = signature.into();
+        pubkey.verify(digest, &signature).is_ok()
+    }
+}
+
+/// A node's ed25519 networking secret key
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct NodeNetworkingSignature;
+pub struct NodeNetworkingSecretKey([u8; 32]);
+
+impl From<Ed25519PrivateKey> for NodeNetworkingSecretKey {
+    fn from(value: Ed25519PrivateKey) -> Self {
+        let bytes = value.as_ref();
+        NodeNetworkingSecretKey(*array_ref!(bytes, 0, 32))
+    }
+}
+
+impl From<&NodeNetworkingSecretKey> for Ed25519PrivateKey {
+    fn from(value: &NodeNetworkingSecretKey) -> Self {
+        Ed25519PrivateKey::from_bytes(&value.0).unwrap()
+    }
+}
+
+impl From<NodeNetworkingSecretKey> for Ed25519KeyPair {
+    fn from(value: NodeNetworkingSecretKey) -> Self {
+        let secret: Ed25519PrivateKey = (&value).into();
+        secret.into()
+    }
+}
+
+impl SecretKey for NodeNetworkingSecretKey {
+    type PublicKey = NodeNetworkingPublicKey;
+
+    fn generate() -> Self {
+        let pair = Ed25519KeyPair::generate(&mut ThreadRng::default());
+        pair.private().into()
+    }
+
+    fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
+        let secret: Ed25519PrivateKey = self.into();
+        let pair: Ed25519KeyPair = secret.into();
+        pair.sign(digest).into()
+    }
+
+    fn to_pk(&self) -> Self::PublicKey {
+        let secret: &Ed25519PrivateKey = &self.into();
+        let pubkey: Ed25519PublicKey = secret.into();
+        pubkey.into()
+    }
+}
+
+/// A node's ed25519 networking signature
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
+pub struct NodeNetworkingSignature([u8; 32]);
+
+impl From<Ed25519Signature> for NodeNetworkingSignature {
+    fn from(value: Ed25519Signature) -> Self {
+        let bytes = value.as_ref();
+        NodeNetworkingSignature(*array_ref!(bytes, 0, 32))
+    }
+}
+
+impl From<&NodeNetworkingSignature> for Ed25519Signature {
+    fn from(value: &NodeNetworkingSignature) -> Self {
+        Ed25519Signature::from_bytes(&value.0).unwrap()
+    }
+}
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct ClientPublicKey(pub [u8; 20]);
@@ -164,14 +247,6 @@ impl From<AccountOwnerPublicKey> for TransactionSender {
     }
 }
 
-impl PublicKey for NodeNetworkingPublicKey {
-    type Signature = NodeNetworkingSignature;
-
-    fn verify(&self, _signature: &Self::Signature, _digest: &[u8; 32]) -> bool {
-        todo!()
-    }
-}
-
 impl PublicKey for ClientPublicKey {
     type Signature = ClientSignature;
 
@@ -184,22 +259,6 @@ impl PublicKey for AccountOwnerPublicKey {
     type Signature = AccountOwnerSignature;
 
     fn verify(&self, _signature: &Self::Signature, _digest: &[u8; 32]) -> bool {
-        todo!()
-    }
-}
-
-impl SecretKey for NodeNetworkingSecretKey {
-    type PublicKey = NodeNetworkingPublicKey;
-
-    fn generate() -> Self {
-        todo!()
-    }
-
-    fn sign(&self, _digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
-        todo!()
-    }
-
-    fn to_pk(&self) -> Self::PublicKey {
         todo!()
     }
 }
