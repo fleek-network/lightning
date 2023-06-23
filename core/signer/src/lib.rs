@@ -1,4 +1,6 @@
 mod config;
+use std::sync::{Arc, Mutex};
+
 use async_trait::async_trait;
 use config::Config;
 use draco_interfaces::{
@@ -10,26 +12,39 @@ use draco_interfaces::{
 use fleek_crypto::{
     NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
+use tokio::sync::oneshot;
 
 #[derive(Clone)]
-pub struct Signer {}
+pub struct Signer {
+    shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
+}
 
 #[async_trait]
 impl WithStartAndShutdown for Signer {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
-        todo!()
+        self.shutdown_tx.lock().unwrap().is_some()
     }
 
     /// Start the system, should not do anything if the system is already
     /// started.
     async fn start(&self) {
-        todo!()
+        let (tx, mut rx) = oneshot::channel();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = &mut rx => break,
+                }
+            }
+        });
+        *self.shutdown_tx.lock().unwrap() = Some(tx);
     }
 
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
-        todo!()
+        if let Some(shutdown_tx) = self.shutdown_tx.lock().unwrap().take() {
+            shutdown_tx.send(()).unwrap();
+        }
     }
 }
 

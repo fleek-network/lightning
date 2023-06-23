@@ -10,5 +10,6 @@ draco-interfaces = {path="../interfaces"}
 anyhow.workspace = true
 async-trait.workspace = true
 serde.workspace = true
+tokio.workspace = true
 
 fleek-crypto.workspace = true
