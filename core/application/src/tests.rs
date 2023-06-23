@@ -10,14 +10,13 @@ use big_decimal::BigDecimal;
 use draco_interfaces::{
     application::ExecutionEngineSocket,
     types::{
-        Block, Epoch, ExecutionError, NodeInfo, ProofOfConsensus, ProtocolParams,
-        ReputationMeasurements, Tokens, TotalServed, TransactionResponse, UpdateMethod,
-        UpdatePayload, UpdateRequest,
+        Block, Epoch, ExecutionError, NodeInfo, ProofOfConsensus, ReputationMeasurements, Tokens,
+        TotalServed, TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
     },
     ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
 };
 use fastcrypto::{
-    bls12381::min_sig::BLS12381PublicKey, ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64,
+    bls12381::min_sig::BLS12381PublicKey, traits::EncodeDecodeBase64,
 };
 use fleek_crypto::{
     AccountOwnerPublicKey, AccountOwnerSignature, NodePublicKey, NodeSignature,
@@ -34,13 +33,13 @@ use crate::{
 };
 
 pub struct Params {
-    epoch_time: Option<String>,
-    max_inflation: Option<String>,
-    protocol_share: Option<String>,
-    node_share: Option<String>,
-    validator_share: Option<String>,
-    max_boost: Option<String>,
-    supply_at_genesis: Option<String>,
+    epoch_time: Option<u64>,
+    max_inflation: Option<u16>,
+    protocol_share: Option<u16>,
+    node_share: Option<u16>,
+    validator_share: Option<u16>,
+    max_boost: Option<u16>,
+    supply_at_genesis: Option<u128>,
 }
 
 const ACCOUNT_ONE: AccountOwnerPublicKey = AccountOwnerPublicKey([0; 32]);
@@ -61,8 +60,7 @@ async fn init_app_with_params(params: Params) -> (ExecutionEngineSocket, QueryRu
     genesis.epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
-        .as_millis()
-        .to_string();
+        .as_millis() as u64;
     if let Some(epoch_time) = params.epoch_time {
         genesis.epoch_time = epoch_time;
     }
@@ -299,10 +297,7 @@ async fn test_genesis() {
     // Query to make sure that holds true
     for node in genesis_committee {
         let balance = query_runner.get_staked(&node.public_key);
-        assert_eq!(
-            BigDecimal::<18>::from(genesis.min_stake.parse::<u128>().unwrap()),
-            balance
-        );
+        assert_eq!(BigDecimal::<18>::from(genesis.min_stake), balance);
     }
 }
 
@@ -454,7 +449,7 @@ async fn test_stake() {
     // Since this test starts at epoch 0 locked_until will be == lock_time
     assert_eq!(
         query_runner.get_locked_time(&node_public_key),
-        genesis.lock_time.parse::<u64>().unwrap()
+        genesis.lock_time
     );
 
     // Try to withdraw the locked tokens and it should revery
@@ -571,20 +566,20 @@ async fn test_pod_without_proof() {
 
 #[test]
 async fn test_distribute_rewards() {
-    let max_inflation = "10".to_owned();
-    let protocol_part = "15".to_owned();
-    let node_part = "80".to_owned();
-    let validator_part = "5".to_owned();
-    let boost = "4".to_owned();
-    let supply_at_genesis = "1000000".to_owned();
+    let max_inflation = 10;
+    let protocol_part = 15;
+    let node_part = 80;
+    let validator_part = 5;
+    let boost = 4;
+    let supply_at_genesis = 1000000;
     let (update_socket, query_runner) = init_app_with_params(Params {
         epoch_time: None,
-        max_inflation: Some(max_inflation.clone()),
-        protocol_share: Some(protocol_part.clone()),
-        node_share: Some(node_part.clone()),
-        validator_share: Some(validator_part.clone()),
-        max_boost: Some(boost.clone()),
-        supply_at_genesis: Some(supply_at_genesis.clone()),
+        max_inflation: Some(max_inflation),
+        protocol_share: Some(protocol_part),
+        node_share: Some(node_part),
+        validator_share: Some(validator_part),
+        max_boost: Some(boost),
+        supply_at_genesis: Some(supply_at_genesis),
     })
     .await;
 
@@ -592,12 +587,13 @@ async fn test_distribute_rewards() {
     let (owner_key2, node_key2) = node_and_account_key(4);
 
     // get params for emission calculations
-    let supply_at_year_start: BigDecimal<18> = supply_at_genesis.parse().unwrap_or(0.0).into();
-    let inflation: BigDecimal<18> = max_inflation.parse().unwrap_or(0.0).into();
-    let node_share = BigDecimal::from(node_part.parse().unwrap_or(0.0) / 100.0);
-    let validator_share = BigDecimal::from(validator_part.parse().unwrap_or(0.0) / 100.0);
-    let protocol_share = BigDecimal::from(protocol_part.parse().unwrap_or(0.0) / 100.0);
-    let max_boost: BigDecimal<18> = boost.parse().unwrap_or(0.0).into();
+    let percentage_divisor: BigDecimal<18> = 100_u16.into();
+    let supply_at_year_start: BigDecimal<18> = supply_at_genesis.into();
+    let inflation: BigDecimal<18> = BigDecimal::from(max_inflation) / &percentage_divisor;
+    let node_share = BigDecimal::from(node_part) / &percentage_divisor;
+    let validator_share = BigDecimal::from(validator_part) / &percentage_divisor;
+    let protocol_share = BigDecimal::from(protocol_part) / &percentage_divisor;
+    let max_boost: BigDecimal<18> = boost.into();
 
     // deposit FLK tokens and stake it
     deposit(10_000_u64.into(), Tokens::FLK, owner_key1, &update_socket).await;
@@ -650,13 +646,7 @@ async fn test_distribute_rewards() {
     let total_emissions: BigDecimal<18> = (&node_flk_rewards1 + &node_flk_rewards2) / &node_share;
 
     // assert protocols share
-    let protocol_address = query_runner.get_protocol_params(ProtocolParams::ProtocolFundAddress);
-    let protocol_account: AccountOwnerPublicKey = AccountOwnerPublicKey(
-        Ed25519PublicKey::decode_base64(&protocol_address)
-            .unwrap()
-            .0
-            .to_bytes(),
-    );
+    let protocol_account = query_runner.get_protocol_fund_address();
     let protocol_balance = query_runner.get_flk_balance(&protocol_account);
     let protocol_rewards = &total_emissions * &protocol_share;
     assert_eq!(protocol_balance, protocol_rewards);
@@ -804,31 +794,32 @@ async fn test_rep_scores() {
 #[test]
 #[ignore = "some minute precision errors"]
 async fn test_supply_across_epoch() {
-    let epoch_time = "100".to_string();
-    let max_inflation = "10".to_owned();
-    let protocol_part = "10".to_owned();
-    let node_part = "85".to_owned();
-    let validator_part = "5".to_owned();
-    let boost = "4".to_owned();
-    let supply_at_genesis = "1000000".to_owned();
+    let epoch_time = 100;
+    let max_inflation = 10;
+    let protocol_part = 15;
+    let node_part = 80;
+    let validator_part = 5;
+    let boost = 4;
+    let supply_at_genesis = 1000000;
     let (update_socket, query_runner) = init_app_with_params(Params {
-        epoch_time: Some(epoch_time.clone()),
-        max_inflation: Some(max_inflation.clone()),
-        protocol_share: Some(protocol_part.clone()),
-        node_share: Some(node_part.clone()),
-        validator_share: Some(validator_part.clone()),
-        max_boost: Some(boost.clone()),
-        supply_at_genesis: Some(supply_at_genesis.clone()),
+        epoch_time: Some(epoch_time),
+        max_inflation: Some(max_inflation),
+        protocol_share: Some(protocol_part),
+        node_share: Some(node_part),
+        validator_share: Some(validator_part),
+        max_boost: Some(boost),
+        supply_at_genesis: Some(supply_at_genesis),
     })
     .await;
 
     // get params for emission calculations
-    let supply_at_year_start: BigDecimal<18> = supply_at_genesis.parse().unwrap_or(0.0).into();
-    let inflation: BigDecimal<18> = max_inflation.parse().unwrap_or(0.0).into();
-    let node_share = node_part.parse().unwrap_or(0.0) / 100.0;
-    let validator_share = validator_part.parse().unwrap_or(0.0) / 400.0;
-    let protocol_share = protocol_part.parse().unwrap_or(0.0) / 100.0;
-    let max_boost: BigDecimal<18> = boost.parse().unwrap_or(0.0).into();
+    let percentage_divisor: BigDecimal<18> = 100_u16.into();
+    let supply_at_year_start: BigDecimal<18> = supply_at_genesis.into();
+    let inflation: BigDecimal<18> = BigDecimal::from(max_inflation) / &percentage_divisor;
+    let node_share = BigDecimal::from(node_part) / &percentage_divisor;
+    let validator_share = BigDecimal::from(validator_part) / &percentage_divisor;
+    let protocol_share = BigDecimal::from(protocol_part) / &percentage_divisor;
+    let max_boost: BigDecimal<18> = boost.into();
 
     let (owner_key1, node_key1) = node_and_account_key(5);
 
@@ -858,21 +849,21 @@ async fn test_supply_across_epoch() {
         }
         println!(
             "{}\n{}\n{}\n{}\n{}\n{}\n",
-            (&emissions_per_epoch * &node_share.into()),
-            (&emissions_per_epoch * &validator_share.into()),
-            (&emissions_per_epoch * &validator_share.into()),
-            (&emissions_per_epoch * &validator_share.into()),
-            (&emissions_per_epoch * &validator_share.into()),
-            (&emissions_per_epoch * &protocol_share.into())
+            (&emissions_per_epoch * &node_share),
+            (&emissions_per_epoch * &validator_share),
+            (&emissions_per_epoch * &validator_share),
+            (&emissions_per_epoch * &validator_share),
+            (&emissions_per_epoch * &validator_share),
+            (&emissions_per_epoch * &protocol_share)
         );
         println!(
             "{}\n",
-            (&emissions_per_epoch * &node_share.into())
-                + (&emissions_per_epoch * &validator_share.into())
-                + (&emissions_per_epoch * &validator_share.into())
-                + (&emissions_per_epoch * &validator_share.into())
-                + (&emissions_per_epoch * &validator_share.into())
-                + (&emissions_per_epoch * &protocol_share.into())
+            (&emissions_per_epoch * &node_share)
+                + (&emissions_per_epoch * &validator_share)
+                + (&emissions_per_epoch * &validator_share)
+                + (&emissions_per_epoch * &validator_share)
+                + (&emissions_per_epoch * &validator_share)
+                + (&emissions_per_epoch * &protocol_share)
                 + (&1_000_000_u128.into())
         );
         let epoch = query_runner.get_epoch_info().epoch;

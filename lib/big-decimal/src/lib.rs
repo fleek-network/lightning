@@ -63,6 +63,10 @@ impl<const P: usize> BigDecimal<P> {
 
         BigDecimal::<Q>(scaled_value)
     }
+
+    pub fn min<'a>(&'a self, rhs: &'a Self) -> &'a Self {
+        if self.0 <= rhs.0 { self } else { rhs }
+    }
 }
 
 impl<const P: usize> fmt::Display for BigDecimal<P> {
@@ -245,6 +249,19 @@ impl<const P: usize> From<f64> for BigDecimal<P> {
 impl<const P: usize> From<BigUint> for BigDecimal<P> {
     fn from(value: BigUint) -> Self {
         BigDecimal(value * BigUint::from(10u32).pow(P.try_into().unwrap()))
+    }
+}
+
+impl<const P: usize> From<u16> for BigDecimal<P> {
+    fn from(value: u16) -> Self {
+        let value_to_big: BigUint = BigUint::from_u16(value).unwrap();
+        BigDecimal(value_to_big * BigUint::from(10u32).pow(P.try_into().unwrap()))
+    }
+}
+impl<const P: usize> From<u32> for BigDecimal<P> {
+    fn from(value: u32) -> Self {
+        let value_to_big: BigUint = BigUint::from_u32(value).unwrap();
+        BigDecimal(value_to_big * BigUint::from(10u32).pow(P.try_into().unwrap()))
     }
 }
 

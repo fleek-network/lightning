@@ -20,7 +20,7 @@ pub struct QueryRunner {
     node_table: ResolvedTableReference<NodePublicKey, NodeInfo>,
     committee_table: ResolvedTableReference<Epoch, Committee>,
     _services_table: ResolvedTableReference<ServiceId, Service>,
-    param_table: ResolvedTableReference<ProtocolParams, String>,
+    param_table: ResolvedTableReference<ProtocolParams, u128>,
     current_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
     rep_measurements: ResolvedTableReference<NodePublicKey, Vec<ReportedReputationMeasurements>>,
     rep_scores: ResolvedTableReference<NodePublicKey, u8>,
@@ -38,7 +38,7 @@ impl QueryRunner {
             node_table: atomo.resolve::<NodePublicKey, NodeInfo>("node"),
             committee_table: atomo.resolve::<Epoch, Committee>("committee"),
             _services_table: atomo.resolve::<ServiceId, Service>("service"),
-            param_table: atomo.resolve::<ProtocolParams, String>("parameter"),
+            param_table: atomo.resolve::<ProtocolParams, u128>("parameter"),
             current_epoch_served: atomo
                 .resolve::<NodePublicKey, CommodityServed>("current_epoch_served"),
             rep_measurements: atomo
@@ -167,8 +167,6 @@ impl SyncQueryRunnerInterface for QueryRunner {
             self.param_table
                 .get(ctx)
                 .get(&ProtocolParams::MinimumNodeStake)
-                .unwrap_or("0".to_owned())
-                .parse()
                 .unwrap_or(0)
         })
     }
@@ -256,13 +254,24 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn get_protocol_params(&self, param: ProtocolParams) -> String {
+    fn get_protocol_fund_address(&self) -> AccountOwnerPublicKey {
+        self.inner.run(|ctx| {
+            let owner = match self
+                .metadata_table
+                .get(ctx)
+                .get(&Metadata::ProtocolFundAddress)
+            {
+                Some(Value::AccountPublicKey(s)) => s,
+                _ => panic!("AccountPublicKey is set genesis and should never be empty"),
+            };
+            owner
+        })
+    }
+
+    fn get_protocol_params(&self, param: ProtocolParams) -> u128 {
         self.inner.run(|ctx| {
             let param = &param;
-            self.param_table
-                .get(ctx)
-                .get(param)
-                .unwrap_or("0".to_owned())
+            self.param_table.get(ctx).get(param).unwrap_or(0)
         })
     }
 }

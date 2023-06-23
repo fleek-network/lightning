@@ -143,8 +143,11 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
     /// Return the total supply at year start point used for inflation
     fn get_year_start_supply(&self) -> BigDecimal<18>;
 
+    /// Return the foundation address where protocol fund goes to
+    fn get_protocol_fund_address(&self) -> AccountOwnerPublicKey;
+
     /// Returns the passed in protocol parameter
-    fn get_protocol_params(&self, param: ProtocolParams) -> String;
+    fn get_protocol_params(&self, param: ProtocolParams) -> u128;
 }
 
 #[derive(Clone, Debug)]

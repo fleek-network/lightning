@@ -35,11 +35,13 @@ pub enum Tokens {
     FLK,
 }
 
+/// The Value enum is a data type used to represent values in a key-value pair for a metadata table
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Value {
     Epoch(u64),
     String(String),
     BigDecimal(BigDecimal<18>),
+    AccountPublicKey(AccountOwnerPublicKey),
 }
 
 /// This is commodities served by different services in Fleek Network
@@ -305,6 +307,7 @@ pub enum Metadata {
     Epoch,
     SupplyYearStart,
     TotalSupply,
+    ProtocolFundAddress,
 }
 
 /// Adjustable paramaters that are stored in the blockchain
@@ -335,8 +338,6 @@ pub enum ProtocolParams {
     MaxBoost = 10,
     /// The max amount of time tokens can be locked
     MaxLockTime = 11,
-    /// The protocol funds address to receive share from emission
-    ProtocolFundAddress = 12,
 }
 
 /// The physical address of a node where it can be reached, the port numbers are

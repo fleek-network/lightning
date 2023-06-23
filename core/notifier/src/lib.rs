@@ -73,10 +73,9 @@ mod tests {
         let epoch_start = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
-            .as_millis()
-            .to_string();
+            .as_millis() as u64;
         genesis.epoch_start = epoch_start;
-        genesis.epoch_time = epoch_time.to_string();
+        genesis.epoch_time = epoch_time;
         let config = Config {
             genesis: Some(genesis),
             mode: Mode::Test,

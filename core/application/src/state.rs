@@ -14,7 +14,6 @@ use draco_interfaces::{
     DeliveryAcknowledgment,
 };
 use draco_reputation::{statistics, types::WeightedReputationMeasurements};
-use fastcrypto::{ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{
     AccountOwnerPublicKey, ClientPublicKey, NodeNetworkingPublicKey, NodePublicKey,
     TransactionSender,
@@ -56,7 +55,7 @@ pub struct State<B: Backend> {
     pub node_info: B::Ref<NodePublicKey, NodeInfo>,
     pub committee_info: B::Ref<Epoch, Committee>,
     pub services: B::Ref<ServiceId, Service>,
-    pub parameters: B::Ref<ProtocolParams, String>,
+    pub parameters: B::Ref<ProtocolParams, u128>,
     pub rep_measurements: B::Ref<NodePublicKey, Vec<ReportedReputationMeasurements>>,
     pub rep_scores: B::Ref<NodePublicKey, u8>,
     pub current_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
@@ -460,12 +459,10 @@ impl<B: Backend> State<B> {
         let max_lock_time = self
             .parameters
             .get(&ProtocolParams::MaxLockTime)
-            .unwrap_or("0".to_owned())
-            .parse()
             .unwrap_or(1);
 
         // check if total locking is greater than max locking
-        if current_lock + locked_for > max_lock_time {
+        if current_lock + locked_for > max_lock_time as u64 {
             return TransactionResponse::Revert(ExecutionError::LockExceededMaxLockTime);
         }
 
@@ -514,19 +511,14 @@ impl<B: Backend> State<B> {
             return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
         }
 
-        let lock_time = self
-            .parameters
-            .get(&ProtocolParams::LockTime)
-            .unwrap_or("0".to_owned())
-            .parse()
-            .unwrap_or(1_u64);
+        let lock_time = self.parameters.get(&ProtocolParams::LockTime).unwrap_or(0);
 
         // decrease the stake, add to the locked amount, and set the locked time for the withdrawl
         // current epoch + lock time todo(dalton): we should be storing unstaked tokens in a
         // list so we can have multiple locked stakes with dif lock times
         node.stake.staked -= amount.clone();
         node.stake.locked += amount;
-        node.stake.locked_until = current_epoch + lock_time;
+        node.stake.locked_until = current_epoch + lock_time as u64;
 
         // Save the changed node state and return success
         self.node_info.set(node_public_key, node);
@@ -625,13 +617,9 @@ impl<B: Backend> State<B> {
             self.distribute_rewards();
 
             // calculate the next epoch endstamp
-            let epoch_duration = self
-                .parameters
-                .get(&ProtocolParams::EpochTime)
-                .unwrap()
-                .parse()
-                .unwrap_or(1_u64);
-            let new_epoch_end = current_committee.epoch_end_timestamp + epoch_duration;
+            let epoch_duration = self.parameters.get(&ProtocolParams::EpochTime).unwrap_or(1);
+
+            let new_epoch_end = current_committee.epoch_end_timestamp + epoch_duration as u64;
 
             // Save the old committee so we can see who signaled
             self.committee_info.set(current_epoch, current_committee);
@@ -798,14 +786,13 @@ impl<B: Backend> State<B> {
             _ => 0,
         };
 
-        let node_share: BigDecimal<18> = (self
+        let percentage_divisor = BigDecimal::<18>::from(100_u64);
+        let node_share: BigDecimal<18> = self
             .parameters
             .get(&ProtocolParams::NodeShare)
-            .unwrap_or("0".to_owned())
-            .parse()
-            .unwrap_or(0.0)
-            / 100.0)
+            .unwrap_or_default()
             .into();
+
         let (_max_emissions, flk_per_stable_revenue_unit) = self.calculate_emissions(&epoch);
         let mut total_emissions: BigDecimal<18> = 0.0.into();
         let nodes = self.current_epoch_served.keys();
@@ -818,52 +805,49 @@ impl<B: Backend> State<B> {
             // safe to unwrap since all the nodes in current_epoch_served table are in node info
             // this is checked in submit_pod contract/function
             let locked_until = self.node_info.get(&node).unwrap().stake.stake_locked_until;
-            let boost: BigDecimal<18> = self.get_boost(locked_until, &epoch).into();
+            let boost: BigDecimal<18> = self.get_boost(locked_until, &epoch);
             let node_stables_revenue = stables_revenue.convert_precision::<18>();
             let flk_rewards = &node_stables_revenue * &flk_per_stable_revenue_unit * &boost;
             total_emissions += flk_rewards.clone();
             let node_owner = self.node_info.get(&node).unwrap().owner;
-            self.mint_and_transfer_flk(&flk_rewards * &node_share, node_owner);
+            self.mint_and_transfer_flk(
+                &flk_rewards * (&node_share / &percentage_divisor),
+                node_owner,
+            );
             self.current_epoch_served.remove(&node);
         }
 
         // distribute rewards to validators
-        let validator_share = self
+        let validator_share: BigDecimal<18> = self
             .parameters
             .get(&ProtocolParams::ValidatorShare)
-            .unwrap_or("0".to_owned())
-            .parse()
-            .unwrap_or(0.0)
-            / 100.0;
+            .unwrap_or_default()
+            .into();
 
         let committee_members = self.committee_info.get(&epoch).unwrap().members;
         let committee_size = committee_members.len();
 
         for node in committee_members {
             let node_owner = self.node_info.get(&node).unwrap().owner;
-            let validator_rewards =
-                (&total_emissions * &validator_share.into()) / &committee_size.into();
+            let validator_rewards = (&total_emissions * &validator_share / &percentage_divisor)
+                / &committee_size.into();
             self.mint_and_transfer_flk(validator_rewards, node_owner);
         }
 
-        let protocol_share = self
+        let protocol_share: BigDecimal<18> = self
             .parameters
             .get(&ProtocolParams::ProtocolShare)
-            .unwrap_or("0".to_owned())
-            .parse()
-            .unwrap_or(0.0)
-            / 100.0;
-        let protocol_address = self
-            .parameters
-            .get(&ProtocolParams::ProtocolFundAddress)
-            .unwrap();
-        let protocol_owner: AccountOwnerPublicKey =
-            Ed25519PublicKey::decode_base64(&protocol_address)
-                .unwrap()
-                .0
-                .to_bytes()
-                .into();
-        self.mint_and_transfer_flk(&total_emissions * &protocol_share.into(), protocol_owner);
+            .unwrap_or_default()
+            .into();
+
+        let protocol_owner = match self.metadata.get(&Metadata::ProtocolFundAddress) {
+            Some(Value::AccountPublicKey(owner)) => owner,
+            _ => panic!("ProtocolFundAddress is added at Genesis and should exist"),
+        };
+        self.mint_and_transfer_flk(
+            &total_emissions * (&protocol_share / &percentage_divisor),
+            protocol_owner,
+        );
     }
 
     fn calculate_node_revenue(&self, node: &NodePublicKey) -> BigDecimal<6> {
@@ -891,21 +875,17 @@ impl<B: Backend> State<B> {
         if reward_pool == 0_f64 {
             return (BigDecimal::zero(), BigDecimal::zero());
         }
-
-        let inflation: BigDecimal<18> = (self
+        let percentage_divisor = BigDecimal::<18>::from(100_u64);
+        let inflation_percent: BigDecimal<18> = self
             .parameters
             .get(&ProtocolParams::MaxInflation)
-            .unwrap_or("0".to_owned())
-            .parse()
-            .unwrap_or(1.0)
-            / 100.0)
+            .unwrap_or(0)
             .into();
+        let inflation = &inflation_percent / &percentage_divisor;
         let max_boost: BigDecimal<18> = self
             .parameters
             .get(&ProtocolParams::MaxBoost)
-            .unwrap_or("1.0".to_owned())
-            .parse()
-            .unwrap_or(1.0)
+            .unwrap_or(1)
             .into();
 
         let supply_at_year_start = match self.metadata.get(&Metadata::SupplyYearStart) {
@@ -979,22 +959,22 @@ impl<B: Backend> State<B> {
     ///
     /// Returns:
     /// - The calculated boost factor for the current rewards.
-    fn get_boost(&self, locked_until: u64, current_epoch: &Epoch) -> f64 {
-        let max_boost = self
+    fn get_boost(&self, locked_until: u64, current_epoch: &Epoch) -> BigDecimal<18> {
+        let max_boost: BigDecimal<18> = self
             .parameters
             .get(&ProtocolParams::MaxBoost)
-            .unwrap_or("1.0".to_owned())
-            .parse()
-            .unwrap_or(1.0);
-        let max_lock_time = self
+            .unwrap_or(1)
+            .into();
+        let max_lock_time: BigDecimal<18> = self
             .parameters
             .get(&ProtocolParams::MaxLockTime)
-            .unwrap_or("1.0".to_owned())
-            .parse()
-            .unwrap_or(1.0);
-        let locking_period = locked_until.saturating_sub(*current_epoch) as f64;
-        let boost: f64 = 1.0 + (max_boost - 1.0) * (locking_period / max_lock_time).powf(1.2);
-        f64::min(max_boost, boost)
+            .unwrap_or(1)
+            .into();
+        let min_boost = BigDecimal::from(1_u64);
+        let locking_period = locked_until.saturating_sub(*current_epoch);
+        let boost =
+            &min_boost + (&max_boost - &min_boost) * (&locking_period.into() / &max_lock_time);
+        BigDecimal::<18>::min(&max_boost, &boost).to_owned()
     }
 
     fn choose_new_committee(&self) -> Vec<NodePublicKey> {
