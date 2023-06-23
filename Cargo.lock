@@ -963,6 +963,7 @@ dependencies = [
 name = "big-decimal"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "num-bigint",
  "num-traits",
  "serde",

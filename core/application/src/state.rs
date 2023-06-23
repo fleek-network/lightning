@@ -215,7 +215,8 @@ impl<B: Backend> State<B> {
             .metadata
             .get(&Metadata::Epoch)
             .unwrap_or_default()
-            .into();
+            .try_into()
+            .unwrap();
 
         let mut commodity_served = self.current_epoch_served.get(&sender).unwrap_or_default();
         let mut total_served = self.total_served.get(&current_epoch).unwrap_or_default();
@@ -277,7 +278,7 @@ impl<B: Backend> State<B> {
         // Check the token bridged and increment that amount
         match token {
             Tokens::FLK => account.flk_balance += amount,
-            Tokens::USDC => account.bandwidth_balance += Into::<u128>::into(amount),
+            Tokens::USDC => account.bandwidth_balance += TryInto::<u128>::try_into(amount).unwrap(),
         }
 
         self.account_info.set(sender, account);
@@ -394,7 +395,8 @@ impl<B: Backend> State<B> {
                             .metadata
                             .get(&Metadata::Epoch)
                             .unwrap_or_default()
-                            .into(),
+                            .try_into()
+                            .unwrap(),
                         stake: Staking {
                             staked: amount.clone(),
                             ..Default::default()
@@ -455,7 +457,8 @@ impl<B: Backend> State<B> {
             .metadata
             .get(&Metadata::Epoch)
             .unwrap_or_default()
-            .into();
+            .try_into()
+            .unwrap();
         let current_lock = node.stake.stake_locked_until.saturating_sub(epoch);
 
         let max_lock_time = self
@@ -504,7 +507,8 @@ impl<B: Backend> State<B> {
             .metadata
             .get(&Metadata::Epoch)
             .unwrap_or_default()
-            .into();
+            .try_into()
+            .unwrap();
 
         // Make sure the stakes are not locked
         if node.stake.stake_locked_until > current_epoch {
@@ -563,7 +567,7 @@ impl<B: Backend> State<B> {
         if node.stake.locked == BigDecimal::zero() {
             return TransactionResponse::Revert(ExecutionError::NoLockedTokens);
         }
-        if node.stake.locked_until > current_epoch.into() {
+        if node.stake.locked_until > current_epoch.try_into().unwrap() {
             return TransactionResponse::Revert(ExecutionError::TokensLocked);
         }
 
@@ -592,12 +596,12 @@ impl<B: Backend> State<B> {
             Ok(account) => account,
             Err(e) => return e,
         };
-
         let mut current_epoch = self
             .metadata
             .get(&Metadata::Epoch)
             .unwrap_or_default()
-            .into();
+            .try_into()
+            .unwrap();
 
         match epoch.cmp(&current_epoch) {
             Ordering::Less => {
@@ -623,6 +627,7 @@ impl<B: Backend> State<B> {
         if current_committee.ready_to_change.len() > (2 * current_committee.members.len() / 3) {
             // Todo: Reward nodes, calculate rep?, choose new committee, increment epoch.
             self.calculate_reputation_scores();
+            self.distribute_rewards();
 
             // calculate the next epoch endstamp
             let epoch_duration = self
@@ -648,10 +653,8 @@ impl<B: Backend> State<B> {
                     epoch_end_timestamp: new_epoch_end,
                 },
             );
-
-            self.distribute_rewards();
-
-            self.metadata.set(Metadata::Epoch, current_epoch.into());
+            let updated_epoch: BigDecimal<18> = current_epoch.into();
+            self.metadata.set(Metadata::Epoch, updated_epoch);
             TransactionResponse::Success(ExecutionData::EpochChange)
         } else {
             self.committee_info.set(current_epoch, current_committee);
@@ -799,31 +802,33 @@ impl<B: Backend> State<B> {
             .metadata
             .get(&Metadata::Epoch)
             .unwrap_or_default()
-            .into();
+            .try_into()
+            .unwrap();
 
         let node_share: BigDecimal<18> = (self
             .parameters
             .get(&ProtocolParams::NodeShare)
             .unwrap_or("0".to_owned())
             .parse()
-            .unwrap_or(1.0)
+            .unwrap_or(0.0)
             / 100.0)
             .into();
-        let (max_emissions, flk_per_stable_revenue_unit) = self.calculate_emissions(&epoch);
+        let (_max_emissions, flk_per_stable_revenue_unit) = self.calculate_emissions(&epoch);
+        let mut total_emissions: BigDecimal<18> = 0.0.into();
         let nodes = self.current_epoch_served.keys();
         for node in nodes {
-            let stables_revenue: f64 = self.calculate_node_revenue(&node);
+            let stables_revenue: BigDecimal<6> = self.calculate_node_revenue(&node);
 
             let node_owner = self.node_info.get(&node).unwrap().owner;
-            let node_stables_revenue_6: BigDecimal<6> = BigDecimal::<6>::from(stables_revenue);
-            self.mint_and_transfer_stables(node_stables_revenue_6, node_owner);
+            self.mint_and_transfer_stables(stables_revenue.clone(), node_owner);
 
             // safe to unwrap since all the nodes in current_epoch_served table are in node info
             // this is checked in submit_pod contract/function
             let locked_until = self.node_info.get(&node).unwrap().stake.stake_locked_until;
             let boost: BigDecimal<18> = self.get_boost(locked_until, &epoch).into();
-            let node_stables_revenue = BigDecimal::<18>::from(stables_revenue);
+            let node_stables_revenue = stables_revenue.convert_precision::<18>();
             let flk_rewards = node_stables_revenue * flk_per_stable_revenue_unit.clone() * boost;
+            total_emissions += flk_rewards.clone();
             let node_owner = self.node_info.get(&node).unwrap().owner;
             self.mint_and_transfer_flk(flk_rewards * node_share.clone(), node_owner);
             self.current_epoch_served.remove(&node);
@@ -833,9 +838,10 @@ impl<B: Backend> State<B> {
         let validator_share = self
             .parameters
             .get(&ProtocolParams::ValidatorShare)
-            .unwrap_or("0.0".to_owned())
+            .unwrap_or("0".to_owned())
             .parse()
-            .unwrap_or(0.0);
+            .unwrap_or(0.0)
+            / 100.0;
 
         let committee_members = self.committee_info.get(&epoch).unwrap().members;
         let committee_size = committee_members.len();
@@ -843,16 +849,17 @@ impl<B: Backend> State<B> {
         for node in committee_members {
             let node_owner = self.node_info.get(&node).unwrap().owner;
             let validator_rewards =
-                (max_emissions.clone() * validator_share.into()) / committee_size.into();
+                (total_emissions.clone() * validator_share.into()) / committee_size.into();
             self.mint_and_transfer_flk(validator_rewards, node_owner);
         }
 
         let protocol_share = self
             .parameters
             .get(&ProtocolParams::ProtocolShare)
-            .unwrap_or("0.0".to_string())
+            .unwrap_or("0".to_owned())
             .parse()
-            .unwrap_or(0.0);
+            .unwrap_or(0.0)
+            / 100.0;
         let protocol_address = self
             .parameters
             .get(&ProtocolParams::ProtocolFundAddress)
@@ -863,21 +870,25 @@ impl<B: Backend> State<B> {
                 .0
                 .to_bytes()
                 .into();
-        self.mint_and_transfer_flk(max_emissions * protocol_share.into(), protocol_owner);
+        self.mint_and_transfer_flk(total_emissions * protocol_share.into(), protocol_owner);
     }
 
-    fn calculate_node_revenue(&self, node: &NodePublicKey) -> f64 {
+    fn calculate_node_revenue(&self, node: &NodePublicKey) -> BigDecimal<6> {
         let served = self.current_epoch_served.get(node).unwrap_or_default();
-        served
-            .iter()
-            .enumerate()
-            .fold(0.0, |stables_revenue, (commodity_type, &quantity)| {
-                CommodityTypes::from_u8(commodity_type as u8)
+        served.iter().enumerate().fold(
+            BigDecimal::<6>::zero(),
+            |mut stables_revenue, (commodity_type, &quantity)| {
+                if let Some(price) = CommodityTypes::from_u8(commodity_type as u8)
                     .and_then(|commodity| self.commodity_prices.get(&commodity))
-                    .map_or(stables_revenue, |price| {
-                        stables_revenue + price * quantity as f64
-                    })
-            })
+                {
+                    let big_price: BigDecimal<6> = price.into();
+                    let big_quantity: BigDecimal<6> = quantity.into();
+                    stables_revenue += big_price * big_quantity;
+                }
+
+                stables_revenue
+            },
+        )
     }
 
     fn calculate_emissions(&self, epoch: &Epoch) -> (BigDecimal<18>, BigDecimal<18>) {
@@ -942,7 +953,8 @@ impl<B: Backend> State<B> {
             .metadata
             .get(&Metadata::Epoch)
             .unwrap_or_default()
-            .into();
+            .try_into()
+            .unwrap();
 
         if (current_epoch + 1) % 365_u128 == 0_u128 {
             self.metadata.set(Metadata::SupplyYearStart, current_supply);
@@ -999,7 +1011,8 @@ impl<B: Backend> State<B> {
             .metadata
             .get(&Metadata::Epoch)
             .unwrap_or_default()
-            .into();
+            .try_into()
+            .unwrap();
         self.committee_info.get(&epoch).unwrap_or_default().members
     }
 

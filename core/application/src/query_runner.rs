@@ -185,7 +185,8 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 .get(ctx)
                 .get(&Metadata::Epoch)
                 .unwrap_or_default()
-                .into();
+                .try_into()
+                .unwrap();
 
             // look up current committee
             self.committee_table
@@ -206,8 +207,8 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 .get(ctx)
                 .get(&Metadata::Epoch)
                 .unwrap_or_default()
-                .into();
-
+                .try_into()
+                .unwrap();
             // look up current committee
             let committee = self.committee_table.get(ctx).get(epoch).unwrap_or_default();
 

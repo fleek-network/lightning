@@ -10,8 +10,9 @@ use big_decimal::BigDecimal;
 use draco_interfaces::{
     application::ExecutionEngineSocket,
     types::{
-        Block, ExecutionError, NodeInfo, ProofOfConsensus, ProtocolParams, ReputationMeasurements,
-        Tokens, TotalServed, TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
+        Block, Epoch, ExecutionError, NodeInfo, ProofOfConsensus, ProtocolParams,
+        ReputationMeasurements, Tokens, TotalServed, TransactionResponse, UpdateMethod,
+        UpdatePayload, UpdateRequest,
     },
     ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
 };
@@ -32,6 +33,16 @@ use crate::{
     query_runner::QueryRunner,
 };
 
+pub struct Params {
+    epoch_time: Option<String>,
+    max_inflation: Option<String>,
+    protocol_share: Option<String>,
+    node_share: Option<String>,
+    validator_share: Option<String>,
+    max_boost: Option<String>,
+    supply_at_genesis: Option<String>,
+}
+
 const ACCOUNT_ONE: AccountOwnerPublicKey = AccountOwnerPublicKey([0; 32]);
 const NODE_ONE: &str = "k7XAk/1z4rXf1QHyMPHZ1cgyeX2T3bsCCopNpFV6v8hInZfjyti79w3raEa3YwFADM2BnX+/o49k1HQjKZIYlGDszEZ/zUaK3kn3MfT5BEWkKgP+TFMPJoBxenV33XEZ";
 
@@ -44,7 +55,7 @@ async fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner
     (app.transaction_executor(), app.sync_query())
 }
 
-async fn init_app_with_config() -> (ExecutionEngineSocket, QueryRunner) {
+async fn init_app_with_params(params: Params) -> (ExecutionEngineSocket, QueryRunner) {
     let mut genesis = Genesis::load().expect("Failed to load genesis from file.");
 
     genesis.epoch_start = SystemTime::now()
@@ -52,13 +63,33 @@ async fn init_app_with_config() -> (ExecutionEngineSocket, QueryRunner) {
         .unwrap()
         .as_millis()
         .to_string();
-    genesis.epoch_time = "10000".to_string();
-    genesis.max_inflation = "10".to_owned();
-    genesis.protocol_share = "15".to_owned();
-    genesis.node_share = "80".to_owned();
-    genesis.validator_share = "5".to_owned();
-    genesis.max_boost = "4".to_owned();
-    genesis.supply_at_genesis = "1000000".to_owned();
+    if let Some(epoch_time) = params.epoch_time {
+        genesis.epoch_time = epoch_time;
+    }
+
+    if let Some(max_inflation) = params.max_inflation {
+        genesis.max_inflation = max_inflation;
+    }
+
+    if let Some(protocol_share) = params.protocol_share {
+        genesis.protocol_share = protocol_share;
+    }
+
+    if let Some(node_share) = params.node_share {
+        genesis.node_share = node_share;
+    }
+
+    if let Some(validator_share) = params.validator_share {
+        genesis.validator_share = validator_share;
+    }
+
+    if let Some(max_boost) = params.max_boost {
+        genesis.max_boost = max_boost;
+    }
+
+    if let Some(supply_at_genesis) = params.supply_at_genesis {
+        genesis.supply_at_genesis = supply_at_genesis;
+    }
     let config = Config {
         genesis: Some(genesis),
         mode: Mode::Test,
@@ -72,6 +103,26 @@ fn node_and_account_key(value: u8) -> (AccountOwnerPublicKey, NodePublicKey) {
         AccountOwnerPublicKey([value; 32]),
         NodePublicKey([value; 96]),
     )
+}
+
+async fn simple_epoch_change(
+    epoch: Epoch,
+    committee_members: &Vec<NodePublicKey>,
+    update_socket: &Socket<Block, BlockExecutionResponse>,
+) -> Result<()> {
+    let required_signals = 2 * committee_members.len() / 3 + 1;
+    // make call epoch change for 2/3rd committe members
+    for (index, node) in committee_members.iter().enumerate().take(required_signals) {
+        let req = get_update_request_node(UpdateMethod::ChangeEpoch { epoch }, *node);
+        let res = run_transaction(vec![req], update_socket).await?;
+        // check epoch change
+
+        if index == required_signals - 1 {
+            // println!("{res:?}");
+            assert!(res.change_epoch);
+        }
+    }
+    Ok(())
 }
 
 // Helper method to get a transaction update request from a node
@@ -521,11 +572,33 @@ async fn test_pod_without_proof() {
 
 #[test]
 async fn test_distribute_rewards() {
-    let (update_socket, query_runner) = init_app_with_config().await;
-    let (_, genesis_committee) = get_genesis();
-    // use a node from a genesis committee for testing
+    let max_inflation = "10".to_owned();
+    let protocol_part = "15".to_owned();
+    let node_part = "80".to_owned();
+    let validator_part = "5".to_owned();
+    let boost = "4".to_owned();
+    let supply_at_genesis = "1000000".to_owned();
+    let (update_socket, query_runner) = init_app_with_params(Params {
+        epoch_time: None,
+        max_inflation: Some(max_inflation.clone()),
+        protocol_share: Some(protocol_part.clone()),
+        node_share: Some(node_part.clone()),
+        validator_share: Some(validator_part.clone()),
+        max_boost: Some(boost.clone()),
+        supply_at_genesis: Some(supply_at_genesis.clone()),
+    })
+    .await;
+
     let (owner_key1, node_key1) = node_and_account_key(3);
     let (owner_key2, node_key2) = node_and_account_key(4);
+
+    // get params for emission calculations
+    let supply_at_year_start: BigDecimal<18> = supply_at_genesis.parse().unwrap_or(0.0).into();
+    let inflation: BigDecimal<18> = max_inflation.parse().unwrap_or(0.0).into();
+    let node_share = node_part.parse().unwrap_or(0.0) / 100.0;
+    let validator_share = validator_part.parse().unwrap_or(0.0) / 100.0;
+    let protocol_share = protocol_part.parse().unwrap_or(0.0) / 100.0;
+    let max_boost: BigDecimal<18> = boost.parse().unwrap_or(0.0).into();
 
     // deposit FLK tokens and stake it
     deposit(10_000_u64.into(), Tokens::FLK, owner_key1, &update_socket).await;
@@ -534,71 +607,52 @@ async fn test_distribute_rewards() {
     stake(10_000_u64.into(), node_key2, owner_key2, &update_socket).await;
     // staking locking for four year to get max boosts
     stake_lock(1460, node_key1, owner_key1, &update_socket).await;
-
-    let max_boost: BigDecimal<18> = query_runner
-        .get_protocol_params(ProtocolParams::MaxBoost)
-        .parse()
-        .unwrap_or(0.0)
-        .into();
     let node_1_boost = max_boost.clone();
 
     // submit pods for usage
     let pod_10 = pod_request(node_key1, 10000, 0);
     let pod11 = pod_request(node_key1, 6767, 1);
     let pod_21 = pod_request(node_key2, 5000, 1);
-
     // run the delivery ack transaction
     if let Err(e) = run_transaction(vec![pod_10, pod11, pod_21], &update_socket).await {
         panic!("{e}");
     }
 
     // call epoch change that will trigger distribute rewards
-    let required_signals = 2 * genesis_committee.len() / 3 + 1;
-    // make call epoch change for 2/3rd committe members
-    for (index, node) in genesis_committee.iter().enumerate().take(required_signals) {
-        let req = get_update_request_node(UpdateMethod::ChangeEpoch { epoch: 0 }, node.public_key);
-        let res = run_transaction(vec![req], &update_socket).await.unwrap();
-        // check epoch change
-        if index == required_signals - 1 {
-            assert!(res.change_epoch);
-        }
+    let committee_members = query_runner.get_committee_members();
+    if let Err(err) = simple_epoch_change(0, &committee_members, &update_socket).await {
+        panic!("error while changing epoch, {err}");
     }
-
     let node_1_usd = 0.1 * 10000_f64 + 0.2 * 6767_f64;
     let node_2_usd = 0.2 * 5000_f64;
+    let reward_pool: BigDecimal<18> = (node_2_usd + node_1_usd).into();
 
     // assert stable balances
     let stables_balance = query_runner.get_stables_balance(&owner_key1);
     assert_eq!(stables_balance, node_1_usd.into());
 
-    // get params for emission calculations
-    let reward_pool: BigDecimal<18> = (node_2_usd + node_1_usd).into();
-    let supply_at_year_start: BigDecimal<18> = query_runner.get_year_start_supply();
-    let inflation: BigDecimal<18> = query_runner
-        .get_protocol_params(ProtocolParams::MaxInflation)
-        .parse()
-        .unwrap_or(0.0)
-        .into();
-    let node_share: BigDecimal<18> = query_runner
-        .get_protocol_params(ProtocolParams::NodeShare)
-        .parse()
-        .unwrap_or(0.0)
-        .into();
-
+    // calculate emissions per unit
     let max_emissions: BigDecimal<18> = (inflation * supply_at_year_start) / 36500.0.into();
-    let emissions_per_unit = max_emissions.clone() / (reward_pool * max_boost);
+    let emissions_per_unit = max_emissions / (reward_pool * max_boost);
 
-    let node_flk_rewards: BigDecimal<18> =
-        emissions_per_unit * node_1_boost * (node_share / 100.0.into()) * node_1_usd.into();
-    let node_flk_balance = query_runner.get_flk_balance(&owner_key1);
-    assert_eq!(node_flk_balance, node_flk_rewards);
+    // assert flk balances node 1
+    let node_flk_balance1 = query_runner.get_flk_balance(&owner_key1);
+    let node_flk_rewards1: BigDecimal<18> =
+        emissions_per_unit.clone() * node_1_boost * node_share.into() * node_1_usd.into();
+    assert_eq!(node_flk_balance1, node_flk_rewards1);
 
-    let protocol_share: BigDecimal<18> = query_runner
-        .get_protocol_params(ProtocolParams::ProtocolShare)
-        .parse()
-        .unwrap_or(0.0)
-        .into();
+    // assert flk balances node 2
+    let node_flk_balance2 = query_runner.get_flk_balance(&owner_key2);
+    let node_flk_rewards2: BigDecimal<18> =
+        emissions_per_unit * node_share.into() * node_2_usd.into();
+    assert_eq!(node_flk_balance2, node_flk_rewards2);
 
+    // calculate total emissions based on total emissions for node which is equal to node share. the
+    // rest goes to other validators(maybe) and protocol
+    let total_emissions: BigDecimal<18> =
+        (node_flk_rewards1 + node_flk_rewards2) / node_share.into();
+
+    // assert protocols share
     let protocol_address = query_runner.get_protocol_params(ProtocolParams::ProtocolFundAddress);
     let protocol_account: AccountOwnerPublicKey = AccountOwnerPublicKey(
         Ed25519PublicKey::decode_base64(&protocol_address)
@@ -606,26 +660,19 @@ async fn test_distribute_rewards() {
             .0
             .to_bytes(),
     );
-
-    let protocol_rewards = max_emissions.clone() * protocol_share;
     let protocol_balance = query_runner.get_flk_balance(&protocol_account);
-
+    let protocol_rewards = total_emissions.clone() * protocol_share.into();
     assert_eq!(protocol_balance, protocol_rewards);
 
-    let validator_share: BigDecimal<18> = query_runner
-        .get_protocol_params(ProtocolParams::ValidatorShare)
-        .parse()
-        .unwrap_or(0.0)
-        .into();
-
-    let committee_members = query_runner.get_committee_members();
+    // assert validaots share
     let committee_account1 = query_runner
         .get_node_info(&committee_members[0])
         .unwrap()
         .owner;
 
     let validator_balance = query_runner.get_flk_balance(&committee_account1);
-    let validator_rewards = max_emissions * (validator_share / committee_members.len().into());
+    let validator_rewards =
+        total_emissions * validator_share.into() / committee_members.len().into();
     assert_eq!(validator_balance, validator_rewards);
 }
 
@@ -756,4 +803,88 @@ async fn test_rep_scores() {
 
     assert!(query_runner.get_reputation(&peer1).is_some());
     assert!(query_runner.get_reputation(&peer2).is_some());
+}
+
+#[test]
+#[ignore = "some minute precision errors"]
+async fn test_supply_across_epoch() {
+    let epoch_time = "100".to_string();
+    let max_inflation = "10".to_owned();
+    let protocol_part = "10".to_owned();
+    let node_part = "85".to_owned();
+    let validator_part = "5".to_owned();
+    let boost = "4".to_owned();
+    let supply_at_genesis = "1000000".to_owned();
+    let (update_socket, query_runner) = init_app_with_params(Params {
+        epoch_time: Some(epoch_time.clone()),
+        max_inflation: Some(max_inflation.clone()),
+        protocol_share: Some(protocol_part.clone()),
+        node_share: Some(node_part.clone()),
+        validator_share: Some(validator_part.clone()),
+        max_boost: Some(boost.clone()),
+        supply_at_genesis: Some(supply_at_genesis.clone()),
+    })
+    .await;
+
+    // get params for emission calculations
+    let supply_at_year_start: BigDecimal<18> = supply_at_genesis.parse().unwrap_or(0.0).into();
+    let inflation: BigDecimal<18> = max_inflation.parse().unwrap_or(0.0).into();
+    let node_share = node_part.parse().unwrap_or(0.0) / 100.0;
+    let validator_share = validator_part.parse().unwrap_or(0.0) / 400.0;
+    let protocol_share = protocol_part.parse().unwrap_or(0.0) / 100.0;
+    let max_boost: BigDecimal<18> = boost.parse().unwrap_or(0.0).into();
+
+    let (owner_key1, node_key1) = node_and_account_key(5);
+
+    // deposit FLK tokens and stake it
+    deposit(10_000_u64.into(), Tokens::FLK, owner_key1, &update_socket).await;
+    stake(10_000_u64.into(), node_key1, owner_key1, &update_socket).await;
+
+    //every epoch supply increase similar for simplicity of the test
+    let _node_1_usd = 0.1 * 10000_f64;
+
+    // calculate emissions per unit
+    let max_emissions: BigDecimal<18> = (inflation * supply_at_year_start.clone()) / 36500.0.into();
+
+    let emissions_per_epoch = max_emissions.clone() / (max_boost.clone());
+    let mut supply = supply_at_year_start;
+
+    // 365 epoch changes to see if the current supply and year start suppply are ok
+    for i in 0..2 {
+        let pod_10 = pod_request(node_key1, 10000, 0);
+        // run the delivery ack transaction
+        if let Err(e) = run_transaction(vec![pod_10], &update_socket).await {
+            panic!("{e}");
+        }
+        let committee_members = query_runner.get_committee_members();
+        if let Err(err) = simple_epoch_change(i, &committee_members, &update_socket).await {
+            panic!("error while changing epoch, {err}");
+        }
+        println!(
+            "{}\n{}\n{}\n{}\n{}\n{}\n",
+            (emissions_per_epoch.clone() * node_share.into()),
+            (emissions_per_epoch.clone() * validator_share.into()),
+            (emissions_per_epoch.clone() * validator_share.into()),
+            (emissions_per_epoch.clone() * validator_share.into()),
+            (emissions_per_epoch.clone() * validator_share.into()),
+            (emissions_per_epoch.clone() * protocol_share.into())
+        );
+        println!(
+            "{}\n",
+            (emissions_per_epoch.clone() * node_share.into())
+                + (emissions_per_epoch.clone() * validator_share.into())
+                + (emissions_per_epoch.clone() * validator_share.into())
+                + (emissions_per_epoch.clone() * validator_share.into())
+                + (emissions_per_epoch.clone() * validator_share.into())
+                + (emissions_per_epoch.clone() * protocol_share.into())
+                + (1_000_000_u128.into())
+        );
+        let epoch = query_runner.get_epoch_info().epoch;
+        let total_supply = query_runner.get_total_supply();
+        let supply_year_start = query_runner.get_year_start_supply();
+        supply += emissions_per_epoch.clone();
+        println!("{total_supply} \n{supply}");
+        assert_eq!(total_supply, supply);
+        println!("epoch: {epoch}, suppply: {total_supply}, supply_year_start: {supply_year_start}")
+    }
 }

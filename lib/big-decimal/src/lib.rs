@@ -4,8 +4,16 @@ use std::{
 };
 
 use num_bigint::BigUint;
-use num_traits::{zero, FromPrimitive, Num, ToPrimitive, Zero};
+use num_traits::{zero, CheckedDiv, FromPrimitive, Num, ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug)]
+pub enum BigDecimalConversionError {
+    PrecisionLevelNotSupported,
+    Overflow,
+    DivisionError,
+    FloatParseError,
+}
 
 /// `BigDecimal` is a structure that encapsulates a `BigUint` while enforcing specific precision
 /// rules.
@@ -36,11 +44,24 @@ pub struct BigDecimal<const P: usize>(BigUint);
 
 impl<const P: usize> BigDecimal<P> {
     pub fn new(value: BigUint) -> Self {
-        BigDecimal::<P>(value * 10u128.pow(P.try_into().unwrap()))
+        BigDecimal::<P>(value * BigUint::from(10u32).pow(P.try_into().unwrap()))
     }
 
     pub fn zero() -> BigDecimal<P> {
         BigDecimal::new(zero())
+    }
+    pub fn convert_precision<const Q: usize>(&self) -> BigDecimal<Q> {
+        let current_value: &BigUint = &self.0;
+
+        let precision_diff: i32 = P as i32 - Q as i32;
+
+        let scaled_value: BigUint = if precision_diff > 0 {
+            current_value / BigUint::from(10u128.pow(precision_diff as u32))
+        } else {
+            current_value * BigUint::from(10u128.pow((-precision_diff) as u32))
+        };
+
+        BigDecimal::<Q>(scaled_value)
     }
 }
 
@@ -158,38 +179,103 @@ impl<const P: usize> From<usize> for BigDecimal<P> {
     }
 }
 
-impl<const P: usize> From<BigDecimal<P>> for BigUint {
-    fn from(value: BigDecimal<P>) -> Self {
-        let divisor = BigUint::from(10u64).pow(P.try_into().unwrap());
-        value.0 / divisor
+impl<const P: usize> TryFrom<BigDecimal<P>> for f64 {
+    type Error = BigDecimalConversionError;
+
+    fn try_from(value: BigDecimal<P>) -> Result<Self, Self::Error> {
+        let divisor = BigUint::from(10u32).pow(
+            P.try_into()
+                .map_err(|_| BigDecimalConversionError::PrecisionLevelNotSupported)?,
+        );
+        let fraction_part = value.0.clone() % divisor.clone();
+        let integer_part = value
+            .0
+            .checked_div(&divisor)
+            .ok_or(BigDecimalConversionError::DivisionError)?;
+        let s = format!("{integer_part}.{fraction_part}");
+        s.parse::<f64>()
+            .map_err(|_| BigDecimalConversionError::FloatParseError)
     }
 }
 
-impl<const P: usize> From<BigDecimal<P>> for f64 {
-    fn from(value: BigDecimal<P>) -> Self {
-        let divisor = BigUint::from(10u64).pow(P.try_into().unwrap());
-        value.0.to_f64().unwrap_or_default() / divisor.to_f64().unwrap()
+impl<const P: usize> TryFrom<BigDecimal<P>> for u32 {
+    type Error = BigDecimalConversionError;
+
+    fn try_from(value: BigDecimal<P>) -> Result<Self, Self::Error> {
+        let divisor = BigUint::from(10u32).pow(
+            P.try_into()
+                .map_err(|_| BigDecimalConversionError::PrecisionLevelNotSupported)?,
+        );
+        let interim = value
+            .0
+            .checked_div(&divisor)
+            .ok_or(BigDecimalConversionError::DivisionError)?;
+        interim.to_u32().ok_or(BigDecimalConversionError::Overflow)
     }
 }
 
-impl<const P: usize> From<BigDecimal<P>> for u64 {
-    fn from(value: BigDecimal<P>) -> Self {
-        let divisor = BigUint::from(10u64).pow(P.try_into().unwrap());
-        value.0.to_u64().unwrap_or_default() / divisor.to_u64().unwrap()
+impl<const P: usize> TryFrom<BigDecimal<P>> for u64 {
+    type Error = BigDecimalConversionError;
+
+    fn try_from(value: BigDecimal<P>) -> Result<Self, Self::Error> {
+        let divisor = BigUint::from(10u32).pow(
+            P.try_into()
+                .map_err(|_| BigDecimalConversionError::PrecisionLevelNotSupported)?,
+        );
+        let interim = value
+            .0
+            .checked_div(&divisor)
+            .ok_or(BigDecimalConversionError::DivisionError)?;
+        interim.to_u64().ok_or(BigDecimalConversionError::Overflow)
     }
 }
 
-impl<const P: usize> From<BigDecimal<P>> for u128 {
-    fn from(value: BigDecimal<P>) -> Self {
-        let divisor = BigUint::from(10u64).pow(P.try_into().unwrap());
-        value.0.to_u128().unwrap_or_default() / divisor.to_u128().unwrap()
+impl<const P: usize> TryFrom<BigDecimal<P>> for u128 {
+    type Error = BigDecimalConversionError;
+
+    fn try_from(value: BigDecimal<P>) -> Result<Self, Self::Error> {
+        let divisor = BigUint::from(10u32).pow(
+            P.try_into()
+                .map_err(|_| BigDecimalConversionError::PrecisionLevelNotSupported)?,
+        );
+        let interim = value
+            .0
+            .checked_div(&divisor)
+            .ok_or(BigDecimalConversionError::DivisionError)?;
+        interim.to_u128().ok_or(BigDecimalConversionError::Overflow)
     }
 }
 
-impl<const P: usize> From<BigDecimal<P>> for usize {
-    fn from(value: BigDecimal<P>) -> Self {
-        let divisor = BigUint::from(10u64).pow(P.try_into().unwrap());
-        value.0.to_usize().unwrap_or_default() / divisor.to_usize().unwrap()
+impl<const P: usize> TryFrom<BigDecimal<P>> for usize {
+    type Error = BigDecimalConversionError;
+
+    fn try_from(value: BigDecimal<P>) -> Result<Self, Self::Error> {
+        let divisor = BigUint::from(10u32).pow(
+            P.try_into()
+                .map_err(|_| BigDecimalConversionError::PrecisionLevelNotSupported)?,
+        );
+        let interim = value
+            .0
+            .checked_div(&divisor)
+            .ok_or(BigDecimalConversionError::DivisionError)?;
+        interim
+            .to_usize()
+            .ok_or(BigDecimalConversionError::Overflow)
+    }
+}
+
+impl<const P: usize> TryFrom<BigDecimal<P>> for BigUint {
+    type Error = BigDecimalConversionError;
+
+    fn try_from(value: BigDecimal<P>) -> Result<Self, Self::Error> {
+        let divisor = BigUint::from(10u32).pow(
+            P.try_into()
+                .map_err(|_| BigDecimalConversionError::PrecisionLevelNotSupported)?,
+        );
+        value
+            .0
+            .checked_div(&divisor)
+            .ok_or(BigDecimalConversionError::DivisionError)
     }
 }
 
@@ -197,6 +283,70 @@ impl<const P: usize> From<BigDecimal<P>> for usize {
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn test_try_into() {
+        let large = BigDecimal::<20>::new(BigUint::from(std::u64::MAX as u128 + 1_u128));
+        let medium = BigDecimal::<19>::new(BigUint::from(std::u32::MAX as u64 + 1_u64));
+        let small = BigDecimal::<18>::new(BigUint::from(std::u16::MAX as u32 + 1_u32));
+
+        assert_eq!(
+            std::u64::MAX as u128 + 1_u128,
+            large.clone().try_into().unwrap()
+        );
+        assert!(matches!(
+            TryInto::<usize>::try_into(large.clone()),
+            Err(BigDecimalConversionError::Overflow)
+        ));
+        assert!(matches!(
+            TryInto::<u64>::try_into(large.clone()),
+            Err(BigDecimalConversionError::Overflow)
+        ));
+        assert!(matches!(
+            TryInto::<u32>::try_into(large),
+            Err(BigDecimalConversionError::Overflow)
+        ));
+
+        assert_eq!(
+            TryInto::<u128>::try_into(medium.clone()).unwrap(),
+            std::u32::MAX as u128 + 1
+        );
+        assert_eq!(
+            TryInto::<u64>::try_into(medium.clone()).unwrap(),
+            std::u32::MAX as u64 + 1
+        );
+        assert_eq!(
+            TryInto::<usize>::try_into(medium.clone()).unwrap(),
+            std::u32::MAX as usize + 1
+        );
+        assert!(matches!(
+            TryInto::<u32>::try_into(medium),
+            Err(BigDecimalConversionError::Overflow)
+        ));
+
+        assert_eq!(
+            TryInto::<u128>::try_into(small.clone()).unwrap(),
+            std::u16::MAX as u128 + 1
+        );
+        assert_eq!(
+            TryInto::<usize>::try_into(small.clone()).unwrap(),
+            std::u16::MAX as usize + 1
+        );
+        assert_eq!(
+            TryInto::<u64>::try_into(small.clone()).unwrap(),
+            std::u16::MAX as u64 + 1
+        );
+        assert_eq!(
+            TryInto::<u32>::try_into(small.clone()).unwrap(),
+            std::u16::MAX as u32 + 1
+        );
+
+        let small_by_2 = small / 200_u64.try_into().unwrap();
+        let small_float: f64 = small_by_2.try_into().unwrap();
+        // small_float = 65536(small) / 200   = 327.68
+        assert_eq!(327.68, small_float);
+        // Todo: more tests to test overflow and bigger gloats
+    }
 
     #[test]
     fn test_big_decimal_add() {
@@ -254,4 +404,20 @@ mod tests {
     //         BigUint::from(1_234_567_891_234_568_000_000u128)
     //     );
     // }
+
+    #[test]
+    fn test_convert_precsion_up() {
+        let decimal: f64 = 1234.123456;
+        let decimal1 = BigDecimal::<6>::from(decimal);
+        let result = decimal1.convert_precision::<18>();
+        assert_eq!(result.0, BigUint::from(1_234_123_456_000_000_000_000_u128));
+    }
+
+    #[test]
+    fn test_convert_precsion_down() {
+        let decimal: f64 = 1234.123456;
+        let decimal1 = BigDecimal::<6>::from(decimal);
+        let result = decimal1.convert_precision::<2>();
+        assert_eq!(result.0, BigUint::from(123_412_u128));
+    }
 }
