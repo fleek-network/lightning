@@ -14,7 +14,6 @@ pub struct Genesis {
     pub min_stake: u64,
     pub eligibility_time: u64,
     pub lock_time: Epoch,
-    pub protocol_percentage: u16,
     pub max_inflation: u16,
     pub protocol_share: u16,
     pub validator_share: u16,
@@ -26,7 +25,7 @@ pub struct Genesis {
     pub service: Vec<GenesisService>,
     pub account: Vec<GenesisAccount>,
     pub commodity_prices: Vec<GenesisPrices>,
-    pub supply_at_genesis: u128,
+    pub supply_at_genesis: u64,
     pub protocol_fund_address: String,
 }
 

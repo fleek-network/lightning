@@ -786,14 +786,25 @@ impl<B: Backend> State<B> {
             _ => 0,
         };
 
+        let reward_pool = self
+            .total_served
+            .get(&epoch)
+            .unwrap_or_default()
+            .reward_pool;
+
+        // if reward is 0, no commodity under any service was served
+        if reward_pool == 0_f64 {
+            return;
+        }
+
         let percentage_divisor = BigDecimal::<18>::from(100_u64);
-        let node_share: BigDecimal<18> = self
+        let node_percentage: BigDecimal<18> = self
             .parameters
             .get(&ProtocolParams::NodeShare)
             .unwrap_or_default()
             .into();
-
-        let (_max_emissions, flk_per_stable_revenue_unit) = self.calculate_emissions(&epoch);
+        let node_share = &node_percentage / &percentage_divisor;
+        let (_max_emissions, min_emissions) = self.calculate_emissions();
         let mut total_emissions: BigDecimal<18> = 0.0.into();
         let nodes = self.current_epoch_served.keys();
         for node in nodes {
@@ -807,13 +818,12 @@ impl<B: Backend> State<B> {
             let locked_until = self.node_info.get(&node).unwrap().stake.stake_locked_until;
             let boost: BigDecimal<18> = self.get_boost(locked_until, &epoch);
             let node_stables_revenue = stables_revenue.convert_precision::<18>();
-            let flk_rewards = &node_stables_revenue * &flk_per_stable_revenue_unit * &boost;
+
+            let node_service_proportion = &node_stables_revenue / &reward_pool.into();
+            let flk_rewards = &min_emissions * node_service_proportion * &boost;
             total_emissions += flk_rewards.clone();
             let node_owner = self.node_info.get(&node).unwrap().owner;
-            self.mint_and_transfer_flk(
-                &flk_rewards * (&node_share / &percentage_divisor),
-                node_owner,
-            );
+            self.mint_and_transfer_flk(&flk_rewards * &node_share, node_owner);
             self.current_epoch_served.remove(&node);
         }
 
@@ -825,6 +835,7 @@ impl<B: Backend> State<B> {
             .into();
 
         let committee_members = self.committee_info.get(&epoch).unwrap().members;
+        // todo: pick committee size from genesis.toml or from actual committee?
         let committee_size = committee_members.len();
 
         for node in committee_members {
@@ -844,6 +855,7 @@ impl<B: Backend> State<B> {
             Some(Value::AccountPublicKey(owner)) => owner,
             _ => panic!("ProtocolFundAddress is added at Genesis and should exist"),
         };
+
         self.mint_and_transfer_flk(
             &total_emissions * (&protocol_share / &percentage_divisor),
             protocol_owner,
@@ -868,13 +880,7 @@ impl<B: Backend> State<B> {
         )
     }
 
-    fn calculate_emissions(&self, epoch: &Epoch) -> (BigDecimal<18>, BigDecimal<18>) {
-        let reward_pool = self.total_served.get(epoch).unwrap_or_default().reward_pool;
-
-        // if reward is 0, no commodity under any service was served
-        if reward_pool == 0_f64 {
-            return (BigDecimal::zero(), BigDecimal::zero());
-        }
+    fn calculate_emissions(&self) -> (BigDecimal<18>, BigDecimal<18>) {
         let percentage_divisor = BigDecimal::<18>::from(100_u64);
         let inflation_percent: BigDecimal<18> = self
             .parameters
@@ -897,7 +903,7 @@ impl<B: Backend> State<B> {
 
         let min_emissions = &max_emissions / &max_boost;
 
-        (max_emissions, min_emissions / &reward_pool.into())
+        (max_emissions, min_emissions)
     }
 
     fn mint_and_transfer_stables(&self, amount: BigDecimal<6>, owner: AccountOwnerPublicKey) {
@@ -965,15 +971,14 @@ impl<B: Backend> State<B> {
             .get(&ProtocolParams::MaxBoost)
             .unwrap_or(1)
             .into();
-        let max_lock_time: BigDecimal<18> = self
+        let max_lock_time = self
             .parameters
             .get(&ProtocolParams::MaxLockTime)
-            .unwrap_or(1)
-            .into();
+            .unwrap_or(1);
         let min_boost = BigDecimal::from(1_u64);
         let locking_period = locked_until.saturating_sub(*current_epoch);
-        let boost =
-            &min_boost + (&max_boost - &min_boost) * (&locking_period.into() / &max_lock_time);
+        let power: f64 = (locking_period as f64 / max_lock_time as f64).powf(1.2);
+        let boost = &min_boost + (&max_boost - &min_boost) * (&power.into());
         BigDecimal::<18>::min(&max_boost, &boost).to_owned()
     }
 

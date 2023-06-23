@@ -15,9 +15,7 @@ use draco_interfaces::{
     },
     ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
 };
-use fastcrypto::{
-    bls12381::min_sig::BLS12381PublicKey, traits::EncodeDecodeBase64,
-};
+use fastcrypto::{bls12381::min_sig::BLS12381PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{
     AccountOwnerPublicKey, AccountOwnerSignature, NodePublicKey, NodeSignature,
     TransactionSignature,
@@ -39,7 +37,7 @@ pub struct Params {
     node_share: Option<u16>,
     validator_share: Option<u16>,
     max_boost: Option<u16>,
-    supply_at_genesis: Option<u128>,
+    supply_at_genesis: Option<u64>,
 }
 
 const ACCOUNT_ONE: AccountOwnerPublicKey = AccountOwnerPublicKey([0; 32]);
@@ -627,18 +625,19 @@ async fn test_distribute_rewards() {
     assert_eq!(stables_balance, node_1_usd.into());
 
     // calculate emissions per unit
-    let max_emissions: BigDecimal<18> = (inflation * supply_at_year_start) / &36500.0.into();
-    let emissions_per_unit = &max_emissions / (&reward_pool * &max_boost);
+    let max_emissions: BigDecimal<18> = (inflation * supply_at_year_start) / &365.0.into();
+    let emissions_per_unit = &max_emissions / &max_boost;
 
     // assert flk balances node 1
     let node_flk_balance1 = query_runner.get_flk_balance(&owner_key1);
     let node_flk_rewards1: BigDecimal<18> =
-        &emissions_per_unit * &node_share * node_1_boost * &node_1_usd.into();
+        &emissions_per_unit * &node_share * node_1_boost * (&node_1_usd.into() / &reward_pool);
     assert_eq!(node_flk_balance1, node_flk_rewards1);
 
     // assert flk balances node 2
     let node_flk_balance2 = query_runner.get_flk_balance(&owner_key2);
-    let node_flk_rewards2: BigDecimal<18> = &emissions_per_unit * &node_share * &node_2_usd.into();
+    let node_flk_rewards2: BigDecimal<18> =
+        &emissions_per_unit * &node_share * (&node_2_usd.into() / &reward_pool);
     assert_eq!(node_flk_balance2, node_flk_rewards2);
 
     // calculate total emissions based on total emissions for node which is equal to node share. the
@@ -792,7 +791,6 @@ async fn test_rep_scores() {
 }
 
 #[test]
-#[ignore = "some minute precision errors"]
 async fn test_supply_across_epoch() {
     let epoch_time = 100;
     let max_inflation = 10;
@@ -813,11 +811,13 @@ async fn test_supply_across_epoch() {
     .await;
 
     // get params for emission calculations
+    let committee_size: BigDecimal<18> = query_runner.get_committee_members().len().into();
     let percentage_divisor: BigDecimal<18> = 100_u16.into();
     let supply_at_year_start: BigDecimal<18> = supply_at_genesis.into();
     let inflation: BigDecimal<18> = BigDecimal::from(max_inflation) / &percentage_divisor;
     let node_share = BigDecimal::from(node_part) / &percentage_divisor;
-    let validator_share = BigDecimal::from(validator_part) / &percentage_divisor;
+    let validator_share =
+        (BigDecimal::from(validator_part) / &percentage_divisor) / &committee_size;
     let protocol_share = BigDecimal::from(protocol_part) / &percentage_divisor;
     let max_boost: BigDecimal<18> = boost.into();
 
@@ -831,13 +831,13 @@ async fn test_supply_across_epoch() {
     let _node_1_usd = 0.1 * 10000_f64;
 
     // calculate emissions per unit
-    let max_emissions: BigDecimal<18> = (&inflation * &supply_at_year_start) / &36500.0.into();
+    let max_emissions: BigDecimal<18> = (&inflation * &supply_at_year_start) / &365.0.into();
 
     let emissions_per_epoch = &max_emissions / &max_boost;
     let mut supply = supply_at_year_start;
 
     // 365 epoch changes to see if the current supply and year start suppply are ok
-    for i in 0..2 {
+    for i in 0..365 {
         let pod_10 = pod_request(node_key1, 10000, 0);
         // run the delivery ack transaction
         if let Err(e) = run_transaction(vec![pod_10], &update_socket).await {
@@ -847,31 +847,17 @@ async fn test_supply_across_epoch() {
         if let Err(err) = simple_epoch_change(i, &committee_members, &update_socket).await {
             panic!("error while changing epoch, {err}");
         }
-        println!(
-            "{}\n{}\n{}\n{}\n{}\n{}\n",
-            (&emissions_per_epoch * &node_share),
-            (&emissions_per_epoch * &validator_share),
-            (&emissions_per_epoch * &validator_share),
-            (&emissions_per_epoch * &validator_share),
-            (&emissions_per_epoch * &validator_share),
-            (&emissions_per_epoch * &protocol_share)
-        );
-        println!(
-            "{}\n",
-            (&emissions_per_epoch * &node_share)
-                + (&emissions_per_epoch * &validator_share)
-                + (&emissions_per_epoch * &validator_share)
-                + (&emissions_per_epoch * &validator_share)
-                + (&emissions_per_epoch * &validator_share)
-                + (&emissions_per_epoch * &protocol_share)
-                + (&1_000_000_u128.into())
-        );
-        let epoch = query_runner.get_epoch_info().epoch;
+
+        let supply_increase = &emissions_per_epoch * &node_share
+            + &emissions_per_epoch * &protocol_share
+            + &emissions_per_epoch * &validator_share * &committee_size;
         let total_supply = query_runner.get_total_supply();
         let supply_year_start = query_runner.get_year_start_supply();
-        supply += emissions_per_epoch.clone();
-        println!("{total_supply} \n{supply}");
+        supply += supply_increase;
         assert_eq!(total_supply, supply);
-        println!("epoch: {epoch}, suppply: {total_supply}, supply_year_start: {supply_year_start}")
+        if i == 364 {
+            // the supply_year_start should update
+            assert_eq!(total_supply, supply_year_start);
+        }
     }
 }
