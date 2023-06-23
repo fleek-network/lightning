@@ -21,6 +21,8 @@ pub trait SecretKey: Sized {
     type PublicKey: PublicKey;
 
     fn generate() -> Self;
+    fn decode(encoded: &[u8]) -> Self;
+    fn encode(&self) -> Vec<u8>;
     fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature;
     fn to_pk(&self) -> Self::PublicKey;
 }
@@ -87,6 +89,14 @@ impl SecretKey for NodeSecretKey {
     fn generate() -> Self {
         let pair = BLS12381KeyPair::generate(&mut ThreadRng::default());
         pair.private().into()
+    }
+
+    fn decode(_encoded: &[u8]) -> Self {
+        todo!()
+    }
+
+    fn encode(&self) -> Vec<u8> {
+        todo!()
     }
 
     fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
@@ -182,6 +192,14 @@ impl SecretKey for NodeNetworkingSecretKey {
         pair.private().into()
     }
 
+    fn decode(_encoded: &[u8]) -> Self {
+        todo!()
+    }
+
+    fn encode(&self) -> Vec<u8> {
+        todo!()
+    }
+
     fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
         let secret: Ed25519PrivateKey = self.into();
         let pair: Ed25519KeyPair = secret.into();
@@ -230,6 +248,14 @@ impl SecretKey for ClientSecretKey {
     type PublicKey = ClientPublicKey;
 
     fn generate() -> Self {
+        todo!()
+    }
+
+    fn decode(_encoded: &[u8]) -> Self {
+        todo!()
+    }
+
+    fn encode(&self) -> Vec<u8> {
         todo!()
     }
 
@@ -300,6 +326,14 @@ impl SecretKey for AccountOwnerSecretKey {
     fn generate() -> Self {
         let pair = Secp256k1KeyPair::generate(&mut ThreadRng::default());
         pair.private().into()
+    }
+
+    fn decode(_encoded: &[u8]) -> Self {
+        todo!()
+    }
+
+    fn encode(&self) -> Vec<u8> {
+        todo!()
     }
 
     fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
