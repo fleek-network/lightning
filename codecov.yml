@@ -1,3 +1,6 @@
+# Disable github checks for now, we just want insight not litigation
+github_checks: false
+
 # Ignore dummy implementations in coverage reports
 ignore:
   - "core/node/src/template"
