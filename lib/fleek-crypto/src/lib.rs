@@ -4,6 +4,7 @@ use fastcrypto::{
         BLS12381KeyPair, BLS12381PrivateKey, BLS12381PublicKey, BLS12381Signature,
     },
     ed25519::{Ed25519KeyPair, Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
+    secp256k1::{Secp256k1KeyPair, Secp256k1PrivateKey, Secp256k1PublicKey, Secp256k1Signature},
     traits::{KeyPair, Signer, ToFromBytes, VerifyingKey},
 };
 use rand::rngs::ThreadRng;
@@ -27,6 +28,12 @@ pub trait SecretKey: Sized {
 /// A node's BLS 12-381 public key
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct NodePublicKey(#[serde(with = "BigArray")] pub [u8; 96]);
+
+impl From<[u8; 96]> for NodePublicKey {
+    fn from(value: [u8; 96]) -> Self {
+        Self(value)
+    }
+}
 
 impl From<BLS12381PublicKey> for NodePublicKey {
     fn from(value: BLS12381PublicKey) -> Self {
@@ -113,6 +120,12 @@ impl From<&NodeSignature> for BLS12381Signature {
 /// A node's ed25519 networking public key
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct NodeNetworkingPublicKey(pub [u8; 32]);
+
+impl From<[u8; 32]> for NodeNetworkingPublicKey {
+    fn from(value: [u8; 32]) -> Self {
+        Self(value)
+    }
+}
 
 impl From<Ed25519PublicKey> for NodeNetworkingPublicKey {
     fn from(value: Ed25519PublicKey) -> Self {
@@ -201,15 +214,122 @@ impl From<&NodeNetworkingSignature> for Ed25519Signature {
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct ClientPublicKey(pub [u8; 20]);
+
+impl PublicKey for ClientPublicKey {
+    type Signature = ClientSignature;
+
+    fn verify(&self, _signature: &Self::Signature, _digest: &[u8; 32]) -> bool {
+        todo!()
+    }
+}
+
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct ClientSecretKey([u8; 32]);
+
+impl SecretKey for ClientSecretKey {
+    type PublicKey = ClientPublicKey;
+
+    fn generate() -> Self {
+        todo!()
+    }
+
+    fn sign(&self, _digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
+        todo!()
+    }
+
+    fn to_pk(&self) -> Self::PublicKey {
+        todo!()
+    }
+}
+
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct ClientSignature;
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct AccountOwnerPublicKey(pub [u8; 32]);
-pub struct AccountOwnerSecretKey;
+pub struct AccountOwnerPublicKey(#[serde(with = "BigArray")] pub [u8; 32]);
+
+impl From<[u8; 32]> for AccountOwnerPublicKey {
+    fn from(value: [u8; 32]) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Secp256k1PublicKey> for AccountOwnerPublicKey {
+    fn from(value: Secp256k1PublicKey) -> Self {
+        let bytes = value.as_ref();
+        AccountOwnerPublicKey(*array_ref!(bytes, 1, 32))
+    }
+}
+
+impl From<&AccountOwnerPublicKey> for Secp256k1PublicKey {
+    fn from(value: &AccountOwnerPublicKey) -> Self {
+        let mut bytes = Vec::with_capacity(33);
+        bytes.push(0x04);
+        bytes.append(&mut value.0.into());
+        Secp256k1PublicKey::from_bytes(&bytes).unwrap()
+    }
+}
+
+impl PublicKey for AccountOwnerPublicKey {
+    type Signature = AccountOwnerSignature;
+
+    fn verify(&self, signature: &Self::Signature, digest: &[u8; 32]) -> bool {
+        let pubkey: Secp256k1PublicKey = self.into();
+        pubkey.verify(digest, &signature.into()).is_ok()
+    }
+}
+
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct AccountOwnerSignature;
+pub struct AccountOwnerSecretKey(#[serde(with = "BigArray")] pub [u8; 32]);
+
+impl From<Secp256k1PrivateKey> for AccountOwnerSecretKey {
+    fn from(value: Secp256k1PrivateKey) -> Self {
+        let bytes = value.as_ref();
+        AccountOwnerSecretKey(*array_ref!(bytes, 0, 32))
+    }
+}
+
+impl From<&AccountOwnerSecretKey> for Secp256k1PrivateKey {
+    fn from(value: &AccountOwnerSecretKey) -> Self {
+        Secp256k1PrivateKey::from_bytes(&value.0).unwrap()
+    }
+}
+
+impl SecretKey for AccountOwnerSecretKey {
+    type PublicKey = AccountOwnerPublicKey;
+    fn generate() -> Self {
+        let pair = Secp256k1KeyPair::generate(&mut ThreadRng::default());
+        pair.private().into()
+    }
+
+    fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
+        let secret: Secp256k1PrivateKey = self.into();
+        let pair: Secp256k1KeyPair = secret.into();
+        pair.sign(digest).into()
+    }
+
+    fn to_pk(&self) -> Self::PublicKey {
+        let secret: &Secp256k1PrivateKey = &self.into();
+        let pubkey: Secp256k1PublicKey = secret.into();
+        pubkey.into()
+    }
+}
+
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
+pub struct AccountOwnerSignature(#[serde(with = "BigArray")] pub [u8; 64]);
+
+impl From<Secp256k1Signature> for AccountOwnerSignature {
+    fn from(value: Secp256k1Signature) -> Self {
+        let bytes = value.as_ref();
+        AccountOwnerSignature(*array_ref!(bytes, 0, 64))
+    }
+}
+
+impl From<&AccountOwnerSignature> for Secp256k1Signature {
+    fn from(value: &AccountOwnerSignature) -> Self {
+        Secp256k1Signature::from_bytes(&value.0).unwrap()
+    }
+}
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum TransactionSender {
@@ -244,70 +364,5 @@ impl From<NodePublicKey> for TransactionSender {
 impl From<AccountOwnerPublicKey> for TransactionSender {
     fn from(value: AccountOwnerPublicKey) -> Self {
         TransactionSender::AccountOwner(value)
-    }
-}
-
-impl PublicKey for ClientPublicKey {
-    type Signature = ClientSignature;
-
-    fn verify(&self, _signature: &Self::Signature, _digest: &[u8; 32]) -> bool {
-        todo!()
-    }
-}
-
-impl PublicKey for AccountOwnerPublicKey {
-    type Signature = AccountOwnerSignature;
-
-    fn verify(&self, _signature: &Self::Signature, _digest: &[u8; 32]) -> bool {
-        todo!()
-    }
-}
-
-impl SecretKey for ClientSecretKey {
-    type PublicKey = ClientPublicKey;
-
-    fn generate() -> Self {
-        todo!()
-    }
-
-    fn sign(&self, _digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
-        todo!()
-    }
-
-    fn to_pk(&self) -> Self::PublicKey {
-        todo!()
-    }
-}
-
-impl SecretKey for AccountOwnerSecretKey {
-    type PublicKey = AccountOwnerPublicKey;
-    fn generate() -> Self {
-        todo!()
-    }
-
-    fn sign(&self, _digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
-        todo!()
-    }
-
-    fn to_pk(&self) -> Self::PublicKey {
-        todo!()
-    }
-}
-
-impl From<[u8; 32]> for NodeNetworkingPublicKey {
-    fn from(value: [u8; 32]) -> Self {
-        Self(value)
-    }
-}
-
-impl From<[u8; 32]> for AccountOwnerPublicKey {
-    fn from(value: [u8; 32]) -> Self {
-        Self(value)
-    }
-}
-
-impl From<[u8; 96]> for NodePublicKey {
-    fn from(value: [u8; 96]) -> Self {
-        Self(value)
     }
 }

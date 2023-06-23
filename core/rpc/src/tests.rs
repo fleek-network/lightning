@@ -8,7 +8,7 @@ use draco_interfaces::{
     types::{Block, ProofOfConsensus, Tokens, UpdateMethod, UpdatePayload, UpdateRequest},
     ApplicationInterface, ExecutionEngineSocket, MempoolSocket, RpcInterface, WithStartAndShutdown,
 };
-use fleek_crypto::{AccountOwnerPublicKey, AccountOwnerSignature, TransactionSignature};
+use fleek_crypto::{AccountOwnerPublicKey, AccountOwnerSignature};
 use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -153,9 +153,10 @@ async fn test_rpc_get_balance() -> Result<()> {
     };
 
     // deposit FLK to test get balance
+    // TODO: sign the thing
     let update = UpdateRequest {
         sender: ACCOUNT_ONE.into(),
-        signature: TransactionSignature::AccountOwner(AccountOwnerSignature),
+        signature: AccountOwnerSignature([0; 64]).into(),
         payload: UpdatePayload {
             nonce: 0,
             method: deposit_method,

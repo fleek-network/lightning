@@ -135,9 +135,10 @@ fn get_update_request_account(
     method: UpdateMethod,
     sender: AccountOwnerPublicKey,
 ) -> UpdateRequest {
+    // TODO: sign the thing
     UpdateRequest {
         sender: sender.into(),
-        signature: TransactionSignature::AccountOwner(AccountOwnerSignature),
+        signature: AccountOwnerSignature([0; 64]).into(),
         payload: UpdatePayload { nonce: 0, method },
     }
 }
