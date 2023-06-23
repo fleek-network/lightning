@@ -1,0 +1,14 @@
+[package]
+name = "signer"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+draco-interfaces = {path="../interfaces"}
+anyhow.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+
+fleek-crypto.workspace = true

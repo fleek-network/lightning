@@ -6459,6 +6459,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "signer"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "draco-interfaces",
+ "fleek-crypto",
+ "serde",
+]
+
+[[package]]
 name = "simulon"
 version = "0.0.1"
 dependencies = [
