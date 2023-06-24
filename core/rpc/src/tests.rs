@@ -16,7 +16,7 @@ use tokio::{task, test};
 
 use crate::{config::Config as RpcConfig, server::Rpc};
 
-const ACCOUNT_ONE: AccountOwnerPublicKey = AccountOwnerPublicKey([0; 32]);
+const ACCOUNT_ONE: AccountOwnerPublicKey = AccountOwnerPublicKey([0; 33]);
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RpcSuccessResponse {
