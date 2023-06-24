@@ -8,8 +8,15 @@ use fastcrypto::{
     traits::{KeyPair, Signer, ToFromBytes, VerifyingKey},
 };
 use rand::rngs::ThreadRng;
+use sec1::{
+    pkcs8::{der::EncodePem, ObjectIdentifier, SecretDocument},
+    DecodeEcPrivateKey, EcParameters, EcPrivateKey,
+};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
+
+#[cfg(test)]
+mod tests;
 
 pub trait PublicKey {
     type Signature;
@@ -21,8 +28,8 @@ pub trait SecretKey: Sized {
     type PublicKey: PublicKey;
 
     fn generate() -> Self;
-    fn decode(encoded: &[u8]) -> Self;
-    fn encode(&self) -> Vec<u8>;
+    fn decode_pem(encoded: &str) -> Self;
+    fn encode_pem(&self) -> String;
     fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature;
     fn to_pk(&self) -> Self::PublicKey;
 }
@@ -91,11 +98,11 @@ impl SecretKey for NodeSecretKey {
         pair.private().into()
     }
 
-    fn decode(_encoded: &[u8]) -> Self {
+    fn decode_pem(_encoded: &str) -> Self {
         todo!()
     }
 
-    fn encode(&self) -> Vec<u8> {
+    fn encode_pem(&self) -> String {
         todo!()
     }
 
@@ -192,11 +199,11 @@ impl SecretKey for NodeNetworkingSecretKey {
         pair.private().into()
     }
 
-    fn decode(_encoded: &[u8]) -> Self {
+    fn decode_pem(_encoded: &str) -> Self {
         todo!()
     }
 
-    fn encode(&self) -> Vec<u8> {
+    fn encode_pem(&self) -> String {
         todo!()
     }
 
@@ -251,11 +258,11 @@ impl SecretKey for ClientSecretKey {
         todo!()
     }
 
-    fn decode(_encoded: &[u8]) -> Self {
+    fn decode_pem(_encoded: &str) -> Self {
         todo!()
     }
 
-    fn encode(&self) -> Vec<u8> {
+    fn encode_pem(&self) -> String {
         todo!()
     }
 
@@ -325,12 +332,28 @@ impl SecretKey for AccountOwnerSecretKey {
         pair.private().into()
     }
 
-    fn decode(_encoded: &[u8]) -> Self {
-        todo!()
+    fn decode_pem(encoded: &str) -> Self {
+        let doc = SecretDocument::from_sec1_pem(encoded).unwrap();
+
+        // TODO: follow up on github issue about this not working:
+        //let info: EcPrivateKey = doc.decode_msg().unwrap();
+
+        let raw = doc.as_bytes();
+        let priv_key = *array_ref!(raw, 32, 32);
+        Self(priv_key)
     }
 
-    fn encode(&self) -> Vec<u8> {
-        todo!()
+    fn encode_pem(&self) -> String {
+        let pubkey = self.to_pk();
+        EcPrivateKey {
+            private_key: &self.0,
+            parameters: Some(EcParameters::NamedCurve(
+                ObjectIdentifier::new("1.3.132.0.10").unwrap(),
+            )),
+            public_key: Some(&pubkey.0),
+        }
+        .to_pem(sec1::pkcs8::LineEnding::LF)
+        .unwrap()
     }
 
     fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {

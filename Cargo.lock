@@ -2750,6 +2750,7 @@ dependencies = [
  "arrayref",
  "fastcrypto",
  "rand 0.8.5",
+ "sec1 0.7.2",
  "serde",
  "serde-big-array",
 ]
