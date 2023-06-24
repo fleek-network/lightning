@@ -1,5 +1,8 @@
-# Disable github checks for now, we just want insight not litigation
-github_checks: false
+# Disable github status checks
+coverage:
+  status:
+    project: off
+    patch: off
 
 # Ignore dummy implementations in coverage reports
 ignore:
