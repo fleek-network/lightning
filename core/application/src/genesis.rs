@@ -1,8 +1,10 @@
 use anyhow::{Context, Result};
 use draco_interfaces::types::{CommodityTypes, Epoch, NodeInfo, Staking, Worker};
 use fastcrypto::{
-    bls12381::min_sig::BLS12381PublicKey, ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64,
+    bls12381::min_sig::BLS12381PublicKey, ed25519::Ed25519PublicKey, secp256k1::Secp256k1PublicKey,
+    traits::EncodeDecodeBase64,
 };
+use fleek_crypto::AccountOwnerPublicKey;
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
 
@@ -76,10 +78,9 @@ fn test() {
 
 impl From<&GenesisCommittee> for NodeInfo {
     fn from(value: &GenesisCommittee) -> Self {
-        let owner = Ed25519PublicKey::decode_base64(&value.owner)
+        let owner: AccountOwnerPublicKey = Secp256k1PublicKey::decode_base64(&value.owner)
             .unwrap()
-            .0
-            .to_bytes();
+            .into();
 
         let public_key = BLS12381PublicKey::decode_base64(&value.primary_public_key)
             .unwrap()
@@ -104,7 +105,7 @@ impl From<&GenesisCommittee> for NodeInfo {
         };
 
         NodeInfo {
-            owner: owner.into(),
+            owner,
             public_key: public_key.into(),
             network_key: network_key.into(),
             domain,

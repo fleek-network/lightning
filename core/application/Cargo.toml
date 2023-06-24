@@ -15,7 +15,7 @@ multiaddr = "0.17.1"
 draco-interfaces = { path = "../interfaces" }
 draco-reputation = { path = "../reputation" }
 num-traits.workspace = true
-fastcrypto = "0.1.5"
+fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1" }
 
 # Our libraries
 affair.workspace = true

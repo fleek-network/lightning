@@ -40,7 +40,7 @@ pub struct Params {
     supply_at_genesis: Option<u64>,
 }
 
-const ACCOUNT_ONE: AccountOwnerPublicKey = AccountOwnerPublicKey([0; 32]);
+const ACCOUNT_ONE: AccountOwnerPublicKey = AccountOwnerPublicKey([0; 33]);
 const NODE_ONE: &str = "k7XAk/1z4rXf1QHyMPHZ1cgyeX2T3bsCCopNpFV6v8hInZfjyti79w3raEa3YwFADM2BnX+/o49k1HQjKZIYlGDszEZ/zUaK3kn3MfT5BEWkKgP+TFMPJoBxenV33XEZ";
 
 // Init the app and return the execution engine socket that would go to narwhal and the query socket
@@ -96,7 +96,7 @@ async fn init_app_with_params(params: Params) -> (ExecutionEngineSocket, QueryRu
 
 fn node_and_account_key(value: u8) -> (AccountOwnerPublicKey, NodePublicKey) {
     (
-        AccountOwnerPublicKey([value; 32]),
+        AccountOwnerPublicKey([value; 33]),
         NodePublicKey([value; 96]),
     )
 }

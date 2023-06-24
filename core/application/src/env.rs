@@ -11,7 +11,7 @@ use draco_interfaces::{
     },
     BlockExecutionResponse,
 };
-use fastcrypto::{ed25519::Ed25519PublicKey, traits::EncodeDecodeBase64};
+use fastcrypto::{secp256k1::Secp256k1PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 
 use crate::{
@@ -130,10 +130,8 @@ impl Env<UpdatePerm> {
                 ctx.get_table::<CommodityTypes, f64>("commodity_prices");
 
             let protocol_fund_address: AccountOwnerPublicKey =
-                Ed25519PublicKey::decode_base64(&genesis.protocol_fund_address)
+                Secp256k1PublicKey::decode_base64(&genesis.protocol_fund_address)
                     .unwrap()
-                    .0
-                    .to_bytes()
                     .into();
             metadata_table.insert(
                 Metadata::ProtocolFundAddress,
@@ -209,10 +207,8 @@ impl Env<UpdatePerm> {
 
             for account in genesis.account {
                 let public_key: AccountOwnerPublicKey =
-                    Ed25519PublicKey::decode_base64(&account.public_key)
+                    Secp256k1PublicKey::decode_base64(&account.public_key)
                         .unwrap()
-                        .0
-                        .to_bytes()
                         .into();
                 let info = AccountInfo {
                     flk_balance: account.flk_balance.into(),
