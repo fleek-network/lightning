@@ -272,10 +272,10 @@ impl SecretKey for ClientSecretKey {
 pub struct ClientSignature;
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct AccountOwnerPublicKey(#[serde(with = "BigArray")] pub [u8; 32]);
+pub struct AccountOwnerPublicKey(#[serde(with = "BigArray")] pub [u8; 33]);
 
-impl From<[u8; 32]> for AccountOwnerPublicKey {
-    fn from(value: [u8; 32]) -> Self {
+impl From<[u8; 33]> for AccountOwnerPublicKey {
+    fn from(value: [u8; 33]) -> Self {
         Self(value)
     }
 }
@@ -283,16 +283,13 @@ impl From<[u8; 32]> for AccountOwnerPublicKey {
 impl From<Secp256k1PublicKey> for AccountOwnerPublicKey {
     fn from(value: Secp256k1PublicKey) -> Self {
         let bytes = value.as_ref();
-        AccountOwnerPublicKey(*array_ref!(bytes, 1, 32))
+        AccountOwnerPublicKey(*array_ref!(bytes, 0, 33))
     }
 }
 
 impl From<&AccountOwnerPublicKey> for Secp256k1PublicKey {
     fn from(value: &AccountOwnerPublicKey) -> Self {
-        let mut bytes = Vec::with_capacity(33);
-        bytes.push(0x04);
-        bytes.append(&mut value.0.into());
-        Secp256k1PublicKey::from_bytes(&bytes).unwrap()
+        Secp256k1PublicKey::from_bytes(&value.0).unwrap()
     }
 }
 
