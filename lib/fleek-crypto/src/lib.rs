@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use arrayref::array_ref;
 use fastcrypto::{
     bls12381::min_sig::{
@@ -9,8 +11,9 @@ use fastcrypto::{
 };
 use rand::rngs::ThreadRng;
 use sec1::{
-    pkcs8::{der::EncodePem, ObjectIdentifier, SecretDocument},
-    DecodeEcPrivateKey, EcParameters, EcPrivateKey,
+    pem,
+    pkcs8::{der::EncodePem, AlgorithmIdentifierRef, ObjectIdentifier, PrivateKeyInfo},
+    EcParameters, EcPrivateKey,
 };
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
@@ -28,7 +31,7 @@ pub trait SecretKey: Sized {
     type PublicKey: PublicKey;
 
     fn generate() -> Self;
-    fn decode_pem(encoded: &str) -> Self;
+    fn decode_pem(encoded: &str) -> Option<Self>;
     fn encode_pem(&self) -> String;
     fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature;
     fn to_pk(&self) -> Self::PublicKey;
@@ -98,7 +101,7 @@ impl SecretKey for NodeSecretKey {
         pair.private().into()
     }
 
-    fn decode_pem(_encoded: &str) -> Self {
+    fn decode_pem(_encoded: &str) -> Option<NodeSecretKey> {
         todo!()
     }
 
@@ -199,12 +202,27 @@ impl SecretKey for NodeNetworkingSecretKey {
         pair.private().into()
     }
 
-    fn decode_pem(_encoded: &str) -> Self {
-        todo!()
+    fn decode_pem(encoded: &str) -> Option<Self> {
+        let (label, der_bytes) = pem::decode_vec(encoded.as_bytes()).ok()?;
+        if label != "PRIVATE KEY" {
+            return None;
+        }
+        let info = PrivateKeyInfo::try_from(der_bytes.as_ref()).ok()?;
+        Some(Self(*array_ref!(info.private_key, 2, 32)))
     }
 
     fn encode_pem(&self) -> String {
-        todo!()
+        let algorithm = AlgorithmIdentifierRef {
+            oid: ObjectIdentifier::from_str("1.3.101.112").unwrap(),
+            parameters: None,
+        };
+        PrivateKeyInfo::new(algorithm, &{
+            let mut key = vec![0x04, 0x20];
+            key.append(&mut self.0.into());
+            key
+        })
+        .to_pem(sec1::pkcs8::LineEnding::LF)
+        .unwrap()
     }
 
     fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
@@ -258,7 +276,7 @@ impl SecretKey for ClientSecretKey {
         todo!()
     }
 
-    fn decode_pem(_encoded: &str) -> Self {
+    fn decode_pem(_encoded: &str) -> Option<ClientSecretKey> {
         todo!()
     }
 
@@ -332,15 +350,13 @@ impl SecretKey for AccountOwnerSecretKey {
         pair.private().into()
     }
 
-    fn decode_pem(encoded: &str) -> Self {
-        let doc = SecretDocument::from_sec1_pem(encoded).unwrap();
-
-        // TODO: follow up on github issue about this not working:
-        //let info: EcPrivateKey = doc.decode_msg().unwrap();
-
-        let raw = doc.as_bytes();
-        let priv_key = *array_ref!(raw, 32, 32);
-        Self(priv_key)
+    fn decode_pem(encoded: &str) -> Option<Self> {
+        let (label, der_bytes) = pem::decode_vec(encoded.as_bytes()).ok()?;
+        if label != "EC PRIVATE KEY" {
+            return None;
+        }
+        let info = EcPrivateKey::try_from(der_bytes.as_ref()).ok()?;
+        Some(Self(*array_ref!(info.private_key, 0, 32)))
     }
 
     fn encode_pem(&self) -> String {
