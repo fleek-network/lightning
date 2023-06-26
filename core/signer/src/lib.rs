@@ -17,6 +17,7 @@ use draco_interfaces::{
 };
 use fleek_crypto::{
     NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
+    SecretKey,
 };
 use tokio::{sync::mpsc, time::interval};
 
@@ -82,8 +83,8 @@ impl SignerInterface for Signer {
     type SyncQuery = QueryRunner;
 
     /// Initialize the signature service.
-    async fn init(_config: Self::Config) -> anyhow::Result<Self> {
-        let inner = SignerInner::new();
+    async fn init(config: Config) -> anyhow::Result<Self> {
+        let inner = SignerInner::new(config);
         let (socket, rx) = Socket::raw_bounded(2048);
         Ok(Self {
             inner: Arc::new(inner),
@@ -111,12 +112,12 @@ impl SignerInterface for Signer {
 
     /// Returns the `BLS` public key of the current node.
     fn get_bls_pk(&self) -> NodePublicKey {
-        todo!()
+        self.inner.node_public_key
     }
 
     /// Returns the `Ed25519` (network) public key of the current node.
     fn get_ed25519_pk(&self) -> NodeNetworkingPublicKey {
-        todo!()
+        self.inner.network_public_key
     }
 
     /// Returns the loaded secret key material.
@@ -126,7 +127,7 @@ impl SignerInterface for Signer {
     /// Just like any other function which deals with secret material this function should
     /// be used with the greatest caution.
     fn get_sk(&self) -> (NodeNetworkingSecretKey, NodeSecretKey) {
-        todo!()
+        (self.inner.network_secret_key, self.inner.node_secret_key)
     }
 
     /// Returns a socket that can be used to submit transactions to the mempool, these
@@ -174,11 +175,26 @@ impl Signer {
     }
 }
 
-struct SignerInner {}
+struct SignerInner {
+    node_secret_key: NodeSecretKey,
+    node_public_key: NodePublicKey,
+    network_secret_key: NodeNetworkingSecretKey,
+    network_public_key: NodeNetworkingPublicKey,
+}
 
 impl SignerInner {
-    fn new() -> Self {
-        Self {}
+    fn new(_config: Config) -> Self {
+        // TODO: load private keys from file if they exist
+        let node_secret_key = NodeSecretKey::generate();
+        let node_public_key = node_secret_key.to_pk();
+        let network_secret_key = NodeNetworkingSecretKey::generate();
+        let network_public_key = network_secret_key.to_pk();
+        Self {
+            node_secret_key,
+            node_public_key,
+            network_secret_key,
+            network_public_key,
+        }
     }
 
     async fn handle(
