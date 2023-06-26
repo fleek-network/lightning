@@ -35,6 +35,7 @@ pub struct Signer {
     inner: Arc<SignerInner>,
     shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
     socket: Socket<UpdateMethod, u64>,
+    is_running: Arc<Mutex<bool>>,
     // `rx` is only parked here for the time from the call to `ìnit` to the call to `start`,
     // when it is moved into the SignerInner. The only reason it is behind a Arc<Mutex<>> is to
     // ensure that `Signer` is Send and Sync.
@@ -51,7 +52,7 @@ pub struct Signer {
 impl WithStartAndShutdown for Signer {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
-        self.shutdown_tx.lock().unwrap().is_some()
+        *self.is_running.lock().unwrap()
     }
 
     /// Start the system, should not do anything if the system is already
@@ -64,6 +65,7 @@ impl WithStartAndShutdown for Signer {
         let query_runner = self.get_query_runner();
         tokio::spawn(async move { inner.handle(rx, shutdown_rx, mempool_socket, query_runner) });
         *self.shutdown_tx.lock().unwrap() = Some(shutdown_tx);
+        *self.is_running.lock().unwrap() = true;
     }
 
     /// Send the shutdown signal to the system.
@@ -87,6 +89,7 @@ impl SignerInterface for Signer {
             inner: Arc::new(inner),
             shutdown_tx: Arc::new(Mutex::new(None)),
             socket,
+            is_running: Arc::new(Mutex::new(false)),
             rx: Arc::new(Mutex::new(Some(rx))),
             mempool_socket: Arc::new(Mutex::new(None)),
             query_runner: Arc::new(Mutex::new(None)),
