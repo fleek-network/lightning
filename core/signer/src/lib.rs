@@ -59,14 +59,18 @@ impl WithStartAndShutdown for Signer {
     /// Start the system, should not do anything if the system is already
     /// started.
     async fn start(&self) {
-        let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
-        let inner = self.inner.clone();
-        let rx = self.rx.lock().unwrap().take().unwrap();
-        let mempool_socket = self.get_mempool_socket();
-        let query_runner = self.get_query_runner();
-        tokio::spawn(async move { inner.handle(rx, shutdown_rx, mempool_socket, query_runner) });
-        *self.shutdown_tx.lock().unwrap() = Some(shutdown_tx);
-        *self.is_running.lock().unwrap() = true;
+        if !*self.is_running.lock().unwrap() {
+            let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
+            let inner = self.inner.clone();
+            let rx = self.rx.lock().unwrap().take().unwrap();
+            let mempool_socket = self.get_mempool_socket();
+            let query_runner = self.get_query_runner();
+            tokio::spawn(
+                async move { inner.handle(rx, shutdown_rx, mempool_socket, query_runner) },
+            );
+            *self.shutdown_tx.lock().unwrap() = Some(shutdown_tx);
+            *self.is_running.lock().unwrap() = true;
+        }
     }
 
     /// Send the shutdown signal to the system.
