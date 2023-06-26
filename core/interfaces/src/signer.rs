@@ -4,7 +4,10 @@ use fleek_crypto::{
     NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
 
-use crate::{config::ConfigConsumer, consensus::MempoolSocket, types::UpdateMethod};
+use crate::{
+    application::SyncQueryRunnerInterface, config::ConfigConsumer, consensus::MempoolSocket,
+    types::UpdateMethod,
+};
 
 /// A socket that is responsible to submit a transaction to the consensus from our node,
 /// implementation of this socket needs to assure the consistency and increment of the
@@ -15,12 +18,18 @@ pub type SubmitTxSocket = Socket<UpdateMethod, u64>;
 /// the node.
 #[async_trait]
 pub trait SignerInterface: ConfigConsumer + Sized + Send + Sync {
+    type SyncQuery: SyncQueryRunnerInterface;
+
     /// Initialize the signature service.
     async fn init(config: Self::Config) -> anyhow::Result<Self>;
 
     /// Provide the signer service with the mempool socket after initialization, this function
     /// should only be called once.
     fn provide_mempool(&mut self, mempool: MempoolSocket);
+
+    /// Provide the signer service with the query runner after initialization, this function
+    /// should only be called once.
+    fn provide_query_runner(&self, query_runner: Self::SyncQuery);
 
     /// Returns the `BLS` public key of the current node.
     fn get_bls_pk(&self) -> NodePublicKey;

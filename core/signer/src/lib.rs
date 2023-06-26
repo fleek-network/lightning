@@ -1,9 +1,13 @@
 mod config;
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use affair::{Socket, Task};
 use async_trait::async_trait;
 use config::Config;
+use draco_application::query_runner::QueryRunner;
 use draco_interfaces::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
@@ -14,7 +18,17 @@ use draco_interfaces::{
 use fleek_crypto::{
     NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, time::interval};
+
+// The signer has to stay in sync with the application.
+// If the application has a different nonce then expected, the signer has to react.
+// `QUERY_INTERVAL` specifies the interval for querying the application.
+const QUERY_INTERVAL: Duration = Duration::from_secs(5);
+
+// If a transaction does not get ordered, the signer will try to resend it.
+// `TIMEOUT` specifies the duration the signer will wait before resending transactions to the
+// mempool.
+const _TIMEOUT: Duration = Duration::from_secs(20);
 
 #[allow(clippy::type_complexity)]
 pub struct Signer {
@@ -55,7 +69,7 @@ impl WithStartAndShutdown for Signer {
 
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
-        let shutdown_tx = self.get_shutdown();
+        let shutdown_tx = self.get_shutdown_tx();
         if let Some(shutdown_tx) = shutdown_tx {
             shutdown_tx.send(()).await.unwrap();
         }
@@ -64,6 +78,8 @@ impl WithStartAndShutdown for Signer {
 
 #[async_trait]
 impl SignerInterface for Signer {
+    type SyncQuery = QueryRunner;
+
     /// Initialize the signature service.
     async fn init(_config: Self::Config) -> anyhow::Result<Self> {
         let inner = SignerInner::new();
@@ -82,6 +98,10 @@ impl SignerInterface for Signer {
     fn provide_mempool(&mut self, mempool: MempoolSocket) {
         // TODO(matthias): I think the receiver can be &self here.
         *self.mempool_socket.lock().unwrap() = Some(mempool);
+    }
+
+    fn provide_query_runner(&self, _query_runner: Self::SyncQuery) {
+        todo!()
     }
 
     /// Returns the `BLS` public key of the current node.
@@ -112,9 +132,6 @@ impl SignerInterface for Signer {
     ///
     /// This function can panic if there has not been a prior call to `provide_mempool`.
     fn get_socket(&self) -> SubmitTxSocket {
-        if self.mempool_socket.lock().unwrap().is_some() {
-            panic!("`provide_mempool` must be called before calling `get_socket`");
-        }
         self.socket.clone()
     }
 
@@ -131,7 +148,7 @@ impl SignerInterface for Signer {
 }
 
 impl Signer {
-    fn get_shutdown(&self) -> Option<mpsc::Sender<()>> {
+    fn get_shutdown_tx(&self) -> Option<mpsc::Sender<()>> {
         self.shutdown_tx.lock().unwrap().take()
     }
 }
@@ -149,10 +166,14 @@ impl SignerInner {
         mut shutdown_rx: mpsc::Receiver<()>,
         _mempool_socket: MempoolSocket,
     ) {
+        let mut query_interval = interval(QUERY_INTERVAL);
         loop {
             tokio::select! {
                 _update_method = rx.recv() => {
                     // TODO: send to mempool
+                }
+                _ = query_interval.tick() => {
+
                 }
                 _ = shutdown_rx.recv() => break,
             }

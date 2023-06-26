@@ -59,6 +59,8 @@ impl WithStartAndShutdown for Signer {
 
 #[async_trait]
 impl SignerInterface for Signer {
+    type SyncQuery = QueryRunner;
+
     /// Initialize the signature service.
     async fn init(_config: Self::Config) -> anyhow::Result<Self> {
         todo!()
@@ -67,6 +69,12 @@ impl SignerInterface for Signer {
     /// Provide the signer service with the mempool socket after initialization, this function
     /// should only be called once.
     fn provide_mempool(&mut self, _mempool: MempoolSocket) {
+        todo!()
+    }
+
+    /// Provide the signer service with the query runner after initialization, this function
+    /// should only be called once.
+    fn provide_query_runner(&self, _query_runner: Self::SyncQuery) {
         todo!()
     }
 
