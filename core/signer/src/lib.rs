@@ -20,7 +20,7 @@ use tokio::sync::mpsc;
 pub struct Signer {
     inner: Arc<SignerInner>,
     shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
-    _socket: Socket<UpdateMethod, u64>,
+    socket: Socket<UpdateMethod, u64>,
     // `rx` is only parked here for the time from the call to `ìnit` to the call to `start`,
     // when it is moved into the SignerInner. The only reason it is behind a Arc<Mutex<>> is to
     // ensure that `Signer` is Send and Sync.
@@ -43,7 +43,13 @@ impl WithStartAndShutdown for Signer {
         let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
         let inner = self.inner.clone();
         let rx = self.rx.lock().unwrap().take().unwrap();
-        tokio::spawn(async move { inner.handle(rx, shutdown_rx) });
+        let mempool_socket = self
+            .mempool_socket
+            .lock()
+            .unwrap()
+            .take()
+            .expect("Mempool socket must be provided before starting the signer.");
+        tokio::spawn(async move { inner.handle(rx, shutdown_rx, mempool_socket) });
         *self.shutdown_tx.lock().unwrap() = Some(shutdown_tx);
     }
 
@@ -65,7 +71,7 @@ impl SignerInterface for Signer {
         Ok(Self {
             inner: Arc::new(inner),
             shutdown_tx: Arc::new(Mutex::new(None)),
-            _socket: socket,
+            socket,
             rx: Arc::new(Mutex::new(Some(rx))),
             mempool_socket: Arc::new(Mutex::new(None)),
         })
@@ -106,7 +112,10 @@ impl SignerInterface for Signer {
     ///
     /// This function can panic if there has not been a prior call to `provide_mempool`.
     fn get_socket(&self) -> SubmitTxSocket {
-        todo!()
+        if self.mempool_socket.lock().unwrap().is_some() {
+            panic!("`provide_mempool` must be called before calling `get_socket`");
+        }
+        self.socket.clone()
     }
 
     /// Sign the provided raw digest and return a signature.
@@ -138,6 +147,7 @@ impl SignerInner {
         self: Arc<Self>,
         mut rx: mpsc::Receiver<Task<UpdateMethod, u64>>,
         mut shutdown_rx: mpsc::Receiver<()>,
+        _mempool_socket: MempoolSocket,
     ) {
         loop {
             tokio::select! {
