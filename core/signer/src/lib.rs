@@ -1,7 +1,8 @@
 mod config;
 use std::{
+    collections::VecDeque,
     sync::{Arc, Mutex},
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use affair::{Socket, Task};
@@ -12,12 +13,12 @@ use draco_interfaces::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
     signer::{SignerInterface, SubmitTxSocket},
-    types::UpdateMethod,
-    MempoolSocket,
+    types::{UpdateMethod, UpdatePayload, UpdateRequest},
+    MempoolSocket, SyncQueryRunnerInterface,
 };
 use fleek_crypto::{
     NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
-    SecretKey,
+    SecretKey, TransactionSender, TransactionSignature,
 };
 use tokio::{sync::mpsc, time::interval};
 
@@ -29,7 +30,7 @@ const QUERY_INTERVAL: Duration = Duration::from_secs(5);
 // If a transaction does not get ordered, the signer will try to resend it.
 // `TIMEOUT` specifies the duration the signer will wait before resending transactions to the
 // mempool.
-const _TIMEOUT: Duration = Duration::from_secs(20);
+const TIMEOUT: Duration = Duration::from_secs(300);
 
 #[allow(clippy::type_complexity)]
 pub struct Signer {
@@ -205,19 +206,96 @@ impl SignerInner {
         self: Arc<Self>,
         mut rx: mpsc::Receiver<Task<UpdateMethod, u64>>,
         mut shutdown_rx: mpsc::Receiver<()>,
-        _mempool_socket: MempoolSocket,
-        _query_runner: QueryRunner,
+        mempool_socket: MempoolSocket,
+        query_runner: QueryRunner,
     ) {
         let mut query_interval = interval(QUERY_INTERVAL);
+        let mut pending_transactions = VecDeque::new();
+        let mut last_nonce_increment = None;
+        let application_nonce = query_runner
+            .get_node_info(&self.node_public_key)
+            .unwrap()
+            .nonce;
+        let mut base_nonce = application_nonce;
+        let mut next_nonce = application_nonce;
         loop {
             tokio::select! {
-                _update_method = rx.recv() => {
+                task = rx.recv() => {
                     // TODO: send to mempool
+                    let task = task.expect("Failed to receive UpdateMethod.");
+                    let update_method = task.request.clone();
+                    task.respond(next_nonce);
+                    let update_payload = UpdatePayload { method: update_method, nonce: next_nonce };
+                    let update_request = UpdateRequest {
+                        sender:  TransactionSender::Node(self.node_public_key),
+                        // TODO: replace dummy signature
+                        signature: TransactionSignature::Node(NodeSignature([0; 48])),
+                        payload: update_payload,
+                    };
+                    mempool_socket.enqueue(update_request.clone()).await.expect("Failed to send transaction to mempool.");
+                    // Optimistically increment nonce
+                    next_nonce += 1;
+                    pending_transactions.push_back(update_request);
+                    // Set timer
+                    last_nonce_increment = Some(SystemTime::now());
                 }
                 _ = query_interval.tick() => {
-
+                    self.clone().sync_with_application(
+                        &query_runner,
+                        &mempool_socket,
+                        &mut base_nonce,
+                        &mut next_nonce,
+                        &mut last_nonce_increment,
+                        &mut pending_transactions
+                    ).await;
                 }
                 _ = shutdown_rx.recv() => break,
+            }
+        }
+    }
+
+    async fn sync_with_application(
+        self: Arc<Self>,
+        query_runner: &QueryRunner,
+        mempool_socket: &MempoolSocket,
+        base_nonce: &mut u64,
+        next_nonce: &mut u64,
+        last_nonce_increment: &mut Option<SystemTime>,
+        pending_transactions: &mut VecDeque<UpdateRequest>,
+    ) {
+        let application_nonce = query_runner
+            .get_node_info(&self.node_public_key)
+            .unwrap()
+            .nonce;
+        if *base_nonce == application_nonce && next_nonce > base_nonce {
+            // Application nonce has not been incremented even though we sent out
+            // transaction
+            if let Some(last_nonce_increment_) = last_nonce_increment {
+                if last_nonce_increment_.elapsed().unwrap() >= TIMEOUT {
+                    // At this point we assume that the transaction with nonce `base_nonce` will
+                    // never arrive at the mempool
+                    *last_nonce_increment = None;
+                    // Reset `next_nonce` to application nonce.
+                    *next_nonce = *base_nonce;
+                    // Resend all transactions with nonce >= base_nonce.
+                    for req in pending_transactions.iter_mut() {
+                        *next_nonce += 1;
+                        mempool_socket
+                            .enqueue(req.clone())
+                            .await
+                            .expect("Failed to send transaction to mempool.");
+                    }
+                    *last_nonce_increment = Some(SystemTime::now());
+                }
+            }
+        } else if application_nonce > *base_nonce {
+            *base_nonce = application_nonce;
+            // All transactions in range [base_nonce, application_nonce - 1] have been ordered have
+            // been ordered, so we can remove them from `pending_transactions`.
+            while !pending_transactions.is_empty()
+                && pending_transactions.get(0).unwrap().payload.nonce < application_nonce
+            {
+                pending_transactions.pop_front();
             }
         }
     }
