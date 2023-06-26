@@ -2185,15 +2185,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "draco-identity"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "draco-interfaces",
- "serde",
-]
-
-[[package]]
 name = "draco-interfaces"
 version = "0.1.0"
 dependencies = [
