@@ -89,7 +89,7 @@ pub struct UpdateRequest {
 #[derive(Debug, Hash, Clone, Serialize, Deserialize)]
 pub struct UpdatePayload {
     /// The counter or nonce of this request.
-    pub nonce: u64,
+    pub nonce: u128,
     /// The transition function (and parameters) for this update request.
     pub method: UpdateMethod,
 }
