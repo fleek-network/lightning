@@ -27,6 +27,7 @@ enum Mode {
     Verify {
         proof: Option<Bytes>,
         root: Blake3Hash,
+        verifier: IncrementalVerifier,
     },
     Trust {
         tree_builder: Box<HashTreeBuilder>,
@@ -38,7 +39,14 @@ where
     S: Store,
 {
     pub fn verifier(store: S, root: Blake3Hash) -> Self {
-        Self::internal_new(store, Mode::Verify { proof: None, root })
+        Self::internal_new(
+            store,
+            Mode::Verify {
+                proof: None,
+                root,
+                verifier: IncrementalVerifier::new(root, 0),
+            },
+        )
     }
 
     pub fn trust(store: S) -> Self {
@@ -97,8 +105,9 @@ where
             block.update(chunk.as_ref());
 
             match &mut self.mode {
-                Mode::Verify { proof, root } => {
-                    let mut verifier = IncrementalVerifier::new(*root, block_count);
+                Mode::Verify {
+                    proof, verifier, ..
+                } => {
                     verifier
                         .feed_proof(
                             proof

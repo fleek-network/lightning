@@ -56,6 +56,14 @@ mod tests {
         tree_builder.finalize()
     }
 
+    fn new_proof(tree: &[[u8; 32]], block: usize) -> ProofBuf {
+        if block > 0 {
+            ProofBuf::resume(tree, block)
+        } else {
+            ProofBuf::new(tree, block)
+        }
+    }
+
     #[test]
     async fn test_put() {
         // Given: some content.
@@ -90,7 +98,7 @@ mod tests {
         // When: we put the content by block and feed the proof to verify it.
         let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
         for (i, block) in content.chunks(BLAKE3_CHUNK_SIZE).enumerate() {
-            let proof = ProofBuf::new(&hash_tree.tree, i);
+            let proof = new_proof(&hash_tree.tree, i);
             putter.feed_proof(proof.as_slice()).unwrap();
             putter
                 .write(block, CompressionAlgorithm::Uncompressed)
@@ -137,7 +145,7 @@ mod tests {
         // When: we put the content by block and feed the proof to verify it.
         let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
         for (i, block) in content.chunks(BLAKE3_CHUNK_SIZE).enumerate() {
-            let proof = ProofBuf::new(&hash_tree.tree, i);
+            let proof = new_proof(&hash_tree.tree, i);
             putter.feed_proof(proof.as_slice()).unwrap();
             for chunk in block.chunks(128) {
                 putter

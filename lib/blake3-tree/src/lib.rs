@@ -60,6 +60,8 @@ struct IncrementalVerifierTreeNode {
     hash: [u8; 32],
 }
 
+unsafe impl Send for IncrementalVerifier {}
+
 impl IncrementalVerifier {
     /// Create a new incremental verifier that verifies an stream of proofs and
     /// content against the provided root hash.
