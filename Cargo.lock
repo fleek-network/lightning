@@ -6398,6 +6398,7 @@ dependencies = [
 name = "signer"
 version = "0.0.0"
 dependencies = [
+ "affair",
  "anyhow",
  "async-trait",
  "draco-interfaces",

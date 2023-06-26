@@ -1,22 +1,33 @@
 mod config;
 use std::sync::{Arc, Mutex};
 
+use affair::{Socket, Task};
 use async_trait::async_trait;
 use config::Config;
 use draco_interfaces::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
     signer::{SignerInterface, SubmitTxSocket},
+    types::UpdateMethod,
     MempoolSocket,
 };
 use fleek_crypto::{
     NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
-use tokio::sync::oneshot;
+use tokio::sync::mpsc;
 
-#[derive(Clone)]
+#[allow(clippy::type_complexity)]
 pub struct Signer {
-    shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
+    inner: Arc<SignerInner>,
+    shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
+    _socket: Socket<UpdateMethod, u64>,
+    // `rx` is only parked here for the time from the call to `ìnit` to the call to `start`,
+    // when it is moved into the SignerInner. The only reason it is behind a Arc<Mutex<>> is to
+    // ensure that `Signer` is Send and Sync.
+    rx: Arc<Mutex<Option<mpsc::Receiver<Task<UpdateMethod, u64>>>>>,
+    // `mempool_socket` is only parked here for the time from the call to `provide_mempool` to the
+    // call to `start`, when it is moved into SignerInner.
+    _mempool_socket: Arc<Mutex<Option<MempoolSocket>>>,
 }
 
 #[async_trait]
@@ -29,21 +40,18 @@ impl WithStartAndShutdown for Signer {
     /// Start the system, should not do anything if the system is already
     /// started.
     async fn start(&self) {
-        let (tx, mut rx) = oneshot::channel();
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    _ = &mut rx => break,
-                }
-            }
-        });
-        *self.shutdown_tx.lock().unwrap() = Some(tx);
+        let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
+        let inner = self.inner.clone();
+        let rx = self.rx.lock().unwrap().take().unwrap();
+        tokio::spawn(async move { inner.handle(rx, shutdown_rx) });
+        *self.shutdown_tx.lock().unwrap() = Some(shutdown_tx);
     }
 
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
-        if let Some(shutdown_tx) = self.shutdown_tx.lock().unwrap().take() {
-            shutdown_tx.send(()).unwrap();
+        let shutdown_tx = self.get_shutdown();
+        if let Some(shutdown_tx) = shutdown_tx {
+            shutdown_tx.send(()).await.unwrap();
         }
     }
 }
@@ -52,7 +60,15 @@ impl WithStartAndShutdown for Signer {
 impl SignerInterface for Signer {
     /// Initialize the signature service.
     async fn init(_config: Self::Config) -> anyhow::Result<Self> {
-        todo!()
+        let inner = SignerInner::new();
+        let (socket, rx) = Socket::raw_bounded(2048);
+        Ok(Self {
+            inner: Arc::new(inner),
+            shutdown_tx: Arc::new(Mutex::new(None)),
+            _socket: socket,
+            rx: Arc::new(Mutex::new(Some(rx))),
+            _mempool_socket: Arc::new(Mutex::new(None)),
+        })
     }
 
     /// Provide the signer service with the mempool socket after initialization, this function
@@ -101,6 +117,35 @@ impl SignerInterface for Signer {
     /// the system.
     fn sign_raw_digest(&self, _digest: &[u8; 32]) -> NodeSignature {
         todo!()
+    }
+}
+
+impl Signer {
+    fn get_shutdown(&self) -> Option<mpsc::Sender<()>> {
+        self.shutdown_tx.lock().unwrap().take()
+    }
+}
+
+struct SignerInner {}
+
+impl SignerInner {
+    fn new() -> Self {
+        Self {}
+    }
+
+    async fn handle(
+        self: Arc<Self>,
+        mut rx: mpsc::Receiver<Task<UpdateMethod, u64>>,
+        mut shutdown_rx: mpsc::Receiver<()>,
+    ) {
+        loop {
+            tokio::select! {
+                _update_method = rx.recv() => {
+                    // TODO: send to mempool
+                }
+                _ = shutdown_rx.recv() => break,
+            }
+        }
     }
 }
 
