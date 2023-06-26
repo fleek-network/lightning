@@ -41,7 +41,7 @@ impl Env<UpdatePerm> {
             .with_table::<NodePublicKey, CommodityServed>("current_epoch_served")
             .with_table::<NodePublicKey, CommodityServed>("last_epoch_served")
             .with_table::<Epoch, TotalServed>("total_served")
-            .with_table::<CommodityTypes, f64>("commodity_prices")
+            .with_table::<CommodityTypes, BigDecimal<6>>("commodity_prices")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("rep_scores")
@@ -127,7 +127,7 @@ impl Env<UpdatePerm> {
             let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
             let mut metadata_table = ctx.get_table::<Metadata, Value>("metadata");
             let mut commodity_prices_table =
-                ctx.get_table::<CommodityTypes, f64>("commodity_prices");
+                ctx.get_table::<CommodityTypes, BigDecimal<6>>("commodity_prices");
 
             let protocol_fund_address: AccountOwnerPublicKey =
                 Secp256k1PublicKey::decode_base64(&genesis.protocol_fund_address)
@@ -222,7 +222,8 @@ impl Env<UpdatePerm> {
             // add commodity prices
             for commodity_price in genesis.commodity_prices {
                 let GenesisPrices { commodity, price } = commodity_price;
-                commodity_prices_table.insert(commodity, price);
+                let big_price: BigDecimal<6> = price.into();
+                commodity_prices_table.insert(commodity, big_price);
             }
         })
     }

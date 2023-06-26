@@ -61,7 +61,7 @@ pub struct State<B: Backend> {
     pub current_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
     pub last_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
     pub total_served: B::Ref<Epoch, TotalServed>,
-    pub commodity_prices: B::Ref<CommodityTypes, f64>,
+    pub commodity_prices: B::Ref<CommodityTypes, BigDecimal<6>>,
     pub backend: B,
 }
 
@@ -233,7 +233,8 @@ impl<B: Backend> State<B> {
         }
         commodity_served[commodity_index] += commodity;
         total_served.served[commodity_index] += commodity;
-        total_served.reward_pool += commodity as f64 * commodity_prices;
+        let commodity_to_big: BigDecimal<6> = commodity.into();
+        total_served.reward_pool += commodity_to_big * commodity_prices;
 
         self.current_epoch_served.set(sender, commodity_served);
         self.total_served.set(current_epoch, total_served);
@@ -793,7 +794,7 @@ impl<B: Backend> State<B> {
             .reward_pool;
 
         // if reward is 0, no commodity under any service was served
-        if reward_pool == 0_f64 {
+        if reward_pool == BigDecimal::zero() {
             return;
         }
 
@@ -817,9 +818,9 @@ impl<B: Backend> State<B> {
             // this is checked in submit_pod contract/function
             let locked_until = self.node_info.get(&node).unwrap().stake.stake_locked_until;
             let boost: BigDecimal<18> = self.get_boost(locked_until, &epoch);
-            let node_stables_revenue = stables_revenue.convert_precision::<18>();
 
-            let node_service_proportion = &node_stables_revenue / &reward_pool.into();
+            let node_service_proportion =
+                (&stables_revenue / &reward_pool).convert_precision::<18>();
             let flk_rewards = &min_emissions * node_service_proportion * &boost;
             total_emissions += flk_rewards.clone();
             let node_owner = self.node_info.get(&node).unwrap().owner;
@@ -870,9 +871,8 @@ impl<B: Backend> State<B> {
                 if let Some(price) = CommodityTypes::from_u8(commodity_type as u8)
                     .and_then(|commodity| self.commodity_prices.get(&commodity))
                 {
-                    let big_price: BigDecimal<6> = price.into();
                     let big_quantity: BigDecimal<6> = quantity.into();
-                    stables_revenue += big_price * big_quantity;
+                    stables_revenue += price * big_quantity;
                 }
 
                 stables_revenue
@@ -943,8 +943,8 @@ impl<B: Backend> State<B> {
 
     /// The `get_boost` method calculates a reward boost factor based on the locked staking period.
     ///
-    /// This function follows a modified logistic growth model, where the growth is slow at start
-    /// and accelerates as t increases. The modification is the hard cap on lower and upper bounds.
+    /// This function follows a linear interpolation mathematical model given by the equation:
+    /// boost(t) = min(maxBoost, minBoost + (maxBoost - minBoost) * (t/max_T))
     /// The locked period is determined by the difference between the current
     /// epoch and the 'locked_until' parameter, signifying the epoch until which the stake is
     /// locked.
@@ -953,8 +953,6 @@ impl<B: Backend> State<B> {
     ///
     /// The calculated boost value is capped at `maxBoost`, a parameter set by the protocol, to
     /// prevent excessive boosts. The boost formula is as follows:
-    ///
-    /// boost(t) = min(maxBoost, minBoost + (maxBoost - minBoost) * (t/max_T)^n)
     ///
     /// The `minBoost` value is consistently set at 1, as we aim to avoid penalizing nodes that are
     /// not participating in staking lockups.
@@ -971,14 +969,14 @@ impl<B: Backend> State<B> {
             .get(&ProtocolParams::MaxBoost)
             .unwrap_or(1)
             .into();
-        let max_lock_time = self
+        let max_lock_time: BigDecimal<18> = self
             .parameters
             .get(&ProtocolParams::MaxLockTime)
-            .unwrap_or(1);
+            .unwrap_or(1)
+            .into();
         let min_boost = BigDecimal::from(1_u64);
-        let locking_period = locked_until.saturating_sub(*current_epoch);
-        let power: f64 = (locking_period as f64 / max_lock_time as f64).powf(1.2);
-        let boost = &min_boost + (&max_boost - &min_boost) * (&power.into());
+        let locking_period: BigDecimal<18> = (locked_until.saturating_sub(*current_epoch)).into();
+        let boost = &min_boost + (&max_boost - &min_boost) * (&locking_period / &max_lock_time);
         BigDecimal::<18>::min(&max_boost, &boost).to_owned()
     }
 

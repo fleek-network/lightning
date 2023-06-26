@@ -26,7 +26,7 @@ pub struct QueryRunner {
     rep_scores: ResolvedTableReference<NodePublicKey, u8>,
     _last_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
     total_served_table: ResolvedTableReference<Epoch, TotalServed>,
-    _commodity_price: ResolvedTableReference<CommodityTypes, f64>,
+    _commodity_price: ResolvedTableReference<CommodityTypes, BigDecimal<6>>,
 }
 
 impl QueryRunner {
@@ -47,7 +47,7 @@ impl QueryRunner {
             _last_epoch_served: atomo
                 .resolve::<NodePublicKey, CommodityServed>("last_epoch_served"),
             total_served_table: atomo.resolve::<Epoch, TotalServed>("total_served"),
-            _commodity_price: atomo.resolve::<CommodityTypes, f64>("commodity_prices"),
+            _commodity_price: atomo.resolve::<CommodityTypes, BigDecimal<6>>("commodity_prices"),
             inner: atomo,
         }
     }

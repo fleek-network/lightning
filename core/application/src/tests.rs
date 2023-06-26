@@ -558,7 +558,7 @@ async fn test_pod_without_proof() {
         query_runner.get_total_served(0),
         TotalServed {
             served: vec![1000, 2000],
-            reward_pool: (0.1 * 1000_f64 + 0.2 * 2000_f64)
+            reward_pool: (0.1 * 1000_f64 + 0.2 * 2000_f64).into()
         }
     );
 }
@@ -619,7 +619,7 @@ async fn test_distribute_rewards() {
     }
     let node_1_usd = 0.1 * 10000_f64 + 0.2 * 6767_f64;
     let node_2_usd = 0.2 * 5000_f64;
-    let reward_pool: BigDecimal<18> = (node_2_usd + node_1_usd).into();
+    let reward_pool: BigDecimal<6> = (node_2_usd + node_1_usd).into();
 
     // assert stable balances
     let stables_balance = query_runner.get_stables_balance(&owner_key1);
@@ -628,17 +628,18 @@ async fn test_distribute_rewards() {
     // calculate emissions per unit
     let max_emissions: BigDecimal<18> = (inflation * supply_at_year_start) / &365.0.into();
     let emissions_per_unit = &max_emissions / &max_boost;
+    let node_proportion_1 = (&node_1_usd.into() / &reward_pool).convert_precision::<18>();
+    let node_proportion_2 = (&node_2_usd.into() / &reward_pool).convert_precision::<18>();
 
     // assert flk balances node 1
     let node_flk_balance1 = query_runner.get_flk_balance(&owner_key1);
     let node_flk_rewards1: BigDecimal<18> =
-        &emissions_per_unit * &node_share * node_1_boost * (&node_1_usd.into() / &reward_pool);
+        &emissions_per_unit * &node_share * node_1_boost * node_proportion_1;
     assert_eq!(node_flk_balance1, node_flk_rewards1);
 
     // assert flk balances node 2
     let node_flk_balance2 = query_runner.get_flk_balance(&owner_key2);
-    let node_flk_rewards2: BigDecimal<18> =
-        &emissions_per_unit * &node_share * (&node_2_usd.into() / &reward_pool);
+    let node_flk_rewards2: BigDecimal<18> = &emissions_per_unit * &node_share * node_proportion_2;
     assert_eq!(node_flk_balance2, node_flk_rewards2);
 
     // calculate total emissions based on total emissions for node which is equal to node share. the

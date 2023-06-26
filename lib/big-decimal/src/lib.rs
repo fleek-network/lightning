@@ -67,6 +67,10 @@ impl<const P: usize> BigDecimal<P> {
     pub fn min<'a>(&'a self, rhs: &'a Self) -> &'a Self {
         if self.0 <= rhs.0 { self } else { rhs }
     }
+
+    pub fn max<'a>(&'a self, rhs: &'a Self) -> &'a Self {
+        if self.0 >= rhs.0 { self } else { rhs }
+    }
 }
 
 impl<const P: usize> fmt::Display for BigDecimal<P> {

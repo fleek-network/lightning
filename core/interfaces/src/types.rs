@@ -44,8 +44,8 @@ pub enum Value {
     AccountPublicKey(AccountOwnerPublicKey),
 }
 
-/// This is commodities served by different services in Fleek Network
-/// C-like enums here to future proof for state, if we add more commodity types
+/// This is commodities served by different services in Fleek Network.
+/// C-like enums used here to future proof for state, if we add more commodity types
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, FromPrimitive)]
 #[repr(u8)]
 pub enum CommodityTypes {
@@ -60,7 +60,7 @@ pub type CommodityServed = Vec<u128>;
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
 pub struct TotalServed {
     pub served: CommodityServed,
-    pub reward_pool: f64,
+    pub reward_pool: BigDecimal<6>,
 }
 
 /// Placeholder
