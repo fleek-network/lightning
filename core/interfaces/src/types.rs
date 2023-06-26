@@ -89,7 +89,7 @@ pub struct UpdateRequest {
 #[derive(Debug, Hash, Clone, Serialize, Deserialize)]
 pub struct UpdatePayload {
     /// The counter or nonce of this request.
-    pub nonce: u128,
+    pub nonce: u64,
     /// The transition function (and parameters) for this update request.
     pub method: UpdateMethod,
 }
@@ -242,7 +242,7 @@ pub struct AccountInfo {
     pub bandwidth_balance: u128,
     /// The nonce of the account. Added to each transaction before signed to prevent replays and
     /// enforce ordering
-    pub nonce: u128,
+    pub nonce: u64,
 }
 
 /// Struct that stores
@@ -277,7 +277,7 @@ pub struct NodeInfo {
     pub workers: Vec<Worker>,
     /// The nonce of the node. Added to each transaction before signed to prevent replays and
     /// enforce ordering
-    pub nonce: u128,
+    pub nonce: u64,
 }
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
