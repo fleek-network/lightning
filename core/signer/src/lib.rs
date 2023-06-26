@@ -42,6 +42,9 @@ pub struct Signer {
     // `mempool_socket` is only parked here for the time from the call to `provide_mempool` to the
     // call to `start`, when it is moved into SignerInner.
     mempool_socket: Arc<Mutex<Option<MempoolSocket>>>,
+    // `mempool_socket` is only parked here for the time from the call to `provide_query_runner` to
+    // the call to `start`, when it is moved into SignerInner.
+    query_runner: Arc<Mutex<Option<QueryRunner>>>,
 }
 
 #[async_trait]
@@ -57,13 +60,9 @@ impl WithStartAndShutdown for Signer {
         let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
         let inner = self.inner.clone();
         let rx = self.rx.lock().unwrap().take().unwrap();
-        let mempool_socket = self
-            .mempool_socket
-            .lock()
-            .unwrap()
-            .take()
-            .expect("Mempool socket must be provided before starting the signer.");
-        tokio::spawn(async move { inner.handle(rx, shutdown_rx, mempool_socket) });
+        let mempool_socket = self.get_mempool_socket();
+        let query_runner = self.get_query_runner();
+        tokio::spawn(async move { inner.handle(rx, shutdown_rx, mempool_socket, query_runner) });
         *self.shutdown_tx.lock().unwrap() = Some(shutdown_tx);
     }
 
@@ -90,6 +89,7 @@ impl SignerInterface for Signer {
             socket,
             rx: Arc::new(Mutex::new(Some(rx))),
             mempool_socket: Arc::new(Mutex::new(None)),
+            query_runner: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -100,8 +100,10 @@ impl SignerInterface for Signer {
         *self.mempool_socket.lock().unwrap() = Some(mempool);
     }
 
-    fn provide_query_runner(&self, _query_runner: Self::SyncQuery) {
-        todo!()
+    /// Provide the signer service with the query runner after initialization, this function
+    /// should only be called once.
+    fn provide_query_runner(&self, query_runner: Self::SyncQuery) {
+        *self.query_runner.lock().unwrap() = Some(query_runner);
     }
 
     /// Returns the `BLS` public key of the current node.
@@ -151,6 +153,22 @@ impl Signer {
     fn get_shutdown_tx(&self) -> Option<mpsc::Sender<()>> {
         self.shutdown_tx.lock().unwrap().take()
     }
+
+    fn get_mempool_socket(&self) -> MempoolSocket {
+        self.mempool_socket
+            .lock()
+            .unwrap()
+            .take()
+            .expect("Mempool socket must be provided before starting the signer service.")
+    }
+
+    fn get_query_runner(&self) -> QueryRunner {
+        self.query_runner
+            .lock()
+            .unwrap()
+            .take()
+            .expect("Query runner must be provided before starting the signer serivce.")
+    }
 }
 
 struct SignerInner {}
@@ -165,6 +183,7 @@ impl SignerInner {
         mut rx: mpsc::Receiver<Task<UpdateMethod, u64>>,
         mut shutdown_rx: mpsc::Receiver<()>,
         _mempool_socket: MempoolSocket,
+        _query_runner: QueryRunner,
     ) {
         let mut query_interval = interval(QUERY_INTERVAL);
         loop {
