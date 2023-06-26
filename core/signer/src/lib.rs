@@ -27,7 +27,7 @@ pub struct Signer {
     rx: Arc<Mutex<Option<mpsc::Receiver<Task<UpdateMethod, u64>>>>>,
     // `mempool_socket` is only parked here for the time from the call to `provide_mempool` to the
     // call to `start`, when it is moved into SignerInner.
-    _mempool_socket: Arc<Mutex<Option<MempoolSocket>>>,
+    mempool_socket: Arc<Mutex<Option<MempoolSocket>>>,
 }
 
 #[async_trait]
@@ -67,14 +67,15 @@ impl SignerInterface for Signer {
             shutdown_tx: Arc::new(Mutex::new(None)),
             _socket: socket,
             rx: Arc::new(Mutex::new(Some(rx))),
-            _mempool_socket: Arc::new(Mutex::new(None)),
+            mempool_socket: Arc::new(Mutex::new(None)),
         })
     }
 
     /// Provide the signer service with the mempool socket after initialization, this function
     /// should only be called once.
-    fn provide_mempool(&mut self, _mempool: MempoolSocket) {
-        todo!()
+    fn provide_mempool(&mut self, mempool: MempoolSocket) {
+        // TODO(matthias): I think the receiver can be &self here.
+        *self.mempool_socket.lock().unwrap() = Some(mempool);
     }
 
     /// Returns the `BLS` public key of the current node.
