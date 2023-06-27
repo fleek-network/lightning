@@ -22,6 +22,8 @@ pub struct IncrementalPut<S> {
     stack: Vec<Chunk>,
     store: S,
     mode: Mode,
+    compression: Option<CompressionAlgorithm>,
+    block_count: usize,
 }
 
 enum Mode {
@@ -66,6 +68,8 @@ where
             prev_block: None,
             stack: Vec::new(),
             buf: BytesMut::new(),
+            compression: None,
+            block_count: 0,
         }
     }
 }
@@ -100,10 +104,9 @@ where
         self.buf.put(content);
 
         while self.buf.len() >= BLAKE3_CHUNK_SIZE {
-            let block_count = self.stack.len() + self.prev_block.as_ref().map(|_| 1).unwrap_or(0);
             let chunk = self.buf.split_to(BLAKE3_CHUNK_SIZE);
             let mut block = BlockHasher::new();
-            block.set_block(block_count);
+            block.set_block(self.block_count);
             block.update(chunk.as_ref());
 
             match &mut self.mode {
@@ -138,6 +141,7 @@ where
                 content: chunk.to_vec(),
             };
             self.prev_block = Some((block, content_chunk));
+            self.block_count += 1;
         }
 
         // Remove this proof so it's ready for next block.
@@ -160,12 +164,35 @@ where
         let (prev_block, prev_content_chunk) = self
             .prev_block
             .ok_or_else(|| PutFinalizeError::PartialContent)?;
-        let is_root = self.stack.len() == 0;
+        // If the buf is not empty, it means we have some data smaller than a
+        // Blake3 chunk size that needs to be processed so this buffered block
+        // is not the root.
+        let is_root = self.block_count == 0 && self.buf.is_empty();
         let hash = prev_block.finalize(is_root);
         self.stack.push(Chunk {
             hash,
             content: prev_content_chunk,
         });
+
+        // Check if there is some data left that we haven't pushed in the stack.
+        // This data is smaller than a Blake3 chunk size.
+        if !self.buf.is_empty() {
+            let compression = self
+                .compression
+                .expect("user to have specified a compression algorithm");
+            let mut block = BlockHasher::new();
+            block.set_block(self.stack.len());
+            block.update(self.buf.as_ref());
+            let is_root = self.stack.is_empty();
+            let hash = block.finalize(is_root);
+            self.stack.push(Chunk {
+                hash,
+                content: ContentChunk {
+                    compression,
+                    content: self.buf.to_vec(),
+                },
+            });
+        }
 
         // TODO: put methods use a non-async lock so these calls could
         // block the thread. Maybe let's use the worker pattern.
