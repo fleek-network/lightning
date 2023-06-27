@@ -3,7 +3,6 @@ use std::{
     collections::{BTreeMap, HashMap},
 };
 
-use big_decimal::BigDecimal;
 use draco_interfaces::{
     types::{
         AccountInfo, CommodityServed, CommodityTypes, Epoch, ExecutionData, ExecutionError,
@@ -18,6 +17,7 @@ use fleek_crypto::{
     AccountOwnerPublicKey, ClientPublicKey, NodeNetworkingPublicKey, NodePublicKey,
     TransactionSender,
 };
+use hp_float::unsigned::HpUfloat;
 use multiaddr::Multiaddr;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -61,7 +61,7 @@ pub struct State<B: Backend> {
     pub current_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
     pub last_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
     pub total_served: B::Ref<Epoch, TotalServed>,
-    pub commodity_prices: B::Ref<CommodityTypes, BigDecimal<6>>,
+    pub commodity_prices: B::Ref<CommodityTypes, HpUfloat<6>>,
     pub backend: B,
 }
 
@@ -233,7 +233,7 @@ impl<B: Backend> State<B> {
         }
         commodity_served[commodity_index] += commodity;
         total_served.served[commodity_index] += commodity;
-        let commodity_to_big: BigDecimal<6> = commodity.into();
+        let commodity_to_big: HpUfloat<6> = commodity.into();
         total_served.reward_pool += commodity_to_big * commodity_prices;
 
         self.current_epoch_served.set(sender, commodity_served);
@@ -246,7 +246,7 @@ impl<B: Backend> State<B> {
         &self,
         _sender: TransactionSender,
         _reciever: AccountOwnerPublicKey,
-        _amount: BigDecimal<18>,
+        _amount: HpUfloat<18>,
         _token: Tokens,
     ) -> TransactionResponse {
         todo!()
@@ -256,7 +256,7 @@ impl<B: Backend> State<B> {
         &self,
         sender: TransactionSender,
         proof: ProofOfConsensus,
-        amount: BigDecimal<18>,
+        amount: HpUfloat<18>,
         token: Tokens,
     ) -> TransactionResponse {
         // This transaction is only callable by AccountOwners and not nodes
@@ -287,7 +287,7 @@ impl<B: Backend> State<B> {
     fn stake(
         &self,
         sender: TransactionSender,
-        amount: BigDecimal<18>,
+        amount: HpUfloat<18>,
         node_public_key: NodePublicKey,
         node_network_key: Option<NodeNetworkingPublicKey>,
         node_domain: Option<String>,
@@ -447,7 +447,7 @@ impl<B: Backend> State<B> {
             return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
         }
         // check if node has stakes to be locked
-        if node.stake.staked == BigDecimal::zero() {
+        if node.stake.staked == HpUfloat::zero() {
             return TransactionResponse::Revert(ExecutionError::InsufficientStakesToLock);
         }
 
@@ -477,7 +477,7 @@ impl<B: Backend> State<B> {
     fn unstake(
         &self,
         sender: TransactionSender,
-        amount: BigDecimal<18>,
+        amount: HpUfloat<18>,
         node_public_key: NodePublicKey,
     ) -> TransactionResponse {
         // This transaction is only callable by AccountOwners and not nodes
@@ -554,7 +554,7 @@ impl<B: Backend> State<B> {
             _ => 0,
         };
         // Make sure the node has locked tokens and that the lock time is passed
-        if node.stake.locked == BigDecimal::zero() {
+        if node.stake.locked == HpUfloat::zero() {
             return TransactionResponse::Revert(ExecutionError::NoLockedTokens);
         }
         if node.stake.locked_until > current_epoch {
@@ -569,7 +569,7 @@ impl<B: Backend> State<B> {
         // no need to reset locked_until on the node because that will get adjusted the next time
         // the node unstakes
         reciever.flk_balance += node.stake.locked;
-        node.stake.locked = BigDecimal::zero();
+        node.stake.locked = HpUfloat::zero();
 
         // Todo(dalton): if the nodes stake+locked are equal to 0 here should we remove him from the
         // state tables completly?
@@ -794,22 +794,22 @@ impl<B: Backend> State<B> {
             .reward_pool;
 
         // if reward is 0, no commodity under any service was served
-        if reward_pool == BigDecimal::zero() {
+        if reward_pool == HpUfloat::zero() {
             return;
         }
 
-        let percentage_divisor = BigDecimal::<18>::from(100_u64);
-        let node_percentage: BigDecimal<18> = self
+        let percentage_divisor = HpUfloat::<18>::from(100_u64);
+        let node_percentage: HpUfloat<18> = self
             .parameters
             .get(&ProtocolParams::NodeShare)
             .unwrap_or_default()
             .into();
         let node_share = &node_percentage / &percentage_divisor;
         let (_max_emissions, min_emissions) = self.calculate_emissions();
-        let mut total_emissions: BigDecimal<18> = 0.0.into();
+        let mut total_emissions: HpUfloat<18> = 0.0.into();
         let nodes = self.current_epoch_served.keys();
         for node in nodes {
-            let stables_revenue: BigDecimal<6> = self.calculate_node_revenue(&node);
+            let stables_revenue: HpUfloat<6> = self.calculate_node_revenue(&node);
 
             let node_owner = self.node_info.get(&node).unwrap().owner;
             self.mint_and_transfer_stables(stables_revenue.clone(), node_owner);
@@ -817,7 +817,7 @@ impl<B: Backend> State<B> {
             // safe to unwrap since all the nodes in current_epoch_served table are in node info
             // this is checked in submit_pod contract/function
             let locked_until = self.node_info.get(&node).unwrap().stake.stake_locked_until;
-            let boost: BigDecimal<18> = self.get_boost(locked_until, &epoch);
+            let boost: HpUfloat<18> = self.get_boost(locked_until, &epoch);
 
             let node_service_proportion =
                 (&stables_revenue / &reward_pool).convert_precision::<18>();
@@ -829,7 +829,7 @@ impl<B: Backend> State<B> {
         }
 
         // distribute rewards to validators
-        let validator_share: BigDecimal<18> = self
+        let validator_share: HpUfloat<18> = self
             .parameters
             .get(&ProtocolParams::ValidatorShare)
             .unwrap_or_default()
@@ -846,7 +846,7 @@ impl<B: Backend> State<B> {
             self.mint_and_transfer_flk(validator_rewards, node_owner);
         }
 
-        let protocol_share: BigDecimal<18> = self
+        let protocol_share: HpUfloat<18> = self
             .parameters
             .get(&ProtocolParams::ProtocolShare)
             .unwrap_or_default()
@@ -863,15 +863,15 @@ impl<B: Backend> State<B> {
         );
     }
 
-    fn calculate_node_revenue(&self, node: &NodePublicKey) -> BigDecimal<6> {
+    fn calculate_node_revenue(&self, node: &NodePublicKey) -> HpUfloat<6> {
         let served = self.current_epoch_served.get(node).unwrap_or_default();
         served.iter().enumerate().fold(
-            BigDecimal::<6>::zero(),
+            HpUfloat::<6>::zero(),
             |mut stables_revenue, (commodity_type, &quantity)| {
                 if let Some(price) = CommodityTypes::from_u8(commodity_type as u8)
                     .and_then(|commodity| self.commodity_prices.get(&commodity))
                 {
-                    let big_quantity: BigDecimal<6> = quantity.into();
+                    let big_quantity: HpUfloat<6> = quantity.into();
                     stables_revenue += price * big_quantity;
                 }
 
@@ -880,54 +880,54 @@ impl<B: Backend> State<B> {
         )
     }
 
-    fn calculate_emissions(&self) -> (BigDecimal<18>, BigDecimal<18>) {
-        let percentage_divisor = BigDecimal::<18>::from(100_u64);
-        let inflation_percent: BigDecimal<18> = self
+    fn calculate_emissions(&self) -> (HpUfloat<18>, HpUfloat<18>) {
+        let percentage_divisor = HpUfloat::<18>::from(100_u64);
+        let inflation_percent: HpUfloat<18> = self
             .parameters
             .get(&ProtocolParams::MaxInflation)
             .unwrap_or(0)
             .into();
         let inflation = &inflation_percent / &percentage_divisor;
-        let max_boost: BigDecimal<18> = self
+        let max_boost: HpUfloat<18> = self
             .parameters
             .get(&ProtocolParams::MaxBoost)
             .unwrap_or(1)
             .into();
 
         let supply_at_year_start = match self.metadata.get(&Metadata::SupplyYearStart) {
-            Some(Value::BigDecimal(supply)) => supply,
+            Some(Value::HpUfloat(supply)) => supply,
             _ => panic!("SupplyYearStart is set genesis and should never be empty"),
         };
 
-        let max_emissions: BigDecimal<18> = (&inflation * &supply_at_year_start) / &365.0.into();
+        let max_emissions: HpUfloat<18> = (&inflation * &supply_at_year_start) / &365.0.into();
 
         let min_emissions = &max_emissions / &max_boost;
 
         (max_emissions, min_emissions)
     }
 
-    fn mint_and_transfer_stables(&self, amount: BigDecimal<6>, owner: AccountOwnerPublicKey) {
+    fn mint_and_transfer_stables(&self, amount: HpUfloat<6>, owner: AccountOwnerPublicKey) {
         let mut account = self.account_info.get(&owner).unwrap_or_default();
 
         account.stables_balance += amount;
         self.account_info.set(owner, account);
     }
 
-    fn mint_and_transfer_flk(&self, amount: BigDecimal<18>, owner: AccountOwnerPublicKey) {
+    fn mint_and_transfer_flk(&self, amount: HpUfloat<18>, owner: AccountOwnerPublicKey) {
         let mut account = self.account_info.get(&owner).unwrap_or_default();
         account.flk_balance += amount.clone();
 
         self.account_info.set(owner, account);
 
         let mut current_supply = match self.metadata.get(&Metadata::TotalSupply) {
-            Some(Value::BigDecimal(supply)) => supply,
+            Some(Value::HpUfloat(supply)) => supply,
             _ => panic!("TotalSupply is set genesis and should never be empty"),
         };
 
         current_supply += amount;
         self.metadata.set(
             Metadata::TotalSupply,
-            Value::BigDecimal(current_supply.clone()),
+            Value::HpUfloat(current_supply.clone()),
         );
 
         let current_epoch = match self.metadata.get(&Metadata::Epoch) {
@@ -937,7 +937,7 @@ impl<B: Backend> State<B> {
 
         if (current_epoch + 1) % 365_u64 == 0_u64 {
             self.metadata
-                .set(Metadata::SupplyYearStart, Value::BigDecimal(current_supply));
+                .set(Metadata::SupplyYearStart, Value::HpUfloat(current_supply));
         }
     }
 
@@ -963,21 +963,21 @@ impl<B: Backend> State<B> {
     ///
     /// Returns:
     /// - The calculated boost factor for the current rewards.
-    fn get_boost(&self, locked_until: u64, current_epoch: &Epoch) -> BigDecimal<18> {
-        let max_boost: BigDecimal<18> = self
+    fn get_boost(&self, locked_until: u64, current_epoch: &Epoch) -> HpUfloat<18> {
+        let max_boost: HpUfloat<18> = self
             .parameters
             .get(&ProtocolParams::MaxBoost)
             .unwrap_or(1)
             .into();
-        let max_lock_time: BigDecimal<18> = self
+        let max_lock_time: HpUfloat<18> = self
             .parameters
             .get(&ProtocolParams::MaxLockTime)
             .unwrap_or(1)
             .into();
-        let min_boost = BigDecimal::from(1_u64);
-        let locking_period: BigDecimal<18> = (locked_until.saturating_sub(*current_epoch)).into();
+        let min_boost = HpUfloat::from(1_u64);
+        let locking_period: HpUfloat<18> = (locked_until.saturating_sub(*current_epoch)).into();
         let boost = &min_boost + (&max_boost - &min_boost) * (&locking_period / &max_lock_time);
-        BigDecimal::<18>::min(&max_boost, &boost).to_owned()
+        HpUfloat::<18>::min(&max_boost, &boost).to_owned()
     }
 
     fn choose_new_committee(&self) -> Vec<NodePublicKey> {

@@ -17,7 +17,7 @@ bincode.workspace = true
 
 affair.workspace = true
 fleek-crypto.workspace = true
-big-decimal.workspace = true
+hp-float.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

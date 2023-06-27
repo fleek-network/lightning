@@ -34,7 +34,7 @@ num-derive = "0.3.3"
 affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
 fleek-crypto = { path = "lib/fleek-crypto" }
-big-decimal = { path= "lib/big-decimal" }
+hp-float = { path= "lib/hp-float" }
 
 # Since MystenLabs uses Hakari in the sui repository, and we bring narwhal in from there, this
 # results into all of their dependencies and packages to be listed in their workspace-hack crate.

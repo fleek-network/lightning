@@ -1,7 +1,7 @@
 use affair::Socket;
 use async_trait::async_trait;
-use big_decimal::BigDecimal;
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
+use hp_float::unsigned::HpUfloat;
 
 use crate::{
     common::WithStartAndShutdown,
@@ -77,16 +77,16 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
     fn get_client_balance(&self, client: &ClientPublicKey) -> u128;
 
     /// Returns the latest FLK balance of an account
-    fn get_flk_balance(&self, account: &AccountOwnerPublicKey) -> BigDecimal<18>;
+    fn get_flk_balance(&self, account: &AccountOwnerPublicKey) -> HpUfloat<18>;
 
     /// Returns the latest stables balance of an account
-    fn get_stables_balance(&self, account: &AccountOwnerPublicKey) -> BigDecimal<6>;
+    fn get_stables_balance(&self, account: &AccountOwnerPublicKey) -> HpUfloat<6>;
 
     /// Returns the amount of flk a node has staked
-    fn get_staked(&self, node: &NodePublicKey) -> BigDecimal<18>;
+    fn get_staked(&self, node: &NodePublicKey) -> HpUfloat<18>;
 
     /// Returns the amount of locked tokens a node has
-    fn get_locked(&self, node: &NodePublicKey) -> BigDecimal<18>;
+    fn get_locked(&self, node: &NodePublicKey) -> HpUfloat<18>;
 
     /// Returns the epoch number until which the stakes are locked
     fn get_stake_locked_until(&self, node: &NodePublicKey) -> Epoch;
@@ -138,10 +138,10 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
     fn get_commodity_served(&self, node: &NodePublicKey) -> CommodityServed;
 
     /// Return the current total supply of FLK tokens
-    fn get_total_supply(&self) -> BigDecimal<18>;
+    fn get_total_supply(&self) -> HpUfloat<18>;
 
     /// Return the total supply at year start point used for inflation
-    fn get_year_start_supply(&self) -> BigDecimal<18>;
+    fn get_year_start_supply(&self) -> HpUfloat<18>;
 
     /// Return the foundation address where protocol fund goes to
     fn get_protocol_fund_address(&self) -> AccountOwnerPublicKey;

@@ -960,16 +960,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "big-decimal"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "num-bigint",
- "num-traits",
- "serde",
-]
-
-[[package]]
 name = "bincode"
 version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2103,13 +2093,13 @@ dependencies = [
  "anyhow",
  "async-trait",
  "atomo",
- "big-decimal",
  "bincode",
  "draco-interfaces",
  "draco-reputation",
  "draco-test-utils",
  "fastcrypto",
  "fleek-crypto",
+ "hp-float",
  "multiaddr",
  "num-traits",
  "rand 0.8.5",
@@ -2193,9 +2183,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "atomo",
- "big-decimal",
  "bytes",
  "fleek-crypto",
+ "hp-float",
  "multiaddr",
  "num-bigint",
  "num-derive",
@@ -2314,11 +2304,11 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum",
- "big-decimal",
  "bincode",
  "draco-application",
  "draco-interfaces",
  "fleek-crypto",
+ "hp-float",
  "jsonrpc-v2",
  "reqwest",
  "serde",
@@ -3164,6 +3154,16 @@ name = "hmac-sha512"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77e806677ce663d0a199541030c816847b36e8dc095f70dae4a4f4ad63da5383"
+
+[[package]]
+name = "hp-float"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "num-bigint",
+ "num-traits",
+ "serde",
+]
 
 [[package]]
 name = "http"

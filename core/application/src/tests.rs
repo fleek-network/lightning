@@ -2,7 +2,6 @@ use std::{collections::BTreeMap, time::SystemTime, vec};
 
 use affair::Socket;
 use anyhow::{anyhow, Result};
-use big_decimal::BigDecimal;
 use draco_interfaces::{
     application::ExecutionEngineSocket,
     types::{
@@ -17,7 +16,8 @@ use fleek_crypto::{
     AccountOwnerPublicKey, AccountOwnerSignature, NodePublicKey, NodeSignature,
     TransactionSignature,
 };
-use rand::Rng;
+use hp_float::unsigned::HpUfloat;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use tokio::test;
 
 use crate::{
@@ -175,7 +175,7 @@ async fn run_transaction(
 }
 
 async fn deposit(
-    amount: BigDecimal<18>,
+    amount: HpUfloat<18>,
     token: Tokens,
     sender: AccountOwnerPublicKey,
     update_socket: &Socket<Block, BlockExecutionResponse>,
@@ -204,7 +204,7 @@ async fn stake_lock(
 }
 
 async fn stake(
-    amount: BigDecimal<18>,
+    amount: HpUfloat<18>,
     node_public_key: NodePublicKey,
     sender: AccountOwnerPublicKey,
     update_socket: &Socket<Block, BlockExecutionResponse>,
@@ -241,7 +241,7 @@ async fn test_genesis() {
     // Query to make sure that holds true
     for node in genesis_committee {
         let balance = query_runner.get_staked(&node.public_key);
-        assert_eq!(BigDecimal::<18>::from(genesis.min_stake), balance);
+        assert_eq!(HpUfloat::<18>::from(genesis.min_stake), balance);
     }
 }
 
@@ -531,13 +531,13 @@ async fn test_distribute_rewards() {
     let (owner_key2, node_key2) = node_and_account_key(4);
 
     // get params for emission calculations
-    let percentage_divisor: BigDecimal<18> = 100_u16.into();
-    let supply_at_year_start: BigDecimal<18> = supply_at_genesis.into();
-    let inflation: BigDecimal<18> = BigDecimal::from(max_inflation) / &percentage_divisor;
-    let node_share = BigDecimal::from(node_part) / &percentage_divisor;
-    let validator_share = BigDecimal::from(validator_part) / &percentage_divisor;
-    let protocol_share = BigDecimal::from(protocol_part) / &percentage_divisor;
-    let max_boost: BigDecimal<18> = boost.into();
+    let percentage_divisor: HpUfloat<18> = 100_u16.into();
+    let supply_at_year_start: HpUfloat<18> = supply_at_genesis.into();
+    let inflation: HpUfloat<18> = HpUfloat::from(max_inflation) / &percentage_divisor;
+    let node_share = HpUfloat::from(node_part) / &percentage_divisor;
+    let validator_share = HpUfloat::from(validator_part) / &percentage_divisor;
+    let protocol_share = HpUfloat::from(protocol_part) / &percentage_divisor;
+    let max_boost: HpUfloat<18> = boost.into();
 
     // deposit FLK tokens and stake it
     deposit(10_000_u64.into(), Tokens::FLK, owner_key1, &update_socket).await;
@@ -564,32 +564,32 @@ async fn test_distribute_rewards() {
     }
     let node_1_usd = 0.1 * 10000_f64 + 0.2 * 6767_f64;
     let node_2_usd = 0.2 * 5000_f64;
-    let reward_pool: BigDecimal<6> = (node_2_usd + node_1_usd).into();
+    let reward_pool: HpUfloat<6> = (node_2_usd + node_1_usd).into();
 
     // assert stable balances
     let stables_balance = query_runner.get_stables_balance(&owner_key1);
     assert_eq!(stables_balance, node_1_usd.into());
 
     // calculate emissions per unit
-    let max_emissions: BigDecimal<18> = (inflation * supply_at_year_start) / &365.0.into();
+    let max_emissions: HpUfloat<18> = (inflation * supply_at_year_start) / &365.0.into();
     let emissions_per_unit = &max_emissions / &max_boost;
     let node_proportion_1 = (&node_1_usd.into() / &reward_pool).convert_precision::<18>();
     let node_proportion_2 = (&node_2_usd.into() / &reward_pool).convert_precision::<18>();
 
     // assert flk balances node 1
     let node_flk_balance1 = query_runner.get_flk_balance(&owner_key1);
-    let node_flk_rewards1: BigDecimal<18> =
+    let node_flk_rewards1: HpUfloat<18> =
         &emissions_per_unit * &node_share * node_1_boost * node_proportion_1;
     assert_eq!(node_flk_balance1, node_flk_rewards1);
 
     // assert flk balances node 2
     let node_flk_balance2 = query_runner.get_flk_balance(&owner_key2);
-    let node_flk_rewards2: BigDecimal<18> = &emissions_per_unit * &node_share * node_proportion_2;
+    let node_flk_rewards2: HpUfloat<18> = &emissions_per_unit * &node_share * node_proportion_2;
     assert_eq!(node_flk_balance2, node_flk_rewards2);
 
     // calculate total emissions based on total emissions for node which is equal to node share. the
     // rest goes to other validators(maybe) and protocol
-    let total_emissions: BigDecimal<18> = (&node_flk_rewards1 + &node_flk_rewards2) / &node_share;
+    let total_emissions: HpUfloat<18> = (&node_flk_rewards1 + &node_flk_rewards2) / &node_share;
 
     // assert protocols share
     let protocol_account = query_runner.get_protocol_fund_address();
@@ -758,15 +758,14 @@ async fn test_supply_across_epoch() {
     .await;
 
     // get params for emission calculations
-    let committee_size: BigDecimal<18> = query_runner.get_committee_members().len().into();
-    let percentage_divisor: BigDecimal<18> = 100_u16.into();
-    let supply_at_year_start: BigDecimal<18> = supply_at_genesis.into();
-    let inflation: BigDecimal<18> = BigDecimal::from(max_inflation) / &percentage_divisor;
-    let node_share = BigDecimal::from(node_part) / &percentage_divisor;
-    let validator_share =
-        (BigDecimal::from(validator_part) / &percentage_divisor) / &committee_size;
-    let protocol_share = BigDecimal::from(protocol_part) / &percentage_divisor;
-    let max_boost: BigDecimal<18> = boost.into();
+    let committee_size: HpUfloat<18> = query_runner.get_committee_members().len().into();
+    let percentage_divisor: HpUfloat<18> = 100_u16.into();
+    let supply_at_year_start: HpUfloat<18> = supply_at_genesis.into();
+    let inflation: HpUfloat<18> = HpUfloat::from(max_inflation) / &percentage_divisor;
+    let node_share = HpUfloat::from(node_part) / &percentage_divisor;
+    let validator_share = (HpUfloat::from(validator_part) / &percentage_divisor) / &committee_size;
+    let protocol_share = HpUfloat::from(protocol_part) / &percentage_divisor;
+    let max_boost: HpUfloat<18> = boost.into();
 
     let (owner_key1, node_key1) = node_and_account_key(5);
 
@@ -778,7 +777,7 @@ async fn test_supply_across_epoch() {
     let _node_1_usd = 0.1 * 10000_f64;
 
     // calculate emissions per unit
-    let max_emissions: BigDecimal<18> = (&inflation * &supply_at_year_start) / &365.0.into();
+    let max_emissions: HpUfloat<18> = (&inflation * &supply_at_year_start) / &365.0.into();
 
     let emissions_per_epoch = &max_emissions / &max_boost;
     let mut supply = supply_at_year_start;

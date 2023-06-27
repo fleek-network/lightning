@@ -2,7 +2,6 @@ use std::time::SystemTime;
 
 use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
-use big_decimal::BigDecimal;
 use draco_interfaces::{
     types::{
         AccountInfo, Block, CommodityServed, CommodityTypes, Epoch, ExecutionData, Metadata,
@@ -13,6 +12,7 @@ use draco_interfaces::{
 };
 use fastcrypto::{secp256k1::Secp256k1PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
+use hp_float::unsigned::HpUfloat;
 
 use crate::{
     config::{Config, Mode},
@@ -41,7 +41,7 @@ impl Env<UpdatePerm> {
             .with_table::<NodePublicKey, CommodityServed>("current_epoch_served")
             .with_table::<NodePublicKey, CommodityServed>("last_epoch_served")
             .with_table::<Epoch, TotalServed>("total_served")
-            .with_table::<CommodityTypes, BigDecimal<6>>("commodity_prices")
+            .with_table::<CommodityTypes, HpUfloat<6>>("commodity_prices")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("rep_scores")
@@ -127,7 +127,7 @@ impl Env<UpdatePerm> {
             let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
             let mut metadata_table = ctx.get_table::<Metadata, Value>("metadata");
             let mut commodity_prices_table =
-                ctx.get_table::<CommodityTypes, BigDecimal<6>>("commodity_prices");
+                ctx.get_table::<CommodityTypes, HpUfloat<6>>("commodity_prices");
 
             let protocol_fund_address: AccountOwnerPublicKey =
                 Secp256k1PublicKey::decode_base64(&genesis.protocol_fund_address)
@@ -138,14 +138,14 @@ impl Env<UpdatePerm> {
                 Value::AccountPublicKey(protocol_fund_address),
             );
 
-            let supply_at_genesis: BigDecimal<18> = BigDecimal::from(genesis.supply_at_genesis);
+            let supply_at_genesis: HpUfloat<18> = HpUfloat::from(genesis.supply_at_genesis);
             metadata_table.insert(
                 Metadata::TotalSupply,
-                Value::BigDecimal(supply_at_genesis.clone()),
+                Value::HpUfloat(supply_at_genesis.clone()),
             );
             metadata_table.insert(
                 Metadata::SupplyYearStart,
-                Value::BigDecimal(supply_at_genesis),
+                Value::HpUfloat(supply_at_genesis),
             );
             param_table.insert(ProtocolParams::MaxBoost, genesis.max_boost as u128);
             param_table.insert(ProtocolParams::MaxLockTime, genesis.max_lock_time as u128);
@@ -180,7 +180,7 @@ impl Env<UpdatePerm> {
 
             for node in &genesis.committee {
                 let mut node_info: NodeInfo = node.into();
-                node_info.stake.staked = BigDecimal::<18>::from(genesis.min_stake);
+                node_info.stake.staked = HpUfloat::<18>::from(genesis.min_stake);
                 committee_members.push(node_info.public_key);
 
                 node_table.insert(node_info.public_key, node_info);
@@ -222,7 +222,7 @@ impl Env<UpdatePerm> {
             // add commodity prices
             for commodity_price in genesis.commodity_prices {
                 let GenesisPrices { commodity, price } = commodity_price;
-                let big_price: BigDecimal<6> = price.into();
+                let big_price: HpUfloat<6> = price.into();
                 commodity_prices_table.insert(commodity, big_price);
             }
         })

@@ -1,5 +1,4 @@
 use atomo::{Atomo, QueryPerm, ResolvedTableReference};
-use big_decimal::BigDecimal;
 use draco_interfaces::{
     application::SyncQueryRunnerInterface,
     types::{
@@ -8,6 +7,7 @@ use draco_interfaces::{
     },
 };
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
+use hp_float::unsigned::HpUfloat;
 
 use crate::state::Committee;
 
@@ -26,7 +26,7 @@ pub struct QueryRunner {
     rep_scores: ResolvedTableReference<NodePublicKey, u8>,
     _last_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
     total_served_table: ResolvedTableReference<Epoch, TotalServed>,
-    _commodity_price: ResolvedTableReference<CommodityTypes, BigDecimal<6>>,
+    _commodity_price: ResolvedTableReference<CommodityTypes, HpUfloat<6>>,
 }
 
 impl QueryRunner {
@@ -47,7 +47,7 @@ impl QueryRunner {
             _last_epoch_served: atomo
                 .resolve::<NodePublicKey, CommodityServed>("last_epoch_served"),
             total_served_table: atomo.resolve::<Epoch, TotalServed>("total_served"),
-            _commodity_price: atomo.resolve::<CommodityTypes, BigDecimal<6>>("commodity_prices"),
+            _commodity_price: atomo.resolve::<CommodityTypes, HpUfloat<6>>("commodity_prices"),
             inner: atomo,
         }
     }
@@ -77,43 +77,43 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn get_flk_balance(&self, account: &AccountOwnerPublicKey) -> BigDecimal<18> {
+    fn get_flk_balance(&self, account: &AccountOwnerPublicKey) -> HpUfloat<18> {
         self.inner.run(|ctx| {
             self.account_table
                 .get(ctx)
                 .get(account)
                 .map(|account| account.flk_balance)
-                .unwrap_or(BigDecimal::<18>::zero())
+                .unwrap_or(HpUfloat::<18>::zero())
         })
     }
 
-    fn get_stables_balance(&self, account: &AccountOwnerPublicKey) -> BigDecimal<6> {
+    fn get_stables_balance(&self, account: &AccountOwnerPublicKey) -> HpUfloat<6> {
         self.inner.run(|ctx| {
             self.account_table
                 .get(ctx)
                 .get(account)
                 .map(|account| account.stables_balance)
-                .unwrap_or(BigDecimal::<6>::zero())
+                .unwrap_or(HpUfloat::<6>::zero())
         })
     }
 
-    fn get_staked(&self, node: &NodePublicKey) -> BigDecimal<18> {
+    fn get_staked(&self, node: &NodePublicKey) -> HpUfloat<18> {
         self.inner.run(|ctx| {
             self.node_table
                 .get(ctx)
                 .get(node)
                 .map(|node| node.stake.staked)
-                .unwrap_or(BigDecimal::zero())
+                .unwrap_or(HpUfloat::zero())
         })
     }
 
-    fn get_locked(&self, node: &NodePublicKey) -> BigDecimal<18> {
+    fn get_locked(&self, node: &NodePublicKey) -> HpUfloat<18> {
         self.inner.run(|ctx| {
             self.node_table
                 .get(ctx)
                 .get(node)
                 .map(|node| node.stake.locked)
-                .unwrap_or(BigDecimal::zero())
+                .unwrap_or(HpUfloat::zero())
         })
     }
 
@@ -235,19 +235,19 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn get_total_supply(&self) -> BigDecimal<18> {
+    fn get_total_supply(&self) -> HpUfloat<18> {
         self.inner.run(|ctx| {
             let supply = match self.metadata_table.get(ctx).get(&Metadata::TotalSupply) {
-                Some(Value::BigDecimal(s)) => s,
+                Some(Value::HpUfloat(s)) => s,
                 _ => panic!("TotalSupply is set genesis and should never be empty"),
             };
             supply
         })
     }
-    fn get_year_start_supply(&self) -> BigDecimal<18> {
+    fn get_year_start_supply(&self) -> HpUfloat<18> {
         self.inner.run(|ctx| {
             let supply = match self.metadata_table.get(ctx).get(&Metadata::SupplyYearStart) {
-                Some(Value::BigDecimal(s)) => s,
+                Some(Value::HpUfloat(s)) => s,
                 _ => panic!("SupplyYearStart is set genesis and should never be empty"),
             };
             supply

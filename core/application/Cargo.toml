@@ -21,7 +21,7 @@ fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a015
 affair.workspace = true
 atomo.workspace = true
 fleek-crypto.workspace = true
-big-decimal.workspace = true
+hp-float.workspace = true
 
 
 [dev-dependencies]

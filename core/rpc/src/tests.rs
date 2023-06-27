@@ -2,13 +2,13 @@ use std::{thread, time::Duration};
 
 use affair::{Executor, TokioSpawn, Worker};
 use anyhow::Result;
-use big_decimal::BigDecimal;
 use draco_application::{app::Application, config::Config as AppConfig, query_runner::QueryRunner};
 use draco_interfaces::{
     types::{Block, ProofOfConsensus, Tokens, UpdateMethod, UpdatePayload, UpdateRequest},
     ApplicationInterface, ExecutionEngineSocket, MempoolSocket, RpcInterface, WithStartAndShutdown,
 };
 use fleek_crypto::{AccountOwnerPublicKey, AccountOwnerSignature};
+use hp_float::unsigned::HpUfloat;
 use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -22,7 +22,7 @@ const ACCOUNT_ONE: AccountOwnerPublicKey = AccountOwnerPublicKey([0; 33]);
 struct RpcSuccessResponse {
     jsonrpc: String,
     id: usize,
-    result: BigDecimal<18>,
+    result: HpUfloat<18>,
 }
 
 /// get mempool socket for test cases that do not require consensus
@@ -149,7 +149,7 @@ async fn test_rpc_get_balance() -> Result<()> {
     let deposit_method = UpdateMethod::Deposit {
         proof: ProofOfConsensus {},
         token: Tokens::FLK,
-        amount: BigDecimal::<18>::new(1_000_u32.into()),
+        amount: HpUfloat::<18>::new(1_000_u32.into()),
     };
 
     // deposit FLK to test get balance
@@ -185,7 +185,7 @@ async fn test_rpc_get_balance() -> Result<()> {
             // Parse the response as a successful response
             let success_response: RpcSuccessResponse = serde_json::from_value(value)?;
             assert_eq!(
-                BigDecimal::<18>::new(1_000_u32.into()),
+                HpUfloat::<18>::new(1_000_u32.into()),
                 success_response.result
             );
         } else {
