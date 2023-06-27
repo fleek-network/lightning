@@ -37,6 +37,8 @@ pub trait SecretKey: Sized {
     fn to_pk(&self) -> Self::PublicKey;
 }
 
+const BLS12_381_PEM_LABEL: &str = "DRACO BLS12_381 PRIVATE KEY";
+
 /// A node's BLS 12-381 public key
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct NodePublicKey(#[serde(with = "BigArray")] pub [u8; 96]);
@@ -101,12 +103,17 @@ impl SecretKey for NodeSecretKey {
         pair.private().into()
     }
 
-    fn decode_pem(_encoded: &str) -> Option<NodeSecretKey> {
-        todo!()
+    /// Decode a BLS12-381 secret key from a custom protobuf pem file
+    fn decode_pem(encoded: &str) -> Option<NodeSecretKey> {
+        let (label, bytes) = sec1::pem::decode_vec(encoded.as_bytes()).ok()?;
+        // todo: verify ec point
+        (label == BLS12_381_PEM_LABEL && bytes.len() == 32)
+            .then(|| NodeSecretKey(*array_ref!(bytes, 0, 32)))
     }
 
+    /// Encode the BLS12-381 secret key to a custom protobuf pem file
     fn encode_pem(&self) -> String {
-        todo!()
+        sec1::pem::encode_string(BLS12_381_PEM_LABEL, sec1::LineEnding::LF, &self.0).unwrap()
     }
 
     fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
