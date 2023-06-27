@@ -23,7 +23,7 @@ use crate::{format_hp_float, get_float_parts, HpFloatConversionError};
 /// # Examples
 ///
 /// ```
-/// use hp_float::HpFloat;
+/// use hp_float::signed::HpFloat;
 ///
 /// let x = HpFloat::<5>::from(10.12345);
 /// let y = HpFloat::<5>::from(20.12345);
