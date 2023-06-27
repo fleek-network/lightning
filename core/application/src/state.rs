@@ -1003,9 +1003,9 @@ impl<B: Backend> State<B> {
                 self.node_info.set(node, node_info);
             },
             TransactionSender::AccountOwner(account) => {
-                let mut node_info = self.account_info.get(&account).unwrap();
-                node_info.nonce += 1;
-                self.account_info.set(account, node_info);
+                let mut account_info = self.account_info.get(&account).unwrap();
+                account_info.nonce += 1;
+                self.account_info.set(account, account_info);
             },
         }
     }
