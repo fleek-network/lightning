@@ -11,11 +11,11 @@ use crate::{format_hp_float, HpFloatConversionError};
 
 /// A high-precision unsigned floating-point number backed by a `BigUint`.
 ///
-/// `HpUfloat` is parameterized over the precision `P`, which determines the number of digits 
-/// maintained after the decimal point. This structure is primarily used for accurate accounting 
+/// `HpUfloat` is parameterized over the precision `P`, which determines the number of digits
+/// maintained after the decimal point. This structure is primarily used for accurate accounting
 /// in relation to specific tokens where precision requirements are critical.
 ///
-/// The precision `P` is defined at compile time and is crucial for ensuring accurate 
+/// The precision `P` is defined at compile time and is crucial for ensuring accurate
 /// interoperability with accounting and balances.
 ///
 /// # Examples
@@ -30,13 +30,13 @@ use crate::{format_hp_float, HpFloatConversionError};
 ///
 /// # Notes
 ///
-/// The underlying storage is a `BigUint` from the `num-bigint` crate. When the result of an 
+/// The underlying storage is a `BigUint` from the `num-bigint` crate. When the result of an
 /// operation has more than `P` digits after the decimal point, it is truncated at `P` digits.
 ///
 /// # Type Parameters
 ///
-/// * `P`: The number of digits to maintain after the decimal point in this `HpUfloat`. 
-///   Must be a constant that is known at compile time.
+/// * `P`: The number of digits to maintain after the decimal point in this `HpUfloat`. Must be a
+///   constant that is known at compile time.
 ///
 /// # Attributes
 ///

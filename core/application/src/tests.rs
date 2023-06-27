@@ -17,7 +17,7 @@ use fleek_crypto::{
     TransactionSignature,
 };
 use hp_float::unsigned::HpUfloat;
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::Rng;
 use tokio::test;
 
 use crate::{

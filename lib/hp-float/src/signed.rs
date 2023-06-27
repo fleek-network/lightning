@@ -1,7 +1,7 @@
 use std::{
     convert::TryInto,
     fmt,
-    ops::{Add, Div, Mul, Sub, AddAssign, SubAssign},
+    ops::{Add, AddAssign, Div, Mul, Sub, SubAssign},
 };
 
 use num_bigint::{
@@ -17,7 +17,7 @@ use crate::{format_hp_float, get_float_parts, HpFloatConversionError};
 
 /// A high-precision floating-point number backed by a `BigInt`.
 ///
-/// `HpFloat` is parameterized over the precision `P`, which determines 
+/// `HpFloat` is parameterized over the precision `P`, which determines
 /// the number of digits maintained after the decimal point.
 ///
 /// # Examples
@@ -33,16 +33,16 @@ use crate::{format_hp_float, get_float_parts, HpFloatConversionError};
 ///
 /// # Notes
 ///
-/// The underlying storage is a `BigInt` from the `num-bigint` crate. 
-/// The precision `P` is defined at compile-time and applies to all 
-/// operations. When the result of an operation has more than `P` 
+/// The underlying storage is a `BigInt` from the `num-bigint` crate.
+/// The precision `P` is defined at compile-time and applies to all
+/// operations. When the result of an operation has more than `P`
 /// digits after the decimal point, it is truncated at `P` digits.
 ///
 /// # Type Parameters
 ///
-/// * `P`: The number of digits to maintain after the decimal point in this `HpFloat`. 
-///   Must be a constant that is known at compile time.
-/// 
+/// * `P`: The number of digits to maintain after the decimal point in this `HpFloat`. Must be a
+///   constant that is known at compile time.
+///
 /// # Attributes
 ///
 /// * `BigInt`: The underlying large signed integer value that the `HpFloat` wraps around.
