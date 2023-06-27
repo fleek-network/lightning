@@ -2756,6 +2756,7 @@ version = "0.0.0"
 dependencies = [
  "arrayref",
  "fastcrypto",
+ "hex",
  "rand 0.8.5",
  "sec1 0.7.2",
  "serde",

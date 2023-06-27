@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
 use arrayref::array_ref;
 use fastcrypto::{
@@ -6,6 +6,7 @@ use fastcrypto::{
         BLS12381KeyPair, BLS12381PrivateKey, BLS12381PublicKey, BLS12381Signature,
     },
     ed25519::{Ed25519KeyPair, Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
+    hash::{HashFunction, Keccak256},
     secp256k1::{Secp256k1KeyPair, Secp256k1PrivateKey, Secp256k1PublicKey, Secp256k1Signature},
     traits::{KeyPair, Signer, ToFromBytes, VerifyingKey},
 };
@@ -334,6 +335,24 @@ impl PublicKey for AccountOwnerPublicKey {
     }
 }
 
+impl Display for AccountOwnerPublicKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "0x{}", hex::encode(self.to_eth_address()))
+    }
+}
+
+impl AccountOwnerPublicKey {
+    pub fn to_eth_address(&self) -> [u8; 20] {
+        let pubkey: Secp256k1PublicKey = self.into();
+        // get the uncompressed serialization (1 byte prefix + 32 byte X + 32 byte Y)
+        let uncompressed = &pubkey.pubkey.serialize_uncompressed();
+        // Compute a 32 byte keccak256 hash, ignoring the prefix
+        let hash = Keccak256::digest(&uncompressed[1..65]).digest;
+        // return the last 20 bytes of the hash
+        *array_ref!(hash, 12, 20)
+    }
+}
+
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct AccountOwnerSecretKey(#[serde(with = "BigArray")] pub [u8; 32]);
 
@@ -352,6 +371,7 @@ impl From<&AccountOwnerSecretKey> for Secp256k1PrivateKey {
 
 impl SecretKey for AccountOwnerSecretKey {
     type PublicKey = AccountOwnerPublicKey;
+
     fn generate() -> Self {
         let pair = Secp256k1KeyPair::generate(&mut ThreadRng::default());
         pair.private().into()
