@@ -18,6 +18,7 @@ struct Chunk {
 
 pub struct IncrementalPut<S> {
     buf: BytesMut,
+    prev_block: Option<(BlockHasher, ContentChunk)>,
     stack: Vec<Chunk>,
     store: S,
     mode: Mode,
@@ -62,6 +63,7 @@ where
         Self {
             store,
             mode,
+            prev_block: None,
             stack: Vec::new(),
             buf: BytesMut::new(),
         }
@@ -98,7 +100,7 @@ where
         self.buf.put(content);
 
         while self.buf.len() >= BLAKE3_CHUNK_SIZE {
-            let block_count = self.stack.len();
+            let block_count = self.stack.len() + self.prev_block.as_ref().map(|_| 1).unwrap_or(0);
             let chunk = self.buf.split_to(BLAKE3_CHUNK_SIZE);
             let mut block = BlockHasher::new();
             block.set_block(block_count);
@@ -123,14 +125,19 @@ where
                 Mode::Trust { tree_builder } => tree_builder.update(chunk.as_ref()),
             }
 
-            let hash = block.finalize(false); // TODO: Look into how to dynamically pass the proper value.
-            self.stack.push(Chunk {
-                hash,
-                content: ContentChunk {
-                    compression,
-                    content: chunk.to_vec(),
-                },
-            });
+            if let Some((prev_block, prev_content_chunk)) = self.prev_block.take() {
+                let hash = prev_block.finalize(false);
+                self.stack.push(Chunk {
+                    hash,
+                    content: prev_content_chunk,
+                });
+            }
+
+            let content_chunk = ContentChunk {
+                compression,
+                content: chunk.to_vec(),
+            };
+            self.prev_block = Some((block, content_chunk));
         }
 
         // Remove this proof so it's ready for next block.
@@ -150,6 +157,16 @@ where
     }
 
     async fn finalize(mut self) -> Result<Blake3Hash, PutFinalizeError> {
+        let (prev_block, prev_content_chunk) = self
+            .prev_block
+            .ok_or_else(|| PutFinalizeError::PartialContent)?;
+        let is_root = self.stack.len() == 0;
+        let hash = prev_block.finalize(is_root);
+        self.stack.push(Chunk {
+            hash,
+            content: prev_content_chunk,
+        });
+
         // TODO: put methods use a non-async lock so these calls could
         // block the thread. Maybe let's use the worker pattern.
         for (count, chunk) in self.stack.into_iter().enumerate() {
