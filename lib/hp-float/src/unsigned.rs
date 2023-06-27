@@ -9,25 +9,34 @@ use serde::{Deserialize, Serialize};
 
 use crate::{format_hp_float, HpFloatConversionError};
 
-/// `HpUfloat` is a structure that encapsulates a `BigUint` while enforcing specific precision
-/// rules.
+/// A high-precision unsigned floating-point number backed by a `BigUint`.
 ///
-/// This structure is primarily used for accounting purposes in relation to FLK and STABLE tokens.
-/// The precision requirement defined at compile time with the const generic parameter `P`, is
-/// critical for ensuring accurate interoperation with L2 accounting and balances.
+/// `HpUfloat` is parameterized over the precision `P`, which determines the number of digits 
+/// maintained after the decimal point. This structure is primarily used for accurate accounting 
+/// in relation to specific tokens where precision requirements are critical.
 ///
-/// # Type Parameters
+/// The precision `P` is defined at compile time and is crucial for ensuring accurate 
+/// interoperability with accounting and balances.
 ///
-/// * `P`: A const parameter of type `usize` that determines the precision of the `HpUfloat`.
-///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use hp_float::unsigned::HpUfloat;
+///
 /// let value: HpUfloat<18> = 123_u64.into();
 /// ```
 ///
 /// In the above example, `HpUfloat<18>` ensures a precision of 18 decimal places.
+///
+/// # Notes
+///
+/// The underlying storage is a `BigUint` from the `num-bigint` crate. When the result of an 
+/// operation has more than `P` digits after the decimal point, it is truncated at `P` digits.
+///
+/// # Type Parameters
+///
+/// * `P`: The number of digits to maintain after the decimal point in this `HpUfloat`. 
+///   Must be a constant that is known at compile time.
 ///
 /// # Attributes
 ///
