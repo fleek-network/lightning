@@ -1,5 +1,5 @@
 [package]
-name = "draco-reputation"
+name = "draco-test-utils"
 version = "0.0.0"
 edition = "2021"
 
@@ -8,8 +8,4 @@ edition = "2021"
 [dependencies]
 draco-interfaces = {path="../interfaces"}
 fleek-crypto.workspace = true
-
-[dev-dependencies]
-draco-test-utils = {path="../test-utils"}
 rand.workspace = true
-

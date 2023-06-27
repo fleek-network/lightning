@@ -1,5 +1,5 @@
 [package]
-name = "signer"
+name = "draco-signer"
 version = "0.0.0"
 edition = "2021"
 

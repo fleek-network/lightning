@@ -2107,6 +2107,7 @@ dependencies = [
  "bincode",
  "draco-interfaces",
  "draco-reputation",
+ "draco-test-utils",
  "fastcrypto",
  "fleek-crypto",
  "multiaddr",
@@ -2286,6 +2287,7 @@ dependencies = [
  "draco-interfaces",
  "draco-notifier",
  "draco-reputation",
+ "draco-test-utils",
  "fleek-crypto",
  "lru",
  "rand 0.8.5",
@@ -2299,6 +2301,7 @@ name = "draco-reputation"
 version = "0.0.0"
 dependencies = [
  "draco-interfaces",
+ "draco-test-utils",
  "fleek-crypto",
  "rand 0.8.5",
 ]
@@ -2330,6 +2333,29 @@ dependencies = [
  "anyhow",
  "draco-interfaces",
  "serde",
+]
+
+[[package]]
+name = "draco-signer"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "draco-application",
+ "draco-interfaces",
+ "fleek-crypto",
+ "serde",
+ "tokio",
+]
+
+[[package]]
+name = "draco-test-utils"
+version = "0.0.0"
+dependencies = [
+ "draco-interfaces",
+ "fleek-crypto",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -6383,20 +6409,6 @@ checksum = "5e1788eed21689f9cf370582dfc467ef36ed9c707f073528ddafa8d83e3b8500"
 dependencies = [
  "digest 0.10.7",
  "rand_core 0.6.4",
-]
-
-[[package]]
-name = "signer"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "draco-application",
- "draco-interfaces",
- "fleek-crypto",
- "serde",
- "tokio",
 ]
 
 [[package]]

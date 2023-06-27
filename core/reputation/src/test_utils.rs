@@ -1,66 +1,12 @@
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
 
-use draco_interfaces::types::ReputationMeasurements;
+use draco_test_utils::{random, reputation};
 use fleek_crypto::NodePublicKey;
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{rngs::StdRng, Rng};
 
 use crate::{NormalizedMeasurements, WeightedReputationMeasurements};
 
 const PROB_MEASUREMENT_PRESENT: f64 = 0.1;
-
-pub(crate) fn get_seedable_rng() -> StdRng {
-    let seed: [u8; 32] = (0..32).collect::<Vec<u8>>().try_into().unwrap();
-    SeedableRng::from_seed(seed)
-}
-
-pub(crate) fn generate_reputation_measurements(rng: Option<StdRng>) -> ReputationMeasurements {
-    let mut rng = if let Some(rng) = rng {
-        rng
-    } else {
-        get_seedable_rng()
-    };
-    let latency = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
-        None
-    } else {
-        Some(Duration::from_millis(rng.gen_range(100..=400)))
-    };
-    let interactions = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
-        None
-    } else {
-        Some(rng.gen_range(-20..=100))
-    };
-    let inbound_bandwidth = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
-        None
-    } else {
-        // bytes per milliseconds: 50 Mbps to 250 Mbps
-        Some(rng.gen_range(6250..31250))
-    };
-    let outbound_bandwidth = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
-        None
-    } else {
-        // bytes per milliseconds: 50 Mbps to 250 Mbps
-        Some(rng.gen_range(6250..31250))
-    };
-    let bytes_received = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
-        None
-    } else {
-        Some(rng.gen_range(100_000..1_000_000_000))
-    };
-    let bytes_sent = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
-        None
-    } else {
-        Some(rng.gen_range(100_000..1_000_000_000))
-    };
-    ReputationMeasurements {
-        latency,
-        interactions,
-        inbound_bandwidth,
-        outbound_bandwidth,
-        bytes_received,
-        bytes_sent,
-        hops: None,
-    }
-}
 
 pub(crate) fn generate_weighted_measurements_map(
     map_size: usize,
@@ -69,7 +15,7 @@ pub(crate) fn generate_weighted_measurements_map(
     let mut rng = if let Some(rng) = rng {
         rng
     } else {
-        get_seedable_rng()
+        random::get_seedable_rng()
     };
     let mut map = HashMap::with_capacity(map_size);
     for _ in 0..map_size {
@@ -92,12 +38,13 @@ pub(crate) fn generate_weighted_measurements(
     let mut rng = if let Some(rng) = rng {
         rng
     } else {
-        get_seedable_rng()
+        random::get_seedable_rng()
     };
 
     let mut reported_measurements = Vec::with_capacity(num_measurements);
     for _ in 0..num_measurements {
-        let measurements = generate_reputation_measurements(Some(rng.clone()));
+        let measurements =
+            reputation::generate_reputation_measurements(&mut rng, PROB_MEASUREMENT_PRESENT);
         let weight = rng.gen_range(0..=100);
 
         let reported_measurement = WeightedReputationMeasurements {
@@ -113,7 +60,7 @@ pub(crate) fn generate_normalized_measurements_map(
     map_size: usize,
 ) -> HashMap<NodePublicKey, NormalizedMeasurements> {
     let mut map = HashMap::with_capacity(map_size);
-    let mut rng = get_seedable_rng();
+    let mut rng = random::get_seedable_rng();
     for _ in 0..map_size {
         let latency = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
             None

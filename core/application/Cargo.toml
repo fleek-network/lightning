@@ -25,5 +25,6 @@ big-decimal.workspace = true
 
 
 [dev-dependencies]
+draco-test-utils = {path="../test-utils"}
 tokio.workspace = true
 rand.workspace = true

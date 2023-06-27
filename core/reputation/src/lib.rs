@@ -45,6 +45,7 @@ fn calculate_normalized_measurements(
 #[cfg(test)]
 mod tests {
 
+    use draco_test_utils::random;
     use rand::Rng;
 
     use super::*;
@@ -54,7 +55,7 @@ mod tests {
 
     #[test]
     fn test_from_weighted_measurements_for_collected_measurements_counts() {
-        let rng = get_seedable_rng();
+        let rng = random::get_seedable_rng();
         let weighted_measurements = generate_weighted_measurements(10, Some(rng));
         let mut latency_count = 0;
         let mut interactions_count = 0;
@@ -105,7 +106,7 @@ mod tests {
 
     #[test]
     fn test_from_weighted_measurements_for_collected_measurements_weights_sum_to_1() {
-        let rng = get_seedable_rng();
+        let rng = random::get_seedable_rng();
         let weighted_measurements = generate_weighted_measurements(10, Some(rng));
         let collected_measurements: CollectedMeasurements = weighted_measurements.into();
 
@@ -160,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_from_weighted_measurements_for_collected_measurements_values() {
-        let rng = get_seedable_rng();
+        let rng = random::get_seedable_rng();
         let weighted_measurements = generate_weighted_measurements(1, Some(rng));
         let collected_measurements: CollectedMeasurements = weighted_measurements.clone().into();
         if let Some(latency) = weighted_measurements[0].measurements.latency {
@@ -203,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_from_collected_measurements_for_normalized_measurements() {
-        let rng = get_seedable_rng();
+        let rng = random::get_seedable_rng();
         let weighted_measurements = generate_weighted_measurements(10, Some(rng));
         let mut collected_measurements: CollectedMeasurements = weighted_measurements.into();
         collected_measurements.outbound_bandwidth = Vec::new();
@@ -243,7 +244,7 @@ mod tests {
 
     #[test]
     fn test_normalized_measurements_min_max_normalize() {
-        let rng = get_seedable_rng();
+        let rng = random::get_seedable_rng();
         let weighted_measurements_map = generate_weighted_measurements_map(10, Some(rng));
         let mut normalized_measurements_map =
             calculate_normalized_measurements(weighted_measurements_map);
@@ -285,7 +286,7 @@ mod tests {
 
     #[test]
     fn test_calculate_reputation_scores() {
-        let mut rng = get_seedable_rng();
+        let mut rng = random::get_seedable_rng();
 
         let mut map = HashMap::new();
         let mut array = [0; 96];

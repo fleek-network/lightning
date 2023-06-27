@@ -1,8 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    time::{Duration, SystemTime},
-    vec,
-};
+use std::{collections::BTreeMap, time::SystemTime, vec};
 
 use affair::Socket;
 use anyhow::{anyhow, Result};
@@ -10,17 +6,18 @@ use big_decimal::BigDecimal;
 use draco_interfaces::{
     application::ExecutionEngineSocket,
     types::{
-        Block, Epoch, ExecutionError, NodeInfo, ProofOfConsensus, ReputationMeasurements, Tokens,
-        TotalServed, TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
+        Block, Epoch, ExecutionError, NodeInfo, ProofOfConsensus, Tokens, TotalServed,
+        TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
     },
     ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
 };
+use draco_test_utils::{random, reputation};
 use fastcrypto::{bls12381::min_sig::BLS12381PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{
     AccountOwnerPublicKey, AccountOwnerSignature, NodePublicKey, NodeSignature,
     TransactionSignature,
 };
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::Rng;
 use tokio::test;
 
 use crate::{
@@ -162,58 +159,6 @@ fn pod_request(node: NodePublicKey, commodity: u128, service_id: u32) -> UpdateR
         },
         node,
     )
-}
-
-fn get_seedable_rng() -> StdRng {
-    let seed: [u8; 32] = (0..32).collect::<Vec<u8>>().try_into().unwrap();
-    SeedableRng::from_seed(seed)
-}
-
-fn generate_reputation_measurements(
-    rng: &mut StdRng,
-    prob_measurement_present: f64,
-) -> ReputationMeasurements {
-    let latency = if rng.gen_bool(prob_measurement_present) {
-        None
-    } else {
-        Some(Duration::from_millis(rng.gen_range(100..=400)))
-    };
-    let interactions = if rng.gen_bool(prob_measurement_present) {
-        None
-    } else {
-        Some(rng.gen_range(-20..=100))
-    };
-    let inbound_bandwidth = if rng.gen_bool(prob_measurement_present) {
-        None
-    } else {
-        // bytes per milliseconds: 50 Mbps to 250 Mbps
-        Some(rng.gen_range(6250..31250))
-    };
-    let outbound_bandwidth = if rng.gen_bool(prob_measurement_present) {
-        None
-    } else {
-        // bytes per milliseconds: 50 Mbps to 250 Mbps
-        Some(rng.gen_range(6250..31250))
-    };
-    let bytes_received = if rng.gen_bool(prob_measurement_present) {
-        None
-    } else {
-        Some(rng.gen_range(100_000..1_000_000_000))
-    };
-    let bytes_sent = if rng.gen_bool(prob_measurement_present) {
-        None
-    } else {
-        Some(rng.gen_range(100_000..1_000_000_000))
-    };
-    ReputationMeasurements {
-        latency,
-        interactions,
-        inbound_bandwidth,
-        outbound_bandwidth,
-        bytes_received,
-        bytes_sent,
-        hops: None,
-    }
 }
 
 async fn run_transaction(
@@ -669,7 +614,7 @@ async fn test_submit_rep_measurements() {
     let (update_socket, query_runner) = init_app(None).await;
 
     let mut map = BTreeMap::new();
-    let mut rng = get_seedable_rng();
+    let mut rng = random::get_seedable_rng();
 
     let node_public_key: NodePublicKey = BLS12381PublicKey::decode_base64(NODE_ONE)
         .unwrap()
@@ -686,11 +631,11 @@ async fn test_submit_rep_measurements() {
     )
     .await;
 
-    let measurements1 = generate_reputation_measurements(&mut rng, 0.1);
+    let measurements1 = reputation::generate_reputation_measurements(&mut rng, 0.1);
     let peer1 = NodePublicKey([0; 96]);
     map.insert(peer1, measurements1.clone());
 
-    let measurements2 = generate_reputation_measurements(&mut rng, 0.1);
+    let measurements2 = reputation::generate_reputation_measurements(&mut rng, 0.1);
     let peer2 = NodePublicKey([1; 96]);
     map.insert(peer2, measurements2.clone());
 
@@ -720,7 +665,7 @@ async fn test_rep_scores() {
     let (_, genesis_committee) = get_genesis();
     let required_signals = 2 * genesis_committee.len() / 3 + 1;
 
-    let mut rng = get_seedable_rng();
+    let mut rng = random::get_seedable_rng();
 
     let mut array = [0; 96];
     (0..96).for_each(|i| array[i] = rng.gen_range(0..=255));
@@ -747,11 +692,11 @@ async fn test_rep_scores() {
     .await;
 
     let mut map = BTreeMap::new();
-    let measurements = generate_reputation_measurements(&mut rng, 0.1);
+    let measurements = reputation::generate_reputation_measurements(&mut rng, 0.1);
     let peer1 = NodePublicKey([0; 96]);
     map.insert(peer1, measurements.clone());
 
-    let measurements = generate_reputation_measurements(&mut rng, 0.1);
+    let measurements = reputation::generate_reputation_measurements(&mut rng, 0.1);
     let peer2 = NodePublicKey([1; 96]);
     map.insert(peer2, measurements.clone());
 
@@ -765,11 +710,11 @@ async fn test_rep_scores() {
     }
 
     let mut map = BTreeMap::new();
-    let measurements = generate_reputation_measurements(&mut rng, 0.1);
+    let measurements = reputation::generate_reputation_measurements(&mut rng, 0.1);
     let peer1 = NodePublicKey([0; 96]);
     map.insert(peer1, measurements.clone());
 
-    let measurements = generate_reputation_measurements(&mut rng, 0.1);
+    let measurements = reputation::generate_reputation_measurements(&mut rng, 0.1);
     let peer2 = NodePublicKey([1; 96]);
     map.insert(peer2, measurements.clone());
 

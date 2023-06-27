@@ -221,7 +221,6 @@ impl SignerInner {
         loop {
             tokio::select! {
                 task = rx.recv() => {
-                    // TODO: send to mempool
                     let task = task.expect("Failed to receive UpdateMethod.");
                     let update_method = task.request.clone();
                     task.respond(next_nonce);

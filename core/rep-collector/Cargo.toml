@@ -19,4 +19,5 @@ lru.workspace = true
 scc.workspace = true
 
 [dev-dependencies]
+draco-test-utils = {path="../test-utils"}
 rand.workspace = true
