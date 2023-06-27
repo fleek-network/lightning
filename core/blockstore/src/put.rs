@@ -17,9 +17,9 @@ struct Chunk {
 }
 
 pub struct IncrementalPut<S> {
-    buf: BytesMut,
+    content_buf: BytesMut,
     prev_block: Option<(BlockHasher, ContentChunk)>,
-    stack: Vec<Chunk>,
+    chunks: Vec<Chunk>,
     store: S,
     mode: Mode,
     compression: Option<CompressionAlgorithm>,
@@ -66,8 +66,8 @@ where
             store,
             mode,
             prev_block: None,
-            stack: Vec::new(),
-            buf: BytesMut::new(),
+            chunks: Vec::new(),
+            content_buf: BytesMut::new(),
             compression: None,
             block_count: 0,
         }
@@ -101,10 +101,10 @@ where
         content: &[u8],
         compression: CompressionAlgorithm,
     ) -> Result<(), PutWriteError> {
-        self.buf.put(content);
+        self.content_buf.put(content);
 
-        while self.buf.len() >= BLAKE3_CHUNK_SIZE {
-            let chunk = self.buf.split_to(BLAKE3_CHUNK_SIZE);
+        while self.content_buf.len() >= BLAKE3_CHUNK_SIZE {
+            let chunk = self.content_buf.split_to(BLAKE3_CHUNK_SIZE);
             let mut block = BlockHasher::new();
             block.set_block(self.block_count);
             block.update(chunk.as_ref());
@@ -130,7 +130,7 @@ where
 
             if let Some((prev_block, prev_content_chunk)) = self.prev_block.take() {
                 let hash = prev_block.finalize(false);
-                self.stack.push(Chunk {
+                self.chunks.push(Chunk {
                     hash,
                     content: prev_content_chunk,
                 });
@@ -146,10 +146,14 @@ where
 
         // Remove this proof so it's ready for next block.
         match &mut self.mode {
-            Mode::Verify { proof, .. } if self.buf.is_empty() => {
+            Mode::Verify { proof, .. } if self.content_buf.is_empty() => {
                 proof.take();
             },
             _ => {},
+        }
+
+        if self.compression.is_none() {
+            self.compression = Some(compression);
         }
 
         Ok(())
@@ -161,42 +165,48 @@ where
     }
 
     async fn finalize(mut self) -> Result<Blake3Hash, PutFinalizeError> {
-        let (prev_block, prev_content_chunk) = self
-            .prev_block
-            .ok_or_else(|| PutFinalizeError::PartialContent)?;
-        // If the buf is not empty, it means we have some data smaller than a
-        // Blake3 chunk size that needs to be processed so this buffered block
-        // is not the root.
-        let is_root = self.block_count == 0 && self.buf.is_empty();
-        let hash = prev_block.finalize(is_root);
-        self.stack.push(Chunk {
-            hash,
-            content: prev_content_chunk,
-        });
+        match self.prev_block {
+            None => {
+                if self.content_buf.is_empty() {
+                    return Err(PutFinalizeError::PartialContent);
+                }
+            },
+            Some((prev_block, prev_content_chunk)) => {
+                // If the buf is not empty, it means we have some data smaller than a
+                // Blake3 chunk size that needs to be processed so this buffered block
+                // is not the root.
+                let is_root = self.block_count == 0 && self.content_buf.is_empty();
+                let hash = prev_block.finalize(is_root);
+                self.chunks.push(Chunk {
+                    hash,
+                    content: prev_content_chunk,
+                });
+            },
+        }
 
         // Check if there is some data left that we haven't pushed in the stack.
         // This data is smaller than a Blake3 chunk size.
-        if !self.buf.is_empty() {
+        if !self.content_buf.is_empty() {
             let compression = self
                 .compression
                 .expect("user to have specified a compression algorithm");
             let mut block = BlockHasher::new();
-            block.set_block(self.stack.len());
-            block.update(self.buf.as_ref());
-            let is_root = self.stack.is_empty();
+            block.set_block(self.chunks.len());
+            block.update(self.content_buf.as_ref());
+            let is_root = self.chunks.is_empty();
             let hash = block.finalize(is_root);
-            self.stack.push(Chunk {
+            self.chunks.push(Chunk {
                 hash,
                 content: ContentChunk {
                     compression,
-                    content: self.buf.to_vec(),
+                    content: self.content_buf.to_vec(),
                 },
             });
         }
 
         // TODO: put methods use a non-async lock so these calls could
         // block the thread. Maybe let's use the worker pattern.
-        for (count, chunk) in self.stack.into_iter().enumerate() {
+        for (count, chunk) in self.chunks.into_iter().enumerate() {
             let block = bincode::serialize(&BlockContent::Chunk(chunk.content.content))
                 .map_err(|_| PutFinalizeError::PartialContent)?;
             self.store
