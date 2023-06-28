@@ -7,5 +7,13 @@ edition = "2021"
 
 [dependencies]
 draco-interfaces = {path="../interfaces"}
+async-trait.workspace = true
 fleek-crypto.workspace = true
+affair.workspace = true
+anyhow.workspace = true
 rand.workspace = true
+serde.workspace = true
+tokio.workspace = true
+scc.workspace = true
+big-decimal.workspace = true
+

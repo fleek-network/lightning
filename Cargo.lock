@@ -2332,8 +2332,10 @@ dependencies = [
  "affair",
  "anyhow",
  "async-trait",
+ "big-decimal",
  "draco-application",
  "draco-interfaces",
+ "draco-test-utils",
  "fleek-crypto",
  "serde",
  "tokio",
@@ -2343,9 +2345,16 @@ dependencies = [
 name = "draco-test-utils"
 version = "0.0.0"
 dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "big-decimal",
  "draco-interfaces",
  "fleek-crypto",
  "rand 0.8.5",
+ "scc",
+ "serde",
+ "tokio",
 ]
 
 [[package]]

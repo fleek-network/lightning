@@ -1,4 +1,6 @@
 mod config;
+#[cfg(test)]
+mod tests;
 use std::{
     collections::VecDeque,
     sync::{Arc, Mutex},
@@ -66,9 +68,11 @@ impl WithStartAndShutdown for Signer {
             let rx = self.rx.lock().unwrap().take().unwrap();
             let mempool_socket = self.get_mempool_socket();
             let query_runner = self.get_query_runner();
-            tokio::spawn(
-                async move { inner.handle(rx, shutdown_rx, mempool_socket, query_runner) },
-            );
+            tokio::spawn(async move {
+                inner
+                    .handle(rx, shutdown_rx, mempool_socket, query_runner)
+                    .await
+            });
             *self.shutdown_tx.lock().unwrap() = Some(shutdown_tx);
             *self.is_running.lock().unwrap() = true;
         }
@@ -212,10 +216,12 @@ impl SignerInner {
         let mut query_interval = interval(QUERY_INTERVAL);
         let mut pending_transactions = VecDeque::new();
         let mut last_nonce_increment = None;
-        let application_nonce = query_runner
-            .get_node_info(&self.node_public_key)
-            .unwrap()
-            .nonce;
+        let application_nonce =
+            if let Some(node_info) = query_runner.get_node_info(&self.node_public_key) {
+                node_info.nonce
+            } else {
+                0
+            };
         let mut base_nonce = application_nonce;
         let mut next_nonce = application_nonce;
         loop {
@@ -231,10 +237,15 @@ impl SignerInner {
                         signature: TransactionSignature::Node(NodeSignature([0; 48])),
                         payload: update_payload,
                     };
-                    mempool_socket.enqueue(update_request.clone()).await.expect("Failed to send transaction to mempool.");
-                    // Optimistically increment nonce
-                    next_nonce += 1;
-                    pending_transactions.push_back(update_request);
+                    //mempool_socket.enqueue(update_request.clone()).await.expect("Failed to send transaction to mempool.");
+                    mempool_socket.run(update_request.clone())
+                        .await
+                        .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
+                        .expect("Failed to send transaction to mempool.");
+
+                        // Optimistically increment nonce
+                        next_nonce += 1;
+                        pending_transactions.push_back(update_request);
                     // Set timer
                     last_nonce_increment = Some(SystemTime::now());
                 }
@@ -262,10 +273,14 @@ impl SignerInner {
         last_nonce_increment: &mut Option<SystemTime>,
         pending_transactions: &mut VecDeque<UpdateRequest>,
     ) {
-        let application_nonce = query_runner
-            .get_node_info(&self.node_public_key)
-            .unwrap()
-            .nonce;
+        // If node_info does not exist for the node, there is no point in sending a transaction
+        // because it will revert. However, this can still be useful for testing.
+        let application_nonce =
+            if let Some(node_info) = query_runner.get_node_info(&self.node_public_key) {
+                node_info.nonce
+            } else {
+                0
+            };
         if *base_nonce == application_nonce && next_nonce > base_nonce {
             // Application nonce has not been incremented even though we sent out
             // transaction
