@@ -1,6 +1,7 @@
 mod config;
 #[cfg(test)]
 mod tests;
+mod utils;
 use std::{
     collections::VecDeque,
     sync::{Arc, Mutex},
@@ -193,13 +194,14 @@ struct SignerInner {
 
 impl SignerInner {
     fn new(config: Config) -> Self {
-        // TODO: load private keys from file if they exist
         let node_secret_key =
             match NodeSecretKey::decode_pem(config.node_key_path.to_str().unwrap()) {
                 Some(node_secret_key) => node_secret_key,
                 None => {
-                    NodeSecretKey::generate()
-                    // TODO(matthias): save file to disk
+                    let node_secret_key = NodeSecretKey::generate();
+                    utils::save(&config.node_key_path, node_secret_key.encode_pem())
+                        .expect("Failed to save NodeSecretKey to disk.");
+                    node_secret_key
                 },
             };
         let node_public_key = node_secret_key.to_pk();
@@ -207,8 +209,10 @@ impl SignerInner {
             match NodeNetworkingSecretKey::decode_pem(config.network_key_path.to_str().unwrap()) {
                 Some(network_secret_key) => network_secret_key,
                 None => {
-                    NodeNetworkingSecretKey::generate()
-                    // TODO(matthias): save file to disk
+                    let network_secret_key = NodeNetworkingSecretKey::generate();
+                    utils::save(&config.network_key_path, network_secret_key.encode_pem())
+                        .expect("Failed to save NodeNetworkingSecretKey to disk.");
+                    network_secret_key
                 },
             };
         let network_public_key = network_secret_key.to_pk();
