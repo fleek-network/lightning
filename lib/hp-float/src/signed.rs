@@ -79,6 +79,11 @@ impl<const P: usize> HpFloat<P> {
     pub fn max<'a>(&'a self, rhs: &'a Self) -> &'a Self {
         if self.0 >= rhs.0 { self } else { rhs }
     }
+
+    pub fn try_abs(&self) -> Option<HpFloat<P>> {
+        let big_int = BigInt::try_from(self.clone()).ok()?;
+        Some(Self::from(big_int.abs()))
+    }
 }
 
 impl<const P: usize> fmt::Display for HpFloat<P> {
@@ -590,5 +595,12 @@ mod tests {
         let decimal1 = HpFloat::<6>::from(decimal);
         let result = decimal1.convert_precision::<2>();
         assert_eq!(result.0, BigInt::from(-123_412_i128));
+    }
+
+    #[test]
+    fn test_try_abs() {
+        let num = HpFloat::<18>::from(-10);
+        let target = HpFloat::<18>::from(10);
+        assert_eq!(num.try_abs().unwrap(), target);
     }
 }
