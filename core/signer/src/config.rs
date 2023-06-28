@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
-    node_key_path: PathBuf,
-    network_key_path: PathBuf,
+    pub node_key_path: PathBuf,
+    pub network_key_path: PathBuf,
 }
 
 impl Default for Config {

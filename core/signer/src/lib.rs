@@ -192,11 +192,25 @@ struct SignerInner {
 }
 
 impl SignerInner {
-    fn new(_config: Config) -> Self {
+    fn new(config: Config) -> Self {
         // TODO: load private keys from file if they exist
-        let node_secret_key = NodeSecretKey::generate();
+        let node_secret_key =
+            match NodeSecretKey::decode_pem(config.node_key_path.to_str().unwrap()) {
+                Some(node_secret_key) => node_secret_key,
+                None => {
+                    NodeSecretKey::generate()
+                    // TODO(matthias): save file to disk
+                },
+            };
         let node_public_key = node_secret_key.to_pk();
-        let network_secret_key = NodeNetworkingSecretKey::generate();
+        let network_secret_key =
+            match NodeNetworkingSecretKey::decode_pem(config.network_key_path.to_str().unwrap()) {
+                Some(network_secret_key) => network_secret_key,
+                None => {
+                    NodeNetworkingSecretKey::generate()
+                    // TODO(matthias): save file to disk
+                },
+            };
         let network_public_key = network_secret_key.to_pk();
         Self {
             node_secret_key,
