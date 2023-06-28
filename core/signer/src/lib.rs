@@ -157,8 +157,8 @@ impl SignerInterface for Signer {
     /// This function is unsafe to use without proper reasoning, which is trivial since
     /// this function is responsible for signing arbitrary messages from other parts of
     /// the system.
-    fn sign_raw_digest(&self, _digest: &[u8; 32]) -> NodeSignature {
-        todo!()
+    fn sign_raw_digest(&self, digest: &[u8; 32]) -> NodeSignature {
+        self.inner.node_secret_key.sign(digest)
     }
 }
 
