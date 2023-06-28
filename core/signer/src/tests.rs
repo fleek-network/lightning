@@ -2,7 +2,6 @@ use std::{collections::BTreeMap, time::Duration};
 
 use affair::Socket;
 use anyhow::{anyhow, Result};
-use big_decimal::BigDecimal;
 use draco_application::{app::Application, config::Config as AppConfig};
 use draco_interfaces::{
     application::{ApplicationInterface, BlockExecutionResponse},
@@ -17,6 +16,7 @@ use draco_interfaces::{
 };
 use draco_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use fleek_crypto::{AccountOwnerPublicKey, AccountOwnerSignature, NodePublicKey};
+use hp_float::unsigned::HpUfloat;
 
 use crate::{config::Config, Signer};
 
@@ -34,7 +34,7 @@ fn get_update_request_account(
 }
 
 async fn deposit(
-    amount: BigDecimal<18>,
+    amount: HpUfloat<18>,
     token: Tokens,
     sender: AccountOwnerPublicKey,
     update_socket: &Socket<Block, BlockExecutionResponse>,
@@ -65,7 +65,7 @@ async fn run_transaction(
 }
 
 async fn stake(
-    amount: BigDecimal<18>,
+    amount: HpUfloat<18>,
     node_public_key: NodePublicKey,
     sender: AccountOwnerPublicKey,
     update_socket: &Socket<Block, BlockExecutionResponse>,

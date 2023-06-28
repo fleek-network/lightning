@@ -15,5 +15,5 @@ rand.workspace = true
 serde.workspace = true
 tokio.workspace = true
 scc.workspace = true
-big-decimal.workspace = true
+hp-float.workspace = true
 

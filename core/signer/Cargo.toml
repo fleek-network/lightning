@@ -18,4 +18,4 @@ affair.workspace = true
 
 [dev-dependencies]
 draco-test-utils = {path="../test-utils"}
-big-decimal.workspace = true
+hp-float.workspace = true
