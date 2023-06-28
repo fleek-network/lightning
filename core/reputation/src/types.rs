@@ -5,30 +5,40 @@ use std::{
 
 use draco_interfaces::types::ReputationMeasurements;
 use fleek_crypto::NodePublicKey;
+use hp_float::signed::HpFloat;
 
-use crate::statistics;
+use crate::{statistics, PRECISION};
 
 pub trait WeightedValue {
-    fn get_weighted_value(&self) -> f64;
+    fn get_weighted_value(&self) -> HpFloat<PRECISION>;
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) struct WeightedFloat {
-    pub(crate) value: f64,
-    pub(crate) weight: f64,
+    pub(crate) value: HpFloat<PRECISION>,
+    pub(crate) weight: HpFloat<PRECISION>,
+}
+
+impl From<usize> for WeightedFloat {
+    fn from(value: usize) -> Self {
+        WeightedFloat {
+            value: (value as i128).into(),
+            weight: 1.0.into(),
+        }
+    }
 }
 
 impl WeightedValue for WeightedFloat {
-    fn get_weighted_value(&self) -> f64 {
-        self.value * self.weight
+    fn get_weighted_value(&self) -> HpFloat<PRECISION> {
+        self.value.clone() * self.weight.clone()
     }
 }
 
 impl Default for WeightedFloat {
     fn default() -> Self {
         WeightedFloat {
-            value: 0.0,
-            weight: 1.0,
+            value: 0.0.into(),
+            weight: 1.0.into(),
         }
     }
 }
@@ -79,7 +89,19 @@ impl Sub for WeightedFloat {
 
 impl From<f64> for WeightedFloat {
     fn from(value: f64) -> Self {
-        WeightedFloat { value, weight: 1.0 }
+        WeightedFloat {
+            value: value.into(),
+            weight: 1.0.into(),
+        }
+    }
+}
+
+impl From<HpFloat<PRECISION>> for WeightedFloat {
+    fn from(value: HpFloat<PRECISION>) -> Self {
+        WeightedFloat {
+            value,
+            weight: 1.0.into(),
+        }
     }
 }
 
@@ -113,22 +135,22 @@ pub(crate) struct CollectedMeasurements {
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct NormalizedMeasurements {
-    pub latency: Option<f64>,
-    pub interactions: Option<f64>,
-    pub inbound_bandwidth: Option<f64>,
-    pub outbound_bandwidth: Option<f64>,
-    pub bytes_received: Option<f64>,
-    pub bytes_sent: Option<f64>,
+    pub latency: Option<HpFloat<PRECISION>>,
+    pub interactions: Option<HpFloat<PRECISION>>,
+    pub inbound_bandwidth: Option<HpFloat<PRECISION>>,
+    pub outbound_bandwidth: Option<HpFloat<PRECISION>>,
+    pub bytes_received: Option<HpFloat<PRECISION>>,
+    pub bytes_sent: Option<HpFloat<PRECISION>>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Values {
-    latency: f64,
-    interactions: f64,
-    inbound_bandwidth: f64,
-    outbound_bandwidth: f64,
-    bytes_received: f64,
-    bytes_sent: f64,
+    latency: HpFloat<PRECISION>,
+    interactions: HpFloat<PRECISION>,
+    inbound_bandwidth: HpFloat<PRECISION>,
+    outbound_bandwidth: HpFloat<PRECISION>,
+    bytes_received: HpFloat<PRECISION>,
+    bytes_sent: HpFloat<PRECISION>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -139,12 +161,12 @@ pub(crate) struct MinMaxValues {
 
 impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
     fn from(weighted_measurements: Vec<WeightedReputationMeasurements>) -> Self {
-        let mut weight_sum_latency = 0.0;
-        let mut weight_sum_interactions = 0.0;
-        let mut weight_sum_inbound_bandwidth = 0.0;
-        let mut weight_sum_outbound_bandwidth = 0.0;
-        let mut weight_sum_bytes_received = 0.0;
-        let mut weight_sum_bytes_sent = 0.0;
+        let mut weight_sum_latency: HpFloat<PRECISION> = 0.0.into();
+        let mut weight_sum_interactions: HpFloat<PRECISION> = 0.0.into();
+        let mut weight_sum_inbound_bandwidth: HpFloat<PRECISION> = 0.0.into();
+        let mut weight_sum_outbound_bandwidth: HpFloat<PRECISION> = 0.0.into();
+        let mut weight_sum_bytes_received: HpFloat<PRECISION> = 0.0.into();
+        let mut weight_sum_bytes_sent: HpFloat<PRECISION> = 0.0.into();
 
         let mut count_latency = 0;
         let mut count_interactions = 0;
@@ -154,95 +176,105 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
         let mut count_bytes_sent = 0;
         weighted_measurements.iter().for_each(|m| {
             if m.measurements.latency.is_some() {
-                weight_sum_latency += m.weight as f64;
+                weight_sum_latency += (m.weight as i16).into();
                 count_latency += 1;
             }
             if m.measurements.interactions.is_some() {
-                weight_sum_interactions += m.weight as f64;
+                weight_sum_interactions += (m.weight as i16).into();
                 count_interactions += 1;
             }
             if m.measurements.inbound_bandwidth.is_some() {
-                weight_sum_inbound_bandwidth += m.weight as f64;
+                weight_sum_inbound_bandwidth += (m.weight as i16).into();
                 count_inbound_bandwidth += 1;
             }
             if m.measurements.outbound_bandwidth.is_some() {
-                weight_sum_outbound_bandwidth += m.weight as f64;
+                weight_sum_outbound_bandwidth += (m.weight as i16).into();
                 count_outbound_bandwidth += 1;
             }
             if m.measurements.bytes_received.is_some() {
-                weight_sum_bytes_received += m.weight as f64;
+                weight_sum_bytes_received += (m.weight as i16).into();
                 count_bytes_received += 1;
             }
             if m.measurements.bytes_sent.is_some() {
-                weight_sum_bytes_sent += m.weight as f64;
+                weight_sum_bytes_sent += (m.weight as i16).into();
                 count_bytes_sent += 1;
             }
         });
         let mut measurements = Self::default();
         weighted_measurements.into_iter().for_each(|m| {
             if let Some(latency) = m.measurements.latency {
-                let weight = if weight_sum_latency == 0.0 {
-                    1.0 / count_latency as f64
+                let weight = if weight_sum_latency == 0.into() {
+                    HpFloat::<PRECISION>::from(1) / HpFloat::<PRECISION>::from(count_latency)
                 } else {
-                    m.weight as f64 / weight_sum_latency
+                    HpFloat::<PRECISION>::from(m.weight as i16) / weight_sum_latency.clone()
                 };
                 measurements.latency.push(WeightedFloat {
-                    value: latency.as_millis() as f64,
+                    value: i128::try_from(latency.as_millis())
+                        .unwrap_or(i128::MAX)
+                        .into(),
                     weight,
                 });
             }
             if let Some(interactions) = m.measurements.interactions {
-                let weight = if weight_sum_interactions == 0.0 {
-                    1.0 / count_interactions as f64
+                let weight = if weight_sum_interactions == 0.into() {
+                    HpFloat::<PRECISION>::from(1) / HpFloat::<PRECISION>::from(count_interactions)
                 } else {
-                    m.weight as f64 / weight_sum_interactions
+                    HpFloat::<PRECISION>::from(m.weight as i16) / weight_sum_interactions.clone()
                 };
                 measurements.interactions.push(WeightedFloat {
-                    value: interactions as f64,
+                    value: interactions.into(),
                     weight,
                 });
             }
             if let Some(inbound_bandwidth) = m.measurements.inbound_bandwidth {
-                let weight = if weight_sum_inbound_bandwidth == 0.0 {
-                    1.0 / count_inbound_bandwidth as f64
+                let weight = if weight_sum_inbound_bandwidth == 0.into() {
+                    HpFloat::<PRECISION>::from(1)
+                        / HpFloat::<PRECISION>::from(count_inbound_bandwidth)
                 } else {
-                    m.weight as f64 / weight_sum_inbound_bandwidth
+                    HpFloat::<PRECISION>::from(m.weight as i16)
+                        / weight_sum_inbound_bandwidth.clone()
                 };
                 measurements.inbound_bandwidth.push(WeightedFloat {
-                    value: inbound_bandwidth as f64,
+                    value: i128::try_from(inbound_bandwidth)
+                        .unwrap_or(i128::MAX)
+                        .into(),
                     weight,
                 });
             }
             if let Some(outbound_bandwidth) = m.measurements.outbound_bandwidth {
-                let weight = if weight_sum_outbound_bandwidth == 0.0 {
-                    1.0 / count_outbound_bandwidth as f64
+                let weight = if weight_sum_outbound_bandwidth == 0.into() {
+                    HpFloat::<PRECISION>::from(1)
+                        / HpFloat::<PRECISION>::from(count_outbound_bandwidth)
                 } else {
-                    m.weight as f64 / weight_sum_outbound_bandwidth
+                    HpFloat::<PRECISION>::from(m.weight as i16)
+                        / weight_sum_outbound_bandwidth.clone()
                 };
                 measurements.outbound_bandwidth.push(WeightedFloat {
-                    value: outbound_bandwidth as f64,
+                    value: i128::try_from(outbound_bandwidth)
+                        .unwrap_or(i128::MAX)
+                        .into(),
                     weight,
                 });
             }
             if let Some(bytes_received) = m.measurements.bytes_received {
-                let weight = if weight_sum_bytes_received == 0.0 {
-                    1.0 / count_bytes_received as f64
+                let weight = if weight_sum_bytes_received == 0.into() {
+                    HpFloat::<PRECISION>::from(1) / HpFloat::<PRECISION>::from(count_bytes_received)
                 } else {
-                    m.weight as f64 / weight_sum_bytes_received
+                    HpFloat::<PRECISION>::from(m.weight as i16) / weight_sum_bytes_received.clone()
                 };
                 measurements.bytes_received.push(WeightedFloat {
-                    value: bytes_received as f64,
+                    value: i128::try_from(bytes_received).unwrap_or(i128::MAX).into(),
                     weight,
                 });
             }
             if let Some(bytes_sent) = m.measurements.bytes_sent {
-                let weight = if weight_sum_bytes_sent == 0.0 {
-                    1.0 / count_bytes_sent as f64
+                let weight = if weight_sum_bytes_sent == 0.into() {
+                    HpFloat::<PRECISION>::from(1) / HpFloat::<PRECISION>::from(count_bytes_sent)
                 } else {
-                    m.weight as f64 / weight_sum_bytes_sent
+                    HpFloat::<PRECISION>::from(m.weight as i16) / weight_sum_bytes_sent.clone()
                 };
                 measurements.bytes_sent.push(WeightedFloat {
-                    value: bytes_sent as f64,
+                    value: i128::try_from(bytes_sent).unwrap_or(i128::MAX).into(),
                     weight,
                 });
             }
@@ -253,13 +285,16 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
         // reputation scores.
         // To prevent this, we invert the weights that were derived from the reputation score for
         // latency measurements.
-        if weight_sum_latency != 0.0 {
+        if weight_sum_latency != 0.into() && measurements.latency.len() > 1 {
             let inverse_weight_sum = measurements
                 .latency
                 .iter()
-                .fold(0.0, |acc, w| acc + (1.0 - w.weight));
+                .fold(HpFloat::<PRECISION>::from(0), |acc, w| {
+                    acc + (HpFloat::<PRECISION>::from(1) - w.weight.clone())
+                });
             measurements.latency.iter_mut().for_each(|w| {
-                w.weight = (1.0 - w.weight) / inverse_weight_sum;
+                w.weight =
+                    (HpFloat::<PRECISION>::from(1) - w.weight.clone()) / inverse_weight_sum.clone();
             });
         }
         measurements
@@ -269,20 +304,20 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
 impl From<&HashMap<NodePublicKey, NormalizedMeasurements>> for MinMaxValues {
     fn from(normalized_measurements: &HashMap<NodePublicKey, NormalizedMeasurements>) -> Self {
         let min_values = Values {
-            latency: f64::MAX,
-            interactions: f64::MAX,
-            inbound_bandwidth: f64::MAX,
-            outbound_bandwidth: f64::MAX,
-            bytes_received: f64::MAX,
-            bytes_sent: f64::MAX,
+            latency: HpFloat::<PRECISION>::from(f64::MAX),
+            interactions: HpFloat::<PRECISION>::from(f64::MAX),
+            inbound_bandwidth: HpFloat::<PRECISION>::from(f64::MAX),
+            outbound_bandwidth: HpFloat::<PRECISION>::from(f64::MAX),
+            bytes_received: HpFloat::<PRECISION>::from(f64::MAX),
+            bytes_sent: HpFloat::<PRECISION>::from(f64::MAX),
         };
         let max_values = Values {
-            latency: f64::MIN,
-            interactions: f64::MIN,
-            inbound_bandwidth: f64::MIN,
-            outbound_bandwidth: f64::MIN,
-            bytes_received: f64::MIN,
-            bytes_sent: f64::MIN,
+            latency: HpFloat::<PRECISION>::from(f64::MIN),
+            interactions: HpFloat::<PRECISION>::from(f64::MIN),
+            inbound_bandwidth: HpFloat::<PRECISION>::from(f64::MIN),
+            outbound_bandwidth: HpFloat::<PRECISION>::from(f64::MIN),
+            bytes_received: HpFloat::<PRECISION>::from(f64::MIN),
+            bytes_sent: HpFloat::<PRECISION>::from(f64::MIN),
         };
         let mut min_max_vals = MinMaxValues {
             min_values,
@@ -290,47 +325,71 @@ impl From<&HashMap<NodePublicKey, NormalizedMeasurements>> for MinMaxValues {
         };
 
         normalized_measurements.iter().for_each(|(_, m)| {
-            if let Some(latency) = m.latency {
-                min_max_vals.min_values.latency = min_max_vals.min_values.latency.min(latency);
-                min_max_vals.max_values.latency = min_max_vals.max_values.latency.max(latency);
+            if let Some(latency) = &m.latency {
+                min_max_vals.min_values.latency =
+                    min_max_vals.min_values.latency.clone().min(latency.clone());
+                min_max_vals.max_values.latency =
+                    min_max_vals.max_values.latency.clone().max(latency.clone());
             }
-            if let Some(interactions) = m.interactions {
-                min_max_vals.min_values.interactions =
-                    min_max_vals.min_values.interactions.min(interactions);
-                min_max_vals.max_values.interactions =
-                    min_max_vals.max_values.interactions.max(interactions);
+            if let Some(interactions) = &m.interactions {
+                min_max_vals.min_values.interactions = min_max_vals
+                    .min_values
+                    .interactions
+                    .clone()
+                    .min(interactions.clone());
+                min_max_vals.max_values.interactions = min_max_vals
+                    .max_values
+                    .interactions
+                    .clone()
+                    .max(interactions.clone());
             }
-            if let Some(inbound_bandwidth) = m.inbound_bandwidth {
+            if let Some(inbound_bandwidth) = &m.inbound_bandwidth {
                 min_max_vals.min_values.inbound_bandwidth = min_max_vals
                     .min_values
                     .inbound_bandwidth
-                    .min(inbound_bandwidth);
+                    .clone()
+                    .min(inbound_bandwidth.clone());
                 min_max_vals.max_values.inbound_bandwidth = min_max_vals
                     .max_values
                     .inbound_bandwidth
-                    .max(inbound_bandwidth);
+                    .clone()
+                    .max(inbound_bandwidth.clone());
             }
-            if let Some(outbound_bandwidth) = m.outbound_bandwidth {
+            if let Some(outbound_bandwidth) = &m.outbound_bandwidth {
                 min_max_vals.min_values.outbound_bandwidth = min_max_vals
                     .min_values
                     .outbound_bandwidth
-                    .min(outbound_bandwidth);
+                    .clone()
+                    .min(outbound_bandwidth.clone());
                 min_max_vals.max_values.outbound_bandwidth = min_max_vals
                     .max_values
                     .outbound_bandwidth
-                    .max(outbound_bandwidth);
+                    .clone()
+                    .max(outbound_bandwidth.clone());
             }
-            if let Some(bytes_received) = m.bytes_received {
-                min_max_vals.min_values.bytes_received =
-                    min_max_vals.min_values.bytes_received.min(bytes_received);
-                min_max_vals.max_values.bytes_received =
-                    min_max_vals.max_values.bytes_received.max(bytes_received);
+            if let Some(bytes_received) = &m.bytes_received {
+                min_max_vals.min_values.bytes_received = min_max_vals
+                    .min_values
+                    .bytes_received
+                    .clone()
+                    .min(bytes_received.clone());
+                min_max_vals.max_values.bytes_received = min_max_vals
+                    .max_values
+                    .bytes_received
+                    .clone()
+                    .max(bytes_received.clone());
             }
-            if let Some(bytes_sent) = m.bytes_sent {
-                min_max_vals.min_values.bytes_sent =
-                    min_max_vals.min_values.bytes_sent.min(bytes_sent);
-                min_max_vals.max_values.bytes_sent =
-                    min_max_vals.max_values.bytes_sent.max(bytes_sent);
+            if let Some(bytes_sent) = &m.bytes_sent {
+                min_max_vals.min_values.bytes_sent = min_max_vals
+                    .min_values
+                    .bytes_sent
+                    .clone()
+                    .min(bytes_sent.clone());
+                min_max_vals.max_values.bytes_sent = min_max_vals
+                    .max_values
+                    .bytes_sent
+                    .clone()
+                    .max(bytes_sent.clone());
             }
         });
         min_max_vals
@@ -366,42 +425,42 @@ impl From<CollectedMeasurements> for NormalizedMeasurements {
 
 impl NormalizedMeasurements {
     pub fn min_max_normalize(&mut self, min_max_vals: MinMaxValues) {
-        if let Some(latency) = self.latency {
+        if let Some(latency) = self.latency.clone() {
             self.latency = statistics::try_min_max_normalize(
                 latency,
                 min_max_vals.min_values.latency,
                 min_max_vals.max_values.latency,
             );
         }
-        if let Some(interactions) = self.interactions {
+        if let Some(interactions) = self.interactions.clone() {
             self.interactions = statistics::try_min_max_normalize(
                 interactions,
                 min_max_vals.min_values.interactions,
                 min_max_vals.max_values.interactions,
             );
         }
-        if let Some(inbound_bandwidth) = self.inbound_bandwidth {
+        if let Some(inbound_bandwidth) = self.inbound_bandwidth.clone() {
             self.inbound_bandwidth = statistics::try_min_max_normalize(
                 inbound_bandwidth,
                 min_max_vals.min_values.inbound_bandwidth,
                 min_max_vals.max_values.inbound_bandwidth,
             );
         }
-        if let Some(outbound_bandwidth) = self.outbound_bandwidth {
+        if let Some(outbound_bandwidth) = self.outbound_bandwidth.clone() {
             self.outbound_bandwidth = statistics::try_min_max_normalize(
                 outbound_bandwidth,
                 min_max_vals.min_values.outbound_bandwidth,
                 min_max_vals.max_values.outbound_bandwidth,
             );
         }
-        if let Some(bytes_received) = self.bytes_received {
+        if let Some(bytes_received) = self.bytes_received.clone() {
             self.bytes_received = statistics::try_min_max_normalize(
                 bytes_received,
                 min_max_vals.min_values.bytes_received,
                 min_max_vals.max_values.bytes_received,
             );
         }
-        if let Some(bytes_sent) = self.bytes_sent {
+        if let Some(bytes_sent) = self.bytes_sent.clone() {
             self.bytes_sent = statistics::try_min_max_normalize(
                 bytes_sent,
                 min_max_vals.min_values.bytes_sent,
@@ -411,30 +470,30 @@ impl NormalizedMeasurements {
     }
 
     pub fn calculate_score(&self) -> Option<u8> {
-        let mut score = 0.0;
+        let mut score = HpFloat::<PRECISION>::from(0);
         let mut count = 0;
-        if let Some(latency) = self.latency {
-            score += 1.0 - latency;
+        if let Some(latency) = &self.latency {
+            score += HpFloat::<PRECISION>::from(1) - latency;
             count += 1;
         }
-        if let Some(interactions) = self.interactions {
-            score += interactions;
+        if let Some(interactions) = &self.interactions {
+            score = score + interactions;
             count += 1;
         }
-        if let Some(inbound_bandwidth) = self.inbound_bandwidth {
-            score += inbound_bandwidth;
+        if let Some(inbound_bandwidth) = &self.inbound_bandwidth {
+            score = score + inbound_bandwidth;
             count += 1;
         }
-        if let Some(outbound_bandwidth) = self.outbound_bandwidth {
-            score += outbound_bandwidth;
+        if let Some(outbound_bandwidth) = &self.outbound_bandwidth {
+            score = score + outbound_bandwidth;
             count += 1;
         }
-        if let Some(bytes_received) = self.bytes_received {
-            score += bytes_received;
+        if let Some(bytes_received) = &self.bytes_received {
+            score = score + bytes_received;
             count += 1;
         }
-        if let Some(bytes_sent) = self.bytes_sent {
-            score += bytes_sent;
+        if let Some(bytes_sent) = &self.bytes_sent {
+            score = score + bytes_sent;
             count += 1;
         }
 
@@ -442,7 +501,9 @@ impl NormalizedMeasurements {
             return None;
         }
         // This value will be in the range [0, 1]
-        score /= count as f64;
-        Some((score * 100.0) as u8)
+        score = score / HpFloat::<PRECISION>::from(count);
+        let score: i128 = (score * HpFloat::<PRECISION>::from(100)).try_into().ok()?;
+        // The value of score will be in range [0, 100]
+        Some(score.min(100) as u8)
     }
 }

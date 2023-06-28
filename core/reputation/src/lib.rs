@@ -11,6 +11,8 @@ use types::{
     CollectedMeasurements, MinMaxValues, NormalizedMeasurements, WeightedReputationMeasurements,
 };
 
+pub(crate) const PRECISION: usize = 18;
+
 pub fn calculate_reputation_scores(
     weighted_measurements_map: HashMap<NodePublicKey, Vec<WeightedReputationMeasurements>>,
 ) -> HashMap<NodePublicKey, u8> {
@@ -46,6 +48,7 @@ fn calculate_normalized_measurements(
 mod tests {
 
     use draco_test_utils::random;
+    use hp_float::signed::HpFloat;
     use rand::Rng;
 
     use super::*;
@@ -110,53 +113,83 @@ mod tests {
         let weighted_measurements = generate_weighted_measurements(10, Some(rng));
         let collected_measurements: CollectedMeasurements = weighted_measurements.into();
 
-        let mut weight_sum = 0.0;
+        let mut weight_sum = HpFloat::<PRECISION>::from(0);
         collected_measurements.latency.iter().for_each(|w| {
-            assert!((0.0..=1.0).contains(&w.weight));
-            weight_sum += w.weight;
+            assert!((0.0.into()..=1.0.into()).contains(&w.weight));
+            weight_sum += w.weight.clone();
         });
-        assert!((weight_sum - 1.0).abs() < EPSILON);
+        assert!(
+            (weight_sum - HpFloat::<PRECISION>::from(1))
+                .try_abs()
+                .unwrap()
+                < EPSILON.into()
+        );
 
-        let mut weight_sum = 0.0;
+        let mut weight_sum = HpFloat::<PRECISION>::from(0);
         collected_measurements.latency.iter().for_each(|w| {
-            assert!((0.0..=1.0).contains(&w.weight));
-            weight_sum += w.weight;
+            assert!((0.0.into()..=1.0.into()).contains(&w.weight));
+            weight_sum += w.weight.clone();
         });
-        assert!((weight_sum - 1.0).abs() < EPSILON);
+        assert!(
+            (weight_sum - HpFloat::<PRECISION>::from(1))
+                .try_abs()
+                .unwrap()
+                < EPSILON.into()
+        );
 
-        let mut weight_sum = 0.0;
+        let mut weight_sum = HpFloat::<PRECISION>::from(0);
         collected_measurements
             .inbound_bandwidth
             .iter()
             .for_each(|w| {
-                assert!((0.0..=1.0).contains(&w.weight));
-                weight_sum += w.weight;
+                assert!((0.0.into()..=1.0.into()).contains(&w.weight));
+                weight_sum += w.weight.clone();
             });
-        assert!((weight_sum - 1.0).abs() < EPSILON);
+        assert!(
+            (weight_sum - HpFloat::<PRECISION>::from(1))
+                .try_abs()
+                .unwrap()
+                < EPSILON.into()
+        );
 
-        let mut weight_sum = 0.0;
+        let mut weight_sum = HpFloat::<PRECISION>::from(0);
         collected_measurements
             .outbound_bandwidth
             .iter()
             .for_each(|w| {
-                assert!((0.0..=1.0).contains(&w.weight));
-                weight_sum += w.weight;
+                assert!((0.0.into()..=1.0.into()).contains(&w.weight));
+                weight_sum += w.weight.clone();
             });
-        assert!((weight_sum - 1.0).abs() < EPSILON);
+        assert!(
+            (weight_sum - HpFloat::<PRECISION>::from(1))
+                .try_abs()
+                .unwrap()
+                < EPSILON.into()
+        );
 
-        let mut weight_sum = 0.0;
+        let mut weight_sum = HpFloat::<PRECISION>::from(0);
         collected_measurements.bytes_received.iter().for_each(|w| {
-            assert!((0.0..=1.0).contains(&w.weight));
-            weight_sum += w.weight;
+            assert!((0.0.into()..=1.0.into()).contains(&w.weight));
+            weight_sum += w.weight.clone();
         });
-        assert!((weight_sum - 1.0).abs() < EPSILON);
+        assert!(
+            (weight_sum - HpFloat::<PRECISION>::from(1))
+                .try_abs()
+                .unwrap()
+                < EPSILON.into()
+        );
 
-        let mut weight_sum = 0.0;
+        let mut weight_sum = HpFloat::<PRECISION>::from(0);
         collected_measurements.bytes_sent.iter().for_each(|w| {
-            assert!((0.0..=1.0).contains(&w.weight));
-            weight_sum += w.weight;
+            assert!((0.0.into()..=1.0.into()).contains(&w.weight));
+            weight_sum += w.weight.clone();
         });
-        assert!((weight_sum - 1.0).abs() < EPSILON);
+        assert!(
+            (weight_sum - HpFloat::<PRECISION>::from(1))
+                .try_abs()
+                .unwrap()
+                < EPSILON.into()
+        );
     }
 
     #[test]
@@ -166,37 +199,37 @@ mod tests {
         let collected_measurements: CollectedMeasurements = weighted_measurements.clone().into();
         if let Some(latency) = weighted_measurements[0].measurements.latency {
             assert_eq!(
-                latency.as_millis() as f64,
+                HpFloat::<PRECISION>::from(i128::try_from(latency.as_millis()).unwrap()),
                 collected_measurements.latency[0].value
             );
         }
         if let Some(interactions) = weighted_measurements[0].measurements.interactions {
             assert_eq!(
-                interactions as f64,
+                HpFloat::<PRECISION>::from(interactions),
                 collected_measurements.interactions[0].value
             );
         }
         if let Some(inbound_bandwidth) = weighted_measurements[0].measurements.inbound_bandwidth {
             assert_eq!(
-                inbound_bandwidth as f64,
+                HpFloat::<PRECISION>::from(i128::try_from(inbound_bandwidth).unwrap()),
                 collected_measurements.inbound_bandwidth[0].value
             );
         }
         if let Some(outbound_bandwidth) = weighted_measurements[0].measurements.outbound_bandwidth {
             assert_eq!(
-                outbound_bandwidth as f64,
+                HpFloat::<PRECISION>::from(i128::try_from(outbound_bandwidth).unwrap()),
                 collected_measurements.outbound_bandwidth[0].value
             );
         }
         if let Some(bytes_received) = weighted_measurements[0].measurements.bytes_received {
             assert_eq!(
-                bytes_received as f64,
+                HpFloat::<PRECISION>::from(i128::try_from(bytes_received).unwrap()),
                 collected_measurements.bytes_received[0].value
             );
         }
         if let Some(bytes_sent) = weighted_measurements[0].measurements.bytes_sent {
             assert_eq!(
-                bytes_sent as f64,
+                HpFloat::<PRECISION>::from(i128::try_from(bytes_sent).unwrap()),
                 collected_measurements.bytes_sent[0].value
             );
         }
@@ -250,26 +283,25 @@ mod tests {
             calculate_normalized_measurements(weighted_measurements_map);
 
         let min_max_vals: MinMaxValues = (&normalized_measurements_map).into();
-
         normalized_measurements_map.iter_mut().for_each(|(_, m)| {
             m.min_max_normalize(min_max_vals.clone());
             if let Some(latency) = &m.latency {
-                assert!((0.0..=1.0).contains(latency));
+                assert!((0.0.into()..=1.0.into()).contains(latency));
             }
             if let Some(interactions) = &m.interactions {
-                assert!((0.0..=1.0).contains(interactions));
+                assert!((0.0.into()..=1.0.into()).contains(interactions));
             }
             if let Some(inbound_bandwidth) = &m.inbound_bandwidth {
-                assert!((0.0..=1.0).contains(inbound_bandwidth));
+                assert!((0.0.into()..=1.0.into()).contains(inbound_bandwidth));
             }
             if let Some(outbound_bandwidth) = &m.outbound_bandwidth {
-                assert!((0.0..=1.0).contains(outbound_bandwidth));
+                assert!((0.0.into()..=1.0.into()).contains(outbound_bandwidth));
             }
             if let Some(bytes_received) = &m.bytes_received {
-                assert!((0.0..=1.0).contains(bytes_received));
+                assert!((0.0.into()..=1.0.into()).contains(bytes_received));
             }
             if let Some(bytes_sent) = &m.bytes_sent {
-                assert!((0.0..=1.0).contains(bytes_sent));
+                assert!((0.0.into()..=1.0.into()).contains(bytes_sent));
             }
         });
     }

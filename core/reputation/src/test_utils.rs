@@ -65,32 +65,32 @@ pub(crate) fn generate_normalized_measurements_map(
         let latency = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
             None
         } else {
-            Some(rng.gen_range(0.0..=1.0))
+            Some(rng.gen_range(0.0..=1.0).into())
         };
         let interactions = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
             None
         } else {
-            Some(rng.gen_range(0.0..=1.0))
+            Some(rng.gen_range(0.0..=1.0).into())
         };
         let inbound_bandwidth = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
             None
         } else {
-            Some(rng.gen_range(0.0..=1.0))
+            Some(rng.gen_range(0.0..=1.0).into())
         };
         let outbound_bandwidth = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
             None
         } else {
-            Some(rng.gen_range(0.0..=1.0))
+            Some(rng.gen_range(0.0..=1.0).into())
         };
         let bytes_received = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
             None
         } else {
-            Some(rng.gen_range(0.0..=1.0))
+            Some(rng.gen_range(0.0..=1.0).into())
         };
         let bytes_sent = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
             None
         } else {
-            Some(rng.gen_range(0.0..=1.0))
+            Some(rng.gen_range(0.0..=1.0).into())
         };
         let normalized_measurements = NormalizedMeasurements {
             latency,

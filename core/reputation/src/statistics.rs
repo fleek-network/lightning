@@ -1,6 +1,8 @@
 use std::ops::{Add, Div, Mul, Sub};
 
-use crate::types::WeightedValue;
+use hp_float::signed::HpFloat;
+
+use crate::{types::WeightedValue, PRECISION};
 
 const EPSILON: f64 = 1e-8;
 
@@ -16,9 +18,9 @@ pub fn approx_quantile<T: Ord + PartialOrd + Copy>(mut values: Vec<T>, q: f64) -
 
 pub fn try_min_max_normalize<T>(value: T, min_value: T, max_value: T) -> Option<T>
 where
-    T: Sub<T, Output = T> + PartialOrd<T> + Div<Output = T> + From<f64> + Copy,
+    T: Sub<T, Output = T> + PartialOrd<T> + Div<Output = T> + From<f64> + Clone,
 {
-    if abs_difference(min_value, max_value) < EPSILON.into() {
+    if abs_difference(min_value.clone(), max_value.clone()) < EPSILON.into() {
         return None;
     }
     Some(min_max_normalize(value, min_value, max_value))
@@ -26,9 +28,9 @@ where
 
 pub fn min_max_normalize<T>(value: T, min_value: T, max_value: T) -> T
 where
-    T: Sub<T, Output = T> + Div<Output = T> + Copy,
+    T: Sub<T, Output = T> + Div<Output = T> + Clone,
 {
-    (value - min_value) / (max_value - min_value)
+    (value - min_value.clone()) / (max_value - min_value)
 }
 
 fn abs_difference<T>(a: T, b: T) -> T
@@ -40,10 +42,10 @@ where
 
 fn calculate_mean<T>(values: &[T]) -> Option<T>
 where
-    T: Default + Add<T, Output = T> + Div<Output = T> + From<f64> + Mul<T, Output = T> + Copy,
+    T: Default + Add<T, Output = T> + Div<Output = T> + From<f64> + Mul<T, Output = T> + Clone,
 {
     if !values.is_empty() {
-        let sum = values.iter().copied().fold(T::default(), |acc, x| acc + x);
+        let sum = values.iter().cloned().fold(T::default(), |acc, x| acc + x);
         let n = values.len() as f64;
         Some(sum / n.into())
     } else {
@@ -59,14 +61,17 @@ where
         + Mul<T, Output = T>
         + From<f64>
         + Sub<T, Output = T>
-        + Copy,
+        + Clone,
 {
+    if values.len() == 1 {
+        return Some(1.0.into());
+    }
     calculate_mean(values).map(|values_mean| {
         let n: T = (values.len() as f64).into();
         values
             .iter()
-            .copied()
-            .map(|v| (v - values_mean) * (v - values_mean))
+            .cloned()
+            .map(|v| (v.clone() - values_mean.clone()) * (v - values_mean.clone()))
             .fold(T::default(), |acc, x| acc + x)
             / (n - 1.0.into())
     })
@@ -79,9 +84,9 @@ where
         + From<f64>
         + Sub<T, Output = T>
         + Div<T, Output = T>
-        + Copy,
+        + Clone,
 {
-    ((x - mean) * (x - mean)) / (variance + EPSILON.into())
+    ((x.clone() - mean.clone()) * (x - mean)) / (variance + EPSILON.into())
 }
 
 fn z_score_normalize_filter<T>(values: &mut Vec<T>)
@@ -93,18 +98,20 @@ where
         + From<f64>
         + Sub<T, Output = T>
         + PartialOrd<T>
-        + Copy,
+        + Clone,
 {
     if let Some(variance) = calculate_variance(values) {
         if variance > EPSILON.into() {
             if let Some(mean) = calculate_mean(values) {
-                values.retain(|&x| calculate_z_score(x, mean, variance) < 9.0.into());
+                values.retain(|x| {
+                    calculate_z_score(x.clone(), mean.clone(), variance.clone()) < 9.0.into()
+                });
             }
         }
     }
 }
 
-fn calculate_weighted_mean<T>(values: &[T]) -> Option<f64>
+fn calculate_weighted_mean<T>(values: &[T]) -> Option<HpFloat<PRECISION>>
 where
     T: Default
         + WeightedValue
@@ -112,20 +119,22 @@ where
         + Div<Output = T>
         + From<f64>
         + Mul<T, Output = T>
-        + Copy,
+        + Clone,
 {
     if !values.is_empty() {
         let mean = values
             .iter()
-            .copied()
-            .fold(0.0, |acc, v| acc + v.get_weighted_value());
+            .cloned()
+            .fold(0.0.into(), |acc: HpFloat<PRECISION>, v| {
+                acc + v.get_weighted_value()
+            });
         Some(mean)
     } else {
         None
     }
 }
 
-pub fn calculate_z_normalized_weighted_mean<T>(mut values: Vec<T>) -> Option<f64>
+pub fn calculate_z_normalized_weighted_mean<T>(mut values: Vec<T>) -> Option<HpFloat<PRECISION>>
 where
     T: Default
         + WeightedValue
@@ -133,9 +142,10 @@ where
         + Div<Output = T>
         + Mul<T, Output = T>
         + From<f64>
+        + From<usize>
         + Sub<T, Output = T>
         + PartialOrd<T>
-        + Copy,
+        + Clone,
 {
     z_score_normalize_filter(&mut values);
     calculate_weighted_mean(&values)
@@ -263,32 +273,32 @@ mod tests {
     fn test_calculate_weighted_mean() {
         let values = vec![
             WeightedFloat {
-                value: 1.0,
-                weight: 0.2,
+                value: 1.0.into(),
+                weight: 0.2.into(),
             },
             WeightedFloat {
-                value: 2.0,
-                weight: 0.1,
+                value: 2.0.into(),
+                weight: 0.1.into(),
             },
             WeightedFloat {
-                value: 3.0,
-                weight: 0.1,
+                value: 3.0.into(),
+                weight: 0.1.into(),
             },
             WeightedFloat {
-                value: 4.0,
-                weight: 0.3,
+                value: 4.0.into(),
+                weight: 0.3.into(),
             },
             WeightedFloat {
-                value: 5.0,
-                weight: 0.1,
+                value: 5.0.into(),
+                weight: 0.1.into(),
             },
             WeightedFloat {
-                value: 6.0,
-                weight: 0.2,
+                value: 6.0.into(),
+                weight: 0.2.into(),
             },
         ];
         let weighted_mean = calculate_weighted_mean(&values);
-        assert_eq!(weighted_mean, Some(3.6));
+        assert_eq!(weighted_mean, Some(3.6.into()));
     }
 
     #[test]
@@ -312,55 +322,55 @@ mod tests {
     fn test_calculate_z_normalized_weighted_mean() {
         let values = vec![
             WeightedFloat {
-                value: 4.0,
-                weight: 0.1,
+                value: 4.0.into(),
+                weight: 0.1.into(),
             },
             WeightedFloat {
-                value: 6.0,
-                weight: 0.01,
+                value: 6.0.into(),
+                weight: 0.01.into(),
             },
             WeightedFloat {
-                value: 3.0,
-                weight: 0.01,
+                value: 3.0.into(),
+                weight: 0.01.into(),
             },
             WeightedFloat {
-                value: 4.0,
-                weight: 0.18,
+                value: 4.0.into(),
+                weight: 0.18.into(),
             },
             WeightedFloat {
-                value: 5.0,
-                weight: 0.1,
+                value: 5.0.into(),
+                weight: 0.1.into(),
             },
             WeightedFloat {
-                value: 2.0,
-                weight: 0.1,
+                value: 2.0.into(),
+                weight: 0.1.into(),
             },
             WeightedFloat {
-                value: 2.0,
-                weight: 0.1,
+                value: 2.0.into(),
+                weight: 0.1.into(),
             },
             WeightedFloat {
-                value: 1.0,
-                weight: 0.1,
+                value: 1.0.into(),
+                weight: 0.1.into(),
             },
             WeightedFloat {
-                value: 3.0,
-                weight: 0.1,
+                value: 3.0.into(),
+                weight: 0.1.into(),
             },
             WeightedFloat {
-                value: 2.0,
-                weight: 0.1,
+                value: 2.0.into(),
+                weight: 0.1.into(),
             },
             WeightedFloat {
-                value: 4.0,
-                weight: 0.05,
+                value: 4.0.into(),
+                weight: 0.05.into(),
             },
             WeightedFloat {
-                value: 50.0,
-                weight: 0.05,
+                value: 50.0.into(),
+                weight: 0.05.into(),
             },
         ];
         let weighted_mean = calculate_z_normalized_weighted_mean(values);
-        assert_eq!(weighted_mean, Some(2.91));
+        assert_eq!(weighted_mean, Some(2.91.into()));
     }
 }

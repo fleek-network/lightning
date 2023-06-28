@@ -2293,6 +2293,7 @@ dependencies = [
  "draco-interfaces",
  "draco-test-utils",
  "fleek-crypto",
+ "hp-float",
  "rand 0.8.5",
 ]
 
