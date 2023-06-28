@@ -69,7 +69,7 @@ pub trait ApplicationInterface:
     fn sync_query(&self) -> Self::SyncExecutor;
 }
 
-pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
+pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Returns the latest bandwidth balance associated with the given account public key.
     fn get_account_balance(&self, account: &AccountOwnerPublicKey) -> u128;
 
@@ -128,6 +128,8 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync {
     /// Returns the committee members of the current epoch.
     fn get_committee_members(&self) -> Vec<NodePublicKey>;
 
+    /// Returns just the current epoch
+    fn get_epoch(&self) -> Epoch;
     /// Returns all the information on the current epoch that Narwhal needs to run
     fn get_epoch_info(&self) -> EpochInfo;
 

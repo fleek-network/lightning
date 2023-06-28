@@ -192,6 +192,15 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
+    fn get_epoch(&self) -> Epoch {
+        self.inner.run(
+            |ctx| match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
+                Some(Value::Epoch(epoch)) => epoch,
+                _ => 0,
+            },
+        )
+    }
+
     fn get_epoch_info(&self) -> EpochInfo {
         self.inner.run(|ctx| {
             let node_table = self.node_table.get(ctx);

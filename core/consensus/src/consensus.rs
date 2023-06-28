@@ -5,6 +5,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use affair::{Executor, TokioSpawn};
 use async_trait::async_trait;
 use draco_interfaces::{
     application::ExecutionEngineSocket,
@@ -33,6 +34,7 @@ use tokio::{
 use crate::{
     config::Config,
     execution::Execution,
+    forwarder::Forwarder,
     narwhal::{NarwhalArgs, NarwhalService},
 };
 
@@ -50,6 +52,9 @@ pub struct Consensus<Q: SyncQueryRunnerInterface> {
     /// so its not always sending     a transaction to its own mempool. The signer interface
     /// also takes care of nonce bookkeeping and retry logic
     txn_socket: SubmitTxSocket,
+    /// This socket recieves signed transactions and forwards them to an active committee member to
+    /// be ordered
+    mempool_socket: MempoolSocket,
     /// Narwhal execution state.
     execution_state: Arc<Execution>,
     /// Timestamp of the narwhal certificate that caused an epoch change
@@ -261,14 +266,14 @@ impl<Q: SyncQueryRunnerInterface> ConsensusInterface for Consensus<Q> {
         let reconfigure_notify = Arc::new(Notify::new());
 
         let networking_keypair = NetworkKeyPair::from(networking_sk);
-
-        // TODO(dalton): Give signer mempool socket
+        let primary_keypair = KeyPair::from(primary_sk);
+        let forwarder = Forwarder::new(query_runner.clone(), primary_keypair.public().clone());
 
         Ok(Self {
             query_runner,
             store_path: config.store_path,
             narwhal_args: NarwhalArgs {
-                primary_keypair: KeyPair::from(primary_sk),
+                primary_keypair,
                 primary_network_keypair: networking_keypair.copy(),
                 worker_keypair: networking_keypair,
                 primary_address: config.address,
@@ -279,6 +284,7 @@ impl<Q: SyncQueryRunnerInterface> ConsensusInterface for Consensus<Q> {
             epoch_state: Mutex::new(None),
             execution_state: Arc::new(Execution::new(executor, reconfigure_notify.clone())),
             txn_socket: signer.get_socket(),
+            mempool_socket: TokioSpawn::spawn_async(forwarder),
             reconfigure_notify,
             shutdown_notify: Notify::new(),
         })
@@ -288,6 +294,6 @@ impl<Q: SyncQueryRunnerInterface> ConsensusInterface for Consensus<Q> {
     /// this can be used by any other systems that are interested in posting some
     /// transaction to the consensus.
     fn mempool(&self) -> MempoolSocket {
-        todo!()
+        self.mempool_socket.clone()
     }
 }
