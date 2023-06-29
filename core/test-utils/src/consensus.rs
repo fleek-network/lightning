@@ -113,8 +113,8 @@ impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
         mut rx: mpsc::Receiver<Task<UpdateRequest, ()>>,
         mut shutdown_rx: mpsc::Receiver<()>,
     ) {
+        let mut tx_count = 0;
         loop {
-            //let mut nonces = Arc::new(scc::HashMap::new());
             tokio::select! {
                 task = rx.recv() => {
                     let task = task.expect("Failed to receive UpdateRequest.");
@@ -123,11 +123,18 @@ impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
                     let ordering_duration = rand::thread_rng().gen_range(range);
                     sleep(Duration::from_secs(ordering_duration)).await;
                     // Randomly drop a transaction so we can handle this case.
-                    if rand::thread_rng().gen_bool(self.config.probability_transaction_lost) {
+                    if rand::thread_rng().gen_bool(self.config.probability_txn_lost) {
                         continue;
                     }
                     let update_request = task.request.clone();
                     task.respond(());
+                    tx_count += 1;
+                    // Drop every `lose_every_n_txn` transaction.
+                    if let Some(lose_every_n_txn) = self.config.lose_every_n_txn {
+                        if tx_count % lose_every_n_txn == 0 {
+                            continue;
+                        }
+                    }
 
                     let block = Block {
                         transactions: vec![update_request],
@@ -148,9 +155,16 @@ impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
+    /// Lower bound for the random time it takes to order a transaction.
     pub min_ordering_time: u64,
+    /// Upper bound for the random time it takes to order a transaction.
     pub max_ordering_time: u64,
-    pub probability_transaction_lost: f64,
+    /// Probability that a transaction won't get through.
+    /// The nonce won't be incremented on the application.
+    pub probability_txn_lost: f64,
+    /// Every `lose_every_n_txn` transaction will be lost.
+    /// The nonce won't be incremented on the application.
+    pub lose_every_n_txn: Option<u32>,
 }
 
 impl Default for Config {
@@ -158,7 +172,8 @@ impl Default for Config {
         Self {
             min_ordering_time: 0,
             max_ordering_time: 5,
-            probability_transaction_lost: 0.1,
+            probability_txn_lost: 0.1,
+            lose_every_n_txn: None,
         }
     }
 }

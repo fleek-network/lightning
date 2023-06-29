@@ -16,7 +16,6 @@ use tokio::sync::mpsc;
 
 use crate::{buffered_mpsc, config::Config, measurement_manager::MeasurementManager};
 
-#[allow(dead_code)]
 pub struct ReputationAggregator {
     report_rx: buffered_mpsc::BufferedReceiver<ReportMessage>,
     reporter: MyReputationReporter,
@@ -26,7 +25,7 @@ pub struct ReputationAggregator {
     notifier: Notifier,
     notify_rx: mpsc::Receiver<Notification>,
     notify_tx: mpsc::Sender<Notification>,
-    config: Config,
+    _config: Config,
 }
 
 #[allow(dead_code)]
@@ -115,7 +114,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
             notifier,
             notify_rx,
             notify_tx,
-            config,
+            _config: config,
         })
     }
 

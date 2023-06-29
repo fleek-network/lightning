@@ -33,7 +33,10 @@ const QUERY_INTERVAL: Duration = Duration::from_secs(5);
 // If a transaction does not get ordered, the signer will try to resend it.
 // `TIMEOUT` specifies the duration the signer will wait before resending transactions to the
 // mempool.
+#[cfg(not(test))]
 const TIMEOUT: Duration = Duration::from_secs(300);
+#[cfg(test)]
+const TIMEOUT: Duration = Duration::from_secs(3);
 
 #[allow(clippy::type_complexity)]
 pub struct Signer {
