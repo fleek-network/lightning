@@ -8,7 +8,7 @@ use crate::{
     config::ConfigConsumer,
     types::{
         Block, CommodityServed, Epoch, EpochInfo, NodeInfo, ProtocolParams,
-        ReportedReputationMeasurements, TotalServed, TransactionResponse,
+        ReportedReputationMeasurements, TotalServed, TransactionResponse, UpdateRequest,
     },
 };
 
@@ -150,6 +150,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Returns the passed in protocol parameter
     fn get_protocol_params(&self, param: ProtocolParams) -> u128;
+
+    /// Validates the passed in transaction
+    fn validate_txn(&self, txn: UpdateRequest) -> TransactionResponse;
 }
 
 #[derive(Clone, Debug)]

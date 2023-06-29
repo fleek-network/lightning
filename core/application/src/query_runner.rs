@@ -3,13 +3,17 @@ use draco_interfaces::{
     application::SyncQueryRunnerInterface,
     types::{
         AccountInfo, CommodityServed, CommodityTypes, Epoch, EpochInfo, Metadata, NodeInfo,
-        ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, TotalServed, Value,
+        ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, TotalServed,
+        TransactionResponse, UpdateRequest, Value,
     },
 };
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
 use hp_float::unsigned::HpUfloat;
 
-use crate::state::Committee;
+use crate::{
+    state::{Committee, State},
+    table::StateTables,
+};
 
 #[derive(Clone)]
 pub struct QueryRunner {
@@ -281,6 +285,17 @@ impl SyncQueryRunnerInterface for QueryRunner {
         self.inner.run(|ctx| {
             let param = &param;
             self.param_table.get(ctx).get(param).unwrap_or(0)
+        })
+    }
+
+    fn validate_txn(&self, txn: UpdateRequest) -> TransactionResponse {
+        self.inner.run(|ctx| {
+            // Create the app/execution enviroment
+            let backend = StateTables {
+                table_selector: ctx,
+            };
+            let app = State::new(backend);
+            app.execute_txn(txn.clone())
         })
     }
 }

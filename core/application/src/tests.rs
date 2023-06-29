@@ -5,8 +5,8 @@ use anyhow::{anyhow, Result};
 use draco_interfaces::{
     application::ExecutionEngineSocket,
     types::{
-        Block, Epoch, ExecutionError, NodeInfo, ProofOfConsensus, Tokens, TotalServed,
-        TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
+        Block, Epoch, ExecutionData, ExecutionError, NodeInfo, ProofOfConsensus, Tokens,
+        TotalServed, TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
     },
     ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
 };
@@ -806,4 +806,37 @@ async fn test_supply_across_epoch() {
             assert_eq!(total_supply, supply_year_start);
         }
     }
+}
+
+#[test]
+async fn test_validate_txn() {
+    let (update_socket, query_runner) = init_app(None).await;
+    let (_, genesis_committee) = get_genesis();
+
+    // Submit a ChangeEpoch transaction that will revert (EpochHasNotStarted) and ensure that the
+    // `validate_txn` method of the query runner returns the same response as the update runner.
+    let req = get_update_request_node(
+        UpdateMethod::ChangeEpoch { epoch: 1 },
+        genesis_committee[0].public_key,
+    );
+    let res = run_transaction(vec![req.clone()], &update_socket)
+        .await
+        .unwrap();
+    assert_eq!(
+        res.txn_receipts[0],
+        //TransactionResponse::Revert(ExecutionError::EpochHasNotStarted)
+        query_runner.validate_txn(req)
+    );
+
+    // Submit a ChangeEpoch transaction that will succeed and ensure that the
+    // `validate_txn` method of the query runner returns the same response as the update runner.
+    let req = get_update_request_node(
+        UpdateMethod::ChangeEpoch { epoch: 0 },
+        genesis_committee[0].public_key,
+    );
+    let res = run_transaction(vec![req], &update_socket).await.unwrap();
+    assert_eq!(
+        res.txn_receipts[0],
+        TransactionResponse::Success(ExecutionData::None)
+    );
 }
