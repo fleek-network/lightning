@@ -258,7 +258,6 @@ impl SignerInner {
                         signature: TransactionSignature::Node(NodeSignature([0; 48])),
                         payload: update_payload,
                     };
-                    //mempool_socket.enqueue(update_request.clone()).await.expect("Failed to send transaction to mempool.");
                     mempool_socket.run(update_request.clone())
                         .await
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
@@ -271,7 +270,8 @@ impl SignerInner {
                     last_nonce_increment = Some(SystemTime::now());
                 }
                 _ = query_interval.tick() => {
-                    self.clone().sync_with_application(
+                    SignerInner::sync_with_application(
+                        self.node_public_key,
                         &query_runner,
                         &mempool_socket,
                         &mut base_nonce,
@@ -286,7 +286,7 @@ impl SignerInner {
     }
 
     async fn sync_with_application(
-        self: Arc<Self>,
+        node_public_key: NodePublicKey,
         query_runner: &QueryRunner,
         mempool_socket: &MempoolSocket,
         base_nonce: &mut u64,
@@ -297,7 +297,7 @@ impl SignerInner {
         // If node_info does not exist for the node, there is no point in sending a transaction
         // because it will revert. However, this can still be useful for testing.
         let application_nonce =
-            if let Some(node_info) = query_runner.get_node_info(&self.node_public_key) {
+            if let Some(node_info) = query_runner.get_node_info(&node_public_key) {
                 node_info.nonce
             } else {
                 0
