@@ -2171,7 +2171,6 @@ dependencies = [
  "narwhal-worker",
  "prometheus",
  "rand 0.8.5",
- "rayon",
  "resolve-path",
  "serde",
  "sui-protocol-config",

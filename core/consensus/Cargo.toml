@@ -18,7 +18,6 @@ tokio.workspace = true
 
 rand = "0.8.5"
 resolve-path = "0.1.0"
-rayon = "1.7.0"
 
 # Narwhal b06ada015694890d7c46347b13fbc3e9a763513c
 narwhal-config = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-config" }
