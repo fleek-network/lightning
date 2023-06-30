@@ -263,11 +263,15 @@ impl SignerInner {
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                         .expect("Failed to send transaction to mempool.");
 
-                        // Optimistically increment nonce
-                        next_nonce += 1;
-                        pending_transactions.push_back(update_request);
+                    // Optimistically increment nonce
+                    next_nonce += 1;
+                    let timestamp = SystemTime::now();
+                    pending_transactions.push_back(PendingTransaction {
+                        update_request,
+                        timestamp,
+                    });
                     // Set timer
-                    last_nonce_increment = Some(SystemTime::now());
+                    last_nonce_increment = Some(timestamp);
                 }
                 _ = query_interval.tick() => {
                     SignerInner::sync_with_application(
@@ -292,7 +296,7 @@ impl SignerInner {
         base_nonce: &mut u64,
         next_nonce: &mut u64,
         last_nonce_increment: &mut Option<SystemTime>,
-        pending_transactions: &mut VecDeque<UpdateRequest>,
+        pending_transactions: &mut VecDeque<PendingTransaction>,
     ) {
         // If node_info does not exist for the node, there is no point in sending a transaction
         // because it will revert. However, this can still be useful for testing.
@@ -313,38 +317,47 @@ impl SignerInner {
                     // Reset `next_nonce` to application nonce.
                     *next_nonce = *base_nonce;
                     // Resend all transactions with nonce >= base_nonce.
-                    for req in pending_transactions.iter_mut() {
+                    for pending_tx in pending_transactions.iter_mut() {
                         if let TransactionResponse::Revert(_) =
-                            query_runner.validate_txn(req.clone())
+                            query_runner.validate_txn(pending_tx.update_request.clone())
                         {
                             // If transaction reverts, don't retry.
                             continue;
                         }
                         *next_nonce += 1;
                         mempool_socket
-                            .run(req.clone())
+                            .run(pending_tx.update_request.clone())
                             .await
                             .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                             .expect("Failed to send transaction to mempool.");
-                    }
-                    if *next_nonce > *base_nonce {
-                        // If transactions were re-tried, set timer.
-                        *last_nonce_increment = Some(SystemTime::now());
+                        // Update timestamp to resending time.
+                        pending_tx.timestamp = SystemTime::now();
+                        *last_nonce_increment = Some(pending_tx.timestamp);
                     }
                 }
             }
         } else if application_nonce > *base_nonce {
-            // TODO: check if we have to turn off timer.
             *base_nonce = application_nonce;
-            // All transactions in range [base_nonce, application_nonce - 1] have been ordered have
+            // All transactions in range [base_nonce, application_nonce - 1] have
             // been ordered, so we can remove them from `pending_transactions`.
             while !pending_transactions.is_empty()
-                && pending_transactions.get(0).unwrap().payload.nonce < application_nonce
+                && pending_transactions[0].update_request.payload.nonce < application_nonce
             {
                 pending_transactions.pop_front();
             }
+            if pending_transactions.is_empty() {
+                *last_nonce_increment = None;
+            } else {
+                *last_nonce_increment = Some(pending_transactions[0].timestamp);
+            }
         }
     }
+}
+
+#[derive(Clone)]
+struct PendingTransaction {
+    pub update_request: UpdateRequest,
+    pub timestamp: SystemTime,
 }
 
 impl ConfigConsumer for Signer {
