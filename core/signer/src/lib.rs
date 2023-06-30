@@ -16,7 +16,7 @@ use draco_interfaces::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
     signer::{SignerInterface, SubmitTxSocket},
-    types::{UpdateMethod, UpdatePayload, UpdateRequest},
+    types::{TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest},
     MempoolSocket, SyncQueryRunnerInterface,
 };
 use fleek_crypto::{
@@ -314,16 +314,27 @@ impl SignerInner {
                     *next_nonce = *base_nonce;
                     // Resend all transactions with nonce >= base_nonce.
                     for req in pending_transactions.iter_mut() {
+                        if let TransactionResponse::Revert(_) =
+                            query_runner.validate_txn(req.clone())
+                        {
+                            // If transaction reverts, don't retry.
+                            continue;
+                        }
                         *next_nonce += 1;
                         mempool_socket
-                            .enqueue(req.clone())
+                            .run(req.clone())
                             .await
+                            .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                             .expect("Failed to send transaction to mempool.");
                     }
-                    *last_nonce_increment = Some(SystemTime::now());
+                    if *next_nonce > *base_nonce {
+                        // If transactions were re-tried, set timer.
+                        *last_nonce_increment = Some(SystemTime::now());
+                    }
                 }
             }
         } else if application_nonce > *base_nonce {
+            // TODO: check if we have to turn off timer.
             *base_nonce = application_nonce;
             // All transactions in range [base_nonce, application_nonce - 1] have been ordered have
             // been ordered, so we can remove them from `pending_transactions`.
