@@ -11,14 +11,16 @@ fleek-crypto.workspace = true
 async-trait.workspace = true
 bincode.workspace = true
 draco-interfaces = { path = "../interfaces" }
+futures.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 tokio.workspace = true
 
 rand = "0.8.5"
 resolve-path = "0.1.0"
+rayon = "1.7.0"
 
-# Narwhal 65ae52bdc72c6f7f504510d83b73cf2404562f2f
+# Narwhal b06ada015694890d7c46347b13fbc3e9a763513c
 narwhal-config = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-config" }
 narwhal-consensus = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-consensus" }
 narwhal-crypto = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-crypto" }
@@ -31,6 +33,8 @@ narwhal-network = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada
 mysten-metrics = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "mysten-metrics" }
 mysten-network = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "mysten-network" }
 sui-protocol-config = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "sui-protocol-config" }
+tonic = { version = "0.8.2", features = ["transport", "tls"] }
+
 prometheus = "0.13.3"
 multiaddr = "0.17.1"
 fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1" }

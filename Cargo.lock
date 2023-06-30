@@ -2156,6 +2156,7 @@ dependencies = [
  "draco-interfaces",
  "fastcrypto",
  "fleek-crypto",
+ "futures",
  "multiaddr",
  "mysten-metrics",
  "mysten-network",
@@ -2170,10 +2171,12 @@ dependencies = [
  "narwhal-worker",
  "prometheus",
  "rand 0.8.5",
+ "rayon",
  "resolve-path",
  "serde",
  "sui-protocol-config",
  "tokio",
+ "tonic",
 ]
 
 [[package]]
