@@ -10,3 +10,4 @@ anyhow = "1.0.71"
 num-bigint = {version = "0.4.3", features=["serde"]}
 serde = { version = "1.0", features = ["derive"] }
 num-traits ="0.2.15"
+random-oracle.workspace = true

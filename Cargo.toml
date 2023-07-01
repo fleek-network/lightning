@@ -36,7 +36,9 @@ dirs = "5.0.1"
 affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
 fleek-crypto = { path = "lib/fleek-crypto" }
-hp-float = { path = "lib/hp-float" }
+hp-float = { path= "lib/hp-float" }
+blake3-tree = { path= "lib/blake3-tree" }
+random-oracle = { path= "lib/random-oracle" }
 
 # Since MystenLabs uses Hakari in the sui repository, and we bring narwhal in from there, this
 # results into all of their dependencies and packages to be listed in their workspace-hack crate.

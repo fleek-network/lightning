@@ -5,6 +5,7 @@ use std::{
 
 use num_bigint::BigUint;
 use num_traits::{zero, CheckedDiv, FromPrimitive, Num, ToPrimitive, Zero};
+use random_oracle::RandomOracleInput;
 use serde::{Deserialize, Serialize};
 
 use crate::{format_hp_float, HpFloatConversionError};
@@ -73,6 +74,10 @@ impl<const P: usize> HpUfloat<P> {
 
     pub fn max<'a>(&'a self, rhs: &'a Self) -> &'a Self {
         if self.0 >= rhs.0 { self } else { rhs }
+    }
+
+    pub fn get_value(&self) -> &BigUint {
+        &self.0
     }
 }
 
@@ -380,6 +385,23 @@ impl<const P: usize> TryFrom<HpUfloat<P>> for BigUint {
             .0
             .checked_div(&divisor)
             .ok_or(HpFloatConversionError::DivisionError)
+    }
+}
+
+impl<const P: usize> RandomOracleInput for HpUfloat<P> {
+    const TYPE: &'static str = "HpUfloat";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        let mut input = Vec::new();
+
+        // Append the precision value as a byte
+        input.push(P as u8);
+
+        // Append the BigUint data as bytes
+        let data_bytes = self.get_value().to_bytes_le();
+        input.extend_from_slice(&data_bytes);
+
+        input
     }
 }
 

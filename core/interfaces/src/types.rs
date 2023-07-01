@@ -7,9 +7,12 @@ use fleek_crypto::{
 use hp_float::unsigned::HpUfloat;
 use multiaddr::Multiaddr;
 use num_derive::FromPrimitive;
+use random_oracle::{RandomOracle, RandomOracleInput};
 use serde::{Deserialize, Serialize};
 
 use crate::{common::ToDigest, pod::DeliveryAcknowledgment};
+
+const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";
 
 /// Unix time stamp in second.
 pub type UnixTs = u64;
@@ -371,7 +374,79 @@ impl ToDigest for UpdatePayload {
     /// nonce, the name of all of the update method names along with the value
     /// for all of the parameters.
     fn to_digest(&self) -> [u8; 32] {
-        todo!()
+        let mut random_oracle =
+            RandomOracle::empty(FN_TXN_PAYLOAD_DOMAIN).with("nonce", &self.nonce);
+
+        // insert method fields
+        match &self.method {
+            UpdateMethod::Deposit {
+                proof: _,
+                token,
+                amount,
+            } => {
+                random_oracle = random_oracle
+                    .with("transaction_name", &"deposit")
+                    .with_prefix("input".to_owned())
+                    .with("token", token)
+                    .with("amount", amount);
+                //.with("method.proof", proof);
+            },
+
+            UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+                commodity,
+                service_id,
+                proofs: _,
+                metadata,
+            } => {
+                random_oracle = random_oracle
+                    .with(
+                        "transaction_name",
+                        &"submit_delivery_acknowledgment_aggregation",
+                    )
+                    .with_prefix("input".to_owned())
+                    .with("commodity", commodity)
+                    .with("service_id", service_id)
+                    .with("metadata", metadata);
+                //.with("method.proof", proof);
+            },
+            UpdateMethod::Withdraw {
+                amount: _,
+                token: _,
+                receiving_address: _,
+            } => todo!(),
+            UpdateMethod::Stake {
+                amount: _,
+                node_public_key: _,
+                node_network_key: _,
+                node_domain: _,
+                worker_public_key: _,
+                worker_domain: _,
+                worker_mempool_address: _,
+            } => todo!(),
+            UpdateMethod::StakeLock {
+                node: _,
+                locked_for: _,
+            } => todo!(),
+            UpdateMethod::Unstake { amount: _, node: _ } => todo!(),
+            UpdateMethod::WithdrawUnstaked {
+                node: _,
+                recipient: _,
+            } => todo!(),
+            UpdateMethod::ChangeEpoch { epoch: _ } => todo!(),
+            UpdateMethod::AddService {
+                service: _,
+                service_id: _,
+            } => todo!(),
+            UpdateMethod::RemoveService { service_id: _ } => todo!(),
+            UpdateMethod::Slash {
+                service_id: _,
+                node: _,
+                proof_of_misbehavior: _,
+            } => todo!(),
+            UpdateMethod::SubmitReputationMeasurements { measurements: _ } => todo!(),
+        }
+
+        random_oracle.hash()
     }
 }
 
@@ -403,4 +478,15 @@ pub struct ReputationMeasurements {
 pub struct ReportedReputationMeasurements {
     pub reporting_node: NodePublicKey,
     pub measurements: ReputationMeasurements,
+}
+
+impl RandomOracleInput for Tokens {
+    const TYPE: &'static str = "Tokens";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        match self {
+            Tokens::USDC => b"USDC".to_vec(),
+            Tokens::FLK => b"FLK".to_vec(),
+        }
+    }
 }
