@@ -236,7 +236,7 @@ impl SignerInner {
     ) {
         let mut query_interval = interval(QUERY_INTERVAL);
         let mut pending_transactions = VecDeque::new();
-        let mut last_nonce_increment = None;
+        let mut base_timestamp = None;
         let application_nonce =
             if let Some(node_info) = query_runner.get_node_info(&self.node_public_key) {
                 node_info.nonce
@@ -271,7 +271,9 @@ impl SignerInner {
                         timestamp,
                     });
                     // Set timer
-                    last_nonce_increment = Some(timestamp);
+                    if base_timestamp.is_none() {
+                        base_timestamp = Some(timestamp);
+                    }
                 }
                 _ = query_interval.tick() => {
                     SignerInner::sync_with_application(
@@ -280,7 +282,7 @@ impl SignerInner {
                         &mempool_socket,
                         &mut base_nonce,
                         &mut next_nonce,
-                        &mut last_nonce_increment,
+                        &mut base_timestamp,
                         &mut pending_transactions
                     ).await;
                 }
@@ -295,7 +297,7 @@ impl SignerInner {
         mempool_socket: &MempoolSocket,
         base_nonce: &mut u64,
         next_nonce: &mut u64,
-        last_nonce_increment: &mut Option<SystemTime>,
+        base_timestamp: &mut Option<SystemTime>,
         pending_transactions: &mut VecDeque<PendingTransaction>,
     ) {
         // If node_info does not exist for the node, there is no point in sending a transaction
@@ -309,11 +311,11 @@ impl SignerInner {
         if *base_nonce == application_nonce && next_nonce > base_nonce {
             // Application nonce has not been incremented even though we sent out
             // transaction
-            if let Some(last_nonce_increment_) = last_nonce_increment {
-                if last_nonce_increment_.elapsed().unwrap() >= TIMEOUT {
+            if let Some(base_timestamp_) = base_timestamp {
+                if base_timestamp_.elapsed().unwrap() >= TIMEOUT {
                     // At this point we assume that the transaction with nonce `base_nonce` will
                     // never arrive at the mempool
-                    *last_nonce_increment = None;
+                    *base_timestamp = None;
                     // Reset `next_nonce` to application nonce.
                     *next_nonce = *base_nonce;
                     // Resend all transactions with nonce >= base_nonce.
@@ -332,7 +334,9 @@ impl SignerInner {
                             .expect("Failed to send transaction to mempool.");
                         // Update timestamp to resending time.
                         pending_tx.timestamp = SystemTime::now();
-                        *last_nonce_increment = Some(pending_tx.timestamp);
+                        if base_timestamp.is_none() {
+                            *base_timestamp = Some(pending_tx.timestamp);
+                        }
                     }
                 }
             }
@@ -346,9 +350,9 @@ impl SignerInner {
                 pending_transactions.pop_front();
             }
             if pending_transactions.is_empty() {
-                *last_nonce_increment = None;
+                *base_timestamp = None;
             } else {
-                *last_nonce_increment = Some(pending_transactions[0].timestamp);
+                *base_timestamp = Some(pending_transactions[0].timestamp);
             }
         }
     }
