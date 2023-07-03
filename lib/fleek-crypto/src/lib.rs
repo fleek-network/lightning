@@ -6,6 +6,7 @@ use fastcrypto::{
         BLS12381KeyPair, BLS12381PrivateKey, BLS12381PublicKey, BLS12381Signature,
     },
     ed25519::{Ed25519KeyPair, Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
+    encoding::Base64,
     hash::{HashFunction, Keccak256},
     secp256k1::{Secp256k1KeyPair, Secp256k1PrivateKey, Secp256k1PublicKey, Secp256k1Signature},
     traits::{KeyPair, Signer, ToFromBytes, VerifyingKey},
@@ -26,6 +27,7 @@ pub trait PublicKey {
     type Signature;
 
     fn verify(&self, signature: &Self::Signature, digest: &[u8; 32]) -> bool;
+    fn to_base64(&self) -> String;
 }
 
 pub trait SecretKey: Sized {
@@ -70,6 +72,16 @@ impl PublicKey for NodePublicKey {
         let pubkey: BLS12381PublicKey = self.into();
         let signature: BLS12381Signature = signature.into();
         pubkey.verify(digest, &signature).is_ok()
+    }
+
+    fn to_base64(&self) -> String {
+        Base64::from_bytes(&self.0).encoded()
+    }
+}
+
+impl Display for NodePublicKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
     }
 }
 
@@ -176,6 +188,16 @@ impl PublicKey for NodeNetworkingPublicKey {
         let signature: Ed25519Signature = signature.into();
         pubkey.verify(digest, &signature).is_ok()
     }
+
+    fn to_base64(&self) -> String {
+        Base64::from_bytes(&self.0).encoded()
+    }
+}
+
+impl Display for NodeNetworkingPublicKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
+    }
 }
 
 /// A node's ed25519 networking secret key
@@ -272,6 +294,16 @@ impl PublicKey for ClientPublicKey {
     fn verify(&self, _signature: &Self::Signature, _digest: &[u8; 32]) -> bool {
         todo!()
     }
+
+    fn to_base64(&self) -> String {
+        Base64::from_bytes(&self.0).encoded()
+    }
+}
+
+impl Display for ClientPublicKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
+    }
 }
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
@@ -332,6 +364,10 @@ impl PublicKey for AccountOwnerPublicKey {
     fn verify(&self, signature: &Self::Signature, digest: &[u8; 32]) -> bool {
         let pubkey: Secp256k1PublicKey = self.into();
         pubkey.verify(digest, &signature.into()).is_ok()
+    }
+
+    fn to_base64(&self) -> String {
+        Base64::from_bytes(&self.0).encoded()
     }
 }
 
