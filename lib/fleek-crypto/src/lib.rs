@@ -6,7 +6,7 @@ use fastcrypto::{
         BLS12381KeyPair, BLS12381PrivateKey, BLS12381PublicKey, BLS12381Signature,
     },
     ed25519::{Ed25519KeyPair, Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
-    encoding::Base64,
+    encoding::{Base64, Encoding},
     hash::{HashFunction, Keccak256},
     secp256k1::{Secp256k1KeyPair, Secp256k1PrivateKey, Secp256k1PublicKey, Secp256k1Signature},
     traits::{KeyPair, Signer, ToFromBytes, VerifyingKey},
@@ -23,11 +23,12 @@ use serde_big_array::BigArray;
 #[cfg(test)]
 mod tests;
 
-pub trait PublicKey {
+pub trait PublicKey: Sized {
     type Signature;
 
     fn verify(&self, signature: &Self::Signature, digest: &[u8; 32]) -> bool;
     fn to_base64(&self) -> String;
+    fn from_base64(encoded: &str) -> Option<Self>;
 }
 
 pub trait SecretKey: Sized {
@@ -75,7 +76,12 @@ impl PublicKey for NodePublicKey {
     }
 
     fn to_base64(&self) -> String {
-        Base64::from_bytes(&self.0).encoded()
+        Base64::encode(self.0)
+    }
+
+    fn from_base64(encoded: &str) -> Option<Self> {
+        let bytes = Base64::decode(encoded).ok()?;
+        (bytes.len() == 96).then(|| Self(*array_ref!(bytes, 0, 96)))
     }
 }
 
@@ -190,7 +196,12 @@ impl PublicKey for NodeNetworkingPublicKey {
     }
 
     fn to_base64(&self) -> String {
-        Base64::from_bytes(&self.0).encoded()
+        Base64::encode(self.0)
+    }
+
+    fn from_base64(encoded: &str) -> Option<Self> {
+        let bytes = Base64::decode(encoded).ok()?;
+        (bytes.len() == 32).then(|| Self(*array_ref!(bytes, 0, 32)))
     }
 }
 
@@ -296,7 +307,12 @@ impl PublicKey for ClientPublicKey {
     }
 
     fn to_base64(&self) -> String {
-        Base64::from_bytes(&self.0).encoded()
+        Base64::encode(self.0)
+    }
+
+    fn from_base64(encoded: &str) -> Option<Self> {
+        let bytes = Base64::decode(encoded).ok()?;
+        (bytes.len() == 20).then(|| Self(*array_ref!(bytes, 0, 20)))
     }
 }
 
@@ -367,7 +383,12 @@ impl PublicKey for AccountOwnerPublicKey {
     }
 
     fn to_base64(&self) -> String {
-        Base64::from_bytes(&self.0).encoded()
+        Base64::encode(self.0)
+    }
+
+    fn from_base64(encoded: &str) -> Option<Self> {
+        let bytes = Base64::decode(encoded).ok()?;
+        (bytes.len() == 33).then(|| Self(*array_ref!(bytes, 0, 33)))
     }
 }
 
