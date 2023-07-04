@@ -1,12 +1,10 @@
 // inspired by https://gist.github.com/qti3e/ed5b1e06514957f7032d3b41ff362c34
 
-use blake3_tree::blake3::derive_key;
-
 /// `RandomOracle` is a verifiable randomness generator using a transcript of input data.
 ///
 /// The struct includes a `domain` as a unique identifier, a `data` vector containing the input data
 /// (as tuples of label and data in byte vectors), and an optional `prefix` that can be used for
-/// all new labels. The prefix is especially useful when the `RandomOracle` is used in a loop.
+/// all new labels
 ///
 /// By using a hash function on the provided input data, the `RandomOracle` provides a way to
 /// generate and verify randomness.
@@ -17,7 +15,7 @@ use blake3_tree::blake3::derive_key;
 /// use random_oracle::RandomOracle;
 /// let mut oracle = RandomOracle::empty("example domain");
 /// oracle = oracle.with("label", &123u64);
-/// let result = oracle.hash();
+/// let result = oracle.compile();
 /// ```
 ///
 /// # Panics
@@ -55,6 +53,10 @@ impl RandomOracle {
             data: Vec::new(),
             prefix: None,
         }
+    }
+
+    pub fn get_domain(&self) -> &str {
+        &self.domain
     }
 
     /// Merges another `RandomOracle` instance into the current one. The function mutates the
@@ -108,15 +110,15 @@ impl RandomOracle {
         };
     }
 
-    /// Returns a combined input stream and hash from all the inputs this oracle has already
+    /// Returns a combined input stream from all the inputs this oracle has already
     /// been given.
-    pub fn hash(&self) -> [u8; 32] {
+    pub fn compile(&self) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
         for (key, value) in &self.data {
             result.extend(key);
             result.extend(value);
         }
-        derive_key(&self.domain, &result)
+        result
     }
 }
 
@@ -152,6 +154,17 @@ impl RandomOracleInput for String {
     }
 }
 
+impl RandomOracleInput for Option<String> {
+    const TYPE: &'static str = "String";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        match self {
+            Some(v) => v.as_bytes().to_vec(),
+            None => Vec::new(),
+        }
+    }
+}
+
 impl<'a> RandomOracleInput for &'a str {
     const TYPE: &'static str = "str";
 
@@ -161,13 +174,21 @@ impl<'a> RandomOracleInput for &'a str {
 }
 
 impl RandomOracleInput for Option<Vec<u8>> {
-    const TYPE: &'static str = "OptionalBuffer";
+    const TYPE: &'static str = "buffer";
 
     fn to_random_oracle_input(&self) -> Vec<u8> {
         match self {
             Some(v) => v.clone(),
             None => Vec::new(),
         }
+    }
+}
+
+impl RandomOracleInput for &[u8] {
+    const TYPE: &'static str = "buffer";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        self.to_vec()
     }
 }
 
@@ -179,8 +200,18 @@ impl RandomOracleInput for Vec<u8> {
     }
 }
 
+impl<const N: usize> RandomOracleInput for [u8; N] {
+    const TYPE: &'static str = "buffer";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        Vec::from(self.as_ref())
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use blake3_tree::blake3::derive_key;
+
     use super::*;
 
     #[test]
@@ -190,15 +221,20 @@ mod tests {
             .with("transaction", &"deposit")
             .with_prefix("new".to_string())
             .with("value", &1000_u64)
-            .with("type", &"FLK");
+            .with("type", &"FLK")
+            .compile();
 
         let ro_2 = RandomOracle::empty("test-digest")
             .with("transaction", &"deposit")
             .with("nonce", &202_u64)
             .with_prefix("new".to_string())
             .with("type", &"FLK")
-            .with("value", &1000_u64);
+            .with("value", &1000_u64)
+            .compile();
 
-        assert_eq!(ro_1.hash(), ro_2.hash());
+        assert_eq!(
+            derive_key("test-digest", &ro_1),
+            derive_key("test-digest", &ro_2)
+        );
     }
 }

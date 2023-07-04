@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, time::Duration};
 
+use blake3_tree::blake3::derive_key;
 use fleek_crypto::{
     AccountOwnerPublicKey, NodeNetworkingPublicKey, NodePublicKey, TransactionSender,
     TransactionSignature,
@@ -410,43 +411,97 @@ impl ToDigest for UpdatePayload {
                 //.with("method.proof", proof);
             },
             UpdateMethod::Withdraw {
-                amount: _,
-                token: _,
-                receiving_address: _,
-            } => todo!(),
+                amount,
+                token,
+                receiving_address,
+            } => {
+                random_oracle = random_oracle
+                    .with("transaction_name", &"withdraw")
+                    .with_prefix("input".to_owned())
+                    .with("amount", amount)
+                    .with("token", token)
+                    .with("receiving_address", &receiving_address.0);
+            },
             UpdateMethod::Stake {
-                amount: _,
-                node_public_key: _,
-                node_network_key: _,
-                node_domain: _,
-                worker_public_key: _,
-                worker_domain: _,
-                worker_mempool_address: _,
-            } => todo!(),
-            UpdateMethod::StakeLock {
-                node: _,
-                locked_for: _,
-            } => todo!(),
-            UpdateMethod::Unstake { amount: _, node: _ } => todo!(),
-            UpdateMethod::WithdrawUnstaked {
-                node: _,
-                recipient: _,
-            } => todo!(),
-            UpdateMethod::ChangeEpoch { epoch: _ } => todo!(),
+                amount,
+                node_public_key,
+                node_network_key,
+                node_domain,
+                worker_public_key,
+                worker_domain,
+                worker_mempool_address,
+            } => {
+                random_oracle = random_oracle
+                    .with("transaction_name", &"stake")
+                    .with_prefix("input".to_owned())
+                    .with("amount", amount)
+                    .with("node_public_key", &node_public_key.0)
+                    .with(
+                        "node_network_key",
+                        &node_network_key.map_or([0u8; 32], |key| key.0),
+                    )
+                    .with("node_domain", node_domain)
+                    .with(
+                        "worker_public_key",
+                        &worker_public_key.map_or([0u8; 32], |key| key.0),
+                    )
+                    .with("worker_domain", worker_domain)
+                    .with("worker_mempool_address", worker_mempool_address);
+            },
+            UpdateMethod::StakeLock { node, locked_for } => {
+                random_oracle = random_oracle
+                    .with("transaction_name", &"stake_lock")
+                    .with_prefix("input".to_owned())
+                    .with("node", &node.0)
+                    .with("locked_for", locked_for);
+            },
+            UpdateMethod::Unstake { amount, node } => {
+                random_oracle = random_oracle
+                    .with("transaction_name", &"unstake")
+                    .with_prefix("input".to_owned())
+                    .with("node", &node.0)
+                    .with("amount", amount);
+            },
+            UpdateMethod::WithdrawUnstaked { node, recipient } => {
+                random_oracle = random_oracle
+                    .with("transaction_name", &"withdraw_unstaked")
+                    .with_prefix("input".to_owned())
+                    .with("node", &node.0)
+                    .with("recipient", &recipient.map_or([0u8; 33], |key| key.0));
+            },
+            UpdateMethod::ChangeEpoch { epoch } => {
+                random_oracle = random_oracle
+                    .with("transaction_name", &"change_epoch")
+                    .with_prefix("input".to_owned())
+                    .with("epoch", epoch);
+            },
             UpdateMethod::AddService {
                 service: _,
                 service_id: _,
             } => todo!(),
-            UpdateMethod::RemoveService { service_id: _ } => todo!(),
+            UpdateMethod::RemoveService { service_id } => {
+                random_oracle = random_oracle
+                    .with("transaction_name", &"remove_service")
+                    .with_prefix("input".to_owned())
+                    .with("service_id", service_id);
+            },
             UpdateMethod::Slash {
-                service_id: _,
-                node: _,
+                service_id,
+                node,
                 proof_of_misbehavior: _,
-            } => todo!(),
+            } => {
+                random_oracle = random_oracle
+                    .with("transaction_name", &"slash")
+                    .with_prefix("input".to_owned())
+                    .with("service_id", service_id)
+                .with("node", &node.0)
+                // .with("proof_of_misbehavior", proof_of_misbehavior)
+                ;
+            },
             UpdateMethod::SubmitReputationMeasurements { measurements: _ } => todo!(),
         }
 
-        random_oracle.hash()
+        derive_key(random_oracle.get_domain(), &random_oracle.compile())
     }
 }
 
