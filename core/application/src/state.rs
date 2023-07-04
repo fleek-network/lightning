@@ -26,10 +26,10 @@ use crate::table::{Backend, TableRef};
 
 /// Minimum number of reported measurements that have to be available for a node.
 /// If less measurements have been reported, no reputation score will be computed in that epoch.
-#[cfg(not(test))]
+#[cfg(all(not(test), not(feature = "test")))]
 const MIN_NUM_MEASUREMENTS: usize = 10;
-#[cfg(test)]
-const MIN_NUM_MEASUREMENTS: usize = 1;
+#[cfg(any(test, feature = "test"))]
+const MIN_NUM_MEASUREMENTS: usize = 2;
 
 /// Reported measurements are weighted by the reputation score of the reporting node.
 /// If there is no reputation score for the reporting node, we use a quantile from the array
@@ -165,7 +165,6 @@ impl<B: Backend> State<B> {
             },
         };
         // Increment nonce of the sender
-        //
         self.increment_nonce(txn.sender);
         // Return the response
         response
@@ -696,13 +695,15 @@ impl<B: Backend> State<B> {
             }
         });
 
-        // Remove outdated rep scores.
-        let nodes = self.rep_scores.keys();
-        nodes.for_each(|node| {
-            if !new_rep_scores.contains_key(&node) {
-                self.rep_scores.remove(&node);
-            }
-        });
+        // If not in test mode, remove outdated rep scores.
+        if cfg!(all(not(test), not(feature = "test"))) {
+            let nodes = self.rep_scores.keys();
+            nodes.for_each(|node| {
+                if !new_rep_scores.contains_key(&node) {
+                    self.rep_scores.remove(&node);
+                }
+            });
+        }
 
         // Remove measurements from this epoch once we ccalculated the rep scores.
         let nodes = self.rep_measurements.keys();

@@ -21,7 +21,5 @@ scc.workspace = true
 [dev-dependencies]
 draco-test-utils = {path="../test-utils"}
 draco-signer = {path="../signer"}
-draco-application = {path="../application"}
-draco-notifier = {path="../notifier"}
+draco-application = {path="../application", features = ["test"]}
 rand.workspace = true
-fleek-crypto.workspace = true

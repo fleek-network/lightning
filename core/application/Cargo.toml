@@ -28,3 +28,6 @@ hp-float.workspace = true
 draco-test-utils = {path="../test-utils"}
 tokio.workspace = true
 rand.workspace = true
+
+[features]
+test = []

@@ -152,7 +152,7 @@ impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Lower bound for the random time it takes to order a transaction.
     pub min_ordering_time: u64,
