@@ -132,13 +132,15 @@ impl ReputationAggregatorInterface for ReputationAggregator {
     /// to submit a transaction to the consensus.
     fn submit_aggregation(&self) {
         let measurements = self.measurement_manager.get_measurements();
-        let submit_tx = self.submit_tx.clone();
-        tokio::spawn(async move {
-            submit_tx
-                .run(UpdateMethod::SubmitReputationMeasurements { measurements })
-                .await
-                .expect("SubmitReputationMeasurements transaction failed.");
-        });
+        if !measurements.is_empty() {
+            let submit_tx = self.submit_tx.clone();
+            tokio::spawn(async move {
+                submit_tx
+                    .run(UpdateMethod::SubmitReputationMeasurements { measurements })
+                    .await
+                    .expect("SubmitReputationMeasurements transaction failed.");
+            });
+        }
     }
 
     /// Returns a reputation reporter that can be used to capture interactions that we have
