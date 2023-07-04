@@ -5,6 +5,7 @@ pub mod compression;
 pub mod config;
 pub mod consensus;
 pub mod fs;
+pub mod gossip;
 pub mod handshake;
 pub mod indexer;
 pub mod node;
@@ -15,9 +16,9 @@ pub mod reputation;
 pub mod rpc;
 pub mod sdk;
 pub mod sdk_v2;
-pub mod types;
-
 pub mod signer;
+pub mod topology;
+pub mod types;
 
 // TODO:
 // - SDK: Read DA.
@@ -30,6 +31,7 @@ pub use compression::*;
 pub use config::*;
 pub use consensus::*;
 pub use fs::*;
+pub use gossip::*;
 pub use handshake::*;
 pub use indexer::*;
 pub use node::*;
@@ -39,3 +41,4 @@ pub use pod::*;
 pub use reputation::*;
 pub use rpc::*;
 pub use sdk::*;
+pub use topology::*;
