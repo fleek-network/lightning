@@ -1108,6 +1108,7 @@ dependencies = [
  "arrayref",
  "blake3-tree",
  "bytes",
+ "criterion 0.5.1",
 ]
 
 [[package]]

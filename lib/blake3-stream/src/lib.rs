@@ -178,7 +178,6 @@ impl<W: Write> Encoder<W> {
 
 impl<W: Write> Write for Encoder<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        println!("storing: {}", buf.len());
         self.buffer.put(buf);
 
         let mut proof = if self.block == 0 {
