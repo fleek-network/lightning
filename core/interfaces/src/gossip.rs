@@ -1,10 +1,14 @@
 use std::sync::Arc;
 
 use affair::Socket;
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 
-use crate::{topology::TopologyInterface, ConfigConsumer, NotifierInterface, WithStartAndShutdown};
+use crate::{
+    signer::SignerInterface, topology::TopologyInterface, ConfigConsumer, NotifierInterface,
+    WithStartAndShutdown,
+};
 
 /// Numerical value for different gossip topics used by Fleek Network.
 // New topics can be added as the system grows.
@@ -33,11 +37,18 @@ pub trait GossipInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send 
     /// The notifier that allows us to refresh the connections once the epoch changes.
     type Notifier: NotifierInterface;
 
+    /// The signer that we can used to sign and submit messages.
+    type Signer: SignerInterface;
+
     /// Subscriber implementation used for listening on a topic.
-    type Subscriber<T: DeserializeOwned>: GossipSubscriber<T>;
+    type Subscriber<T: DeserializeOwned + Send + Sync>: GossipSubscriberInterface<T>;
 
     /// Initialize the gossip system with the config and the topology object..
-    async fn init(config: Self::Config, topology: Arc<Self::Topology>) -> Self;
+    async fn init(
+        config: Self::Config,
+        topology: Arc<Self::Topology>,
+        signer: &Self::Signer,
+    ) -> Result<Self>;
 
     /// Get a socket which can be used to broadcast a message globally under any topic.
     fn broadcast_socket(&self) -> Socket<GossipMessage, ()>;
@@ -46,14 +57,14 @@ pub trait GossipInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send 
     /// be deserialized as `T` are returned to the listener.
     fn subscribe<T>(&self, topic: Topic) -> Self::Subscriber<T>
     where
-        T: DeserializeOwned;
+        T: DeserializeOwned + Send + Sync;
 }
 
 /// A subscriber for the incoming messages under a topic.
 #[async_trait]
-pub trait GossipSubscriber<T>
+pub trait GossipSubscriberInterface<T>: Send + Sync
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + Send + Sync,
 {
     /// Await the next message in the topic, should only return `None` if there are
     /// no longer any new messages coming. (indicating that the gossip instance is

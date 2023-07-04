@@ -2228,6 +2228,7 @@ dependencies = [
 name = "draco-node"
 version = "0.1.0"
 dependencies = [
+ "affair",
  "anyhow",
  "async-trait",
  "bytes",

@@ -19,6 +19,7 @@ use crate::{
     sdk::{HandlerFn, SdkInterface},
     signer::SignerInterface,
     types::ServiceId,
+    GossipInterface, TopologyInterface,
 };
 
 pub struct Node<
@@ -40,6 +41,8 @@ pub struct Node<
         FileSystem = FileSystem,
     >,
     Handshake: HandshakeInterface<Sdk = Sdk>,
+    Topology: TopologyInterface<SyncQuery = Application::SyncExecutor>,
+    Gossip: GossipInterface<Topology = Topology, Notifier = Notifier, Signer = Signer>,
 > {
     pub configuration: Arc<ConfigProvider>,
     pub consensus: Consensus,
@@ -53,6 +56,8 @@ pub struct Node<
     pub delivery_acknowledgment_aggregator: DeliveryAcknowledgmentAggregator,
     pub reputation_aggregator: ReputationAggregator,
     pub handshake: Handshake,
+    pub topology: Arc<Topology>,
+    pub gossip: Gossip,
     pub sdk: PhantomData<Sdk>,
     pub notifier: PhantomData<Notifier>,
 }
@@ -76,6 +81,8 @@ impl<
         FileSystem = FileSystem,
     >,
     Handshake: HandshakeInterface<Sdk = Sdk>,
+    Topology: TopologyInterface<SyncQuery = Application::SyncExecutor>,
+    Gossip: GossipInterface<Topology = Topology, Notifier = Notifier, Signer = Signer>,
 >
     Node<
         ConfigProvider,
@@ -92,12 +99,25 @@ impl<
         Rpc,
         Sdk,
         Handshake,
+        Topology,
+        Gossip,
     >
 {
     pub async fn init(configuration: Arc<ConfigProvider>) -> anyhow::Result<Self> {
         let mut signer = Signer::init(configuration.get::<Signer>()).await?;
 
         let application = Application::init(configuration.get::<Application>()).await?;
+
+        let topology = Arc::new(
+            Topology::init(
+                configuration.get::<Topology>(),
+                signer.get_bls_pk(),
+                application.sync_query(),
+            )
+            .await?,
+        );
+
+        let gossip = Gossip::init(configuration.get::<Gossip>(), topology.clone(), &signer).await?;
 
         let consensus = Consensus::init(
             configuration.get::<Consensus>(),
@@ -153,6 +173,8 @@ impl<
             delivery_acknowledgment_aggregator,
             reputation_aggregator,
             handshake,
+            topology,
+            gossip,
             sdk: PhantomData,
             notifier: PhantomData,
         })
@@ -229,6 +251,8 @@ impl<
         FileSystem = FileSystem,
     >,
     Handshake: HandshakeInterface<Sdk = Sdk>,
+    Topology: TopologyInterface<SyncQuery = Application::SyncExecutor>,
+    Gossip: GossipInterface<Topology = Topology, Notifier = Notifier, Signer = Signer>,
 > WithStartAndShutdown
     for Node<
         ConfigProvider,
@@ -245,6 +269,8 @@ impl<
         Rpc,
         Sdk,
         Handshake,
+        Topology,
+        Gossip,
     >
 where
     Self: Send,

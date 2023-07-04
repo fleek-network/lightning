@@ -13,6 +13,7 @@ use draco_handshake::server::{StreamProvider, TcpHandshakeServer, TcpProvider};
 use draco_interfaces::{common::WithStartAndShutdown as _, ConfigProviderInterface, Node};
 use draco_notifier::Notifier;
 use draco_rep_collector::ReputationAggregator;
+use template::{gossip::Gossip, topology::Topology};
 
 use crate::{
     cli::{CliArgs, Command},
@@ -41,6 +42,8 @@ pub type ConcreteNode = Node<
     TcpHandshakeServer<
         Sdk<<TcpProvider as StreamProvider>::Reader, <TcpProvider as StreamProvider>::Writer>,
     >,
+    Topology<QueryRunner>,
+    Gossip<Signer, Topology<QueryRunner>, Notifier>,
 >;
 
 #[tokio::main]
