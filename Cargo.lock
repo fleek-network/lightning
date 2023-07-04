@@ -1101,6 +1101,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake3-stream"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrayref",
+ "blake3-tree",
+ "bytes",
+]
+
+[[package]]
 name = "blake3-tree"
 version = "0.1.0"
 dependencies = [
