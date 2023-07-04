@@ -1,96 +1,18 @@
 use std::{collections::BTreeMap, time::Duration};
 
-use affair::Socket;
-use anyhow::{anyhow, Result};
-use draco_application::{app::Application, config::Config as AppConfig};
+use draco_application::{
+    app::Application,
+    config::{Config as AppConfig, Mode},
+    genesis::{Genesis, GenesisCommittee},
+};
 use draco_interfaces::{
-    application::{ApplicationInterface, BlockExecutionResponse},
-    common::WithStartAndShutdown,
-    consensus::ConsensusInterface,
-    signer::SignerInterface,
-    types::{
-        Block, ProofOfConsensus, Tokens, TransactionResponse, UpdateMethod, UpdatePayload,
-        UpdateRequest,
-    },
-    SyncQueryRunnerInterface,
+    application::ApplicationInterface, common::WithStartAndShutdown, consensus::ConsensusInterface,
+    signer::SignerInterface, types::UpdateMethod, SyncQueryRunnerInterface,
 };
 use draco_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
-use fleek_crypto::{AccountOwnerPublicKey, AccountOwnerSignature, NodePublicKey};
-use hp_float::unsigned::HpUfloat;
+use fleek_crypto::{AccountOwnerSecretKey, PublicKey, SecretKey};
 
 use crate::{config::Config, Signer};
-
-// TODO: copied from application tests, this should be in test-utils.
-fn get_update_request_account(
-    method: UpdateMethod,
-    sender: AccountOwnerPublicKey,
-) -> UpdateRequest {
-    // TODO: sign the thing
-    UpdateRequest {
-        sender: sender.into(),
-        signature: AccountOwnerSignature([0; 64]).into(),
-        payload: UpdatePayload { nonce: 0, method },
-    }
-}
-
-async fn deposit(
-    amount: HpUfloat<18>,
-    token: Tokens,
-    sender: AccountOwnerPublicKey,
-    update_socket: &Socket<Block, BlockExecutionResponse>,
-) {
-    // Deposit some FLK into account 1
-    let req = get_update_request_account(
-        UpdateMethod::Deposit {
-            proof: ProofOfConsensus {},
-            token,
-            amount,
-        },
-        sender,
-    );
-    run_transaction(vec![req], update_socket).await.unwrap();
-}
-
-async fn run_transaction(
-    requests: Vec<UpdateRequest>,
-    update_socket: &Socket<Block, BlockExecutionResponse>,
-) -> Result<BlockExecutionResponse> {
-    let res = update_socket
-        .run(Block {
-            transactions: requests,
-        })
-        .await
-        .map_err(|r| anyhow!(format!("{r:?}")))?;
-    Ok(res)
-}
-
-async fn stake(
-    amount: HpUfloat<18>,
-    node_public_key: NodePublicKey,
-    sender: AccountOwnerPublicKey,
-    update_socket: &Socket<Block, BlockExecutionResponse>,
-) {
-    let update = get_update_request_account(
-        UpdateMethod::Stake {
-            amount,
-            node_public_key,
-            node_network_key: Some([0; 32].into()),
-            node_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
-            worker_public_key: Some([0; 32].into()),
-            worker_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
-            worker_mempool_address: Some("/ip4/127.0.0.1/udp/38000".to_string()),
-        },
-        sender,
-    );
-    if let TransactionResponse::Revert(error) = run_transaction(vec![update], update_socket)
-        .await
-        .unwrap()
-        .txn_receipts[0]
-        .clone()
-    {
-        panic!("Stake reverted: {error:?}");
-    }
-}
 
 #[tokio::test]
 async fn test_send_two_txs_in_a_row() {
@@ -98,7 +20,30 @@ async fn test_send_two_txs_in_a_row() {
     let mut signer = Signer::init(signer_config).await.unwrap();
     let signer_socket = signer.get_socket();
 
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let mut genesis = Genesis::load().unwrap();
+    let (network_secret_key, secret_key) = signer.get_sk();
+    let public_key = secret_key.to_pk();
+    let network_public_key = network_secret_key.to_pk();
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner_public_key = owner_secret_key.to_pk();
+
+    genesis.committee.push(GenesisCommittee::new(
+        owner_public_key.to_base64(),
+        public_key.to_base64(),
+        "/ip4/127.0.0.1/udp/48000".to_owned(),
+        network_public_key.to_base64(),
+        "/ip4/127.0.0.1/udp/48101/http".to_owned(),
+        network_public_key.to_base64(),
+        "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
+        None,
+    ));
+
+    let app = Application::init(AppConfig {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+    })
+    .await
+    .unwrap();
     app.start().await;
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
@@ -122,17 +67,6 @@ async fn test_send_two_txs_in_a_row() {
     signer.provide_query_runner(query_runner.clone());
     signer.start().await;
     consensus.start().await;
-
-    // Make sure that node info is created before sending the transaction.
-    let account = AccountOwnerPublicKey([0; 33]);
-    deposit(1_000_u64.into(), Tokens::FLK, account, &update_socket).await;
-    stake(
-        1_000_u64.into(),
-        signer.get_bls_pk(),
-        AccountOwnerPublicKey([0; 33]),
-        &update_socket,
-    )
-    .await;
 
     // Send two transactions to the signer.
     let update_method = UpdateMethod::SubmitReputationMeasurements {
@@ -160,7 +94,30 @@ async fn test_retry_send() {
     let mut signer = Signer::init(signer_config).await.unwrap();
     let signer_socket = signer.get_socket();
 
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let mut genesis = Genesis::load().unwrap();
+    let (network_secret_key, secret_key) = signer.get_sk();
+    let public_key = secret_key.to_pk();
+    let network_public_key = network_secret_key.to_pk();
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner_public_key = owner_secret_key.to_pk();
+
+    genesis.committee.push(GenesisCommittee::new(
+        owner_public_key.to_base64(),
+        public_key.to_base64(),
+        "/ip4/127.0.0.1/udp/48000".to_owned(),
+        network_public_key.to_base64(),
+        "/ip4/127.0.0.1/udp/48101/http".to_owned(),
+        network_public_key.to_base64(),
+        "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
+        None,
+    ));
+
+    let app = Application::init(AppConfig {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+    })
+    .await
+    .unwrap();
     app.start().await;
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
@@ -184,17 +141,6 @@ async fn test_retry_send() {
     signer.provide_query_runner(query_runner.clone());
     signer.start().await;
     consensus.start().await;
-
-    // Make sure that node info is created before sending the transaction.
-    let account = AccountOwnerPublicKey([0; 33]);
-    deposit(1_000_u64.into(), Tokens::FLK, account, &update_socket).await;
-    stake(
-        1_000_u64.into(),
-        signer.get_bls_pk(),
-        AccountOwnerPublicKey([0; 33]),
-        &update_socket,
-    )
-    .await;
 
     // Send two transactions to the signer.
     let update_method = UpdateMethod::SubmitReputationMeasurements {

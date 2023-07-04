@@ -27,12 +27,9 @@ async fn test_submit_measurements() {
     let mut signer = Signer::init(signer_config).await.unwrap();
 
     let mut genesis = Genesis::load().unwrap();
-
     let (network_secret_key, secret_key) = signer.get_sk();
     let public_key = secret_key.to_pk();
-
     let network_public_key = network_secret_key.to_pk();
-
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
@@ -97,6 +94,7 @@ async fn test_submit_measurements() {
         rep_aggregator.start().await.unwrap();
     });
 
+    // Report some measurements to the reputation aggregator.
     let peer = NodePublicKey([1; 96]);
     rep_reporter.report_latency(&peer, Duration::from_millis(300));
     rep_reporter.report_latency(&peer, Duration::from_millis(100));
@@ -110,6 +108,8 @@ async fn test_submit_measurements() {
             _ = interval.tick() => {
                 let measurements = query_runner.get_rep_measurements(peer);
                 if !measurements.is_empty() {
+                    // Make sure that the reported measurements were submitted to the application
+                    // state.
                     assert_eq!(measurements.len(), 1);
                     assert_eq!(measurements[0].reporting_node, public_key);
                     assert_eq!(
