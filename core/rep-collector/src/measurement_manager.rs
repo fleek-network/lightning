@@ -252,7 +252,7 @@ impl Latency {
 }
 
 #[derive(Clone)]
-struct Interactions {
+pub(crate) struct Interactions {
     sum: Option<i64>,
 }
 
@@ -274,7 +274,7 @@ impl Interactions {
         self.sum
     }
 
-    fn get_weight(weight: Weight) -> i64 {
+    pub(crate) fn get_weight(weight: Weight) -> i64 {
         match weight {
             Weight::Weak => 1,
             Weight::Strong => 5,

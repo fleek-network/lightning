@@ -12,14 +12,14 @@ use draco_interfaces::{
     notifier::NotifierInterface,
     reputation::{ReputationAggregatorInterface, ReputationReporterInterface},
     signer::SignerInterface,
-    SyncQueryRunnerInterface,
+    SyncQueryRunnerInterface, Weight,
 };
 use draco_notifier::Notifier;
 use draco_signer::{Config as SignerConfig, Signer};
 use draco_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, PublicKey, SecretKey};
 
-use crate::{aggregator::ReputationAggregator, config::Config};
+use crate::{aggregator::ReputationAggregator, config::Config, measurement_manager::Interactions};
 
 #[tokio::test]
 async fn test_submit_measurements() {
@@ -96,10 +96,13 @@ async fn test_submit_measurements() {
 
     // Report some measurements to the reputation aggregator.
     let peer = NodePublicKey([1; 96]);
+    rep_reporter.report_sat(&peer, Weight::Weak);
+    rep_reporter.report_sat(&peer, Weight::Strong);
     rep_reporter.report_latency(&peer, Duration::from_millis(300));
     rep_reporter.report_latency(&peer, Duration::from_millis(100));
-    rep_reporter.report_bytes_sent(&peer, 10_000, None);
-    rep_reporter.report_bytes_received(&peer, 20_000, None);
+    rep_reporter.report_bytes_sent(&peer, 10_000, Some(Duration::from_millis(100)));
+    rep_reporter.report_bytes_received(&peer, 20_000, Some(Duration::from_millis(100)));
+    rep_reporter.report_hops(&peer, 4);
 
     let mut interval = tokio::time::interval(Duration::from_millis(100));
     loop {
@@ -116,8 +119,14 @@ async fn test_submit_measurements() {
                         measurements[0].measurements.latency,
                         Some(Duration::from_millis(200))
                     );
+                    let interactions = Interactions::get_weight(Weight::Weak)
+                        + Interactions::get_weight(Weight::Strong);
+                    assert_eq!(measurements[0].measurements.interactions, Some(interactions));
                     assert_eq!(measurements[0].measurements.bytes_received, Some(20_000));
                     assert_eq!(measurements[0].measurements.bytes_sent, Some(10_000));
+                    assert_eq!(measurements[0].measurements.inbound_bandwidth, Some(100));
+                    assert_eq!(measurements[0].measurements.outbound_bandwidth, Some(200));
+                    assert_eq!(measurements[0].measurements.hops, Some(4));
                     break;
                 }
             }
