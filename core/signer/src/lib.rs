@@ -1,16 +1,16 @@
 mod config;
-#[cfg(test)]
-mod tests;
 mod utils;
 use std::{
     collections::VecDeque,
     sync::{Arc, Mutex},
     time::{Duration, SystemTime},
 };
+#[cfg(test)]
+mod tests;
 
 use affair::{Socket, Task};
 use async_trait::async_trait;
-use config::Config;
+pub use config::Config;
 use draco_application::query_runner::QueryRunner;
 use draco_interfaces::{
     common::WithStartAndShutdown,

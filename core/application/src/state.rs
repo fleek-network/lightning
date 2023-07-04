@@ -685,7 +685,6 @@ impl<B: Backend> State<B> {
             }
         }
         let new_rep_scores = draco_reputation::calculate_reputation_scores(map);
-
         // Store new scores in application state.
         new_rep_scores.iter().for_each(|(node, new_score)| {
             if let Some(old_score) = rep_scores.get(node) {

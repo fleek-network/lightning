@@ -116,3 +116,28 @@ impl From<&GenesisCommittee> for NodeInfo {
         }
     }
 }
+
+impl GenesisCommittee {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        owner: String,
+        primary_public_key: String,
+        primary_address: String,
+        network_key: String,
+        worker_address: String,
+        worker_public_key: String,
+        worker_mempool: String,
+        staking: Option<u64>,
+    ) -> Self {
+        Self {
+            owner,
+            primary_public_key,
+            primary_address,
+            network_key,
+            worker_address,
+            worker_public_key,
+            worker_mempool,
+            staking,
+        }
+    }
+}

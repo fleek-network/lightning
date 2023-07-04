@@ -2304,6 +2304,7 @@ dependencies = [
  "draco-interfaces",
  "draco-notifier",
  "draco-reputation",
+ "draco-signer",
  "draco-test-utils",
  "fleek-crypto",
  "lru",

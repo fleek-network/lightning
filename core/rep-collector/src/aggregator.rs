@@ -16,6 +16,11 @@ use tokio::sync::mpsc;
 
 use crate::{buffered_mpsc, config::Config, measurement_manager::MeasurementManager};
 
+#[cfg(not(test))]
+const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(3600);
+#[cfg(test)]
+const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(2);
+
 pub struct ReputationAggregator {
     report_rx: buffered_mpsc::BufferedReceiver<ReportMessage>,
     reporter: MyReputationReporter,
@@ -30,10 +35,9 @@ pub struct ReputationAggregator {
 
 #[allow(dead_code)]
 impl ReputationAggregator {
-    async fn start(mut self) -> anyhow::Result<()> {
-        let hour = Duration::from_secs(3600);
+    pub async fn start(mut self) -> anyhow::Result<()> {
         self.notifier
-            .notify_before_epoch_change(hour, self.notify_tx.clone());
+            .notify_before_epoch_change(BEFORE_EPOCH_CHANGE, self.notify_tx.clone());
         loop {
             tokio::select! {
                 report_msg = self.report_rx.recv() => {
@@ -42,7 +46,11 @@ impl ReputationAggregator {
                 notification = self.notify_rx.recv() => {
                     if let Notification::BeforeEpochChange = notification.expect("Failed to receive notification.") {
                         self.submit_aggregation();
-                        self.notifier.notify_before_epoch_change(hour, self.notify_tx.clone());
+                        self.notifier
+                            .notify_before_epoch_change(
+                                BEFORE_EPOCH_CHANGE,
+                                self.notify_tx.clone()
+                            );
                         self.measurement_manager.clear_measurements();
                     }
                 }
@@ -101,7 +109,8 @@ impl ReputationAggregatorInterface for ReputationAggregator {
         submit_tx: SubmitTxSocket,
         notifier: Self::Notifier,
     ) -> anyhow::Result<Self> {
-        let (report_tx, report_rx) = buffered_mpsc::buffered_channel(100, 2048);
+        let (report_tx, report_rx) =
+            buffered_mpsc::buffered_channel(config.reporter_buffer_size, 2048);
         let (notify_tx, notify_rx) = mpsc::channel(2048);
         let measurement_manager = MeasurementManager::new();
         let local_reputation_ref = measurement_manager.get_local_reputation_ref();

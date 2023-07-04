@@ -145,7 +145,6 @@ impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
                         .await
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                         .unwrap();
-
                 }
                 _ = shutdown_rx.recv() => break,
             }
