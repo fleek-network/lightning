@@ -118,7 +118,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
             report_rx,
             reporter: MyReputationReporter::new(report_tx),
             query: MyReputationQuery::new(local_reputation_ref),
-            measurement_manager: MeasurementManager::new(),
+            measurement_manager,
             submit_tx,
             notifier,
             notify_rx,

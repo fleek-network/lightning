@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, num::NonZeroUsize, sync::Arc, time::Duration};
 
 use draco_interfaces::{types::ReputationMeasurements, Weight};
-use draco_reputation::statistics::min_max_normalize;
+use draco_reputation::statistics::try_min_max_normalize;
 use fleek_crypto::NodePublicKey;
 use lru::LruCache;
 
@@ -150,20 +150,22 @@ impl MeasurementManager {
                 score += bytes_sent;
                 count += 1;
             }
-            score /= count as f64;
-            let score = score * 100.0;
-            self.local_reputation
-                .entry(peer)
-                .and_modify(|s| {
-                    *s = (*s as f64 * REP_EWMA_WEIGHT + (1.0 - REP_EWMA_WEIGHT) * score) as u8
-                })
-                .or_insert(score as u8);
+            if count != 0 {
+                score /= count as f64;
+                score *= 100.0;
+                self.local_reputation
+                    .entry(peer)
+                    .and_modify(|s| {
+                        *s = (*s as f64 * REP_EWMA_WEIGHT + (1.0 - REP_EWMA_WEIGHT) * score) as u8
+                    })
+                    .or_insert(score as u8);
+            }
         }
     }
 }
 
 /// Holds all the current measurements for a particular peer.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct MeasurementStore {
     latency: Latency,
     interactions: Interactions,
@@ -220,7 +222,7 @@ impl MeasurementStore {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Latency {
     sum: Duration,
     count: u32,
@@ -251,7 +253,7 @@ impl Latency {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct Interactions {
     sum: Option<i64>,
 }
@@ -284,7 +286,7 @@ impl Interactions {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Bandwidth {
     bytes_per_ms_sum: f64,
     count: u64,
@@ -314,7 +316,7 @@ impl Bandwidth {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct BytesTransferred {
     bytes: u128,
 }
@@ -334,7 +336,7 @@ impl BytesTransferred {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Hops {
     hops: Option<u8>,
 }
@@ -441,8 +443,8 @@ impl NormalizedMeasurements {
         let latency = if let (Some(min_val), Some(max_val)) =
             (summary_stats.min.latency, summary_stats.max.latency)
         {
-            values.latency.map(|x| {
-                min_max_normalize(
+            values.latency.and_then(|x| {
+                try_min_max_normalize(
                     x.as_millis() as f64,
                     min_val.as_millis() as f64,
                     max_val.as_millis() as f64,
@@ -457,7 +459,7 @@ impl NormalizedMeasurements {
         ) {
             values
                 .interactions
-                .map(|x| min_max_normalize(x as f64, min_val as f64, max_val as f64))
+                .and_then(|x| try_min_max_normalize(x as f64, min_val as f64, max_val as f64))
         } else {
             None
         };
@@ -467,7 +469,7 @@ impl NormalizedMeasurements {
         ) {
             values
                 .inbound_bandwidth
-                .map(|x| min_max_normalize(x as f64, min_val as f64, max_val as f64))
+                .and_then(|x| try_min_max_normalize(x as f64, min_val as f64, max_val as f64))
         } else {
             None
         };
@@ -477,7 +479,7 @@ impl NormalizedMeasurements {
         ) {
             values
                 .outbound_bandwidth
-                .map(|x| min_max_normalize(x as f64, min_val as f64, max_val as f64))
+                .and_then(|x| try_min_max_normalize(x as f64, min_val as f64, max_val as f64))
         } else {
             None
         };
@@ -487,7 +489,7 @@ impl NormalizedMeasurements {
         ) {
             values
                 .bytes_received
-                .map(|x| min_max_normalize(x as f64, min_val as f64, max_val as f64))
+                .and_then(|x| try_min_max_normalize(x as f64, min_val as f64, max_val as f64))
         } else {
             None
         };
@@ -496,7 +498,7 @@ impl NormalizedMeasurements {
         {
             values
                 .bytes_sent
-                .map(|x| min_max_normalize(x as f64, min_val as f64, max_val as f64))
+                .and_then(|x| try_min_max_normalize(x as f64, min_val as f64, max_val as f64))
         } else {
             None
         };
@@ -693,6 +695,7 @@ mod tests {
         let mut manager = MeasurementManager::new();
         let peer = NodePublicKey([0; 96]);
         manager.report_sat(peer, Weight::Weak);
+        manager.report_sat(peer, Weight::Strong);
         let reputation_map = manager.get_local_reputation_ref();
         assert!(reputation_map.contains(&peer));
     }
