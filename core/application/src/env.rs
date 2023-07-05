@@ -19,7 +19,7 @@ use crate::{
     genesis::{Genesis, GenesisPrices},
     query_runner::QueryRunner,
     state::{Committee, State},
-    table::{Backend, StateTables},
+    table::StateTables,
 };
 
 pub struct Env<P> {
@@ -67,12 +67,8 @@ impl Env<UpdatePerm> {
 
             // Execute each transaction and add the results to the block response
             for txn in &block.transactions {
-                // Verify the signature and nonce and then execute the transactions
-                let receipt = if let Err(error) = app.backend.verify_transaction(txn) {
-                    TransactionResponse::Revert(error)
-                } else {
-                    app.execute_txn(txn.clone())
-                };
+                let receipt = app.execute_txn(txn.clone());
+
                 // If the transaction moved the epoch forward, aknowledge that in the block response
                 if let TransactionResponse::Success(ExecutionData::EpochChange) = receipt {
                     response.change_epoch = true;

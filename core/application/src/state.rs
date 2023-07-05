@@ -94,6 +94,14 @@ impl<B: Backend> State<B> {
 
     /// This function is the entry point of a transaction
     pub fn execute_txn(&self, txn: UpdateRequest) -> TransactionResponse {
+        // Check the signature
+        if let Err(err) = self.verify_transaction(&txn) {
+            // If it is a bad signature return here without incrementing nonce
+            // todo: We can probably just increment nonce inside this function if succesfull and
+            // remove the increment_nonce function
+            return TransactionResponse::Revert(err);
+        }
+
         // Execute transaction
         let response = match txn.payload.method {
             UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
@@ -194,13 +202,7 @@ impl<B: Backend> State<B> {
             return TransactionResponse::Revert(ExecutionError::InvalidServiceId);
         }
         // Todo: build proof based on delivery acks
-        if !self.backend.verify_proof_of_delivery(
-            &account_owner,
-            &sender,
-            &commodity,
-            &service_id,
-            (),
-        ) {
+        if !self.verify_proof_of_delivery(&account_owner, &sender, &commodity, &service_id, ()) {
             return TransactionResponse::Revert(ExecutionError::InvalidProof);
         }
 
@@ -267,7 +269,7 @@ impl<B: Backend> State<B> {
         };
 
         // Verify the proof from the bridge
-        if !self.backend.verify_proof_of_consensus(proof) {
+        if !self.verify_proof_of_consensus(proof) {
             return TransactionResponse::Revert(ExecutionError::InvalidProof);
         }
 
@@ -990,6 +992,30 @@ impl<B: Backend> State<B> {
             _ => 0,
         };
         self.committee_info.get(&epoch).unwrap_or_default().members
+    }
+
+    /// This function takes in the Transaction and verifies the Signature matches the Sender. It
+    /// also checks the nonce of the sender and makes sure it is equal to the account nonce + 1,
+    /// to prevent replay attacks and enforce ordering
+    fn verify_transaction(&self, _txn: &UpdateRequest) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    /// Takes in a zk Proof Of Delivery and returns true if valid
+    fn verify_proof_of_delivery(
+        &self,
+        _client: &AccountOwnerPublicKey,
+        _provider: &NodePublicKey,
+        _commodity: &u128,
+        _service_id: &u32,
+        _proof: (),
+    ) -> bool {
+        true
+    }
+
+    /// Takes in a zk Proof Of Consensus and returns true if valid
+    fn verify_proof_of_consensus(&self, _proof: ProofOfConsensus) -> bool {
+        true
     }
 
     /// Called internally at the end of every transaction to increment the senders nonce.
