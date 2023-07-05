@@ -217,7 +217,7 @@ mod tests {
         }
 
         // Cleanup client and server
-        // TODO: cleaner finish method which returns the raw streams back
+        // TODO: cleaner finish method which exits the service and returns the raw streams back
         drop(client);
         server.shutdown().await;
 

@@ -2,5 +2,5 @@ pub mod client;
 pub mod connection;
 pub mod server;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "dummy"))]
 pub mod dummy;

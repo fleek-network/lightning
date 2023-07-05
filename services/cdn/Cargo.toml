@@ -21,6 +21,13 @@ draco-interfaces = { path="../../core/interfaces" }
 draco-handshake = { path = "../../core/handshake" }
 draco-sdk = {path="../../core/sdk"}
 
+# dummy dependencies (needed to share with example)
+affair = { workspace = true, optional = true }
+draco-application = { path = "../../core/application", optional = true }
+draco-blockstore = { path = "../../core/blockstore", optional = true }
+draco-rep-collector = { path = "../../core/rep-collector", optional = true }
+draco-notifier = { path = "../../core/notifier", optional = true }
+
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
 affair.workspace = true
@@ -28,3 +35,11 @@ draco-application = { path = "../../core/application" }
 draco-blockstore = { path = "../../core/blockstore" }
 draco-rep-collector = { path = "../../core/rep-collector" }
 draco-notifier = { path = "../../core/notifier" }
+
+[features]
+dummy = ["affair", "draco-application", "draco-blockstore", "draco-rep-collector", "draco-notifier"]
+
+[[example]]
+name = "cdn_server"
+path = "examples/server.rs"
+required-features = ["dummy"]
