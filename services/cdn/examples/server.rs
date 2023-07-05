@@ -7,10 +7,11 @@ use draco_application::{
     config::{Config, Mode},
 };
 use draco_blockstore::memory::MemoryBlockStore;
-use draco_handshake::server::{HandshakeServerConfig, TcpHandshakeServer};
+use draco_handshake::server::{HandshakeServerConfig, RawLaneConnection, TcpHandshakeServer};
 use draco_interfaces::{
-    ApplicationInterface, BlockStoreInterface, CompressionAlgorithm, FileSystemInterface,
-    HandshakeInterface, IncrementalPutInterface, SdkInterface, WithStartAndShutdown,
+    ApplicationInterface, BlockStoreInterface, CompressionAlgorithm, ConnectionInterface,
+    FileSystemInterface, HandshakeInterface, IncrementalPutInterface, SdkInterface,
+    WithStartAndShutdown,
 };
 use fleek_cdn::{
     dummy::{FileSystem, Indexer, MyReputationReporter, Sdk, Signer},
@@ -38,7 +39,7 @@ async fn main() -> Result<()> {
         .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
         .unwrap();
     let hash = putter.finalize().await.unwrap();
-    println!("serving hash: {hash:?}");
+    println!("content hash: {hash:?}");
 
     // setup sdk and friends
     let signer = TokioSpawn::spawn(Signer {});
@@ -61,12 +62,14 @@ async fn main() -> Result<()> {
     .await?;
 
     // setup and register the cdn handler
-    let handler = |s, c| {
+    let handler = |s, c: RawLaneConnection<OwnedReadHalf, OwnedWriteHalf>| {
         async {
-            println!("handling new cdn session");
+            let client = *c.get_client();
+            println!("handling new cdn session for pubkey {client}");
             if let Err(e) = handle_session(s, c).await {
                 eprintln!("Session error: {e}")
             }
+            println!("session completed for {client}");
         }
         .boxed()
     };
