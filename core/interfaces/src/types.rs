@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use fleek_crypto::{
-    AccountOwnerPublicKey, NodeNetworkingPublicKey, NodePublicKey, TransactionSender,
-    TransactionSignature,
+    NodeNetworkingPublicKey, NodePublicKey, TransactionSender,
+    TransactionSignature, EthAddress,
 };
 use hp_float::unsigned::HpUfloat;
 use multiaddr::Multiaddr;
@@ -44,7 +44,7 @@ pub enum Value {
     Epoch(u64),
     String(String),
     HpUfloat(HpUfloat<18>),
-    AccountPublicKey(AccountOwnerPublicKey),
+    AccountPublicKey(EthAddress),
 }
 
 /// This is commodities served by different services in Fleek Network.
@@ -120,7 +120,7 @@ pub enum UpdateMethod {
         /// Which token to withdrawl
         token: Tokens,
         /// The address to recieve these tokens on the L2
-        receiving_address: AccountOwnerPublicKey,
+        receiving_address: EthAddress,
     },
     /// Submit of PoC from the bridge on the L2 to get the tokens in network
     Deposit {
@@ -165,7 +165,7 @@ pub enum UpdateMethod {
     /// recieve the tokens
     WithdrawUnstaked {
         node: NodePublicKey,
-        recipient: Option<AccountOwnerPublicKey>,
+        recipient: Option<EthAddress>,
     },
     /// Sent by committee member to signal he is ready to change epoch
     ChangeEpoch { epoch: Epoch },
@@ -264,7 +264,7 @@ pub struct Staking {
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
 pub struct NodeInfo {
     /// The owner of this node
-    pub owner: AccountOwnerPublicKey,
+    pub owner: EthAddress,
     /// The BLS public key of the node which is used for our BFT DAG consensus
     /// multi signatures.
     pub public_key: NodePublicKey,

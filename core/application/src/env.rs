@@ -11,7 +11,7 @@ use draco_interfaces::{
     BlockExecutionResponse,
 };
 use fastcrypto::{secp256k1::Secp256k1PublicKey, traits::EncodeDecodeBase64};
-use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
+use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey, EthAddress};
 use hp_float::unsigned::HpUfloat;
 
 use crate::{
@@ -30,8 +30,8 @@ impl Env<UpdatePerm> {
     pub fn new() -> Self {
         let atomo = AtomoBuilder::<DefaultSerdeBackend>::new()
             .with_table::<Metadata, Value>("metadata")
-            .with_table::<AccountOwnerPublicKey, AccountInfo>("account")
-            .with_table::<ClientPublicKey, AccountOwnerPublicKey>("client_keys")
+            .with_table::<EthAddress, AccountInfo>("account")
+            .with_table::<ClientPublicKey, EthAddress>("client_keys")
             .with_table::<NodePublicKey, NodeInfo>("node")
             .with_table::<Epoch, Committee>("committee")
             .with_table::<ServiceId, Service>("service")
@@ -121,7 +121,7 @@ impl Env<UpdatePerm> {
             }
 
             let mut node_table = ctx.get_table::<NodePublicKey, NodeInfo>("node");
-            let mut account_table = ctx.get_table::<AccountOwnerPublicKey, AccountInfo>("account");
+            let mut account_table = ctx.get_table::<EthAddress, AccountInfo>("account");
             let mut service_table = ctx.get_table::<ServiceId, Service>("service");
             let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
             let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
@@ -135,7 +135,7 @@ impl Env<UpdatePerm> {
                     .into();
             metadata_table.insert(
                 Metadata::ProtocolFundAddress,
-                Value::AccountPublicKey(protocol_fund_address),
+                Value::AccountPublicKey(protocol_fund_address.into()),
             );
 
             let supply_at_genesis: HpUfloat<18> = HpUfloat::from(genesis.supply_at_genesis);
@@ -216,7 +216,7 @@ impl Env<UpdatePerm> {
                     bandwidth_balance: account.bandwidth_balance.into(),
                     nonce: 0,
                 };
-                account_table.insert(public_key, info);
+                account_table.insert(EthAddress::from(public_key), info);
             }
 
             // add commodity prices

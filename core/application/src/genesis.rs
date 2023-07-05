@@ -105,7 +105,7 @@ impl From<&GenesisCommittee> for NodeInfo {
         };
 
         NodeInfo {
-            owner,
+            owner: owner.into(),
             public_key: public_key.into(),
             network_key: network_key.into(),
             domain,

@@ -13,8 +13,8 @@ use draco_interfaces::{
 use draco_test_utils::{random, reputation};
 use fastcrypto::{bls12381::min_sig::BLS12381PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{
-    AccountOwnerPublicKey, AccountOwnerSignature, NodePublicKey, NodeSignature,
-    TransactionSignature,
+    AccountOwnerSignature, NodePublicKey, NodeSignature,
+    TransactionSignature, EthAddress,
 };
 use hp_float::unsigned::HpUfloat;
 use rand::Rng;
@@ -37,7 +37,7 @@ pub struct Params {
     supply_at_genesis: Option<u64>,
 }
 
-const ACCOUNT_ONE: AccountOwnerPublicKey = AccountOwnerPublicKey([0; 33]);
+const ACCOUNT_ONE: EthAddress = EthAddress([0; 20]);
 const NODE_ONE: &str = "k7XAk/1z4rXf1QHyMPHZ1cgyeX2T3bsCCopNpFV6v8hInZfjyti79w3raEa3YwFADM2BnX+/o49k1HQjKZIYlGDszEZ/zUaK3kn3MfT5BEWkKgP+TFMPJoBxenV33XEZ";
 
 // Init the app and return the execution engine socket that would go to narwhal and the query socket
@@ -91,9 +91,9 @@ async fn init_app_with_params(params: Params) -> (ExecutionEngineSocket, QueryRu
     init_app(Some(config)).await
 }
 
-fn node_and_account_key(value: u8) -> (AccountOwnerPublicKey, NodePublicKey) {
+fn node_and_account_key(value: u8) -> (EthAddress, NodePublicKey) {
     (
-        AccountOwnerPublicKey([value; 33]),
+        EthAddress([value; 20]),
         NodePublicKey([value; 96]),
     )
 }
@@ -130,11 +130,11 @@ fn get_update_request_node(method: UpdateMethod, sender: NodePublicKey) -> Updat
 
 fn get_update_request_account(
     method: UpdateMethod,
-    sender: AccountOwnerPublicKey,
+    sender: EthAddress,
 ) -> UpdateRequest {
     // TODO: sign the thing
     UpdateRequest {
-        sender: sender.into(),
+        sender: fleek_crypto::TransactionSender::AccountOwner(sender),
         signature: AccountOwnerSignature([0; 64]).into(),
         payload: UpdatePayload { nonce: 0, method },
     }
@@ -177,7 +177,7 @@ async fn run_transaction(
 async fn deposit(
     amount: HpUfloat<18>,
     token: Tokens,
-    sender: AccountOwnerPublicKey,
+    sender: EthAddress,
     update_socket: &Socket<Block, BlockExecutionResponse>,
 ) {
     // Deposit some FLK into account 1
@@ -195,7 +195,7 @@ async fn deposit(
 async fn stake_lock(
     locked_for: u64,
     node: NodePublicKey,
-    sender: AccountOwnerPublicKey,
+    sender: EthAddress,
     update_socket: &Socket<Block, BlockExecutionResponse>,
 ) {
     // Deposit some FLK into account 1
@@ -206,7 +206,7 @@ async fn stake_lock(
 async fn stake(
     amount: HpUfloat<18>,
     node_public_key: NodePublicKey,
-    sender: AccountOwnerPublicKey,
+    sender: EthAddress,
     update_socket: &Socket<Block, BlockExecutionResponse>,
 ) {
     let update = get_update_request_account(
@@ -302,7 +302,7 @@ async fn test_stake() {
         .unwrap();
 
     // check that he has 2_000 flk balance
-    assert_eq!(query_runner.get_flk_balance(&ACCOUNT_ONE), 2_000_u64.into());
+    assert_eq!(query_runner.get_flk_balance(&ACCOUNT_ONE.into()), 2_000_u64.into());
 
     // Test staking on a new node
 
@@ -424,8 +424,8 @@ async fn test_stake_lock() {
         .to_bytes()
         .into();
 
-    deposit(1_000_u64.into(), Tokens::FLK, ACCOUNT_ONE, &update_socket).await;
-    assert_eq!(query_runner.get_flk_balance(&ACCOUNT_ONE), 1_000_u64.into());
+    deposit(1_000_u64.into(), Tokens::FLK, ACCOUNT_ONE.into(), &update_socket).await;
+    assert_eq!(query_runner.get_flk_balance(&ACCOUNT_ONE.into()), 1_000_u64.into());
 
     stake(
         1_000_u64.into(),
@@ -540,12 +540,12 @@ async fn test_distribute_rewards() {
     let max_boost: HpUfloat<18> = boost.into();
 
     // deposit FLK tokens and stake it
-    deposit(10_000_u64.into(), Tokens::FLK, owner_key1, &update_socket).await;
-    stake(10_000_u64.into(), node_key1, owner_key1, &update_socket).await;
-    deposit(10_000_u64.into(), Tokens::FLK, owner_key2, &update_socket).await;
-    stake(10_000_u64.into(), node_key2, owner_key2, &update_socket).await;
+    deposit(10_000_u64.into(), Tokens::FLK, owner_key1.into(), &update_socket).await;
+    stake(10_000_u64.into(), node_key1, owner_key1.into(), &update_socket).await;
+    deposit(10_000_u64.into(), Tokens::FLK, owner_key2.into(), &update_socket).await;
+    stake(10_000_u64.into(), node_key2, owner_key2.into(), &update_socket).await;
     // staking locking for four year to get max boosts
-    stake_lock(1460, node_key1, owner_key1, &update_socket).await;
+    stake_lock(1460, node_key1, owner_key1.into(), &update_socket).await;
     let node_1_boost = &max_boost;
 
     // submit pods for usage
@@ -567,7 +567,7 @@ async fn test_distribute_rewards() {
     let reward_pool: HpUfloat<6> = (node_2_usd + node_1_usd).into();
 
     // assert stable balances
-    let stables_balance = query_runner.get_stables_balance(&owner_key1);
+    let stables_balance = query_runner.get_stables_balance(&owner_key1.into());
     assert_eq!(stables_balance, node_1_usd.into());
 
     // calculate emissions per unit
@@ -577,13 +577,13 @@ async fn test_distribute_rewards() {
     let node_proportion_2 = (&node_2_usd.into() / &reward_pool).convert_precision::<18>();
 
     // assert flk balances node 1
-    let node_flk_balance1 = query_runner.get_flk_balance(&owner_key1);
+    let node_flk_balance1 = query_runner.get_flk_balance(&owner_key1.into());
     let node_flk_rewards1: HpUfloat<18> =
         &emissions_per_unit * &node_share * node_1_boost * node_proportion_1;
     assert_eq!(node_flk_balance1, node_flk_rewards1);
 
     // assert flk balances node 2
-    let node_flk_balance2 = query_runner.get_flk_balance(&owner_key2);
+    let node_flk_balance2 = query_runner.get_flk_balance(&owner_key2.into());
     let node_flk_rewards2: HpUfloat<18> = &emissions_per_unit * &node_share * node_proportion_2;
     assert_eq!(node_flk_balance2, node_flk_rewards2);
 
@@ -770,8 +770,8 @@ async fn test_supply_across_epoch() {
     let (owner_key1, node_key1) = node_and_account_key(5);
 
     // deposit FLK tokens and stake it
-    deposit(10_000_u64.into(), Tokens::FLK, owner_key1, &update_socket).await;
-    stake(10_000_u64.into(), node_key1, owner_key1, &update_socket).await;
+    deposit(10_000_u64.into(), Tokens::FLK, owner_key1.into(), &update_socket).await;
+    stake(10_000_u64.into(), node_key1, owner_key1.into(), &update_socket).await;
 
     //every epoch supply increase similar for simplicity of the test
     let _node_1_usd = 0.1 * 10000_f64;

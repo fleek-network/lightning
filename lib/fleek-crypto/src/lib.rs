@@ -1,4 +1,4 @@
-use std::{fmt::Display, str::FromStr};
+use std::{fmt::Display, str::FromStr, borrow::Borrow};
 
 use arrayref::array_ref;
 use fastcrypto::{
@@ -337,19 +337,29 @@ impl PublicKey for AccountOwnerPublicKey {
 
 impl Display for AccountOwnerPublicKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "0x{}", hex::encode(self.to_eth_address()))
+        let address: EthAddress = self.into();
+        write!(f, "0x{}", hex::encode(address))
     }
 }
 
-impl AccountOwnerPublicKey {
-    pub fn to_eth_address(&self) -> [u8; 20] {
-        let pubkey: Secp256k1PublicKey = self.into();
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
+pub struct EthAddress (pub [u8; 20]);
+
+impl AsRef<[u8]> for EthAddress {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl <A: Borrow<AccountOwnerPublicKey>> From<A> for EthAddress {
+    fn from(value: A) -> Self {
+        let pubkey: Secp256k1PublicKey = value.borrow().into();
         // get the uncompressed serialization (1 byte prefix + 32 byte X + 32 byte Y)
         let uncompressed = &pubkey.pubkey.serialize_uncompressed();
         // Compute a 32 byte keccak256 hash, ignoring the prefix
         let hash = Keccak256::digest(&uncompressed[1..65]).digest;
         // return the last 20 bytes of the hash
-        *array_ref!(hash, 12, 20)
+        EthAddress(*array_ref!(hash, 12, 20))
     }
 }
 
@@ -431,7 +441,7 @@ impl From<&AccountOwnerSignature> for Secp256k1Signature {
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum TransactionSender {
     Node(NodePublicKey),
-    AccountOwner(AccountOwnerPublicKey),
+    AccountOwner(EthAddress),
 }
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
@@ -460,6 +470,6 @@ impl From<NodePublicKey> for TransactionSender {
 
 impl From<AccountOwnerPublicKey> for TransactionSender {
     fn from(value: AccountOwnerPublicKey) -> Self {
-        TransactionSender::AccountOwner(value)
+        TransactionSender::AccountOwner(value.into())
     }
 }

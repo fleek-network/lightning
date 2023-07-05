@@ -4,7 +4,7 @@ use atomo::{KeyIterator, SerdeBackend, TableRef as AtomoTableRef, TableSelector}
 use draco_interfaces::types::{
     ExecutionError, ProofOfConsensus, ProofOfMisbehavior, UpdateRequest,
 };
-use fleek_crypto::{AccountOwnerPublicKey, NodePublicKey};
+use fleek_crypto::{NodePublicKey, EthAddress};
 use serde::{de::DeserializeOwned, Serialize};
 
 pub trait Backend {
@@ -25,7 +25,7 @@ pub trait Backend {
     /// Takes in a zk Proof Of Delivery and returns true if valid
     fn verify_proof_of_delivery(
         &self,
-        client: &AccountOwnerPublicKey,
+        client: &EthAddress,
         provider: &NodePublicKey,
         commodity: &u128,
         service_id: &u32,
@@ -70,7 +70,7 @@ impl<'selector, S: SerdeBackend> Backend for StateTables<'selector, S> {
 
     fn verify_proof_of_delivery(
         &self,
-        _client: &AccountOwnerPublicKey,
+        _client: &EthAddress,
         _provider: &NodePublicKey,
         _commodity: &u128,
         _service_id: &u32,

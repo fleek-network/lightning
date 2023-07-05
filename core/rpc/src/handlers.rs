@@ -48,7 +48,7 @@ pub async fn get_balance_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>
     data: Data<Arc<I>>,
     Params(params): Params<PublicKeyParam>,
 ) -> Result<HpUfloat<18>> {
-    Ok(data.0.query_runner().get_flk_balance(&params.public_key))
+    Ok(data.0.query_runner().get_flk_balance(&params.public_key.into()))
 }
 
 pub async fn get_bandwidth_balance_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>>(
@@ -58,7 +58,7 @@ pub async fn get_bandwidth_balance_handler<Q: SyncQueryRunnerInterface, I: RpcIn
     Ok(data
         .0
         .query_runner()
-        .get_account_balance(&params.public_key))
+        .get_account_balance(&params.public_key.into()))
 }
 
 pub async fn get_locked_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>>(
