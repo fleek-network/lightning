@@ -100,17 +100,18 @@ async fn test_query() {
     });
     // Report some measurements for alice and bob.
     let alice = NodePublicKey([1; 96]);
+    let bob = NodePublicKey([2; 96]);
     rep_reporter.report_sat(&alice, Weight::Strong);
     rep_reporter.report_sat(&alice, Weight::VeryStrong);
-    rep_reporter.report_unsat(&alice, Weight::Weak);
-    rep_reporter.report_latency(&alice, Duration::from_millis(100));
-    rep_reporter.report_latency(&alice, Duration::from_millis(120));
-
-    let bob = NodePublicKey([2; 96]);
     rep_reporter.report_sat(&bob, Weight::Weak);
     rep_reporter.report_unsat(&bob, Weight::Strong);
+
+    rep_reporter.report_latency(&alice, Duration::from_millis(100));
+    rep_reporter.report_latency(&alice, Duration::from_millis(120));
     rep_reporter.report_latency(&bob, Duration::from_millis(300));
     rep_reporter.report_latency(&bob, Duration::from_millis(350));
+
+    rep_reporter.report_bytes_sent(&bob, 1000, None);
 
     // Check that there are local reputation score for alice and bob.
     let mut interval = tokio::time::interval(Duration::from_millis(100));
@@ -121,6 +122,9 @@ async fn test_query() {
                 let alice_rep = rep_query.get_reputation_of(&alice);
                 let bob_rep = rep_query.get_reputation_of(&bob);
                 if alice_rep.is_some() && bob_rep.is_some() {
+                    // We reported better measurements for alice, therefore alice should have a
+                    // better local reputation score.
+                    assert!(alice_rep.unwrap() > bob_rep.unwrap());
                     break;
                 }
             }

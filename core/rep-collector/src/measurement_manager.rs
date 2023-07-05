@@ -32,6 +32,7 @@ impl MeasurementManager {
 
     pub fn clear_measurements(&mut self) {
         self.peers.clear();
+        self.summary_stats.clear();
     }
 
     pub fn get_measurements(&self) -> BTreeMap<NodePublicKey, ReputationMeasurements> {
@@ -46,29 +47,34 @@ impl MeasurementManager {
     }
 
     pub fn report_sat(&mut self, peer: NodePublicKey, weight: Weight) {
-        self.peers
-            .get_or_insert_mut(peer, MeasurementStore::default)
+        self.insert_if_not_exists(&peer);
+        let (old_val, new_val) = self
+            .peers
+            .get_mut(&peer)
+            .unwrap()
             .register_interaction(true, weight);
-        let value = self.peers.get(&peer).unwrap().interactions.get().unwrap();
-        self.summary_stats.update_interactions(value);
+        self.summary_stats.remove_interactions(old_val);
+        self.summary_stats.add_interactions(new_val);
         self.update_local_reputation_score(peer);
     }
 
     pub fn report_unsat(&mut self, peer: NodePublicKey, weight: Weight) {
-        self.peers
-            .get_or_insert_mut(peer, MeasurementStore::default)
+        self.insert_if_not_exists(&peer);
+        let (old_val, new_val) = self
+            .peers
+            .get_mut(&peer)
+            .unwrap()
             .register_interaction(false, weight);
-        let value = self.peers.get(&peer).unwrap().interactions.get().unwrap();
-        self.summary_stats.update_interactions(value);
+        self.summary_stats.remove_interactions(old_val);
+        self.summary_stats.add_interactions(new_val);
         self.update_local_reputation_score(peer);
     }
 
     pub fn report_latency(&mut self, peer: NodePublicKey, latency: Duration) {
-        self.peers
-            .get_or_insert_mut(peer, MeasurementStore::default)
-            .register_latency(latency);
-        let value = self.peers.get(&peer).unwrap().latency.get().unwrap();
-        self.summary_stats.update_latency(value);
+        self.insert_if_not_exists(&peer);
+        let (old_val, new_val) = self.peers.get_mut(&peer).unwrap().register_latency(latency);
+        self.summary_stats.remove_latency(old_val);
+        self.summary_stats.add_latency(new_val);
         self.update_local_reputation_score(peer);
     }
 
@@ -78,16 +84,23 @@ impl MeasurementManager {
         bytes: u64,
         duration: Option<Duration>,
     ) {
-        let measurements = self
+        self.insert_if_not_exists(&peer);
+        let (old_val, new_val) = self
             .peers
-            .get_or_insert_mut(peer, MeasurementStore::default);
-        measurements.register_bytes_received(bytes);
-        let value = measurements.bytes_received.get();
-        self.summary_stats.update_bytes_received(value);
+            .get_mut(&peer)
+            .unwrap()
+            .register_bytes_received(bytes);
+        self.summary_stats.remove_bytes_received(old_val);
+        self.summary_stats.add_bytes_received(new_val);
+
         if let Some(duration) = duration {
-            measurements.register_outbound_bandwidth(bytes, duration);
-            let value = measurements.outbound_bandwidth.get().unwrap();
-            self.summary_stats.update_outbound_bandwidth(value);
+            let (old_val, new_val) = self
+                .peers
+                .get_mut(&peer)
+                .unwrap()
+                .register_outbound_bandwidth(bytes, duration);
+            self.summary_stats.remove_outbound_bandwidth(old_val);
+            self.summary_stats.add_outbound_bandwidth(new_val);
         }
         self.update_local_reputation_score(peer);
     }
@@ -98,26 +111,42 @@ impl MeasurementManager {
         bytes: u64,
         duration: Option<Duration>,
     ) {
-        let measurements = self
+        self.insert_if_not_exists(&peer);
+        let (old_val, new_val) = self
             .peers
-            .get_or_insert_mut(peer, MeasurementStore::default);
-        measurements.register_bytes_sent(bytes);
-        let value = measurements.bytes_sent.get();
-        self.summary_stats.update_bytes_sent(value);
+            .get_mut(&peer)
+            .unwrap()
+            .register_bytes_sent(bytes);
+        self.summary_stats.remove_bytes_sent(old_val);
+        self.summary_stats.add_bytes_sent(new_val);
+
         if let Some(duration) = duration {
-            measurements.register_inbound_bandwidth(bytes, duration);
-            let value = measurements.inbound_bandwidth.get().unwrap();
-            self.summary_stats.update_inbound_bandwidth(value);
+            let (old_val, new_val) = self
+                .peers
+                .get_mut(&peer)
+                .unwrap()
+                .register_inbound_bandwidth(bytes, duration);
+            self.summary_stats.remove_inbound_bandwidth(old_val);
+            self.summary_stats.add_inbound_bandwidth(new_val);
         }
         self.update_local_reputation_score(peer);
     }
 
     pub fn report_hops(&mut self, peer: NodePublicKey, hops: u8) {
-        self.peers
-            .get_or_insert_mut(peer, MeasurementStore::default)
-            .register_hops(hops);
-        let value = self.peers.get(&peer).unwrap().hops.get().unwrap();
-        self.summary_stats.update_hops(value);
+        self.insert_if_not_exists(&peer);
+        let (old_val, new_val) = self.peers.get_mut(&peer).unwrap().register_hops(hops);
+        self.summary_stats.remove_hops(old_val);
+        self.summary_stats.add_hops(new_val);
+    }
+
+    fn insert_if_not_exists(&mut self, peer: &NodePublicKey) {
+        if !self.peers.contains(peer) {
+            if let Some((_, measurements)) = self.peers.push(*peer, MeasurementStore::default()) {
+                // If the insertion removed measurements from the lru cache, we have to update the
+                // summary stats accordingly.
+                self.summary_stats.remove(measurements);
+            }
+        }
     }
 
     fn update_local_reputation_score(&mut self, peer: NodePublicKey) {
@@ -191,34 +220,42 @@ impl Default for MeasurementStore {
 }
 
 impl MeasurementStore {
-    fn register_latency(&mut self, latency: Duration) {
-        self.latency.register_latency(latency);
+    fn register_latency(&mut self, latency: Duration) -> (Option<Duration>, Option<Duration>) {
+        self.latency.register_latency(latency)
     }
 
-    fn register_interaction(&mut self, sat: bool, weight: Weight) {
-        self.interactions.register_interaction(sat, weight);
+    fn register_interaction(&mut self, sat: bool, weight: Weight) -> (Option<i64>, Option<i64>) {
+        self.interactions.register_interaction(sat, weight)
     }
 
-    fn register_inbound_bandwidth(&mut self, bytes: u64, duration: Duration) {
+    fn register_inbound_bandwidth(
+        &mut self,
+        bytes: u64,
+        duration: Duration,
+    ) -> (Option<u128>, Option<u128>) {
         self.inbound_bandwidth
-            .register_bytes_transferred(bytes, duration);
+            .register_bytes_transferred(bytes, duration)
     }
 
-    fn register_outbound_bandwidth(&mut self, bytes: u64, duration: Duration) {
+    fn register_outbound_bandwidth(
+        &mut self,
+        bytes: u64,
+        duration: Duration,
+    ) -> (Option<u128>, Option<u128>) {
         self.outbound_bandwidth
-            .register_bytes_transferred(bytes, duration);
+            .register_bytes_transferred(bytes, duration)
     }
 
-    fn register_bytes_received(&mut self, bytes: u64) {
-        self.bytes_received.register_bytes_transferred(bytes);
+    fn register_bytes_received(&mut self, bytes: u64) -> (u128, u128) {
+        self.bytes_received.register_bytes_transferred(bytes)
     }
 
-    fn register_bytes_sent(&mut self, bytes: u64) {
-        self.bytes_sent.register_bytes_transferred(bytes);
+    fn register_bytes_sent(&mut self, bytes: u64) -> (u128, u128) {
+        self.bytes_sent.register_bytes_transferred(bytes)
     }
 
-    fn register_hops(&mut self, hops: u8) {
-        self.hops.register_hops(hops);
+    fn register_hops(&mut self, hops: u8) -> (Option<u8>, Option<u8>) {
+        self.hops.register_hops(hops)
     }
 }
 
@@ -236,11 +273,14 @@ impl Latency {
         }
     }
 
-    fn register_latency(&mut self, latency: Duration) {
+    fn register_latency(&mut self, latency: Duration) -> (Option<Duration>, Option<Duration>) {
+        let old_value = self.get();
         if latency.as_millis() > 0 {
             self.sum += latency;
             self.count += 1;
         }
+        let new_value = self.get();
+        (old_value, new_value)
     }
 
     #[allow(dead_code)]
@@ -263,12 +303,15 @@ impl Interactions {
         Self { sum: None }
     }
 
-    fn register_interaction(&mut self, sat: bool, weight: Weight) {
+    fn register_interaction(&mut self, sat: bool, weight: Weight) -> (Option<i64>, Option<i64>) {
+        let old_value = self.get();
         if sat {
             self.sum = Some(self.sum.unwrap_or(0) + Interactions::get_weight(weight));
         } else {
             self.sum = Some(self.sum.unwrap_or(0) - Interactions::get_weight(weight));
         }
+        let new_value = self.get();
+        (old_value, new_value)
     }
 
     #[allow(dead_code)]
@@ -300,10 +343,17 @@ impl Bandwidth {
         }
     }
 
-    fn register_bytes_transferred(&mut self, bytes: u64, duration: Duration) {
+    fn register_bytes_transferred(
+        &mut self,
+        bytes: u64,
+        duration: Duration,
+    ) -> (Option<u128>, Option<u128>) {
+        let old_value = self.get();
         let bytes_per_ms = bytes as f64 / duration.as_millis() as f64;
         self.bytes_per_ms_sum += bytes_per_ms;
         self.count += 1;
+        let new_value = self.get();
+        (old_value, new_value)
     }
 
     #[allow(dead_code)]
@@ -326,8 +376,11 @@ impl BytesTransferred {
         Self { bytes: 0 }
     }
 
-    fn register_bytes_transferred(&mut self, bytes: u64) {
+    fn register_bytes_transferred(&mut self, bytes: u64) -> (u128, u128) {
+        let old_value = self.get();
         self.bytes += bytes as u128;
+        let new_value = self.get();
+        (old_value, new_value)
     }
 
     #[allow(dead_code)]
@@ -346,8 +399,11 @@ impl Hops {
         Self { hops: None }
     }
 
-    fn register_hops(&mut self, hops: u8) {
-        self.hops = Some(hops)
+    fn register_hops(&mut self, hops: u8) -> (Option<u8>, Option<u8>) {
+        let old_value = self.get();
+        self.hops = Some(hops);
+        let new_value = self.get();
+        (old_value, new_value)
     }
 
     #[allow(dead_code)]
@@ -358,59 +414,228 @@ impl Hops {
 
 #[derive(Debug, Default)]
 struct SummaryStatistics {
-    min: ReputationMeasurements,
-    max: ReputationMeasurements,
+    latency: BTreeMap<Duration, u32>,
+    interactions: BTreeMap<i64, u32>,
+    inbound_bandwidth: BTreeMap<u128, u32>,
+    outbound_bandwidth: BTreeMap<u128, u32>,
+    bytes_received: BTreeMap<u128, u32>,
+    bytes_sent: BTreeMap<u128, u32>,
+    hops: BTreeMap<u8, u32>,
 }
 
 impl SummaryStatistics {
-    fn update_latency(&mut self, value: Duration) {
-        self.min.latency = Self::update(self.min.latency, value, &std::cmp::min);
-        self.max.latency = Self::update(self.max.latency, value, &std::cmp::max);
+    fn min_latency(&self) -> Option<Duration> {
+        self.latency.first_key_value().map(|(v, _)| *v)
     }
 
-    fn update_interactions(&mut self, value: i64) {
-        self.min.interactions = Self::update(self.min.interactions, value, &std::cmp::min);
-        self.max.interactions = Self::update(self.max.interactions, value, &std::cmp::max);
+    fn max_latency(&self) -> Option<Duration> {
+        self.latency.last_key_value().map(|(v, _)| *v)
     }
 
-    fn update_inbound_bandwidth(&mut self, value: u128) {
-        self.min.inbound_bandwidth =
-            Self::update(self.min.inbound_bandwidth, value, &std::cmp::min);
-        self.max.inbound_bandwidth =
-            Self::update(self.max.inbound_bandwidth, value, &std::cmp::max);
+    fn min_interactions(&self) -> Option<i64> {
+        self.interactions.first_key_value().map(|(v, _)| *v)
     }
 
-    fn update_outbound_bandwidth(&mut self, value: u128) {
-        self.min.outbound_bandwidth =
-            Self::update(self.min.outbound_bandwidth, value, &std::cmp::min);
-        self.max.outbound_bandwidth =
-            Self::update(self.max.outbound_bandwidth, value, &std::cmp::max);
+    fn max_interactions(&self) -> Option<i64> {
+        self.interactions.last_key_value().map(|(v, _)| *v)
     }
 
-    fn update_bytes_received(&mut self, value: u128) {
-        self.min.bytes_received = Self::update(self.min.bytes_received, value, &std::cmp::min);
-        self.max.bytes_received = Self::update(self.max.bytes_received, value, &std::cmp::max);
+    fn min_inbound_bandwidth(&self) -> Option<u128> {
+        self.inbound_bandwidth.first_key_value().map(|(v, _)| *v)
     }
 
-    fn update_bytes_sent(&mut self, value: u128) {
-        self.min.bytes_sent = Self::update(self.min.bytes_sent, value, &std::cmp::min);
-        self.max.bytes_sent = Self::update(self.max.bytes_sent, value, &std::cmp::max);
+    fn max_inbound_bandwidth(&self) -> Option<u128> {
+        self.inbound_bandwidth.last_key_value().map(|(v, _)| *v)
     }
 
-    fn update_hops(&mut self, value: u8) {
-        self.min.hops = Self::update(self.min.hops, value, &std::cmp::min);
-        self.max.hops = Self::update(self.max.hops, value, &std::cmp::max);
+    fn min_outbound_bandwidth(&self) -> Option<u128> {
+        self.outbound_bandwidth.first_key_value().map(|(v, _)| *v)
     }
 
-    fn update<T: PartialOrd + Copy>(
-        summary_val: Option<T>,
-        new_value: T,
-        cmp: &dyn Fn(T, T) -> T,
-    ) -> Option<T> {
-        match summary_val {
-            Some(summary_val) => Some(cmp(summary_val, new_value)),
-            None => Some(new_value),
+    fn max_outbound_bandwidth(&self) -> Option<u128> {
+        self.outbound_bandwidth.last_key_value().map(|(v, _)| *v)
+    }
+
+    fn min_bytes_received(&self) -> Option<u128> {
+        self.bytes_received.first_key_value().map(|(v, _)| *v)
+    }
+
+    fn max_bytes_received(&self) -> Option<u128> {
+        self.bytes_received.last_key_value().map(|(v, _)| *v)
+    }
+
+    fn min_bytes_sent(&self) -> Option<u128> {
+        self.bytes_sent.first_key_value().map(|(v, _)| *v)
+    }
+
+    fn max_bytes_sent(&self) -> Option<u128> {
+        self.bytes_sent.last_key_value().map(|(v, _)| *v)
+    }
+
+    #[allow(dead_code)]
+    fn min_hops(&self) -> Option<u8> {
+        self.hops.first_key_value().map(|(v, _)| *v)
+    }
+
+    #[allow(dead_code)]
+    fn max_hops(&self) -> Option<u8> {
+        self.hops.last_key_value().map(|(v, _)| *v)
+    }
+
+    fn add_latency(&mut self, value: Option<Duration>) {
+        if let Some(value) = value {
+            self.latency
+                .entry(value)
+                .and_modify(|v| *v += 1)
+                .or_insert(1);
         }
+    }
+
+    fn remove_latency(&mut self, value: Option<Duration>) {
+        if let Some(value) = value {
+            if let Some(count) = self.latency.get(&value) {
+                if *count == 1 {
+                    self.latency.remove(&value);
+                } else {
+                    self.latency.insert(value, count - 1);
+                }
+            }
+        }
+    }
+
+    fn add_interactions(&mut self, value: Option<i64>) {
+        if let Some(value) = value {
+            self.interactions
+                .entry(value)
+                .and_modify(|v| *v += 1)
+                .or_insert(1);
+        }
+    }
+
+    fn remove_interactions(&mut self, value: Option<i64>) {
+        if let Some(value) = value {
+            if let Some(count) = self.interactions.get(&value) {
+                if *count == 1 {
+                    self.interactions.remove(&value);
+                } else {
+                    self.interactions.insert(value, count - 1);
+                }
+            }
+        }
+    }
+
+    fn add_inbound_bandwidth(&mut self, value: Option<u128>) {
+        if let Some(value) = value {
+            self.inbound_bandwidth
+                .entry(value)
+                .and_modify(|v| *v += 1)
+                .or_insert(1);
+        }
+    }
+
+    fn remove_inbound_bandwidth(&mut self, value: Option<u128>) {
+        if let Some(value) = value {
+            if let Some(count) = self.inbound_bandwidth.get(&value) {
+                if *count == 1 {
+                    self.inbound_bandwidth.remove(&value);
+                } else {
+                    self.inbound_bandwidth.insert(value, count - 1);
+                }
+            }
+        }
+    }
+
+    fn add_outbound_bandwidth(&mut self, value: Option<u128>) {
+        if let Some(value) = value {
+            self.outbound_bandwidth
+                .entry(value)
+                .and_modify(|v| *v += 1)
+                .or_insert(1);
+        }
+    }
+
+    fn remove_outbound_bandwidth(&mut self, value: Option<u128>) {
+        if let Some(value) = value {
+            if let Some(count) = self.outbound_bandwidth.get(&value) {
+                if *count == 1 {
+                    self.outbound_bandwidth.remove(&value);
+                } else {
+                    self.outbound_bandwidth.insert(value, count - 1);
+                }
+            }
+        }
+    }
+
+    fn add_bytes_received(&mut self, value: u128) {
+        self.bytes_received
+            .entry(value)
+            .and_modify(|v| *v += 1)
+            .or_insert(1);
+    }
+
+    fn remove_bytes_received(&mut self, value: u128) {
+        if let Some(count) = self.bytes_received.get(&value) {
+            if *count == 1 {
+                self.bytes_received.remove(&value);
+            } else {
+                self.bytes_received.insert(value, count - 1);
+            }
+        }
+    }
+
+    fn add_bytes_sent(&mut self, value: u128) {
+        self.bytes_sent
+            .entry(value)
+            .and_modify(|v| *v += 1)
+            .or_insert(1);
+    }
+
+    fn remove_bytes_sent(&mut self, value: u128) {
+        if let Some(count) = self.bytes_sent.get(&value) {
+            if *count == 1 {
+                self.bytes_sent.remove(&value);
+            } else {
+                self.bytes_sent.insert(value, count - 1);
+            }
+        }
+    }
+
+    fn add_hops(&mut self, value: Option<u8>) {
+        if let Some(value) = value {
+            self.hops.entry(value).and_modify(|v| *v += 1).or_insert(1);
+        }
+    }
+
+    fn remove_hops(&mut self, value: Option<u8>) {
+        if let Some(value) = value {
+            if let Some(count) = self.hops.get(&value) {
+                if *count == 1 {
+                    self.hops.remove(&value);
+                } else {
+                    self.hops.insert(value, count - 1);
+                }
+            }
+        }
+    }
+
+    fn remove(&mut self, measurements: MeasurementStore) {
+        self.remove_latency(measurements.latency.get());
+        self.remove_interactions(measurements.interactions.get());
+        self.remove_inbound_bandwidth(measurements.inbound_bandwidth.get());
+        self.remove_outbound_bandwidth(measurements.outbound_bandwidth.get());
+        self.remove_bytes_received(measurements.bytes_received.get());
+        self.remove_bytes_sent(measurements.bytes_sent.get());
+        self.remove_hops(measurements.hops.get());
+    }
+
+    fn clear(&mut self) {
+        self.latency.clear();
+        self.interactions.clear();
+        self.inbound_bandwidth.clear();
+        self.outbound_bandwidth.clear();
+        self.bytes_received.clear();
+        self.bytes_sent.clear();
+        self.hops.clear();
     }
 }
 
@@ -441,7 +666,7 @@ struct NormalizedMeasurements {
 impl NormalizedMeasurements {
     fn new(values: ReputationMeasurements, summary_stats: &SummaryStatistics) -> Self {
         let latency = if let (Some(min_val), Some(max_val)) =
-            (summary_stats.min.latency, summary_stats.max.latency)
+            (summary_stats.min_latency(), summary_stats.max_latency())
         {
             values.latency.and_then(|x| {
                 try_min_max_normalize(
@@ -454,8 +679,8 @@ impl NormalizedMeasurements {
             None
         };
         let interactions = if let (Some(min_val), Some(max_val)) = (
-            summary_stats.min.interactions,
-            summary_stats.max.interactions,
+            summary_stats.min_interactions(),
+            summary_stats.max_interactions(),
         ) {
             values
                 .interactions
@@ -464,8 +689,8 @@ impl NormalizedMeasurements {
             None
         };
         let inbound_bandwidth = if let (Some(min_val), Some(max_val)) = (
-            summary_stats.min.inbound_bandwidth,
-            summary_stats.max.inbound_bandwidth,
+            summary_stats.min_inbound_bandwidth(),
+            summary_stats.max_inbound_bandwidth(),
         ) {
             values
                 .inbound_bandwidth
@@ -474,8 +699,8 @@ impl NormalizedMeasurements {
             None
         };
         let outbound_bandwidth = if let (Some(min_val), Some(max_val)) = (
-            summary_stats.min.outbound_bandwidth,
-            summary_stats.max.outbound_bandwidth,
+            summary_stats.min_outbound_bandwidth(),
+            summary_stats.max_outbound_bandwidth(),
         ) {
             values
                 .outbound_bandwidth
@@ -484,8 +709,8 @@ impl NormalizedMeasurements {
             None
         };
         let bytes_received = if let (Some(min_val), Some(max_val)) = (
-            summary_stats.min.bytes_received,
-            summary_stats.max.bytes_received,
+            summary_stats.min_bytes_received(),
+            summary_stats.max_bytes_received(),
         ) {
             values
                 .bytes_received
@@ -493,9 +718,10 @@ impl NormalizedMeasurements {
         } else {
             None
         };
-        let bytes_sent = if let (Some(min_val), Some(max_val)) =
-            (summary_stats.min.bytes_sent, summary_stats.max.bytes_sent)
-        {
+        let bytes_sent = if let (Some(min_val), Some(max_val)) = (
+            summary_stats.min_bytes_sent(),
+            summary_stats.max_bytes_sent(),
+        ) {
             values
                 .bytes_sent
                 .and_then(|x| try_min_max_normalize(x as f64, min_val as f64, max_val as f64))
@@ -518,6 +744,7 @@ mod tests {
     use draco_interfaces::{types::ReputationMeasurements, Weight};
     use draco_test_utils::{random, reputation};
     use fleek_crypto::NodePublicKey;
+    use rand::Rng;
 
     use super::*;
 
@@ -616,88 +843,175 @@ mod tests {
 
     #[test]
     fn test_lateny_min_max() {
+        let mut rng = random::get_seedable_rng();
+        let peers: Vec<NodePublicKey> = (0..10).map(|i| NodePublicKey([i; 96])).collect();
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 96]);
-        manager.report_latency(peer, Duration::from_millis(200));
-        let peer = NodePublicKey([1; 96]);
-        manager.report_latency(peer, Duration::from_millis(100));
-        assert_eq!(
-            manager.summary_stats.min.latency.unwrap(),
-            Duration::from_millis(100)
-        );
-        assert_eq!(
-            manager.summary_stats.max.latency.unwrap(),
-            Duration::from_millis(200)
-        );
+
+        for _ in 0..100 {
+            let measurements =
+                reputation::generate_reputation_measurements(&mut rng, PROB_MEASUREMENT_PRESENT);
+            let index = rng.gen_range(0..peers.len());
+            let peer = peers[index];
+            if let Some(latency) = measurements.latency {
+                manager.report_latency(peer, latency);
+            }
+        }
+        let mut min_val = Duration::from_millis(u64::MAX);
+        let mut max_val = Duration::from_millis(0);
+        manager.peers.iter().for_each(|(_, measurements)| {
+            if let Some(value) = measurements.latency.get() {
+                min_val = min_val.min(value);
+                max_val = max_val.max(value);
+            }
+        });
+        assert_eq!(manager.summary_stats.min_latency().unwrap(), min_val);
+        assert_eq!(manager.summary_stats.max_latency().unwrap(), max_val);
     }
 
     #[test]
     fn test_interactions_min_max() {
+        let mut rng = random::get_seedable_rng();
+        let peers: Vec<NodePublicKey> = (0..10).map(|i| NodePublicKey([i; 96])).collect();
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 96]);
-        manager.report_sat(peer, Weight::Weak);
-        let peer = NodePublicKey([1; 96]);
-        manager.report_sat(peer, Weight::Strong);
-        assert_eq!(
-            manager.summary_stats.min.interactions.unwrap(),
-            Interactions::get_weight(Weight::Weak)
-        );
-        assert_eq!(
-            manager.summary_stats.max.interactions.unwrap(),
-            Interactions::get_weight(Weight::Strong)
-        );
+
+        for _ in 0..100 {
+            let index = rng.gen_range(0..peers.len());
+            let peer = peers[index];
+            if rng.gen_bool(0.5) {
+                manager.report_sat(peer, Weight::Weak);
+            } else {
+                manager.report_unsat(peer, Weight::Weak);
+            }
+        }
+        let mut min_val = i64::MAX;
+        let mut max_val = i64::MIN;
+        manager.peers.iter().for_each(|(_, measurements)| {
+            if let Some(value) = measurements.interactions.get() {
+                min_val = min_val.min(value);
+                max_val = max_val.max(value);
+            }
+        });
+        assert_eq!(manager.summary_stats.min_interactions().unwrap(), min_val);
+        assert_eq!(manager.summary_stats.max_interactions().unwrap(), max_val);
     }
 
     #[test]
     fn test_bytes_received_min_max() {
+        let mut rng = random::get_seedable_rng();
+        let peers: Vec<NodePublicKey> = (0..10).map(|i| NodePublicKey([i; 96])).collect();
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 96]);
-        manager.report_bytes_received(peer, 1000, Some(Duration::from_millis(200)));
-        let peer = NodePublicKey([1; 96]);
-        manager.report_bytes_received(peer, 2000, Some(Duration::from_millis(100)));
 
-        assert_eq!(manager.summary_stats.min.bytes_received.unwrap(), 1000);
-        assert_eq!(manager.summary_stats.min.outbound_bandwidth.unwrap(), 5);
+        for _ in 0..100 {
+            let index = rng.gen_range(0..peers.len());
+            let peer = peers[index];
+            let bytes = rng.gen_range(100..10000);
+            let duration = Duration::from_millis(rng.gen_range(100..10000));
+            manager.report_bytes_received(peer, bytes, Some(duration));
+        }
+        let mut min_val_br = u128::MAX;
+        let mut max_val_br = u128::MIN;
 
-        assert_eq!(manager.summary_stats.max.bytes_received.unwrap(), 2000);
-        assert_eq!(manager.summary_stats.max.outbound_bandwidth.unwrap(), 20);
+        let mut min_val_ob = u128::MAX;
+        let mut max_val_ob = u128::MIN;
+        manager.peers.iter().for_each(|(_, measurements)| {
+            min_val_br = min_val_br.min(measurements.bytes_received.get());
+            max_val_br = max_val_br.max(measurements.bytes_received.get());
+
+            if let Some(value) = measurements.outbound_bandwidth.get() {
+                min_val_ob = min_val_ob.min(value);
+                max_val_ob = max_val_ob.max(value);
+            }
+        });
+        assert_eq!(
+            manager.summary_stats.min_bytes_received().unwrap(),
+            min_val_br
+        );
+        assert_eq!(
+            manager.summary_stats.max_bytes_received().unwrap(),
+            max_val_br
+        );
+        assert_eq!(
+            manager.summary_stats.min_outbound_bandwidth().unwrap(),
+            min_val_ob
+        );
+        assert_eq!(
+            manager.summary_stats.max_outbound_bandwidth().unwrap(),
+            max_val_ob
+        );
     }
 
     #[test]
     fn test_bytes_sent_min_max() {
+        let mut rng = random::get_seedable_rng();
+        let peers: Vec<NodePublicKey> = (0..10).map(|i| NodePublicKey([i; 96])).collect();
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 96]);
-        manager.report_bytes_sent(peer, 1000, Some(Duration::from_millis(200)));
-        let peer = NodePublicKey([1; 96]);
-        manager.report_bytes_sent(peer, 2000, Some(Duration::from_millis(100)));
 
-        assert_eq!(manager.summary_stats.min.bytes_sent.unwrap(), 1000);
-        assert_eq!(manager.summary_stats.min.inbound_bandwidth.unwrap(), 5);
+        for _ in 0..100 {
+            let index = rng.gen_range(0..peers.len());
+            let peer = peers[index];
+            let bytes = rng.gen_range(100..10000);
+            let duration = Duration::from_millis(rng.gen_range(100..10000));
+            manager.report_bytes_sent(peer, bytes, Some(duration));
+        }
+        let mut min_val_bs = u128::MAX;
+        let mut max_val_bs = u128::MIN;
 
-        assert_eq!(manager.summary_stats.max.bytes_sent.unwrap(), 2000);
-        assert_eq!(manager.summary_stats.max.inbound_bandwidth.unwrap(), 20);
+        let mut min_val_ib = u128::MAX;
+        let mut max_val_ib = u128::MIN;
+        manager.peers.iter().for_each(|(_, measurements)| {
+            min_val_bs = min_val_bs.min(measurements.bytes_sent.get());
+            max_val_bs = max_val_bs.max(measurements.bytes_sent.get());
+
+            if let Some(value) = measurements.inbound_bandwidth.get() {
+                min_val_ib = min_val_ib.min(value);
+                max_val_ib = max_val_ib.max(value);
+            }
+        });
+        assert_eq!(manager.summary_stats.min_bytes_sent().unwrap(), min_val_bs);
+        assert_eq!(manager.summary_stats.max_bytes_sent().unwrap(), max_val_bs);
+        assert_eq!(
+            manager.summary_stats.min_inbound_bandwidth().unwrap(),
+            min_val_ib
+        );
+        assert_eq!(
+            manager.summary_stats.max_inbound_bandwidth().unwrap(),
+            max_val_ib
+        );
     }
 
     #[test]
     fn test_hops_min_max() {
+        let mut rng = random::get_seedable_rng();
+        let peers: Vec<NodePublicKey> = (0..10).map(|i| NodePublicKey([i; 96])).collect();
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 96]);
-        manager.report_hops(peer, 10);
-        let peer = NodePublicKey([1; 96]);
-        manager.report_hops(peer, 20);
 
-        assert_eq!(manager.summary_stats.min.hops.unwrap(), 10);
-        assert_eq!(manager.summary_stats.max.hops.unwrap(), 20);
+        for _ in 0..100 {
+            let index = rng.gen_range(0..peers.len());
+            let peer = peers[index];
+            let hops = rng.gen_range(3..10);
+            manager.report_hops(peer, hops);
+        }
+        let mut min_val = u8::MAX;
+        let mut max_val = u8::MIN;
+        manager.peers.iter().for_each(|(_, measurements)| {
+            if let Some(value) = measurements.hops.get() {
+                min_val = min_val.min(value);
+                max_val = max_val.max(value);
+            }
+        });
+        assert_eq!(manager.summary_stats.min_hops().unwrap(), min_val);
+        assert_eq!(manager.summary_stats.max_hops().unwrap(), max_val);
     }
 
     #[test]
     fn test_get_local_reputation_ref() {
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 96]);
-        manager.report_sat(peer, Weight::Weak);
-        manager.report_sat(peer, Weight::Strong);
+        let peer1 = NodePublicKey([0; 96]);
+        manager.report_sat(peer1, Weight::Weak);
+        let peer2 = NodePublicKey([1; 96]);
+        manager.report_sat(peer2, Weight::Strong);
         let reputation_map = manager.get_local_reputation_ref();
-        assert!(reputation_map.contains(&peer));
+        assert!(reputation_map.contains(&peer2));
     }
 
     #[test]
@@ -744,27 +1058,17 @@ mod tests {
         let mut summary_stats = SummaryStatistics::default();
         let rep_measurements = generate_weighted_measurements(20);
         rep_measurements.iter().for_each(|m| {
-            if let Some(latency) = m.latency {
-                summary_stats.update_latency(latency);
-            }
-            if let Some(interactions) = m.interactions {
-                summary_stats.update_interactions(interactions);
-            }
-            if let Some(inbound_bandwidth) = m.inbound_bandwidth {
-                summary_stats.update_inbound_bandwidth(inbound_bandwidth);
-            }
-            if let Some(outbound_bandwidth) = m.outbound_bandwidth {
-                summary_stats.update_outbound_bandwidth(outbound_bandwidth);
-            }
+            summary_stats.add_latency(m.latency);
+            summary_stats.add_interactions(m.interactions);
+            summary_stats.add_inbound_bandwidth(m.inbound_bandwidth);
+            summary_stats.add_outbound_bandwidth(m.outbound_bandwidth);
             if let Some(bytes_received) = m.bytes_received {
-                summary_stats.update_bytes_received(bytes_received);
+                summary_stats.add_bytes_received(bytes_received);
             }
             if let Some(bytes_sent) = m.bytes_sent {
-                summary_stats.update_bytes_sent(bytes_sent);
+                summary_stats.add_bytes_sent(bytes_sent);
             }
-            if let Some(hops) = m.hops {
-                summary_stats.update_hops(hops);
-            }
+            summary_stats.add_hops(m.hops);
         });
         for rm in rep_measurements {
             let normalized_measurements = NormalizedMeasurements::new(rm, &summary_stats);
