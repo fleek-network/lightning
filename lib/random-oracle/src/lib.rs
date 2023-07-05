@@ -122,6 +122,93 @@ impl RandomOracle {
     }
 }
 
+impl RandomOracleInput for Option<i32> {
+    const TYPE: &'static str = "i32";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        match self {
+            Some(v) => v.to_random_oracle_input(),
+            None => vec![],
+        }
+    }
+}
+
+impl RandomOracleInput for i32 {
+    const TYPE: &'static str = "i32";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        Vec::from(self.to_be_bytes())
+    }
+}
+
+impl RandomOracleInput for Option<i64> {
+    const TYPE: &'static str = "i64";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        match self {
+            Some(v) => v.to_random_oracle_input(),
+            None => vec![],
+        }
+    }
+}
+
+impl RandomOracleInput for i64 {
+    const TYPE: &'static str = "i64";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        Vec::from(self.to_be_bytes())
+    }
+}
+
+impl RandomOracleInput for u8 {
+    const TYPE: &'static str = "u8";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        Vec::from(self.to_be_bytes())
+    }
+}
+
+impl RandomOracleInput for Option<u8> {
+    const TYPE: &'static str = "u8";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        match self {
+            Some(v) => v.to_random_oracle_input(),
+            None => vec![],
+        }
+    }
+}
+
+impl RandomOracleInput for u16 {
+    const TYPE: &'static str = "u16";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        Vec::from(self.to_be_bytes())
+    }
+}
+
+impl RandomOracleInput for Option<u16> {
+    const TYPE: &'static str = "u16";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        match self {
+            Some(v) => v.to_random_oracle_input(),
+            None => vec![],
+        }
+    }
+}
+
+impl RandomOracleInput for Option<u32> {
+    const TYPE: &'static str = "u32";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        match self {
+            Some(v) => v.to_random_oracle_input(),
+            None => vec![],
+        }
+    }
+}
+
 impl RandomOracleInput for u32 {
     const TYPE: &'static str = "u32";
 
@@ -138,11 +225,33 @@ impl RandomOracleInput for u64 {
     }
 }
 
+impl RandomOracleInput for Option<u64> {
+    const TYPE: &'static str = "u64";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        match self {
+            Some(v) => v.to_random_oracle_input(),
+            None => vec![],
+        }
+    }
+}
+
 impl RandomOracleInput for u128 {
     const TYPE: &'static str = "u128";
 
     fn to_random_oracle_input(&self) -> Vec<u8> {
         Vec::from(self.to_be_bytes())
+    }
+}
+
+impl RandomOracleInput for Option<u128> {
+    const TYPE: &'static str = "u128";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        match self {
+            Some(v) => v.to_random_oracle_input(),
+            None => vec![],
+        }
     }
 }
 

@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, time::Duration};
 
 use blake3_tree::blake3::derive_key;
 use fleek_crypto::{
-    AccountOwnerPublicKey, NodeNetworkingPublicKey, NodePublicKey, TransactionSender,
+    AccountOwnerPublicKey, NodeNetworkingPublicKey, NodePublicKey, PublicKey, TransactionSender,
     TransactionSignature,
 };
 use hp_float::unsigned::HpUfloat;
@@ -476,9 +476,15 @@ impl ToDigest for UpdatePayload {
                     .with("epoch", epoch);
             },
             UpdateMethod::AddService {
-                service: _,
-                service_id: _,
-            } => todo!(),
+                service,
+                service_id,
+            } => {
+                random_oracle = random_oracle
+                    .with("transaction_name", &"add_service")
+                    .with_prefix("input".to_owned())
+                    .with("service_id", service_id)
+                    .with("service", service);
+            },
             UpdateMethod::RemoveService { service_id } => {
                 random_oracle = random_oracle
                     .with("transaction_name", &"remove_service")
@@ -498,7 +504,21 @@ impl ToDigest for UpdatePayload {
                 // .with("proof_of_misbehavior", proof_of_misbehavior)
                 ;
             },
-            UpdateMethod::SubmitReputationMeasurements { measurements: _ } => todo!(),
+            UpdateMethod::SubmitReputationMeasurements { measurements } => {
+                random_oracle =
+                    random_oracle.with("transaction_name", &"submit_reputation_measurements");
+                for (key, value) in measurements {
+                    random_oracle = random_oracle
+                        .with_prefix(key.to_base64())
+                        .with("latency", &value.latency.map_or(0, |l| l.as_nanos()))
+                        .with("interactions", &value.interactions)
+                        .with("inbound_bandwidth", &value.inbound_bandwidth)
+                        .with("outbound_bandwidth", &value.outbound_bandwidth)
+                        .with("bytes_received", &value.bytes_received)
+                        .with("bytes_sent", &value.bytes_sent)
+                        .with("hops", &value.hops);
+                }
+            },
         }
 
         derive_key(random_oracle.get_domain(), &random_oracle.compile())
@@ -543,5 +563,26 @@ impl RandomOracleInput for Tokens {
             Tokens::USDC => b"USDC".to_vec(),
             Tokens::FLK => b"FLK".to_vec(),
         }
+    }
+}
+
+impl RandomOracleInput for CommodityTypes {
+    const TYPE: &'static str = "commodity_types";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        match self {
+            CommodityTypes::Bandwidth => b"Bandwidth".to_vec(),
+            CommodityTypes::Compute => b"Compute".to_vec(),
+            CommodityTypes::Gpu => b"Gpu".to_vec(),
+        }
+    }
+}
+
+impl RandomOracleInput for Service {
+    const TYPE: &'static str = "service";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        self.commodity_type.to_random_oracle_input()
+        // todo: check if implementation needs to change when slashing is implemented
     }
 }
