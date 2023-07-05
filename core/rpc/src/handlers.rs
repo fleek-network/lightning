@@ -48,10 +48,7 @@ pub async fn get_balance_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>
     data: Data<Arc<I>>,
     Params(params): Params<PublicKeyParam>,
 ) -> Result<HpUfloat<18>> {
-    Ok(data
-        .0
-        .query_runner()
-        .get_flk_balance(&params.public_key.into()))
+    Ok(data.0.query_runner().get_flk_balance(&params.public_key))
 }
 
 pub async fn get_bandwidth_balance_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>>(

@@ -444,7 +444,7 @@ impl<B: Backend> State<B> {
         };
 
         // Make sure the caller is the owner of the node
-        if sender != node.owner.into() {
+        if sender != node.owner {
             return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
         }
         // check if node has stakes to be locked
@@ -494,7 +494,7 @@ impl<B: Backend> State<B> {
         };
 
         // Make sure the caller is the owner of the node
-        if sender != node.owner.into() {
+        if sender != node.owner {
             return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
         }
 
@@ -546,7 +546,7 @@ impl<B: Backend> State<B> {
         };
 
         // Make sure the caller is the owner of the node
-        if sender_public_key != node.owner.into() {
+        if sender_public_key != node.owner {
             return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
         }
 
@@ -564,7 +564,7 @@ impl<B: Backend> State<B> {
 
         // if there is no recipient the owner will recieve the withdrawl
         let recipient = recipient.unwrap_or(sender_public_key);
-        let mut reciever = self.account_info.get(&recipient.into()).unwrap_or_default();
+        let mut reciever = self.account_info.get(&recipient).unwrap_or_default();
 
         // add the withdrawn tokens to the recipient and reset the nodes locked stake state
         // no need to reset locked_until on the node because that will get adjusted the next time
@@ -576,7 +576,7 @@ impl<B: Backend> State<B> {
         // state tables completly?
 
         // Save state changes and return response
-        self.account_info.set(recipient.into(), reciever);
+        self.account_info.set(recipient, reciever);
         self.node_info.set(node_public_key, node);
         TransactionResponse::Success(ExecutionData::None)
     }
@@ -909,17 +909,17 @@ impl<B: Backend> State<B> {
     }
 
     fn mint_and_transfer_stables(&self, amount: HpUfloat<6>, owner: EthAddress) {
-        let mut account = self.account_info.get(&owner.into()).unwrap_or_default();
+        let mut account = self.account_info.get(&owner).unwrap_or_default();
 
         account.stables_balance += amount;
         self.account_info.set(owner, account);
     }
 
     fn mint_and_transfer_flk(&self, amount: HpUfloat<18>, owner: EthAddress) {
-        let mut account = self.account_info.get(&owner.into()).unwrap_or_default();
+        let mut account = self.account_info.get(&owner).unwrap_or_default();
         account.flk_balance += amount.clone();
 
-        self.account_info.set(owner.into(), account);
+        self.account_info.set(owner, account);
 
         let mut current_supply = match self.metadata.get(&Metadata::TotalSupply) {
             Some(Value::HpUfloat(supply)) => supply,
@@ -1029,9 +1029,9 @@ impl<B: Backend> State<B> {
                 self.node_info.set(node, node_info);
             },
             TransactionSender::AccountOwner(account) => {
-                let mut account_info = self.account_info.get(&account.into()).unwrap();
+                let mut account_info = self.account_info.get(&account).unwrap();
                 account_info.nonce += 1;
-                self.account_info.set(account.into(), account_info);
+                self.account_info.set(account, account_info);
             },
         }
     }
