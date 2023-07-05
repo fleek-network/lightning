@@ -24,7 +24,7 @@ use crate::{
 
 pub struct Node<
     ConfigProvider: ConfigProviderInterface,
-    Consensus: ConsensusInterface<QueryRunner = Application::SyncExecutor>,
+    Consensus: ConsensusInterface<QueryRunner = Application::SyncExecutor, Gossip = Gossip>,
     Application: ApplicationInterface,
     BlockStore: BlockStoreInterface,
     Indexer: IndexerInterface,
@@ -57,14 +57,14 @@ pub struct Node<
     pub reputation_aggregator: ReputationAggregator,
     pub handshake: Handshake,
     pub topology: Arc<Topology>,
-    pub gossip: Gossip,
+    pub gossip: Arc<Gossip>,
     pub sdk: PhantomData<Sdk>,
     pub notifier: PhantomData<Notifier>,
 }
 
 impl<
     ConfigProvider: ConfigProviderInterface,
-    Consensus: ConsensusInterface<QueryRunner = Application::SyncExecutor>,
+    Consensus: ConsensusInterface<QueryRunner = Application::SyncExecutor, Gossip = Gossip>,
     Application: ApplicationInterface,
     BlockStore: BlockStoreInterface,
     Indexer: IndexerInterface,
@@ -117,13 +117,15 @@ impl<
             .await?,
         );
 
-        let gossip = Gossip::init(configuration.get::<Gossip>(), topology.clone(), &signer).await?;
+        let gossip =
+            Arc::new(Gossip::init(configuration.get::<Gossip>(), topology.clone(), &signer).await?);
 
         let consensus = Consensus::init(
             configuration.get::<Consensus>(),
             &signer,
             application.transaction_executor(),
             application.sync_query(),
+            gossip.clone(),
         )
         .await?;
 
@@ -234,7 +236,7 @@ impl<
 #[async_trait]
 impl<
     ConfigProvider: ConfigProviderInterface,
-    Consensus: ConsensusInterface<QueryRunner = Application::SyncExecutor>,
+    Consensus: ConsensusInterface<QueryRunner = Application::SyncExecutor, Gossip = Gossip>,
     Application: ApplicationInterface,
     BlockStore: BlockStoreInterface,
     Indexer: IndexerInterface,

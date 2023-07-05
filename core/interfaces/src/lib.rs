@@ -41,4 +41,5 @@ pub use pod::*;
 pub use reputation::*;
 pub use rpc::*;
 pub use sdk::*;
+pub use signer::*;
 pub use topology::*;

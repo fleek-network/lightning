@@ -17,6 +17,8 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tokio::{sync::mpsc, time::sleep};
 
+use crate::empty_interfaces::MockGossip;
+
 #[allow(clippy::type_complexity)]
 pub struct MockConsensus<Q: SyncQueryRunnerInterface + 'static> {
     inner: Arc<MockConsensusInner<Q>>,
@@ -35,13 +37,14 @@ struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static> {
 #[async_trait]
 impl<Q: SyncQueryRunnerInterface> ConsensusInterface for MockConsensus<Q> {
     type QueryRunner = Q;
-
+    type Gossip = MockGossip;
     /// Create a new consensus service with the provided config and executor.
     async fn init<S: SignerInterface>(
         config: Config,
         _signer: &S,
         executor: ExecutionEngineSocket,
         query_runner: Self::QueryRunner,
+        _gossip: Arc<Self::Gossip>,
     ) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
         let inner = MockConsensusInner {

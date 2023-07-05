@@ -14,7 +14,7 @@ use draco_interfaces::{
     consensus::{ConsensusInterface, MempoolSocket},
     signer::{SignerInterface, SubmitTxSocket},
     types::{Epoch, EpochInfo, UpdateMethod},
-    SyncQueryRunnerInterface,
+    GossipInterface, SyncQueryRunnerInterface,
 };
 use mysten_metrics::RegistryService;
 use mysten_network::Multiaddr;
@@ -38,9 +38,11 @@ use crate::{
     narwhal::{NarwhalArgs, NarwhalService},
 };
 
-pub struct Consensus<Q: SyncQueryRunnerInterface> {
+pub struct Consensus<Q: SyncQueryRunnerInterface, G: GossipInterface> {
     /// Used to query the application data
     pub query_runner: Q,
+    /// Interface for sending messages through the gossip layer
+    _gossip: Arc<G>,
     /// Path to the database used by the narwhal implementation
     pub store_path: PathBuf,
     /// This narwhal node data
@@ -71,7 +73,7 @@ struct EpochState {
     narwhal: NarwhalService,
 }
 
-impl<Q: SyncQueryRunnerInterface> Consensus<Q> {
+impl<Q: SyncQueryRunnerInterface, G: GossipInterface> Consensus<Q, G> {
     async fn start_current_epoch(&self) {
         // Get current epoch information
         let (committee, worker_cache, epoch, epoch_end) = self.get_epoch_info();
@@ -208,7 +210,7 @@ impl<Q: SyncQueryRunnerInterface> Consensus<Q> {
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface> WithStartAndShutdown for Consensus<Q> {
+impl<Q: SyncQueryRunnerInterface, G: GossipInterface> WithStartAndShutdown for Consensus<Q, G> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         todo!()
@@ -245,22 +247,23 @@ impl<Q: SyncQueryRunnerInterface> WithStartAndShutdown for Consensus<Q> {
     }
 }
 
-impl<Q: SyncQueryRunnerInterface> ConfigConsumer for Consensus<Q> {
+impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConfigConsumer for Consensus<Q, G> {
     const KEY: &'static str = "consensus";
 
     type Config = Config;
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface> ConsensusInterface for Consensus<Q> {
+impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConsensusInterface for Consensus<Q, G> {
     type QueryRunner = Q;
-
+    type Gossip = G;
     /// Create a new consensus service with the provided config and executor.
     async fn init<S: SignerInterface>(
         config: Self::Config,
         signer: &S,
         executor: ExecutionEngineSocket,
         query_runner: Q,
+        gossip: Arc<Self::Gossip>,
     ) -> anyhow::Result<Self> {
         let (networking_sk, primary_sk) = signer.get_sk();
         let reconfigure_notify = Arc::new(Notify::new());
@@ -271,6 +274,7 @@ impl<Q: SyncQueryRunnerInterface> ConsensusInterface for Consensus<Q> {
 
         Ok(Self {
             query_runner,
+            _gossip: gossip,
             store_path: config.store_path,
             narwhal_args: NarwhalArgs {
                 primary_keypair,

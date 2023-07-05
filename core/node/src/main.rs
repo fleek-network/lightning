@@ -27,7 +27,7 @@ use crate::{
 
 pub type ConcreteNode = Node<
     TomlConfigProvider,
-    Consensus<QueryRunner>,
+    Consensus<QueryRunner, Gossip<Signer, Topology<QueryRunner>, Notifier>>,
     Application,
     BlockStore,
     Indexer,

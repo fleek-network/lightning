@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use draco_application::{
     app::Application,
@@ -9,7 +9,10 @@ use draco_interfaces::{
     application::ApplicationInterface, common::WithStartAndShutdown, consensus::ConsensusInterface,
     signer::SignerInterface, types::UpdateMethod, SyncQueryRunnerInterface,
 };
-use draco_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+use draco_test_utils::{
+    consensus::{Config as ConsensusConfig, MockConsensus},
+    empty_interfaces::MockGossip,
+};
 use fleek_crypto::{AccountOwnerSecretKey, PublicKey, SecretKey};
 
 use crate::{config::Config, Signer};
@@ -59,6 +62,7 @@ async fn test_send_two_txs_in_a_row() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
+        Arc::new(MockGossip {}),
     )
     .await
     .unwrap();
@@ -133,6 +137,7 @@ async fn test_retry_send() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
+        Arc::new(MockGossip {}),
     )
     .await
     .unwrap();

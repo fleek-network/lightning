@@ -1,4 +1,7 @@
-use std::time::{Duration, SystemTime};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 use draco_application::{
     app::Application,
@@ -17,7 +20,10 @@ use draco_interfaces::{
 };
 use draco_notifier::Notifier;
 use draco_signer::{Config as SignerConfig, Signer};
-use draco_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+use draco_test_utils::{
+    consensus::{Config as ConsensusConfig, MockConsensus},
+    empty_interfaces::MockGossip,
+};
 use fleek_crypto::{
     AccountOwnerSecretKey, NodePublicKey, NodeSignature, PublicKey, SecretKey, TransactionSender,
     TransactionSignature,
@@ -172,6 +178,7 @@ async fn test_submit_measurements() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
+        Arc::new(MockGossip {}),
     )
     .await
     .unwrap();
@@ -298,6 +305,7 @@ async fn test_reputation_calculation_and_query() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
+    let mock_gossip = Arc::new(MockGossip {});
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 1,
@@ -309,6 +317,7 @@ async fn test_reputation_calculation_and_query() {
         &signer1,
         update_socket.clone(),
         query_runner.clone(),
+        mock_gossip.clone(),
     )
     .await
     .unwrap();
@@ -317,6 +326,7 @@ async fn test_reputation_calculation_and_query() {
         &signer2,
         update_socket.clone(),
         query_runner.clone(),
+        mock_gossip.clone(),
     )
     .await
     .unwrap();
