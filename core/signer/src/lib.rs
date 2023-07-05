@@ -13,7 +13,7 @@ use async_trait::async_trait;
 pub use config::Config;
 use draco_application::query_runner::QueryRunner;
 use draco_interfaces::{
-    common::WithStartAndShutdown,
+    common::{ToDigest, WithStartAndShutdown},
     config::ConfigConsumer,
     signer::{SignerInterface, SubmitTxSocket},
     types::{TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest},
@@ -21,7 +21,7 @@ use draco_interfaces::{
 };
 use fleek_crypto::{
     NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
-    SecretKey, TransactionSender, TransactionSignature,
+    SecretKey, TransactionSender,
 };
 use tokio::{sync::mpsc, time::interval};
 
@@ -252,10 +252,11 @@ impl SignerInner {
                     let update_method = task.request.clone();
                     task.respond(next_nonce);
                     let update_payload = UpdatePayload { method: update_method, nonce: next_nonce };
+                    let digest = update_payload.to_digest();
+                    let signature = self.node_secret_key.sign(&digest);
                     let update_request = UpdateRequest {
                         sender:  TransactionSender::Node(self.node_public_key),
-                        // TODO: replace dummy signature
-                        signature: TransactionSignature::Node(NodeSignature([0; 48])),
+                        signature: signature.into(),
                         payload: update_payload,
                     };
                     mempool_socket.run(update_request.clone())
