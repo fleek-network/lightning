@@ -35,6 +35,7 @@ draco-application = { path = "../../core/application" }
 draco-blockstore = { path = "../../core/blockstore" }
 draco-rep-collector = { path = "../../core/rep-collector" }
 draco-notifier = { path = "../../core/notifier" }
+rand = "0.8.5"
 
 [features]
 dummy = ["affair", "draco-application", "draco-blockstore", "draco-rep-collector", "draco-notifier"]
@@ -43,3 +44,7 @@ dummy = ["affair", "draco-application", "draco-blockstore", "draco-rep-collector
 name = "cdn_server"
 path = "examples/server.rs"
 required-features = ["dummy"]
+
+[[example]]
+name = "cdn_client"
+path = "examples/client.rs"
