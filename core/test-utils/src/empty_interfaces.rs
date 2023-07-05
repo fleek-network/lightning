@@ -40,14 +40,10 @@ impl WithStartAndShutdown for MockGossip {
 
     /// Start the system, should not do anything if the system is already
     /// started.
-    async fn start(&self) {
-        
-    }
+    async fn start(&self) {}
 
     /// Send the shutdown signal to the system.
-    async fn shutdown(&self) {
-        
-    }
+    async fn shutdown(&self) {}
 }
 
 impl ConfigConsumer for MockGossip {
@@ -101,13 +97,9 @@ impl SignerInterface for MockSigner {
         Ok(Self {})
     }
 
-    fn provide_mempool(&mut self, _mempool: MempoolSocket) {
-        
-    }
+    fn provide_mempool(&mut self, _mempool: MempoolSocket) {}
 
-    fn provide_query_runner(&self, _query_runner: Self::SyncQuery) {
-        
-    }
+    fn provide_query_runner(&self, _query_runner: Self::SyncQuery) {}
 
     fn get_bls_pk(&self) -> NodePublicKey {
         NodePublicKey([0; 96])
@@ -252,13 +244,9 @@ impl NotifierInterface for MockNotifier {
         Self {}
     }
 
-    fn notify_on_new_epoch(&self, _tx: mpsc::Sender<Notification>) {
-        
-    }
+    fn notify_on_new_epoch(&self, _tx: mpsc::Sender<Notification>) {}
 
-    fn notify_before_epoch_change(&self, _duration: Duration, _tx: mpsc::Sender<Notification>) {
-        
-    }
+    fn notify_before_epoch_change(&self, _duration: Duration, _tx: mpsc::Sender<Notification>) {}
 }
 
 impl ConfigConsumer for MockTopology {
