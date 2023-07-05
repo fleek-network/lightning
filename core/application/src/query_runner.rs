@@ -7,7 +7,7 @@ use draco_interfaces::{
         TransactionResponse, UpdateRequest, Value,
     },
 };
-use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
+use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_float::unsigned::HpUfloat;
 
 use crate::{
@@ -19,8 +19,8 @@ use crate::{
 pub struct QueryRunner {
     inner: Atomo<QueryPerm>,
     metadata_table: ResolvedTableReference<Metadata, Value>,
-    account_table: ResolvedTableReference<AccountOwnerPublicKey, AccountInfo>,
-    client_table: ResolvedTableReference<ClientPublicKey, AccountOwnerPublicKey>,
+    account_table: ResolvedTableReference<EthAddress, AccountInfo>,
+    client_table: ResolvedTableReference<ClientPublicKey, EthAddress>,
     node_table: ResolvedTableReference<NodePublicKey, NodeInfo>,
     committee_table: ResolvedTableReference<Epoch, Committee>,
     _services_table: ResolvedTableReference<ServiceId, Service>,
@@ -37,8 +37,8 @@ impl QueryRunner {
     pub fn init(atomo: Atomo<QueryPerm>) -> Self {
         Self {
             metadata_table: atomo.resolve::<Metadata, Value>("metadata"),
-            account_table: atomo.resolve::<AccountOwnerPublicKey, AccountInfo>("account"),
-            client_table: atomo.resolve::<ClientPublicKey, AccountOwnerPublicKey>("client_keys"),
+            account_table: atomo.resolve::<EthAddress, AccountInfo>("account"),
+            client_table: atomo.resolve::<ClientPublicKey, EthAddress>("client_keys"),
             node_table: atomo.resolve::<NodePublicKey, NodeInfo>("node"),
             committee_table: atomo.resolve::<Epoch, Committee>("committee"),
             _services_table: atomo.resolve::<ServiceId, Service>("service"),
@@ -58,7 +58,7 @@ impl QueryRunner {
 }
 
 impl SyncQueryRunnerInterface for QueryRunner {
-    fn get_account_balance(&self, account: &AccountOwnerPublicKey) -> u128 {
+    fn get_account_balance(&self, account: &EthAddress) -> u128 {
         self.inner.run(|ctx| {
             self.account_table
                 .get(ctx)
@@ -81,7 +81,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn get_flk_balance(&self, account: &AccountOwnerPublicKey) -> HpUfloat<18> {
+    fn get_flk_balance(&self, account: &EthAddress) -> HpUfloat<18> {
         self.inner.run(|ctx| {
             self.account_table
                 .get(ctx)
@@ -91,7 +91,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn get_stables_balance(&self, account: &AccountOwnerPublicKey) -> HpUfloat<6> {
+    fn get_stables_balance(&self, account: &EthAddress) -> HpUfloat<6> {
         self.inner.run(|ctx| {
             self.account_table
                 .get(ctx)
@@ -267,7 +267,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn get_protocol_fund_address(&self) -> AccountOwnerPublicKey {
+    fn get_protocol_fund_address(&self) -> EthAddress {
         self.inner.run(|ctx| {
             let owner = match self
                 .metadata_table

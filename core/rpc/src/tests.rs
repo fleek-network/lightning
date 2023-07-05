@@ -7,7 +7,7 @@ use draco_interfaces::{
     types::{Block, ProofOfConsensus, Tokens, UpdateMethod, UpdatePayload, UpdateRequest},
     ApplicationInterface, ExecutionEngineSocket, MempoolSocket, RpcInterface, WithStartAndShutdown,
 };
-use fleek_crypto::{AccountOwnerPublicKey, AccountOwnerSignature};
+use fleek_crypto::{AccountOwnerSignature, EthAddress};
 use hp_float::unsigned::HpUfloat;
 use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
@@ -16,7 +16,7 @@ use tokio::{task, test};
 
 use crate::{config::Config as RpcConfig, server::Rpc};
 
-const ACCOUNT_ONE: AccountOwnerPublicKey = AccountOwnerPublicKey([0; 33]);
+const ACCOUNT_ONE: EthAddress = EthAddress([0; 20]);
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RpcSuccessResponse {

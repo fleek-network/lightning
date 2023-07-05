@@ -1,9 +1,9 @@
-use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
+use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct PublicKeyParam {
-    pub public_key: AccountOwnerPublicKey,
+    pub public_key: EthAddress,
 }
 
 #[derive(Deserialize)]

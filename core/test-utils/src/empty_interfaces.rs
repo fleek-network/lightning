@@ -13,8 +13,8 @@ use draco_interfaces::{
     Topic, TopologyInterface, WithStartAndShutdown,
 };
 use fleek_crypto::{
-    AccountOwnerPublicKey, ClientPublicKey, NodeNetworkingPublicKey, NodeNetworkingSecretKey,
-    NodePublicKey, NodeSecretKey, NodeSignature,
+    ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey,
+    NodeSecretKey, NodeSignature,
 };
 use hp_float::unsigned::HpUfloat;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -123,7 +123,7 @@ impl SignerInterface for MockSigner {
 }
 
 impl SyncQueryRunnerInterface for MockQueryRunner {
-    fn get_account_balance(&self, _account: &AccountOwnerPublicKey) -> u128 {
+    fn get_account_balance(&self, _account: &EthAddress) -> u128 {
         0
     }
 
@@ -131,11 +131,11 @@ impl SyncQueryRunnerInterface for MockQueryRunner {
         0
     }
 
-    fn get_flk_balance(&self, _account: &AccountOwnerPublicKey) -> HpUfloat<18> {
+    fn get_flk_balance(&self, _account: &EthAddress) -> HpUfloat<18> {
         HpUfloat::from(0_u64)
     }
 
-    fn get_stables_balance(&self, _account: &AccountOwnerPublicKey) -> HpUfloat<6> {
+    fn get_stables_balance(&self, _account: &EthAddress) -> HpUfloat<6> {
         HpUfloat::from(0_u64)
     }
 
@@ -222,8 +222,8 @@ impl SyncQueryRunnerInterface for MockQueryRunner {
         HpUfloat::from(0_u64)
     }
 
-    fn get_protocol_fund_address(&self) -> AccountOwnerPublicKey {
-        AccountOwnerPublicKey([0; 33])
+    fn get_protocol_fund_address(&self) -> EthAddress {
+        EthAddress([0; 20])
     }
 
     /// Returns the passed in protocol parameter

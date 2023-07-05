@@ -1,6 +1,6 @@
 use affair::Socket;
 use async_trait::async_trait;
-use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, NodePublicKey};
+use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_float::unsigned::HpUfloat;
 
 use crate::{
@@ -71,16 +71,16 @@ pub trait ApplicationInterface:
 
 pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Returns the latest bandwidth balance associated with the given account public key.
-    fn get_account_balance(&self, account: &AccountOwnerPublicKey) -> u128;
+    fn get_account_balance(&self, account: &EthAddress) -> u128;
 
     /// Returns the latest bandwidth balance associated with the given client public key.
     fn get_client_balance(&self, client: &ClientPublicKey) -> u128;
 
     /// Returns the latest FLK balance of an account
-    fn get_flk_balance(&self, account: &AccountOwnerPublicKey) -> HpUfloat<18>;
+    fn get_flk_balance(&self, account: &EthAddress) -> HpUfloat<18>;
 
     /// Returns the latest stables balance of an account
-    fn get_stables_balance(&self, account: &AccountOwnerPublicKey) -> HpUfloat<6>;
+    fn get_stables_balance(&self, account: &EthAddress) -> HpUfloat<6>;
 
     /// Returns the amount of flk a node has staked
     fn get_staked(&self, node: &NodePublicKey) -> HpUfloat<18>;
@@ -146,7 +146,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_year_start_supply(&self) -> HpUfloat<18>;
 
     /// Return the foundation address where protocol fund goes to
-    fn get_protocol_fund_address(&self) -> AccountOwnerPublicKey;
+    fn get_protocol_fund_address(&self) -> EthAddress;
 
     /// Returns the passed in protocol parameter
     fn get_protocol_params(&self, param: ProtocolParams) -> u128;

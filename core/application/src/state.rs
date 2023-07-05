@@ -14,8 +14,7 @@ use draco_interfaces::{
 };
 use draco_reputation::{statistics, types::WeightedReputationMeasurements};
 use fleek_crypto::{
-    AccountOwnerPublicKey, ClientPublicKey, NodeNetworkingPublicKey, NodePublicKey,
-    TransactionSender,
+    ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodePublicKey, TransactionSender,
 };
 use hp_float::unsigned::HpUfloat;
 use multiaddr::Multiaddr;
@@ -50,8 +49,8 @@ const REP_EWMA_WEIGHT: f64 = 0.7;
 /// All state changes come from Transactions and start at execute_txn
 pub struct State<B: Backend> {
     pub metadata: B::Ref<Metadata, Value>,
-    pub account_info: B::Ref<AccountOwnerPublicKey, AccountInfo>,
-    pub client_keys: B::Ref<ClientPublicKey, AccountOwnerPublicKey>,
+    pub account_info: B::Ref<EthAddress, AccountInfo>,
+    pub client_keys: B::Ref<ClientPublicKey, EthAddress>,
     pub node_info: B::Ref<NodePublicKey, NodeInfo>,
     pub committee_info: B::Ref<Epoch, Committee>,
     pub services: B::Ref<ServiceId, Service>,
@@ -247,7 +246,7 @@ impl<B: Backend> State<B> {
     fn withdraw(
         &self,
         _sender: TransactionSender,
-        _reciever: AccountOwnerPublicKey,
+        _reciever: EthAddress,
         _amount: HpUfloat<18>,
         _token: Tokens,
     ) -> TransactionResponse {
@@ -445,7 +444,7 @@ impl<B: Backend> State<B> {
         };
 
         // Make sure the caller is the owner of the node
-        if node.owner != sender {
+        if sender != node.owner.into() {
             return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
         }
         // check if node has stakes to be locked
@@ -495,7 +494,7 @@ impl<B: Backend> State<B> {
         };
 
         // Make sure the caller is the owner of the node
-        if node.owner != sender {
+        if sender != node.owner.into() {
             return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
         }
 
@@ -532,7 +531,7 @@ impl<B: Backend> State<B> {
         &self,
         sender: TransactionSender,
         node_public_key: NodePublicKey,
-        recipient: Option<AccountOwnerPublicKey>,
+        recipient: Option<EthAddress>,
     ) -> TransactionResponse {
         // This transaction is only callable by AccountOwners and not nodes
         // So revert if the sender is a node public key
@@ -547,7 +546,7 @@ impl<B: Backend> State<B> {
         };
 
         // Make sure the caller is the owner of the node
-        if node.owner != sender_public_key {
+        if sender_public_key != node.owner.into() {
             return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
         }
 
@@ -565,7 +564,7 @@ impl<B: Backend> State<B> {
 
         // if there is no recipient the owner will recieve the withdrawl
         let recipient = recipient.unwrap_or(sender_public_key);
-        let mut reciever = self.account_info.get(&recipient).unwrap_or_default();
+        let mut reciever = self.account_info.get(&recipient.into()).unwrap_or_default();
 
         // add the withdrawn tokens to the recipient and reset the nodes locked stake state
         // no need to reset locked_until on the node because that will get adjusted the next time
@@ -577,7 +576,7 @@ impl<B: Backend> State<B> {
         // state tables completly?
 
         // Save state changes and return response
-        self.account_info.set(recipient, reciever);
+        self.account_info.set(recipient.into(), reciever);
         self.node_info.set(node_public_key, node);
         TransactionResponse::Success(ExecutionData::None)
     }
@@ -909,18 +908,18 @@ impl<B: Backend> State<B> {
         (max_emissions, min_emissions)
     }
 
-    fn mint_and_transfer_stables(&self, amount: HpUfloat<6>, owner: AccountOwnerPublicKey) {
-        let mut account = self.account_info.get(&owner).unwrap_or_default();
+    fn mint_and_transfer_stables(&self, amount: HpUfloat<6>, owner: EthAddress) {
+        let mut account = self.account_info.get(&owner.into()).unwrap_or_default();
 
         account.stables_balance += amount;
         self.account_info.set(owner, account);
     }
 
-    fn mint_and_transfer_flk(&self, amount: HpUfloat<18>, owner: AccountOwnerPublicKey) {
-        let mut account = self.account_info.get(&owner).unwrap_or_default();
+    fn mint_and_transfer_flk(&self, amount: HpUfloat<18>, owner: EthAddress) {
+        let mut account = self.account_info.get(&owner.into()).unwrap_or_default();
         account.flk_balance += amount.clone();
 
-        self.account_info.set(owner, account);
+        self.account_info.set(owner.into(), account);
 
         let mut current_supply = match self.metadata.get(&Metadata::TotalSupply) {
             Some(Value::HpUfloat(supply)) => supply,
@@ -1004,7 +1003,7 @@ impl<B: Backend> State<B> {
     /// Takes in a zk Proof Of Delivery and returns true if valid
     fn verify_proof_of_delivery(
         &self,
-        _client: &AccountOwnerPublicKey,
+        _client: &EthAddress,
         _provider: &NodePublicKey,
         _commodity: &u128,
         _service_id: &u32,
@@ -1030,9 +1029,9 @@ impl<B: Backend> State<B> {
                 self.node_info.set(node, node_info);
             },
             TransactionSender::AccountOwner(account) => {
-                let mut account_info = self.account_info.get(&account).unwrap();
+                let mut account_info = self.account_info.get(&account.into()).unwrap();
                 account_info.nonce += 1;
-                self.account_info.set(account, account_info);
+                self.account_info.set(account.into(), account_info);
             },
         }
     }
@@ -1041,7 +1040,7 @@ impl<B: Backend> State<B> {
     fn only_account_owner(
         &self,
         sender: TransactionSender,
-    ) -> Result<AccountOwnerPublicKey, TransactionResponse> {
+    ) -> Result<EthAddress, TransactionResponse> {
         match sender {
             TransactionSender::AccountOwner(account) => Ok(account),
             _ => Err(TransactionResponse::Revert(
