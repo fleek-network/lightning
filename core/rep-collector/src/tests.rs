@@ -75,6 +75,7 @@ async fn test_query() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
+        Arc::new(MockGossip {}),
     )
     .await
     .unwrap();
