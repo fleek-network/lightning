@@ -295,10 +295,7 @@ async fn test_stake() {
         .unwrap();
 
     // check that he has 2_000 flk balance
-    assert_eq!(
-        query_runner.get_flk_balance(&ACCOUNT_ONE.into()),
-        2_000_u64.into()
-    );
+    assert_eq!(query_runner.get_flk_balance(&ACCOUNT_ONE), 2_000_u64.into());
 
     // Test staking on a new node
 
@@ -420,17 +417,8 @@ async fn test_stake_lock() {
         .to_bytes()
         .into();
 
-    deposit(
-        1_000_u64.into(),
-        Tokens::FLK,
-        ACCOUNT_ONE.into(),
-        &update_socket,
-    )
-    .await;
-    assert_eq!(
-        query_runner.get_flk_balance(&ACCOUNT_ONE.into()),
-        1_000_u64.into()
-    );
+    deposit(1_000_u64.into(), Tokens::FLK, ACCOUNT_ONE, &update_socket).await;
+    assert_eq!(query_runner.get_flk_balance(&ACCOUNT_ONE), 1_000_u64.into());
 
     stake(
         1_000_u64.into(),
@@ -545,36 +533,12 @@ async fn test_distribute_rewards() {
     let max_boost: HpUfloat<18> = boost.into();
 
     // deposit FLK tokens and stake it
-    deposit(
-        10_000_u64.into(),
-        Tokens::FLK,
-        owner_key1.into(),
-        &update_socket,
-    )
-    .await;
-    stake(
-        10_000_u64.into(),
-        node_key1,
-        owner_key1.into(),
-        &update_socket,
-    )
-    .await;
-    deposit(
-        10_000_u64.into(),
-        Tokens::FLK,
-        owner_key2.into(),
-        &update_socket,
-    )
-    .await;
-    stake(
-        10_000_u64.into(),
-        node_key2,
-        owner_key2.into(),
-        &update_socket,
-    )
-    .await;
+    deposit(10_000_u64.into(), Tokens::FLK, owner_key1, &update_socket).await;
+    stake(10_000_u64.into(), node_key1, owner_key1, &update_socket).await;
+    deposit(10_000_u64.into(), Tokens::FLK, owner_key2, &update_socket).await;
+    stake(10_000_u64.into(), node_key2, owner_key2, &update_socket).await;
     // staking locking for four year to get max boosts
-    stake_lock(1460, node_key1, owner_key1.into(), &update_socket).await;
+    stake_lock(1460, node_key1, owner_key1, &update_socket).await;
     let node_1_boost = &max_boost;
 
     // submit pods for usage
@@ -596,7 +560,7 @@ async fn test_distribute_rewards() {
     let reward_pool: HpUfloat<6> = (node_2_usd + node_1_usd).into();
 
     // assert stable balances
-    let stables_balance = query_runner.get_stables_balance(&owner_key1.into());
+    let stables_balance = query_runner.get_stables_balance(&owner_key1);
     assert_eq!(stables_balance, node_1_usd.into());
 
     // calculate emissions per unit
@@ -606,13 +570,13 @@ async fn test_distribute_rewards() {
     let node_proportion_2 = (&node_2_usd.into() / &reward_pool).convert_precision::<18>();
 
     // assert flk balances node 1
-    let node_flk_balance1 = query_runner.get_flk_balance(&owner_key1.into());
+    let node_flk_balance1 = query_runner.get_flk_balance(&owner_key1);
     let node_flk_rewards1: HpUfloat<18> =
         &emissions_per_unit * &node_share * node_1_boost * node_proportion_1;
     assert_eq!(node_flk_balance1, node_flk_rewards1);
 
     // assert flk balances node 2
-    let node_flk_balance2 = query_runner.get_flk_balance(&owner_key2.into());
+    let node_flk_balance2 = query_runner.get_flk_balance(&owner_key2);
     let node_flk_rewards2: HpUfloat<18> = &emissions_per_unit * &node_share * node_proportion_2;
     assert_eq!(node_flk_balance2, node_flk_rewards2);
 
@@ -799,20 +763,8 @@ async fn test_supply_across_epoch() {
     let (owner_key1, node_key1) = node_and_account_key(5);
 
     // deposit FLK tokens and stake it
-    deposit(
-        10_000_u64.into(),
-        Tokens::FLK,
-        owner_key1.into(),
-        &update_socket,
-    )
-    .await;
-    stake(
-        10_000_u64.into(),
-        node_key1,
-        owner_key1.into(),
-        &update_socket,
-    )
-    .await;
+    deposit(10_000_u64.into(), Tokens::FLK, owner_key1, &update_socket).await;
+    stake(10_000_u64.into(), node_key1, owner_key1, &update_socket).await;
 
     //every epoch supply increase similar for simplicity of the test
     let _node_1_usd = 0.1 * 10000_f64;
