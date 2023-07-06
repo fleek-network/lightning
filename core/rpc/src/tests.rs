@@ -156,7 +156,7 @@ async fn test_rpc_get_balance() -> Result<()> {
     // TODO: sign the thing
     let update = UpdateRequest {
         sender: ACCOUNT_ONE.into(),
-        signature: AccountOwnerSignature([0; 64]).into(),
+        signature: AccountOwnerSignature([0; 65]).into(),
         payload: UpdatePayload {
             nonce: 0,
             method: deposit_method,

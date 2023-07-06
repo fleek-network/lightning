@@ -8,8 +8,14 @@ use fastcrypto::{
     ed25519::{Ed25519KeyPair, Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     encoding::{Base64, Encoding},
     hash::{HashFunction, Keccak256},
-    secp256k1::{Secp256k1KeyPair, Secp256k1PrivateKey, Secp256k1PublicKey, Secp256k1Signature},
-    traits::{KeyPair, Signer, ToFromBytes, VerifyingKey},
+    secp256k1::{
+        recoverable::Secp256k1RecoverableSignature, Secp256k1KeyPair, Secp256k1PrivateKey,
+        Secp256k1PublicKey,
+    },
+    traits::{
+        KeyPair, RecoverableSignature, RecoverableSigner, Signer, ToFromBytes, VerifyRecoverable,
+        VerifyingKey,
+    },
 };
 use rand::rngs::ThreadRng;
 use sec1::{
@@ -379,7 +385,7 @@ impl PublicKey for AccountOwnerPublicKey {
 
     fn verify(&self, signature: &Self::Signature, digest: &[u8; 32]) -> bool {
         let pubkey: Secp256k1PublicKey = self.into();
-        pubkey.verify(digest, &signature.into()).is_ok()
+        pubkey.verify_recoverable(digest, &signature.into()).is_ok()
     }
 
     fn to_base64(&self) -> String {
@@ -423,6 +429,23 @@ impl<A: Borrow<AccountOwnerPublicKey>> From<A> for EthAddress {
 impl Display for EthAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "0x{}", hex::encode(self))
+    }
+}
+
+impl EthAddress {
+    pub fn verify(&self, signature: &AccountOwnerSignature, digest: &[u8; 32]) -> bool {
+        let signature: Secp256k1RecoverableSignature = signature.into();
+        match signature.recover(digest) {
+            Ok(public_key) => {
+                if public_key.verify_recoverable(digest, &signature).is_err() {
+                    return false;
+                }
+                let public_key: AccountOwnerPublicKey = public_key.into();
+                let eth_address: EthAddress = public_key.into();
+                self.eq(&eth_address)
+            },
+            Err(_) => false,
+        }
     }
 }
 
@@ -475,7 +498,7 @@ impl SecretKey for AccountOwnerSecretKey {
     fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
         let secret: Secp256k1PrivateKey = self.into();
         let pair: Secp256k1KeyPair = secret.into();
-        pair.sign(digest).into()
+        pair.sign_recoverable(digest).into()
     }
 
     fn to_pk(&self) -> Self::PublicKey {
@@ -486,18 +509,18 @@ impl SecretKey for AccountOwnerSecretKey {
 }
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct AccountOwnerSignature(#[serde(with = "BigArray")] pub [u8; 64]);
+pub struct AccountOwnerSignature(#[serde(with = "BigArray")] pub [u8; 65]);
 
-impl From<Secp256k1Signature> for AccountOwnerSignature {
-    fn from(value: Secp256k1Signature) -> Self {
+impl From<Secp256k1RecoverableSignature> for AccountOwnerSignature {
+    fn from(value: Secp256k1RecoverableSignature) -> Self {
         let bytes = value.as_ref();
-        AccountOwnerSignature(*array_ref!(bytes, 0, 64))
+        AccountOwnerSignature(*array_ref!(bytes, 0, 65))
     }
 }
 
-impl From<&AccountOwnerSignature> for Secp256k1Signature {
+impl From<&AccountOwnerSignature> for Secp256k1RecoverableSignature {
     fn from(value: &AccountOwnerSignature) -> Self {
-        Secp256k1Signature::from_bytes(&value.0).unwrap()
+        Secp256k1RecoverableSignature::from_bytes(&value.0).unwrap()
     }
 }
 

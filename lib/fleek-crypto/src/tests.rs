@@ -1,4 +1,4 @@
-use crate::{AccountOwnerSecretKey, SecretKey};
+use crate::{AccountOwnerSecretKey, EthAddress, SecretKey};
 
 #[test]
 fn account_owner_to_eth_address() {
@@ -13,6 +13,29 @@ oSQDIgADbn0owIbD5+gHfyMLRqhrni5fryqoUsVdKwh2FZjWxLc=
         pubkey.to_string(),
         "0x2d79dc4842e5c156a8b4387217d0c44ab3559548"
     );
+}
+
+#[test]
+fn test_verify_correct_eth_address() {
+    let secret_key = AccountOwnerSecretKey::generate();
+    let digest = [0; 32];
+    let signature = secret_key.sign(&digest);
+    let public_key = secret_key.to_pk();
+    let eth_address: EthAddress = public_key.into();
+    assert!(eth_address.verify(&signature, &digest));
+}
+
+#[test]
+fn test_verify_false_eth_address() {
+    let secret_key = AccountOwnerSecretKey::generate();
+    let digest = [0; 32];
+    let signature = secret_key.sign(&digest);
+
+    // Create different eth address and make sure that the verification fails.
+    let secret_key = AccountOwnerSecretKey::generate();
+    let public_key = secret_key.to_pk();
+    let eth_address: EthAddress = public_key.into();
+    assert!(!eth_address.verify(&signature, &digest));
 }
 
 mod pem {

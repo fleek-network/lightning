@@ -128,7 +128,7 @@ fn get_update_request_account(method: UpdateMethod, sender: EthAddress) -> Updat
     // TODO: sign the thing
     UpdateRequest {
         sender: sender.into(),
-        signature: AccountOwnerSignature([0; 64]).into(),
+        signature: AccountOwnerSignature([0; 65]).into(),
         payload: UpdatePayload { nonce: 0, method },
     }
 }
