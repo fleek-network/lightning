@@ -5,9 +5,10 @@ use anyhow::Result;
 use draco_application::{app::Application, config::Config as AppConfig, query_runner::QueryRunner};
 use draco_interfaces::{
     types::{Block, ProofOfConsensus, Tokens, UpdateMethod, UpdatePayload, UpdateRequest},
-    ApplicationInterface, ExecutionEngineSocket, MempoolSocket, RpcInterface, WithStartAndShutdown,
+    ApplicationInterface, ExecutionEngineSocket, MempoolSocket, RpcInterface, ToDigest,
+    WithStartAndShutdown,
 };
-use fleek_crypto::{AccountOwnerSignature, EthAddress};
+use fleek_crypto::{AccountOwnerSecretKey, EthAddress, SecretKey};
 use hp_float::unsigned::HpUfloat;
 use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
@@ -15,8 +16,6 @@ use serde_json::{json, Value};
 use tokio::{task, test};
 
 use crate::{config::Config as RpcConfig, server::Rpc};
-
-const ACCOUNT_ONE: EthAddress = EthAddress([0; 20]);
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RpcSuccessResponse {
@@ -152,15 +151,21 @@ async fn test_rpc_get_balance() -> Result<()> {
         amount: HpUfloat::<18>::new(1_000_u32.into()),
     };
 
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let eth_address: EthAddress = owner_secret_key.to_pk().into();
+
+    let payload = UpdatePayload {
+        nonce: 1,
+        method: deposit_method,
+    };
+    let digest = payload.to_digest();
+    let signature = owner_secret_key.sign(&digest);
+
     // deposit FLK to test get balance
-    // TODO: sign the thing
     let update = UpdateRequest {
-        sender: ACCOUNT_ONE.into(),
-        signature: AccountOwnerSignature([0; 65]).into(),
-        payload: UpdatePayload {
-            nonce: 0,
-            method: deposit_method,
-        },
+        sender: owner_secret_key.to_pk().into(),
+        signature: signature.into(),
+        payload,
     };
 
     update_socket
@@ -170,10 +175,11 @@ async fn test_rpc_get_balance() -> Result<()> {
         .await
         .unwrap();
 
+    // TODO(matthias): we should maybe rename the `public_key` param to `eth_address` or similar.
     let req = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_balance",
-        "params": {"public_key": ACCOUNT_ONE},
+        "params": {"public_key": eth_address},
         "id":1,
     });
 

@@ -244,7 +244,7 @@ impl SignerInner {
                 0
             };
         let mut base_nonce = application_nonce;
-        let mut next_nonce = application_nonce;
+        let mut next_nonce = application_nonce + 1;
         loop {
             tokio::select! {
                 task = rx.recv() => {
@@ -309,7 +309,7 @@ impl SignerInner {
             } else {
                 0
             };
-        if *base_nonce == application_nonce && next_nonce > base_nonce {
+        if *base_nonce == application_nonce && *next_nonce > *base_nonce + 1 {
             // Application nonce has not been incremented even though we sent out
             // transaction
             if let Some(base_timestamp_) = base_timestamp {
@@ -318,7 +318,7 @@ impl SignerInner {
                     // never arrive at the mempool
                     *base_timestamp = None;
                     // Reset `next_nonce` to application nonce.
-                    *next_nonce = *base_nonce;
+                    *next_nonce = *base_nonce + 1;
                     // Resend all transactions with nonce >= base_nonce.
                     for pending_tx in pending_transactions.iter_mut() {
                         if let TransactionResponse::Revert(_) =
@@ -343,10 +343,10 @@ impl SignerInner {
             }
         } else if application_nonce > *base_nonce {
             *base_nonce = application_nonce;
-            // All transactions in range [base_nonce, application_nonce - 1] have
+            // All transactions in range [base_nonce, application_nonce] have
             // been ordered, so we can remove them from `pending_transactions`.
             while !pending_transactions.is_empty()
-                && pending_transactions[0].update_request.payload.nonce < application_nonce
+                && pending_transactions[0].update_request.payload.nonce <= application_nonce
             {
                 pending_transactions.pop_front();
             }

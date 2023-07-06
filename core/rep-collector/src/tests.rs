@@ -15,8 +15,8 @@ use draco_interfaces::{
     notifier::NotifierInterface,
     reputation::{ReputationAggregatorInterface, ReputationReporterInterface},
     signer::SignerInterface,
-    types::{Block, NodeInfo, UpdateMethod, UpdatePayload, UpdateRequest},
-    ReputationQueryInteface, SyncQueryRunnerInterface, Weight,
+    types::{Block, UpdateMethod, UpdatePayload, UpdateRequest},
+    ReputationQueryInteface, SyncQueryRunnerInterface, ToDigest, Weight,
 };
 use draco_notifier::Notifier;
 use draco_signer::{Config as SignerConfig, Signer};
@@ -25,11 +25,53 @@ use draco_test_utils::{
     empty_interfaces::MockGossip,
 };
 use fleek_crypto::{
-    AccountOwnerSecretKey, NodePublicKey, NodeSignature, PublicKey, SecretKey, TransactionSender,
-    TransactionSignature,
+    AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
+    SecretKey,
 };
 
 use crate::{aggregator::ReputationAggregator, config::Config, measurement_manager::Interactions};
+
+// TODO(matthias): the same struct and `get_genesis_committee` already exist in the application
+// tests. This should be moved to test-utils, however, fot his to work, we have to move the genesis
+// structs to the types interface.
+struct GenesisCommitteeKeystore {
+    _owner_secret_key: AccountOwnerSecretKey,
+    node_secret_key: NodeSecretKey,
+    _network_secret_key: NodeNetworkingSecretKey,
+    _worker_secret_key: NodeNetworkingSecretKey,
+}
+
+fn get_genesis_committee(
+    num_members: usize,
+) -> (Vec<GenesisCommittee>, Vec<GenesisCommitteeKeystore>) {
+    let mut keystore = Vec::new();
+    let mut committee = Vec::new();
+    (0..num_members).for_each(|i| {
+        let node_secret_key = NodeSecretKey::generate();
+        let node_public_key = node_secret_key.to_pk();
+        let network_secret_key = NodeNetworkingSecretKey::generate();
+        let network_public_key = network_secret_key.to_pk();
+        let owner_secret_key = AccountOwnerSecretKey::generate();
+        let owner_public_key = owner_secret_key.to_pk();
+        committee.push(GenesisCommittee::new(
+            owner_public_key.to_base64(),
+            node_public_key.to_base64(),
+            format!("/ip4/127.0.0.1/udp/800{i}"),
+            network_public_key.to_base64(),
+            format!("/ip4/127.0.0.1/udp/810{i}/http"),
+            network_public_key.to_base64(),
+            format!("/ip4/127.0.0.1/tcp/810{i}/http"),
+            None,
+        ));
+        keystore.push(GenesisCommitteeKeystore {
+            _owner_secret_key: owner_secret_key,
+            node_secret_key,
+            _network_secret_key: network_secret_key,
+            _worker_secret_key: network_secret_key,
+        });
+    });
+    (committee, keystore)
+}
 
 #[tokio::test]
 async fn test_query() {
@@ -255,7 +297,9 @@ async fn test_reputation_calculation_and_query() {
     let mut signer1 = Signer::init(SignerConfig::default()).await.unwrap();
     let mut signer2 = Signer::init(SignerConfig::default()).await.unwrap();
 
+    let (committee, mut keystore) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
+    genesis.committee = committee;
 
     let (network_secret_key1, secret_key1) = signer1.get_sk();
     let public_key1 = secret_key1.to_pk();
@@ -273,6 +317,12 @@ async fn test_reputation_calculation_and_query() {
         "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
         None,
     ));
+    keystore.push(GenesisCommitteeKeystore {
+        _owner_secret_key: owner_secret_key1,
+        node_secret_key: secret_key1,
+        _network_secret_key: network_secret_key1,
+        _worker_secret_key: network_secret_key1,
+    });
 
     let (network_secret_key2, secret_key2) = signer2.get_sk();
     let public_key2 = secret_key2.to_pk();
@@ -290,8 +340,12 @@ async fn test_reputation_calculation_and_query() {
         "/ip4/127.0.0.1/tcp/48103/http".to_owned(),
         None,
     ));
-    let genesis_committee: Vec<NodeInfo> =
-        genesis.committee.iter().map(|node| node.into()).collect();
+    keystore.push(GenesisCommitteeKeystore {
+        _owner_secret_key: owner_secret_key2,
+        node_secret_key: secret_key2,
+        _network_secret_key: network_secret_key2,
+        _worker_secret_key: network_secret_key2,
+    });
 
     let epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -407,20 +461,23 @@ async fn test_reputation_calculation_and_query() {
     }
 
     // Change epoch to trigger reputation score calculation.
-    let required_signals = 2 * genesis_committee.len() / 3 + 1;
-    for node in genesis_committee.iter().take(required_signals) {
+    let required_signals = 2 * keystore.len() / 3 + 1;
+    for node in keystore.iter().take(required_signals) {
         let method = UpdateMethod::ChangeEpoch { epoch: 0 };
         // If the committee member is either one of the nodes from this test, we have to increment
         // the nonce, since the nodes already send a transaction containing the measurements.
-        let nonce = if node.public_key == public_key1 || node.public_key == public_key2 {
-            1
+        let nonce = if node.node_secret_key == secret_key1 || node.node_secret_key == secret_key1 {
+            2
         } else {
-            0
+            1
         };
+        let payload = UpdatePayload { nonce, method };
+        let digest = payload.to_digest();
+        let signature = node.node_secret_key.sign(&digest);
         let req = UpdateRequest {
-            sender: TransactionSender::Node(node.public_key),
-            signature: TransactionSignature::Node(NodeSignature([0; 48])),
-            payload: UpdatePayload { nonce, method },
+            sender: node.node_secret_key.to_pk().into(),
+            signature: signature.into(),
+            payload,
         };
         let _res = update_socket
             .run(Block {

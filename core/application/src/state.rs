@@ -10,11 +10,12 @@ use draco_interfaces::{
         ReportedReputationMeasurements, ReputationMeasurements, Service, ServiceId, Staking,
         Tokens, TotalServed, TransactionResponse, UpdateMethod, UpdateRequest, Value, Worker,
     },
-    DeliveryAcknowledgment,
+    DeliveryAcknowledgment, ToDigest,
 };
 use draco_reputation::{statistics, types::WeightedReputationMeasurements};
 use fleek_crypto::{
-    ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodePublicKey, TransactionSender,
+    ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodePublicKey, PublicKey,
+    TransactionSender, TransactionSignature,
 };
 use hp_float::unsigned::HpUfloat;
 use multiaddr::Multiaddr;
@@ -100,7 +101,6 @@ impl<B: Backend> State<B> {
             // remove the increment_nonce function
             return TransactionResponse::Revert(err);
         }
-
         // Execute transaction
         let response = match txn.payload.method {
             UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
@@ -996,8 +996,50 @@ impl<B: Backend> State<B> {
     /// This function takes in the Transaction and verifies the Signature matches the Sender. It
     /// also checks the nonce of the sender and makes sure it is equal to the account nonce + 1,
     /// to prevent replay attacks and enforce ordering
-    fn verify_transaction(&self, _txn: &UpdateRequest) -> Result<(), ExecutionError> {
-        Ok(())
+    fn verify_transaction(&self, txn: &UpdateRequest) -> Result<(), ExecutionError> {
+        // Check nonce
+        match txn.sender {
+            TransactionSender::Node(node) => match self.node_info.get(&node) {
+                Some(node_info) => {
+                    if txn.payload.nonce != node_info.nonce + 1 {
+                        return Err(ExecutionError::InvalidNonce);
+                    }
+                },
+                None => return Err(ExecutionError::NodeDoesNotExist),
+            },
+            TransactionSender::AccountOwner(account) => {
+                let account_info = self.account_info.get(&account).unwrap_or_default();
+                if txn.payload.nonce != account_info.nonce + 1 {
+                    return Err(ExecutionError::InvalidNonce);
+                }
+            },
+        }
+
+        // Check signature
+        let payload = txn.payload.clone();
+        let digest = payload.to_digest();
+        match txn.sender {
+            TransactionSender::Node(public_key) => match txn.signature {
+                TransactionSignature::Node(signature) => {
+                    if public_key.verify(&signature, &digest) {
+                        Ok(())
+                    } else {
+                        Err(ExecutionError::InvalidSignature)
+                    }
+                },
+                TransactionSignature::AccountOwner(_) => Err(ExecutionError::InvalidSignature),
+            },
+            TransactionSender::AccountOwner(eth_address) => match txn.signature {
+                TransactionSignature::AccountOwner(signature) => {
+                    if eth_address.verify(&signature, &digest) {
+                        Ok(())
+                    } else {
+                        Err(ExecutionError::InvalidSignature)
+                    }
+                },
+                TransactionSignature::Node(_) => Err(ExecutionError::InvalidSignature),
+            },
+        }
     }
 
     /// Takes in a zk Proof Of Delivery and returns true if valid
