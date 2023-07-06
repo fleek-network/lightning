@@ -466,7 +466,7 @@ async fn test_reputation_calculation_and_query() {
         let method = UpdateMethod::ChangeEpoch { epoch: 0 };
         // If the committee member is either one of the nodes from this test, we have to increment
         // the nonce, since the nodes already send a transaction containing the measurements.
-        let nonce = if node.node_secret_key == secret_key1 || node.node_secret_key == secret_key1 {
+        let nonce = if node.node_secret_key == secret_key1 || node.node_secret_key == secret_key2 {
             2
         } else {
             1
