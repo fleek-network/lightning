@@ -680,13 +680,10 @@ impl<B: Backend> State<B> {
         let new_rep_scores = draco_reputation::calculate_reputation_scores(map);
         // Store new scores in application state.
         new_rep_scores.iter().for_each(|(node, new_score)| {
-            if let Some(old_score) = rep_scores.get(node) {
-                let score = *old_score as f64 * REP_EWMA_WEIGHT
-                    + (1.0 - REP_EWMA_WEIGHT) * *new_score as f64;
-                self.rep_scores.set(*node, score as u8)
-            } else {
-                self.rep_scores.set(*node, *new_score);
-            }
+            let old_score = rep_scores.get(node).unwrap_or(&0);
+            let score =
+                *old_score as f64 * REP_EWMA_WEIGHT + (1.0 - REP_EWMA_WEIGHT) * *new_score as f64;
+            self.rep_scores.set(*node, score as u8)
         });
 
         // If not in test mode, remove outdated rep scores.
