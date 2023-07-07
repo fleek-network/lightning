@@ -16,7 +16,10 @@ use draco_interfaces::{
 };
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use tokio::{sync::mpsc, time::sleep};
+use tokio::{
+    sync::{mpsc, Notify},
+    time::sleep,
+};
 
 use crate::empty_interfaces::MockGossip;
 
@@ -27,12 +30,14 @@ pub struct MockConsensus<Q: SyncQueryRunnerInterface + 'static> {
     is_running: Arc<Mutex<bool>>,
     shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
     rx: Arc<Mutex<Option<mpsc::Receiver<Task<UpdateRequest, ()>>>>>,
+    new_block_notify: Arc<Notify>,
 }
 
 struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static> {
     _query_runner: Q,
     executor: ExecutionEngineSocket,
     config: Config,
+    new_block_notify: Arc<Notify>,
 }
 
 #[async_trait]
@@ -48,10 +53,12 @@ impl<Q: SyncQueryRunnerInterface> ConsensusInterface for MockConsensus<Q> {
         _gossip: Arc<Self::Gossip>,
     ) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
+        let new_block_notify = Arc::new(Notify::new());
         let inner = MockConsensusInner {
             _query_runner: query_runner,
             executor,
             config,
+            new_block_notify: new_block_notify.clone(),
         };
         Ok(Self {
             inner: Arc::new(inner),
@@ -59,6 +66,7 @@ impl<Q: SyncQueryRunnerInterface> ConsensusInterface for MockConsensus<Q> {
             is_running: Arc::new(Mutex::new(false)),
             shutdown_tx: Arc::new(Mutex::new(None)),
             rx: Arc::new(Mutex::new(Some(rx))),
+            new_block_notify,
         })
     }
 
@@ -67,6 +75,10 @@ impl<Q: SyncQueryRunnerInterface> ConsensusInterface for MockConsensus<Q> {
     /// transaction to the consensus.
     fn mempool(&self) -> MempoolSocket {
         self.socket.clone()
+    }
+
+    fn new_block_notifier(&self) -> Arc<Notify> {
+        self.new_block_notify.clone()
     }
 }
 
@@ -148,6 +160,8 @@ impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
                         .await
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                         .unwrap();
+
+                    self.new_block_notify.notify_waiters();
                 }
                 _ = shutdown_rx.recv() => break,
             }

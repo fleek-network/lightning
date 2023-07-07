@@ -62,6 +62,8 @@ pub struct Consensus<Q: SyncQueryRunnerInterface, G: GossipInterface> {
     /// Timestamp of the narwhal certificate that caused an epoch change
     /// is sent through this channel to notify that epoch chould change.
     reconfigure_notify: Arc<Notify>,
+    /// A notifier that is notified everytime a new block is proccessed
+    new_block_notify: Arc<Notify>,
     /// Called from the shutdown function to notify the start event loop to
     /// exit.
     shutdown_notify: Notify,
@@ -267,7 +269,7 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConsensusInterface for Con
     ) -> anyhow::Result<Self> {
         let (networking_sk, primary_sk) = signer.get_sk();
         let reconfigure_notify = Arc::new(Notify::new());
-
+        let new_block_notify = Arc::new(Notify::new());
         let networking_keypair = NetworkKeyPair::from(networking_sk);
         let primary_keypair = KeyPair::from(primary_sk);
         let forwarder = Forwarder::new(query_runner.clone(), primary_keypair.public().clone());
@@ -286,10 +288,15 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConsensusInterface for Con
                 registry_service: RegistryService::new(Registry::new()),
             },
             epoch_state: Mutex::new(None),
-            execution_state: Arc::new(Execution::new(executor, reconfigure_notify.clone())),
+            execution_state: Arc::new(Execution::new(
+                executor,
+                reconfigure_notify.clone(),
+                new_block_notify.clone(),
+            )),
             txn_socket: signer.get_socket(),
             mempool_socket: TokioSpawn::spawn_async(forwarder),
             reconfigure_notify,
+            new_block_notify,
             shutdown_notify: Notify::new(),
         })
     }
@@ -299,5 +306,9 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConsensusInterface for Con
     /// transaction to the consensus.
     fn mempool(&self) -> MempoolSocket {
         self.mempool_socket.clone()
+    }
+
+    fn new_block_notifier(&self) -> Arc<Notify> {
+        self.new_block_notify.clone()
     }
 }

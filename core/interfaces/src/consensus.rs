@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use affair::Socket;
 use async_trait::async_trait;
+use tokio::sync::Notify;
 
 use crate::{
     application::ExecutionEngineSocket, common::WithStartAndShutdown, config::ConfigConsumer,
@@ -36,4 +37,7 @@ pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Se
     /// this can be used by any other systems that are interested in posting some
     /// transaction to the consensus.
     fn mempool(&self) -> MempoolSocket;
+
+    /// Returns a tokio Notifier that notifies everytime a new block is finished being processed
+    fn new_block_notifier(&self) -> Arc<Notify>;
 }
