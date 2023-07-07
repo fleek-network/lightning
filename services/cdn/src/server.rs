@@ -122,17 +122,19 @@ pub async fn handle_session<
 mod tests {
     use std::net::SocketAddr;
 
-    use affair::{Executor, TokioSpawn};
     use anyhow::Result;
-    use draco_application::{
-        app::Application,
-        config::{Config, Mode},
-    };
-    use draco_blockstore::memory::MemoryBlockStore;
     use draco_handshake::server::{HandshakeServer, HandshakeServerConfig, TcpHandshakeServer};
     use draco_interfaces::{
         ApplicationInterface, BlockStoreInterface, CompressionAlgorithm, FileSystemInterface,
-        HandshakeInterface, IncrementalPutInterface, SdkInterface, WithStartAndShutdown,
+        HandshakeInterface, IncrementalPutInterface, SdkInterface, SignerInterface,
+        WithStartAndShutdown,
+    };
+    use draco_test_utils::{
+        app::app::Application,
+        blockstore::MemoryBlockStore,
+        empty_interfaces::{MockConfig, MockIndexer, MockReputationReporter, MockSigner},
+        filesystem::MockFileSystem,
+        sdk::MockSdk,
     };
     use fleek_crypto::ClientPublicKey;
     use tokio::net::{
@@ -140,12 +142,7 @@ mod tests {
         TcpStream,
     };
 
-    use crate::{
-        client::CdnClient,
-        connection::ServiceMode,
-        dummy::{FileSystem, Indexer, MyReputationReporter, Sdk, Signer},
-        server::setup_cdn_service,
-    };
+    use crate::{client::CdnClient, connection::ServiceMode, server::setup_cdn_service};
 
     fn create_content() -> Vec<u8> {
         (0..4)
@@ -157,12 +154,12 @@ mod tests {
     async fn setup_node(
         listen_addr: SocketAddr,
     ) -> Result<(
-        TcpHandshakeServer<Sdk<OwnedReadHalf, OwnedWriteHalf>>,
-        Sdk<OwnedReadHalf, OwnedWriteHalf>,
+        TcpHandshakeServer<MockSdk<OwnedReadHalf, OwnedWriteHalf>>,
+        MockSdk<OwnedReadHalf, OwnedWriteHalf>,
         [u8; 32],
     )> {
         // setup blockstore with some content
-        let blockstore = MemoryBlockStore::init(draco_blockstore::config::Config {}).await?;
+        let blockstore = MemoryBlockStore::init(draco_test_utils::blockstore::Config {}).await?;
         let content = create_content();
         let mut putter = blockstore.put(None);
         putter
@@ -171,17 +168,17 @@ mod tests {
         let hash = putter.finalize().await.unwrap();
 
         // setup sdk and friends
-        let signer = TokioSpawn::spawn(Signer {});
-        let app = Application::init(Config {
+        let signer = MockSigner::init(MockConfig {}).await?;
+        let app = Application::init(draco_test_utils::app::config::Config {
             genesis: None,
-            mode: Mode::Test,
+            mode: draco_test_utils::app::config::Mode::Test,
         })
         .await?;
-        let sdk = Sdk::<OwnedReadHalf, OwnedWriteHalf>::new(
+        let sdk = MockSdk::<OwnedReadHalf, OwnedWriteHalf>::new(
             app.sync_query(),
-            MyReputationReporter {},
-            FileSystem::new(&blockstore, &Indexer {}),
-            signer,
+            MockReputationReporter {},
+            MockFileSystem::new(&blockstore, &MockIndexer {}),
+            signer.get_socket(),
         );
 
         // finally, initialize the handshake server
