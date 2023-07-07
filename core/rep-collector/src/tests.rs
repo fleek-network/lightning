@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     sync::Arc,
     time::{Duration, SystemTime},
 };
@@ -110,7 +111,7 @@ async fn test_query() {
         min_ordering_time: 0,
         max_ordering_time: 1,
         probability_txn_lost: 0.0,
-        lose_every_n_txn: None,
+        transactions_to_lose: HashSet::new(),
     };
     let consensus = MockConsensus::init(
         consensus_config,
@@ -218,7 +219,7 @@ async fn test_submit_measurements() {
         min_ordering_time: 0,
         max_ordering_time: 1,
         probability_txn_lost: 0.0,
-        lose_every_n_txn: None,
+        transactions_to_lose: HashSet::new(),
     };
     let consensus = MockConsensus::init(
         consensus_config,
@@ -369,7 +370,7 @@ async fn test_reputation_calculation_and_query() {
         min_ordering_time: 0,
         max_ordering_time: 1,
         probability_txn_lost: 0.0,
-        lose_every_n_txn: None,
+        transactions_to_lose: HashSet::new(),
     };
     let consensus1 = MockConsensus::init(
         consensus_config.clone(),

@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -132,11 +133,9 @@ impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
                     let update_request = task.request.clone();
                     task.respond(());
                     tx_count += 1;
-                    // Drop every `lose_every_n_txn` transaction.
-                    if let Some(lose_every_n_txn) = self.config.lose_every_n_txn {
-                        if tx_count % lose_every_n_txn == 0 {
-                            continue;
-                        }
+
+                    if self.config.transactions_to_lose.contains(&tx_count) {
+                        continue;
                     }
 
                     let block = Block {
@@ -164,9 +163,10 @@ pub struct Config {
     /// Probability that a transaction won't get through.
     /// The nonce won't be incremented on the application.
     pub probability_txn_lost: f64,
-    /// Every `lose_every_n_txn` transaction will be lost.
-    /// The nonce won't be incremented on the application.
-    pub lose_every_n_txn: Option<u32>,
+    /// Transactions specified in this set will be lost.
+    /// For example, if the set contains 1 and 3, then the first and third transactions
+    /// arriving at the consensus will be lost.
+    pub transactions_to_lose: HashSet<u32>,
 }
 
 impl Default for Config {
@@ -175,7 +175,7 @@ impl Default for Config {
             min_ordering_time: 0,
             max_ordering_time: 5,
             probability_txn_lost: 0.1,
-            lose_every_n_txn: None,
+            transactions_to_lose: HashSet::new(),
         }
     }
 }
