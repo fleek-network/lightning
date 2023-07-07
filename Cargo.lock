@@ -2250,6 +2250,7 @@ dependencies = [
  "draco-interfaces",
  "draco-notifier",
  "draco-rep-collector",
+ "draco-signer",
  "fleek-crypto",
  "mockall",
  "serde",

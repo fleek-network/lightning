@@ -13,6 +13,7 @@ use draco_handshake::server::{StreamProvider, TcpHandshakeServer, TcpProvider};
 use draco_interfaces::{common::WithStartAndShutdown as _, ConfigProviderInterface, Node};
 use draco_notifier::Notifier;
 use draco_rep_collector::ReputationAggregator;
+use draco_signer::Signer;
 use template::{gossip::Gossip, topology::Topology};
 
 use crate::{
@@ -21,7 +22,7 @@ use crate::{
     shutdown::ShutdownController,
     template::{
         blockstore::BlockStore, fs::FileSystem, indexer::Indexer, origin::MyStream,
-        pod::DeliveryAcknowledgmentAggregator, rpc::Rpc, sdk::Sdk, signer::Signer,
+        pod::DeliveryAcknowledgmentAggregator, rpc::Rpc, sdk::Sdk,
     },
 };
 

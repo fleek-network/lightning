@@ -7,5 +7,4 @@ pub mod origin;
 pub mod pod;
 pub mod rpc;
 pub mod sdk;
-pub mod signer;
 pub mod topology;

@@ -13,6 +13,7 @@ draco-interfaces = { path = "../interfaces" }
 draco-rep-collector = { path = "../rep-collector" }
 draco-consensus = { path = "../consensus" }
 draco-notifier = { path = "../notifier" }
+draco-signer = { path = "../signer" }
 anyhow.workspace = true
 clap = { version = "4.2", features = ["derive"] }
 serde.workspace = true
