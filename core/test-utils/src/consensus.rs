@@ -96,6 +96,7 @@ impl<Q: SyncQueryRunnerInterface + 'static> WithStartAndShutdown for MockConsens
         if let Some(shutdown_tx) = shutdown_tx {
             shutdown_tx.send(()).await.unwrap();
         }
+        *self.is_running.lock().unwrap() = false;
     }
 }
 

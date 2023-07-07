@@ -202,3 +202,27 @@ async fn test_shutdown() {
     signer.shutdown().await;
     assert!(!signer.is_running());
 }
+
+#[tokio::test]
+async fn test_sign_raw_digest() {
+    let mut signer = Signer::init(Config::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).await.unwrap();
+    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let consensus = MockConsensus::init(
+        ConsensusConfig::default(),
+        &signer,
+        update_socket.clone(),
+        query_runner.clone(),
+        Arc::new(MockGossip {}),
+    )
+    .await
+    .unwrap();
+    signer.provide_mempool(consensus.mempool());
+    signer.provide_query_runner(query_runner.clone());
+    signer.start().await;
+
+    let digest = [0; 32];
+    let signature = signer.sign_raw_digest(&digest);
+    let public_key = signer.get_bls_pk();
+    assert!(public_key.verify(&signature, &digest));
+}
