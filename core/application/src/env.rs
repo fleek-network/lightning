@@ -67,7 +67,10 @@ impl Env<UpdatePerm> {
 
             // Execute each transaction and add the results to the block response
             for txn in &block.transactions {
-                let receipt = app.execute_txn(txn.clone());
+                let receipt = match app.verify_transaction(txn) {
+                    Ok(_) => app.execute_txn(txn.clone()),
+                    Err(err) => TransactionResponse::Revert(err),
+                };
 
                 // If the transaction moved the epoch forward, aknowledge that in the block response
                 if let TransactionResponse::Success(ExecutionData::EpochChange) = receipt {

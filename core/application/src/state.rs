@@ -94,13 +94,6 @@ impl<B: Backend> State<B> {
 
     /// This function is the entry point of a transaction
     pub fn execute_txn(&self, txn: UpdateRequest) -> TransactionResponse {
-        // Check the signature
-        if let Err(err) = self.verify_transaction(&txn) {
-            // If it is a bad signature return here without incrementing nonce
-            // todo: We can probably just increment nonce inside this function if succesfull and
-            // remove the increment_nonce function
-            return TransactionResponse::Revert(err);
-        }
         // Execute transaction
         let response = match txn.payload.method {
             UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
@@ -996,7 +989,7 @@ impl<B: Backend> State<B> {
     /// This function takes in the Transaction and verifies the Signature matches the Sender. It
     /// also checks the nonce of the sender and makes sure it is equal to the account nonce + 1,
     /// to prevent replay attacks and enforce ordering
-    fn verify_transaction(&self, txn: &UpdateRequest) -> Result<(), ExecutionError> {
+    pub fn verify_transaction(&self, txn: &UpdateRequest) -> Result<(), ExecutionError> {
         // Check nonce
         match txn.sender {
             TransactionSender::Node(node) => match self.node_info.get(&node) {
