@@ -2389,7 +2389,6 @@ dependencies = [
  "affair",
  "anyhow",
  "async-trait",
- "draco-application",
  "draco-interfaces",
  "fleek-crypto",
  "hp-float",
