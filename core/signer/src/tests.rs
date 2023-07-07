@@ -96,7 +96,6 @@ async fn test_send_two_txs_in_a_row() {
     assert_eq!(new_nonce, 2);
 }
 
-// TODO(matthias): fix this test
 #[tokio::test]
 async fn test_retry_send() {
     let signer_config = Config::default();
@@ -178,4 +177,28 @@ async fn test_retry_send() {
         .unwrap()
         .nonce;
     assert_eq!(new_nonce, 3);
+}
+
+#[tokio::test]
+async fn test_shutdown() {
+    let mut signer = Signer::init(Config::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).await.unwrap();
+    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let consensus = MockConsensus::init(
+        ConsensusConfig::default(),
+        &signer,
+        update_socket.clone(),
+        query_runner.clone(),
+        Arc::new(MockGossip {}),
+    )
+    .await
+    .unwrap();
+    signer.provide_mempool(consensus.mempool());
+    signer.provide_query_runner(query_runner.clone());
+
+    assert!(!signer.is_running());
+    signer.start().await;
+    assert!(signer.is_running());
+    signer.shutdown().await;
+    assert!(!signer.is_running());
 }
