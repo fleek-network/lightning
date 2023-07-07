@@ -21,16 +21,10 @@ draco-interfaces = { path="../../core/interfaces" }
 draco-handshake = { path = "../../core/handshake" }
 draco-sdk = {path="../../core/sdk"}
 
-# dummy dependencies (needed to share with example)
-
-
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
 draco-test-utils = { path = "../../core/test-utils" }
 rand = "0.8.5"
-
-[features]
-dummy = []
 
 [[example]]
 name = "cdn_server"
