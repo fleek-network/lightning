@@ -2389,6 +2389,9 @@ dependencies = [
  "affair",
  "anyhow",
  "async-trait",
+ "draco-application",
+ "draco-blockstore",
+ "draco-handshake",
  "draco-interfaces",
  "fleek-crypto",
  "hp-float",
@@ -2779,7 +2782,6 @@ dependencies = [
 name = "fleek-cdn"
 version = "0.0.0"
 dependencies = [
- "affair",
  "anyhow",
  "arrayref",
  "arrayvec",
@@ -2787,13 +2789,10 @@ dependencies = [
  "blake3-tree",
  "bytes",
  "criterion 0.4.0",
- "draco-application",
- "draco-blockstore",
  "draco-handshake",
  "draco-interfaces",
- "draco-notifier",
- "draco-rep-collector",
  "draco-sdk",
+ "draco-test-utils",
  "fleek-crypto",
  "futures",
  "rand 0.8.5",

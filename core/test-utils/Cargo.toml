@@ -17,3 +17,6 @@ tokio.workspace = true
 scc.workspace = true
 hp-float.workspace = true
 
+draco-handshake = { path = "../handshake" }
+draco-application = { path = "../application" }
+draco-blockstore = { path = "../blockstore" }

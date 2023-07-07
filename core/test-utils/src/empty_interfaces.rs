@@ -8,9 +8,11 @@ use draco_interfaces::{
         CommodityServed, Epoch, EpochInfo, NodeInfo, ProtocolParams,
         ReportedReputationMeasurements, TotalServed, TransactionResponse, UpdateRequest,
     },
-    ConfigConsumer, GossipInterface, GossipMessage, GossipSubscriberInterface, MempoolSocket,
-    Notification, NotifierInterface, SignerInterface, SubmitTxSocket, SyncQueryRunnerInterface,
-    Topic, TopologyInterface, WithStartAndShutdown,
+    Blake3Hash, ConfigConsumer, GossipInterface, GossipMessage, GossipSubscriberInterface,
+    IndexerInterface, MempoolSocket, Notification, NotifierInterface,
+    ReputationAggregatorInterface, ReputationQueryInteface, ReputationReporterInterface,
+    SignerInterface, SubmitTxSocket, SyncQueryRunnerInterface, Topic, TopologyInterface, Weight,
+    WithStartAndShutdown,
 };
 use fleek_crypto::{
     ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey,
@@ -22,14 +24,136 @@ use tokio::sync::mpsc;
 
 pub struct MockGossip {}
 pub struct MockSubscriber {}
-pub struct MockSigner {}
+pub struct MockSigner {
+    socket: SubmitTxSocket,
+}
 pub struct MockTopology {}
 #[derive(Clone)]
 pub struct MockQueryRunner {}
 pub struct MockNotifier {}
-
+#[derive(Clone)]
+pub struct MockReputationAggregator {}
+#[derive(Clone)]
+pub struct MockReputationQuery {}
+#[derive(Clone)]
+pub struct MockReputationReporter {}
 #[derive(Default, Serialize, Deserialize)]
 pub struct MockConfig {}
+#[derive(Clone)]
+pub struct MockIndexer {}
+
+#[async_trait]
+impl WithStartAndShutdown for MockIndexer {
+    /// Returns true if this system is running or not.
+    fn is_running(&self) -> bool {
+        true
+    }
+
+    /// Start the system, should not do anything if the system is already
+    /// started.
+    async fn start(&self) {}
+
+    /// Send the shutdown signal to the system.
+    async fn shutdown(&self) {}
+}
+
+#[async_trait]
+impl IndexerInterface for MockIndexer {
+    async fn init(_config: Self::Config) -> anyhow::Result<Self> {
+        Ok(Self {})
+    }
+
+    /// Publish to everyone that we have cached a content with the given `cid` successfully.
+    // TODO: Put the service that caused this cid to be cached as a param here.
+    fn publish(&self, _cid: &Blake3Hash) {}
+
+    /// Returns the list of top nodes that should have a content cached.
+    fn get_nodes_for_cid<Q: ReputationQueryInteface>(&self, _reputation: &Q) -> Vec<u8> {
+        Vec::new()
+    }
+}
+
+impl ConfigConsumer for MockIndexer {
+    const KEY: &'static str = "indexer";
+
+    type Config = MockConfig;
+}
+
+impl ReputationQueryInteface for MockReputationQuery {
+    /// The application layer's synchronize query runner.
+    type SyncQuery = MockQueryRunner;
+
+    /// Returns the reputation of the provided node locally.
+    fn get_reputation_of(&self, _peer: &NodePublicKey) -> Option<u8> {
+        Some(1)
+    }
+}
+
+impl ReputationReporterInterface for MockReputationReporter {
+    /// Report a satisfactory (happy) interaction with the given peer.
+    fn report_sat(&self, _peer: &NodePublicKey, _weight: Weight) {}
+
+    /// Report a unsatisfactory (happy) interaction with the given peer.
+    fn report_unsat(&self, _peer: &NodePublicKey, _weight: Weight) {}
+
+    /// Report a latency which we witnessed from another peer.
+    fn report_latency(&self, _peer: &NodePublicKey, _latency: Duration) {}
+
+    /// Report the number of (healthy) bytes which we received from another peer.
+    fn report_bytes_received(&self, _peer: &NodePublicKey, _bytes: u64, _: Option<Duration>) {}
+
+    fn report_bytes_sent(
+        &self,
+        _: &fleek_crypto::NodePublicKey,
+        _: u64,
+        _: std::option::Option<std::time::Duration>,
+    ) {
+    }
+
+    fn report_hops(&self, _: &fleek_crypto::NodePublicKey, _: u8) {}
+}
+
+#[async_trait]
+impl ReputationAggregatorInterface for MockReputationAggregator {
+    /// The reputation reporter can be used by our system to report the reputation of other
+    type ReputationReporter = MockReputationReporter;
+
+    /// The query runner can be used to query the local reputation of other nodes.
+    type ReputationQuery = MockReputationQuery;
+
+    type Notifier = MockNotifier;
+
+    /// Create a new reputation
+    async fn init(
+        _config: Self::Config,
+        _submit_tx: SubmitTxSocket,
+        _notifier: Self::Notifier,
+    ) -> anyhow::Result<Self> {
+        todo!()
+    }
+
+    /// Returns a reputation reporter that can be used to capture interactions that we have
+    /// with another peer.
+    fn get_reporter(&self) -> Self::ReputationReporter {
+        todo!()
+    }
+
+    /// Returns a reputation query that can be used to answer queries about the local
+    /// reputation we have of another peer.
+    fn get_query(&self) -> Self::ReputationQuery {
+        todo!()
+    }
+
+    fn submit_aggregation(&self) {
+        todo!()
+    }
+}
+
+impl ConfigConsumer for MockReputationAggregator {
+    const KEY: &'static str = "reputation";
+
+    type Config = MockConfig;
+}
 
 #[async_trait]
 impl WithStartAndShutdown for MockGossip {
@@ -94,7 +218,8 @@ impl SignerInterface for MockSigner {
     type SyncQuery = MockQueryRunner;
 
     async fn init(_config: Self::Config) -> anyhow::Result<Self> {
-        Ok(Self {})
+        let (socket, _) = Socket::raw_bounded(2048);
+        Ok(Self { socket })
     }
 
     fn provide_mempool(&mut self, _mempool: MempoolSocket) {}
@@ -114,7 +239,7 @@ impl SignerInterface for MockSigner {
     }
 
     fn get_socket(&self) -> SubmitTxSocket {
-        todo!()
+        self.socket.clone()
     }
 
     fn sign_raw_digest(&self, _digest: &[u8; 32]) -> NodeSignature {
