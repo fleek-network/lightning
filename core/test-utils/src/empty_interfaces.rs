@@ -20,7 +20,7 @@ use fleek_crypto::{
 };
 use hp_float::unsigned::HpUfloat;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Notify};
 
 pub struct MockGossip {}
 pub struct MockSubscriber {}
@@ -225,6 +225,8 @@ impl SignerInterface for MockSigner {
     fn provide_mempool(&mut self, _mempool: MempoolSocket) {}
 
     fn provide_query_runner(&self, _query_runner: Self::SyncQuery) {}
+
+    fn provide_new_block_notify(&self, _block_notify: Arc<Notify>) {}
 
     fn get_bls_pk(&self) -> NodePublicKey {
         NodePublicKey([0; 96])

@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use affair::Socket;
 use async_trait::async_trait;
 use fleek_crypto::{
     NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
+use tokio::sync::Notify;
 
 use crate::{
     application::SyncQueryRunnerInterface, config::ConfigConsumer, consensus::MempoolSocket,
@@ -30,6 +33,10 @@ pub trait SignerInterface: ConfigConsumer + Sized + Send + Sync {
     /// Provide the signer service with the query runner after initialization, this function
     /// should only be called once.
     fn provide_query_runner(&self, query_runner: Self::SyncQuery);
+
+    // Provide the signer service with a block notifier to get notified when a block of
+    // transactions has been processed at the application.
+    fn provide_new_block_notify(&self, block_notify: Arc<Notify>);
 
     /// Returns the `BLS` public key of the current node.
     fn get_bls_pk(&self) -> NodePublicKey;

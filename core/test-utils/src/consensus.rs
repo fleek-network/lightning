@@ -18,7 +18,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{mpsc, Notify},
-    time::sleep,
+    time::{interval, sleep},
 };
 
 use crate::empty_interfaces::MockGossip;
@@ -131,6 +131,7 @@ impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
         mut shutdown_rx: mpsc::Receiver<()>,
     ) {
         let mut tx_count = 0;
+        let mut interval = interval(self.config.new_block_interval);
         loop {
             tokio::select! {
                 task = rx.recv() => {
@@ -163,6 +164,10 @@ impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
 
                     self.new_block_notify.notify_waiters();
                 }
+                _ = interval.tick() => {
+                    // Lets pretend that a new block arrived.
+                    self.new_block_notify.notify_waiters();
+                }
                 _ = shutdown_rx.recv() => break,
             }
         }
@@ -182,6 +187,8 @@ pub struct Config {
     /// For example, if the set contains 1 and 3, then the first and third transactions
     /// arriving at the consensus will be lost.
     pub transactions_to_lose: HashSet<u32>,
+    /// This specifies the interval for new blocks being pretend submitted to the application.
+    pub new_block_interval: Duration,
 }
 
 impl Default for Config {
@@ -191,6 +198,7 @@ impl Default for Config {
             max_ordering_time: 5,
             probability_txn_lost: 0.1,
             transactions_to_lose: HashSet::new(),
+            new_block_interval: Duration::from_secs(5),
         }
     }
 }

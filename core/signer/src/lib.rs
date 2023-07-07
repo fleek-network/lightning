@@ -23,12 +23,7 @@ use fleek_crypto::{
     NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
     SecretKey, TransactionSender,
 };
-use tokio::{sync::mpsc, time::interval};
-
-// The signer has to stay in sync with the application.
-// If the application has a different nonce then expected, the signer has to react.
-// `QUERY_INTERVAL` specifies the interval for querying the application.
-const QUERY_INTERVAL: Duration = Duration::from_secs(5);
+use tokio::sync::{mpsc, Notify};
 
 // If a transaction does not get ordered, the signer will try to resend it.
 // `TIMEOUT` specifies the duration the signer will wait before resending transactions to the
@@ -54,6 +49,9 @@ pub struct Signer {
     // `mempool_socket` is only parked here for the time from the call to `provide_query_runner` to
     // the call to `start`, when it is moved into SignerInner.
     query_runner: Arc<Mutex<Option<QueryRunner>>>,
+    // `new_block_notify` is only parked here for the time from the call to
+    // `provide_new_block_notify` to the call to `start`, when it is moved into SignerInner.
+    new_block_notify: Arc<Mutex<Option<Arc<Notify>>>>,
 }
 
 #[async_trait]
@@ -72,9 +70,16 @@ impl WithStartAndShutdown for Signer {
             let rx = self.rx.lock().unwrap().take().unwrap();
             let mempool_socket = self.get_mempool_socket();
             let query_runner = self.get_query_runner();
+            let new_block_notify = self.get_new_block_notify();
             tokio::spawn(async move {
                 inner
-                    .handle(rx, shutdown_rx, mempool_socket, query_runner)
+                    .handle(
+                        rx,
+                        shutdown_rx,
+                        mempool_socket,
+                        query_runner,
+                        new_block_notify,
+                    )
                     .await
             });
             *self.shutdown_tx.lock().unwrap() = Some(shutdown_tx);
@@ -108,6 +113,7 @@ impl SignerInterface for Signer {
             rx: Arc::new(Mutex::new(Some(rx))),
             mempool_socket: Arc::new(Mutex::new(None)),
             query_runner: Arc::new(Mutex::new(None)),
+            new_block_notify: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -122,6 +128,12 @@ impl SignerInterface for Signer {
     /// should only be called once.
     fn provide_query_runner(&self, query_runner: Self::SyncQuery) {
         *self.query_runner.lock().unwrap() = Some(query_runner);
+    }
+
+    // Provide the signer service with a block notifier to get notified when a block of
+    // transactions has been processed at the application.
+    fn provide_new_block_notify(&self, new_block_notify: Arc<Notify>) {
+        *self.new_block_notify.lock().unwrap() = Some(new_block_notify);
     }
 
     /// Returns the `BLS` public key of the current node.
@@ -187,6 +199,14 @@ impl Signer {
             .take()
             .expect("Query runner must be provided before starting the signer serivce.")
     }
+
+    fn get_new_block_notify(&self) -> Arc<Notify> {
+        self.new_block_notify
+            .lock()
+            .unwrap()
+            .take()
+            .expect("New block notify must be provided before starting the signer serivce.")
+    }
 }
 
 struct SignerInner {
@@ -234,8 +254,9 @@ impl SignerInner {
         mut shutdown_rx: mpsc::Receiver<()>,
         mempool_socket: MempoolSocket,
         query_runner: QueryRunner,
+        new_block_notify: Arc<Notify>,
     ) {
-        let mut query_interval = interval(QUERY_INTERVAL);
+        //let mut query_interval = interval(QUERY_INTERVAL);
         let mut pending_transactions = VecDeque::new();
         let mut base_timestamp = None;
         let application_nonce =
@@ -277,7 +298,7 @@ impl SignerInner {
                         base_timestamp = Some(timestamp);
                     }
                 }
-                _ = query_interval.tick() => {
+                _ = new_block_notify.notified() => {
                     SignerInner::sync_with_application(
                         self.node_public_key,
                         &query_runner,

@@ -112,6 +112,7 @@ async fn test_query() {
         max_ordering_time: 1,
         probability_txn_lost: 0.0,
         transactions_to_lose: HashSet::new(),
+        new_block_interval: Duration::from_secs(5),
     };
     let consensus = MockConsensus::init(
         consensus_config,
@@ -125,6 +126,7 @@ async fn test_query() {
 
     signer.provide_mempool(consensus.mempool());
     signer.provide_query_runner(query_runner.clone());
+    signer.provide_new_block_notify(consensus.new_block_notifier());
     signer.start().await;
     consensus.start().await;
 
@@ -220,6 +222,7 @@ async fn test_submit_measurements() {
         max_ordering_time: 1,
         probability_txn_lost: 0.0,
         transactions_to_lose: HashSet::new(),
+        new_block_interval: Duration::from_secs(5),
     };
     let consensus = MockConsensus::init(
         consensus_config,
@@ -233,6 +236,7 @@ async fn test_submit_measurements() {
 
     signer.provide_mempool(consensus.mempool());
     signer.provide_query_runner(query_runner.clone());
+    signer.provide_new_block_notify(consensus.new_block_notifier());
     signer.start().await;
     consensus.start().await;
 
@@ -371,6 +375,7 @@ async fn test_reputation_calculation_and_query() {
         max_ordering_time: 1,
         probability_txn_lost: 0.0,
         transactions_to_lose: HashSet::new(),
+        new_block_interval: Duration::from_secs(5),
     };
     let consensus1 = MockConsensus::init(
         consensus_config.clone(),
@@ -395,6 +400,8 @@ async fn test_reputation_calculation_and_query() {
     signer2.provide_mempool(consensus2.mempool());
     signer1.provide_query_runner(query_runner.clone());
     signer2.provide_query_runner(query_runner.clone());
+    signer1.provide_new_block_notify(consensus1.new_block_notifier());
+    signer2.provide_new_block_notify(consensus2.new_block_notifier());
     signer1.start().await;
     signer2.start().await;
     consensus1.start().await;

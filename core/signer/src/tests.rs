@@ -60,6 +60,7 @@ async fn test_send_two_txs_in_a_row() {
         max_ordering_time: 2,
         probability_txn_lost: 0.0,
         transactions_to_lose: HashSet::new(),
+        new_block_interval: Duration::from_secs(5),
     };
     let consensus = MockConsensus::init(
         consensus_config,
@@ -73,6 +74,7 @@ async fn test_send_two_txs_in_a_row() {
 
     signer.provide_mempool(consensus.mempool());
     signer.provide_query_runner(query_runner.clone());
+    signer.provide_new_block_notify(consensus.new_block_notifier());
     signer.start().await;
     consensus.start().await;
 
@@ -135,6 +137,7 @@ async fn test_retry_send() {
         max_ordering_time: 2,
         probability_txn_lost: 0.0,
         transactions_to_lose: HashSet::from([2]), // drop the 2nd transaction arriving
+        new_block_interval: Duration::from_secs(5),
     };
     let consensus = MockConsensus::init(
         consensus_config,
@@ -148,6 +151,7 @@ async fn test_retry_send() {
 
     signer.provide_mempool(consensus.mempool());
     signer.provide_query_runner(query_runner.clone());
+    signer.provide_new_block_notify(consensus.new_block_notifier());
     signer.start().await;
     consensus.start().await;
 
@@ -171,7 +175,7 @@ async fn test_retry_send() {
     // The signer will notice that the nonce doesn't increment on the application after the second
     // transaction, and then it will resend all following transactions.
     // Hence, the application nonce should be 3 after some time.
-    tokio::time::sleep(Duration::from_secs(20)).await;
+    tokio::time::sleep(Duration::from_secs(30)).await;
     let new_nonce = query_runner
         .get_node_info(&signer.get_bls_pk())
         .unwrap()
@@ -195,6 +199,7 @@ async fn test_shutdown() {
     .unwrap();
     signer.provide_mempool(consensus.mempool());
     signer.provide_query_runner(query_runner.clone());
+    signer.provide_new_block_notify(consensus.new_block_notifier());
 
     assert!(!signer.is_running());
     signer.start().await;
@@ -219,6 +224,7 @@ async fn test_sign_raw_digest() {
     .unwrap();
     signer.provide_mempool(consensus.mempool());
     signer.provide_query_runner(query_runner.clone());
+    signer.provide_new_block_notify(consensus.new_block_notifier());
     signer.start().await;
 
     let digest = [0; 32];

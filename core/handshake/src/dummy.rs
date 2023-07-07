@@ -20,7 +20,10 @@ use fleek_crypto::{
     NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
 use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    sync::Notify,
+};
 
 use crate::server::RawLaneConnection;
 
@@ -73,6 +76,12 @@ impl SignerInterface for Signer {
     /// Provide the signer service with the query runner after initialization, this function
     /// should only be called once.
     fn provide_query_runner(&self, _query_runner: Self::SyncQuery) {
+        todo!()
+    }
+
+    // Provide the signer service with a block notifier to get notified when a block of
+    // transactions has been processed at the application.
+    fn provide_new_block_notify(&self, _block_notify: Arc<Notify>) {
         todo!()
     }
 
