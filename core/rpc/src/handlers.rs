@@ -35,6 +35,7 @@ impl RpcServer {
                 get_bandwidth_balance_handler::<Q, I>,
             )
             .with_method("flk_get_locked", get_locked_handler::<Q, I>)
+            .with_method("flk_get_staked", get_staked_handler::<Q, I>)
             .with_method("flk_get_reputation", get_reputation_handler::<Q, I>);
 
         RpcServer(server.finish())
@@ -73,7 +74,7 @@ pub async fn get_staked_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>>
     data: Data<Arc<I>>,
     Params(params): Params<NodeKeyParam>,
 ) -> Result<HpUfloat<18>> {
-    Ok(data.0.query_runner().get_locked(&params.public_key))
+    Ok(data.0.query_runner().get_staked(&params.public_key))
 }
 
 pub async fn get_reputation_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>>(

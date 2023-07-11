@@ -75,3 +75,14 @@ price = 0.2
 
 [rep_scores]
 "l0Jel6KEFG7H6sV2nWKOQxDaMKWMeiUBqK5VHKcStWrLPHAANRB+dt7gp0jQ7ooxEaI7ukOQZk6U5vcL7ESHA1J/iAWQ7YNO/ZCvR1pfWfcTNBONIzeiUWAN+iyKfV10" = 50
+
+[node_info]
+[node_info."gtn7ycB6nPrj6uimvlBfXqv6Sff45tx1JKbE2E9YpCbJUPtDYFiu2aZj6mmZC5S+FIuQCnh6OlBKrGGvAliQ11xGW6TX4tSbphoTpKdg+SnhICm6hbs4kbaqTeRTSYvN"]
+owner = [6, 92, 131, 129, 157, 244, 246, 222, 58, 14, 88, 161, 92, 83, 85, 125, 1, 189, 252, 68]
+public_key = [130, 217, 251, 201, 192, 122, 156, 250, 227, 234, 232, 166, 190, 80, 95, 94, 171, 250, 73, 247, 248, 230, 220, 117, 36, 166, 196, 216, 79, 88, 164, 38, 201, 80, 251, 67, 96, 88, 174, 217, 166, 99, 234, 105, 153, 11, 148, 190, 20, 139, 144, 10, 120, 122, 58, 80, 74, 172, 97, 175, 2, 88, 144, 215, 92, 70, 91, 164, 215, 226, 212, 155, 166, 26, 19, 164, 167, 96, 249, 41, 225, 32, 41, 186, 133, 187, 56, 145, 182, 170, 77, 228, 83, 73, 139, 205]
+network_key = [83, 96, 114, 75, 234, 61, 141, 177, 48, 228, 57, 9, 129, 241, 156, 50, 127, 73, 111, 115, 1, 237, 7, 234, 23, 219, 255, 154, 0, 46, 100, 83]
+staked_since = 1
+stake = {staked = [1000], stake_locked_until = 365, locked = [0], locked_until = 0}
+domain = "/ip4/127.0.0.1/udp/38000"
+workers = [{public_key = [83, 96, 114, 75, 234, 61, 141, 177, 48, 228, 57, 9, 129, 241, 156, 50, 127, 73, 111, 115, 1, 237, 7, 234, 23, 219, 255, 154, 0, 46, 100, 83], address = "/ip4/127.0.0.1/udp/38101/http", mempool = "/ip4/127.0.0.1/tcp/38102/http"}]
+nonce = 0

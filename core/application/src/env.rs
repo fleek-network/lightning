@@ -236,6 +236,13 @@ impl Env<UpdatePerm> {
                 );
                 rep_scores_table.insert(node_public_key, rep_score);
             }
+
+            // add node info
+            for (node_public_key_b64, node_info) in genesis.node_info {
+                let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
+                    .expect("Failed to parse node public key from genesis.");
+                node_table.insert(node_public_key, node_info);
+            }
         })
     }
 }
