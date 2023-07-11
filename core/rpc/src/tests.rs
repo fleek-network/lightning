@@ -9,7 +9,10 @@ use draco_application::{
     query_runner::QueryRunner,
 };
 use draco_interfaces::{
-    types::{EpochInfo, NodeInfo, ProtocolParams, Staking, UpdateRequest, Worker as NodeWorker},
+    types::{
+        CommodityServed, EpochInfo, NodeInfo, ProtocolParams, Staking, TotalServed, UpdateRequest,
+        Worker as NodeWorker,
+    },
     ApplicationInterface, MempoolSocket, RpcInterface, SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
@@ -1198,5 +1201,124 @@ async fn test_rpc_get_protocol_params() -> Result<()> {
         panic!("Request failed with status: {}", response.status());
     }
 
+    Ok(())
+}
+
+#[test]
+async fn test_rpc_get_total_served() -> Result<()> {
+    // Init application service and store total served in application state.
+    let mut genesis = Genesis::load().unwrap();
+
+    let total_served = TotalServed {
+        served: vec![1000],
+        reward_pool: 1_000_u32.into(),
+    };
+    genesis.total_served.insert(0, total_served.clone());
+
+    let app = Application::init(AppConfig {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+    })
+    .await
+    .unwrap();
+    let query_runner = app.sync_query();
+    app.start().await;
+
+    // Init rpc service
+    let port = 30016;
+    let mut rpc = Rpc::init(
+        RpcConfig::default(),
+        MockWorker::mempool_socket(),
+        query_runner,
+    )
+    .await?;
+    rpc.config.port = port;
+
+    task::spawn(async move {
+        rpc.start().await;
+    });
+    wait_for_server_start(port).await?;
+
+    let req = json!({
+        "jsonrpc": "2.0",
+        "method":"flk_get_total_served",
+        "params": 0,
+        "id":1,
+    });
+
+    let response = make_request(port, req.to_string()).await?;
+
+    if response.status().is_success() {
+        let value: Value = response.json().await?;
+        if value.get("result").is_some() {
+            // Parse the response as a successful response
+            let success_response: RpcSuccessResponse<TotalServed> = serde_json::from_value(value)?;
+            assert_eq!(total_served, success_response.result);
+        } else {
+            panic!("Rpc Error: {value}")
+        }
+    } else {
+        panic!("Request failed with status: {}", response.status());
+    }
+    Ok(())
+}
+
+#[test]
+async fn test_rpc_get_commodity_served() -> Result<()> {
+    // Init application service and store total served in application state.
+    let mut genesis = Genesis::load().unwrap();
+
+    let node_secret_key = NodeSecretKey::generate();
+    let node_public_key = node_secret_key.to_pk();
+    genesis
+        .current_epoch_served
+        .insert(node_public_key.to_base64(), vec![1000]);
+
+    let app = Application::init(AppConfig {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+    })
+    .await
+    .unwrap();
+    let query_runner = app.sync_query();
+    app.start().await;
+
+    // Init rpc service
+    let port = 30017;
+    let mut rpc = Rpc::init(
+        RpcConfig::default(),
+        MockWorker::mempool_socket(),
+        query_runner,
+    )
+    .await?;
+    rpc.config.port = port;
+
+    task::spawn(async move {
+        rpc.start().await;
+    });
+    wait_for_server_start(port).await?;
+
+    let req = json!({
+        "jsonrpc": "2.0",
+        "method":"flk_get_commodity_served",
+        "params": {"public_key": node_public_key},
+        "id":1,
+    });
+
+    let response = make_request(port, req.to_string()).await?;
+
+    if response.status().is_success() {
+        let value: Value = response.json().await?;
+        if value.get("result").is_some() {
+            // Parse the response as a successful response
+            let success_response: RpcSuccessResponse<CommodityServed> =
+                serde_json::from_value(value)?;
+            assert_eq!(vec![1000], success_response.result);
+        } else {
+            panic!("Rpc Error: {value}")
+        }
+    } else {
+        panic!("Request failed with status: {}", response.status());
+    }
     Ok(())
 }

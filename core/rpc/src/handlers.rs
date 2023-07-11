@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{Extension, Json};
 use draco_interfaces::{
-    types::{EpochInfo, NodeInfo, ProtocolParams},
+    types::{CommodityServed, EpochInfo, NodeInfo, ProtocolParams, TotalServed},
     RpcInterface, SyncQueryRunnerInterface,
 };
 use fleek_crypto::{EthAddress, NodePublicKey};
@@ -69,6 +69,11 @@ impl RpcServer {
             .with_method(
                 "flk_get_protocol_params",
                 get_protocol_params_handler::<Q, I>,
+            )
+            .with_method("flk_get_total_served", get_total_served_handler::<Q, I>)
+            .with_method(
+                "flk_get_commodity_served",
+                get_commodity_served_handler::<Q, I>,
             )
             .with_method("flk_get_reputation", get_reputation_handler::<Q, I>);
 
@@ -199,4 +204,21 @@ pub async fn get_protocol_params_handler<Q: SyncQueryRunnerInterface, I: RpcInte
     Params(params): Params<ProtocolParams>,
 ) -> Result<u128> {
     Ok(data.0.query_runner().get_protocol_params(params))
+}
+
+pub async fn get_total_served_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>>(
+    data: Data<Arc<I>>,
+    Params(params): Params<u64>,
+) -> Result<TotalServed> {
+    Ok(data.0.query_runner().get_total_served(params))
+}
+
+pub async fn get_commodity_served_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>>(
+    data: Data<Arc<I>>,
+    Params(params): Params<NodeKeyParam>,
+) -> Result<CommodityServed> {
+    Ok(data
+        .0
+        .query_runner()
+        .get_commodity_served(&params.public_key))
 }
