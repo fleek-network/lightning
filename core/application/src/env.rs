@@ -11,7 +11,7 @@ use draco_interfaces::{
     BlockExecutionResponse,
 };
 use fastcrypto::{secp256k1::Secp256k1PublicKey, traits::EncodeDecodeBase64};
-use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, EthAddress, NodePublicKey};
+use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, EthAddress, NodePublicKey, PublicKey};
 use hp_float::unsigned::HpUfloat;
 
 use crate::{
@@ -127,6 +127,7 @@ impl Env<UpdatePerm> {
             let mut metadata_table = ctx.get_table::<Metadata, Value>("metadata");
             let mut commodity_prices_table =
                 ctx.get_table::<CommodityTypes, HpUfloat<6>>("commodity_prices");
+            let mut rep_scores_table = ctx.get_table::<NodePublicKey, u8>("rep_scores");
 
             let protocol_fund_address: AccountOwnerPublicKey =
                 Secp256k1PublicKey::decode_base64(&genesis.protocol_fund_address)
@@ -223,6 +224,17 @@ impl Env<UpdatePerm> {
                 let GenesisPrices { commodity, price } = commodity_price;
                 let big_price: HpUfloat<6> = price.into();
                 commodity_prices_table.insert(commodity, big_price);
+            }
+
+            // add reputation reputation scores
+            for (node_public_key_b64, rep_score) in genesis.rep_scores {
+                let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
+                    .expect("Failed to parse node public key from genesis.");
+                assert!(
+                    (0..=100).contains(&rep_score),
+                    "Reputation scores must be in range [0, 100]."
+                );
+                rep_scores_table.insert(node_public_key, rep_score);
             }
         })
     }

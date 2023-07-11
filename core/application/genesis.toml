@@ -72,3 +72,6 @@ price = 0.1
 [[commodity_prices]]
 commodity = "Compute"
 price = 0.2
+
+[rep_scores]
+"l0Jel6KEFG7H6sV2nWKOQxDaMKWMeiUBqK5VHKcStWrLPHAANRB+dt7gp0jQ7ooxEaI7ukOQZk6U5vcL7ESHA1J/iAWQ7YNO/ZCvR1pfWfcTNBONIzeiUWAN+iyKfV10" = 50

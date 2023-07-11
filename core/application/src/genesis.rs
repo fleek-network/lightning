@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::{Context, Result};
 use draco_interfaces::types::{CommodityTypes, Epoch, NodeInfo, Staking, Worker};
 use fastcrypto::{
@@ -29,6 +31,7 @@ pub struct Genesis {
     pub commodity_prices: Vec<GenesisPrices>,
     pub supply_at_genesis: u64,
     pub protocol_fund_address: String,
+    pub rep_scores: HashMap<String, u8>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
