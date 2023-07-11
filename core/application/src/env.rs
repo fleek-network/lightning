@@ -128,6 +128,9 @@ impl Env<UpdatePerm> {
             let mut commodity_prices_table =
                 ctx.get_table::<CommodityTypes, HpUfloat<6>>("commodity_prices");
             let mut rep_scores_table = ctx.get_table::<NodePublicKey, u8>("rep_scores");
+            let mut total_served_table = ctx.get_table::<Epoch, TotalServed>("total_served");
+            let mut current_epoch_served_table =
+                ctx.get_table::<NodePublicKey, CommodityServed>("current_epoch_served");
 
             let protocol_fund_address: AccountOwnerPublicKey =
                 Secp256k1PublicKey::decode_base64(&genesis.protocol_fund_address)
@@ -242,6 +245,18 @@ impl Env<UpdatePerm> {
                 let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
                     .expect("Failed to parse node public key from genesis.");
                 node_table.insert(node_public_key, node_info);
+            }
+
+            // add total served
+            for (epoch, total_served) in genesis.total_served {
+                total_served_table.insert(epoch, total_served);
+            }
+
+            // add current epoch served
+            for (node_public_key_b64, commodity_served) in genesis.current_epoch_served {
+                let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
+                    .expect("Failed to parse node public key from genesis.");
+                current_epoch_served_table.insert(node_public_key, commodity_served);
             }
         })
     }

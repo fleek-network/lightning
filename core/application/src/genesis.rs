@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result};
-use draco_interfaces::types::{CommodityTypes, Epoch, NodeInfo, Staking, Worker};
+use draco_interfaces::types::{
+    CommodityServed, CommodityTypes, Epoch, NodeInfo, Staking, TotalServed, Worker,
+};
 use fastcrypto::{
     bls12381::min_sig::BLS12381PublicKey, ed25519::Ed25519PublicKey, secp256k1::Secp256k1PublicKey,
     traits::EncodeDecodeBase64,
@@ -33,6 +35,8 @@ pub struct Genesis {
     pub protocol_fund_address: String,
     pub rep_scores: HashMap<String, u8>,
     pub node_info: HashMap<String, NodeInfo>,
+    pub total_served: HashMap<Epoch, TotalServed>,
+    pub current_epoch_served: HashMap<String, CommodityServed>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
