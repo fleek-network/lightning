@@ -621,43 +621,22 @@ impl PartialEq<&[u8]> for ProofBuf {
     }
 }
 
-pub struct ProofSizeEstimator {
-    next_idx: usize,
-    num_blocks: usize,
-    tree_len: usize,
-}
+pub struct ProofSizeEstimator(pub usize);
 
 impl ProofSizeEstimator {
-    /// Create a new proof size estimator, additionally returning the size of the first proof.
-    ///
-    /// # Panics
-    ///
-    /// If num blocks > 0, or start > num_blocks
-    pub fn new(start: usize, num_blocks: usize) -> (Self, usize) {
-        assert!(num_blocks > 0 && start < num_blocks);
+    pub fn new(block: usize, num_blocks: usize) -> Self {
+        assert!(num_blocks > 0 && block < num_blocks);
         let tree_len = 2 * (num_blocks - 1) + 1;
-        let walker = TreeWalker::new(start, tree_len);
+        let walker = TreeWalker::new(block, tree_len);
         let count = walker.count();
-        (
-            Self {
-                // 32 byte hashes + 1 byte every 8 hashes
-                next_idx: start + 1,
-                num_blocks,
-                tree_len,
-            },
-            count * 32 + ((count + 7) / 8),
-        )
+        Self(count * 32 + ((count + 7) / 8))
     }
-
-    /// Advance the cursor, returning the next block's proof size, or none if the proof is
-    /// finished.
-    pub fn advance(&mut self) -> Option<usize> {
-        (self.next_idx < self.num_blocks).then(|| {
-            let walker = TreeWalker::resume(self.next_idx, self.tree_len);
-            let count = walker.count();
-            self.next_idx += 1;
-            count * 32 + ((count + 7) / 8)
-        })
+    pub fn resume(block: usize, num_blocks: usize) -> Self {
+        assert!(num_blocks > 0 && block < num_blocks);
+        let tree_len = 2 * (num_blocks - 1) + 1;
+        let walker = TreeWalker::resume(block, tree_len);
+        let count = walker.count();
+        Self(count * 32 + ((count + 7) / 8))
     }
 }
 
@@ -1193,14 +1172,17 @@ mod tests {
             // leaving the builder for the next size
             let output = tree_builder.clone().finalize();
 
-            let (mut estimator, mut len) = ProofSizeEstimator::new(0, size);
+            // check the first block's proof buf estimation
+            let mut estimator = ProofSizeEstimator::new(0, size);
             let mut proof = ProofBuf::new(&output.tree, 0);
-            // iterate over each block and ensure the estimator outputs matches the
+            assert_eq!(proof.len(), estimator.0);
+
+            // iterate over the remaining blocks and ensure the estimator outputs matches the
             // proof buf lengths
-            for i in 0..size {
-                assert_eq!(proof.len(), len);
-                proof = ProofBuf::resume(&output.tree, i + 1);
-                len = estimator.advance().unwrap_or_default();
+            for i in 1..size {
+                proof = ProofBuf::resume(&output.tree, i);
+                estimator = ProofSizeEstimator::resume(i, size);
+                assert_eq!(proof.len(), estimator.0);
             }
         }
     }
