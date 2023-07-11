@@ -24,7 +24,7 @@ fn bench(c: &mut Criterion) {
             decode.throughput(Throughput::Bytes(length as u64));
             let (content, tree) = get_content_and_tree(length);
             let mut encoded_buffer = Vec::new();
-            let mut encoder = Encoder::new(&mut encoded_buffer, tree.clone());
+            let mut encoder = Encoder::new(&mut encoded_buffer, size, tree.clone()).unwrap();
             encoder.write_all(&content).unwrap();
             encoder.flush().unwrap();
 

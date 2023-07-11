@@ -27,7 +27,8 @@ fn bench(c: &mut Criterion) {
             encode.bench_with_input(BenchmarkId::new(name.to_string(), size), &length, |b, _| {
                 b.iter(|| {
                     let mut encoded_buffer = Vec::new();
-                    let mut encoder = Encoder::new(&mut encoded_buffer, tree.clone());
+                    let mut encoder =
+                        Encoder::new(&mut encoded_buffer, size, tree.clone()).unwrap();
                     encoder.write_all(&content).unwrap();
                     encoder.flush().unwrap();
                 })

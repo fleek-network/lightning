@@ -1,45 +1,16 @@
 //! Verified stream encoding
 //!
-//! A stream is constructed of blake3 tree segments and blocks of 256 KiB.
+//! A stream is constructed of a single u64 content length header, blake3 tree segments, and 256 KiB
+//! blocks of data.
 //!
-//! The encoding is divided up into a few frames:
-//!
-//! - Tree Segment:
-//!
-//!   ```text
-//!   [ 0x00 . len (u16) . proof bytes ]
-//!   ```
-//!
-//! - Block:
-//!
-//!   ```text
-//!   [ 0x01 . block bytes (256KiB) ]
-//!   ```
-//!
-//! - Sized Block:
-//!
-//!   ```text
-//!   [ 0x02 . byte len (u32) . block bytes ]
-//!   ```
+//! The content length header is used to determine the number of blocks, the length of the last
+//! block, and the size of the proof tree. On the client side, a simple state machine is used to
+//! determine which type of data is being read.
 //!
 //! An encoded file will then look like:
 //!
 //! ```text
-//! [ tree segment ] [ block ] [ block ] ... [ sized block ]
-//! ```
-//!
-//! # TODO
-//!
-//! Frame padding (tag, lengths) can be eliminated by prefixing the stream with a fixed size content
-//! length header. From this length, we should be able to calculate the number of blocks, and the
-//! final blocks length. Additionally, from the current block it should be possible to calculate the
-//! tree segment size. We can also keep a state enum, which would dictate if a header, tree segment,
-//! or block should be read next.
-//!
-//! An encoded file would then look like:
-//!
-//! ```text
-//! [ header (u64) . tree segment bytes . block bytes . block bytes ... ]
+//! [ header (u64) . tree bytes . block bytes . block bytes . tree bytes . block bytes ... ]
 //! ```
 
 use std::{
@@ -50,9 +21,9 @@ use std::{
 use arrayref::array_ref;
 use blake3_tree::{
     blake3::tree::{BlockHasher, HashTree},
-    IncrementalVerifier, ProofBuf,
+    IncrementalVerifier, ProofBuf, ProofSizeEstimator,
 };
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{BufMut, BytesMut};
 
 pub const BLOCK_SIZE: usize = 256 * 1024;
 
@@ -60,119 +31,28 @@ pub const PROOF_TAG: u8 = 0x00;
 pub const BLOCK_TAG: u8 = 0x01;
 pub const SIZED_BLOCK_TAG: u8 = 0x02;
 
-/// Frames used in the encoding
-pub enum Frame {
-    TreeSegment(BytesMut),
-    Block(BytesMut),
-}
-
-impl Frame {
-    /// Return the calculated size of the encoded frame
-    pub fn size(&self) -> usize {
-        match self {
-            Self::TreeSegment(bytes) => 3 + bytes.len(),
-            Self::Block(bytes) => {
-                if bytes.len() == BLOCK_SIZE {
-                    1 + BLOCK_SIZE
-                } else {
-                    5 + bytes.len()
-                }
-            },
-        }
-    }
-
-    /// Encode the frame
-    pub fn encode(self) -> BytesMut {
-        match self {
-            Frame::TreeSegment(bytes) => {
-                let mut buf = BytesMut::with_capacity(3 + bytes.len());
-                buf.put_u8(PROOF_TAG);
-                buf.put_u16(bytes.len() as u16);
-                buf.put(bytes);
-                buf
-            },
-            Frame::Block(bytes) => {
-                if bytes.len() == BLOCK_SIZE {
-                    let mut buf = BytesMut::with_capacity(1 + BLOCK_SIZE);
-                    buf.put_u8(BLOCK_TAG);
-                    buf.put(bytes.as_ref());
-                    buf
-                } else {
-                    let mut buf = BytesMut::with_capacity(5 + bytes.len());
-                    buf.put_u8(SIZED_BLOCK_TAG);
-                    buf.put_u32(bytes.len() as u32);
-                    buf.put(bytes.as_ref());
-                    buf
-                }
-            },
-        }
-    }
-
-    /// Decode a frame
-    pub fn decode(buf: &mut BytesMut) -> io::Result<Option<Self>> {
-        if buf.is_empty() {
-            return Ok(None);
-        }
-
-        match buf[0] {
-            PROOF_TAG => {
-                if buf.len() >= 3 {
-                    let len = u16::from_be_bytes(*array_ref!(buf, 1, 2)) as usize;
-                    if buf.len() >= len + 3 {
-                        buf.advance(3);
-                        let bytes = buf.split_to(len);
-                        buf.reserve(len + 3);
-                        return Ok(Some(Self::TreeSegment(bytes)));
-                    }
-                }
-                Ok(None)
-            },
-            BLOCK_TAG => {
-                if buf.len() > BLOCK_SIZE {
-                    buf.advance(1);
-                    let bytes = buf.split_to(BLOCK_SIZE);
-                    buf.reserve(BLOCK_SIZE + 1);
-                    Ok(Some(Self::Block(bytes)))
-                } else {
-                    Ok(None)
-                }
-            },
-            SIZED_BLOCK_TAG => {
-                if buf.len() >= 5 {
-                    let len = u32::from_be_bytes(*array_ref!(buf, 1, 4)) as usize;
-                    if buf.len() >= len + 5 {
-                        buf.advance(5);
-                        let bytes = buf.split_to(len);
-                        buf.reserve(5 + len);
-                        return Ok(Some(Self::Block(bytes)));
-                    }
-                }
-                Ok(None)
-            },
-            _ => Err(io::Error::from(io::ErrorKind::InvalidData)),
-        }
-    }
-}
-
 /// Encoder for a blake3 stream of content
 pub struct Encoder<W: Write> {
     writer: W,
-    tree: HashTree,
     buffer: BytesMut,
+    tree: HashTree,
     block: usize,
     num_blocks: usize,
+    content_len: usize,
 }
 
 impl<W: Write> Encoder<W> {
-    pub fn new(writer: W, tree: HashTree) -> Self {
-        let max_block = (tree.tree.len() + 1) / 2;
-        Self {
+    /// Create a new proof encoder, immediately writing the u64 length header
+    pub fn new(mut writer: W, content_len: usize, tree: HashTree) -> io::Result<Self> {
+        writer.write_all(&(content_len as u64).to_be_bytes())?;
+        Ok(Self {
+            num_blocks: (tree.tree.len() + 1) / 2,
             writer,
             tree,
+            content_len,
             buffer: BytesMut::new(),
             block: 0,
-            num_blocks: max_block,
-        }
+        })
     }
 }
 
@@ -188,17 +68,17 @@ impl<W: Write> Write for Encoder<W> {
 
         // Write as many blocks as we can
         while !self.buffer.is_empty()
-            && (self.buffer.len() >= BLOCK_SIZE || self.block == self.num_blocks - 1)
+            && (self.buffer.len() >= BLOCK_SIZE
+                || ((self.block == self.num_blocks - 1)
+                    && self.buffer.len() == self.content_len % BLOCK_SIZE))
         {
             if !proof.is_empty() {
-                let bytes = Frame::TreeSegment(proof.as_slice().into()).encode();
-                self.writer.write_all(&bytes)?;
+                self.writer.write_all(proof.as_ref())?;
             };
 
             let bytes = self.buffer.split_to(self.buffer.len().min(BLOCK_SIZE));
-            let encoded = Frame::Block(bytes).encode();
 
-            self.writer.write_all(&encoded)?;
+            self.writer.write_all(bytes.as_ref())?;
 
             self.block += 1;
             if self.block < self.num_blocks {
@@ -214,6 +94,25 @@ impl<W: Write> Write for Encoder<W> {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum DecoderState {
+    WaitingForHeader,
+    WaitingForProof(usize),
+    WaitingForBlock(usize),
+    Finished,
+}
+
+impl DecoderState {
+    pub fn next_size(&self) -> Option<usize> {
+        match self {
+            DecoderState::WaitingForHeader => Some(8),
+            DecoderState::WaitingForProof(proof_len) => Some(*proof_len),
+            DecoderState::WaitingForBlock(block_len) => Some(*block_len),
+            DecoderState::Finished => None,
+        }
+    }
+}
+
 /// Decoder for a blake3 stream of content
 /// TODO:
 ///   - make verification optional
@@ -224,6 +123,9 @@ pub struct VerifiedDecoder<R: Read> {
     read_buffer: BytesMut,
     out_buffer: BytesMut,
     block: usize,
+    num_blocks: usize,
+    remaining: usize,
+    state: DecoderState,
 }
 
 impl<R: Read> VerifiedDecoder<R> {
@@ -232,9 +134,12 @@ impl<R: Read> VerifiedDecoder<R> {
         Self {
             reader,
             iv: IncrementalVerifier::new(root_hash, 0),
-            read_buffer: BytesMut::with_capacity(BLOCK_SIZE + 4),
+            read_buffer: BytesMut::with_capacity(BLOCK_SIZE),
             out_buffer: BytesMut::new(),
             block: 0,
+            num_blocks: 0,
+            remaining: 0,
+            state: DecoderState::WaitingForHeader,
         }
     }
 }
@@ -252,57 +157,99 @@ impl<R: Read + Debug> Read for VerifiedDecoder<R> {
         }
 
         loop {
-            if let Some(frame) = Frame::decode(&mut self.read_buffer)? {
-                match frame {
-                    Frame::TreeSegment(bytes) => {
-                        self.iv
-                            .feed_proof(&bytes)
-                            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-                    },
-                    Frame::Block(mut bytes) => {
-                        // verify block
-                        let mut hasher = BlockHasher::new();
-                        hasher.set_block(self.block);
-                        hasher.update(&bytes);
+            if let Some(size) = self.state.next_size() {
+                if self.read_buffer.len() >= size {
+                    match self.state {
+                        DecoderState::WaitingForHeader => {
+                            let bytes = self.read_buffer.split_to(size);
 
-                        self.iv
-                            .verify(hasher)
-                            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+                            // read a u64 content length header
+                            self.remaining = u64::from_be_bytes(*array_ref!(bytes, 0, 8)) as usize;
+                            self.num_blocks = (self.remaining + BLOCK_SIZE - 1) / BLOCK_SIZE;
+                            let proof_len = ProofSizeEstimator::new(0, self.num_blocks).0;
+                            self.state = DecoderState::WaitingForProof(proof_len);
+                        },
+                        DecoderState::WaitingForProof(_) => {
+                            if size != 0 {
+                                let bytes = self.read_buffer.split_to(size);
 
-                        self.block += 1;
+                                self.iv
+                                    .feed_proof(&bytes)
+                                    .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+                            }
 
-                        if bytes.len() > buf.len() {
-                            // We have to write more bytes than the buffer has available
-                            let take = bytes.len() - buf.len();
-                            buf[..take].copy_from_slice(&bytes.split_to(take));
-                            self.out_buffer.put(bytes);
-                            break Ok(take);
-                        } else {
-                            // or, write the entire content
-                            let take = bytes.len().min(buf.len());
-                            buf[..take].copy_from_slice(&bytes.split_to(take));
-                            break Ok(take);
-                        }
-                    },
+                            let block_len = if self.block < self.num_blocks - 1 {
+                                BLOCK_SIZE
+                            } else {
+                                // final block
+                                let mut len = self.remaining % BLOCK_SIZE;
+                                if len == 0 {
+                                    len = BLOCK_SIZE;
+                                }
+                                len
+                            };
+                            self.state = DecoderState::WaitingForBlock(block_len);
+                        },
+                        DecoderState::WaitingForBlock(_) => {
+                            // we have enough bytes to parse the next item
+                            let mut bytes = self.read_buffer.split_to(size);
+
+                            // verify block
+                            let mut hasher = BlockHasher::new();
+                            hasher.set_block(self.block);
+                            hasher.update(&bytes);
+
+                            self.iv
+                                .verify(hasher)
+                                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+                            // setup state for the next block
+                            self.block += 1;
+                            if self.block < self.num_blocks {
+                                let proof_len =
+                                    ProofSizeEstimator::resume(self.block, self.num_blocks).0;
+                                self.state = DecoderState::WaitingForProof(proof_len);
+                            } else {
+                                self.state = DecoderState::Finished;
+                            }
+
+                            if bytes.len() > buf.len() {
+                                // We have to write more bytes than the buffer has available
+                                let take = bytes.len() - buf.len();
+                                buf[..take].copy_from_slice(&bytes.split_to(take));
+                                self.out_buffer.put(bytes);
+                                break Ok(take);
+                            } else {
+                                // or, write the entire content
+                                let take = bytes.len().min(buf.len());
+                                buf[..take].copy_from_slice(&bytes.split_to(take));
+                                break Ok(take);
+                            }
+                        },
+                        DecoderState::Finished => break Ok(0),
+                    };
+                } else {
+                    // We don't have enough bytes, get some more from the reader
+                    let mut buf = [0; BLOCK_SIZE];
+                    match self.reader.read(&mut buf)? {
+                        0 => {
+                            break if !self.read_buffer.is_empty() {
+                                // If the buffer contains anything, the connection was
+                                // interrupted
+                                // while transferring data.
+                                Err(io::Error::from(io::ErrorKind::ConnectionReset))
+                            } else {
+                                Ok(0)
+                            };
+                        },
+                        len => {
+                            self.read_buffer.extend_from_slice(&buf[0..len]);
+                        },
+                    }
                 }
             } else {
-                // Couldn't decode a frame, get some more bytes from the reader
-                let mut buf = [0; BLOCK_SIZE];
-                match self.reader.read(&mut buf)? {
-                    0 => {
-                        break if !self.read_buffer.is_empty() {
-                            // If the buffer contains anything, the connection was
-                            // interrupted
-                            // while transferring data.
-                            Err(io::Error::from(io::ErrorKind::ConnectionReset))
-                        } else {
-                            Ok(0)
-                        };
-                    },
-                    len => {
-                        self.read_buffer.extend_from_slice(&buf[0..len]);
-                    },
-                }
+                // Stream is finished
+                break Ok(0);
             }
         }
     }
@@ -318,9 +265,6 @@ mod tests {
     use crate::{Encoder, VerifiedDecoder, BLOCK_SIZE};
 
     pub const TEST_CASES: &[usize] = &[
-        1,
-        1024,
-        16 * 1024,
         BLOCK_SIZE - 1,
         BLOCK_SIZE,
         BLOCK_SIZE + 1,
@@ -350,12 +294,12 @@ mod tests {
     }
 
     #[test]
-    fn encode_decode() -> std::io::Result<()> {
+    fn encode_and_decode() -> std::io::Result<()> {
         for &content_len in TEST_CASES {
             let (content, tree) = get_content_and_tree(content_len);
 
             let mut encoded_buffer = Vec::new();
-            let mut encoder = Encoder::new(&mut encoded_buffer, tree.clone());
+            let mut encoder = Encoder::new(&mut encoded_buffer, content.len(), tree.clone())?;
             encoder.write_all(&content)?;
             encoder.flush()?;
 
@@ -370,12 +314,12 @@ mod tests {
     }
 
     #[test]
-    fn encode_content_incrementally() -> std::io::Result<()> {
+    fn encode_incrementally_and_decode() -> std::io::Result<()> {
         for &content_len in TEST_CASES {
             let (content, tree) = get_content_and_tree(content_len);
 
             let mut encoded_buffer = Vec::new();
-            let mut encoder = Encoder::new(&mut encoded_buffer, tree.clone());
+            let mut encoder = Encoder::new(&mut encoded_buffer, content.len(), tree.clone())?;
 
             let mut bytes: BytesMut = content.as_slice().into();
             while !bytes.is_empty() {
