@@ -1062,7 +1062,7 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
     app.start().await;
 
     // Init rpc service
-    let port = 30014;
+    let port = 30015;
     let mut rpc = Rpc::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
@@ -1111,7 +1111,7 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
     app.start().await;
 
     // Init rpc service
-    let port = 30014;
+    let port = 30016;
     let mut rpc = Rpc::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
@@ -1160,7 +1160,7 @@ async fn test_rpc_get_protocol_params() -> Result<()> {
     app.start().await;
 
     // Init rpc service
-    let port = 30015;
+    let port = 30017;
     let mut rpc = Rpc::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
@@ -1225,7 +1225,7 @@ async fn test_rpc_get_total_served() -> Result<()> {
     app.start().await;
 
     // Init rpc service
-    let port = 30016;
+    let port = 30018;
     let mut rpc = Rpc::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
@@ -1284,7 +1284,7 @@ async fn test_rpc_get_commodity_served() -> Result<()> {
     app.start().await;
 
     // Init rpc service
-    let port = 30017;
+    let port = 30019;
     let mut rpc = Rpc::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),

@@ -2129,7 +2129,6 @@ dependencies = [
  "draco-interfaces",
  "draco-reputation",
  "draco-test-utils",
- "fastcrypto",
  "fleek-crypto",
  "hp-float",
  "multiaddr",

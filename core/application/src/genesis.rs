@@ -4,11 +4,7 @@ use anyhow::{Context, Result};
 use draco_interfaces::types::{
     CommodityServed, CommodityTypes, Epoch, NodeInfo, Staking, TotalServed, Worker,
 };
-use fastcrypto::{
-    bls12381::min_sig::BLS12381PublicKey, ed25519::Ed25519PublicKey, secp256k1::Secp256k1PublicKey,
-    traits::EncodeDecodeBase64,
-};
-use fleek_crypto::AccountOwnerPublicKey;
+use fleek_crypto::{AccountOwnerPublicKey, NodeNetworkingPublicKey, NodePublicKey, PublicKey};
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
 
@@ -86,36 +82,22 @@ fn test() {
 
 impl From<&GenesisCommittee> for NodeInfo {
     fn from(value: &GenesisCommittee) -> Self {
-        let owner: AccountOwnerPublicKey = Secp256k1PublicKey::decode_base64(&value.owner)
-            .unwrap()
-            .into();
-
-        let public_key = BLS12381PublicKey::decode_base64(&value.primary_public_key)
-            .unwrap()
-            .pubkey
-            .to_bytes();
-
-        let network_key = Ed25519PublicKey::decode_base64(&value.network_key)
-            .unwrap()
-            .0
-            .to_bytes();
+        let owner = AccountOwnerPublicKey::from_base64(&value.owner).unwrap();
+        let public_key = NodePublicKey::from_base64(&value.primary_public_key).unwrap();
+        let network_key = NodeNetworkingPublicKey::from_base64(&value.network_key).unwrap();
 
         let domain: Multiaddr = value.primary_address.parse().unwrap();
 
         let worker = Worker {
-            public_key: Ed25519PublicKey::decode_base64(&value.worker_public_key)
-                .unwrap()
-                .0
-                .to_bytes()
-                .into(),
+            public_key: NodeNetworkingPublicKey::from_base64(&value.worker_public_key).unwrap(),
             address: value.worker_address.parse().unwrap(),
             mempool: value.worker_mempool.parse().unwrap(),
         };
 
         NodeInfo {
             owner: owner.into(),
-            public_key: public_key.into(),
-            network_key: network_key.into(),
+            public_key,
+            network_key,
             domain,
             workers: [worker].to_vec(),
             staked_since: 0,

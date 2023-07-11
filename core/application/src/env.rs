@@ -10,7 +10,6 @@ use draco_interfaces::{
     },
     BlockExecutionResponse,
 };
-use fastcrypto::{secp256k1::Secp256k1PublicKey, traits::EncodeDecodeBase64};
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, EthAddress, NodePublicKey, PublicKey};
 use hp_float::unsigned::HpUfloat;
 
@@ -132,10 +131,8 @@ impl Env<UpdatePerm> {
             let mut current_epoch_served_table =
                 ctx.get_table::<NodePublicKey, CommodityServed>("current_epoch_served");
 
-            let protocol_fund_address: AccountOwnerPublicKey =
-                Secp256k1PublicKey::decode_base64(&genesis.protocol_fund_address)
-                    .unwrap()
-                    .into();
+            let protocol_fund_address =
+                AccountOwnerPublicKey::from_base64(&genesis.protocol_fund_address).unwrap();
             metadata_table.insert(
                 Metadata::ProtocolFundAddress,
                 Value::AccountPublicKey(protocol_fund_address.into()),
@@ -209,10 +206,7 @@ impl Env<UpdatePerm> {
             }
 
             for account in genesis.account {
-                let public_key: AccountOwnerPublicKey =
-                    Secp256k1PublicKey::decode_base64(&account.public_key)
-                        .unwrap()
-                        .into();
+                let public_key = AccountOwnerPublicKey::from_base64(&account.public_key).unwrap();
                 let info = AccountInfo {
                     flk_balance: account.flk_balance.into(),
                     stables_balance: account.stables_balance.into(),
