@@ -10,8 +10,8 @@ use draco_application::{
 };
 use draco_interfaces::{
     types::{EpochInfo, NodeInfo, ProtocolParams, Staking, UpdateRequest, Worker as NodeWorker},
-    ApplicationInterface, ExecutionEngineSocket, MempoolSocket, RpcInterface,
-    SyncQueryRunnerInterface, WithStartAndShutdown,
+    ApplicationInterface, MempoolSocket, RpcInterface, SyncQueryRunnerInterface,
+    WithStartAndShutdown,
 };
 use fleek_crypto::{
     AccountOwnerSecretKey, EthAddress, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey,
