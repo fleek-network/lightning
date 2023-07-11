@@ -31,7 +31,7 @@ impl WithStartAndShutdown for Indexer {
 #[async_trait]
 impl IndexerInterface for Indexer {
     async fn init(_config: Self::Config) -> anyhow::Result<Self> {
-        todo!()
+        Ok(Self {})
     }
 
     /// Publish to everyone that we have cached a content with the given `cid` successfully.

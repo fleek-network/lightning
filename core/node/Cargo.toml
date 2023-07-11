@@ -8,11 +8,13 @@ default-run = "draco-node"
 
 [dependencies]
 draco-application = { path = "../application" }
+draco-blockstore = { path = "../blockstore" }
 draco-handshake = { path = "../handshake" }
 draco-interfaces = { path = "../interfaces" }
 draco-rep-collector = { path = "../rep-collector" }
 draco-consensus = { path = "../consensus" }
 draco-notifier = { path = "../notifier" }
+draco-rpc = { path = "../rpc" }
 draco-signer = { path = "../signer" }
 anyhow.workspace = true
 clap = { version = "4.2", features = ["derive"] }

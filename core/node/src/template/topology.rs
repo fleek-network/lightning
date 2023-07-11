@@ -19,7 +19,7 @@ impl<Q: SyncQueryRunnerInterface> TopologyInterface for Topology<Q> {
         _our_public_key: NodePublicKey,
         _query_runner: Self::SyncQuery,
     ) -> anyhow::Result<Self> {
-        todo!()
+        Ok(Self { query: PhantomData })
     }
 
     fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>> {

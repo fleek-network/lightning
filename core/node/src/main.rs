@@ -8,11 +8,13 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::Result;
 use clap::Parser;
 use draco_application::{app::Application, query_runner::QueryRunner};
+use draco_blockstore::memory::MemoryBlockStore;
 use draco_consensus::consensus::Consensus;
 use draco_handshake::server::{StreamProvider, TcpHandshakeServer, TcpProvider};
 use draco_interfaces::{common::WithStartAndShutdown as _, ConfigProviderInterface, Node};
 use draco_notifier::Notifier;
 use draco_rep_collector::ReputationAggregator;
+use draco_rpc::server::Rpc;
 use draco_signer::Signer;
 use template::{gossip::Gossip, topology::Topology};
 
@@ -21,8 +23,8 @@ use crate::{
     config::TomlConfigProvider,
     shutdown::ShutdownController,
     template::{
-        blockstore::BlockStore, fs::FileSystem, indexer::Indexer, origin::MyStream,
-        pod::DeliveryAcknowledgmentAggregator, rpc::Rpc, sdk::Sdk,
+        fs::FileSystem, indexer::Indexer, origin::MyStream, pod::DeliveryAcknowledgmentAggregator,
+        sdk::Sdk,
     },
 };
 
@@ -30,7 +32,7 @@ pub type ConcreteNode = Node<
     TomlConfigProvider,
     Consensus<QueryRunner, Gossip<Signer, Topology<QueryRunner>, Notifier>>,
     Application,
-    BlockStore,
+    MemoryBlockStore,
     Indexer,
     FileSystem,
     Signer,

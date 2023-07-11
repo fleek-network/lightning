@@ -1,11 +1,12 @@
 use async_trait::async_trait;
+use draco_blockstore::memory::MemoryBlockStore;
 use draco_interfaces::{
     blockstore::BlockStoreInterface, common::WithStartAndShutdown, config::ConfigConsumer,
     fs::FileSystemInterface, Blake3Hash, Blake3Tree, CompressionAlgoSet, ContentChunk,
 };
 
 use super::config::Config;
-use crate::{BlockStore, Indexer};
+use crate::Indexer;
 
 #[derive(Clone)]
 pub struct FileSystem {}
@@ -32,13 +33,13 @@ impl WithStartAndShutdown for FileSystem {
 #[async_trait]
 impl FileSystemInterface for FileSystem {
     /// The block store used for this file system.
-    type BlockStore = BlockStore;
+    type BlockStore = MemoryBlockStore;
 
     /// The indexer used for this file system.
     type Indexer = Indexer;
 
     fn new(_store: &Self::BlockStore, _indexer: &Self::Indexer) -> Self {
-        todo!()
+        Self {}
     }
 
     /// Returns true if the given `cid` is already cached on the node.

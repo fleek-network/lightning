@@ -54,7 +54,11 @@ impl<S: SignerInterface, Topo: TopologyInterface, N: NotifierInterface + Send + 
         _topology: Arc<Self::Topology>,
         _signer: &Self::Signer,
     ) -> Result<Self> {
-        todo!()
+        Ok(Self {
+            signer: PhantomData,
+            topology: PhantomData,
+            notifier: PhantomData,
+        })
     }
 
     fn subscribe<T>(&self, _topic: draco_interfaces::Topic) -> Self::Subscriber<T>

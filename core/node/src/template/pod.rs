@@ -32,7 +32,7 @@ impl WithStartAndShutdown for DeliveryAcknowledgmentAggregator {
 impl DeliveryAcknowledgmentAggregatorInterface for DeliveryAcknowledgmentAggregator {
     /// Initialize a new delivery acknowledgment aggregator.
     async fn init(_config: Self::Config, _submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
-        todo!()
+        Ok(Self {})
     }
 
     /// Returns the socket that can be used to submit delivery acknowledgments to be aggregated.
