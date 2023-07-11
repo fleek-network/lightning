@@ -628,11 +628,11 @@ pub struct ProofSizeEstimator {
 }
 
 impl ProofSizeEstimator {
-    /// Create a new proof size estimator, returning self and the size of the first proof.
+    /// Create a new proof size estimator, additionally returning the size of the first proof.
     ///
     /// # Panics
     ///
-    /// If num blocks > 0, or start < num_blocks - 1
+    /// If num blocks > 0, or start > num_blocks
     pub fn new(start: usize, num_blocks: usize) -> (Self, usize) {
         assert!(num_blocks > 0 && start < num_blocks);
         let tree_len = 2 * (num_blocks - 1) + 1;
@@ -650,9 +650,9 @@ impl ProofSizeEstimator {
     }
 
     /// Advance the cursor, returning the next block's proof size, or none if the proof is
-    /// finished
+    /// finished.
     pub fn advance(&mut self) -> Option<usize> {
-        (self.next_idx <= self.num_blocks).then(|| {
+        (self.next_idx < self.num_blocks).then(|| {
             let walker = TreeWalker::resume(self.next_idx, self.tree_len);
             let count = walker.count();
             self.next_idx += 1;
