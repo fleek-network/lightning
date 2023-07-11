@@ -2,13 +2,18 @@ use std::{thread, time::Duration};
 
 use affair::{Executor, TokioSpawn, Worker};
 use anyhow::Result;
-use draco_application::{app::Application, config::Config as AppConfig, query_runner::QueryRunner};
+use draco_application::{
+    app::Application,
+    config::{Config as AppConfig, Mode},
+    genesis::Genesis,
+    query_runner::QueryRunner,
+};
 use draco_interfaces::{
     types::{Block, ProofOfConsensus, Tokens, UpdateMethod, UpdatePayload, UpdateRequest},
     ApplicationInterface, ExecutionEngineSocket, MempoolSocket, RpcInterface, ToDigest,
     WithStartAndShutdown,
 };
-use fleek_crypto::{AccountOwnerSecretKey, EthAddress, SecretKey};
+use fleek_crypto::{AccountOwnerSecretKey, EthAddress, NodeSecretKey, PublicKey, SecretKey};
 use hp_float::unsigned::HpUfloat;
 use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
@@ -18,10 +23,10 @@ use tokio::{task, test};
 use crate::{config::Config as RpcConfig, server::Rpc};
 
 #[derive(Serialize, Deserialize, Debug)]
-struct RpcSuccessResponse {
+struct RpcSuccessResponse<T> {
     jsonrpc: String,
     id: usize,
-    result: HpUfloat<18>,
+    result: T,
 }
 
 /// get mempool socket for test cases that do not require consensus
@@ -105,6 +110,7 @@ async fn make_request(port: u16, req: String) -> Result<Response> {
         .send()
         .await?)
 }
+
 #[test]
 async fn test_rpc_ping() -> Result<()> {
     let port = 30000;
@@ -175,7 +181,6 @@ async fn test_rpc_get_balance() -> Result<()> {
         .await
         .unwrap();
 
-    // TODO(matthias): we should maybe rename the `public_key` param to `eth_address` or similar.
     let req = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_balance",
@@ -189,11 +194,69 @@ async fn test_rpc_get_balance() -> Result<()> {
         let value: Value = response.json().await?;
         if value.get("result").is_some() {
             // Parse the response as a successful response
-            let success_response: RpcSuccessResponse = serde_json::from_value(value)?;
+            let success_response: RpcSuccessResponse<HpUfloat<18>> = serde_json::from_value(value)?;
             assert_eq!(
                 HpUfloat::<18>::new(1_000_u32.into()),
                 success_response.result
             );
+        } else {
+            panic!("Rpc Error: {value}")
+        }
+    } else {
+        panic!("Request failed with status: {}", response.status());
+    }
+    Ok(())
+}
+
+#[test]
+async fn test_rpc_get_reputation() -> Result<()> {
+    // Create keys
+    let node_secret_key = NodeSecretKey::generate();
+    let node_public_key = node_secret_key.to_pk();
+
+    // Init application service and store reputation score in application state.
+    let mut genesis = Genesis::load().unwrap();
+    genesis.rep_scores.insert(node_public_key.to_base64(), 46);
+
+    let app = Application::init(AppConfig {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+    })
+    .await
+    .unwrap();
+    let (_, query_runner) = (app.transaction_executor(), app.sync_query());
+    app.start().await;
+
+    // Init rpc service
+    let port = 30002;
+    let mut rpc = Rpc::init(
+        RpcConfig::default(),
+        MockWorker::mempool_socket(),
+        query_runner,
+    )
+    .await?;
+    rpc.config.port = port;
+
+    task::spawn(async move {
+        rpc.start().await;
+    });
+    wait_for_server_start(port).await?;
+
+    let req = json!({
+        "jsonrpc": "2.0",
+        "method":"flk_get_reputation",
+        "params": {"public_key": node_public_key},
+        "id":1,
+    });
+
+    let response = make_request(port, req.to_string()).await?;
+
+    if response.status().is_success() {
+        let value: Value = response.json().await?;
+        if value.get("result").is_some() {
+            // Parse the response as a successful response
+            let success_response: RpcSuccessResponse<Option<u8>> = serde_json::from_value(value)?;
+            assert_eq!(Some(46), success_response.result);
         } else {
             panic!("Rpc Error: {value}")
         }

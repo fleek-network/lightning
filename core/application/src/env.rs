@@ -226,7 +226,7 @@ impl Env<UpdatePerm> {
                 commodity_prices_table.insert(commodity, big_price);
             }
 
-            // add reputation reputation scores
+            // add reputation scores
             for (node_public_key_b64, rep_score) in genesis.rep_scores {
                 let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
                     .expect("Failed to parse node public key from genesis.");
