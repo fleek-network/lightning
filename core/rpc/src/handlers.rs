@@ -76,6 +76,7 @@ impl RpcServer {
                 get_commodity_served_handler::<Q, I>,
             )
             .with_method("flk_is_valid_node", is_valid_node_handler::<Q, I>)
+            .with_method("flk_get_node_registry", get_node_registry_handler::<Q, I>)
             .with_method("flk_get_reputation", get_reputation_handler::<Q, I>);
 
         RpcServer(server.finish())
@@ -229,4 +230,10 @@ pub async fn is_valid_node_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<
     Params(params): Params<NodeKeyParam>,
 ) -> Result<bool> {
     Ok(data.0.query_runner().is_valid_node(&params.public_key))
+}
+
+pub async fn get_node_registry_handler<Q: SyncQueryRunnerInterface, I: RpcInterface<Q>>(
+    data: Data<Arc<I>>,
+) -> Result<Vec<NodeInfo>> {
+    Ok(data.0.query_runner().get_node_registry())
 }
