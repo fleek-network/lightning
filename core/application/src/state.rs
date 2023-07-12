@@ -34,9 +34,9 @@ const MIN_NUM_MEASUREMENTS: usize = 2;
 /// Reported measurements are weighted by the reputation score of the reporting node.
 /// If there is no reputation score for the reporting node, we use a quantile from the array
 /// of all reputation scores.
-/// For example, if `DEFAULT_REP_QUANTILE = 0.3`, then we use the reputation score that is higher
-/// than 30% of scores and lower than 70% of scores.
-const DEFAULT_REP_QUANTILE: f64 = 0.3;
+/// For example, if `DEFAULT_REP_QUANTILE = 0.1`, then we use the reputation score that is higher
+/// than 10% of scores and lower than 90% of scores.
+const DEFAULT_REP_QUANTILE: f64 = 0.1;
 
 /// The rep score of a node is the exponentially weighted moving average of its rep scores over the
 /// past epochs.
