@@ -1322,3 +1322,89 @@ async fn test_rpc_get_commodity_served() -> Result<()> {
     }
     Ok(())
 }
+
+#[test]
+async fn test_rpc_is_valid_node() -> Result<()> {
+    // Create keys
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner_public_key = owner_secret_key.to_pk();
+    let eth_address = owner_public_key.into();
+    let node_secret_key = NodeSecretKey::generate();
+    let node_public_key = node_secret_key.to_pk();
+    let network_secret_key = NodeNetworkingSecretKey::generate();
+    let network_public_key = network_secret_key.to_pk();
+
+    // Init application service and store node info in application state.
+    let mut genesis = Genesis::load().unwrap();
+    let staking = Staking {
+        staked: genesis.min_stake.into(),
+        stake_locked_until: 0,
+        locked: 0_u32.into(),
+        locked_until: 0,
+    };
+    let node_info = NodeInfo {
+        owner: eth_address,
+        public_key: node_public_key,
+        network_key: network_public_key,
+        staked_since: 1,
+        stake: staking,
+        domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
+        workers: vec![NodeWorker {
+            public_key: network_public_key,
+            address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
+            mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
+        }],
+        nonce: 0,
+    };
+
+    genesis
+        .node_info
+        .insert(node_public_key.to_base64(), node_info.clone());
+
+    let app = Application::init(AppConfig {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+    })
+    .await
+    .unwrap();
+    let query_runner = app.sync_query();
+    app.start().await;
+
+    // Init rpc service
+    let port = 30020;
+    let mut rpc = Rpc::init(
+        RpcConfig::default(),
+        MockWorker::mempool_socket(),
+        query_runner,
+    )
+    .await?;
+    rpc.config.port = port;
+
+    task::spawn(async move {
+        rpc.start().await;
+    });
+    wait_for_server_start(port).await?;
+
+    let req = json!({
+        "jsonrpc": "2.0",
+        "method":"flk_is_valid_node",
+        "params": {"public_key": node_public_key},
+        "id":1,
+    });
+
+    let response = make_request(port, req.to_string()).await?;
+
+    if response.status().is_success() {
+        let value: Value = response.json().await?;
+        if value.get("result").is_some() {
+            // Parse the response as a successful response
+            let success_response: RpcSuccessResponse<bool> = serde_json::from_value(value)?;
+            assert!(success_response.result);
+        } else {
+            panic!("Rpc Error: {value}")
+        }
+    } else {
+        panic!("Request failed with status: {}", response.status());
+    }
+    Ok(())
+}
