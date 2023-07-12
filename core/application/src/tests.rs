@@ -1023,3 +1023,58 @@ async fn test_validate_txn() {
     );
     assert_eq!(res.txn_receipts[0], query_runner.validate_txn(req));
 }
+
+#[test]
+async fn test_is_valid_node() {
+    let (update_socket, query_runner) = init_app(None).await;
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_secret_key = NodeSecretKey::generate();
+
+    // Stake minimum required amount.
+    let minimum_stake_amount = query_runner.get_staking_amount();
+    deposit(
+        minimum_stake_amount.into(),
+        Tokens::FLK,
+        owner_secret_key,
+        &update_socket,
+        1,
+    )
+    .await;
+    stake(
+        minimum_stake_amount.into(),
+        node_secret_key.to_pk(),
+        owner_secret_key,
+        &update_socket,
+        2,
+    )
+    .await;
+    // Make sure that this node is a valid node.
+    assert!(query_runner.is_valid_node(&node_secret_key.to_pk()));
+
+    // Generate new keys for a different node.
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_secret_key = NodeSecretKey::generate();
+
+    // Stake less than the minimum required amount.
+    let minimum_stake_amount = query_runner.get_staking_amount();
+    let less_than_minimum_skate_amount = minimum_stake_amount / 2;
+    deposit(
+        less_than_minimum_skate_amount.into(),
+        Tokens::FLK,
+        owner_secret_key,
+        &update_socket,
+        1,
+    )
+    .await;
+    stake(
+        less_than_minimum_skate_amount.into(),
+        node_secret_key.to_pk(),
+        owner_secret_key,
+        &update_socket,
+        2,
+    )
+    .await;
+    // Make sure that this node is not a valid node.
+    assert!(!query_runner.is_valid_node(&node_secret_key.to_pk()));
+}
