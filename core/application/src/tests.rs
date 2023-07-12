@@ -1057,7 +1057,6 @@ async fn test_is_valid_node() {
     let node_secret_key = NodeSecretKey::generate();
 
     // Stake less than the minimum required amount.
-    let minimum_stake_amount = query_runner.get_staking_amount();
     let less_than_minimum_skate_amount = minimum_stake_amount / 2;
     deposit(
         less_than_minimum_skate_amount.into(),
@@ -1077,4 +1076,102 @@ async fn test_is_valid_node() {
     .await;
     // Make sure that this node is not a valid node.
     assert!(!query_runner.is_valid_node(&node_secret_key.to_pk()));
+}
+
+#[test]
+async fn test_get_node_registry() {
+    let (committee, keystore) = get_genesis_committee(4);
+    let mut genesis = Genesis::load().unwrap();
+    genesis.committee = committee;
+    let (update_socket, query_runner) = init_app(Some(Config {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+    }))
+    .await;
+
+    let owner_secret_key1 = AccountOwnerSecretKey::generate();
+    let node_secret_key1 = NodeSecretKey::generate();
+
+    // Stake minimum required amount.
+    let minimum_stake_amount = query_runner.get_staking_amount();
+    deposit(
+        minimum_stake_amount.into(),
+        Tokens::FLK,
+        owner_secret_key1,
+        &update_socket,
+        1,
+    )
+    .await;
+    stake(
+        minimum_stake_amount.into(),
+        node_secret_key1.to_pk(),
+        owner_secret_key1,
+        &update_socket,
+        2,
+    )
+    .await;
+
+    // Generate new keys for a different node.
+    let owner_secret_key2 = AccountOwnerSecretKey::generate();
+    let node_secret_key2 = NodeSecretKey::generate();
+
+    // Stake less than the minimum required amount.
+    let less_than_minimum_skate_amount = minimum_stake_amount / 2;
+    deposit(
+        less_than_minimum_skate_amount.into(),
+        Tokens::FLK,
+        owner_secret_key2,
+        &update_socket,
+        1,
+    )
+    .await;
+    stake(
+        less_than_minimum_skate_amount.into(),
+        node_secret_key2.to_pk(),
+        owner_secret_key2,
+        &update_socket,
+        2,
+    )
+    .await;
+
+    // Generate new keys for a different node.
+    let owner_secret_key3 = AccountOwnerSecretKey::generate();
+    let node_secret_key3 = NodeSecretKey::generate();
+
+    // Stake minimum required amount.
+    deposit(
+        minimum_stake_amount.into(),
+        Tokens::FLK,
+        owner_secret_key3,
+        &update_socket,
+        1,
+    )
+    .await;
+    stake(
+        minimum_stake_amount.into(),
+        node_secret_key3.to_pk(),
+        owner_secret_key3,
+        &update_socket,
+        2,
+    )
+    .await;
+
+    let valid_nodes = query_runner.get_node_registry();
+    // We added two valid nodes, so the node registry should contain 2 nodes plus the committee.
+    assert_eq!(valid_nodes.len(), 2 + keystore.len());
+    let node_info1 = query_runner
+        .get_node_info(&node_secret_key1.to_pk())
+        .unwrap();
+    // Node registry contains the first valid node
+    assert!(valid_nodes.contains(&node_info1));
+    let node_info2 = query_runner
+        .get_node_info(&node_secret_key2.to_pk())
+        .unwrap();
+    // Node registry doesn't contain the invalid node
+    assert!(!valid_nodes.contains(&node_info2));
+    let node_info3 = query_runner
+        .get_node_info(&node_secret_key3.to_pk())
+        .unwrap();
+    // Node registry contains the second valid node
+    assert!(valid_nodes.contains(&node_info3));
 }

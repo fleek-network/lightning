@@ -44,6 +44,7 @@ impl Env<UpdatePerm> {
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("rep_scores")
+            .enable_iter("node")
             .build();
 
         Self { inner: atomo }

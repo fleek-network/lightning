@@ -159,7 +159,15 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     fn get_node_registry(&self) -> Vec<NodeInfo> {
-        todo!()
+        let public_keys: Vec<NodePublicKey> = self
+            .inner
+            .run(|ctx| self.node_table.get(ctx).keys())
+            .collect();
+        public_keys
+            .into_iter()
+            .filter(|node| self.is_valid_node(node))
+            .filter_map(|node| self.inner.run(|ctx| self.node_table.get(ctx).get(node)))
+            .collect()
     }
 
     fn is_valid_node(&self, id: &NodePublicKey) -> bool {
