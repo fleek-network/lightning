@@ -256,7 +256,6 @@ impl SignerInner {
         query_runner: QueryRunner,
         new_block_notify: Arc<Notify>,
     ) {
-        //let mut query_interval = interval(QUERY_INTERVAL);
         let mut pending_transactions = VecDeque::new();
         let mut base_timestamp = None;
         let application_nonce =

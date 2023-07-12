@@ -175,7 +175,7 @@ async fn test_retry_send() {
     // The signer will notice that the nonce doesn't increment on the application after the second
     // transaction, and then it will resend all following transactions.
     // Hence, the application nonce should be 3 after some time.
-    tokio::time::sleep(Duration::from_secs(30)).await;
+    tokio::time::sleep(Duration::from_secs(15)).await;
     let new_nonce = query_runner
         .get_node_info(&signer.get_bls_pk())
         .unwrap()
