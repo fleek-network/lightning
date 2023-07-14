@@ -17,6 +17,4 @@ pub trait RpcInterface<Q: SyncQueryRunnerInterface>:
         mempool: MempoolSocket,
         query_runner: Q,
     ) -> anyhow::Result<Self>;
-
-    fn query_runner(&self) -> Q;
 }

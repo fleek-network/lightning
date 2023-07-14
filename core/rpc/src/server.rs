@@ -16,12 +16,16 @@ use draco_interfaces::{
 use super::config::Config;
 use crate::handlers::{rpc_handler, RpcServer};
 
-#[derive(Clone)]
 pub struct Rpc<Q: SyncQueryRunnerInterface> {
-    _mempool_address: MempoolSocket,
-    query_runner: Q,
-    server_running: Arc<RwLock<bool>>,
+    /// Data available to the rpc handler during a request
+    data: Arc<RpcData<Q>>,
+    server_running: RwLock<bool>,
     pub config: Config,
+}
+
+pub struct RpcData<Q: SyncQueryRunnerInterface> {
+    pub query_runner: Q,
+    pub _mempool_address: MempoolSocket,
 }
 
 impl<Q: SyncQueryRunnerInterface> Rpc<Q> {
@@ -44,13 +48,13 @@ impl<Q: SyncQueryRunnerInterface + 'static> WithStartAndShutdown for Rpc<Q> {
     async fn start(&self) {
         if !self.is_running() {
             println!("RPC server starting up");
-            let rpc = Arc::new(self.clone());
-            let server = RpcServer::new(Arc::clone(&rpc));
+
+            let server = RpcServer::new(self.data.clone());
 
             let app = Router::new()
                 .route("/health", get(|| async { "OK" }))
                 .route("/rpc/v0", post(rpc_handler))
-                .layer(Extension(server.clone()));
+                .layer(Extension(server));
 
             self.set_running(true);
             let http_address = SocketAddr::from(([127, 0, 0, 1], self.config.port));
@@ -79,14 +83,13 @@ impl<Q: SyncQueryRunnerInterface + Send + Sync + 'static> RpcInterface<Q> for Rp
         query_runner: Q,
     ) -> anyhow::Result<Self> {
         Ok(Self {
-            _mempool_address: mempool,
-            query_runner,
+            data: Arc::new(RpcData {
+                _mempool_address: mempool,
+                query_runner,
+            }),
             config,
-            server_running: Arc::new(RwLock::new(false)),
+            server_running: RwLock::new(false),
         })
-    }
-    fn query_runner(&self) -> Q {
-        self.query_runner.clone()
     }
 }
 
