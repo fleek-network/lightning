@@ -25,7 +25,7 @@ pub struct Rpc<Q: SyncQueryRunnerInterface> {
 
 pub struct RpcData<Q: SyncQueryRunnerInterface> {
     pub query_runner: Q,
-    pub _mempool_address: MempoolSocket,
+    pub mempool_socket: MempoolSocket,
 }
 
 impl<Q: SyncQueryRunnerInterface> Rpc<Q> {
@@ -84,7 +84,7 @@ impl<Q: SyncQueryRunnerInterface + Send + Sync + 'static> RpcInterface<Q> for Rp
     ) -> anyhow::Result<Self> {
         Ok(Self {
             data: Arc::new(RpcData {
-                _mempool_address: mempool,
+                mempool_socket: mempool,
                 query_runner,
             }),
             config,
