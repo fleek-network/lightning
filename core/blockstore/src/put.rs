@@ -210,7 +210,8 @@ where
             let block = bincode::serialize(&BlockContent::Chunk(chunk.content.content))
                 .map_err(|_| PutFinalizeError::PartialContent)?;
             self.store
-                .store_put(Key::chunk_key(chunk.hash, count as u32), block);
+                .insert(Key::chunk_key(chunk.hash, count as u32), block)
+                .await;
         }
 
         match self.mode {
@@ -219,11 +220,13 @@ where
                 let hash_tree = tree_builder.finalize();
                 let block = bincode::serialize(&BlockContent::Tree(hash_tree.tree))
                     .map_err(|_| PutFinalizeError::PartialContent)?;
-                self.store.store_put(
-                    Key::tree_key(Blake3Hash::from(hash_tree.hash)),
-                    // TODO: We need a more descriptive error for serialization-related errors.
-                    block,
-                );
+                self.store
+                    .insert(
+                        Key::tree_key(Blake3Hash::from(hash_tree.hash)),
+                        // TODO: We need a more descriptive error for serialization-related errors.
+                        block,
+                    )
+                    .await;
                 Ok(Blake3Hash::from(hash_tree.hash))
             },
         }

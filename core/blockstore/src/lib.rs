@@ -1,4 +1,5 @@
 pub mod config;
+mod fs;
 pub mod memory;
 pub mod put;
 mod store;

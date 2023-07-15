@@ -1,32 +1,46 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use draco_interfaces::{
     Blake3Hash, Blake3Tree, BlockStoreInterface, CompressionAlgoSet, CompressionAlgorithm,
     ConfigConsumer, ContentChunk,
 };
-use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
+use tempdir::TempDir;
+use tokio::{
+    fs::{self, File},
+    io::AsyncWriteExt,
+};
 
-use crate::{config::Config, put::IncrementalPut, store::Store, Block, BlockContent, Key};
+use crate::{put::IncrementalPut, store::Store, Block, BlockContent, Key};
 
-#[derive(Clone, Default)]
-pub struct MemoryBlockStore {
-    inner: Arc<RwLock<HashMap<Key, Block>>>,
+const TMP_DIR_PREFIX: &str = "tmp-store";
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct FsStoreConfig {
+    store_dir_path: String,
 }
 
-impl ConfigConsumer for MemoryBlockStore {
-    const KEY: &'static str = "blockstore";
-    type Config = Config;
+#[derive(Clone)]
+pub struct FsStore {
+    store_dir_path: String,
+    tmp_dir: Arc<TempDir>,
+}
+
+impl ConfigConsumer for FsStore {
+    const KEY: &'static str = "fsstore";
+    type Config = FsStoreConfig;
 }
 
 #[async_trait]
-impl BlockStoreInterface for MemoryBlockStore {
+impl BlockStoreInterface for FsStore {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
     type Put = IncrementalPut<Self>;
 
-    async fn init(_: Self::Config) -> anyhow::Result<Self> {
+    async fn init(config: Self::Config) -> anyhow::Result<Self> {
         Ok(Self {
-            inner: Default::default(),
+            store_dir_path: config.store_dir_path,
+            tmp_dir: TempDir::new(TMP_DIR_PREFIX).map(Arc::new)?,
         })
     }
 
@@ -70,13 +84,30 @@ impl BlockStoreInterface for MemoryBlockStore {
     }
 }
 
+// TODO: Add logging.
 #[async_trait]
-impl Store for MemoryBlockStore {
+impl Store for FsStore {
     async fn fetch(&self, key: &Key) -> Option<Block> {
-        self.inner.read().get(key).cloned()
+        let path = format!("{}/{:?}", self.store_dir_path, key.0);
+        fs::read(path).await.ok()
     }
 
+    // TODO: This should perhaps return an error.
     async fn insert(&mut self, key: Key, block: Block) {
-        self.inner.write().insert(key, block);
+        let filename = format!("{:?}", key.0);
+        let path = self.tmp_dir.path().join(filename);
+        if let Ok(mut tmp_file) = File::create(&path).await {
+            if tmp_file.write_all(block.as_ref()).await.is_err() {
+                return;
+            }
+            // TODO: Is this needed before calling rename?
+            if tmp_file.sync_all().await.is_err() {
+                return;
+            }
+            let store_path = format!("{}/{:?}", self.store_dir_path, key.0);
+            if fs::rename(path, store_path).await.is_err() {
+                return;
+            }
+        }
     }
 }

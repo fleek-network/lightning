@@ -1,7 +1,10 @@
+use async_trait::async_trait;
+
 use crate::{Block, Key};
 
-/// Basic get and put store trait.
+/// Simple block store interface.
+#[async_trait]
 pub trait Store {
-    fn store_get(&self, key: &Key) -> Option<Block>;
-    fn store_put(&mut self, key: Key, block: Block);
+    async fn fetch(&self, key: &Key) -> Option<Block>;
+    async fn insert(&mut self, key: Key, block: Block);
 }
