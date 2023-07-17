@@ -1,7 +1,10 @@
 use std::{
     collections::BTreeMap,
     path::PathBuf,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, SystemTime},
 };
 
@@ -39,26 +42,15 @@ use crate::{
 };
 
 pub struct Consensus<Q: SyncQueryRunnerInterface, G: GossipInterface> {
-    /// Used to query the application data
-    pub query_runner: Q,
+    /// Inner state of the consensus
+    /// todo(dalton): We can probably get a little more effecient then a mutex here
+    /// maybe a once box
+    epoch_state: Mutex<Option<EpochState<Q>>>,
     /// Interface for sending messages through the gossip layer
     _gossip: Arc<G>,
-    /// Path to the database used by the narwhal implementation
-    pub store_path: PathBuf,
-    /// This narwhal node data
-    narwhal_args: NarwhalArgs,
-    /// The state of the current Narwhal epoch.
-    epoch_state: Mutex<Option<EpochState>>,
-    /// Used to send transactions to consensus
-    /// We still use this socket on consensus struct because a node is not always on the committee,
-    /// so its not always sending     a transaction to its own mempool. The signer interface
-    /// also takes care of nonce bookkeeping and retry logic
-    txn_socket: SubmitTxSocket,
     /// This socket recieves signed transactions and forwards them to an active committee member to
     /// be ordered
     mempool_socket: MempoolSocket,
-    /// Narwhal execution state.
-    execution_state: Arc<Execution>,
     /// Timestamp of the narwhal certificate that caused an epoch change
     /// is sent through this channel to notify that epoch chould change.
     reconfigure_notify: Arc<Notify>,
@@ -66,17 +58,49 @@ pub struct Consensus<Q: SyncQueryRunnerInterface, G: GossipInterface> {
     new_block_notify: Arc<Notify>,
     /// Called from the shutdown function to notify the start event loop to
     /// exit.
-    shutdown_notify: Notify,
+    shutdown_notify: Arc<Notify>,
+    /// bool indicating if narwhal is running
+    is_running: AtomicBool,
 }
 
 /// This struct contains mutable state only for the current epoch.
-struct EpochState {
+struct EpochState<Q: SyncQueryRunnerInterface> {
     /// The Narwhal service for the current epoch.
-    narwhal: NarwhalService,
+    narwhal: Option<NarwhalService>,
+    /// Used to query the application data
+    query_runner: Q,
+    /// This narwhal node data
+    narwhal_args: NarwhalArgs,
+    /// Path to the database used by the narwhal implementation
+    pub store_path: PathBuf,
+    /// Narwhal execution state.
+    execution_state: Arc<Execution>,
+    /// Used to send transactions to consensus
+    /// We still use this socket on consensus struct because a node is not always on the committee,
+    /// so its not always sending     a transaction to its own mempool. The signer interface
+    /// also takes care of nonce bookkeeping and retry logic
+    txn_socket: SubmitTxSocket,
 }
 
-impl<Q: SyncQueryRunnerInterface, G: GossipInterface> Consensus<Q, G> {
-    async fn start_current_epoch(&self) {
+impl<Q: SyncQueryRunnerInterface> EpochState<Q> {
+    fn new(
+        query_runner: Q,
+        narwhal_args: NarwhalArgs,
+        store_path: PathBuf,
+        execution_state: Arc<Execution>,
+        txn_socket: SubmitTxSocket,
+    ) -> Self {
+        Self {
+            narwhal: None,
+            query_runner,
+            narwhal_args,
+            store_path,
+            execution_state,
+            txn_socket,
+        }
+    }
+
+    async fn start_current_epoch(&mut self) {
         // Get current epoch information
         let (committee, worker_cache, epoch, epoch_end) = self.get_epoch_info();
 
@@ -112,16 +136,14 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> Consensus<Q, G> {
 
         service.start(self.execution_state.clone()).await;
 
-        *self.epoch_state.lock().await = Some(EpochState { narwhal: service })
+        self.narwhal = Some(service)
     }
 
-    async fn move_to_next_epoch(&self) {
-        {
-            let epoch_state_mut = self.epoch_state.lock().await.take();
-            if let Some(state) = epoch_state_mut {
-                state.narwhal.shutdown().await
-            }
+    async fn move_to_next_epoch(&mut self) {
+        if let Some(state) = self.narwhal.take() {
+            state.shutdown().await
         }
+
         self.start_current_epoch().await
     }
 
@@ -215,37 +237,51 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> Consensus<Q, G> {
 impl<Q: SyncQueryRunnerInterface, G: GossipInterface> WithStartAndShutdown for Consensus<Q, G> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
-        todo!()
+        self.is_running.load(Ordering::Relaxed)
     }
 
     /// Start the system, should not do anything if the system is already
     /// started.
     async fn start(&self) {
-        self.start_current_epoch().await;
-        // todo(dalton): Use affair to await:
-        //      A:) shutdown_future
-        //      B:) Reconfigure_notifier
-        loop {
-            let reconfigure_future = self.reconfigure_notify.notified();
-            let shutdown_future = self.shutdown_notify.notified();
-            pin!(shutdown_future);
-            pin!(reconfigure_future);
+        let reconfigure_notify = self.reconfigure_notify.clone();
+        let shutdown_notify = self.shutdown_notify.clone();
 
-            select! {
-                _ = shutdown_future => {
-                    break
-                }
-                _ = reconfigure_future => {
-                    self.move_to_next_epoch().await;
-                    continue
+        let mut epoch_state = self
+            .epoch_state
+            .lock()
+            .await
+            .take()
+            .expect("Consensus was tried to start before initialization");
+
+        self.is_running.store(true, Ordering::Relaxed);
+        task::spawn(async move {
+            epoch_state.start_current_epoch().await;
+            loop {
+                let reconfigure_future = reconfigure_notify.notified();
+                let shutdown_future = shutdown_notify.notified();
+                pin!(shutdown_future);
+                pin!(reconfigure_future);
+
+                select! {
+                    _ = shutdown_future => {
+                        if let Some(narwhal) = epoch_state.narwhal.take() {
+                            narwhal.shutdown().await;
+                        }
+                        break
+                    }
+                    _ = reconfigure_future => {
+                        epoch_state.move_to_next_epoch().await;
+                        continue
+                    }
                 }
             }
-        }
+        });
     }
 
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
         self.shutdown_notify.notify_waiters();
+        self.is_running.store(false, Ordering::Relaxed);
     }
 }
 
@@ -273,31 +309,35 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConsensusInterface for Con
         let networking_keypair = NetworkKeyPair::from(networking_sk);
         let primary_keypair = KeyPair::from(primary_sk);
         let forwarder = Forwarder::new(query_runner.clone(), primary_keypair.public().clone());
-
-        Ok(Self {
+        let narwhal_args = NarwhalArgs {
+            primary_keypair,
+            primary_network_keypair: networking_keypair.copy(),
+            worker_keypair: networking_keypair,
+            primary_address: config.address,
+            worker_address: config.worker_address,
+            worker_mempool: config.mempool_address,
+            registry_service: RegistryService::new(Registry::new()),
+        };
+        let execution_state = Arc::new(Execution::new(
+            executor,
+            reconfigure_notify.clone(),
+            new_block_notify.clone(),
+        ));
+        let epoch_state = EpochState::new(
             query_runner,
+            narwhal_args,
+            config.store_path,
+            execution_state,
+            signer.get_socket(),
+        );
+        Ok(Self {
+            epoch_state: Mutex::new(Some(epoch_state)),
             _gossip: gossip,
-            store_path: config.store_path,
-            narwhal_args: NarwhalArgs {
-                primary_keypair,
-                primary_network_keypair: networking_keypair.copy(),
-                worker_keypair: networking_keypair,
-                primary_address: config.address,
-                worker_address: config.worker_address,
-                worker_mempool: config.mempool_address,
-                registry_service: RegistryService::new(Registry::new()),
-            },
-            epoch_state: Mutex::new(None),
-            execution_state: Arc::new(Execution::new(
-                executor,
-                reconfigure_notify.clone(),
-                new_block_notify.clone(),
-            )),
-            txn_socket: signer.get_socket(),
             mempool_socket: TokioSpawn::spawn_async(forwarder),
             reconfigure_notify,
             new_block_notify,
-            shutdown_notify: Notify::new(),
+            shutdown_notify: Arc::new(Notify::new()),
+            is_running: AtomicBool::new(false),
         })
     }
 
