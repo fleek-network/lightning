@@ -69,14 +69,15 @@ impl<Q: SyncQueryRunnerInterface + 'static> WithStartAndShutdown for Rpc<Q> {
                 .with_graceful_shutdown(shutdown_notify.notified())
                 .await
                 .expect("Server should not fail to start");
-
-            println!("666");
+            // If we get to this line, server is no longer running and we should update the atomic
             is_running.store(false, Ordering::Relaxed);
         });
     }
 
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
+        // Nothing else needed to do, the rpc thread will update the is_running atomic after
+        // graceful shutdown
         self.shutdown_notify.notify_waiters();
     }
 }
