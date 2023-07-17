@@ -27,12 +27,12 @@ impl WithStartAndShutdown for Application {
 
     /// Start the system, should not do anything if the system is already
     /// started.
-    async fn start(&self) {}
+    async fn start(&self) {
+        // No op because application is started in the init
+    }
 
     /// Send the shutdown signal to the system.
-    async fn shutdown(&self) {
-        todo!()
-    }
+    async fn shutdown(&self) {}
 }
 
 impl ConfigConsumer for Application {

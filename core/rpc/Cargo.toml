@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-draco-interfaces = {path="../interfaces"}
+draco-interfaces = { path = "../interfaces" }
 axum.workspace = true
 anyhow.workspace = true
 jsonrpc-v2.workspace = true
@@ -14,13 +14,13 @@ serde.workspace = true
 async-trait.workspace = true
 serde_json.workspace = true
 bincode.workspace = true
+tokio.workspace = true
 
 affair.workspace = true
 fleek-crypto.workspace = true
 hp-float.workspace = true
 
 [dev-dependencies]
-tokio.workspace = true
-reqwest = {workspace = true, features = ["json"]}
-draco-application = {path="../application"}
+reqwest = { workspace = true, features = ["json"] }
+draco-application = { path = "../application" }
 #draco-consensus = {path="../consensus"}

@@ -1,6 +1,9 @@
 use std::{
     net::SocketAddr,
-    sync::{Arc, RwLock},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 use async_trait::async_trait;
@@ -12,6 +15,7 @@ use draco_interfaces::{
     common::WithStartAndShutdown, config::ConfigConsumer, MempoolSocket, RpcInterface,
     SyncQueryRunnerInterface,
 };
+use tokio::{sync::Notify, task};
 
 use super::config::Config;
 use crate::handlers::{rpc_handler, RpcServer};
@@ -19,8 +23,9 @@ use crate::handlers::{rpc_handler, RpcServer};
 pub struct Rpc<Q: SyncQueryRunnerInterface> {
     /// Data available to the rpc handler during a request
     data: Arc<RpcData<Q>>,
-    server_running: RwLock<bool>,
+    is_running: Arc<AtomicBool>,
     pub config: Config,
+    shutdown_notify: Arc<Notify>,
 }
 
 pub struct RpcData<Q: SyncQueryRunnerInterface> {
@@ -28,49 +33,51 @@ pub struct RpcData<Q: SyncQueryRunnerInterface> {
     pub mempool_socket: MempoolSocket,
 }
 
-impl<Q: SyncQueryRunnerInterface> Rpc<Q> {
-    fn set_running(&self, status: bool) {
-        if let Ok(mut server_running) = self.server_running.write() {
-            *server_running = status;
-        }
-    }
-}
-
 #[async_trait]
 impl<Q: SyncQueryRunnerInterface + 'static> WithStartAndShutdown for Rpc<Q> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
-        *self.server_running.read().unwrap()
+        self.is_running.load(Ordering::Relaxed)
     }
 
     /// Start the system, should not do anything if the system is already
     /// started.
     async fn start(&self) {
-        if !self.is_running() {
-            println!("RPC server starting up");
+        if self.is_running() {
+            return;
+        }
 
-            let server = RpcServer::new(self.data.clone());
+        println!("RPC server starting up");
 
-            let app = Router::new()
-                .route("/health", get(|| async { "OK" }))
-                .route("/rpc/v0", post(rpc_handler))
-                .layer(Extension(server));
+        let server = RpcServer::new(self.data.clone());
 
-            self.set_running(true);
-            let http_address = SocketAddr::from(([127, 0, 0, 1], self.config.port));
-            println!("listening on {http_address}");
+        let app = Router::new()
+            .route("/health", get(|| async { "OK" }))
+            .route("/rpc/v0", post(rpc_handler))
+            .layer(Extension(server));
+
+        self.is_running.store(true, Ordering::Relaxed);
+        let http_address = SocketAddr::from(([127, 0, 0, 1], self.config.port));
+
+        let shutdown_notify = self.shutdown_notify.clone();
+        let is_running = self.is_running.clone();
+
+        println!("listening on {http_address}");
+        task::spawn(async move {
             axum::Server::bind(&http_address)
                 .serve(app.into_make_service())
+                .with_graceful_shutdown(shutdown_notify.notified())
                 .await
                 .expect("Server should not fail to start");
-        }
+
+            println!("666");
+            is_running.store(false, Ordering::Relaxed);
+        });
     }
 
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
-        self.set_running(false);
-        // more loggic here
-        todo!()
+        self.shutdown_notify.notify_waiters();
     }
 }
 
@@ -88,7 +95,8 @@ impl<Q: SyncQueryRunnerInterface + Send + Sync + 'static> RpcInterface<Q> for Rp
                 query_runner,
             }),
             config,
-            server_running: RwLock::new(false),
+            is_running: Arc::new(AtomicBool::new(false)),
+            shutdown_notify: Arc::new(Notify::new()),
         })
     }
 }

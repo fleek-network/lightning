@@ -292,6 +292,7 @@ where
         self.delivery_acknowledgment_aggregator.start().await;
         self.indexer.start().await;
         self.handshake.start().await;
+        self.rpc.start().await;
     }
 
     async fn shutdown(&self) {
@@ -300,5 +301,6 @@ where
         self.delivery_acknowledgment_aggregator.shutdown().await;
         self.indexer.shutdown().await;
         self.handshake.shutdown().await;
+        self.rpc.shutdown().await;
     }
 }
