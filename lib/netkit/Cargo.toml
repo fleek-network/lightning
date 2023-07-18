@@ -1,0 +1,10 @@
+[package]
+name = "netkit"
+version = "0.0.0"
+edition = "2021"
+authors = ["Miguel G. Meier <miguel@fleek.xyz>"]
+description = "networking support for draco"
+license = "MIT"
+repository = "https://github.com/fleek-network/draco"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
