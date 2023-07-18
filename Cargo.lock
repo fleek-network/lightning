@@ -2253,6 +2253,7 @@ dependencies = [
  "draco-rpc",
  "draco-signer",
  "fleek-crypto",
+ "mock",
  "mockall",
  "serde",
  "tokio",
