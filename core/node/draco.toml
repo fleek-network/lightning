@@ -4,10 +4,9 @@ mode = "Dev"
 [blockstore]
 
 [consensus]
-address = "/ip4/0.0.0.0/udp/8000"
-mempool_address = "/ip4/0.0.0.0/udp/8002"
-store_path = "~/.fleek/data/narwhal_store"
-worker_address = "/ip4/0.0.0.0/udp/8001"
+host = "0.0.0.0"
+mempool_success_rate = 0.85
+port = 2120
 
 [handshake]
 listen_addr = "0.0.0.0:6969"

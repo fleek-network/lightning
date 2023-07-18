@@ -1,7 +1,7 @@
 use std::{marker::PhantomData, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
-use clap::{arg, Parser, Subcommand};
+use clap::{arg, ArgAction, Parser, Subcommand};
 use draco_interfaces::{ConfigProviderInterface, DracoTypes, Node, WithStartAndShutdown};
 
 use crate::{config::TomlConfigProvider, shutdown::ShutdownController};
@@ -15,6 +15,9 @@ pub struct CliArgs {
     /// Determines that we should be using the mock consensus backend.
     #[arg(long)]
     pub with_mock_consensus: bool,
+    /// Increases the level of verbosity (the max level is -vvv).
+    #[clap(short, action = ArgAction::Count)]
+    pub verbose: u8,
     #[command(subcommand)]
     pub cmd: Command,
 }

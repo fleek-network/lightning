@@ -1,62 +1,55 @@
 mod cli;
 mod config;
+mod node;
 mod shutdown;
 mod template;
 
+use std::fs::File;
+
 use anyhow::Result;
+use chrono::Local;
 use clap::Parser;
 use cli::Cli;
-use draco_application::{app::Application, query_runner::QueryRunner};
-use draco_blockstore::memory::MemoryBlockStore;
-use draco_consensus::consensus::Consensus;
-use draco_handshake::server::{StreamProvider, TcpHandshakeServer, TcpProvider};
 use draco_interfaces::{transformers, ApplicationInterface, DracoTypes};
-use draco_notifier::Notifier;
-use draco_rep_collector::ReputationAggregator;
-use draco_rpc::server::Rpc;
-use draco_signer::Signer;
 use mock::consensus::MockConsensus;
-use template::{gossip::Gossip, topology::Topology};
+use simplelog::*;
 
-use crate::{
-    cli::CliArgs,
-    config::TomlConfigProvider,
-    template::{
-        fs::FileSystem, indexer::Indexer, origin::MyStream, pod::DeliveryAcknowledgmentAggregator,
-        sdk::Sdk,
-    },
-};
-
-/// Finalized type bindings for Draco.
-pub struct FinalTypes;
-
-impl DracoTypes for FinalTypes {
-    type ConfigProvider = TomlConfigProvider;
-    type Consensus = Consensus<QueryRunner, Gossip<Signer, Topology<QueryRunner>, Notifier>>;
-    type Application = Application;
-    type BlockStore = MemoryBlockStore;
-    type Indexer = Indexer;
-    type FileSystem = FileSystem;
-    type Signer = Signer;
-    type Stream = MyStream;
-    type DeliveryAcknowledgmentAggregator = DeliveryAcknowledgmentAggregator;
-    type Notifier = Notifier;
-    type ReputationAggregator = ReputationAggregator;
-    type Rpc = Rpc<QueryRunner>;
-    type Sdk =
-        Sdk<<TcpProvider as StreamProvider>::Reader, <TcpProvider as StreamProvider>::Writer>;
-    type Handshake = TcpHandshakeServer<
-        Sdk<<TcpProvider as StreamProvider>::Reader, <TcpProvider as StreamProvider>::Writer>,
-    >;
-    type Topology = Topology<QueryRunner>;
-    type Gossip = Gossip<Signer, Topology<QueryRunner>, Notifier>;
-}
+use crate::{cli::CliArgs, node::FinalTypes, template::indexer::Indexer};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = CliArgs::parse();
 
+    let log_level = args.verbose;
+    let log_filter = match log_level {
+        0 => log::LevelFilter::Warn,
+        1 => log::LevelFilter::Info,
+        2 => log::LevelFilter::Debug,
+        _3_or_more => log::LevelFilter::Trace,
+    };
+
+    let date = Local::now();
+    let log_file =
+        std::env::temp_dir().join(format!("draco-{}.log", date.format("%Y-%m-%d-%H:%M:%S")));
+
+    CombinedLogger::init(vec![
+        TermLogger::new(
+            log_filter,
+            Config::default(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        ),
+        WriteLogger::new(
+            LevelFilter::Trace,
+            Config::default(),
+            File::create(log_file).unwrap(),
+        ),
+    ])
+    .unwrap();
+
     if args.with_mock_consensus {
+        log::info!("Using MockConsensus");
+
         type Node = transformers::WithConsensus<
             FinalTypes,
             MockConsensus<

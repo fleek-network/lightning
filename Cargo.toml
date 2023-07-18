@@ -31,6 +31,7 @@ scc = "1.8.1"
 num-traits = "0.2.15"
 num-derive = "0.3.3"
 dirs = "5.0.1"
+log = "0.4"
 
 # Our libraries
 affair = { path = "lib/affair" }

@@ -29,3 +29,6 @@ tokio-stream.workspace = true
 fleek-crypto.workspace = true
 tracing = "0.1"
 affair.workspace = true
+log.workspace = true
+simplelog = "0.12.1"
+chrono = "0.4.26"
