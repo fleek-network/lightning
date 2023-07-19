@@ -2,6 +2,7 @@ mod config;
 mod utils;
 use std::{
     collections::VecDeque,
+    fs::read_to_string,
     sync::{Arc, Mutex},
     time::{Duration, SystemTime},
 };
@@ -23,6 +24,7 @@ use fleek_crypto::{
     NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
     SecretKey, TransactionSender,
 };
+use log::warn;
 use tokio::sync::{mpsc, Notify};
 
 // If a transaction does not get ordered, the signer will try to resend it.
@@ -218,27 +220,51 @@ struct SignerInner {
 
 impl SignerInner {
     fn new(config: Config) -> Self {
-        let node_secret_key =
-            match NodeSecretKey::decode_pem(config.node_key_path.to_str().unwrap()) {
-                Some(node_secret_key) => node_secret_key,
-                None => {
-                    let node_secret_key = NodeSecretKey::generate();
-                    utils::save(&config.node_key_path, node_secret_key.encode_pem())
-                        .expect("Failed to save NodeSecretKey to disk.");
-                    node_secret_key
-                },
-            };
+        let node_secret_key = if config.node_key_path.exists() {
+            // read pem file, if we cant read the pem file we should panic
+            let encoded =
+                read_to_string(config.node_key_path).expect("Failed to read node pem file");
+            // todo(dalton): We should panic if we cannot decode pem file. But we should try to
+            // identify the encoding and try a few different ways first. Also we should
+            // support passworded pems
+            NodeSecretKey::decode_pem(&encoded).expect("Failed to decode node pem file")
+        } else {
+            // if the path doesn't exist, create a new key
+            warn!(
+                "Path to node key does not exist({}): Generating a new key there",
+                config.node_key_path.to_str().unwrap()
+            );
+            let node_secret_key = NodeSecretKey::generate();
+
+            utils::save(&config.node_key_path, node_secret_key.encode_pem())
+                .expect("Failed to save NodeSecretKey to disk.");
+            node_secret_key
+        };
+
+        let network_secret_key = if config.network_key_path.exists() {
+            // read pem file, if we cant read the pem file we should panic
+            let encoded =
+                read_to_string(config.network_key_path).expect("Failed to read network pem file");
+            // todo(dalton): We should panic if we cannot decode pem file. But we should try to
+            // identify the encoding and try a few different ways first. Also we should
+            // support passworded pems
+            NodeNetworkingSecretKey::decode_pem(&encoded)
+                .expect("Failed to decode network pem file")
+        } else {
+            // if the path doesn't exist, create a new key
+            warn!(
+                "Path to network key does not exist({}): Generating a new key there",
+                config.network_key_path.to_str().unwrap()
+            );
+            let network_secret_key = NodeNetworkingSecretKey::generate();
+
+            utils::save(&config.network_key_path, network_secret_key.encode_pem())
+                .expect("Failed to save NetworkSecretKey to disk.");
+            network_secret_key
+        };
+
         let node_public_key = node_secret_key.to_pk();
-        let network_secret_key =
-            match NodeNetworkingSecretKey::decode_pem(config.network_key_path.to_str().unwrap()) {
-                Some(network_secret_key) => network_secret_key,
-                None => {
-                    let network_secret_key = NodeNetworkingSecretKey::generate();
-                    utils::save(&config.network_key_path, network_secret_key.encode_pem())
-                        .expect("Failed to save NodeNetworkingSecretKey to disk.");
-                    network_secret_key
-                },
-            };
+
         let network_public_key = network_secret_key.to_pk();
         Self {
             node_secret_key,
