@@ -11,8 +11,9 @@ use chrono::Local;
 use clap::Parser;
 use cli::Cli;
 use draco_interfaces::{transformers, ApplicationInterface, DracoTypes};
+use log::LevelFilter;
 use mock::consensus::MockConsensus;
-use simplelog::*;
+use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
 
 use crate::{cli::CliArgs, node::FinalTypes, template::indexer::Indexer};
 
@@ -35,13 +36,13 @@ async fn main() -> Result<()> {
     CombinedLogger::init(vec![
         TermLogger::new(
             log_filter,
-            Config::default(),
+            simplelog::Config::default(),
             TerminalMode::Mixed,
             ColorChoice::Auto,
         ),
         WriteLogger::new(
             LevelFilter::Trace,
-            Config::default(),
+            simplelog::Config::default(),
             File::create(log_file).unwrap(),
         ),
     ])
