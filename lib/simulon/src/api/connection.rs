@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 
 use super::RemoteAddr;
 use crate::state::{with_node, ResourceId};
@@ -33,6 +33,13 @@ impl Connection {
     {
         self.writer.write(message)
     }
+
+    pub async fn recv<T>(&mut self) -> Option<T>
+    where
+        T: DeserializeOwned,
+    {
+        self.reader.recv::<T>().await
+    }
 }
 
 pub struct Reader {
@@ -45,8 +52,13 @@ pub struct Writer {
 }
 
 impl Reader {
-    async fn recv<T>(&mut self) -> Option<T> {
-        todo!()
+    /// Receive a message from the connection.
+    pub async fn recv<T>(&mut self) -> Option<T>
+    where
+        T: DeserializeOwned,
+    {
+        let bytes = with_node(|n| n.recv(self.rid)).await?;
+        Some(bincode::deserialize(&bytes).unwrap())
     }
 }
 

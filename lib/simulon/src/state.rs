@@ -89,7 +89,7 @@ pub enum Resource {
         waker: DeferredFutureWaker<Result<ResourceId, ConnectError>>,
     },
     EstablishedConnection {
-        recv: Option<DeferredFutureWaker<()>>,
+        recv: Option<DeferredFutureWaker<Option<Vec<u8>>>>,
         queue: VecDeque<Vec<u8>>,
     },
 }
@@ -200,6 +200,25 @@ impl NodeState {
         };
 
         self.outgoing.push(message);
+    }
+
+    pub fn recv(&mut self, rid: ResourceId) -> DeferredFuture<Option<Vec<u8>>> {
+        let resource = self.resources.get_mut(&rid).expect("Resource not found.");
+
+        let (recv, queue) = if let Resource::EstablishedConnection { recv, queue } = resource {
+            (recv, queue)
+        } else {
+            panic!("Invalid resource type.");
+        };
+
+        if let Some(msg) = queue.pop_front() {
+            DeferredFuture::resolved(Some(msg))
+        } else {
+            assert!(recv.is_none(), "Another recv is already in progress.");
+            let future = DeferredFuture::<Option<Vec<u8>>>::new();
+            *recv = Some(future.waker());
+            future
+        }
     }
 
     fn accepted(&mut self, addr: RemoteAddr, remote_rid: ResourceId) -> AcceptResponse {
