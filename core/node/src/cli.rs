@@ -18,6 +18,9 @@ pub struct CliArgs {
     /// Increases the level of verbosity (the max level is -vvv).
     #[clap(short, action = ArgAction::Count)]
     pub verbose: u8,
+    /// Print code location on console logs
+    #[arg(long)]
+    pub log_location: bool,
     #[command(subcommand)]
     pub cmd: Command,
 }

@@ -25,10 +25,10 @@ async fn main() -> Result<()> {
 
     let log_level = args.verbose;
     let log_filter = match log_level {
-        0 => log::LevelFilter::Warn,
-        1 => log::LevelFilter::Info,
-        2 => log::LevelFilter::Debug,
-        _3_or_more => log::LevelFilter::Trace,
+        0 => LevelFilter::Warn,
+        1 => LevelFilter::Info,
+        2 => LevelFilter::Debug,
+        _3_or_more => LevelFilter::Trace,
     };
 
     // Add ignore for proccess subdag because Narwhal prints it as an err everytime it succesfully
@@ -36,8 +36,12 @@ async fn main() -> Result<()> {
     let logger_config = ConfigBuilder::new()
         .add_filter_ignore_str("narwhal_consensus::bullshark")
         .add_filter_ignore_str("anemo")
-        .set_target_level(log::LevelFilter::Error)
-        .set_location_level(log::LevelFilter::Error)
+        .set_target_level(LevelFilter::Error)
+        .set_location_level(if args.log_location {
+            LevelFilter::Error
+        } else {
+            LevelFilter::Trace
+        })
         .build();
 
     let date = Local::now();
