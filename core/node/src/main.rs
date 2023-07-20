@@ -35,6 +35,7 @@ async fn main() -> Result<()> {
     // proccesses a new sub_dag
     let logger_config = ConfigBuilder::new()
         .add_filter_ignore_str("narwhal_consensus::bullshark")
+        .add_filter_ignore_str("anemo")
         .set_target_level(log::LevelFilter::Error)
         .set_location_level(log::LevelFilter::Error)
         .build();
