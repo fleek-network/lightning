@@ -6,4 +6,5 @@ pub mod report;
 pub mod simulation;
 
 mod future;
+mod message;
 mod state;

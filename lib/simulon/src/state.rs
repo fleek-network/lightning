@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{HashMap, VecDeque},
+    collections::{BTreeSet, HashMap, VecDeque},
 };
 
 use futures::executor::LocalPool;
@@ -9,6 +9,7 @@ use fxhash::FxHashMap;
 use crate::{
     api::{ConnectError, RemoteAddr},
     future::{DeferredFuture, DeferredFutureWaker},
+    message::{Message, MessageDetail},
 };
 
 thread_local! {
@@ -58,7 +59,7 @@ pub struct NodeState {
     /// The array of pending outgoing requests.
     pub outgoing: Vec<Message>,
     /// The messages which we have received and should execute when the time comes.
-    pub received: VecDeque<Message>,
+    pub received: BTreeSet<Message>,
     next_rid: usize,
 }
 
@@ -80,40 +81,8 @@ pub struct AcceptResponse {
     pub remote_rid: ResourceId,
 }
 
-pub struct Message {
-    pub time: u128,
-    pub sender: RemoteAddr,
-    pub detail: MessageDetail,
-}
-
-pub enum MessageDetail {
-    Connect {
-        remote: RemoteAddr,
-        port: u16,
-        rid: ResourceId,
-    },
-    Connected {
-        source: RemoteAddr,
-        source_rid: ResourceId,
-        remote_rid: ResourceId,
-    },
-    ConnectionRefused {
-        source: RemoteAddr,
-        source_rid: ResourceId,
-    },
-    ConnectionClosed {
-        remote: RemoteAddr,
-        rid: ResourceId,
-    },
-    Data {
-        data: Vec<u8>,
-        remote: RemoteAddr,
-        remote_rid: ResourceId,
-    },
-}
-
 #[derive(Debug, Clone, Copy, Hash, PartialEq, PartialOrd, Ord, Eq)]
-pub struct ResourceId(usize);
+pub struct ResourceId(pub(crate) usize);
 
 pub enum Resource {
     PendingConnection {
@@ -136,7 +105,7 @@ impl NodeState {
             resources: HashMap::with_capacity(16),
             listening: HashMap::default(),
             outgoing: Vec::new(),
-            received: VecDeque::new(),
+            received: BTreeSet::new(),
             next_rid: 0,
         }
     }
@@ -170,8 +139,9 @@ impl NodeState {
 
         let message = Message {
             sender: RemoteAddr(self.node_id),
+            receiver: remote,
             time: self.now(),
-            detail: MessageDetail::Connect { remote, port, rid },
+            detail: MessageDetail::Connect { port, rid },
         };
 
         self.resources.insert(rid, resource);
@@ -205,6 +175,15 @@ impl NodeState {
     }
 
     pub fn run_until_stalled(&mut self) {
+        while let Some(msg) = self.received.pop_first() {
+            if msg.time > self.time {
+                self.received.insert(msg);
+                break;
+            }
+
+            println!("current {}: {:?}", self.node_id, msg);
+        }
+
         self.spawn_pool.run_until_stalled();
     }
 }
