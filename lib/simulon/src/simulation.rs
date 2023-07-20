@@ -264,8 +264,9 @@ mod test {
             if api::RemoteAddr::whoami().0 == 0 {
                 let mut listener = api::listen(18);
 
-                while let Some(conn) = listener.accept().await {
+                while let Some(mut conn) = listener.accept().await {
                     println!("Connection accepted from {:?}", conn.remote());
+                    conn.write(&18);
                 }
             } else {
                 let res = api::connect(api::RemoteAddr(0), 18).await;

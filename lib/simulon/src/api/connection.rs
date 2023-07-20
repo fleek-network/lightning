@@ -1,5 +1,7 @@
+use serde::Serialize;
+
 use super::RemoteAddr;
-use crate::state::ResourceId;
+use crate::state::{with_node, ResourceId};
 
 pub struct Connection {
     reader: Reader,
@@ -23,6 +25,14 @@ impl Connection {
     pub fn remote(&self) -> RemoteAddr {
         self.writer.remote
     }
+
+    /// Send a message through the connection.
+    pub fn write<T>(&mut self, message: &T)
+    where
+        T: Serialize,
+    {
+        self.writer.write(message)
+    }
 }
 
 pub struct Reader {
@@ -41,8 +51,13 @@ impl Reader {
 }
 
 impl Writer {
-    fn write<T>(&mut self, _message: T) {
-        todo!()
+    /// Send a message through the connection.
+    pub fn write<T>(&mut self, message: &T)
+    where
+        T: Serialize,
+    {
+        let bytes = bincode::serialize(message).expect("Serialization failed.");
+        with_node(|n| n.send(self.remote, self.remote_rid, bytes))
     }
 }
 

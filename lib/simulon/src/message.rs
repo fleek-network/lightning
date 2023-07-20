@@ -27,8 +27,8 @@ pub enum MessageDetail {
         rid: ResourceId,
     },
     Data {
-        data: Vec<u8>,
         rid: ResourceId,
+        data: Vec<u8>,
     },
 }
 

@@ -191,6 +191,17 @@ impl NodeState {
         }
     }
 
+    pub fn send(&mut self, remote: RemoteAddr, rid: ResourceId, data: Vec<u8>) {
+        let message = Message {
+            sender: RemoteAddr(self.node_id),
+            receiver: remote,
+            time: self.now(),
+            detail: MessageDetail::Data { rid, data },
+        };
+
+        self.outgoing.push(message);
+    }
+
     fn accepted(&mut self, addr: RemoteAddr, remote_rid: ResourceId) -> AcceptResponse {
         let rid = self.get_rid();
 
