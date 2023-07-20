@@ -14,9 +14,13 @@ impl Listener {
 }
 
 impl Drop for Listener {
-    fn drop(&mut self) {}
+    fn drop(&mut self) {
+        with_node(|n| n.close_listener(self.port));
+    }
 }
 
+/// Start a listener on the given port.
+///
 /// # Panics
 ///
 /// If the current port is already being listened on by another listener.

@@ -19,7 +19,6 @@ pub enum MessageDetail {
         remote_rid: ResourceId,
     },
     ConnectionRefused {
-        source: RemoteAddr,
         source_rid: ResourceId,
     },
     ConnectionClosed {

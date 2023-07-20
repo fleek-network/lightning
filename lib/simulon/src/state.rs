@@ -158,20 +158,93 @@ impl NodeState {
         self.listening.insert(port, ListenerState::default());
     }
 
-    pub fn accept(&mut self, port: u16) -> DeferredFuture<Option<AcceptResponse>> {
-        let future = DeferredFuture::new();
+    pub fn close_listener(&mut self, port: u16) {
+        let mut state = self
+            .listening
+            .remove(&port)
+            .unwrap_or_else(|| panic!("Port {port} is not being listened on"));
 
+        if let Some(waker) = state.accept.take() {
+            waker.wake(None);
+        }
+
+        for (addr, rid) in state.queue {
+            self.refuse_connection(addr, rid);
+        }
+    }
+
+    pub fn accept(&mut self, port: u16) -> DeferredFuture<Option<AcceptResponse>> {
         let listener_state = self.listening.get_mut(&port).expect("Illegal accept call.");
 
-        if listener_state.accept.replace(future.waker()).is_some() {
-            panic!("Another accept call is still on-going.");
-        }
+        assert!(
+            listener_state.accept.is_none(),
+            "Another accept call is still on-going."
+        );
 
-        if let Some(_conn) = listener_state.queue.pop_front() {
-            // todo
+        if let Some((addr, rid)) = listener_state.queue.pop_front() {
+            let res = self.accepted(addr, rid);
+            DeferredFuture::resolved(Some(res))
+        } else {
+            let future = DeferredFuture::new();
+            listener_state.accept = Some(future.waker());
+            future
         }
+    }
 
-        future
+    fn accepted(&mut self, addr: RemoteAddr, remote_rid: ResourceId) -> AcceptResponse {
+        let rid = self.get_rid();
+
+        let resource = Resource::EstablishedConnection {
+            recv: None,
+            queue: VecDeque::new(),
+        };
+
+        let message = Message {
+            sender: RemoteAddr(self.node_id),
+            receiver: addr,
+            time: self.now(),
+            detail: MessageDetail::ConnectionAccepted {
+                source_rid: rid,
+                remote_rid,
+            },
+        };
+
+        self.resources.insert(rid, resource);
+        self.outgoing.push(message);
+
+        AcceptResponse {
+            remote_rid,
+            local_rid: rid,
+            remote: addr,
+        }
+    }
+
+    fn refuse_connection(&mut self, addr: RemoteAddr, remote_rid: ResourceId) {
+        let message = Message {
+            sender: RemoteAddr(self.node_id),
+            receiver: addr,
+            time: self.now(),
+            detail: MessageDetail::ConnectionRefused {
+                source_rid: remote_rid,
+            },
+        };
+
+        self.outgoing.push(message);
+    }
+
+    fn maybe_accept_new_connection(&mut self, port: u16, addr: RemoteAddr, rid: ResourceId) {
+        let listener_state = if let Some(s) = self.listening.get_mut(&port) {
+            s
+        } else {
+            return self.refuse_connection(addr, rid);
+        };
+
+        if let Some(waker) = listener_state.accept.take() {
+            let res = self.accepted(addr, rid);
+            waker.wake(Some(res));
+        } else {
+            listener_state.queue.push_back((addr, rid));
+        }
     }
 
     pub fn run_until_stalled(&mut self) {
@@ -182,6 +255,24 @@ impl NodeState {
             }
 
             println!("current {}: {:?}", self.node_id, msg);
+
+            match msg.detail {
+                MessageDetail::Connect { port, rid } => {
+                    self.maybe_accept_new_connection(port, msg.sender, rid);
+                },
+                MessageDetail::ConnectionAccepted { .. } => {
+                    // todo
+                },
+                MessageDetail::ConnectionRefused { .. } => {
+                    // todo
+                },
+                MessageDetail::ConnectionClosed { .. } => {
+                    // todo
+                },
+                MessageDetail::Data { .. } => {
+                    // todo
+                },
+            }
         }
 
         self.spawn_pool.run_until_stalled();

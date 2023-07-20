@@ -253,8 +253,15 @@ mod test {
         api::spawn(async {
             println!("Spawn from {:?}", api::RemoteAddr::whoami());
 
-            if api::RemoteAddr::whoami().0 != 1 {
-                api::connect(api::RemoteAddr(1), 18).await.unwrap();
+            if api::RemoteAddr::whoami().0 == 0 {
+                let mut listener = api::listen(18);
+
+                while let Some(conn) = listener.accept().await {
+                    println!("Connection accepted from {:?}", conn.remote());
+                }
+            } else {
+                let res = api::connect(api::RemoteAddr(0), 18).await;
+                println!("connect result = {:?}", res.is_ok());
             }
         });
 
