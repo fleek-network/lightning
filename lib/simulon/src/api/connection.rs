@@ -2,9 +2,6 @@ use super::RemoteAddr;
 use crate::state::ResourceId;
 
 pub struct Connection {
-    rid: ResourceId,
-    remote: RemoteAddr,
-    remote_rid: ResourceId,
     reader: Reader,
     writer: Writer,
 }
@@ -12,11 +9,8 @@ pub struct Connection {
 impl Connection {
     pub(super) fn new(rid: ResourceId, remote: RemoteAddr, remote_rid: ResourceId) -> Self {
         Self {
-            rid,
-            remote,
-            remote_rid,
-            reader: Reader {},
-            writer: Writer {},
+            reader: Reader { rid },
+            writer: Writer { remote, remote_rid },
         }
     }
 
@@ -27,16 +21,27 @@ impl Connection {
 
     /// Returns the remote of this connection.
     pub fn remote(&self) -> RemoteAddr {
-        self.remote
+        self.writer.remote
     }
 }
 
-pub struct Reader {}
+pub struct Reader {
+    rid: ResourceId,
+}
 
-pub struct Writer {}
+pub struct Writer {
+    remote: RemoteAddr,
+    remote_rid: ResourceId,
+}
 
 impl Reader {
     async fn recv<T>(&mut self) -> Option<T> {
+        todo!()
+    }
+}
+
+impl Writer {
+    fn write<T>(&mut self, _message: T) {
         todo!()
     }
 }
