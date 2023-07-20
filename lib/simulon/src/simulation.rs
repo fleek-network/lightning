@@ -9,7 +9,7 @@ use std::{
 
 use spin::mutex::SpinMutex;
 
-use crate::state::{hook_node, Message, NodeState};
+use crate::state::{hook_node, with_node, Message, NodeState};
 
 const FRAME_TO_MS: u64 = 4;
 const FRAME_DURATION: Duration = Duration::from_micros(1_000 / FRAME_TO_MS);
@@ -67,7 +67,7 @@ impl SimulationBuilder {
         let num_workers = self
             .num_workers
             .unwrap_or_else(|| num_cpus::get_physical() - 1)
-            .min(1);
+            .max(1);
         let num_nodes = self.num_nodes.unwrap_or(num_workers * 4);
 
         // Cap the number of workers to the number of nodes.
@@ -128,7 +128,7 @@ impl Simulation {
         self.state.frame.store(usize::MAX, Ordering::Relaxed);
 
         while let Some(handle) = self.workers.pop() {
-            handle.join().expect("Worker thread paniced.");
+            handle.join().expect("Worker thread paniked.");
         }
 
         self.state.frame.store(frame, Ordering::Relaxed);
@@ -169,6 +169,7 @@ fn execute_node(state: &Arc<SharedState>, _worker_index: usize, frame: usize, in
 
     if frame == 0 {
         (state.executor)();
+        with_node(|n| n.run_until_stalled());
     }
 
     // todo:
@@ -210,10 +211,25 @@ fn wait_for_workers(state: &Arc<SharedState>) {
     }
 }
 
-#[test]
-fn x() {
-    SimulationBuilder::new(|| println!("Hello! {:?}", crate::api::RemoteAddr::whoami()))
-        .with_nodes(2)
-        .build()
-        .run(Duration::from_secs(1))
+#[cfg(test)]
+mod test {
+    use std::time::Duration;
+
+    use crate::{api, simulation::SimulationBuilder};
+
+    #[test]
+    fn x() {
+        SimulationBuilder::new(exec)
+            .with_nodes(2)
+            .build()
+            .run(Duration::from_secs(1))
+    }
+
+    fn exec() {
+        api::spawn(async {
+            println!("Spawn from {:?}", api::RemoteAddr::whoami());
+        });
+
+        println!("Hello! {:?}", api::RemoteAddr::whoami());
+    }
 }
