@@ -120,7 +120,9 @@ impl NodeState {
 
     /// Returns the current time on the node.
     pub fn now(&mut self) -> u128 {
-        self.time
+        let now = self.time;
+        self.time += 1;
+        now
     }
 
     /// Send a request to establish a connection with the given peer on the provided port number.
@@ -203,7 +205,10 @@ impl NodeState {
     }
 
     pub fn recv(&mut self, rid: ResourceId) -> DeferredFuture<Option<Vec<u8>>> {
-        let resource = self.resources.get_mut(&rid).expect("Resource not found.");
+        let resource = self
+            .resources
+            .get_mut(&rid)
+            .expect("recv: Resource not found.");
 
         let (recv, queue) = if let Resource::EstablishedConnection { recv, queue } = resource {
             (recv, queue)
@@ -218,6 +223,60 @@ impl NodeState {
             let future = DeferredFuture::<Option<Vec<u8>>>::new();
             *recv = Some(future.waker());
             future
+        }
+    }
+
+    pub fn close_connection(&mut self, local_rid: ResourceId, addr: RemoteAddr, rid: ResourceId) {
+        self.close_local_connection(local_rid);
+
+        let message = Message {
+            sender: RemoteAddr(self.node_id),
+            receiver: addr,
+            time: self.now(),
+            detail: MessageDetail::ConnectionClosed { rid },
+        };
+
+        self.outgoing.push(message);
+    }
+
+    pub fn is_connection_open(&mut self, rid: ResourceId) -> bool {
+        self.resources.contains_key(&rid)
+    }
+
+    fn close_local_connection(&mut self, rid: ResourceId) {
+        let resource = if let Some(resource) = self.resources.remove(&rid) {
+            resource
+        } else {
+            return;
+        };
+
+        let (mut recv, _queue) = if let Resource::EstablishedConnection { recv, queue } = resource {
+            (recv, queue)
+        } else {
+            panic!("Invalid resource type.");
+        };
+
+        if let Some(waker) = recv.take() {
+            waker.wake(None);
+        }
+    }
+
+    fn process_message(&mut self, rid: ResourceId, data: Vec<u8>) {
+        let resource = self
+            .resources
+            .get_mut(&rid)
+            .expect("process_message: Resource not found.");
+
+        let (recv, queue) = if let Resource::EstablishedConnection { recv, queue } = resource {
+            (recv, queue)
+        } else {
+            panic!("Invalid resource type.");
+        };
+
+        if let Some(waker) = recv.take() {
+            waker.wake(Some(data));
+        } else {
+            queue.push_back(data);
         }
     }
 
@@ -306,7 +365,7 @@ impl NodeState {
                 break;
             }
 
-            println!("current {}: {:?}", self.node_id, msg);
+            // println!("\t>current {}: {:?}", self.node_id, msg);
 
             match msg.detail {
                 MessageDetail::Connect { port, rid } => {
@@ -321,11 +380,11 @@ impl NodeState {
                 MessageDetail::ConnectionRefused { source_rid } => {
                     self.resolve_connection(source_rid, Err(ConnectError::RemoteIsDown));
                 },
-                MessageDetail::ConnectionClosed { .. } => {
-                    // todo
+                MessageDetail::ConnectionClosed { rid } => {
+                    self.close_local_connection(rid);
                 },
-                MessageDetail::Data { .. } => {
-                    // todo
+                MessageDetail::Data { rid, data } => {
+                    self.process_message(rid, data);
                 },
             }
         }

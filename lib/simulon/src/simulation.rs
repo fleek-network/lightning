@@ -111,6 +111,9 @@ impl Simulation {
             self.run_post_frame();
         }
 
+        wait_for_workers(&self.state);
+        self.run_post_frame();
+
         self.stop_threads();
     }
 
@@ -165,7 +168,6 @@ fn worker_loop(worker_index: usize, state: Arc<SharedState>) {
 
         // If true is returned it means that we're done and should exit the thread.
         if wait_for_next_frame(&state, current_frame) {
-            println!("break");
             break;
         }
 
@@ -271,6 +273,9 @@ mod test {
             } else {
                 let res = api::connect(api::RemoteAddr(0), 18).await;
                 println!("connect result = {:?}", res.is_ok());
+                let mut conn = res.unwrap();
+                let data = conn.recv::<i32>().await;
+                println!("Data received {data:?}");
             }
         });
 

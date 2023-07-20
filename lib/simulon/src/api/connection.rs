@@ -26,6 +26,10 @@ impl Connection {
         self.writer.remote
     }
 
+    pub fn is_closed(&self) -> bool {
+        self.reader.is_closed()
+    }
+
     /// Send a message through the connection.
     pub fn write<T>(&mut self, message: &T)
     where
@@ -52,11 +56,19 @@ pub struct Writer {
 }
 
 impl Reader {
+    pub fn is_closed(&self) -> bool {
+        with_node(|n| !n.is_connection_open(self.rid))
+    }
+
     /// Receive a message from the connection.
     pub async fn recv<T>(&mut self) -> Option<T>
     where
         T: DeserializeOwned,
     {
+        if self.is_closed() {
+            return None;
+        }
+
         let bytes = with_node(|n| n.recv(self.rid)).await?;
         Some(bincode::deserialize(&bytes).unwrap())
     }
@@ -74,5 +86,9 @@ impl Writer {
 }
 
 impl Drop for Connection {
-    fn drop(&mut self) {}
+    fn drop(&mut self) {
+        with_node(|n| {
+            n.close_connection(self.reader.rid, self.writer.remote, self.writer.remote_rid)
+        })
+    }
 }
