@@ -2,6 +2,8 @@ use crate::{api::RemoteAddr, state::ResourceId};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Message {
+    // Time must be the first field so the derived impl of ord
+    // works as expected.
     pub time: u128,
     pub sender: RemoteAddr,
     pub receiver: RemoteAddr,

@@ -247,6 +247,28 @@ impl NodeState {
         }
     }
 
+    fn resolve_connection(
+        &mut self,
+        source_rid: ResourceId,
+        result: Result<ResourceId, ConnectError>,
+    ) {
+        let resource = self.resources.remove(&source_rid).unwrap();
+
+        if result.is_ok() {
+            self.resources.insert(
+                source_rid,
+                Resource::EstablishedConnection {
+                    recv: None,
+                    queue: VecDeque::new(),
+                },
+            );
+        }
+
+        if let Resource::PendingConnection { waker } = resource {
+            waker.wake(result);
+        }
+    }
+
     pub fn run_until_stalled(&mut self) {
         while let Some(msg) = self.received.pop_first() {
             if msg.time > self.time {
@@ -260,11 +282,14 @@ impl NodeState {
                 MessageDetail::Connect { port, rid } => {
                     self.maybe_accept_new_connection(port, msg.sender, rid);
                 },
-                MessageDetail::ConnectionAccepted { .. } => {
-                    // todo
+                MessageDetail::ConnectionAccepted {
+                    source_rid,
+                    remote_rid,
+                } => {
+                    self.resolve_connection(source_rid, Ok(remote_rid));
                 },
-                MessageDetail::ConnectionRefused { .. } => {
-                    // todo
+                MessageDetail::ConnectionRefused { source_rid } => {
+                    self.resolve_connection(source_rid, Err(ConnectError::RemoteIsDown));
                 },
                 MessageDetail::ConnectionClosed { .. } => {
                     // todo
