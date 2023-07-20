@@ -13,7 +13,9 @@ use cli::Cli;
 use draco_interfaces::{transformers, ApplicationInterface, DracoTypes};
 use log::LevelFilter;
 use mock::consensus::MockConsensus;
-use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
+use simplelog::{
+    ColorChoice, CombinedLogger, ConfigBuilder, TermLogger, TerminalMode, WriteLogger,
+};
 
 use crate::{cli::CliArgs, node::FinalTypes, template::indexer::Indexer};
 
@@ -29,6 +31,14 @@ async fn main() -> Result<()> {
         _3_or_more => log::LevelFilter::Trace,
     };
 
+    // Add ignore for proccess subdag because Narwhal prints it as an err everytime it succesfully
+    // proccesses a new sub_dag
+    let logger_config = ConfigBuilder::new()
+        .add_filter_ignore_str("narwhal_consensus::bullshark")
+        .set_target_level(log::LevelFilter::Error)
+        .set_location_level(log::LevelFilter::Error)
+        .build();
+
     let date = Local::now();
     let log_file =
         std::env::temp_dir().join(format!("draco-{}.log", date.format("%Y-%m-%d-%H:%M:%S")));
@@ -36,7 +46,7 @@ async fn main() -> Result<()> {
     CombinedLogger::init(vec![
         TermLogger::new(
             log_filter,
-            simplelog::Config::default(),
+            logger_config,
             TerminalMode::Mixed,
             ColorChoice::Auto,
         ),
