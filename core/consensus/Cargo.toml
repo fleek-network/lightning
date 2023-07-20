@@ -13,6 +13,7 @@ bincode.workspace = true
 draco-interfaces = { path = "../interfaces" }
 futures.workspace = true
 anyhow.workspace = true
+log.workspace = true
 serde.workspace = true
 tokio.workspace = true
 

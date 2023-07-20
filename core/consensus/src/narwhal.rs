@@ -118,6 +118,10 @@ impl NarwhalService {
         let epoch = self.committee.epoch();
         println!("Starting NarwhalService for epoch {epoch}");
 
+        // create the network client the primary and worker use to communicate
+        let network_client =
+            NetworkClient::new_from_keypair(&self.arguments.primary_network_keypair);
+
         let mut running = false;
         for i in 0..MAX_RETRIES {
             println!("Trying to start the Narwhal Primary...");
@@ -133,7 +137,7 @@ impl NarwhalService {
                     self.committee.clone(),
                     self.protocol_config.clone(),
                     self.worker_cache.clone(),
-                    NetworkClient::new_from_keypair(&self.arguments.primary_network_keypair),
+                    network_client.clone(),
                     &self.store,
                     execution_state.clone(),
                 )
@@ -163,7 +167,7 @@ impl NarwhalService {
                     self.arguments.worker_keypair.copy(),
                     self.committee.clone(),
                     self.worker_cache.clone(),
-                    NetworkClient::new_from_keypair(&self.arguments.worker_keypair),
+                    network_client.clone(),
                     &self.store,
                     Validator::new(),
                     None,

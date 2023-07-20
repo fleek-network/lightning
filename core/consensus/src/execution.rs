@@ -5,6 +5,7 @@ use draco_interfaces::{
     types::{Block, UpdateRequest},
     ExecutionEngineSocket,
 };
+use log::info;
 use narwhal_executor::ExecutionState;
 use narwhal_types::{Batch, BatchAPI, ConsensusOutput};
 use tokio::sync::Notify;
@@ -39,10 +40,9 @@ impl Execution {
                     .filter_map(|txn| bincode::deserialize::<UpdateRequest>(txn).ok())
                     .collect(),
             };
-
+            info!("Consensus submitted new block to application");
             // Unfailable
             let results = self.executor.run(block).await.unwrap();
-
             if results.change_epoch {
                 change_epoch = true;
             }

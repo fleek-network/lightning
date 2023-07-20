@@ -17,6 +17,7 @@ use draco_interfaces::{
 };
 use fastcrypto::bls12381::min_sig::BLS12381PublicKey;
 use fleek_crypto::NodePublicKey;
+use log::error;
 use narwhal_types::{TransactionProto, TransactionsClient};
 use rand::seq::SliceRandom;
 use tonic::transport::channel::Channel;
@@ -62,7 +63,7 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
         let epoch = self.query_runner.get_epoch();
 
         // If the epoch is different then the last time we grabbed the committee refresh
-        if epoch != self.epoch {
+        if epoch != self.epoch || epoch == 0 {
             self.refresh_epoch();
         }
 
@@ -139,8 +140,26 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
         while self.active_connections.len() < self.min_connections {
             // Only try to make a connection with this worker if we dont already have one
             if let Entry::Vacant(e) = self.active_connections.entry(self.cursor) {
-                let mempool = self.committee[self.cursor].workers[0].mempool.to_string();
-                if let Ok(client) = TransactionsClient::connect(mempool).await {
+                let mempool = &self.committee[self.cursor].workers[0].mempool;
+                let address = mempool
+                    .iter()
+                    .find_map(|proto| match proto {
+                        multiaddr::Protocol::Ip4(ip) => Some(ip.to_string()),
+                        multiaddr::Protocol::Ip6(ip) => Some(ip.to_string()),
+                        _ => None,
+                    })
+                    .unwrap_or("".to_string());
+
+                let port = mempool
+                    .iter()
+                    .find_map(|proto| match proto {
+                        multiaddr::Protocol::Tcp(port) => Some(port),
+                        _ => None,
+                    })
+                    .unwrap_or(1);
+                if let Ok(client) =
+                    TransactionsClient::connect(format!("http://{address}:{port}")).await
+                {
                     e.insert(client);
                 }
             }
@@ -172,7 +191,7 @@ impl<Q: SyncQueryRunnerInterface + 'static> AsyncWorker for Forwarder<Q> {
         let mut retried = 0;
         while retried < 2 {
             if let Err(e) = self.handle_forward(&req).await {
-                println!("Failed to send transaction to a worker: {e}");
+                error!("Failed to send transaction to a worker: {e}");
                 retried += 1;
             } else {
                 break;

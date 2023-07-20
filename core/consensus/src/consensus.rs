@@ -19,6 +19,7 @@ use draco_interfaces::{
     types::{Epoch, EpochInfo, UpdateMethod},
     GossipInterface, SyncQueryRunnerInterface,
 };
+use log::{error, info};
 use mysten_metrics::RegistryService;
 use mysten_network::Multiaddr;
 use narwhal_config::{Committee, CommitteeBuilder, WorkerCache, WorkerIndex, WorkerInfo};
@@ -103,14 +104,15 @@ impl<Q: SyncQueryRunnerInterface> EpochState<Q> {
     async fn start_current_epoch(&mut self) {
         // Get current epoch information
         let (committee, worker_cache, epoch, epoch_end) = self.get_epoch_info();
-
         if committee
             .authority_by_key(self.narwhal_args.primary_keypair.public())
             .is_none()
         {
+            info!("Not on narwhal committee running edge node service");
             self.run_edge_node();
             return;
         }
+        info!("Node is on current committee, starting narwhal.");
         // Make or open store specific to current epoch
         let mut store_path = self.store_path.clone();
         store_path.push(format!("{epoch}"));
@@ -213,14 +215,14 @@ impl<Q: SyncQueryRunnerInterface> EpochState<Q> {
         let txn_socket = self.txn_socket.clone();
         task::spawn(async move {
             time::sleep(time_until_change).await;
+            info!("Narwhal: Signalling ready to change epoch");
             // We shouldnt panic here lets repeatedly try.
             while txn_socket
                 .run(UpdateMethod::ChangeEpoch { epoch })
                 .await
                 .is_err()
             {
-                // If for some reason there is an error sending to the signer interface try again
-                println!(
+                error!(
                     "Error sending change epoch transaction to signer interface, trying again..."
                 );
                 time::sleep(Duration::from_secs(1)).await;
