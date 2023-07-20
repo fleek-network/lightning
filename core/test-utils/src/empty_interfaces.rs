@@ -214,17 +214,30 @@ impl ConfigConsumer for MockSigner {
 }
 
 #[async_trait]
+impl WithStartAndShutdown for MockSigner {
+    /// Returns true if this system is running or not.
+    fn is_running(&self) -> bool {
+        true
+    }
+
+    /// Start the system, should not do anything if the system is already
+    /// started.
+    async fn start(&self) {}
+
+    /// Send the shutdown signal to the system.
+    async fn shutdown(&self) {}
+}
+
+#[async_trait]
 impl SignerInterface for MockSigner {
     type SyncQuery = MockQueryRunner;
 
-    async fn init(_config: Self::Config) -> anyhow::Result<Self> {
+    async fn init(_config: Self::Config, _query_runner: Self::SyncQuery) -> anyhow::Result<Self> {
         let (socket, _) = Socket::raw_bounded(2048);
         Ok(Self { socket })
     }
 
     fn provide_mempool(&mut self, _mempool: MempoolSocket) {}
-
-    fn provide_query_runner(&self, _query_runner: Self::SyncQuery) {}
 
     fn provide_new_block_notify(&self, _block_notify: Arc<Notify>) {}
 

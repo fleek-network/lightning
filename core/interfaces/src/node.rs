@@ -32,7 +32,9 @@ pub trait DracoTypes: Send + Sync {
     type BlockStore: BlockStoreInterface;
     type Indexer: IndexerInterface;
     type FileSystem: FileSystemInterface<BlockStore = Self::BlockStore, Indexer = Self::Indexer>;
-    type Signer: SignerInterface;
+    type Signer: SignerInterface<
+        SyncQuery = <Self::Application as ApplicationInterface>::SyncExecutor,
+    >;
     type Stream: tokio_stream::Stream<Item = bytes::BytesMut>;
     type DeliveryAcknowledgmentAggregator: DeliveryAcknowledgmentAggregatorInterface;
     type Notifier: NotifierInterface<
@@ -79,9 +81,10 @@ pub struct Node<T: DracoTypes> {
 
 impl<T: DracoTypes> Node<T> {
     pub async fn init(configuration: Arc<T::ConfigProvider>) -> anyhow::Result<Self> {
-        let mut signer = T::Signer::init(configuration.get::<T::Signer>()).await?;
-
         let application = T::Application::init(configuration.get::<T::Application>()).await?;
+
+        let mut signer =
+            T::Signer::init(configuration.get::<T::Signer>(), application.sync_query()).await?;
 
         let topology = Arc::new(
             T::Topology::init(
@@ -107,6 +110,7 @@ impl<T: DracoTypes> Node<T> {
 
         // Provide the mempool socket to the signer so it can use it to send messages to consensus.
         signer.provide_mempool(consensus.mempool());
+        signer.provide_new_block_notify(consensus.new_block_notifier());
 
         let store = T::BlockStore::init(configuration.get::<T::BlockStore>()).await?;
 
@@ -225,6 +229,7 @@ where
 
     async fn start(&self) {
         self.application.start().await;
+        self.signer.start().await;
         self.consensus.start().await;
         self.delivery_acknowledgment_aggregator.start().await;
         self.indexer.start().await;

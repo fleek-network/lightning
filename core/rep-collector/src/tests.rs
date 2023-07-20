@@ -76,15 +76,14 @@ fn get_genesis_committee(
 
 #[tokio::test]
 async fn test_query() {
-    let signer_config = SignerConfig::default();
-    let mut signer = Signer::init(signer_config).await.unwrap();
-
-    let mut genesis = Genesis::load().unwrap();
-    let (network_secret_key, secret_key) = signer.get_sk();
+    let signer_config = SignerConfig::test();
+    let (secret_key, network_secret_key) = signer_config.load_test_keys();
     let public_key = secret_key.to_pk();
     let network_public_key = network_secret_key.to_pk();
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
+
+    let mut genesis = Genesis::load().unwrap();
 
     genesis.committee.push(GenesisCommittee::new(
         owner_public_key.to_base64(),
@@ -107,6 +106,10 @@ async fn test_query() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
+    let mut signer = Signer::init(signer_config, query_runner.clone())
+        .await
+        .unwrap();
+
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 1,
@@ -125,12 +128,11 @@ async fn test_query() {
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
-    signer.provide_query_runner(query_runner.clone());
     signer.provide_new_block_notify(consensus.new_block_notifier());
     signer.start().await;
     consensus.start().await;
 
-    let notifier = Notifier::init(query_runner.clone());
+    let notifier = Notifier::init(query_runner);
     let config = Config {
         reporter_buffer_size: 1,
     };
@@ -179,15 +181,14 @@ async fn test_query() {
 
 #[tokio::test]
 async fn test_submit_measurements() {
-    let signer_config = SignerConfig::default();
-    let mut signer = Signer::init(signer_config).await.unwrap();
-
-    let mut genesis = Genesis::load().unwrap();
-    let (network_secret_key, secret_key) = signer.get_sk();
+    let signer_config = SignerConfig::test();
+    let (secret_key, network_secret_key) = signer_config.load_test_keys();
     let public_key = secret_key.to_pk();
     let network_public_key = network_secret_key.to_pk();
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
+
+    let mut genesis = Genesis::load().unwrap();
 
     genesis.committee.push(GenesisCommittee::new(
         owner_public_key.to_base64(),
@@ -217,6 +218,10 @@ async fn test_submit_measurements() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
+    let mut signer = Signer::init(signer_config, query_runner.clone())
+        .await
+        .unwrap();
+
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 1,
@@ -235,7 +240,6 @@ async fn test_submit_measurements() {
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
-    signer.provide_query_runner(query_runner.clone());
     signer.provide_new_block_notify(consensus.new_block_notifier());
     signer.start().await;
     consensus.start().await;
@@ -299,14 +303,15 @@ async fn test_reputation_calculation_and_query() {
     // have reported measurements. Therefore, we need to create two reputation aggregators, two
     // signers, and two consensus services that will receive a socket for the same application
     // service.
-    let mut signer1 = Signer::init(SignerConfig::default()).await.unwrap();
-    let mut signer2 = Signer::init(SignerConfig::default()).await.unwrap();
+    let signer_config1 = SignerConfig::test();
+    let signer_config2 = SignerConfig::test2();
+    let (secret_key1, network_secret_key1) = signer_config1.load_test_keys();
+    let (secret_key2, network_secret_key2) = signer_config2.load_test_keys();
 
     let (committee, mut keystore) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
     genesis.committee = committee;
 
-    let (network_secret_key1, secret_key1) = signer1.get_sk();
     let public_key1 = secret_key1.to_pk();
     let network_public_key1 = network_secret_key1.to_pk();
     let owner_secret_key1 = AccountOwnerSecretKey::generate();
@@ -329,7 +334,6 @@ async fn test_reputation_calculation_and_query() {
         _worker_secret_key: network_secret_key1,
     });
 
-    let (network_secret_key2, secret_key2) = signer2.get_sk();
     let public_key2 = secret_key2.to_pk();
     let network_public_key2 = network_secret_key2.to_pk();
     let owner_secret_key2 = AccountOwnerSecretKey::generate();
@@ -369,6 +373,13 @@ async fn test_reputation_calculation_and_query() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
+    let mut signer1 = Signer::init(signer_config1, query_runner.clone())
+        .await
+        .unwrap();
+    let mut signer2 = Signer::init(signer_config2, query_runner.clone())
+        .await
+        .unwrap();
+
     let mock_gossip = Arc::new(MockGossip {});
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
@@ -398,8 +409,6 @@ async fn test_reputation_calculation_and_query() {
 
     signer1.provide_mempool(consensus1.mempool());
     signer2.provide_mempool(consensus2.mempool());
-    signer1.provide_query_runner(query_runner.clone());
-    signer2.provide_query_runner(query_runner.clone());
     signer1.provide_new_block_notify(consensus1.new_block_notifier());
     signer2.provide_new_block_notify(consensus2.new_block_notifier());
     signer1.start().await;

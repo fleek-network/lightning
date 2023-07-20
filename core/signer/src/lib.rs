@@ -7,7 +7,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 #[cfg(test)]
-mod tests;
+pub mod tests;
 
 use affair::{Socket, Task};
 use async_trait::async_trait;
@@ -104,7 +104,7 @@ impl SignerInterface for Signer {
     type SyncQuery = QueryRunner;
 
     /// Initialize the signature service.
-    async fn init(config: Config) -> anyhow::Result<Self> {
+    async fn init(config: Config, query_runner: Self::SyncQuery) -> anyhow::Result<Self> {
         let inner = SignerInner::new(config);
         let (socket, rx) = Socket::raw_bounded(2048);
         Ok(Self {
@@ -114,7 +114,7 @@ impl SignerInterface for Signer {
             is_running: Arc::new(Mutex::new(false)),
             rx: Arc::new(Mutex::new(Some(rx))),
             mempool_socket: Arc::new(Mutex::new(None)),
-            query_runner: Arc::new(Mutex::new(None)),
+            query_runner: Arc::new(Mutex::new(Some(query_runner))),
             new_block_notify: Arc::new(Mutex::new(None)),
         })
     }
@@ -124,12 +124,6 @@ impl SignerInterface for Signer {
     fn provide_mempool(&mut self, mempool: MempoolSocket) {
         // TODO(matthias): I think the receiver can be &self here.
         *self.mempool_socket.lock().unwrap() = Some(mempool);
-    }
-
-    /// Provide the signer service with the query runner after initialization, this function
-    /// should only be called once.
-    fn provide_query_runner(&self, query_runner: Self::SyncQuery) {
-        *self.query_runner.lock().unwrap() = Some(query_runner);
     }
 
     // Provide the signer service with a block notifier to get notified when a block of

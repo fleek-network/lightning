@@ -132,7 +132,9 @@ mod tests {
     use draco_test_utils::{
         app::app::Application,
         blockstore::MemoryBlockStore,
-        empty_interfaces::{MockConfig, MockIndexer, MockReputationReporter, MockSigner},
+        empty_interfaces::{
+            MockConfig, MockIndexer, MockQueryRunner, MockReputationReporter, MockSigner,
+        },
         filesystem::MockFileSystem,
         sdk::MockSdk,
     };
@@ -168,7 +170,7 @@ mod tests {
         let hash = putter.finalize().await.unwrap();
 
         // setup sdk and friends
-        let signer = MockSigner::init(MockConfig {}).await?;
+        let signer = MockSigner::init(MockConfig {}, MockQueryRunner {}).await?;
         let app = Application::init(draco_test_utils::app::config::Config {
             genesis: None,
             mode: draco_test_utils::app::config::Mode::Test,

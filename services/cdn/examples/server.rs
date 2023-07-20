@@ -10,7 +10,9 @@ use draco_interfaces::{
 use draco_test_utils::{
     app::app::Application,
     blockstore::MemoryBlockStore,
-    empty_interfaces::{MockConfig, MockIndexer, MockReputationReporter, MockSigner},
+    empty_interfaces::{
+        MockConfig, MockIndexer, MockQueryRunner, MockReputationReporter, MockSigner,
+    },
     filesystem::MockFileSystem,
     sdk::MockSdk,
 };
@@ -40,12 +42,12 @@ async fn main() -> Result<()> {
     println!("content hash: {hash:?}");
 
     // setup sdk and friends
-    let signer = MockSigner::init(MockConfig {}).await?;
     let app = Application::init(draco_test_utils::app::config::Config {
         genesis: None,
         mode: draco_test_utils::app::config::Mode::Test,
     })
     .await?;
+    let signer = MockSigner::init(MockConfig {}, MockQueryRunner {}).await?;
     let sdk = MockSdk::<OwnedReadHalf, OwnedWriteHalf>::new(
         app.sync_query(),
         MockReputationReporter {},

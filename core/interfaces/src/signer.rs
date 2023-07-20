@@ -9,7 +9,7 @@ use tokio::sync::Notify;
 
 use crate::{
     application::SyncQueryRunnerInterface, config::ConfigConsumer, consensus::MempoolSocket,
-    types::UpdateMethod,
+    types::UpdateMethod, WithStartAndShutdown,
 };
 
 /// A socket that is responsible to submit a transaction to the consensus from our node,
@@ -20,19 +20,15 @@ pub type SubmitTxSocket = Socket<UpdateMethod, u64>;
 /// The signature provider is responsible for signing messages using the private key of
 /// the node.
 #[async_trait]
-pub trait SignerInterface: ConfigConsumer + Sized + Send + Sync {
+pub trait SignerInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
     type SyncQuery: SyncQueryRunnerInterface;
 
     /// Initialize the signature service.
-    async fn init(config: Self::Config) -> anyhow::Result<Self>;
+    async fn init(config: Self::Config, query_runner: Self::SyncQuery) -> anyhow::Result<Self>;
 
     /// Provide the signer service with the mempool socket after initialization, this function
     /// should only be called once.
     fn provide_mempool(&mut self, mempool: MempoolSocket);
-
-    /// Provide the signer service with the query runner after initialization, this function
-    /// should only be called once.
-    fn provide_query_runner(&self, query_runner: Self::SyncQuery);
 
     // Provide the signer service with a block notifier to get notified when a block of
     // transactions has been processed at the application.

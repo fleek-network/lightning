@@ -23,12 +23,10 @@ use crate::{config::Config, Signer};
 
 #[tokio::test]
 async fn test_send_two_txs_in_a_row() {
-    let signer_config = Config::default();
-    let mut signer = Signer::init(signer_config).await.unwrap();
-    let signer_socket = signer.get_socket();
+    let signer_config = Config::test();
+    let (secret_key, network_secret_key) = signer_config.load_test_keys();
 
     let mut genesis = Genesis::load().unwrap();
-    let (network_secret_key, secret_key) = signer.get_sk();
     let public_key = secret_key.to_pk();
     let network_public_key = network_secret_key.to_pk();
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -55,6 +53,11 @@ async fn test_send_two_txs_in_a_row() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
+    let mut signer = Signer::init(signer_config, query_runner.clone())
+        .await
+        .unwrap();
+    let signer_socket = signer.get_socket();
+
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 2,
@@ -73,7 +76,6 @@ async fn test_send_two_txs_in_a_row() {
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
-    signer.provide_query_runner(query_runner.clone());
     signer.provide_new_block_notify(consensus.new_block_notifier());
     signer.start().await;
     consensus.start().await;
@@ -100,12 +102,11 @@ async fn test_send_two_txs_in_a_row() {
 
 #[tokio::test]
 async fn test_retry_send() {
-    let signer_config = Config::default();
-    let mut signer = Signer::init(signer_config).await.unwrap();
-    let signer_socket = signer.get_socket();
-
+    let signer_config = Config::test();
+    let (secret_key, network_secret_key) = signer_config.load_test_keys();
+    println!("{:}", secret_key.to_pk());
     let mut genesis = Genesis::load().unwrap();
-    let (network_secret_key, secret_key) = signer.get_sk();
+
     let public_key = secret_key.to_pk();
     let network_public_key = network_secret_key.to_pk();
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -132,6 +133,10 @@ async fn test_retry_send() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
+    let mut signer = Signer::init(signer_config, app.sync_query()).await.unwrap();
+
+    let signer_socket = signer.get_socket();
+
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 2,
@@ -150,7 +155,6 @@ async fn test_retry_send() {
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
-    signer.provide_query_runner(query_runner.clone());
     signer.provide_new_block_notify(consensus.new_block_notifier());
     signer.start().await;
     consensus.start().await;
@@ -185,9 +189,11 @@ async fn test_retry_send() {
 
 #[tokio::test]
 async fn test_shutdown() {
-    let mut signer = Signer::init(Config::default()).await.unwrap();
     let app = Application::init(AppConfig::default()).await.unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let mut signer = Signer::init(Config::default(), query_runner.clone())
+        .await
+        .unwrap();
     let consensus = MockConsensus::init(
         ConsensusConfig::default(),
         &signer,
@@ -198,7 +204,6 @@ async fn test_shutdown() {
     .await
     .unwrap();
     signer.provide_mempool(consensus.mempool());
-    signer.provide_query_runner(query_runner.clone());
     signer.provide_new_block_notify(consensus.new_block_notifier());
 
     assert!(!signer.is_running());
@@ -210,9 +215,11 @@ async fn test_shutdown() {
 
 #[tokio::test]
 async fn test_sign_raw_digest() {
-    let mut signer = Signer::init(Config::default()).await.unwrap();
     let app = Application::init(AppConfig::default()).await.unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let mut signer = Signer::init(Config::default(), query_runner.clone())
+        .await
+        .unwrap();
     let consensus = MockConsensus::init(
         ConsensusConfig::default(),
         &signer,
@@ -223,7 +230,6 @@ async fn test_sign_raw_digest() {
     .await
     .unwrap();
     signer.provide_mempool(consensus.mempool());
-    signer.provide_query_runner(query_runner.clone());
     signer.provide_new_block_notify(consensus.new_block_notifier());
     signer.start().await;
 
