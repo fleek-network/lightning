@@ -245,8 +245,10 @@ impl Simulation {
         // Figure out how many frames to move forward.
         let first = unsafe { &*self.state.nodes[0] };
         let msg = first.received.peek()?;
-        let _time = msg.time.0;
-        Some(1)
+        let time = msg.time.0;
+
+        debug_assert!(time > self.now);
+        Some(((time - self.now) / FRAME_DURATION.as_nanos()).max(1) as usize)
     }
 
     fn get_latency(&self, _s: usize, _r: usize) -> Duration {
