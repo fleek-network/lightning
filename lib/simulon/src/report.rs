@@ -98,6 +98,13 @@ pub struct Timeline(pub FxHashMap<usize, Metrics>);
 
 impl Timeline {
     pub fn insert(&mut self, key: usize, metric: Metrics) {
+        if !metric.is_empty() {
+            self.insert_inner(key, metric);
+        }
+    }
+
+    #[inline(always)]
+    fn insert_inner(&mut self, key: usize, metric: Metrics) {
         match self.entry(key) {
             std::collections::hash_map::Entry::Vacant(e) => {
                 e.insert(metric);
@@ -114,7 +121,7 @@ impl Add for Timeline {
 
     fn add(mut self, rhs: Self) -> Self::Output {
         for (index, metric) in rhs.0 {
-            self.insert(index, metric);
+            self.insert_inner(index, metric);
         }
 
         self
