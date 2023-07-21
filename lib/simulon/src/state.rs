@@ -10,6 +10,7 @@ use crate::{
     api::{ConnectError, RemoteAddr},
     future::{DeferredFuture, DeferredFutureWaker},
     message::{Message, MessageDetail},
+    report::{Metrics, NodeMetrics},
 };
 
 thread_local! {
@@ -60,9 +61,36 @@ pub struct NodeState {
     pub outgoing: Vec<Message>,
     /// The messages which we have received and should execute when the time comes.
     pub received: BTreeSet<Message>,
+    /// The collected metrics during the entire execution.
+    pub metrics: NodeMetrics,
+    /// The current metrics being collected for the current frame.
+    pub current_metrics: Metrics,
     next_rid: usize,
+    clean_up: WithCleanUpDrop,
 }
 
+// When we're getting dropped some futures may still be pending and hold state which
+// may contain a connection or listener, and their Drop will use the `with_node` function
+// we will have an error if the current thread doesn't have a reference to the node that
+// is being executed. So here we set the current node as the node that is getting executed.
+impl Drop for NodeState {
+    fn drop(&mut self) {
+        hook_node(self as *mut NodeState);
+    }
+}
+
+/// This is the last field of the [`NodeState`] that allows us to run a function
+/// after other fields are dropped. So that we can remote the pointer to this node
+/// from the thread_local and remote the dangling pointer which would remain otherwise.
+struct WithCleanUpDrop;
+
+impl Drop for WithCleanUpDrop {
+    fn drop(&mut self) {
+        hook_node(std::ptr::null_mut());
+    }
+}
+
+// We're cool with moving `LocalPool` across different threads.
 unsafe impl Sync for NodeState {}
 unsafe impl Send for NodeState {}
 
@@ -106,7 +134,10 @@ impl NodeState {
             listening: HashMap::default(),
             outgoing: Vec::new(),
             received: BTreeSet::new(),
+            metrics: NodeMetrics::default(),
+            current_metrics: Metrics::default(),
             next_rid: 0,
+            clean_up: WithCleanUpDrop,
         }
     }
 
@@ -148,6 +179,7 @@ impl NodeState {
 
         self.resources.insert(rid, resource);
         self.outgoing.push(message);
+        self.current_metrics.connections_requested += 1;
 
         (rid, future)
     }
@@ -184,6 +216,7 @@ impl NodeState {
         );
 
         if let Some((addr, rid)) = listener_state.queue.pop_front() {
+            self.current_metrics.connections_accepted += 1;
             let res = self.accepted(addr, rid);
             DeferredFuture::resolved(Some(res))
         } else {
@@ -194,6 +227,9 @@ impl NodeState {
     }
 
     pub fn send(&mut self, remote: RemoteAddr, rid: ResourceId, data: Vec<u8>) {
+        self.current_metrics.msg_sent += 1;
+        self.current_metrics.bytes_sent += data.len() as u64;
+
         let message = Message {
             sender: RemoteAddr(self.node_id),
             receiver: remote,
@@ -217,6 +253,8 @@ impl NodeState {
         };
 
         if let Some(msg) = queue.pop_front() {
+            self.current_metrics.msg_processed += 1;
+            self.current_metrics.bytes_processed += msg.len() as u64;
             DeferredFuture::resolved(Some(msg))
         } else {
             assert!(recv.is_none(), "Another recv is already in progress.");
@@ -250,6 +288,8 @@ impl NodeState {
             return;
         };
 
+        self.current_metrics.connections_closed += 1;
+
         let (mut recv, _queue) = if let Resource::EstablishedConnection { recv, queue } = resource {
             (recv, queue)
         } else {
@@ -274,6 +314,8 @@ impl NodeState {
         };
 
         if let Some(waker) = recv.take() {
+            self.current_metrics.msg_processed += 1;
+            self.current_metrics.bytes_processed += data.len() as u64;
             waker.wake(Some(data));
         } else {
             queue.push_back(data);
@@ -325,10 +367,12 @@ impl NodeState {
         let listener_state = if let Some(s) = self.listening.get_mut(&port) {
             s
         } else {
+            self.current_metrics.connections_refused += 1;
             return self.refuse_connection(addr, rid);
         };
 
         if let Some(waker) = listener_state.accept.take() {
+            self.current_metrics.connections_accepted += 1;
             let res = self.accepted(addr, rid);
             waker.wake(Some(res));
         } else {
@@ -378,12 +422,15 @@ impl NodeState {
                     self.resolve_connection(source_rid, Ok(remote_rid));
                 },
                 MessageDetail::ConnectionRefused { source_rid } => {
+                    self.current_metrics.connections_failed += 1;
                     self.resolve_connection(source_rid, Err(ConnectError::RemoteIsDown));
                 },
                 MessageDetail::ConnectionClosed { rid } => {
                     self.close_local_connection(rid);
                 },
                 MessageDetail::Data { rid, data } => {
+                    self.current_metrics.msg_received += 1;
+                    self.current_metrics.bytes_received += data.len() as u64;
                     self.process_message(rid, data);
                 },
             }

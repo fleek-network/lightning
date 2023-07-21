@@ -5895,6 +5895,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "replace_with"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3a8614ee435691de62bcffcf4a66d91b3594bf1428a5722e79103249a095690"
+
+[[package]]
 name = "reqwest"
 version = "0.11.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6633,6 +6639,7 @@ name = "simulon"
 version = "0.0.1"
 dependencies = [
  "bincode",
+ "derive_more",
  "futures",
  "futures-task",
  "fxhash",
@@ -6641,6 +6648,7 @@ dependencies = [
  "rand 0.8.5",
  "rand_core 0.6.4",
  "rand_distr",
+ "replace_with",
  "serde",
  "spin 0.9.8",
  "thiserror",
