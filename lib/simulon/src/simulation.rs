@@ -197,9 +197,9 @@ impl Simulation {
                 let node_ref =
                     unsafe { &mut *(self.state.nodes.as_ptr().add(node_id) as *mut NodeState) };
 
-                msg.time += self.get_latency(msg.sender.0, msg.receiver.0).as_nanos();
+                msg.time.0 += self.get_latency(msg.sender.0, msg.receiver.0).as_nanos();
 
-                node_ref.received.insert(msg);
+                node_ref.received.push(msg);
             }
         }
     }

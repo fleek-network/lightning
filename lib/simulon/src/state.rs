@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{BTreeSet, HashMap, VecDeque},
+    collections::{BinaryHeap, HashMap, VecDeque},
 };
 
 use futures::executor::LocalPool;
@@ -60,7 +60,7 @@ pub struct NodeState {
     /// The array of pending outgoing requests.
     pub outgoing: Vec<Message>,
     /// The messages which we have received and should execute when the time comes.
-    pub received: BTreeSet<Message>,
+    pub received: BinaryHeap<Message>,
     /// The collected metrics during the entire execution.
     pub metrics: NodeMetrics,
     /// The current metrics being collected for the current frame.
@@ -133,7 +133,7 @@ impl NodeState {
             resources: HashMap::with_capacity(16),
             listening: HashMap::default(),
             outgoing: Vec::new(),
-            received: BTreeSet::new(),
+            received: BinaryHeap::new(),
             metrics: NodeMetrics::default(),
             current_metrics: Metrics::default(),
             next_rid: 0,
@@ -173,7 +173,7 @@ impl NodeState {
         let message = Message {
             sender: RemoteAddr(self.node_id),
             receiver: remote,
-            time: self.now(),
+            time: std::cmp::Reverse(self.now()),
             detail: MessageDetail::Connect { port, rid },
         };
 
@@ -233,7 +233,7 @@ impl NodeState {
         let message = Message {
             sender: RemoteAddr(self.node_id),
             receiver: remote,
-            time: self.now(),
+            time: std::cmp::Reverse(self.now()),
             detail: MessageDetail::Data {
                 receiver_rid: rid,
                 data,
@@ -273,7 +273,7 @@ impl NodeState {
         let message = Message {
             sender: RemoteAddr(self.node_id),
             receiver: addr,
-            time: self.now(),
+            time: std::cmp::Reverse(self.now()),
             detail: MessageDetail::ConnectionClosed { receiver_rid: rid },
         };
 
@@ -336,7 +336,7 @@ impl NodeState {
         let message = Message {
             sender: RemoteAddr(self.node_id),
             receiver: addr,
-            time: self.now(),
+            time: std::cmp::Reverse(self.now()),
             detail: MessageDetail::ConnectionAccepted {
                 sender_rid: rid,
                 receiver_rid: remote_rid,
@@ -357,7 +357,7 @@ impl NodeState {
         let message = Message {
             sender: RemoteAddr(self.node_id),
             receiver: addr,
-            time: self.now(),
+            time: std::cmp::Reverse(self.now()),
             detail: MessageDetail::ConnectionRefused {
                 receiver_rid: remote_rid,
             },
@@ -405,12 +405,13 @@ impl NodeState {
         }
     }
 
+    pub fn is_stalled(&self) -> bool {
+        !matches!(self.received.peek(), Some(msg) if msg.time.0 <= self.time)
+    }
+
     pub fn run_until_stalled(&mut self) {
-        while let Some(msg) = self.received.pop_first() {
-            if msg.time > self.time {
-                self.received.insert(msg);
-                break;
-            }
+        while !self.is_stalled() {
+            let msg = self.received.pop().unwrap();
 
             // eprintln!("\t>current {}: {:?}", self.node_id, msg);
 
