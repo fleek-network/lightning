@@ -86,6 +86,22 @@ impl Report {
     }
 }
 
+impl Metrics {
+    pub fn is_empty(&self) -> bool {
+        self.bytes_sent == 0
+            && self.msg_sent == 0
+            && self.bytes_received == 0
+            && self.msg_received == 0
+            && self.bytes_processed == 0
+            && self.msg_processed == 0
+            && self.connections_accepted == 0
+            && self.connections_requested == 0
+            && self.connections_closed == 0
+            && self.connections_refused == 0
+            && self.connections_failed == 0
+    }
+}
+
 /// A [`Vec`] wrapper that implements pairwise addition.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct VecWithAdd<T>(pub Vec<T>);

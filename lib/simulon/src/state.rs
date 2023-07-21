@@ -234,7 +234,10 @@ impl NodeState {
             sender: RemoteAddr(self.node_id),
             receiver: remote,
             time: self.now(),
-            detail: MessageDetail::Data { rid, data },
+            detail: MessageDetail::Data {
+                receiver_rid: rid,
+                data,
+            },
         };
 
         self.outgoing.push(message);
@@ -271,7 +274,7 @@ impl NodeState {
             sender: RemoteAddr(self.node_id),
             receiver: addr,
             time: self.now(),
-            detail: MessageDetail::ConnectionClosed { rid },
+            detail: MessageDetail::ConnectionClosed { receiver_rid: rid },
         };
 
         self.outgoing.push(message);
@@ -301,10 +304,10 @@ impl NodeState {
         }
     }
 
-    fn process_message(&mut self, rid: ResourceId, data: Vec<u8>) {
+    fn process_message(&mut self, our_rid: ResourceId, data: Vec<u8>) {
         let resource = self
             .resources
-            .get_mut(&rid)
+            .get_mut(&our_rid)
             .expect("process_message: Resource not found.");
 
         let (recv, queue) = if let Resource::EstablishedConnection { recv, queue } = resource {
@@ -335,8 +338,8 @@ impl NodeState {
             receiver: addr,
             time: self.now(),
             detail: MessageDetail::ConnectionAccepted {
-                source_rid: rid,
-                remote_rid,
+                sender_rid: rid,
+                receiver_rid: remote_rid,
             },
         };
 
@@ -356,7 +359,7 @@ impl NodeState {
             receiver: addr,
             time: self.now(),
             detail: MessageDetail::ConnectionRefused {
-                source_rid: remote_rid,
+                receiver_rid: remote_rid,
             },
         };
 
@@ -382,14 +385,14 @@ impl NodeState {
 
     fn resolve_connection(
         &mut self,
-        source_rid: ResourceId,
+        our_rid: ResourceId,
         result: Result<ResourceId, ConnectError>,
     ) {
-        let resource = self.resources.remove(&source_rid).unwrap();
+        let resource = self.resources.remove(&our_rid).unwrap();
 
         if result.is_ok() {
             self.resources.insert(
-                source_rid,
+                our_rid,
                 Resource::EstablishedConnection {
                     recv: None,
                     queue: VecDeque::new(),
@@ -409,29 +412,29 @@ impl NodeState {
                 break;
             }
 
-            // println!("\t>current {}: {:?}", self.node_id, msg);
+            // eprintln!("\t>current {}: {:?}", self.node_id, msg);
 
             match msg.detail {
                 MessageDetail::Connect { port, rid } => {
                     self.maybe_accept_new_connection(port, msg.sender, rid);
                 },
                 MessageDetail::ConnectionAccepted {
-                    source_rid,
-                    remote_rid,
+                    sender_rid,
+                    receiver_rid,
                 } => {
-                    self.resolve_connection(source_rid, Ok(remote_rid));
+                    self.resolve_connection(receiver_rid, Ok(sender_rid));
                 },
-                MessageDetail::ConnectionRefused { source_rid } => {
+                MessageDetail::ConnectionRefused { receiver_rid } => {
                     self.current_metrics.connections_failed += 1;
-                    self.resolve_connection(source_rid, Err(ConnectError::RemoteIsDown));
+                    self.resolve_connection(receiver_rid, Err(ConnectError::RemoteIsDown));
                 },
-                MessageDetail::ConnectionClosed { rid } => {
+                MessageDetail::ConnectionClosed { receiver_rid: rid } => {
                     self.close_local_connection(rid);
                 },
-                MessageDetail::Data { rid, data } => {
+                MessageDetail::Data { receiver_rid, data } => {
                     self.current_metrics.msg_received += 1;
                     self.current_metrics.bytes_received += data.len() as u64;
-                    self.process_message(rid, data);
+                    self.process_message(receiver_rid, data);
                 },
             }
         }

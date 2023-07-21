@@ -347,7 +347,7 @@ mod test {
     #[test]
     fn x() {
         let report = SimulationBuilder::new(exec)
-            .with_nodes(2)
+            .with_nodes(5)
             .build()
             .run(Duration::from_secs(1))
             .finish();
@@ -357,8 +357,6 @@ mod test {
 
     fn exec() {
         api::spawn(async {
-            println!("Spawn from {:?}", api::RemoteAddr::whoami());
-
             if api::RemoteAddr::whoami().0 == 0 {
                 let mut listener = api::listen(18);
 
@@ -368,10 +366,8 @@ mod test {
                 }
             } else {
                 let res = api::connect(api::RemoteAddr(0), 18).await;
-                println!("connect result = {:?}", res.is_ok());
                 let mut conn = res.unwrap();
-                let data = conn.recv::<i32>().await;
-                println!("Data received {data:?}");
+                let _data = conn.recv::<i32>().await;
             }
         });
 

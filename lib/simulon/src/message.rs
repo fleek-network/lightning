@@ -17,17 +17,17 @@ pub enum MessageDetail {
         rid: ResourceId,
     },
     ConnectionAccepted {
-        source_rid: ResourceId,
-        remote_rid: ResourceId,
+        sender_rid: ResourceId,
+        receiver_rid: ResourceId,
     },
     ConnectionRefused {
-        source_rid: ResourceId,
+        receiver_rid: ResourceId,
     },
     ConnectionClosed {
-        rid: ResourceId,
+        receiver_rid: ResourceId,
     },
     Data {
-        rid: ResourceId,
+        receiver_rid: ResourceId,
         data: Vec<u8>,
     },
 }
@@ -46,7 +46,7 @@ mod tests {
             sender: RemoteAddr(1),
             receiver: RemoteAddr(2),
             detail: super::MessageDetail::ConnectionClosed {
-                rid: ResourceId(18),
+                receiver_rid: ResourceId(18),
             },
         };
 
@@ -55,7 +55,7 @@ mod tests {
             sender: RemoteAddr(1),
             receiver: RemoteAddr(2),
             detail: super::MessageDetail::ConnectionClosed {
-                rid: ResourceId(18),
+                receiver_rid: ResourceId(18),
             },
         };
 
@@ -63,21 +63,27 @@ mod tests {
             time: 3,
             sender: RemoteAddr(0),
             receiver: RemoteAddr(0),
-            detail: super::MessageDetail::ConnectionClosed { rid: ResourceId(0) },
+            detail: super::MessageDetail::ConnectionClosed {
+                receiver_rid: ResourceId(0),
+            },
         };
 
         let m4 = Message {
             time: 5,
             sender: RemoteAddr(0),
             receiver: RemoteAddr(0),
-            detail: super::MessageDetail::ConnectionClosed { rid: ResourceId(0) },
+            detail: super::MessageDetail::ConnectionClosed {
+                receiver_rid: ResourceId(0),
+            },
         };
 
         let m5 = Message {
             time: 2,
             sender: RemoteAddr(18),
             receiver: RemoteAddr(0),
-            detail: super::MessageDetail::ConnectionClosed { rid: ResourceId(0) },
+            detail: super::MessageDetail::ConnectionClosed {
+                receiver_rid: ResourceId(0),
+            },
         };
 
         let mut set: BTreeSet<Message> = BTreeSet::new();
