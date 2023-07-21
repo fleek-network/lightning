@@ -296,8 +296,6 @@ fn worker_loop(worker_index: usize, state: Arc<SharedState>) {
             break;
         }
 
-        println!("frame {current_frame}");
-
         loop {
             let index = state.cursor.fetch_add(1, Ordering::Relaxed);
 
@@ -305,25 +303,36 @@ fn worker_loop(worker_index: usize, state: Arc<SharedState>) {
                 break;
             }
 
-            execute_node(&state, worker_state, current_frame - 1, index);
+            if execute_node(&state, worker_state, current_frame - 1, index) {
+                break;
+            }
+
             hook_node(std::ptr::null_mut());
         }
     }
 }
 
+/// Returns true if the node did not have any task to be executed. Since the array of nodes
+/// is sorted by tasks this indicates that the other nodes are not going to have a task as well
+/// and that we can skip them.
 fn execute_node(
     state: &Arc<SharedState>,
     worker_state: &mut WorkerState,
     frame: usize,
     index: usize,
-) {
+) -> bool {
     let ptr = state.nodes[index];
     hook_node(ptr);
 
     // update the time on the node.
-    with_node(|n| {
+    let is_stalled = with_node(|n| {
         n.time = (frame as u128) * FRAME_DURATION.as_nanos();
+        n.is_stalled()
     });
+
+    if is_stalled && frame > 0 {
+        return true;
+    }
 
     let started = std::time::Instant::now();
     if frame == 0 {
@@ -352,6 +361,8 @@ fn execute_node(
 
         n.current_metrics = Metrics::default();
     });
+
+    false
 }
 
 fn wait_for_next_frame(state: &Arc<SharedState>, current_frame: usize) -> Option<usize> {
