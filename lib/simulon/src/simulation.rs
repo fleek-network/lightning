@@ -26,8 +26,14 @@ pub struct SimulationBuilder {
 }
 
 pub struct Simulation {
-    workers: Vec<JoinHandle<()>>,
+    /// The current time in nanoseconds.
+    now: u128,
+    /// The shared state between us and the workers.
     state: Arc<SharedState>,
+    /// The owned array of nodes in their actual order.
+    nodes: Box<[NodeState]>,
+    /// A handle to each worker thread.
+    workers: Vec<JoinHandle<()>>,
 }
 
 #[derive(Default)]
@@ -53,17 +59,19 @@ struct SharedState {
     ///
     /// So only one thread (`main/worker`) is interested in this data at a time.
     workers: Box<[UnsafeCell<WorkerState>]>,
-    /// Store the state of each node.
-    nodes: Box<[NodeState]>,
+    /// Nodes sorted by their event time.
+    nodes: Box<[*mut NodeState]>,
     /// The current frame.
     frame: AtomicUsize,
     /// The current node that is being processed.
     cursor: AtomicUsize,
+    /// Number of threads that have done their execution and are ready to start the next frame.
     ready_workers: AtomicUsize,
 }
 
 // Because `SyncUnsafeCell` is unstable and nightly.
 unsafe impl Sync for SharedState {}
+unsafe impl Send for SharedState {}
 
 impl SimulationBuilder {
     pub fn new<E>(executor: E) -> Self
@@ -114,6 +122,12 @@ impl SimulationBuilder {
 
         // Cap the number of workers to the number of nodes.
         let num_workers = num_workers.min(num_nodes);
+        let nodes = (0..num_nodes)
+            .map(|i| NodeState::new(num_nodes, i))
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+
+        let ptr = nodes.as_ptr();
 
         let state = SharedState {
             executor: self.executor,
@@ -127,8 +141,10 @@ impl SimulationBuilder {
                 })
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
-            nodes: (0..num_nodes)
-                .map(|i| NodeState::new(num_nodes, i))
+            nodes: nodes
+                .iter()
+                .enumerate()
+                .map(|(i, _)| unsafe { ptr.add(i) as *mut NodeState })
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             frame: AtomicUsize::new(0),
@@ -137,34 +153,56 @@ impl SimulationBuilder {
         };
 
         Simulation {
-            workers: Vec::with_capacity(num_workers),
+            now: 0,
             state: Arc::new(state),
+            nodes,
+            workers: Vec::with_capacity(num_workers),
         }
     }
 }
 
 impl Simulation {
-    pub fn run(mut self, duration: Duration) -> Self {
+    pub fn run(mut self, duration: Duration) -> Report {
         self.start_threads();
 
-        let n = duration.as_nanos() / FRAME_DURATION.as_nanos();
-        for _ in 0..n {
+        let mut n = duration.as_nanos() / FRAME_DURATION.as_nanos();
+
+        // Run frame zero regardless that the event queue is empty.
+        wait_for_workers(&self.state);
+        self.state.ready_workers.store(0, Ordering::Relaxed);
+        self.state.frame.fetch_add(1, Ordering::Relaxed);
+
+        while n > 1 {
+            // wait for the workers to become online.
             wait_for_workers(&self.state);
+
+            // reset the work stealing state.
             self.state.ready_workers.store(0, Ordering::Relaxed);
             self.state.cursor.store(0, Ordering::Relaxed);
-            self.state.frame.fetch_add(1, Ordering::Relaxed);
-            self.run_post_frame();
+
+            // Run the post executing tasks and figure out how many frames we should move forward.
+            if let Some(skip) = self.run_post_frame() {
+                debug_assert!(skip >= 1);
+
+                // Move the clock to `skip` frames forward.
+                self.now += skip as u128 * FRAME_DURATION.as_nanos();
+
+                // Update the loop counter and move to the frame.
+                n -= skip as u128;
+                self.state.frame.fetch_add(skip, Ordering::Relaxed);
+            } else {
+                // End early since there is no more event to be processed.
+                break;
+            }
         }
 
-        wait_for_workers(&self.state);
-        self.run_post_frame();
-
+        // wait for threads one last time.
         self.stop_threads();
 
-        self
+        self.finish()
     }
 
-    pub fn finish(self) -> Report {
+    fn finish(mut self) -> Report {
         let mut report = self
             .state
             .workers
@@ -173,18 +211,14 @@ impl Simulation {
             .map(|s| std::mem::take(&mut s.metrics))
             .fold(Report::default(), |a, b| a + b);
 
-        let count = self.state.nodes.len();
-        let nodes = self.state.nodes.as_ptr();
-
-        for i in 0..count {
-            let node = unsafe { &mut *(nodes.add(i) as *mut NodeState) };
+        for node in self.nodes.iter_mut() {
             report.node.push(std::mem::take(&mut node.metrics));
         }
 
         report
     }
 
-    fn run_post_frame(&mut self) {
+    fn run_post_frame(&mut self) -> Option<usize> {
         // Move the messages generated by each worker to each of the destinations.
         for messages in self
             .state
@@ -194,14 +228,25 @@ impl Simulation {
         {
             for mut msg in messages.drain(..) {
                 let node_id = msg.receiver.0;
-                let node_ref =
-                    unsafe { &mut *(self.state.nodes.as_ptr().add(node_id) as *mut NodeState) };
 
                 msg.time.0 += self.get_latency(msg.sender.0, msg.receiver.0).as_nanos();
-
-                node_ref.received.push(msg);
+                self.nodes[node_id].received.push(msg);
             }
         }
+
+        let ptr = self.state.nodes.as_ptr();
+        let slice = unsafe {
+            std::slice::from_raw_parts_mut(ptr as *mut *mut NodeState, self.state.nodes.len())
+        };
+
+        // Sort the nodes by the time of their first event.
+        slice.sort_by_key(|k| std::cmp::Reverse(unsafe { &**k }.received.peek().map(|x| x.time)));
+
+        // Figure out how many frames to move forward.
+        let first = unsafe { &*self.state.nodes[0] };
+        let msg = first.received.peek()?;
+        let _time = msg.time.0;
+        Some(1)
     }
 
     fn get_latency(&self, _s: usize, _r: usize) -> Duration {
@@ -243,13 +288,17 @@ fn worker_loop(worker_index: usize, state: Arc<SharedState>) {
         state.ready_workers.fetch_add(1, Ordering::Relaxed);
 
         // If true is returned it means that we're done and should exit the thread.
-        if wait_for_next_frame(&state, current_frame) {
+        if let Some(frame) = wait_for_next_frame(&state, current_frame) {
+            current_frame = frame;
+        } else {
             break;
         }
 
         if state.frame_per_global_report > 0 && current_frame % state.frame_per_global_report == 0 {
             worker_state.metrics.next_period();
         }
+
+        println!("frame {current_frame}");
 
         loop {
             let index = state.cursor.fetch_add(1, Ordering::Relaxed);
@@ -258,11 +307,9 @@ fn worker_loop(worker_index: usize, state: Arc<SharedState>) {
                 break;
             }
 
-            execute_node(&state, worker_state, current_frame, index);
+            execute_node(&state, worker_state, current_frame - 1, index);
             hook_node(std::ptr::null_mut());
         }
-
-        current_frame += 1;
     }
 }
 
@@ -272,12 +319,11 @@ fn execute_node(
     frame: usize,
     index: usize,
 ) {
-    let ptr = unsafe { state.nodes.as_ptr().add(index) as *mut NodeState };
+    let ptr = state.nodes[index];
     hook_node(ptr);
 
     // update the time on the node.
     with_node(|n| {
-        debug_assert_eq!(n.node_id, index);
         n.time = (frame as u128) * FRAME_DURATION.as_nanos();
 
         if state.frame_per_node_report > 0 && frame % state.frame_per_node_report == 0 {
@@ -306,19 +352,17 @@ fn execute_node(
     });
 }
 
-fn wait_for_next_frame(state: &Arc<SharedState>, current_frame: usize) -> bool {
+fn wait_for_next_frame(state: &Arc<SharedState>, current_frame: usize) -> Option<usize> {
     loop {
         let frame = state.frame.load(Ordering::Relaxed);
 
         if frame == usize::MAX {
-            return true;
+            return None;
         }
 
-        if frame == current_frame + 1 {
-            return false;
+        if frame > current_frame {
+            return Some(frame);
         }
-
-        debug_assert!(frame == current_frame, "Frame was skipped.");
 
         std::hint::spin_loop();
     }
@@ -342,15 +386,15 @@ fn wait_for_workers(state: &Arc<SharedState>) {
 mod test {
     use std::time::Duration;
 
+    use super::FRAME_TO_MS;
     use crate::{api, simulation::SimulationBuilder};
 
     #[test]
     fn x() {
         let report = SimulationBuilder::new(exec)
-            .with_nodes(5)
+            .with_nodes(2)
             .build()
-            .run(Duration::from_secs(1))
-            .finish();
+            .run(Duration::from_millis(100 / FRAME_TO_MS));
 
         println!("{report:#?}");
     }
