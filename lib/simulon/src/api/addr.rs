@@ -29,6 +29,16 @@ impl NodeArray {
             size: with_node(|n| n.count_nodes),
         }
     }
+
+    /// Returns the number of items.
+    pub fn len(&self) -> usize {
+        self.size
+    }
+
+    /// Returns true if there is no items.
+    pub fn is_empty(&self) -> bool {
+        self.size == 0
+    }
 }
 
 impl Default for NodeArray {
@@ -67,5 +77,14 @@ impl Iterator for NodeArrayIterator {
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         self.current += n;
         self.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.current >= self.size {
+            return (0, Some(0));
+        }
+
+        let n = self.size - self.current;
+        (n, Some(n))
     }
 }
