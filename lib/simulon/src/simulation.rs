@@ -294,10 +294,6 @@ fn worker_loop(worker_index: usize, state: Arc<SharedState>) {
             break;
         }
 
-        if state.frame_per_global_report > 0 && current_frame % state.frame_per_global_report == 0 {
-            worker_state.metrics.next_period();
-        }
-
         println!("frame {current_frame}");
 
         loop {
@@ -325,10 +321,6 @@ fn execute_node(
     // update the time on the node.
     with_node(|n| {
         n.time = (frame as u128) * FRAME_DURATION.as_nanos();
-
-        if state.frame_per_node_report > 0 && frame % state.frame_per_node_report == 0 {
-            n.metrics.next_period();
-        }
     });
 
     let started = std::time::Instant::now();
@@ -346,8 +338,16 @@ fn execute_node(
         worker_state.outgoing.append(&mut n.outgoing);
 
         // Push the metrics for this frame to the reporter and clear the data.
-        n.metrics.insert(n.current_metrics);
-        worker_state.metrics.insert(n.current_metrics);
+        n.metrics.insert(
+            frame.checked_div(state.frame_per_node_report),
+            n.current_metrics,
+        );
+
+        worker_state.metrics.insert(
+            frame.checked_div(state.frame_per_global_report),
+            n.current_metrics,
+        );
+
         n.current_metrics = Metrics::default();
     });
 }

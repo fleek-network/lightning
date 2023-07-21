@@ -1,10 +1,11 @@
 use std::ops::{Add, Deref, DerefMut};
 
 use derive_more::{Add, AddAssign};
+use fxhash::FxHashMap;
 use replace_with::replace_with_or_abort;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, Add)]
+#[derive(Clone, Debug, Default, Serialize, Add)]
 pub struct Report {
     /// The number of simulated frames.
     pub frames: u64,
@@ -13,7 +14,7 @@ pub struct Report {
     /// The sum of metrics.
     pub total: Metrics,
     /// The sum of the entire metrics per each 'n' frame.
-    pub timeline: VecWithAdd<Metrics>,
+    pub timeline: Timeline,
     /// Metrics for each node. During execution this must be empty.
     pub node: VecWithAdd<NodeMetrics>,
 }
@@ -23,7 +24,7 @@ pub struct NodeMetrics {
     /// The total metrics during the entire execution.
     pub total: Metrics,
     /// The metrics per each 'n' frame.
-    pub timeline: VecWithAdd<Metrics>,
+    pub timeline: Timeline,
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, Add, AddAssign)]
@@ -58,31 +59,21 @@ pub struct Metrics {
 
 impl NodeMetrics {
     #[inline(always)]
-    pub fn insert(&mut self, metric: Metrics) {
+    pub fn insert(&mut self, key: Option<usize>, metric: Metrics) {
         replace_with_or_abort(&mut self.total, |m| m.add(metric));
-        if let Some(x) = self.timeline.last_mut() {
-            *x += metric;
+        if let Some(key) = key {
+            self.timeline.insert(key, metric);
         }
-    }
-
-    #[inline(always)]
-    pub fn next_period(&mut self) {
-        self.timeline.push(Metrics::default());
     }
 }
 
 impl Report {
     #[inline(always)]
-    pub fn insert(&mut self, metric: Metrics) {
+    pub fn insert(&mut self, key: Option<usize>, metric: Metrics) {
         replace_with_or_abort(&mut self.total, |m| m.add(metric));
-        if let Some(x) = self.timeline.last_mut() {
-            *x += metric;
+        if let Some(key) = key {
+            self.timeline.insert(key, metric);
         }
-    }
-
-    #[inline(always)]
-    pub fn next_period(&mut self) {
-        self.timeline.push(Metrics::default());
     }
 }
 
@@ -99,6 +90,50 @@ impl Metrics {
             && self.connections_closed == 0
             && self.connections_refused == 0
             && self.connections_failed == 0
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Timeline(pub FxHashMap<usize, Metrics>);
+
+impl Timeline {
+    pub fn insert(&mut self, key: usize, metric: Metrics) {
+        match self.entry(key) {
+            std::collections::hash_map::Entry::Vacant(e) => {
+                e.insert(metric);
+            },
+            std::collections::hash_map::Entry::Occupied(mut e) => {
+                *e.get_mut() += metric;
+            },
+        }
+    }
+}
+
+impl Add for Timeline {
+    type Output = Self;
+
+    fn add(mut self, rhs: Self) -> Self::Output {
+        for (index, metric) in rhs.0 {
+            self.insert(index, metric);
+        }
+
+        self
+    }
+}
+
+impl Deref for Timeline {
+    type Target = FxHashMap<usize, Metrics>;
+
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Timeline {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
