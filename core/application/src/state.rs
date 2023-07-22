@@ -770,9 +770,11 @@ impl<B: Backend> State<B> {
     /// proportional to the revenue earned by selling the commodities. 2) `FLK` token that is
     /// proportional to the `stable` currency rewards, but also depends on a `boost` factor.
     ///
-    /// `FLk` emission per unit of stable earned is given by:
+    /// `FLk` total emission is given by:
+    /// `emission = (inflation * supply) / (daysInYear=365.0)`
     ///
-    /// `emission = (inflation * supply) / (maxBoost * rewardPool * daysInYear=365.0)`
+    ///  `FLk` emission per stable is given by:
+    /// `per_stable = emission / ()`
     fn distribute_rewards(&self) {
         let epoch = match self.metadata.get(&Metadata::Epoch) {
             Some(Value::Epoch(epoch)) => epoch,
@@ -789,7 +791,6 @@ impl<B: Backend> State<B> {
         if reward_pool == HpUfloat::zero() {
             return;
         }
-
         let percentage_divisor = HpUfloat::<18>::from(100_u64);
         let node_percentage: HpUfloat<18> = self
             .parameters
@@ -797,62 +798,62 @@ impl<B: Backend> State<B> {
             .unwrap_or_default()
             .into();
         let node_share = &node_percentage / &percentage_divisor;
-        let (_max_emissions, min_emissions) = self.calculate_emissions();
-        let mut total_emissions: HpUfloat<18> = 0.0.into();
-        let nodes = self.current_epoch_served.keys();
-        for node in nodes {
-            let stables_revenue: HpUfloat<6> = self.calculate_node_revenue(&node);
+        let emissions = self.calculate_emissions();
+        let emissions_for_node = &emissions * &node_share;
 
-            let node_owner = self.node_info.get(&node).unwrap().owner;
-            self.mint_and_transfer_stables(stables_revenue.clone(), node_owner);
+        let mut total_reward_share: HpUfloat<18> = HpUfloat::from(0_u64);
+        let mut local_shares_map: HashMap<NodePublicKey, HpUfloat<18>> = HashMap::new();
+        let mut node_info_map: HashMap<NodePublicKey, NodeInfo> = HashMap::new();
 
+        for node in self.current_epoch_served.keys() {
             // safe to unwrap since all the nodes in current_epoch_served table are in node info
             // this is checked in submit_pod contract/function
-            let locked_until = self.node_info.get(&node).unwrap().stake.stake_locked_until;
-            let boost: HpUfloat<18> = self.get_boost(locked_until, &epoch);
+            let node_info = self.node_info.get(&node).unwrap();
+            node_info_map.insert(node, node_info.clone());
 
+            let stables_rewards: HpUfloat<6> = self.calculate_node_revenue(&node);
             let node_service_proportion =
-                (&stables_revenue / &reward_pool).convert_precision::<18>();
-            let flk_rewards = &min_emissions * node_service_proportion * &boost;
-            total_emissions += flk_rewards.clone();
-            let node_owner = self.node_info.get(&node).unwrap().owner;
-            self.mint_and_transfer_flk(&flk_rewards * &node_share, node_owner);
-            self.current_epoch_served.remove(&node);
+                &stables_rewards.convert_precision::<18>() / &reward_pool.convert_precision::<18>();
+            self.mint_and_transfer_stables(
+                stables_rewards * &node_share.convert_precision(),
+                node_info.owner,
+            );
+
+            let locked_until = node_info.stake.stake_locked_until;
+            let local_boost: HpUfloat<3> = self.get_boost(locked_until, &epoch);
+            let local_share = node_service_proportion * &local_boost.convert_precision();
+            total_reward_share = total_reward_share + &local_share;
+            local_shares_map.insert(node, local_share);
         }
 
-        // distribute rewards to validators
-        let validator_share: HpUfloat<18> = self
-            .parameters
-            .get(&ProtocolParams::ValidatorShare)
-            .unwrap_or_default()
-            .into();
+        let base_reward = &emissions_for_node / &total_reward_share;
 
-        let committee_members = self.committee_info.get(&epoch).unwrap().members;
-        // todo: pick committee size from genesis.toml or from actual committee?
-        let committee_size = committee_members.len();
+        for (node, node_info) in node_info_map.iter() {
+            let local_share = local_shares_map.get(node).unwrap();
+            let flk_rewards = &base_reward * local_share;
 
-        for node in committee_members {
-            let node_owner = self.node_info.get(&node).unwrap().owner;
-            let validator_rewards = (&total_emissions * &validator_share / &percentage_divisor)
-                / &committee_size.into();
-            self.mint_and_transfer_flk(validator_rewards, node_owner);
+            // todo: add service builders and protocols share in stables too
+            self.mint_and_transfer_flk(flk_rewards, node_info.owner);
+            self.current_epoch_served.remove(node);
         }
 
-        let protocol_share: HpUfloat<18> = self
+        let protocol_percentage: HpUfloat<18> = self
             .parameters
             .get(&ProtocolParams::ProtocolShare)
             .unwrap_or_default()
             .into();
+        let protocol_share = &protocol_percentage / &percentage_divisor;
 
         let protocol_owner = match self.metadata.get(&Metadata::ProtocolFundAddress) {
             Some(Value::AccountPublicKey(owner)) => owner,
             _ => panic!("ProtocolFundAddress is added at Genesis and should exist"),
         };
-
-        self.mint_and_transfer_flk(
-            &total_emissions * (&protocol_share / &percentage_divisor),
+        // todo: add service builders revenue
+        self.mint_and_transfer_stables(
+            &reward_pool * &protocol_share.convert_precision(),
             protocol_owner,
         );
+        self.mint_and_transfer_flk(&emissions * &protocol_share, protocol_owner);
     }
 
     fn calculate_node_revenue(&self, node: &NodePublicKey) -> HpUfloat<6> {
@@ -872,30 +873,22 @@ impl<B: Backend> State<B> {
         )
     }
 
-    fn calculate_emissions(&self) -> (HpUfloat<18>, HpUfloat<18>) {
+    fn calculate_emissions(&self) -> HpUfloat<18> {
         let percentage_divisor = HpUfloat::<18>::from(100_u64);
         let inflation_percent: HpUfloat<18> = self
             .parameters
             .get(&ProtocolParams::MaxInflation)
             .unwrap_or(0)
             .into();
-        let inflation = &inflation_percent / &percentage_divisor;
-        let max_boost: HpUfloat<18> = self
-            .parameters
-            .get(&ProtocolParams::MaxBoost)
-            .unwrap_or(1)
-            .into();
+        let inflation: HpUfloat<18> =
+            (&inflation_percent / &percentage_divisor).convert_precision();
 
         let supply_at_year_start = match self.metadata.get(&Metadata::SupplyYearStart) {
             Some(Value::HpUfloat(supply)) => supply,
             _ => panic!("SupplyYearStart is set genesis and should never be empty"),
         };
 
-        let max_emissions: HpUfloat<18> = (&inflation * &supply_at_year_start) / &365.0.into();
-
-        let min_emissions = &max_emissions / &max_boost;
-
-        (max_emissions, min_emissions)
+        (&inflation * &supply_at_year_start.convert_precision()) / &365.0.into()
     }
 
     fn mint_and_transfer_stables(&self, amount: HpUfloat<6>, owner: EthAddress) {
@@ -955,21 +948,21 @@ impl<B: Backend> State<B> {
     ///
     /// Returns:
     /// - The calculated boost factor for the current rewards.
-    fn get_boost(&self, locked_until: u64, current_epoch: &Epoch) -> HpUfloat<18> {
-        let max_boost: HpUfloat<18> = self
+    fn get_boost(&self, locked_until: u64, current_epoch: &Epoch) -> HpUfloat<3> {
+        let max_boost: HpUfloat<3> = self
             .parameters
             .get(&ProtocolParams::MaxBoost)
             .unwrap_or(1)
             .into();
-        let max_lock_time: HpUfloat<18> = self
+        let max_lock_time: HpUfloat<3> = self
             .parameters
             .get(&ProtocolParams::MaxLockTime)
             .unwrap_or(1)
             .into();
         let min_boost = HpUfloat::from(1_u64);
-        let locking_period: HpUfloat<18> = (locked_until.saturating_sub(*current_epoch)).into();
+        let locking_period: HpUfloat<3> = (locked_until.saturating_sub(*current_epoch)).into();
         let boost = &min_boost + (&max_boost - &min_boost) * (&locking_period / &max_lock_time);
-        HpUfloat::<18>::min(&max_boost, &boost).to_owned()
+        HpUfloat::<3>::min(&max_boost, &boost).to_owned()
     }
 
     fn choose_new_committee(&self) -> Vec<NodePublicKey> {

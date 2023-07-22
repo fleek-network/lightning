@@ -18,7 +18,6 @@ pub struct Genesis {
     pub lock_time: Epoch,
     pub max_inflation: u16,
     pub protocol_share: u16,
-    pub validator_share: u16,
     pub node_share: u16,
     pub consumer_rebate: u64,
     pub max_boost: u16,

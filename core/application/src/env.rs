@@ -160,10 +160,6 @@ impl Env<UpdatePerm> {
                 genesis.protocol_share as u128,
             );
             param_table.insert(
-                ProtocolParams::ValidatorShare,
-                genesis.validator_share as u128,
-            );
-            param_table.insert(
                 ProtocolParams::EligibilityTime,
                 genesis.eligibility_time as u128,
             );

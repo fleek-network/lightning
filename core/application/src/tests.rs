@@ -31,7 +31,6 @@ pub struct Params {
     max_inflation: Option<u16>,
     protocol_share: Option<u16>,
     node_share: Option<u16>,
-    validator_share: Option<u16>,
     max_boost: Option<u16>,
     supply_at_genesis: Option<u64>,
 }
@@ -112,10 +111,6 @@ async fn init_app_with_params(
 
     if let Some(node_share) = params.node_share {
         genesis.node_share = node_share;
-    }
-
-    if let Some(validator_share) = params.validator_share {
-        genesis.validator_share = validator_share;
     }
 
     if let Some(max_boost) = params.max_boost {
@@ -636,18 +631,16 @@ async fn test_distribute_rewards() {
     let (committee, keystore) = get_genesis_committee(4);
 
     let max_inflation = 10;
-    let protocol_part = 15;
+    let protocol_part = 20;
     let node_part = 80;
-    let validator_part = 5;
     let boost = 4;
-    let supply_at_genesis = 1000000;
+    let supply_at_genesis = 1_000_000;
     let (update_socket, query_runner) = init_app_with_params(
         Params {
             epoch_time: None,
             max_inflation: Some(max_inflation),
             protocol_share: Some(protocol_part),
             node_share: Some(node_part),
-            validator_share: Some(validator_part),
             max_boost: Some(boost),
             supply_at_genesis: Some(supply_at_genesis),
         },
@@ -660,9 +653,7 @@ async fn test_distribute_rewards() {
     let supply_at_year_start: HpUfloat<18> = supply_at_genesis.into();
     let inflation: HpUfloat<18> = HpUfloat::from(max_inflation) / &percentage_divisor;
     let node_share = HpUfloat::from(node_part) / &percentage_divisor;
-    let validator_share = HpUfloat::from(validator_part) / &percentage_divisor;
     let protocol_share = HpUfloat::from(protocol_part) / &percentage_divisor;
-    let max_boost: HpUfloat<18> = boost.into();
 
     let owner_secret_key1 = AccountOwnerSecretKey::generate();
     let node_secret_key1 = NodeSecretKey::generate();
@@ -702,20 +693,19 @@ async fn test_distribute_rewards() {
         2,
     )
     .await;
-    // staking locking for four year to get max boosts
+    // staking locking for 4 year to get boosts
     stake_lock(
         1460,
-        node_secret_key1.to_pk(),
-        owner_secret_key1,
+        node_secret_key2.to_pk(),
+        owner_secret_key2,
         &update_socket,
         3,
     )
     .await;
-    let node_1_boost = &max_boost;
 
     // submit pods for usage
-    let pod_10 = pod_request(node_secret_key1, 10000, 0, 1);
-    let pod11 = pod_request(node_secret_key1, 6767, 1, 2);
+    let pod_10 = pod_request(node_secret_key1, 12_800, 0, 1);
+    let pod11 = pod_request(node_secret_key1, 3_600, 1, 2);
     let pod_21 = pod_request(node_secret_key2, 5000, 1, 1);
     // run the delivery ack transaction
     if let Err(e) = run_transaction(vec![pod_10, pod11, pod_21], &update_socket).await {
@@ -723,54 +713,49 @@ async fn test_distribute_rewards() {
     }
 
     // call epoch change that will trigger distribute rewards
-    let committee_members = query_runner.get_committee_members();
     if let Err(err) = simple_epoch_change(0, &keystore, &update_socket, 1).await {
         panic!("error while changing epoch, {err}");
     }
-    let node_1_usd = 0.1 * 10000_f64 + 0.2 * 6767_f64;
-    let node_2_usd = 0.2 * 5000_f64;
-    let reward_pool: HpUfloat<6> = (node_2_usd + node_1_usd).into();
+    let node_1_usd = 0.1 * 12_800_f64 + 0.2 * 3_600_f64; // 2_000 in revenue
+    let node_2_usd = 0.2 * 5_000_f64; // 1_000 in revenue
 
     // assert stable balances
     let stables_balance = query_runner.get_stables_balance(&owner_secret_key1.to_pk().into());
-    assert_eq!(stables_balance, node_1_usd.into());
+    assert_eq!(
+        stables_balance,
+        <f64 as Into<HpUfloat<6>>>::into(node_1_usd) * node_share.convert_precision()
+    );
+    let stables_balance2 = query_runner.get_stables_balance(&owner_secret_key2.to_pk().into());
+    assert_eq!(
+        stables_balance2,
+        <f64 as Into<HpUfloat<6>>>::into(node_2_usd) * node_share.convert_precision()
+    );
+
+    let node_1_proportion: HpUfloat<18> = HpUfloat::from(2_u64) / HpUfloat::from(3_u64);
+    let node_2_proportion: HpUfloat<18> = HpUfloat::from(1_u64) / HpUfloat::from(3_u64);
+    let total_share =
+        &node_1_proportion * HpUfloat::from(1_u64) + &node_2_proportion * HpUfloat::from(4_u64);
 
     // calculate emissions per unit
-    let max_emissions: HpUfloat<18> = (inflation * supply_at_year_start) / &365.0.into();
-    let emissions_per_unit = &max_emissions / &max_boost;
-    let node_proportion_1 = (&node_1_usd.into() / &reward_pool).convert_precision::<18>();
-    let node_proportion_2 = (&node_2_usd.into() / &reward_pool).convert_precision::<18>();
+    let emissions: HpUfloat<18> = (inflation * supply_at_year_start) / &365.0.into();
+    let emissions_for_node = &emissions * &node_share;
 
     // assert flk balances node 1
     let node_flk_balance1 = query_runner.get_flk_balance(&owner_secret_key1.to_pk().into());
-    let node_flk_rewards1: HpUfloat<18> =
-        &emissions_per_unit * &node_share * node_1_boost * node_proportion_1;
+    let node_flk_rewards1 = (&emissions_for_node * &node_1_proportion) / &total_share;
     assert_eq!(node_flk_balance1, node_flk_rewards1);
 
     // assert flk balances node 2
     let node_flk_balance2 = query_runner.get_flk_balance(&owner_secret_key2.to_pk().into());
-    let node_flk_rewards2: HpUfloat<18> = &emissions_per_unit * &node_share * node_proportion_2;
+    let node_flk_rewards2: HpUfloat<18> =
+        (&emissions_for_node * (&node_2_proportion * HpUfloat::from(4_u64))) / &total_share;
     assert_eq!(node_flk_balance2, node_flk_rewards2);
-
-    // calculate total emissions based on total emissions for node which is equal to node share. the
-    // rest goes to other validators(maybe) and protocol
-    let total_emissions: HpUfloat<18> = (&node_flk_rewards1 + &node_flk_rewards2) / &node_share;
 
     // assert protocols share
     let protocol_account = query_runner.get_protocol_fund_address();
     let protocol_balance = query_runner.get_flk_balance(&protocol_account);
-    let protocol_rewards = &total_emissions * &protocol_share;
+    let protocol_rewards = &emissions * &protocol_share;
     assert_eq!(protocol_balance, protocol_rewards);
-
-    // assert validaots share
-    let committee_account1 = query_runner
-        .get_node_info(&committee_members[0])
-        .unwrap()
-        .owner;
-
-    let validator_balance = query_runner.get_flk_balance(&committee_account1);
-    let validator_rewards = (&total_emissions * &validator_share) / &committee_members.len().into();
-    assert_eq!(validator_balance, validator_rewards);
 }
 
 #[test]
@@ -898,7 +883,6 @@ async fn test_supply_across_epoch() {
     let max_inflation = 10;
     let protocol_part = 15;
     let node_part = 80;
-    let validator_part = 5;
     let boost = 4;
     let supply_at_genesis = 1000000;
     let (update_socket, query_runner) = init_app_with_params(
@@ -907,7 +891,6 @@ async fn test_supply_across_epoch() {
             max_inflation: Some(max_inflation),
             protocol_share: Some(protocol_part),
             node_share: Some(node_part),
-            validator_share: Some(validator_part),
             max_boost: Some(boost),
             supply_at_genesis: Some(supply_at_genesis),
         },
@@ -916,14 +899,11 @@ async fn test_supply_across_epoch() {
     .await;
 
     // get params for emission calculations
-    let committee_size: HpUfloat<18> = query_runner.get_committee_members().len().into();
     let percentage_divisor: HpUfloat<18> = 100_u16.into();
     let supply_at_year_start: HpUfloat<18> = supply_at_genesis.into();
     let inflation: HpUfloat<18> = HpUfloat::from(max_inflation) / &percentage_divisor;
     let node_share = HpUfloat::from(node_part) / &percentage_divisor;
-    let validator_share = (HpUfloat::from(validator_part) / &percentage_divisor) / &committee_size;
     let protocol_share = HpUfloat::from(protocol_part) / &percentage_divisor;
-    let max_boost: HpUfloat<18> = boost.into();
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_secret_key = NodeSecretKey::generate();
@@ -950,9 +930,8 @@ async fn test_supply_across_epoch() {
     let _node_1_usd = 0.1 * 10000_f64;
 
     // calculate emissions per unit
-    let max_emissions: HpUfloat<18> = (&inflation * &supply_at_year_start) / &365.0.into();
+    let emissions_per_epoch: HpUfloat<18> = (&inflation * &supply_at_year_start) / &365.0.into();
 
-    let emissions_per_epoch = &max_emissions / &max_boost;
     let mut supply = supply_at_year_start;
 
     // 365 epoch changes to see if the current supply and year start suppply are ok
@@ -966,9 +945,8 @@ async fn test_supply_across_epoch() {
             panic!("error while changing epoch, {err}");
         }
 
-        let supply_increase = &emissions_per_epoch * &node_share
-            + &emissions_per_epoch * &protocol_share
-            + &emissions_per_epoch * &validator_share * &committee_size;
+        let supply_increase =
+            &emissions_per_epoch * &node_share + &emissions_per_epoch * &protocol_share;
         let total_supply = query_runner.get_total_supply();
         let supply_year_start = query_runner.get_year_start_supply();
         supply += supply_increase;
