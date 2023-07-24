@@ -69,6 +69,8 @@ pub struct NodeState {
     pub current_metrics: Metrics,
     /// The shared storage across all nodes.
     pub storage: Arc<TypedStorage>,
+    /// The already emitted events.
+    pub emitted: FxHashMap<String, u128>,
     next_rid: usize,
     clean_up: WithCleanUpDrop,
 }
@@ -142,6 +144,7 @@ impl NodeState {
             metrics: NodeMetrics::default(),
             current_metrics: Metrics::default(),
             storage,
+            emitted: FxHashMap::default(),
             next_rid: 0,
             clean_up: WithCleanUpDrop,
         }
@@ -305,6 +308,13 @@ impl NodeState {
         self.received.push(message);
 
         future
+    }
+
+    pub fn emit(&mut self, key: String) {
+        assert!(
+            self.emitted.insert(key, self.time).is_none(),
+            "Node has already emitted the event."
+        );
     }
 
     fn close_local_connection(&mut self, rid: ResourceId) {

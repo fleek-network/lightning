@@ -15,10 +15,8 @@ use crate::{
     report::{Metrics, Report},
     state::{hook_node, with_node, NodeState},
     storage::TypedStorage,
+    FRAME_DURATION, FRAME_TO_MS,
 };
-
-const FRAME_TO_MS: u64 = 4;
-const FRAME_DURATION: Duration = Duration::from_micros(1_000 / FRAME_TO_MS);
 
 pub struct SimulationBuilder<L = DefaultLatencyProvider> {
     executor: Box<dyn Fn() + Send + Sync>,
@@ -263,7 +261,6 @@ impl<L: LatencyProvider> Simulation<L> {
 
             // Run the post executing tasks and figure out how many frames we should move forward.
             if let Some(skip) = self.run_post_frame() {
-                println!("skip {skip}");
                 debug_assert!(skip >= 1);
 
                 // Move the clock to `skip` frames forward.
@@ -294,6 +291,16 @@ impl<L: LatencyProvider> Simulation<L> {
             .fold(Report::default(), |a, b| a + b);
 
         for node in self.nodes.iter_mut() {
+            for (event, time) in node.emitted.drain() {
+                *report
+                    .log
+                    .emitted
+                    .entry(event)
+                    .or_default()
+                    .entry(time / 1_000_000)
+                    .or_default() += 1;
+            }
+
             report.node.push(std::mem::take(&mut node.metrics));
         }
 

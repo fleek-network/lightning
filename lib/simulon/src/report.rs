@@ -13,10 +13,26 @@ pub struct Report {
     pub frame_duration: u128,
     /// The sum of metrics.
     pub total: Metrics,
+    /// The log of different events.
+    pub log: Log,
     /// The sum of the entire metrics per each 'n' frame.
     pub timeline: Timeline,
     /// Metrics for each node. During execution this must be empty.
     pub node: VecWithAdd<NodeMetrics>,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct Log {
+    pub emitted: FxHashMap<String, FxHashMap<u128, u32>>,
+}
+
+impl Add for Log {
+    type Output = Log;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        assert!(rhs.emitted.is_empty());
+        self
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, Add)]
