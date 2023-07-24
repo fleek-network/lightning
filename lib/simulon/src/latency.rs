@@ -1,6 +1,8 @@
 use std::time::Duration;
 
 mod constant;
+
+/// A latency data provider from real world data.
 pub mod ping;
 
 /// The latency provider is instantiated per simulation and is responsible to provide the

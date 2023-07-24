@@ -72,7 +72,7 @@ pub struct NodeState {
     /// The already emitted events.
     pub emitted: FxHashMap<String, u128>,
     next_rid: usize,
-    clean_up: WithCleanUpDrop,
+    _clean_up: WithCleanUpDrop,
 }
 
 // When we're getting dropped some futures may still be pending and hold state which
@@ -146,7 +146,7 @@ impl NodeState {
             storage,
             emitted: FxHashMap::default(),
             next_rid: 0,
-            clean_up: WithCleanUpDrop,
+            _clean_up: WithCleanUpDrop,
         }
     }
 

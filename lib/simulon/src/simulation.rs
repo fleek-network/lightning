@@ -18,6 +18,7 @@ use crate::{
     FRAME_DURATION, FRAME_TO_MS,
 };
 
+/// Constructor for a simulation which allows you to set the parameters of a simulation.
 pub struct SimulationBuilder<L = DefaultLatencyProvider> {
     executor: Box<dyn Fn() + Send + Sync>,
     num_workers: Option<usize>,
@@ -486,32 +487,4 @@ fn wait_for_workers(state: &Arc<SharedState>) {
 #[inline(always)]
 fn ceil_div(a: u128, b: u128) -> u128 {
     (a + b - 1) / b
-}
-
-#[cfg(test)]
-mod test {
-    use std::time::Duration;
-
-    use super::FRAME_TO_MS;
-    use crate::{api, simulation::SimulationBuilder};
-
-    #[test]
-    fn x() {
-        let report = SimulationBuilder::new(exec)
-            .with_nodes(1)
-            .build()
-            .run(Duration::from_millis(100 / FRAME_TO_MS));
-
-        println!("{report:#?}");
-    }
-
-    fn exec() {
-        api::spawn(async {
-            println!("Hello! {}", api::now());
-            api::sleep(Duration::from_millis(5)).await;
-            println!("Woke up! {}", api::now());
-        });
-
-        println!("Hello! {:?}", api::RemoteAddr::whoami());
-    }
 }

@@ -2,15 +2,19 @@ use derive_more::Deref;
 
 use crate::state::with_node;
 
+/// An address for a node in the simulation. This can be dereferenced to the global
+/// index of the node. Global index starts from `0`.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Deref)]
 pub struct RemoteAddr(pub(crate) usize);
 
+/// List of all of the nodes in the simulation. The default instance of this type
+/// includes all of the nodes in the current simulation.
 #[derive(Debug, Clone, Copy)]
 pub struct NodeArray {
     size: usize,
 }
 
-/// An iterator for remotes.
+/// An iterator over a [`NodeArray`].
 #[derive(Debug, Clone, Copy)]
 pub struct NodeArrayIterator {
     current: usize,

@@ -3,6 +3,8 @@ use serde::{de::DeserializeOwned, Serialize};
 use super::RemoteAddr;
 use crate::state::{with_node, ResourceId};
 
+/// A connection to a remote peer. You can establish a connection by either connecting to a peer
+/// via the [`crate::api::connect`] method or by accepting connections from a listener.
 pub struct Connection {
     reader: Reader,
     writer: Writer,
@@ -21,11 +23,12 @@ impl Connection {
         (&mut self.reader, &mut self.writer)
     }
 
-    /// Returns the remote of this connection.
+    /// Returns the address of the other end of this connection.
     pub fn remote(&self) -> RemoteAddr {
         self.writer.remote
     }
 
+    /// Returns true if this connection is closed.
     pub fn is_closed(&self) -> bool {
         self.reader.is_closed()
     }
@@ -38,6 +41,7 @@ impl Connection {
         self.writer.write(message)
     }
 
+    /// Receive data from the connection.
     pub async fn recv<T>(&mut self) -> Option<T>
     where
         T: DeserializeOwned,
@@ -56,6 +60,7 @@ pub struct Writer {
 }
 
 impl Reader {
+    /// Returns true if the connection is closed.
     pub fn is_closed(&self) -> bool {
         with_node(|n| !n.is_connection_open(self.rid))
     }
