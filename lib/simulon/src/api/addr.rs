@@ -1,6 +1,8 @@
+use derive_more::Deref;
+
 use crate::state::with_node;
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Deref)]
 pub struct RemoteAddr(pub(crate) usize);
 
 #[derive(Debug, Clone, Copy)]
@@ -19,6 +21,12 @@ impl RemoteAddr {
     /// Returns the id of the current node.
     pub fn whoami() -> RemoteAddr {
         with_node(|n| RemoteAddr(n.node_id))
+    }
+}
+
+impl From<RemoteAddr> for usize {
+    fn from(value: RemoteAddr) -> Self {
+        value.0
     }
 }
 
