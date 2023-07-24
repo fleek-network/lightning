@@ -148,13 +148,14 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> WithStartAndShutdown for M
 impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConsensusInterface for MockConsensus<Q, G> {
     type QueryRunner = Q;
     type Gossip = G;
+    type Certificate = ();
 
     async fn init<S: SignerInterface>(
         config: Self::Config,
         _signer: &S,
         executor: ExecutionEngineSocket,
         _query_runner: Self::QueryRunner,
-        _gossip: Arc<Self::Gossip>,
+        _gossip: <Self::Gossip as GossipInterface>::PubSub<Self::Certificate>,
     ) -> anyhow::Result<Self> {
         let (tx, rx) = mpsc::channel(128);
         let block_notifier = Arc::new(Notify::new());

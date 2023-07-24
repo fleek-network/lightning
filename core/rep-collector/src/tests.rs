@@ -1,6 +1,5 @@
 use std::{
     collections::HashSet,
-    sync::Arc,
     time::{Duration, SystemTime},
 };
 
@@ -17,7 +16,7 @@ use draco_interfaces::{
     reputation::{ReputationAggregatorInterface, ReputationReporterInterface},
     signer::SignerInterface,
     types::{Block, UpdateMethod, UpdatePayload, UpdateRequest},
-    ReputationQueryInteface, SyncQueryRunnerInterface, ToDigest, Weight,
+    GossipInterface, ReputationQueryInteface, SyncQueryRunnerInterface, ToDigest, Topic, Weight,
 };
 use draco_notifier::Notifier;
 use draco_signer::{Config as SignerConfig, Signer};
@@ -122,7 +121,7 @@ async fn test_query() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        Arc::new(MockGossip {}),
+        MockGossip {}.get_pubsub(Topic::Consensus),
     )
     .await
     .unwrap();
@@ -234,7 +233,7 @@ async fn test_submit_measurements() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        Arc::new(MockGossip {}),
+        MockGossip {}.get_pubsub(Topic::Consensus),
     )
     .await
     .unwrap();
@@ -380,7 +379,7 @@ async fn test_reputation_calculation_and_query() {
         .await
         .unwrap();
 
-    let mock_gossip = Arc::new(MockGossip {});
+    let mock_gossip = MockGossip {}.get_pubsub(Topic::Consensus);
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 1,

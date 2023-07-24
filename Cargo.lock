@@ -2269,6 +2269,7 @@ dependencies = [
  "draco-rep-collector",
  "draco-rpc",
  "draco-signer",
+ "draco-test-utils",
  "fleek-crypto",
  "log",
  "mock",

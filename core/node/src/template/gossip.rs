@@ -3,10 +3,10 @@ use std::{marker::PhantomData, sync::Arc};
 use anyhow::Result;
 use async_trait::async_trait;
 use draco_interfaces::{
-    signer::SignerInterface, ConfigConsumer, GossipInterface, GossipSubscriberInterface,
-    NotifierInterface, TopologyInterface, WithStartAndShutdown,
+    signer::SignerInterface, ConfigConsumer, GossipInterface, NotifierInterface, PubSub, Topic,
+    TopologyInterface, WithStartAndShutdown,
 };
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 
 use super::config::Config;
 
@@ -47,7 +47,7 @@ impl<S: SignerInterface, Topo: TopologyInterface, N: NotifierInterface + Send + 
 
     type Notifier = N;
 
-    type Subscriber<T: DeserializeOwned + Send + Sync> = GossipSubscriber<T>;
+    type PubSub<T: DeserializeOwned + Send + Sync + Clone + Serialize> = MockPubSub<T>;
 
     async fn init(
         _config: Self::Config,
@@ -61,15 +61,11 @@ impl<S: SignerInterface, Topo: TopologyInterface, N: NotifierInterface + Send + 
         })
     }
 
-    fn subscribe<T>(&self, _topic: draco_interfaces::Topic) -> Self::Subscriber<T>
-    where
-        T: DeserializeOwned + Send + Sync,
-    {
-        todo!()
-    }
-
-    fn broadcast_socket(&self) -> affair::Socket<draco_interfaces::GossipMessage, ()> {
-        todo!()
+    fn get_pubsub<T: Serialize + DeserializeOwned + Send + Sync + Clone>(
+        &self,
+        _topic: Topic,
+    ) -> Self::PubSub<T> {
+        MockPubSub(PhantomData::<T>)
     }
 }
 
@@ -81,14 +77,16 @@ impl<S: SignerInterface, Topo: TopologyInterface, N: NotifierInterface> ConfigCo
     const KEY: &'static str = "GOSSIP";
 }
 
-pub struct GossipSubscriber<T>(PhantomData<T>);
+#[derive(Clone)]
+pub struct MockPubSub<T>(PhantomData<T>);
 
 #[async_trait]
-impl<T> GossipSubscriberInterface<T> for GossipSubscriber<T>
+impl<T> PubSub<T> for MockPubSub<T>
 where
-    T: DeserializeOwned + Send + Sync,
+    T: DeserializeOwned + Send + Sync + Clone + Serialize,
 {
+    fn send(&self, _msg: T) {}
     async fn recv(&mut self) -> Option<T> {
-        todo!()
+        None
     }
 }

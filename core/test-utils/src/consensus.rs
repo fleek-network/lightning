@@ -12,7 +12,7 @@ use draco_interfaces::{
     consensus::{ConsensusInterface, MempoolSocket},
     signer::SignerInterface,
     types::{Block, UpdateRequest},
-    WithStartAndShutdown,
+    GossipInterface, WithStartAndShutdown,
 };
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -44,13 +44,15 @@ struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static> {
 impl<Q: SyncQueryRunnerInterface> ConsensusInterface for MockConsensus<Q> {
     type QueryRunner = Q;
     type Gossip = MockGossip;
+    type Certificate = ();
+
     /// Create a new consensus service with the provided config and executor.
     async fn init<S: SignerInterface>(
         config: Config,
         _signer: &S,
         executor: ExecutionEngineSocket,
         query_runner: Self::QueryRunner,
-        _gossip: Arc<Self::Gossip>,
+        _pubsub: <Self::Gossip as GossipInterface>::PubSub<Self::Certificate>,
     ) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
         let new_block_notify = Arc::new(Notify::new());

@@ -1,6 +1,5 @@
 use std::{
     collections::{BTreeMap, HashSet},
-    sync::Arc,
     time::Duration,
 };
 
@@ -11,7 +10,7 @@ use draco_application::{
 };
 use draco_interfaces::{
     application::ApplicationInterface, common::WithStartAndShutdown, consensus::ConsensusInterface,
-    signer::SignerInterface, types::UpdateMethod, SyncQueryRunnerInterface,
+    signer::SignerInterface, types::UpdateMethod, GossipInterface, SyncQueryRunnerInterface, Topic,
 };
 use draco_test_utils::{
     consensus::{Config as ConsensusConfig, MockConsensus},
@@ -70,7 +69,7 @@ async fn test_send_two_txs_in_a_row() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        Arc::new(MockGossip {}),
+        MockGossip {}.get_pubsub(Topic::Consensus),
     )
     .await
     .unwrap();
@@ -149,7 +148,7 @@ async fn test_retry_send() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        Arc::new(MockGossip {}),
+        MockGossip {}.get_pubsub(Topic::Consensus),
     )
     .await
     .unwrap();
@@ -199,7 +198,7 @@ async fn test_shutdown() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        Arc::new(MockGossip {}),
+        MockGossip {}.get_pubsub(Topic::Consensus),
     )
     .await
     .unwrap();
@@ -225,7 +224,7 @@ async fn test_sign_raw_digest() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        Arc::new(MockGossip {}),
+        MockGossip {}.get_pubsub(Topic::Consensus),
     )
     .await
     .unwrap();

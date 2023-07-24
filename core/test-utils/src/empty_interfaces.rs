@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{marker::PhantomData, sync::Arc, time::Duration};
 
 use affair::Socket;
 use anyhow::Result;
@@ -8,11 +8,10 @@ use draco_interfaces::{
         CommodityServed, Epoch, EpochInfo, NodeInfo, ProtocolParams,
         ReportedReputationMeasurements, TotalServed, TransactionResponse, UpdateRequest,
     },
-    Blake3Hash, ConfigConsumer, GossipInterface, GossipMessage, GossipSubscriberInterface,
-    IndexerInterface, MempoolSocket, Notification, NotifierInterface,
-    ReputationAggregatorInterface, ReputationQueryInteface, ReputationReporterInterface,
-    SignerInterface, SubmitTxSocket, SyncQueryRunnerInterface, Topic, TopologyInterface, Weight,
-    WithStartAndShutdown,
+    Blake3Hash, ConfigConsumer, GossipInterface, IndexerInterface, MempoolSocket, Notification,
+    NotifierInterface, PubSub, ReputationAggregatorInterface, ReputationQueryInteface,
+    ReputationReporterInterface, SignerInterface, SubmitTxSocket, SyncQueryRunnerInterface, Topic,
+    TopologyInterface, Weight, WithStartAndShutdown,
 };
 use fleek_crypto::{
     ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey,
@@ -41,6 +40,10 @@ pub struct MockReputationReporter {}
 pub struct MockConfig {}
 #[derive(Clone)]
 pub struct MockIndexer {}
+#[derive(Clone, Serialize)]
+pub struct MockPubSub<T: Serialize + DeserializeOwned + Send + Sync + Clone> {
+    pub _data: PhantomData<T>,
+}
 
 #[async_trait]
 impl WithStartAndShutdown for MockIndexer {
@@ -186,8 +189,7 @@ impl GossipInterface for MockGossip {
     /// The signer that we can used to sign and submit messages.
     type Signer = MockSigner;
 
-    /// Subscriber implementation used for listening on a topic.
-    type Subscriber<T: Send + Sync + DeserializeOwned> = MockSubscriber;
+    type PubSub<T: Serialize + DeserializeOwned + Send + Sync + Clone> = MockPubSub<T>;
 
     /// Initialize the gossip system with the config and the topology object..
     async fn init(
@@ -198,12 +200,13 @@ impl GossipInterface for MockGossip {
         Ok(Self {})
     }
 
-    fn broadcast_socket(&self) -> Socket<GossipMessage, ()> {
-        todo!()
-    }
-
-    fn subscribe<T: Send + Sync + DeserializeOwned>(&self, _topic: Topic) -> Self::Subscriber<T> {
-        todo!()
+    fn get_pubsub<T: Serialize + DeserializeOwned + Send + Sync + Clone>(
+        &self,
+        _topic: Topic,
+    ) -> Self::PubSub<T> {
+        MockPubSub {
+            _data: PhantomData::<T>,
+        }
     }
 }
 
@@ -211,6 +214,19 @@ impl ConfigConsumer for MockSigner {
     const KEY: &'static str = "mock_signer";
 
     type Config = MockConfig;
+}
+
+#[async_trait]
+impl<T: Serialize + DeserializeOwned + Send + Sync + Clone> PubSub<T> for MockPubSub<T> {
+    /// Publish a message.
+    fn send(&self, _msg: T) {}
+
+    /// Await the next message in the topic, should only return `None` if there are
+    /// no longer any new messages coming. (indicating that the gossip instance is
+    /// shutdown.)
+    async fn recv(&mut self) -> Option<T> {
+        None
+    }
 }
 
 #[async_trait]
@@ -409,12 +425,5 @@ impl TopologyInterface for MockTopology {
 
     fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>> {
         Arc::new(Vec::new())
-    }
-}
-
-#[async_trait]
-impl<T: Send + Sync + DeserializeOwned> GossipSubscriberInterface<T> for MockSubscriber {
-    async fn recv(&mut self) -> Option<T> {
-        None
     }
 }

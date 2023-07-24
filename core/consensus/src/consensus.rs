@@ -28,6 +28,7 @@ use narwhal_crypto::{
     KeyPair, NetworkKeyPair, NetworkPublicKey, PublicKey,
 };
 use narwhal_node::NodeStorage;
+use narwhal_types::{Batch, Certificate};
 use prometheus::Registry;
 use tokio::{
     pin, select,
@@ -48,7 +49,7 @@ pub struct Consensus<Q: SyncQueryRunnerInterface, G: GossipInterface> {
     /// maybe a once box
     epoch_state: Mutex<Option<EpochState<Q>>>,
     /// Interface for sending messages through the gossip layer
-    _gossip: Arc<G>,
+    _pubsub: G::PubSub<<crate::consensus::Consensus<Q, G> as ConsensusInterface>::Certificate>,
     /// This socket recieves signed transactions and forwards them to an active committee member to
     /// be ordered
     mempool_socket: MempoolSocket,
@@ -297,13 +298,15 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConfigConsumer for Consens
 impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConsensusInterface for Consensus<Q, G> {
     type QueryRunner = Q;
     type Gossip = G;
+    type Certificate = (Certificate, Vec<Batch>);
+
     /// Create a new consensus service with the provided config and executor.
     async fn init<S: SignerInterface>(
         config: Self::Config,
         signer: &S,
         executor: ExecutionEngineSocket,
         query_runner: Q,
-        gossip: Arc<Self::Gossip>,
+        pubsub: <Self::Gossip as GossipInterface>::PubSub<Self::Certificate>,
     ) -> anyhow::Result<Self> {
         let (networking_sk, primary_sk) = signer.get_sk();
         let reconfigure_notify = Arc::new(Notify::new());
@@ -334,7 +337,7 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConsensusInterface for Con
         );
         Ok(Self {
             epoch_state: Mutex::new(Some(epoch_state)),
-            _gossip: gossip,
+            _pubsub: pubsub,
             mempool_socket: TokioSpawn::spawn_async(forwarder),
             reconfigure_notify,
             new_block_notify,

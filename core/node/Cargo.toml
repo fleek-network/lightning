@@ -16,6 +16,7 @@ draco-consensus = { path = "../consensus" }
 draco-notifier = { path = "../notifier" }
 draco-rpc = { path = "../rpc" }
 draco-signer = { path = "../signer" }
+draco-test-utils = { path = "../test-utils" }
 mock = { path = "../mock" }
 anyhow.workspace = true
 clap = { version = "4.2", features = ["derive"] }

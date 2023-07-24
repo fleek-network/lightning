@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use affair::Socket;
 use anyhow::Result;
 use async_trait::async_trait;
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     signer::SignerInterface, topology::TopologyInterface, ConfigConsumer, NotifierInterface,
@@ -18,15 +17,6 @@ pub enum Topic {
     /// The gossip topic for Fleek Network's indexer DHT.
     DistributedHashTable,
 }
-
-/// A gossip message under a specific topic.
-pub struct GossipMessage {
-    /// The topic to send the message to.
-    pub topic: Topic,
-    /// The serialized bytes for this message.
-    pub payload: Vec<u8>,
-}
-
 /// The gossip system in Fleek Network implements the functionality of broadcasting
 /// messages to the rest of the nodes in the network.
 #[async_trait]
@@ -40,8 +30,7 @@ pub trait GossipInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send 
     /// The signer that we can used to sign and submit messages.
     type Signer: SignerInterface;
 
-    /// Subscriber implementation used for listening on a topic.
-    type Subscriber<T: DeserializeOwned + Send + Sync>: GossipSubscriberInterface<T>;
+    type PubSub<T: Serialize + DeserializeOwned + Send + Sync + Clone>: PubSub<T>;
 
     /// Initialize the gossip system with the config and the topology object..
     async fn init(
@@ -50,22 +39,20 @@ pub trait GossipInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send 
         signer: &Self::Signer,
     ) -> Result<Self>;
 
-    /// Get a socket which can be used to broadcast a message globally under any topic.
-    fn broadcast_socket(&self) -> Socket<GossipMessage, ()>;
-
-    /// Subscribe to a specific topic and returns the subscriber. The messages that can
-    /// be deserialized as `T` are returned to the listener.
-    fn subscribe<T>(&self, topic: Topic) -> Self::Subscriber<T>
-    where
-        T: DeserializeOwned + Send + Sync;
+    ///
+    fn get_pubsub<T: Serialize + DeserializeOwned + Send + Sync + Clone>(
+        &self,
+        topic: Topic,
+    ) -> Self::PubSub<T>;
 }
 
-/// A subscriber for the incoming messages under a topic.
 #[async_trait]
-pub trait GossipSubscriberInterface<T>: Send + Sync
-where
-    T: DeserializeOwned + Send + Sync,
+pub trait PubSub<T: Serialize + DeserializeOwned + Send + Sync + Clone>:
+    Clone + Send + Sync
 {
+    /// Publish a message.
+    fn send(&self, msg: T);
+
     /// Await the next message in the topic, should only return `None` if there are
     /// no longer any new messages coming. (indicating that the gossip instance is
     /// shutdown.)

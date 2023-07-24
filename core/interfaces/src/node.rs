@@ -74,7 +74,7 @@ pub struct Node<T: DracoTypes> {
     pub reputation_aggregator: T::ReputationAggregator,
     pub handshake: T::Handshake,
     pub topology: Arc<T::Topology>,
-    pub gossip: Arc<T::Gossip>,
+    pub gossip: T::Gossip,
     pub sdk: PhantomData<T::Sdk>,
     pub notifier: PhantomData<T::Notifier>,
 }
@@ -95,16 +95,16 @@ impl<T: DracoTypes> Node<T> {
             .await?,
         );
 
-        let gossip = Arc::new(
-            T::Gossip::init(configuration.get::<T::Gossip>(), topology.clone(), &signer).await?,
-        );
+        let gossip =
+            T::Gossip::init(configuration.get::<T::Gossip>(), topology.clone(), &signer).await?;
+        let consensus_pubsub = gossip.get_pubsub(crate::Topic::Consensus);
 
         let consensus = T::Consensus::init(
             configuration.get::<T::Consensus>(),
             &signer,
             application.transaction_executor(),
             application.sync_query(),
-            gossip.clone(),
+            consensus_pubsub,
         )
         .await?;
 

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use affair::Socket;
 use async_trait::async_trait;
+use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::Notify;
 
 use crate::{
@@ -23,6 +24,7 @@ pub type MempoolSocket = Socket<UpdateRequest, ()>;
 pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
     type QueryRunner: SyncQueryRunnerInterface;
     type Gossip: GossipInterface;
+    type Certificate: Serialize + DeserializeOwned + Send + Sync + Clone;
 
     /// Create a new consensus service with the provided config and executor.
     async fn init<S: SignerInterface>(
@@ -30,7 +32,7 @@ pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Se
         signer: &S,
         executor: ExecutionEngineSocket,
         query_runner: Self::QueryRunner,
-        gossip: Arc<Self::Gossip>,
+        pubsub: <Self::Gossip as GossipInterface>::PubSub<Self::Certificate>,
     ) -> anyhow::Result<Self>;
 
     /// Returns a socket that can be used to submit transactions to the consensus,
