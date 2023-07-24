@@ -2,6 +2,7 @@
 
 /// The api to use inside a node.
 pub mod api;
+pub mod latency;
 pub mod report;
 pub mod simulation;
 

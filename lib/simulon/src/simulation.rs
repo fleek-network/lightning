@@ -10,6 +10,7 @@ use std::{
 };
 
 use crate::{
+    latency::{DefaultLatencyProvider, LatencyProvider},
     message::Message,
     report::{Metrics, Report},
     state::{hook_node, with_node, NodeState},
@@ -19,16 +20,17 @@ use crate::{
 const FRAME_TO_MS: u64 = 4;
 const FRAME_DURATION: Duration = Duration::from_micros(1_000 / FRAME_TO_MS);
 
-pub struct SimulationBuilder {
+pub struct SimulationBuilder<L = DefaultLatencyProvider> {
     executor: Box<dyn Fn() + Send + Sync>,
     num_workers: Option<usize>,
     num_nodes: Option<usize>,
     frame_per_node_report: usize,
     frame_per_global_report: usize,
     storage: TypedStorage,
+    latency_provider: Option<L>,
 }
 
-pub struct Simulation {
+pub struct Simulation<L: LatencyProvider = DefaultLatencyProvider> {
     /// The current time in nanoseconds.
     now: u128,
     /// The shared state between us and the workers.
@@ -37,6 +39,8 @@ pub struct Simulation {
     nodes: Box<[NodeState]>,
     /// A handle to each worker thread.
     workers: Vec<JoinHandle<()>>,
+    /// The latency provider.
+    latency_provider: L,
 }
 
 #[derive(Default)]
@@ -93,9 +97,12 @@ impl SimulationBuilder {
             frame_per_node_report: (FRAME_TO_MS * 10) as usize,
             frame_per_global_report: FRAME_TO_MS as usize,
             storage: TypedStorage::default(),
+            latency_provider: None,
         }
     }
+}
 
+impl<L> SimulationBuilder<L> {
     /// Insert the given value as shared state value for the executor to access.
     pub fn insert<T: Any>(mut self, data: T) -> Self {
         self.storage.insert(data);
@@ -158,7 +165,23 @@ impl SimulationBuilder {
         self
     }
 
-    pub fn build(self) -> Simulation {
+    /// Set a custom instance of a latency provider.
+    pub fn set_latency_provider<T: LatencyProvider>(self, provider: T) -> SimulationBuilder<T> {
+        SimulationBuilder {
+            executor: self.executor,
+            num_workers: self.num_workers,
+            num_nodes: self.num_nodes,
+            frame_per_node_report: self.frame_per_node_report,
+            frame_per_global_report: self.frame_per_global_report,
+            storage: self.storage,
+            latency_provider: Some(provider),
+        }
+    }
+
+    pub fn build(self) -> Simulation<L>
+    where
+        L: LatencyProvider,
+    {
         let num_workers = self
             .num_workers
             .unwrap_or_else(|| num_cpus::get_physical() - 1)
@@ -203,17 +226,24 @@ impl SimulationBuilder {
             state: Arc::new(state),
             nodes,
             workers: Vec::with_capacity(num_workers),
+            latency_provider: self.latency_provider.unwrap_or_default(),
         }
     }
 
     /// Build and run the simulation.
-    pub fn run(self, duration: Duration) -> Report {
+    pub fn run(self, duration: Duration) -> Report
+    where
+        L: LatencyProvider,
+    {
         self.build().run(duration)
     }
 }
 
-impl Simulation {
+impl<L: LatencyProvider> Simulation<L> {
     pub fn run(mut self, duration: Duration) -> Report {
+        // Initialize the latency provider.
+        self.latency_provider.init(self.nodes.len());
+
         self.start_threads();
 
         let mut n = duration.as_nanos() / FRAME_DURATION.as_nanos();
@@ -281,7 +311,11 @@ impl Simulation {
             for mut msg in messages.drain(..) {
                 let node_id = msg.receiver.0;
 
-                msg.time.0 += self.get_latency(msg.sender.0, msg.receiver.0).as_nanos();
+                msg.time.0 += self
+                    .latency_provider
+                    .get(msg.sender.0, msg.receiver.0)
+                    .as_nanos();
+
                 self.nodes[node_id].received.push(msg);
             }
         }
@@ -301,11 +335,6 @@ impl Simulation {
 
         debug_assert!(time > self.now);
         Some(ceil_div(time - self.now, FRAME_DURATION.as_nanos()).max(1) as usize)
-    }
-
-    fn get_latency(&self, _s: usize, _r: usize) -> Duration {
-        // todo
-        Duration::from_millis(1)
     }
 
     fn start_threads(&mut self) {
