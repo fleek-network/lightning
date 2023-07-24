@@ -182,6 +182,7 @@ impl Simulation {
 
             // Run the post executing tasks and figure out how many frames we should move forward.
             if let Some(skip) = self.run_post_frame() {
+                println!("skip {skip}");
                 debug_assert!(skip >= 1);
 
                 // Move the clock to `skip` frames forward.
@@ -248,7 +249,7 @@ impl Simulation {
         let time = msg.time.0;
 
         debug_assert!(time > self.now);
-        Some(((time - self.now) / FRAME_DURATION.as_nanos()).max(1) as usize)
+        Some(ceil_div(time - self.now, FRAME_DURATION.as_nanos()).max(1) as usize)
     }
 
     fn get_latency(&self, _s: usize, _r: usize) -> Duration {
@@ -395,6 +396,11 @@ fn wait_for_workers(state: &Arc<SharedState>) {
     }
 }
 
+#[inline(always)]
+fn ceil_div(a: u128, b: u128) -> u128 {
+    (a + b - 1) / b
+}
+
 #[cfg(test)]
 mod test {
     use std::time::Duration;
@@ -405,7 +411,7 @@ mod test {
     #[test]
     fn x() {
         let report = SimulationBuilder::new(exec)
-            .with_nodes(2)
+            .with_nodes(1)
             .build()
             .run(Duration::from_millis(100 / FRAME_TO_MS));
 
@@ -414,18 +420,9 @@ mod test {
 
     fn exec() {
         api::spawn(async {
-            if api::RemoteAddr::whoami().0 == 0 {
-                let mut listener = api::listen(18);
-
-                while let Some(mut conn) = listener.accept().await {
-                    println!("Connection accepted from {:?}", conn.remote());
-                    conn.write(&18);
-                }
-            } else {
-                let res = api::connect(api::RemoteAddr(0), 18).await;
-                let mut conn = res.unwrap();
-                let _data = conn.recv::<i32>().await;
-            }
+            println!("Hello! {}", api::now());
+            api::sleep(Duration::from_millis(5)).await;
+            println!("Woke up! {}", api::now());
         });
 
         println!("Hello! {:?}", api::RemoteAddr::whoami());
