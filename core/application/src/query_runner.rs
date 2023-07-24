@@ -1,3 +1,5 @@
+use std::{collections::HashMap, time::Duration};
+
 use atomo::{Atomo, QueryPerm, ResolvedTableReference};
 use draco_interfaces::{
     application::SyncQueryRunnerInterface,
@@ -27,6 +29,7 @@ pub struct QueryRunner {
     param_table: ResolvedTableReference<ProtocolParams, u128>,
     current_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
     rep_measurements: ResolvedTableReference<NodePublicKey, Vec<ReportedReputationMeasurements>>,
+    latencies: ResolvedTableReference<(NodePublicKey, NodePublicKey), Duration>,
     rep_scores: ResolvedTableReference<NodePublicKey, u8>,
     _last_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
     total_served_table: ResolvedTableReference<Epoch, TotalServed>,
@@ -47,6 +50,7 @@ impl QueryRunner {
                 .resolve::<NodePublicKey, CommodityServed>("current_epoch_served"),
             rep_measurements: atomo
                 .resolve::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements"),
+            latencies: atomo.resolve::<(NodePublicKey, NodePublicKey), Duration>("latencies"),
             rep_scores: atomo.resolve::<NodePublicKey, u8>("rep_scores"),
             _last_epoch_served: atomo
                 .resolve::<NodePublicKey, CommodityServed>("last_epoch_served"),
@@ -310,5 +314,23 @@ impl SyncQueryRunnerInterface for QueryRunner {
             let app = State::new(backend);
             app.execute_txn(txn.clone())
         })
+    }
+
+    fn get_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration> {
+        let keys: Vec<(NodePublicKey, NodePublicKey)> = self
+            .inner
+            .run(|ctx| self.latencies.get(ctx).keys())
+            .collect();
+
+        keys.into_iter()
+            .filter_map(|key| {
+                self.inner.run(|ctx| {
+                    self.latencies
+                        .get(ctx)
+                        .get(key)
+                        .map(|latency| (key, latency))
+                })
+            })
+            .collect()
     }
 }

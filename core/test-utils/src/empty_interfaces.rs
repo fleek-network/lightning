@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, sync::Arc, time::Duration};
+use std::{collections::HashMap, marker::PhantomData, sync::Arc, time::Duration};
 
 use affair::Socket;
 use anyhow::Result;
@@ -390,6 +390,10 @@ impl SyncQueryRunnerInterface for MockQueryRunner {
     /// Validates the passed in transaction
     fn validate_txn(&self, _txn: UpdateRequest) -> TransactionResponse {
         todo!()
+    }
+
+    fn get_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration> {
+        HashMap::new()
     }
 }
 

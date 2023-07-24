@@ -1,6 +1,7 @@
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, HashMap},
+    time::Duration,
 };
 
 use draco_interfaces::{
@@ -57,6 +58,7 @@ pub struct State<B: Backend> {
     pub services: B::Ref<ServiceId, Service>,
     pub parameters: B::Ref<ProtocolParams, u128>,
     pub rep_measurements: B::Ref<NodePublicKey, Vec<ReportedReputationMeasurements>>,
+    pub latencies: B::Ref<(NodePublicKey, NodePublicKey), Duration>,
     pub rep_scores: B::Ref<NodePublicKey, u8>,
     pub current_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
     pub last_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
@@ -83,6 +85,7 @@ impl<B: Backend> State<B> {
             services: backend.get_table_reference("service"),
             parameters: backend.get_table_reference("parameter"),
             rep_measurements: backend.get_table_reference("rep_measurements"),
+            latencies: backend.get_table_reference("latencies"),
             rep_scores: backend.get_table_reference("rep_scores"),
             last_epoch_served: backend.get_table_reference("last_epoch_served"),
             current_epoch_served: backend.get_table_reference("current_epoch_served"),
@@ -687,6 +690,7 @@ impl<B: Backend> State<B> {
         });
 
         // If not in test mode, remove outdated rep scores.
+        // TODO(matthias): Maybe we should keep the old rep scores in case a node rejoins?
         if cfg!(all(not(test), not(feature = "test"))) {
             let nodes = self.rep_scores.keys();
             nodes.for_each(|node| {
@@ -696,9 +700,30 @@ impl<B: Backend> State<B> {
             });
         }
 
+        self.update_latencies();
+
         // Remove measurements from this epoch once we ccalculated the rep scores.
         let nodes = self.rep_measurements.keys();
         nodes.for_each(|node| self.rep_measurements.remove(&node));
+    }
+
+    fn update_latencies(&self) {
+        // Remove latency measurements from previous epoch.
+        // TODO(matthias): Should we keep latencies for node pairs for which we don't have
+        // latencies in the new epoch?
+        let keys = self.latencies.keys();
+        keys.for_each(|key| self.latencies.remove(&key));
+
+        for node in self.rep_measurements.keys() {
+            if let Some(reported_measurements) = self.rep_measurements.get(&node) {
+                for measurement in reported_measurements {
+                    if let Some(latency) = measurement.measurements.latency {
+                        self.latencies
+                            .set((measurement.reporting_node, node), latency);
+                    }
+                }
+            }
+        }
     }
 
     fn add_service(

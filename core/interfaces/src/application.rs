@@ -1,3 +1,5 @@
+use std::{collections::HashMap, time::Duration};
+
 use affair::Socket;
 use async_trait::async_trait;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
@@ -153,6 +155,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Validates the passed in transaction
     fn validate_txn(&self, txn: UpdateRequest) -> TransactionResponse;
+
+    /// Return all latencies measurements for the current epoch.
+    fn get_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration>;
 }
 
 #[derive(Clone, Debug)]
