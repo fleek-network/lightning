@@ -7,4 +7,6 @@ pub fn now() -> u128 {
     with_node(|n| n.now())
 }
 
-pub async fn sleep(_time: Duration) {}
+pub async fn sleep(time: Duration) {
+    with_node(|n| n.sleep(time.as_nanos())).await;
+}

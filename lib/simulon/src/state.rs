@@ -9,7 +9,7 @@ use fxhash::FxHashMap;
 use crate::{
     api::{ConnectError, RemoteAddr},
     future::{DeferredFuture, DeferredFutureWaker},
-    message::{Message, MessageDetail},
+    message::{Ignored, Message, MessageDetail},
     report::{Metrics, NodeMetrics},
 };
 
@@ -284,6 +284,23 @@ impl NodeState {
         self.resources.contains_key(&rid)
     }
 
+    pub fn sleep(&mut self, duration: u128) -> DeferredFuture<()> {
+        let future = DeferredFuture::new();
+        let waker = future.waker();
+
+        let message = Message {
+            sender: RemoteAddr(self.node_id),
+            receiver: RemoteAddr(self.node_id),
+            time: std::cmp::Reverse(self.now() + duration),
+            detail: MessageDetail::WakeUp {
+                waker: Ignored(waker),
+            },
+        };
+        self.received.push(message);
+
+        future
+    }
+
     fn close_local_connection(&mut self, rid: ResourceId) {
         let resource = if let Some(resource) = self.resources.remove(&rid) {
             resource
@@ -436,6 +453,9 @@ impl NodeState {
                     self.current_metrics.msg_received += 1;
                     self.current_metrics.bytes_received += data.len() as u64;
                     self.process_message(receiver_rid, data);
+                },
+                MessageDetail::WakeUp { waker } => {
+                    waker.wake(());
                 },
             }
         }

@@ -12,14 +12,17 @@ pub struct DeferredFutureWaker<T>(Weak<Inner<T>>);
 struct Inner<T>(Mutex<(Option<T>, Option<Waker>)>);
 
 impl<T> DeferredFuture<T> {
+    #[inline(always)]
     pub fn new() -> Self {
         DeferredFuture(Arc::new(Inner(Mutex::new((None, None)))))
     }
 
+    #[inline(always)]
     pub fn resolved(value: T) -> Self {
         DeferredFuture(Arc::new(Inner(Mutex::new((Some(value), None)))))
     }
 
+    #[inline(always)]
     pub fn waker(&self) -> DeferredFutureWaker<T> {
         DeferredFutureWaker(Arc::downgrade(&self.0))
     }
@@ -45,6 +48,7 @@ impl<T> Future for DeferredFuture<T> {
 
 impl<T> DeferredFutureWaker<T> {
     /// Wake up the future.
+    #[inline(always)]
     pub fn wake(&self, value: T) {
         if let Some(inner) = self.0.upgrade() {
             let mut guard = inner.0.lock().unwrap();

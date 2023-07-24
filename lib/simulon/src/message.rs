@@ -1,6 +1,8 @@
 use std::cmp::Reverse;
 
-use crate::{api::RemoteAddr, state::ResourceId};
+use derive_more::{Deref, DerefMut};
+
+use crate::{api::RemoteAddr, future::DeferredFutureWaker, state::ResourceId};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Message {
@@ -33,6 +35,35 @@ pub enum MessageDetail {
         receiver_rid: ResourceId,
         data: Vec<u8>,
     },
+    WakeUp {
+        waker: Ignored<DeferredFutureWaker<()>>,
+    },
+}
+
+#[derive(Deref, DerefMut)]
+pub struct Ignored<T>(pub T);
+
+impl<T> std::fmt::Debug for Ignored<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[IGNORED]")
+    }
+}
+
+impl<T> Ord for Ignored<T> {
+    fn cmp(&self, _other: &Self) -> std::cmp::Ordering {
+        std::cmp::Ordering::Equal
+    }
+}
+impl<T> Eq for Ignored<T> {}
+impl<T> PartialEq for Ignored<T> {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+impl<T> PartialOrd for Ignored<T> {
+    fn partial_cmp(&self, _other: &Self) -> Option<std::cmp::Ordering> {
+        Some(std::cmp::Ordering::Equal)
+    }
 }
 
 #[cfg(test)]
