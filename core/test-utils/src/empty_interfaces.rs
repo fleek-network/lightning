@@ -219,7 +219,7 @@ impl ConfigConsumer for MockSigner {
 #[async_trait]
 impl<T: Serialize + DeserializeOwned + Send + Sync + Clone> PubSub<T> for MockPubSub<T> {
     /// Publish a message.
-    fn send(&self, _msg: T) {}
+    fn send(&self, _msg: &T) {}
 
     /// Await the next message in the topic, should only return `None` if there are
     /// no longer any new messages coming. (indicating that the gossip instance is

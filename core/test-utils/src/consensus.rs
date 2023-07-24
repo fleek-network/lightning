@@ -12,7 +12,7 @@ use draco_interfaces::{
     consensus::{ConsensusInterface, MempoolSocket},
     signer::SignerInterface,
     types::{Block, UpdateRequest},
-    GossipInterface, WithStartAndShutdown,
+    WithStartAndShutdown,
 };
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,7 @@ use tokio::{
     time::{interval, sleep},
 };
 
-use crate::empty_interfaces::MockGossip;
+use crate::empty_interfaces::MockPubSub;
 
 #[allow(clippy::type_complexity)]
 pub struct MockConsensus<Q: SyncQueryRunnerInterface + 'static> {
@@ -43,8 +43,8 @@ struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static> {
 #[async_trait]
 impl<Q: SyncQueryRunnerInterface> ConsensusInterface for MockConsensus<Q> {
     type QueryRunner = Q;
-    type Gossip = MockGossip;
     type Certificate = ();
+    type PubSub = MockPubSub<()>;
 
     /// Create a new consensus service with the provided config and executor.
     async fn init<S: SignerInterface>(
@@ -52,7 +52,7 @@ impl<Q: SyncQueryRunnerInterface> ConsensusInterface for MockConsensus<Q> {
         _signer: &S,
         executor: ExecutionEngineSocket,
         query_runner: Self::QueryRunner,
-        _pubsub: <Self::Gossip as GossipInterface>::PubSub<Self::Certificate>,
+        _pubsub: Self::PubSub,
     ) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
         let new_block_notify = Arc::new(Notify::new());

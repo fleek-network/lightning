@@ -51,7 +51,7 @@ pub trait PubSub<T: Serialize + DeserializeOwned + Send + Sync + Clone>:
     Clone + Send + Sync
 {
     /// Publish a message.
-    fn send(&self, msg: T);
+    fn send(&self, msg: &T);
 
     /// Await the next message in the topic, should only return `None` if there are
     /// no longer any new messages coming. (indicating that the gossip instance is

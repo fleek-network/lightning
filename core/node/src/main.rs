@@ -10,7 +10,7 @@ use anyhow::Result;
 use chrono::Local;
 use clap::Parser;
 use cli::Cli;
-use draco_interfaces::{transformers, ApplicationInterface, DracoTypes};
+use draco_interfaces::{transformers, ApplicationInterface, DracoTypes, GossipInterface};
 use log::LevelFilter;
 use mock::consensus::MockConsensus;
 use simplelog::{
@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
             FinalTypes,
             MockConsensus<
                 <<FinalTypes as DracoTypes>::Application as ApplicationInterface>::SyncExecutor,
-                <FinalTypes as DracoTypes>::Gossip,
+                <<FinalTypes as DracoTypes>::Gossip as GossipInterface>::PubSub<()>,
             >,
         >;
 

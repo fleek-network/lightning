@@ -26,7 +26,9 @@ pub trait DracoTypes: Send + Sync {
     type ConfigProvider: ConfigProviderInterface;
     type Consensus: ConsensusInterface<
         QueryRunner = <Self::Application as ApplicationInterface>::SyncExecutor,
-        Gossip = Self::Gossip,
+        PubSub = <Self::Gossip as GossipInterface>::PubSub<
+            <Self::Consensus as ConsensusInterface>::Certificate,
+        >,
     >;
     type Application: ApplicationInterface;
     type BlockStore: BlockStoreInterface;
@@ -253,16 +255,17 @@ pub mod transformers {
     pub struct WithConsensus<
         T: DracoTypes,
         Consensus: ConsensusInterface<
-            QueryRunner = <T::Application as ApplicationInterface>::SyncExecutor,
-            Gossip = T::Gossip,
-        >,
+        QueryRunner = <T::Application as ApplicationInterface>::SyncExecutor
+            >,
     >(T, PhantomData<Consensus>);
 
     impl<
         T: DracoTypes,
         Consensus: ConsensusInterface<
             QueryRunner = <T::Application as ApplicationInterface>::SyncExecutor,
-            Gossip = T::Gossip,
+            PubSub = <T::Gossip as GossipInterface>::PubSub<
+                <Consensus as ConsensusInterface>::Certificate,
+            >,
         >,
     > DracoTypes for WithConsensus<T, Consensus>
     {

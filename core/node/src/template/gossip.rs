@@ -85,7 +85,7 @@ impl<T> PubSub<T> for MockPubSub<T>
 where
     T: DeserializeOwned + Send + Sync + Clone + Serialize,
 {
-    fn send(&self, _msg: T) {}
+    fn send(&self, _msg: &T) {}
     async fn recv(&mut self) -> Option<T> {
         None
     }

@@ -1,8 +1,8 @@
 use draco_application::{app::Application, query_runner::QueryRunner};
 use draco_blockstore::memory::MemoryBlockStore;
-use draco_consensus::consensus::Consensus;
+use draco_consensus::consensus::{Consensus, PubSubMsg};
 use draco_handshake::server::{StreamProvider, TcpHandshakeServer, TcpProvider};
-use draco_interfaces::DracoTypes;
+use draco_interfaces::{DracoTypes, GossipInterface};
 use draco_notifier::Notifier;
 use draco_rep_collector::ReputationAggregator;
 use draco_rpc::server::Rpc;
@@ -21,7 +21,7 @@ pub struct FinalTypes;
 
 impl DracoTypes for FinalTypes {
     type ConfigProvider = TomlConfigProvider;
-    type Consensus = Consensus<QueryRunner, Gossip<Signer, Topology<QueryRunner>, Notifier>>;
+    type Consensus = Consensus<QueryRunner, <Self::Gossip as GossipInterface>::PubSub<PubSubMsg>>;
     type Application = Application;
     type BlockStore = MemoryBlockStore;
     type Indexer = Indexer;

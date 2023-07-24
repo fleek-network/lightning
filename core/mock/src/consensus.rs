@@ -12,9 +12,10 @@ use affair::{AsyncWorker, Executor, TokioSpawn};
 use async_trait::async_trait;
 use axum::{extract::State, routing::post, Json, Router};
 use draco_interfaces::{
+    gossip::PubSub,
     types::{Block, UpdateRequest},
-    ConfigConsumer, ConsensusInterface, ExecutionEngineSocket, GossipInterface, MempoolSocket,
-    SignerInterface, SyncQueryRunnerInterface, WithStartAndShutdown,
+    ConfigConsumer, ConsensusInterface, ExecutionEngineSocket, MempoolSocket, SignerInterface,
+    SyncQueryRunnerInterface, WithStartAndShutdown,
 };
 use log::{debug, info};
 use rand::{thread_rng, Rng, SeedableRng};
@@ -27,7 +28,7 @@ use tokio::sync::{mpsc, Notify};
 /// post endpoint. Transactions can be sent as JSON values.
 ///
 /// The mempool it provides also has a configurable success rate that must be from 0.0 to 1.0.
-pub struct MockConsensus<Q: SyncQueryRunnerInterface, G: GossipInterface> {
+pub struct MockConsensus<Q: SyncQueryRunnerInterface, P: PubSub<()>> {
     addr: SocketAddr,
     socket: mpsc::Sender<UpdateRequest>,
     is_running: Arc<AtomicBool>,
@@ -35,7 +36,7 @@ pub struct MockConsensus<Q: SyncQueryRunnerInterface, G: GossipInterface> {
     block_notifier: Arc<Notify>,
     mempool: MempoolSocket,
     query_runner: PhantomData<Q>,
-    gossip: PhantomData<G>,
+    gossip: PhantomData<P>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -92,7 +93,7 @@ impl Default for Config {
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface, G: GossipInterface> WithStartAndShutdown for MockConsensus<Q, G> {
+impl<Q: SyncQueryRunnerInterface, P: PubSub<()>> WithStartAndShutdown for MockConsensus<Q, P> {
     fn is_running(&self) -> bool {
         self.is_running.load(Ordering::Relaxed)
     }
@@ -145,17 +146,17 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> WithStartAndShutdown for M
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConsensusInterface for MockConsensus<Q, G> {
+impl<Q: SyncQueryRunnerInterface, P: PubSub<()>> ConsensusInterface for MockConsensus<Q, P> {
     type QueryRunner = Q;
-    type Gossip = G;
     type Certificate = ();
+    type PubSub = P;
 
     async fn init<S: SignerInterface>(
         config: Self::Config,
         _signer: &S,
         executor: ExecutionEngineSocket,
         _query_runner: Self::QueryRunner,
-        _gossip: <Self::Gossip as GossipInterface>::PubSub<Self::Certificate>,
+        _pubsub: P,
     ) -> anyhow::Result<Self> {
         let (tx, rx) = mpsc::channel(128);
         let block_notifier = Arc::new(Notify::new());
@@ -191,7 +192,7 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConsensusInterface for Moc
     }
 }
 
-impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConfigConsumer for MockConsensus<Q, G> {
+impl<Q: SyncQueryRunnerInterface, P: PubSub<()>> ConfigConsumer for MockConsensus<Q, P> {
     const KEY: &'static str = "consensus";
 
     type Config = Config;

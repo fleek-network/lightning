@@ -17,7 +17,7 @@ use draco_interfaces::{
     consensus::{ConsensusInterface, MempoolSocket},
     signer::{SignerInterface, SubmitTxSocket},
     types::{Epoch, EpochInfo, UpdateMethod},
-    GossipInterface, SyncQueryRunnerInterface,
+    PubSub, SyncQueryRunnerInterface,
 };
 use log::{error, info};
 use mysten_metrics::RegistryService;
@@ -43,13 +43,15 @@ use crate::{
     narwhal::{NarwhalArgs, NarwhalService},
 };
 
-pub struct Consensus<Q: SyncQueryRunnerInterface, G: GossipInterface> {
+pub type PubSubMsg = (Certificate, Vec<Batch>);
+
+pub struct Consensus<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     /// Inner state of the consensus
     /// todo(dalton): We can probably get a little more effecient then a mutex here
     /// maybe a once box
-    epoch_state: Mutex<Option<EpochState<Q>>>,
+    epoch_state: Mutex<Option<EpochState<Q, P>>>,
     /// Interface for sending messages through the gossip layer
-    _pubsub: G::PubSub<<crate::consensus::Consensus<Q, G> as ConsensusInterface>::Certificate>,
+    _pubsub: P,
     /// This socket recieves signed transactions and forwards them to an active committee member to
     /// be ordered
     mempool_socket: MempoolSocket,
@@ -66,7 +68,7 @@ pub struct Consensus<Q: SyncQueryRunnerInterface, G: GossipInterface> {
 }
 
 /// This struct contains mutable state only for the current epoch.
-struct EpochState<Q: SyncQueryRunnerInterface> {
+struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> {
     /// The Narwhal service for the current epoch.
     narwhal: Option<NarwhalService>,
     /// Used to query the application data
@@ -76,7 +78,7 @@ struct EpochState<Q: SyncQueryRunnerInterface> {
     /// Path to the database used by the narwhal implementation
     pub store_path: PathBuf,
     /// Narwhal execution state.
-    execution_state: Arc<Execution>,
+    execution_state: Arc<Execution<P>>,
     /// Used to send transactions to consensus
     /// We still use this socket on consensus struct because a node is not always on the committee,
     /// so its not always sending     a transaction to its own mempool. The signer interface
@@ -84,12 +86,12 @@ struct EpochState<Q: SyncQueryRunnerInterface> {
     txn_socket: SubmitTxSocket,
 }
 
-impl<Q: SyncQueryRunnerInterface> EpochState<Q> {
+impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, P> {
     fn new(
         query_runner: Q,
         narwhal_args: NarwhalArgs,
         store_path: PathBuf,
-        execution_state: Arc<Execution>,
+        execution_state: Arc<Execution<P>>,
         txn_socket: SubmitTxSocket,
     ) -> Self {
         Self {
@@ -137,7 +139,8 @@ impl<Q: SyncQueryRunnerInterface> EpochState<Q> {
         let service =
             NarwhalService::new(self.narwhal_args.clone(), store, committee, worker_cache);
 
-        service.start(self.execution_state.clone()).await;
+        let tmp = self.execution_state.clone();
+        service.start(tmp).await;
 
         self.narwhal = Some(service)
     }
@@ -237,7 +240,7 @@ impl<Q: SyncQueryRunnerInterface> EpochState<Q> {
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface, G: GossipInterface> WithStartAndShutdown for Consensus<Q, G> {
+impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> WithStartAndShutdown for Consensus<Q, P> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         self.is_running.load(Ordering::Relaxed)
@@ -288,17 +291,17 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> WithStartAndShutdown for C
     }
 }
 
-impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConfigConsumer for Consensus<Q, G> {
+impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> ConfigConsumer for Consensus<Q, P> {
     const KEY: &'static str = "consensus";
 
     type Config = Config;
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConsensusInterface for Consensus<Q, G> {
+impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> ConsensusInterface for Consensus<Q, P> {
     type QueryRunner = Q;
-    type Gossip = G;
-    type Certificate = (Certificate, Vec<Batch>);
+    type Certificate = PubSubMsg;
+    type PubSub = P;
 
     /// Create a new consensus service with the provided config and executor.
     async fn init<S: SignerInterface>(
@@ -306,7 +309,7 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConsensusInterface for Con
         signer: &S,
         executor: ExecutionEngineSocket,
         query_runner: Q,
-        pubsub: <Self::Gossip as GossipInterface>::PubSub<Self::Certificate>,
+        pubsub: P,
     ) -> anyhow::Result<Self> {
         let (networking_sk, primary_sk) = signer.get_sk();
         let reconfigure_notify = Arc::new(Notify::new());
@@ -327,6 +330,7 @@ impl<Q: SyncQueryRunnerInterface, G: GossipInterface> ConsensusInterface for Con
             executor,
             reconfigure_notify.clone(),
             new_block_notify.clone(),
+            pubsub.clone(),
         ));
         let epoch_state = EpochState::new(
             query_runner,
