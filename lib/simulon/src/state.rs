@@ -1,6 +1,7 @@
 use std::{
     cell::RefCell,
     collections::{BinaryHeap, HashMap, VecDeque},
+    sync::Arc,
 };
 
 use futures::executor::LocalPool;
@@ -11,6 +12,7 @@ use crate::{
     future::{DeferredFuture, DeferredFutureWaker},
     message::{Ignored, Message, MessageDetail},
     report::{Metrics, NodeMetrics},
+    storage::TypedStorage,
 };
 
 thread_local! {
@@ -65,6 +67,8 @@ pub struct NodeState {
     pub metrics: NodeMetrics,
     /// The current metrics being collected for the current frame.
     pub current_metrics: Metrics,
+    /// The shared storage across all nodes.
+    pub storage: Arc<TypedStorage>,
     next_rid: usize,
     clean_up: WithCleanUpDrop,
 }
@@ -85,6 +89,7 @@ impl Drop for NodeState {
 struct WithCleanUpDrop;
 
 impl Drop for WithCleanUpDrop {
+    #[inline(always)]
     fn drop(&mut self) {
         hook_node(std::ptr::null_mut());
     }
@@ -124,7 +129,7 @@ pub enum Resource {
 
 impl NodeState {
     /// Create the empty state of a node.
-    pub fn new(count_nodes: usize, node_id: usize) -> Self {
+    pub fn new(storage: Arc<TypedStorage>, count_nodes: usize, node_id: usize) -> Self {
         Self {
             node_id,
             count_nodes,
@@ -136,6 +141,7 @@ impl NodeState {
             received: BinaryHeap::new(),
             metrics: NodeMetrics::default(),
             current_metrics: Metrics::default(),
+            storage,
             next_rid: 0,
             clean_up: WithCleanUpDrop,
         }

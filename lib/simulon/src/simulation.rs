@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     cell::UnsafeCell,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -12,6 +13,7 @@ use crate::{
     message::Message,
     report::{Metrics, Report},
     state::{hook_node, with_node, NodeState},
+    storage::TypedStorage,
 };
 
 const FRAME_TO_MS: u64 = 4;
@@ -23,6 +25,7 @@ pub struct SimulationBuilder {
     num_nodes: Option<usize>,
     frame_per_node_report: usize,
     frame_per_global_report: usize,
+    storage: TypedStorage,
 }
 
 pub struct Simulation {
@@ -74,6 +77,11 @@ unsafe impl Sync for SharedState {}
 unsafe impl Send for SharedState {}
 
 impl SimulationBuilder {
+    /// Creates a new simulation builder with the provided executor function. The executor function
+    /// is used to drive the state of the simulated node.
+    ///
+    /// It should be a pure function that only uses the [`simulon::api`] functions to perform I/O
+    /// with other simulated nodes.
     pub fn new<E>(executor: E) -> Self
     where
         E: Fn() + Send + Sync + 'static,
@@ -82,23 +90,54 @@ impl SimulationBuilder {
             executor: Box::new(executor),
             num_workers: None,
             num_nodes: None,
-            frame_per_node_report: (FRAME_TO_MS * 16) as usize,
+            frame_per_node_report: (FRAME_TO_MS * 10) as usize,
             frame_per_global_report: FRAME_TO_MS as usize,
+            storage: TypedStorage::default(),
         }
     }
 
+    /// Insert the given value as shared state value for the executor to access.
+    pub fn insert<T: Any>(mut self, data: T) -> Self {
+        self.storage.insert(data);
+        self
+    }
+
+    /// Determines the number of workers that we should use to run this simulation.
+    ///
+    /// # Panics
+    ///
+    /// If the value zero is passed.
+    ///
+    /// # Default
+    ///
+    /// By default it equals to `num_cpus::get_physical() - 1`.
     pub fn with_workers(mut self, n: usize) -> Self {
         assert!(n > 0, "Number of workers must be greater than 0");
         self.num_workers = Some(n);
         self
     }
 
+    /// Determines the number of instances that we should simulate.
+    ///
+    /// # Panics
+    ///
+    /// If the value zero is passed.
+    ///
+    /// # Default
+    ///
+    /// By default the number of nodes is 4 times the number of workers.
     pub fn with_nodes(mut self, n: usize) -> Self {
         assert!(n > 0, "Number of nodes must be greater than 0");
         self.num_nodes = Some(n);
         self
     }
 
+    /// Sets the compaction rate of the collected metrics per each individual node. Use `0` to not
+    /// collect per-frame metric data on each node.
+    ///
+    /// # Default
+    ///
+    /// Default value is `10ms`.
     pub fn set_node_metrics_rate(mut self, duration: Duration) -> Self {
         let rate = duration.as_nanos() / FRAME_DURATION.as_nanos();
         assert!(rate < (usize::MAX as u128));
@@ -106,6 +145,12 @@ impl SimulationBuilder {
         self
     }
 
+    /// Sets the compaction rate of the globally aggregated collected metrics collect per-frame
+    /// metric data on each node.
+    ///
+    /// # Default
+    ///
+    /// Default value is `1ms`.
     pub fn set_global_metrics_rate(mut self, duration: Duration) -> Self {
         let rate = duration.as_nanos() / FRAME_DURATION.as_nanos();
         assert!(rate < (usize::MAX as u128));
@@ -122,8 +167,9 @@ impl SimulationBuilder {
 
         // Cap the number of workers to the number of nodes.
         let num_workers = num_workers.min(num_nodes);
+        let storage = Arc::new(self.storage);
         let nodes = (0..num_nodes)
-            .map(|i| NodeState::new(num_nodes, i))
+            .map(|i| NodeState::new(storage.clone(), num_nodes, i))
             .collect::<Vec<_>>()
             .into_boxed_slice();
 
@@ -158,6 +204,11 @@ impl SimulationBuilder {
             nodes,
             workers: Vec::with_capacity(num_workers),
         }
+    }
+
+    /// Build and run the simulation.
+    pub fn run(self, duration: Duration) -> Report {
+        self.build().run(duration)
     }
 }
 
