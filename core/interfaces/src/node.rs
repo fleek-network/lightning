@@ -252,12 +252,13 @@ where
 pub mod transformers {
     use super::*;
 
+    #[rustfmt::skip]
     pub struct WithConsensus<
         T: DracoTypes,
         Consensus: ConsensusInterface<
-        QueryRunner = <T::Application as ApplicationInterface>::SyncExecutor
-            >,
-    >(T, PhantomData<Consensus>);
+            QueryRunner = <T::Application as ApplicationInterface>::SyncExecutor
+                >,
+            >(T, PhantomData<Consensus>);
 
     impl<
         T: DracoTypes,
