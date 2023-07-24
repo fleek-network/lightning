@@ -17,6 +17,7 @@ pub mod reputation;
 pub mod rpc;
 pub mod service;
 pub mod signer;
+pub mod table;
 pub mod topology;
 pub mod types;
 
