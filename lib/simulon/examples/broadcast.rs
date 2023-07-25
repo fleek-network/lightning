@@ -180,9 +180,9 @@ pub fn main() {
 
     let report = SimulationBuilder::new(|| exec(N))
         .with_nodes(N + 1)
-        .set_latency_provider(simulon::latency::ConstLatencyProvider(
-            Duration::from_millis(1),
-        ))
+        // .set_latency_provider(simulon::latency::ConstLatencyProvider(
+        //     Duration::from_millis(1),
+        // ))
         .set_node_metrics_rate(Duration::ZERO)
         .enable_progress_bar()
         .run(Duration::from_secs(120));

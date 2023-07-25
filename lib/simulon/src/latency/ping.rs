@@ -10,7 +10,7 @@ use rand_distr::{Distribution, Normal};
 use super::LatencyProvider;
 
 const PING_DATA: &[u8] = include_bytes!("../ping.bin");
-const COUNT: usize = 217;
+const COUNT: usize = 222;
 
 #[inline(always)]
 fn read(i: usize, j: usize) -> PingStat {

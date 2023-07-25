@@ -62,6 +62,10 @@ fn main() {
         let max = (max * 1000.0) as u32;
         let mdev = (mdev * 1000.0) as u32;
 
+        if min == 0 {
+            continue;
+        }
+
         let stat = PingStat {
             min,
             avg,
@@ -85,7 +89,7 @@ fn main() {
 
     let count = assigned_id.len();
     for u in 0..count {
-        for v in (u)..count {
+        for v in (u + 1)..count {
             let uv = data.get(&(u, v));
             let vu = data.get(&(v, u));
 
@@ -134,6 +138,7 @@ fn main() {
                 buffer.write(&SAME_NODE_DATA);
             } else {
                 let data = data.get(&(u, v)).unwrap();
+                assert!(data.min > 0);
                 buffer.write(data);
             }
         }

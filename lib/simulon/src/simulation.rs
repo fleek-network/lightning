@@ -280,13 +280,17 @@ impl<L: LatencyProvider> Simulation<L> {
 
             // Run the post executing tasks and figure out how many frames we should move forward.
             if let Some(skip) = self.run_post_frame() {
+                if n <= skip as u128 {
+                    break;
+                }
+
                 debug_assert!(skip >= 1);
 
                 // Move the clock to `skip` frames forward.
                 self.now += skip as u128 * FRAME_DURATION.as_nanos();
 
                 // Update the loop counter and move to the frame.
-                n = n.saturating_sub(skip as u128);
+                n -= skip as u128;
                 self.state.frame.fetch_add(skip, Ordering::Relaxed);
                 if let Some(pb) = pb.as_ref() {
                     pb.inc(skip as u64);
@@ -295,6 +299,10 @@ impl<L: LatencyProvider> Simulation<L> {
                 // End early since there is no more event to be processed.
                 break;
             }
+        }
+
+        if let Some(pb) = pb.as_ref() {
+            pb.inc(n as u64);
         }
 
         // wait for threads one last time.
@@ -339,11 +347,13 @@ impl<L: LatencyProvider> Simulation<L> {
         {
             for mut msg in messages.drain(..) {
                 let node_id = msg.receiver.0;
-
-                msg.time.0 += self
+                let latency = self
                     .latency_provider
                     .get(msg.sender.0, msg.receiver.0)
                     .as_nanos();
+
+                debug_assert!(latency > 0);
+                msg.time.0 += latency;
 
                 self.nodes[node_id].received.push(msg);
             }
@@ -361,10 +371,6 @@ impl<L: LatencyProvider> Simulation<L> {
         let first = unsafe { &*self.state.nodes[0] };
         let msg = first.received.peek()?;
         let time = msg.time.0;
-
-        if time <= self.now {
-            println!("{msg:#?}");
-        }
 
         debug_assert!(time > self.now);
         Some(ceil_div(time - self.now, FRAME_DURATION.as_nanos()).max(1) as usize)
