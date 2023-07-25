@@ -9,6 +9,8 @@ use std::{
     time::Duration,
 };
 
+use indicatif::ProgressBar;
+
 use crate::{
     latency::{DefaultLatencyProvider, LatencyProvider},
     message::Message,
@@ -27,6 +29,7 @@ pub struct SimulationBuilder<L = DefaultLatencyProvider> {
     frame_per_global_report: usize,
     storage: TypedStorage,
     latency_provider: Option<L>,
+    show_progress: bool,
 }
 
 pub struct Simulation<L: LatencyProvider = DefaultLatencyProvider> {
@@ -40,6 +43,8 @@ pub struct Simulation<L: LatencyProvider = DefaultLatencyProvider> {
     workers: Vec<JoinHandle<()>>,
     /// The latency provider.
     latency_provider: L,
+    /// Show progress bar or not.
+    show_progress: bool,
 }
 
 #[derive(Default)]
@@ -97,6 +102,7 @@ impl SimulationBuilder {
             frame_per_global_report: FRAME_TO_MS as usize,
             storage: TypedStorage::default(),
             latency_provider: None,
+            show_progress: false,
         }
     }
 }
@@ -105,6 +111,12 @@ impl<L> SimulationBuilder<L> {
     /// Inject the given value as shared state value for the executor to access.
     pub fn with_state<T: Any>(mut self, data: T) -> Self {
         self.storage.insert(data);
+        self
+    }
+
+    /// Show a progress bar when running the simulation.
+    pub fn enable_progress_bar(mut self) -> Self {
+        self.show_progress = true;
         self
     }
 
@@ -174,6 +186,7 @@ impl<L> SimulationBuilder<L> {
             frame_per_global_report: self.frame_per_global_report,
             storage: self.storage,
             latency_provider: Some(provider),
+            show_progress: self.show_progress,
         }
     }
 
@@ -226,6 +239,7 @@ impl<L> SimulationBuilder<L> {
             nodes,
             workers: Vec::with_capacity(num_workers),
             latency_provider: self.latency_provider.unwrap_or_default(),
+            show_progress: self.show_progress,
         }
     }
 
@@ -246,11 +260,15 @@ impl<L: LatencyProvider> Simulation<L> {
         self.start_threads();
 
         let mut n = duration.as_nanos() / FRAME_DURATION.as_nanos();
+        let pb = self.show_progress.then(|| ProgressBar::new(n as u64));
 
         // Run frame zero regardless that the event queue is empty.
         wait_for_workers(&self.state);
         self.state.ready_workers.store(0, Ordering::Relaxed);
         self.state.frame.fetch_add(1, Ordering::Relaxed);
+        if let Some(pb) = pb.as_ref() {
+            pb.inc(1);
+        }
 
         while n > 1 {
             // wait for the workers to become online.
@@ -270,6 +288,9 @@ impl<L: LatencyProvider> Simulation<L> {
                 // Update the loop counter and move to the frame.
                 n = n.saturating_sub(skip as u128);
                 self.state.frame.fetch_add(skip, Ordering::Relaxed);
+                if let Some(pb) = pb.as_ref() {
+                    pb.inc(skip as u64);
+                }
             } else {
                 // End early since there is no more event to be processed.
                 break;
@@ -340,6 +361,10 @@ impl<L: LatencyProvider> Simulation<L> {
         let first = unsafe { &*self.state.nodes[0] };
         let msg = first.received.peek()?;
         let time = msg.time.0;
+
+        if time <= self.now {
+            println!("{msg:#?}");
+        }
 
         debug_assert!(time > self.now);
         Some(ceil_div(time - self.now, FRAME_DURATION.as_nanos()).max(1) as usize)

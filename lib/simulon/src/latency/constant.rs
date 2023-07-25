@@ -4,7 +4,7 @@ use super::LatencyProvider;
 
 /// A latency provider that always returns the same value.
 #[derive(Clone, Copy)]
-pub struct ConstLatencyProvider(Duration);
+pub struct ConstLatencyProvider(pub Duration);
 
 impl From<Duration> for ConstLatencyProvider {
     #[inline]

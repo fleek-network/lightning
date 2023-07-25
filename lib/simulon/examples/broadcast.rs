@@ -27,9 +27,9 @@ struct BroadcastConnection {
 
 impl NodeState {
     fn handle_message_internal(&mut self, id: usize, payload: Vec<u8>) {
-        api::emit(String::from_utf8(payload.clone()).unwrap());
-
-        self.messages.insert(id, payload);
+        if self.messages.insert(id, payload.clone()).is_none() {
+            api::emit(String::from_utf8(payload).unwrap());
+        }
 
         for (_addr, conn) in self.conns.iter_mut() {
             if conn.seen.contains(&id) {
@@ -176,12 +176,15 @@ fn exec(n: usize) {
 }
 
 pub fn main() {
-    const N: usize = 5;
+    const N: usize = 1500;
 
     let report = SimulationBuilder::new(|| exec(N))
         .with_nodes(N + 1)
+        .set_latency_provider(simulon::latency::ConstLatencyProvider(
+            Duration::from_millis(1),
+        ))
         .set_node_metrics_rate(Duration::ZERO)
-        .build()
+        .enable_progress_bar()
         .run(Duration::from_secs(120));
 
     println!("{:#?}", report.log);
