@@ -111,6 +111,14 @@ fn main() {
     println!("Map size = {}", data.len());
     println!("Eliminated size = {}", eliminated.len());
 
+    const SAME_NODE_DATA: PingStat = PingStat {
+        min: 3_000,
+        avg: 3_700,
+        max: 5_000,
+        stddev: 577,
+        count: 0,
+    };
+
     let mut buffer = Buffer::new(assigned_id.len() - eliminated.len());
     for u in 0..count {
         if eliminated.contains(&u) {
@@ -122,8 +130,12 @@ fn main() {
                 continue;
             }
 
-            let data = data.get(&(u, v)).unwrap();
-            buffer.write(data);
+            if u == v {
+                buffer.write(&SAME_NODE_DATA);
+            } else {
+                let data = data.get(&(u, v)).unwrap();
+                buffer.write(data);
+            }
         }
     }
 
@@ -134,7 +146,7 @@ struct Buffer(Vec<u8>);
 
 impl Buffer {
     pub fn new(n: usize) -> Self {
-        Self(Vec::with_capacity(n * n * 5 * 4))
+        Self(Vec::with_capacity(n * n * 4 * 4))
     }
 
     pub fn write(&mut self, data: &PingStat) {
@@ -142,11 +154,11 @@ impl Buffer {
         let avg: [u8; 4] = data.avg.to_le_bytes();
         let max: [u8; 4] = data.max.to_le_bytes();
         let stddev: [u8; 4] = data.stddev.to_le_bytes();
-        let count: [u8; 4] = data.count.to_le_bytes();
+        // let count: [u8; 4] = data.count.to_le_bytes();
         self.0.extend_from_slice(&min as &[u8]);
         self.0.extend_from_slice(&avg as &[u8]);
         self.0.extend_from_slice(&max as &[u8]);
         self.0.extend_from_slice(&stddev as &[u8]);
-        self.0.extend_from_slice(&count as &[u8]);
+        // self.0.extend_from_slice(&count as &[u8]);
     }
 }
