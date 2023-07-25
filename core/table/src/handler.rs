@@ -4,13 +4,17 @@ use anyhow::Result;
 use fleek_crypto::NodeNetworkingPublicKey;
 use tokio::{net::UdpSocket, select, sync::mpsc::Receiver};
 
-use crate::query::{Command, Message, Query, Response};
+use crate::{
+    query::{Command, Message, NodeInfo, Query, Response},
+    routing::Table,
+};
 
 pub struct Handler {
     socket: UdpSocket,
     /// Inflight messages.
     inflight: HashSet<u64>,
     command_receiver: Receiver<Command>,
+    table: Table,
 }
 
 impl Handler {
@@ -23,11 +27,13 @@ impl Handler {
                         None => break,
                     }
                 }
-                incoming = recv_from(&mut self.socket) => {
+                incoming = recv_from(&self.socket) => {
                     match incoming {
-                        Ok((datagram, address)) => self.handle_datagram(datagram, address).await.unwrap(),
-                        Err(_) => {
-                            // Todo: Log error.
+                        Ok((datagram, address)) => {
+                            self.handle_datagram(datagram, address).await.unwrap();
+                        }
+                        Err(e) => {
+                            tracing::error!("unexpected error when reading from socket: {}", e)
                         }
                     }
                 }
@@ -47,50 +53,26 @@ impl Handler {
     async fn handle_datagram(&self, datagram: Vec<u8>, address: SocketAddr) -> Result<()> {
         let message: Message = bincode::deserialize(datagram.as_slice())?;
         match message {
-            Message::Query { payload, .. } => match payload {
-                Query::FindNode { .. } => {
+            Message::Query { id, payload, .. } => match payload {
+                Query::FindNode { key } => {
+                    let nodes = self.handle_find_node(&key).await?;
                     let query = Message::Response {
-                        id: 0,
-                        // Todo: Update.
-                        payload: Response::Pong,
+                        id,
+                        payload: Response::NodeInfo(nodes),
                     };
-                    let bytes = match bincode::serialize(&query) {
-                        Ok(bytes) => bytes,
-                        Err(_) => {
-                            // Todo: Log error.
-                            todo!()
-                        },
-                    };
-                    send_to(&self.socket, bytes.as_slice(), address);
+                    let bytes = bincode::serialize(&query)?;
+                    send_to(&self.socket, bytes.as_slice(), address).await?;
                 },
-                Query::Store { .. } => {
-                    let query = Message::Response {
-                        id: 0,
-                        // Todo: Update.
-                        payload: Response::Pong,
-                    };
-                    let bytes = match bincode::serialize(&query) {
-                        Ok(bytes) => bytes,
-                        Err(_) => {
-                            // Todo: Log error.
-                            todo!()
-                        },
-                    };
-                    send_to(&self.socket, bytes.as_slice(), address);
+                Query::Store { key, value } => {
+                    self.handle_store(key, value).await?;
                 },
                 Query::Ping => {
                     let query = Message::Response {
-                        id: 0,
+                        id,
                         payload: Response::Pong,
                     };
-                    let bytes = match bincode::serialize(&query) {
-                        Ok(bytes) => bytes,
-                        Err(_) => {
-                            // Todo: Log error.
-                            todo!()
-                        },
-                    };
-                    send_to(&self.socket, bytes.as_slice(), address);
+                    let bytes = bincode::serialize(&query)?;
+                    send_to(&self.socket, bytes.as_slice(), address).await?;
                 },
             },
             Message::Response { .. } => {},
@@ -98,15 +80,11 @@ impl Handler {
         Ok(())
     }
 
-    async fn handle_find_node(&self, _: NodeNetworkingPublicKey) {
-        todo!()
+    async fn handle_find_node(&self, target: &NodeNetworkingPublicKey) -> Result<Vec<NodeInfo>> {
+        Ok(self.table.closest_nodes(target))
     }
 
-    async fn handle_store(&self, _: Vec<u8>, _: Vec<u8>) {
-        todo!()
-    }
-
-    async fn handle_ping() {
+    async fn handle_store(&self, _: Vec<u8>, _: Vec<u8>) -> Result<()> {
         todo!()
     }
 }

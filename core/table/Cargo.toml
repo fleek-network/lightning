@@ -12,3 +12,4 @@ fleek-crypto.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tracing = "0.1"

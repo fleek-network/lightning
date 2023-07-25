@@ -1,8 +1,9 @@
 use std::net::SocketAddr;
+
 use fleek_crypto::NodeNetworkingPublicKey;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NodeInfo {
     address: SocketAddr,
     key: NodeNetworkingPublicKey,
@@ -23,7 +24,7 @@ pub enum Message {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Response {
-    NodeInfo(NodeInfo),
+    NodeInfo(Vec<NodeInfo>),
     Pong,
 }
 
