@@ -268,7 +268,7 @@ impl<L: LatencyProvider> Simulation<L> {
                 self.now += skip as u128 * FRAME_DURATION.as_nanos();
 
                 // Update the loop counter and move to the frame.
-                n -= skip as u128;
+                n = n.saturating_sub(skip as u128);
                 self.state.frame.fetch_add(skip, Ordering::Relaxed);
             } else {
                 // End early since there is no more event to be processed.
