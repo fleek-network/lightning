@@ -59,7 +59,15 @@ pub enum CommodityTypes {
 }
 
 /// This is commodity served by each of the commodity types
-pub type CommodityServed = Vec<u128>;
+type CommodityServed = Vec<u128>;
+
+pub type ServiceRevenue = HpUfloat<6>;
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
+pub struct NodeServed {
+    pub served: CommodityServed,
+    pub stables_revenue: HpUfloat<6>,
+}
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
 pub struct TotalServed {
@@ -71,6 +79,10 @@ pub struct TotalServed {
 /// Information about the services
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash)]
 pub struct Service {
+    /// the owner address that deploys the service and also recieves reward share
+    pub owner: EthAddress,
+    // TODO: can there be multiple types of commodity per service
+    /// the commodity that service is going to serve
     pub commodity_type: CommodityTypes,
     /// TODO: List of circuits to prove a node should be slashed
     pub slashing: (),
@@ -330,16 +342,18 @@ pub enum ProtocolParams {
     LockTime = 4,
     /// The percentage of the reward pool the protocol gets
     ProtocolShare = 5,
-    /// The percentage of the FLK emissions per unit that goes to service nodes
+    /// The percentage of the reward pool goes to edge nodes
     NodeShare = 6,
+    /// The percentage of the reward pool goes to edge nodes
+    ServiceBuilderShare = 7,
     /// The maximum targed inflation rate in a year
-    MaxInflation = 7,
+    MaxInflation = 8,
     /// The amount of FLK minted per GB they consume.
-    ConsumerRebate = 8,
+    ConsumerRebate = 9,
     /// The max multiplier on rewards for locking
-    MaxBoost = 9,
+    MaxBoost = 10,
     /// The max amount of time tokens can be locked
-    MaxLockTime = 10,
+    MaxLockTime = 11,
 }
 
 /// The physical address of a node where it can be reached, the port numbers are

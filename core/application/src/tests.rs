@@ -31,6 +31,7 @@ pub struct Params {
     max_inflation: Option<u16>,
     protocol_share: Option<u16>,
     node_share: Option<u16>,
+    service_builder_share: Option<u16>,
     max_boost: Option<u16>,
     supply_at_genesis: Option<u64>,
 }
@@ -111,6 +112,10 @@ async fn init_app_with_params(
 
     if let Some(node_share) = params.node_share {
         genesis.node_share = node_share;
+    }
+
+    if let Some(service_builder_share) = params.service_builder_share {
+        genesis.service_builder_share = service_builder_share;
     }
 
     if let Some(max_boost) = params.max_boost {
@@ -613,7 +618,9 @@ async fn test_pod_without_proof() {
     }
 
     assert_eq!(
-        query_runner.get_commodity_served(&keystore[0].node_secret_key.to_pk()),
+        query_runner
+            .get_node_served(&keystore[0].node_secret_key.to_pk())
+            .served,
         vec![1000, 2000]
     );
 
@@ -631,8 +638,9 @@ async fn test_distribute_rewards() {
     let (committee, keystore) = get_genesis_committee(4);
 
     let max_inflation = 10;
-    let protocol_part = 20;
+    let protocol_part = 10;
     let node_part = 80;
+    let service_part = 10;
     let boost = 4;
     let supply_at_genesis = 1_000_000;
     let (update_socket, query_runner) = init_app_with_params(
@@ -641,6 +649,7 @@ async fn test_distribute_rewards() {
             max_inflation: Some(max_inflation),
             protocol_share: Some(protocol_part),
             node_share: Some(node_part),
+            service_builder_share: Some(service_part),
             max_boost: Some(boost),
             supply_at_genesis: Some(supply_at_genesis),
         },
@@ -654,6 +663,7 @@ async fn test_distribute_rewards() {
     let inflation: HpUfloat<18> = HpUfloat::from(max_inflation) / &percentage_divisor;
     let node_share = HpUfloat::from(node_part) / &percentage_divisor;
     let protocol_share = HpUfloat::from(protocol_part) / &percentage_divisor;
+    let service_share = HpUfloat::from(service_part) / &percentage_divisor;
 
     let owner_secret_key1 = AccountOwnerSecretKey::generate();
     let node_secret_key1 = NodeSecretKey::generate();
@@ -707,6 +717,18 @@ async fn test_distribute_rewards() {
     let pod_10 = pod_request(node_secret_key1, 12_800, 0, 1);
     let pod11 = pod_request(node_secret_key1, 3_600, 1, 2);
     let pod_21 = pod_request(node_secret_key2, 5000, 1, 1);
+
+    let node_1_usd = 0.1 * 12_800_f64 + 0.2 * 3_600_f64; // 2_000 in revenue
+    let node_2_usd = 0.2 * 5_000_f64; // 1_000 in revenue
+    let reward_pool: HpUfloat<6> = (node_1_usd + node_2_usd).into();
+
+    let node_1_proportion: HpUfloat<18> = HpUfloat::from(2000_u64) / HpUfloat::from(3000_u64);
+    let node_2_proportion: HpUfloat<18> = HpUfloat::from(1000_u64) / HpUfloat::from(3000_u64);
+
+    let service_proportions: Vec<HpUfloat<18>> = vec![
+        HpUfloat::from(1280_u64) / HpUfloat::from(3000_u64),
+        HpUfloat::from(1720_u64) / HpUfloat::from(3000_u64),
+    ];
     // run the delivery ack transaction
     if let Err(e) = run_transaction(vec![pod_10, pod11, pod_21], &update_socket).await {
         panic!("{e}");
@@ -716,8 +738,6 @@ async fn test_distribute_rewards() {
     if let Err(err) = simple_epoch_change(0, &keystore, &update_socket, 1).await {
         panic!("error while changing epoch, {err}");
     }
-    let node_1_usd = 0.1 * 12_800_f64 + 0.2 * 3_600_f64; // 2_000 in revenue
-    let node_2_usd = 0.2 * 5_000_f64; // 1_000 in revenue
 
     // assert stable balances
     let stables_balance = query_runner.get_stables_balance(&owner_secret_key1.to_pk().into());
@@ -731,8 +751,6 @@ async fn test_distribute_rewards() {
         <f64 as Into<HpUfloat<6>>>::into(node_2_usd) * node_share.convert_precision()
     );
 
-    let node_1_proportion: HpUfloat<18> = HpUfloat::from(2_u64) / HpUfloat::from(3_u64);
-    let node_2_proportion: HpUfloat<18> = HpUfloat::from(1_u64) / HpUfloat::from(3_u64);
     let total_share =
         &node_1_proportion * HpUfloat::from(1_u64) + &node_2_proportion * HpUfloat::from(4_u64);
 
@@ -756,6 +774,28 @@ async fn test_distribute_rewards() {
     let protocol_balance = query_runner.get_flk_balance(&protocol_account);
     let protocol_rewards = &emissions * &protocol_share;
     assert_eq!(protocol_balance, protocol_rewards);
+    let protocol_stables_balance = query_runner.get_stables_balance(&protocol_account);
+    assert_eq!(
+        &reward_pool * &protocol_share.convert_precision(),
+        protocol_stables_balance
+    );
+
+    // assert service balances with service id 0 and 1
+    for s in 0..2 {
+        let service_owner = query_runner.get_service_info(s).owner;
+        let service_balance = query_runner.get_flk_balance(&service_owner);
+        assert_eq!(
+            service_balance,
+            &emissions * &service_share * &service_proportions[s as usize]
+        );
+        let service_stables_balance = query_runner.get_stables_balance(&service_owner);
+        assert_eq!(
+            service_stables_balance,
+            &reward_pool
+                * &service_share.convert_precision()
+                * &service_proportions[s as usize].convert_precision()
+        );
+    }
 }
 
 #[test]
@@ -881,8 +921,9 @@ async fn test_supply_across_epoch() {
 
     let epoch_time = 100;
     let max_inflation = 10;
-    let protocol_part = 15;
+    let protocol_part = 10;
     let node_part = 80;
+    let service_part = 10;
     let boost = 4;
     let supply_at_genesis = 1000000;
     let (update_socket, query_runner) = init_app_with_params(
@@ -891,6 +932,7 @@ async fn test_supply_across_epoch() {
             max_inflation: Some(max_inflation),
             protocol_share: Some(protocol_part),
             node_share: Some(node_part),
+            service_builder_share: Some(service_part),
             max_boost: Some(boost),
             supply_at_genesis: Some(supply_at_genesis),
         },
@@ -904,6 +946,7 @@ async fn test_supply_across_epoch() {
     let inflation: HpUfloat<18> = HpUfloat::from(max_inflation) / &percentage_divisor;
     let node_share = HpUfloat::from(node_part) / &percentage_divisor;
     let protocol_share = HpUfloat::from(protocol_part) / &percentage_divisor;
+    let service_share = HpUfloat::from(service_part) / &percentage_divisor;
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_secret_key = NodeSecretKey::generate();
@@ -945,8 +988,9 @@ async fn test_supply_across_epoch() {
             panic!("error while changing epoch, {err}");
         }
 
-        let supply_increase =
-            &emissions_per_epoch * &node_share + &emissions_per_epoch * &protocol_share;
+        let supply_increase = &emissions_per_epoch * &node_share
+            + &emissions_per_epoch * &protocol_share
+            + &emissions_per_epoch * &service_share;
         let total_supply = query_runner.get_total_supply();
         let supply_year_start = query_runner.get_year_start_supply();
         supply += supply_increase;

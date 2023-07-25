@@ -6,10 +6,11 @@ use std::{
 
 use draco_interfaces::{
     types::{
-        AccountInfo, CommodityServed, CommodityTypes, Epoch, ExecutionData, ExecutionError,
-        Metadata, NodeInfo, ProofOfConsensus, ProofOfMisbehavior, ProtocolParams,
-        ReportedReputationMeasurements, ReputationMeasurements, Service, ServiceId, Staking,
-        Tokens, TotalServed, TransactionResponse, UpdateMethod, UpdateRequest, Value, Worker,
+        AccountInfo, CommodityTypes, Epoch, ExecutionData, ExecutionError, Metadata, NodeInfo,
+        NodeServed, ProofOfConsensus, ProofOfMisbehavior, ProtocolParams,
+        ReportedReputationMeasurements, ReputationMeasurements, Service, ServiceId, ServiceRevenue,
+        Staking, Tokens, TotalServed, TransactionResponse, UpdateMethod, UpdateRequest, Value,
+        Worker,
     },
     DeliveryAcknowledgment, ToDigest,
 };
@@ -19,8 +20,8 @@ use fleek_crypto::{
     TransactionSender, TransactionSignature,
 };
 use hp_float::unsigned::HpUfloat;
+use lazy_static::lazy_static;
 use multiaddr::Multiaddr;
-use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
 use crate::table::{Backend, TableRef};
@@ -45,6 +46,10 @@ const DEFAULT_REP_QUANTILE: f64 = 0.1;
 /// epochs and 30% is based on the current epoch.
 const REP_EWMA_WEIGHT: f64 = 0.7;
 
+lazy_static! {
+    static ref BIG_HUNDRED: HpUfloat<18> = HpUfloat::<18>::from(100_u64);
+}
+
 /// The state of the Application
 ///
 /// The functions implemented on this struct are the "Smart Contracts" of the application layer
@@ -60,9 +65,10 @@ pub struct State<B: Backend> {
     pub rep_measurements: B::Ref<NodePublicKey, Vec<ReportedReputationMeasurements>>,
     pub latencies: B::Ref<(NodePublicKey, NodePublicKey), Duration>,
     pub rep_scores: B::Ref<NodePublicKey, u8>,
-    pub current_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
-    pub last_epoch_served: B::Ref<NodePublicKey, CommodityServed>,
+    pub current_epoch_served: B::Ref<NodePublicKey, NodeServed>,
+    pub last_epoch_served: B::Ref<NodePublicKey, NodeServed>,
     pub total_served: B::Ref<Epoch, TotalServed>,
+    pub service_revenue: B::Ref<ServiceId, ServiceRevenue>,
     pub commodity_prices: B::Ref<CommodityTypes, HpUfloat<6>>,
     pub backend: B,
 }
@@ -91,6 +97,7 @@ impl<B: Backend> State<B> {
             current_epoch_served: backend.get_table_reference("current_epoch_served"),
             total_served: backend.get_table_reference("total_served"),
             commodity_prices: backend.get_table_reference("commodity_prices"),
+            service_revenue: backend.get_table_reference("service_revenue"),
             backend,
         }
     }
@@ -212,7 +219,7 @@ impl<B: Backend> State<B> {
             _ => 0,
         };
 
-        let mut commodity_served = self.current_epoch_served.get(&sender).unwrap_or_default();
+        let mut node_served = self.current_epoch_served.get(&sender).unwrap_or_default();
         let mut total_served = self.total_served.get(&current_epoch).unwrap_or_default();
         let commodity_prices = self
             .commodity_prices
@@ -221,20 +228,30 @@ impl<B: Backend> State<B> {
 
         let commodity_index = commodity_type as usize;
         for i in 0..=commodity_index {
-            if i >= commodity_served.len() {
-                commodity_served.push(0);
+            if i >= node_served.served.len() {
+                node_served.served.push(0);
             }
             if i >= total_served.served.len() {
                 total_served.served.push(0);
             }
         }
-        commodity_served[commodity_index] += commodity;
-        total_served.served[commodity_index] += commodity;
         let commodity_to_big: HpUfloat<6> = commodity.into();
-        total_served.reward_pool += commodity_to_big * commodity_prices;
+        let revenue = &commodity_to_big * &commodity_prices;
 
-        self.current_epoch_served.set(sender, commodity_served);
+        node_served.served[commodity_index] += commodity;
+        node_served.stables_revenue += revenue.clone();
+
+        total_served.served[commodity_index] += commodity;
+        total_served.reward_pool += revenue.clone();
+
+        // Todo: track commodity served by service to be used for service builders reward share
+        // if the a services serves multiple commodity, the current logic would change
+        let mut service_revenue = self.service_revenue.get(&service_id).unwrap_or_default();
+        service_revenue += revenue;
+
+        self.current_epoch_served.set(sender, node_served);
         self.total_served.set(current_epoch, total_served);
+        self.service_revenue.set(service_id, service_revenue);
 
         TransactionResponse::Success(ExecutionData::None)
     }
@@ -797,9 +814,6 @@ impl<B: Backend> State<B> {
     ///
     /// `FLk` total emission is given by:
     /// `emission = (inflation * supply) / (daysInYear=365.0)`
-    ///
-    ///  `FLk` emission per stable is given by:
-    /// `per_stable = emission / ()`
     fn distribute_rewards(&self) {
         let epoch = match self.metadata.get(&Metadata::Epoch) {
             Some(Value::Epoch(epoch)) => epoch,
@@ -816,13 +830,12 @@ impl<B: Backend> State<B> {
         if reward_pool == HpUfloat::zero() {
             return;
         }
-        let percentage_divisor = HpUfloat::<18>::from(100_u64);
         let node_percentage: HpUfloat<18> = self
             .parameters
             .get(&ProtocolParams::NodeShare)
             .unwrap_or_default()
             .into();
-        let node_share = &node_percentage / &percentage_divisor;
+        let node_share = &node_percentage / &(*BIG_HUNDRED);
         let emissions = self.calculate_emissions();
         let emissions_for_node = &emissions * &node_share;
 
@@ -836,11 +849,16 @@ impl<B: Backend> State<B> {
             let node_info = self.node_info.get(&node).unwrap();
             node_info_map.insert(node, node_info.clone());
 
-            let stables_rewards: HpUfloat<6> = self.calculate_node_revenue(&node);
+            let stables_revenue: HpUfloat<6> = self
+                .current_epoch_served
+                .get(&node)
+                .unwrap_or_default()
+                .stables_revenue;
+
             let node_service_proportion =
-                &stables_rewards.convert_precision::<18>() / &reward_pool.convert_precision::<18>();
+                &stables_revenue.convert_precision::<18>() / &reward_pool.convert_precision::<18>();
             self.mint_and_transfer_stables(
-                stables_rewards * &node_share.convert_precision(),
+                stables_revenue * &node_share.convert_precision(),
                 node_info.owner,
             );
 
@@ -862,40 +880,48 @@ impl<B: Backend> State<B> {
             self.current_epoch_served.remove(node);
         }
 
-        let protocol_percentage: HpUfloat<18> = self
+        // todo: add service builders revenue
+        let service_share: HpUfloat<18> = &(self
+            .parameters
+            .get(&ProtocolParams::ServiceBuilderShare)
+            .unwrap_or_default()
+            .into())
+            / &(*BIG_HUNDRED);
+        let services_stable_reward_pool = &reward_pool * &service_share.convert_precision();
+        let services_flk_reward_pool = &emissions * &service_share;
+        for service_id in self.service_revenue.keys() {
+            let service_owner = self.services.get(&service_id).unwrap().owner;
+            let service_revenue = self.service_revenue.get(&service_id).unwrap_or_default();
+            let revenue_proportion: HpUfloat<18> =
+                &service_revenue.convert_precision() / &reward_pool.convert_precision();
+            self.mint_and_transfer_stables(
+                &services_stable_reward_pool * &revenue_proportion.convert_precision(),
+                service_owner,
+            );
+            self.mint_and_transfer_flk(
+                &services_flk_reward_pool * &revenue_proportion.convert_precision(),
+                service_owner,
+            );
+            self.service_revenue.remove(&service_id);
+        }
+
+        // protcols share for rewards
+        let protocol_share: HpUfloat<18> = &(self
             .parameters
             .get(&ProtocolParams::ProtocolShare)
             .unwrap_or_default()
-            .into();
-        let protocol_share = &protocol_percentage / &percentage_divisor;
+            .into())
+            / &(*BIG_HUNDRED);
 
         let protocol_owner = match self.metadata.get(&Metadata::ProtocolFundAddress) {
             Some(Value::AccountPublicKey(owner)) => owner,
             _ => panic!("ProtocolFundAddress is added at Genesis and should exist"),
         };
-        // todo: add service builders revenue
         self.mint_and_transfer_stables(
             &reward_pool * &protocol_share.convert_precision(),
             protocol_owner,
         );
         self.mint_and_transfer_flk(&emissions * &protocol_share, protocol_owner);
-    }
-
-    fn calculate_node_revenue(&self, node: &NodePublicKey) -> HpUfloat<6> {
-        let served = self.current_epoch_served.get(node).unwrap_or_default();
-        served.iter().enumerate().fold(
-            HpUfloat::<6>::zero(),
-            |mut stables_revenue, (commodity_type, &quantity)| {
-                if let Some(price) = CommodityTypes::from_u8(commodity_type as u8)
-                    .and_then(|commodity| self.commodity_prices.get(&commodity))
-                {
-                    let big_quantity: HpUfloat<6> = quantity.into();
-                    stables_revenue += price * big_quantity;
-                }
-
-                stables_revenue
-            },
-        )
     }
 
     fn calculate_emissions(&self) -> HpUfloat<18> {

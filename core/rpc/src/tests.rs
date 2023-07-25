@@ -10,7 +10,7 @@ use draco_application::{
 };
 use draco_interfaces::{
     types::{
-        CommodityServed, EpochInfo, NodeInfo, ProtocolParams, Staking, TotalServed, UpdateRequest,
+        EpochInfo, NodeInfo, NodeServed, ProtocolParams, Staking, TotalServed, UpdateRequest,
         Worker as NodeWorker,
     },
     ApplicationInterface, MempoolSocket, RpcInterface, SyncQueryRunnerInterface,
@@ -1264,15 +1264,19 @@ async fn test_rpc_get_total_served() -> Result<()> {
 }
 
 #[test]
-async fn test_rpc_get_commodity_served() -> Result<()> {
+async fn test_rpc_get_node_served() -> Result<()> {
     // Init application service and store total served in application state.
     let mut genesis = Genesis::load().unwrap();
 
     let node_secret_key = NodeSecretKey::generate();
     let node_public_key = node_secret_key.to_pk();
-    genesis
-        .current_epoch_served
-        .insert(node_public_key.to_base64(), vec![1000]);
+    genesis.current_epoch_served.insert(
+        node_public_key.to_base64(),
+        NodeServed {
+            served: vec![1000],
+            ..Default::default()
+        },
+    );
 
     let app = Application::init(AppConfig {
         genesis: Some(genesis),
@@ -1300,7 +1304,7 @@ async fn test_rpc_get_commodity_served() -> Result<()> {
 
     let req = json!({
         "jsonrpc": "2.0",
-        "method":"flk_get_commodity_served",
+        "method":"flk_get_node_served",
         "params": {"public_key": node_public_key},
         "id":1,
     });
@@ -1311,9 +1315,8 @@ async fn test_rpc_get_commodity_served() -> Result<()> {
         let value: Value = response.json().await?;
         if value.get("result").is_some() {
             // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<CommodityServed> =
-                serde_json::from_value(value)?;
-            assert_eq!(vec![1000], success_response.result);
+            let success_response: RpcSuccessResponse<NodeServed> = serde_json::from_value(value)?;
+            assert_eq!(vec![1000], success_response.result.served);
         } else {
             panic!("Rpc Error: {value}")
         }

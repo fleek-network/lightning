@@ -4,8 +4,9 @@ committee_size = 10
 min_stake = 1000
 eligibility_time = 1
 lock_time = 5
-protocol_share = 20
+protocol_share = 0
 node_share = 80
+service_builder_share = 20
 max_inflation = 10
 consumer_rebate = 0
 max_boost = 4
@@ -51,10 +52,12 @@ worker_mempool = "/ip4/127.0.0.1/tcp/8102/http"
 
 [[service]]
 id = 0
+owner = "AuFr10sT3ObVRNoTuvJbh0ncSJS6o18oWCFmyXKirdKF"
 commodity_type = "Bandwidth"
 
 [[service]]
 id = 1
+owner = "A2wabLjqOtlgI8XlpTtq5ieDfyA04afQdyq4a7NQFXZB"
 commodity_type = "Compute"
 
 

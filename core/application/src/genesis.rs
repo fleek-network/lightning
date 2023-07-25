@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::{Context, Result};
 use draco_interfaces::types::{
-    CommodityServed, CommodityTypes, Epoch, NodeInfo, Staking, TotalServed, Worker,
+    CommodityTypes, Epoch, NodeInfo, NodeServed, Staking, TotalServed, Worker,
 };
 use fleek_crypto::{AccountOwnerPublicKey, NodeNetworkingPublicKey, NodePublicKey, PublicKey};
 use multiaddr::Multiaddr;
@@ -19,6 +19,7 @@ pub struct Genesis {
     pub max_inflation: u16,
     pub protocol_share: u16,
     pub node_share: u16,
+    pub service_builder_share: u16,
     pub consumer_rebate: u64,
     pub max_boost: u16,
     pub max_lock_time: u64,
@@ -31,7 +32,7 @@ pub struct Genesis {
     pub rep_scores: HashMap<String, u8>,
     pub node_info: HashMap<String, NodeInfo>,
     pub total_served: HashMap<Epoch, TotalServed>,
-    pub current_epoch_served: HashMap<String, CommodityServed>,
+    pub current_epoch_served: HashMap<String, NodeServed>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -45,6 +46,7 @@ pub struct GenesisAccount {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenesisService {
     pub id: u32,
+    pub owner: String,
     pub commodity_type: CommodityTypes,
 }
 

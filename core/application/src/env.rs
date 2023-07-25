@@ -4,9 +4,9 @@ use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use draco_interfaces::{
     types::{
-        AccountInfo, Block, CommodityServed, CommodityTypes, Epoch, ExecutionData, Metadata,
-        NodeInfo, ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, TotalServed,
-        TransactionResponse, Value,
+        AccountInfo, Block, CommodityTypes, Epoch, ExecutionData, Metadata, NodeInfo, NodeServed,
+        ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, ServiceRevenue,
+        TotalServed, TransactionResponse, Value,
     },
     BlockExecutionResponse,
 };
@@ -38,15 +38,17 @@ impl Env<UpdatePerm> {
             .with_table::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements")
             .with_table::<(NodePublicKey, NodePublicKey), Duration>("latencies")
             .with_table::<NodePublicKey, u8>("rep_scores")
-            .with_table::<NodePublicKey, CommodityServed>("current_epoch_served")
-            .with_table::<NodePublicKey, CommodityServed>("last_epoch_served")
+            .with_table::<NodePublicKey, NodeServed>("current_epoch_served")
+            .with_table::<NodePublicKey, NodeServed>("last_epoch_served")
             .with_table::<Epoch, TotalServed>("total_served")
             .with_table::<CommodityTypes, HpUfloat<6>>("commodity_prices")
+            .with_table::<ServiceId, ServiceRevenue>("service_revenue")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("rep_scores")
             .enable_iter("latencies")
             .enable_iter("node")
+            .enable_iter("service_revenue")
             .build();
 
         Self { inner: atomo }
@@ -132,7 +134,7 @@ impl Env<UpdatePerm> {
             let mut rep_scores_table = ctx.get_table::<NodePublicKey, u8>("rep_scores");
             let mut total_served_table = ctx.get_table::<Epoch, TotalServed>("total_served");
             let mut current_epoch_served_table =
-                ctx.get_table::<NodePublicKey, CommodityServed>("current_epoch_served");
+                ctx.get_table::<NodePublicKey, NodeServed>("current_epoch_served");
 
             let protocol_fund_address =
                 AccountOwnerPublicKey::from_base64(&genesis.protocol_fund_address).unwrap();
@@ -160,6 +162,10 @@ impl Env<UpdatePerm> {
             param_table.insert(
                 ProtocolParams::ProtocolShare,
                 genesis.protocol_share as u128,
+            );
+            param_table.insert(
+                ProtocolParams::ServiceBuilderShare,
+                genesis.service_builder_share as u128,
             );
             param_table.insert(
                 ProtocolParams::EligibilityTime,
@@ -195,9 +201,11 @@ impl Env<UpdatePerm> {
             );
 
             for service in &genesis.service {
+                let owner_public_key = AccountOwnerPublicKey::from_base64(&service.owner).unwrap();
                 service_table.insert(
                     service.id,
                     Service {
+                        owner: owner_public_key.into(),
                         commodity_type: service.commodity_type,
                         slashing: (),
                     },

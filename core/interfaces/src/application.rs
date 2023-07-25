@@ -9,8 +9,9 @@ use crate::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
     types::{
-        Block, CommodityServed, Epoch, EpochInfo, NodeInfo, ProtocolParams,
-        ReportedReputationMeasurements, TotalServed, TransactionResponse, UpdateRequest,
+        Block, Epoch, EpochInfo, NodeInfo, NodeServed, ProtocolParams,
+        ReportedReputationMeasurements, Service, ServiceId, TotalServed, TransactionResponse,
+        UpdateRequest,
     },
 };
 
@@ -139,7 +140,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_total_served(&self, epoch: Epoch) -> TotalServed;
 
     /// Return all commodity served for a give node for current epoch
-    fn get_commodity_served(&self, node: &NodePublicKey) -> CommodityServed;
+    fn get_node_served(&self, node: &NodePublicKey) -> NodeServed;
 
     /// Return the current total supply of FLK tokens
     fn get_total_supply(&self) -> HpUfloat<18>;
@@ -158,6 +159,8 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Return all latencies measurements for the current epoch.
     fn get_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration>;
+    /// returns the service information for a given serviceid
+    fn get_service_info(&self, service_id: ServiceId) -> Service;
 }
 
 #[derive(Clone, Debug)]

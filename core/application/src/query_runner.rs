@@ -4,9 +4,9 @@ use atomo::{Atomo, QueryPerm, ResolvedTableReference};
 use draco_interfaces::{
     application::SyncQueryRunnerInterface,
     types::{
-        AccountInfo, CommodityServed, CommodityTypes, Epoch, EpochInfo, Metadata, NodeInfo,
-        ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, TotalServed,
-        TransactionResponse, UpdateRequest, Value,
+        AccountInfo, CommodityTypes, Epoch, EpochInfo, Metadata, NodeInfo, NodeServed,
+        ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, ServiceRevenue,
+        TotalServed, TransactionResponse, UpdateRequest, Value,
     },
 };
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
@@ -25,14 +25,15 @@ pub struct QueryRunner {
     client_table: ResolvedTableReference<ClientPublicKey, EthAddress>,
     node_table: ResolvedTableReference<NodePublicKey, NodeInfo>,
     committee_table: ResolvedTableReference<Epoch, Committee>,
-    _services_table: ResolvedTableReference<ServiceId, Service>,
+    services_table: ResolvedTableReference<ServiceId, Service>,
     param_table: ResolvedTableReference<ProtocolParams, u128>,
-    current_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
+    current_epoch_served: ResolvedTableReference<NodePublicKey, NodeServed>,
     rep_measurements: ResolvedTableReference<NodePublicKey, Vec<ReportedReputationMeasurements>>,
     latencies: ResolvedTableReference<(NodePublicKey, NodePublicKey), Duration>,
     rep_scores: ResolvedTableReference<NodePublicKey, u8>,
-    _last_epoch_served: ResolvedTableReference<NodePublicKey, CommodityServed>,
+    _last_epoch_served: ResolvedTableReference<NodePublicKey, NodeServed>,
     total_served_table: ResolvedTableReference<Epoch, TotalServed>,
+    _service_revenue: ResolvedTableReference<ServiceId, ServiceRevenue>,
     _commodity_price: ResolvedTableReference<CommodityTypes, HpUfloat<6>>,
 }
 
@@ -44,18 +45,18 @@ impl QueryRunner {
             client_table: atomo.resolve::<ClientPublicKey, EthAddress>("client_keys"),
             node_table: atomo.resolve::<NodePublicKey, NodeInfo>("node"),
             committee_table: atomo.resolve::<Epoch, Committee>("committee"),
-            _services_table: atomo.resolve::<ServiceId, Service>("service"),
+            services_table: atomo.resolve::<ServiceId, Service>("service"),
             param_table: atomo.resolve::<ProtocolParams, u128>("parameter"),
             current_epoch_served: atomo
-                .resolve::<NodePublicKey, CommodityServed>("current_epoch_served"),
+                .resolve::<NodePublicKey, NodeServed>("current_epoch_served"),
             rep_measurements: atomo
                 .resolve::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements"),
             latencies: atomo.resolve::<(NodePublicKey, NodePublicKey), Duration>("latencies"),
             rep_scores: atomo.resolve::<NodePublicKey, u8>("rep_scores"),
-            _last_epoch_served: atomo
-                .resolve::<NodePublicKey, CommodityServed>("last_epoch_served"),
+            _last_epoch_served: atomo.resolve::<NodePublicKey, NodeServed>("last_epoch_served"),
             total_served_table: atomo.resolve::<Epoch, TotalServed>("total_served"),
             _commodity_price: atomo.resolve::<CommodityTypes, HpUfloat<6>>("commodity_prices"),
+            _service_revenue: atomo.resolve::<ServiceId, ServiceRevenue>("service_revenue"),
             inner: atomo,
         }
     }
@@ -256,7 +257,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn get_commodity_served(&self, node: &NodePublicKey) -> CommodityServed {
+    fn get_node_served(&self, node: &NodePublicKey) -> NodeServed {
         self.inner.run(|ctx| {
             self.current_epoch_served
                 .get(ctx)
@@ -332,5 +333,9 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 })
             })
             .collect()
+    }
+    fn get_service_info(&self, service_id: ServiceId) -> Service {
+        self.inner
+            .run(|ctx| self.services_table.get(ctx).get(service_id).unwrap())
     }
 }

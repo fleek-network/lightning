@@ -5,8 +5,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use draco_interfaces::{
     types::{
-        CommodityServed, Epoch, EpochInfo, NodeInfo, ProtocolParams,
-        ReportedReputationMeasurements, TotalServed, TransactionResponse, UpdateRequest,
+        Epoch, EpochInfo, NodeInfo, NodeServed, ProtocolParams, ReportedReputationMeasurements,
+        Service, ServiceId, TotalServed, TransactionResponse, UpdateRequest,
     },
     Blake3Hash, ConfigConsumer, GossipInterface, IndexerInterface, MempoolSocket, Notification,
     NotifierInterface, PubSub, ReputationAggregatorInterface, ReputationQueryInteface,
@@ -366,8 +366,8 @@ impl SyncQueryRunnerInterface for MockQueryRunner {
         }
     }
 
-    fn get_commodity_served(&self, _node: &NodePublicKey) -> CommodityServed {
-        Vec::new()
+    fn get_node_served(&self, _node: &NodePublicKey) -> NodeServed {
+        NodeServed::default()
     }
 
     fn get_total_supply(&self) -> HpUfloat<18> {
@@ -394,6 +394,14 @@ impl SyncQueryRunnerInterface for MockQueryRunner {
 
     fn get_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration> {
         HashMap::new()
+    }
+
+    fn get_service_info(&self, _service_id: ServiceId) -> Service {
+        Service {
+            owner: EthAddress([0; 20]),
+            commodity_type: draco_interfaces::types::CommodityTypes::Bandwidth,
+            slashing: (),
+        }
     }
 }
 
