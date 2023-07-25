@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NodeInfo {
-    address: SocketAddr,
-    key: NodeNetworkingPublicKey,
+    pub address: SocketAddr,
+    pub key: NodeNetworkingPublicKey,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -32,6 +32,4 @@ pub enum Response {
 pub enum Command {
     Get,
     Put,
-    FindNode { key: NodeNetworkingPublicKey },
-    Store,
 }

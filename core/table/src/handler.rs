@@ -30,10 +30,12 @@ impl Handler {
                 incoming = recv_from(&self.socket) => {
                     match incoming {
                         Ok((datagram, address)) => {
-                            self.handle_datagram(datagram, address).await.unwrap();
+                            if let Err(e) = self.handle_incoming_datagram(datagram, address).await {
+                                tracing::error!("unexpected error when handling incoming message: {e:?}")
+                            }
                         }
                         Err(e) => {
-                            tracing::error!("unexpected error when reading from socket: {}", e)
+                            tracing::error!("unexpected error when reading from socket: {e:?}")
                         }
                     }
                 }
@@ -45,12 +47,10 @@ impl Handler {
         match command {
             Command::Get => {},
             Command::Put => {},
-            Command::FindNode { .. } => {},
-            Command::Store => {},
         }
     }
 
-    async fn handle_datagram(&self, datagram: Vec<u8>, address: SocketAddr) -> Result<()> {
+    async fn handle_incoming_datagram(&self, datagram: Vec<u8>, address: SocketAddr) -> Result<()> {
         let message: Message = bincode::deserialize(datagram.as_slice())?;
         match message {
             Message::Query { id, payload, .. } => match payload {
