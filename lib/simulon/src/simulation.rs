@@ -102,8 +102,8 @@ impl SimulationBuilder {
 }
 
 impl<L> SimulationBuilder<L> {
-    /// Insert the given value as shared state value for the executor to access.
-    pub fn insert<T: Any>(mut self, data: T) -> Self {
+    /// Inject the given value as shared state value for the executor to access.
+    pub fn with_state<T: Any>(mut self, data: T) -> Self {
         self.storage.insert(data);
         self
     }

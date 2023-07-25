@@ -1,5 +1,8 @@
 use std::time::Duration;
 
+pub use constant::ConstLatencyProvider;
+pub use ping::PingDataLatencyProvider;
+
 mod constant;
 
 /// A latency data provider from real world data.
@@ -17,8 +20,5 @@ pub trait LatencyProvider: Default {
     /// Return a latency between two nodes from the provided global indices.
     fn get(&mut self, a: usize, b: usize) -> Duration;
 }
-
-pub use constant::ConstLatencyProvider;
-pub use ping::PingDataLatencyProvider;
 
 pub type DefaultLatencyProvider = PingDataLatencyProvider;

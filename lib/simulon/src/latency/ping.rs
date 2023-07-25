@@ -93,7 +93,9 @@ impl LatencyProvider for PingDataLatencyProvider {
         loop {
             let sample = entry.distr.sample(&mut self.rng);
             if sample <= entry.min && sample >= entry.max {
-                return Duration::from_micros((sample * 1_000.0) as u64);
+                // we have to return half of the ping value.
+                // * 500 = * 1000 / 2
+                return Duration::from_micros((sample * 500.0) as u64);
             }
         }
     }
