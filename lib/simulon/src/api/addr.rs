@@ -26,6 +26,15 @@ impl RemoteAddr {
     pub fn whoami() -> RemoteAddr {
         with_node(|n| RemoteAddr(n.node_id))
     }
+
+    /// Create a new remote addr manually from the global index of a node.
+    ///
+    /// # Safety
+    ///
+    /// You must ensure that `n` is smaller than the number of nodes that are being simulated.
+    pub fn from_global_index(n: usize) -> Self {
+        RemoteAddr(n)
+    }
 }
 
 impl From<RemoteAddr> for usize {
