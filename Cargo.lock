@@ -3266,7 +3266,6 @@ dependencies = [
  "anyhow",
  "num-bigint",
  "num-traits",
- "random-oracle",
  "serde",
 ]
 
@@ -6682,7 +6681,7 @@ dependencies = [
 
 [[package]]
 name = "simulon"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "arrayref",
  "bincode",

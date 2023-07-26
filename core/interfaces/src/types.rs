@@ -7,6 +7,7 @@ use fleek_crypto::{
 };
 use hp_float::unsigned::HpUfloat;
 use multiaddr::Multiaddr;
+use num_bigint::BigUint;
 use num_derive::FromPrimitive;
 use random_oracle::{RandomOracle, RandomOracleInput};
 use serde::{Deserialize, Serialize};
@@ -401,7 +402,7 @@ impl ToDigest for UpdatePayload {
                     .with("transaction_name", &"deposit")
                     .with_prefix("input".to_owned())
                     .with("token", token)
-                    .with("amount", amount);
+                    .with("amount", &HpUfloatWrapper(amount.clone()));
                 //.with("method.proof", proof);
             },
 
@@ -430,7 +431,7 @@ impl ToDigest for UpdatePayload {
                 random_oracle = random_oracle
                     .with("transaction_name", &"withdraw")
                     .with_prefix("input".to_owned())
-                    .with("amount", amount)
+                    .with("amount", &HpUfloatWrapper(amount.clone()))
                     .with("token", token)
                     .with("receiving_address", &receiving_address.0);
             },
@@ -446,7 +447,7 @@ impl ToDigest for UpdatePayload {
                 random_oracle = random_oracle
                     .with("transaction_name", &"stake")
                     .with_prefix("input".to_owned())
-                    .with("amount", amount)
+                    .with("amount", &HpUfloatWrapper(amount.clone()))
                     .with("node_public_key", &node_public_key.0)
                     .with(
                         "node_network_key",
@@ -472,7 +473,7 @@ impl ToDigest for UpdatePayload {
                     .with("transaction_name", &"unstake")
                     .with_prefix("input".to_owned())
                     .with("node", &node.0)
-                    .with("amount", amount);
+                    .with("amount", &HpUfloatWrapper(amount.clone()));
             },
             UpdateMethod::WithdrawUnstaked { node, recipient } => {
                 random_oracle = random_oracle
@@ -596,5 +597,30 @@ impl RandomOracleInput for Service {
     fn to_random_oracle_input(&self) -> Vec<u8> {
         self.commodity_type.to_random_oracle_input()
         // todo: check if implementation needs to change when slashing is implemented
+    }
+}
+
+pub struct HpUfloatWrapper<const T: usize>(HpUfloat<T>);
+
+impl<const T: usize> HpUfloatWrapper<T> {
+    pub fn get_value(&self) -> &BigUint {
+        self.0.get_value()
+    }
+}
+
+impl<const P: usize> RandomOracleInput for HpUfloatWrapper<P> {
+    const TYPE: &'static str = "HpUfloat";
+
+    fn to_random_oracle_input(&self) -> Vec<u8> {
+        let mut input = Vec::new();
+
+        // Append the precision value as a byte
+        input.push(P as u8);
+
+        // Append the BigUint data as bytes
+        let data_bytes = self.get_value().to_bytes_le();
+        input.extend_from_slice(&data_bytes);
+
+        input
     }
 }
