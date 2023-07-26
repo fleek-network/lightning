@@ -6,6 +6,3 @@ pub mod client;
 
 #[cfg(feature = "server")]
 pub mod server;
-
-#[cfg(test)]
-pub mod dummy;

@@ -2230,9 +2230,7 @@ dependencies = [
  "bytes",
  "criterion 0.4.0",
  "dashmap",
- "draco-application",
  "draco-interfaces",
- "draco-notifier",
  "fleek-crypto",
  "futures",
  "serde",
@@ -2391,15 +2389,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
-]
-
-[[package]]
-name = "draco-sdk"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "draco-interfaces",
- "serde",
 ]
 
 [[package]]
@@ -2841,7 +2830,6 @@ dependencies = [
  "criterion 0.4.0",
  "draco-handshake",
  "draco-interfaces",
- "draco-sdk",
  "draco-test-utils",
  "fleek-crypto",
  "futures",
@@ -2875,6 +2863,18 @@ dependencies = [
 [[package]]
 name = "fn-sdk"
 version = "0.0.1"
+
+[[package]]
+name = "fn-sdk-macros"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "proc-macro2 1.0.66",
+ "quote 1.0.31",
+ "serde",
+ "serde_tokenstream",
+ "syn 2.0.26",
+]
 
 [[package]]
 name = "fnv"
@@ -6483,6 +6483,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96426c9936fd7a0124915f9185ea1d20aa9445cc9821142f0a73bc9207a2e186"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "serde_tokenstream"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a00ffd23fd882d096f09fcaae2a9de8329a328628e86027e049ee051dc1621f"
+dependencies = [
+ "proc-macro2 1.0.66",
+ "quote 1.0.31",
+ "serde",
+ "syn 2.0.26",
 ]
 
 [[package]]

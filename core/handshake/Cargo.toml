@@ -6,7 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-draco-notifier = {path="../notifier"}
 anyhow.workspace = true
 serde.workspace = true
 arrayref = "0.3"
@@ -25,7 +24,6 @@ dashmap = { version = "5.4", optional = true }
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
 affair.workspace = true
-draco-application = { path = "../application" }
 
 [features]
 default = ["server", "client"]

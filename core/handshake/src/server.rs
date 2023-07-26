@@ -8,8 +8,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use draco_interfaces::{
-    handshake::HandshakeInterface, types::ServiceId, CompressionAlgoSet, ConfigConsumer,
-    ConnectionInterface, HandlerFn, SdkInterface, WithStartAndShutdown,
+    handshake::HandshakeInterface, CompressionAlgoSet, ConfigConsumer, ConnectionInterface,
+    WithStartAndShutdown,
 };
 use fleek_crypto::{ClientPublicKey, NodePublicKey};
 use serde::{Deserialize, Serialize};
@@ -82,37 +82,27 @@ pub enum LaneState {
     Disconnected,
 }
 
-pub type TcpHandshakeServer<SDK> = HandshakeServer<SDK, TcpProvider>;
+pub type TcpHandshakeServer = HandshakeServer<TcpProvider>;
 
-pub struct HandshakeServer<
-    SDK: SdkInterface<Connection = RawLaneConnection<L::Reader, L::Writer>>,
-    L: StreamProvider,
-> {
+pub struct HandshakeServer<L: StreamProvider> {
     shutdown_channel: Arc<Mutex<Option<Sender<()>>>>,
-    inner: Arc<HandshakeServerInner<SDK>>,
+    inner: Arc<HandshakeServerInner>,
     listener: Arc<L>,
 }
 
 #[derive(Clone)]
-pub struct HandshakeServerInner<SDK: SdkInterface> {
-    services: Arc<DashMap<ServiceId, (SDK, HandlerFn<'static, SDK>)>>,
+pub struct HandshakeServerInner {
     lanes: Arc<DashMap<ClientPublicKey, [LaneState; 24]>>,
 }
 
-impl<SDK: SdkInterface<Connection = RawLaneConnection<L::Reader, L::Writer>>, L: StreamProvider>
-    ConfigConsumer for HandshakeServer<SDK, L>
-{
+impl<L: StreamProvider> ConfigConsumer for HandshakeServer<L> {
     const KEY: &'static str = "handshake";
 
     type Config = HandshakeServerConfig;
 }
 
 #[async_trait]
-impl<
-    SDK: SdkInterface<Connection = RawLaneConnection<L::Reader, L::Writer>>,
-    L: StreamProvider + 'static,
-> WithStartAndShutdown for HandshakeServer<SDK, L>
-{
+impl<L: StreamProvider + 'static> WithStartAndShutdown for HandshakeServer<L> {
     fn is_running(&self) -> bool {
         self.shutdown_channel.lock().unwrap().is_some()
     }
@@ -156,11 +146,10 @@ impl<
 impl<
     // This implementation accepts an SDK that uses our [`RawLaneConnection`],
     // and the same reader/writer types that the StreamProvider yields.
-    SDK: SdkInterface<Connection = RawLaneConnection<L::Reader, L::Writer>>,
     L: StreamProvider + 'static,
-> HandshakeInterface for HandshakeServer<SDK, L>
+> HandshakeInterface for HandshakeServer<L>
 {
-    type Sdk = SDK;
+    type Connection = RawLaneConnection<L::Reader, L::Writer>;
 
     async fn init(config: Self::Config) -> anyhow::Result<Self> {
         Ok(Self {
@@ -169,24 +158,11 @@ impl<
             shutdown_channel: Mutex::new(None).into(),
         })
     }
-
-    fn register_service_request_handler(
-        &mut self,
-        service: draco_interfaces::types::ServiceId,
-        sdk: Self::Sdk,
-        handler: draco_interfaces::HandlerFn<'static, Self::Sdk>,
-    ) {
-        // TODO: adjust the interface; sdk should probably be added on init,
-        //       instead of passed in along each service.
-
-        self.inner.services.insert(service, (sdk, handler));
-    }
 }
 
-impl<'a, SDK: SdkInterface> HandshakeServerInner<SDK> {
-    pub async fn new() -> HandshakeServerInner<SDK> {
+impl HandshakeServerInner {
+    pub async fn new() -> HandshakeServerInner {
         Self {
-            services: DashMap::new().into(),
             lanes: DashMap::new().into(),
         }
     }
@@ -195,24 +171,21 @@ impl<'a, SDK: SdkInterface> HandshakeServerInner<SDK> {
         R: AsyncRead + Unpin + Send + Sync + 'static,
         W: AsyncWrite + Unpin + Send + Sync + 'static,
     >(
-        inner: Arc<HandshakeServerInner<SDK>>,
+        inner: Arc<HandshakeServerInner>,
         mut conn: HandshakeConnection<R, W>,
-    ) -> Result<()>
-    where
-        SDK: SdkInterface<Connection = RawLaneConnection<R, W>>,
-    {
+    ) -> Result<()> {
         // wait for a handshake request
         match conn.read_frame(Some(HANDSHAKE_REQ_TAG)).await? {
             Some(HandshakeFrame::HandshakeRequest {
                 resume_lane,
                 pubkey,
-                supported_compression_set,
+                supported_compression_set: _,
                 ..
             }) => {
                 let mut user_lanes = inner.lanes.entry(pubkey).or_default();
 
                 // find or resume a lane
-                let lane = match resume_lane {
+                let _lane = match resume_lane {
                     Some(lane) => {
                         let state = &mut user_lanes[lane as usize];
                         if *state == LaneState::Disconnected {
@@ -228,6 +201,7 @@ impl<'a, SDK: SdkInterface> HandshakeServerInner<SDK> {
                                 last_signature: [0; 96],
                             })
                             .await?;
+
                             // todo: read delivery acknowledgment
                             match conn.read_frame(Some(DELIVERY_ACK_TAG)).await? {
                                 Some(HandshakeFrame::DeliveryAcknowledgement { .. }) => {
@@ -265,32 +239,36 @@ impl<'a, SDK: SdkInterface> HandshakeServerInner<SDK> {
 
                 // wait for a service request
                 match conn.read_frame(Some(SERVICE_REQ_TAG)).await? {
-                    Some(HandshakeFrame::ServiceRequest { service_id }) => {
-                        match inner.services.get(&service_id) {
-                            Some(res) => {
-                                let (sdk, handler) = res.clone();
-                                let (read, write) = conn.finish();
-                                let conn = RawLaneConnection::new(
-                                    read,
-                                    write,
-                                    lane,
-                                    pubkey,
-                                    supported_compression_set,
-                                );
+                    Some(HandshakeFrame::ServiceRequest { .. }) => {
+                        // TODO(qti3e): Bring these back when the handshake interface has a way to
+                        // direct a connection to a service.
+                        //
+                        // match inner.services.get(&service_id) {
+                        //     Some(res) => {
+                        //         let (sdk, handler) = res.clone();
+                        //         let (read, write) = conn.finish();
+                        //         let conn = RawLaneConnection::new(
+                        //             read,
+                        //             write,
+                        //             lane,
+                        //             pubkey,
+                        //             supported_compression_set,
+                        //         );
 
-                                // TODO: Figure out lifetimes to more correctly pass conn as a
-                                //       mutable reference.
-                                handler(sdk, conn).await;
+                        //         // TODO: Figure out lifetimes to more correctly pass conn as a
+                        //         //       mutable reference.
+                        //         handler(sdk, conn).await;
 
-                                // TODO: Should we loop back to waiting for another service
-                                //       request here?
-                                Ok(())
-                            },
-                            None => {
-                                conn.termination_signal(Reason::ServiceNotFound).await.ok();
-                                Err(anyhow!("service not found"))
-                            },
-                        }
+                        //         // TODO: Should we loop back to waiting for another service
+                        //         //       request here?
+                        //         Ok(())
+                        //     },
+                        //     None => {
+                        //         conn.termination_signal(Reason::ServiceNotFound).await.ok();
+                        //         Err(anyhow!("service not found"))
+                        //     },
+                        // }
+                        Ok(())
                     },
                     None => Err(anyhow!("session disconnected")),
                     _ => unreachable!(), // Guaranteed by frame filter
@@ -354,133 +332,132 @@ impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> Co
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use affair::{Executor, TokioSpawn};
-    use draco_application::{app::Application, config::Config};
-    use draco_interfaces::ApplicationInterface;
-    use fleek_crypto::ClientSignature;
-    use tokio::{
-        self,
-        io::{AsyncReadExt, AsyncWriteExt},
-        net::TcpStream,
-    };
-
-    use super::*;
-    use crate::{
-        client::HandshakeClient,
-        dummy::{FileSystem, MyReputationReporter, Sdk, Signer},
-    };
-
-    async fn hello_world_server(
-        port: u16,
-    ) -> Result<(
-        TcpHandshakeServer<Sdk<OwnedReadHalf, OwnedWriteHalf>>,
-        Sdk<OwnedReadHalf, OwnedWriteHalf>,
-    )> {
-        let signer = TokioSpawn::spawn(Signer {});
-        let app = Application::init(Config::default()).await?;
-        let sdk = Sdk::<OwnedReadHalf, OwnedWriteHalf>::new(
-            app.sync_query(),
-            MyReputationReporter {},
-            FileSystem {},
-            signer,
-        );
-        let config = HandshakeServerConfig {
-            listen_addr: ([0; 4], port).into(),
-        };
-        Ok((HandshakeServer::init(config).await?, sdk))
-    }
-
-    #[tokio::test]
-    async fn handshake_e2e() -> anyhow::Result<()> {
-        // server setup
-        let (mut server, sdk) = hello_world_server(6969).await?;
-
-        // service setup
-        server.register_service_request_handler(0, sdk, |_, mut conn| {
-            Box::pin(async move {
-                let writer = conn.writer();
-                writer.write_all(b"hello draco").await.unwrap();
-            })
-        });
-
-        server.start().await;
-        assert!(server.is_running());
-
-        // dial the server and create a client
-        let (read, write) = TcpStream::connect("0.0.0.0:6969").await?.into_split();
-        let mut client = HandshakeClient::new(
-            read,
-            write,
-            ClientPublicKey([0u8; 20]),
-            CompressionAlgoSet::new(),
-        );
-
-        // send a handshake
-        client.handshake().await?;
-
-        // start a service request
-        let (mut r, _) = client.request(0).await?;
-
-        // service subprotocol
-        let mut buf = [0u8; 11];
-        r.read_exact(&mut buf).await?;
-        assert_eq!(String::from_utf8_lossy(&buf), "hello draco");
-
-        server.shutdown().await;
-        assert!(!server.is_running());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn handshake_unlock_e2e() -> anyhow::Result<()> {
-        // server setup
-        let (mut server, sdk) = hello_world_server(6970).await?;
-
-        let mut lanes = server
-            .inner
-            .lanes
-            .entry(ClientPublicKey([0u8; 20]))
-            .or_default();
-        lanes[0] = LaneState::Disconnected;
-        drop(lanes);
-
-        // service setup
-        server.register_service_request_handler(0, sdk, |_, mut conn| {
-            Box::pin(async move {
-                let writer = conn.writer();
-                writer.write_all(b"hello draco").await.unwrap();
-            })
-        });
-
-        server.start().await;
-        assert!(server.is_running());
-
-        // dial the server and create a client
-        let (read, write) = TcpStream::connect("0.0.0.0:6970").await?.into_split();
-        let mut client = HandshakeClient::new(
-            read,
-            write,
-            ClientPublicKey([0u8; 20]),
-            CompressionAlgoSet::new(),
-        );
-
-        // send a handshake
-        client.handshake_unlock(0, ClientSignature).await?;
-
-        // start a service request
-        let (mut r, _) = client.request(0).await?;
-
-        // service subprotocol
-        let mut buf = [0u8; 11];
-        r.read_exact(&mut buf).await?;
-        assert_eq!(String::from_utf8_lossy(&buf), "hello draco");
-
-        server.shutdown().await;
-        assert!(!server.is_running());
-
-        Ok(())
-    }
-}
+// TODO(qti3e): Bring these tests back to life after we have more things in the mock crate.
+//
+// #[cfg(test)]
+// mod tests {
+//     use affair::{Executor, TokioSpawn};
+//     use draco_application::{app::Application, config::Config};
+//     use draco_interfaces::ApplicationInterface;
+//     use fleek_crypto::ClientSignature;
+//     use tokio::{
+//         self,
+//         io::{AsyncReadExt, AsyncWriteExt},
+//         net::TcpStream,
+//     };
+//
+//     use super::*;
+//     use crate::client::HandshakeClient;
+//
+//     async fn hello_world_server(
+//         port: u16,
+//     ) -> Result<(
+//         TcpHandshakeServer<Sdk<OwnedReadHalf, OwnedWriteHalf>>,
+//         Sdk<OwnedReadHalf, OwnedWriteHalf>,
+//     )> {
+//         let signer = TokioSpawn::spawn(Signer {});
+//         let app = Application::init(Config::default()).await?;
+//         let sdk = Sdk::<OwnedReadHalf, OwnedWriteHalf>::new(
+//             app.sync_query(),
+//             MyReputationReporter {},
+//             FileSystem {},
+//             signer,
+//         );
+//         let config = HandshakeServerConfig {
+//             listen_addr: ([0; 4], port).into(),
+//         };
+//         Ok((HandshakeServer::init(config).await?, sdk))
+//     }
+//
+//     #[tokio::test]
+//     async fn handshake_e2e() -> anyhow::Result<()> {
+//         // server setup
+//         let (mut server, sdk) = hello_world_server(6969).await?;
+//
+//         // service setup
+//         server.register_service_request_handler(0, sdk, |_, mut conn| {
+//             Box::pin(async move {
+//                 let writer = conn.writer();
+//                 writer.write_all(b"hello draco").await.unwrap();
+//             })
+//         });
+//
+//         server.start().await;
+//         assert!(server.is_running());
+//
+//         // dial the server and create a client
+//         let (read, write) = TcpStream::connect("0.0.0.0:6969").await?.into_split();
+//         let mut client = HandshakeClient::new(
+//             read,
+//             write,
+//             ClientPublicKey([0u8; 20]),
+//             CompressionAlgoSet::new(),
+//         );
+//
+//         // send a handshake
+//         client.handshake().await?;
+//
+//         // start a service request
+//         let (mut r, _) = client.request(0).await?;
+//
+//         // service subprotocol
+//         let mut buf = [0u8; 11];
+//         r.read_exact(&mut buf).await?;
+//         assert_eq!(String::from_utf8_lossy(&buf), "hello draco");
+//
+//         server.shutdown().await;
+//         assert!(!server.is_running());
+//
+//         Ok(())
+//     }
+//
+//     #[tokio::test]
+//     async fn handshake_unlock_e2e() -> anyhow::Result<()> {
+//         // server setup
+//         let (mut server, sdk) = hello_world_server(6970).await?;
+//
+//         let mut lanes = server
+//             .inner
+//             .lanes
+//             .entry(ClientPublicKey([0u8; 20]))
+//             .or_default();
+//         lanes[0] = LaneState::Disconnected;
+//         drop(lanes);
+//
+//         // service setup
+//         server.register_service_request_handler(0, sdk, |_, mut conn| {
+//             Box::pin(async move {
+//                 let writer = conn.writer();
+//                 writer.write_all(b"hello draco").await.unwrap();
+//             })
+//         });
+//
+//         server.start().await;
+//         assert!(server.is_running());
+//
+//         // dial the server and create a client
+//         let (read, write) = TcpStream::connect("0.0.0.0:6970").await?.into_split();
+//         let mut client = HandshakeClient::new(
+//             read,
+//             write,
+//             ClientPublicKey([0u8; 20]),
+//             CompressionAlgoSet::new(),
+//         );
+//
+//         // send a handshake
+//         client.handshake_unlock(0, ClientSignature).await?;
+//
+//         // start a service request
+//         let (mut r, _) = client.request(0).await?;
+//
+//         // service subprotocol
+//         let mut buf = [0u8; 11];
+//         r.read_exact(&mut buf).await?;
+//         assert_eq!(String::from_utf8_lossy(&buf), "hello draco");
+//
+//         server.shutdown().await;
+//         assert!(!server.is_running());
+//
+//         Ok(())
+//     }
+// }

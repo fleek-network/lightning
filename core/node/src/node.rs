@@ -1,7 +1,7 @@
 use draco_application::{app::Application, query_runner::QueryRunner};
 use draco_blockstore::memory::MemoryBlockStore;
 use draco_consensus::consensus::{Consensus, PubSubMsg};
-use draco_handshake::server::{StreamProvider, TcpHandshakeServer, TcpProvider};
+use draco_handshake::server::TcpHandshakeServer;
 use draco_interfaces::{DracoTypes, GossipInterface};
 use draco_notifier::Notifier;
 use draco_rep_collector::ReputationAggregator;
@@ -12,7 +12,7 @@ use crate::{
     config::TomlConfigProvider,
     template::{
         fs::FileSystem, gossip::Gossip, indexer::Indexer, origin::MyStream,
-        pod::DeliveryAcknowledgmentAggregator, sdk::Sdk, topology::Topology,
+        pod::DeliveryAcknowledgmentAggregator, topology::Topology,
     },
 };
 
@@ -32,11 +32,7 @@ impl DracoTypes for FinalTypes {
     type Notifier = Notifier;
     type ReputationAggregator = ReputationAggregator;
     type Rpc = Rpc<QueryRunner>;
-    type Sdk =
-        Sdk<<TcpProvider as StreamProvider>::Reader, <TcpProvider as StreamProvider>::Writer>;
-    type Handshake = TcpHandshakeServer<
-        Sdk<<TcpProvider as StreamProvider>::Reader, <TcpProvider as StreamProvider>::Writer>,
-    >;
+    type Handshake = TcpHandshakeServer;
     type Topology = Topology<QueryRunner>;
     type Gossip = Gossip<Signer, Topology<QueryRunner>, Notifier>;
 }

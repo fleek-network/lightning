@@ -3,23 +3,12 @@ use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 use async_trait::async_trait;
 
 use crate::{
-    application::ApplicationInterface,
-    blockstore::BlockStoreInterface,
-    common::WithStartAndShutdown,
-    config::ConfigProviderInterface,
-    consensus::ConsensusInterface,
-    fs::FileSystemInterface,
-    handshake::HandshakeInterface,
-    indexer::IndexerInterface,
-    notifier::NotifierInterface,
-    origin::OriginProviderInterface,
-    pod::DeliveryAcknowledgmentAggregatorInterface,
-    reputation::ReputationAggregatorInterface,
-    rpc::RpcInterface,
-    sdk::{HandlerFn, SdkInterface},
-    signer::SignerInterface,
-    types::ServiceId,
-    GossipInterface, TopologyInterface,
+    application::ApplicationInterface, blockstore::BlockStoreInterface,
+    common::WithStartAndShutdown, config::ConfigProviderInterface, consensus::ConsensusInterface,
+    fs::FileSystemInterface, handshake::HandshakeInterface, indexer::IndexerInterface,
+    notifier::NotifierInterface, origin::OriginProviderInterface,
+    pod::DeliveryAcknowledgmentAggregatorInterface, reputation::ReputationAggregatorInterface,
+    rpc::RpcInterface, signer::SignerInterface, GossipInterface, TopologyInterface,
 };
 
 pub trait DracoTypes: Send + Sync {
@@ -44,14 +33,7 @@ pub trait DracoTypes: Send + Sync {
     >;
     type ReputationAggregator: ReputationAggregatorInterface<Notifier = Self::Notifier>;
     type Rpc: RpcInterface<<Self::Application as ApplicationInterface>::SyncExecutor>;
-    type Sdk: SdkInterface<
-        SyncQuery = <Self::Application as ApplicationInterface>::SyncExecutor,
-        ReputationReporter = <
-            Self::ReputationAggregator as ReputationAggregatorInterface
-        >::ReputationReporter,
-        FileSystem = Self::FileSystem,
-    >;
-    type Handshake: HandshakeInterface<Sdk = Self::Sdk>;
+    type Handshake: HandshakeInterface;
     type Topology: TopologyInterface<
         SyncQuery = <Self::Application as ApplicationInterface>::SyncExecutor,
     >;
@@ -77,7 +59,6 @@ pub struct Node<T: DracoTypes> {
     pub handshake: T::Handshake,
     pub topology: Arc<T::Topology>,
     pub gossip: T::Gossip,
-    pub sdk: PhantomData<T::Sdk>,
     pub notifier: PhantomData<T::Notifier>,
 }
 
@@ -159,7 +140,6 @@ impl<T: DracoTypes> Node<T> {
             handshake,
             topology,
             gossip,
-            sdk: PhantomData,
             notifier: PhantomData,
         })
     }
@@ -172,24 +152,6 @@ impl<T: DracoTypes> Node<T> {
         if self.origin_providers.insert(name, provider).is_some() {
             panic!("Duplicate origin provider.");
         }
-    }
-
-    pub fn register_service<S: FnOnce(T::Sdk) -> HandlerFn<'static, T::Sdk>>(
-        &mut self,
-        id: ServiceId,
-        setup: S,
-    ) {
-        let sdk = T::Sdk::new(
-            self.application.sync_query(),
-            self.reputation_aggregator.get_reporter(),
-            self.fs.clone(),
-            self.signer.get_socket(),
-        );
-
-        let handler = setup(sdk.clone());
-
-        self.handshake
-            .register_service_request_handler(id, sdk, handler);
     }
 
     /// Returns true if the node is in a healthy state.
@@ -282,7 +244,6 @@ pub mod transformers {
         type Notifier = T::Notifier;
         type ReputationAggregator = T::ReputationAggregator;
         type Rpc = T::Rpc;
-        type Sdk = T::Sdk;
         type Handshake = T::Handshake;
         type Topology = T::Topology;
         type Gossip = T::Gossip;

@@ -31,8 +31,8 @@ async fn main() -> Result<()> {
         _3_or_more => LevelFilter::Trace,
     };
 
-    // Add ignore for proccess subdag because Narwhal prints it as an err everytime it succesfully
-    // proccesses a new sub_dag
+    // Add ignore for process subdag because Narwhal prints it as an err everytime it successfully
+    // processes a new sub_dag
     let logger_config = ConfigBuilder::new()
         .add_filter_ignore_str("narwhal_consensus::bullshark")
         .add_filter_ignore_str("anemo")

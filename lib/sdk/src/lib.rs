@@ -1,1 +1,1 @@
-pub fn hello() {}
+pub fn x() {}
