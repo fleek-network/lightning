@@ -6,10 +6,10 @@ use fleek_crypto::{
     TransactionSignature,
 };
 use hp_fixed::unsigned::HpUfixed;
+use ink_quill::{TranscriptBuilder, TranscriptBuilderInput};
 use multiaddr::Multiaddr;
 use num_bigint::BigUint;
 use num_derive::FromPrimitive;
-use random_oracle::{RandomOracle, RandomOracleInput};
 use serde::{Deserialize, Serialize};
 
 use crate::{common::ToDigest, pod::DeliveryAcknowledgment};
@@ -388,8 +388,8 @@ impl ToDigest for UpdatePayload {
     /// nonce, the name of all of the update method names along with the value
     /// for all of the parameters.
     fn to_digest(&self) -> [u8; 32] {
-        let mut random_oracle =
-            RandomOracle::empty(FN_TXN_PAYLOAD_DOMAIN).with("nonce", &self.nonce);
+        let mut transcript_builder =
+            TranscriptBuilder::empty(FN_TXN_PAYLOAD_DOMAIN).with("nonce", &self.nonce);
 
         // insert method fields
         match &self.method {
@@ -398,7 +398,7 @@ impl ToDigest for UpdatePayload {
                 token,
                 amount,
             } => {
-                random_oracle = random_oracle
+                transcript_builder = transcript_builder
                     .with("transaction_name", &"deposit")
                     .with_prefix("input".to_owned())
                     .with("token", token)
@@ -412,7 +412,7 @@ impl ToDigest for UpdatePayload {
                 proofs: _,
                 metadata,
             } => {
-                random_oracle = random_oracle
+                transcript_builder = transcript_builder
                     .with(
                         "transaction_name",
                         &"submit_delivery_acknowledgment_aggregation",
@@ -428,7 +428,7 @@ impl ToDigest for UpdatePayload {
                 token,
                 receiving_address,
             } => {
-                random_oracle = random_oracle
+                transcript_builder = transcript_builder
                     .with("transaction_name", &"withdraw")
                     .with_prefix("input".to_owned())
                     .with("amount", &HpUfixedWrapper(amount.clone()))
@@ -444,7 +444,7 @@ impl ToDigest for UpdatePayload {
                 worker_domain,
                 worker_mempool_address,
             } => {
-                random_oracle = random_oracle
+                transcript_builder = transcript_builder
                     .with("transaction_name", &"stake")
                     .with_prefix("input".to_owned())
                     .with("amount", &HpUfixedWrapper(amount.clone()))
@@ -462,28 +462,28 @@ impl ToDigest for UpdatePayload {
                     .with("worker_mempool_address", worker_mempool_address);
             },
             UpdateMethod::StakeLock { node, locked_for } => {
-                random_oracle = random_oracle
+                transcript_builder = transcript_builder
                     .with("transaction_name", &"stake_lock")
                     .with_prefix("input".to_owned())
                     .with("node", &node.0)
                     .with("locked_for", locked_for);
             },
             UpdateMethod::Unstake { amount, node } => {
-                random_oracle = random_oracle
+                transcript_builder = transcript_builder
                     .with("transaction_name", &"unstake")
                     .with_prefix("input".to_owned())
                     .with("node", &node.0)
                     .with("amount", &HpUfixedWrapper(amount.clone()));
             },
             UpdateMethod::WithdrawUnstaked { node, recipient } => {
-                random_oracle = random_oracle
+                transcript_builder = transcript_builder
                     .with("transaction_name", &"withdraw_unstaked")
                     .with_prefix("input".to_owned())
                     .with("node", &node.0)
                     .with("recipient", &recipient.map_or([0u8; 20], |key| key.0));
             },
             UpdateMethod::ChangeEpoch { epoch } => {
-                random_oracle = random_oracle
+                transcript_builder = transcript_builder
                     .with("transaction_name", &"change_epoch")
                     .with_prefix("input".to_owned())
                     .with("epoch", epoch);
@@ -492,14 +492,14 @@ impl ToDigest for UpdatePayload {
                 service,
                 service_id,
             } => {
-                random_oracle = random_oracle
+                transcript_builder = transcript_builder
                     .with("transaction_name", &"add_service")
                     .with_prefix("input".to_owned())
                     .with("service_id", service_id)
                     .with("service", service);
             },
             UpdateMethod::RemoveService { service_id } => {
-                random_oracle = random_oracle
+                transcript_builder = transcript_builder
                     .with("transaction_name", &"remove_service")
                     .with_prefix("input".to_owned())
                     .with("service_id", service_id);
@@ -509,7 +509,7 @@ impl ToDigest for UpdatePayload {
                 node,
                 proof_of_misbehavior: _,
             } => {
-                random_oracle = random_oracle
+                transcript_builder = transcript_builder
                     .with("transaction_name", &"slash")
                     .with_prefix("input".to_owned())
                     .with("service_id", service_id)
@@ -518,10 +518,10 @@ impl ToDigest for UpdatePayload {
                 ;
             },
             UpdateMethod::SubmitReputationMeasurements { measurements } => {
-                random_oracle =
-                    random_oracle.with("transaction_name", &"submit_reputation_measurements");
+                transcript_builder =
+                    transcript_builder.with("transaction_name", &"submit_reputation_measurements");
                 for (key, value) in measurements {
-                    random_oracle = random_oracle
+                    transcript_builder = transcript_builder
                         .with_prefix(key.to_base64())
                         .with("latency", &value.latency.map_or(0, |l| l.as_nanos()))
                         .with("interactions", &value.interactions)
@@ -534,7 +534,10 @@ impl ToDigest for UpdatePayload {
             },
         }
 
-        derive_key(random_oracle.get_domain(), &random_oracle.compile())
+        derive_key(
+            transcript_builder.get_domain(),
+            &transcript_builder.compile(),
+        )
     }
 }
 
@@ -568,10 +571,10 @@ pub struct ReportedReputationMeasurements {
     pub measurements: ReputationMeasurements,
 }
 
-impl RandomOracleInput for Tokens {
+impl TranscriptBuilderInput for Tokens {
     const TYPE: &'static str = "Tokens";
 
-    fn to_random_oracle_input(&self) -> Vec<u8> {
+    fn to_transcript_builder_input(&self) -> Vec<u8> {
         match self {
             Tokens::USDC => b"USDC".to_vec(),
             Tokens::FLK => b"FLK".to_vec(),
@@ -579,10 +582,10 @@ impl RandomOracleInput for Tokens {
     }
 }
 
-impl RandomOracleInput for CommodityTypes {
+impl TranscriptBuilderInput for CommodityTypes {
     const TYPE: &'static str = "commodity_types";
 
-    fn to_random_oracle_input(&self) -> Vec<u8> {
+    fn to_transcript_builder_input(&self) -> Vec<u8> {
         match self {
             CommodityTypes::Bandwidth => b"Bandwidth".to_vec(),
             CommodityTypes::Compute => b"Compute".to_vec(),
@@ -591,11 +594,11 @@ impl RandomOracleInput for CommodityTypes {
     }
 }
 
-impl RandomOracleInput for Service {
+impl TranscriptBuilderInput for Service {
     const TYPE: &'static str = "service";
 
-    fn to_random_oracle_input(&self) -> Vec<u8> {
-        self.commodity_type.to_random_oracle_input()
+    fn to_transcript_builder_input(&self) -> Vec<u8> {
+        self.commodity_type.to_transcript_builder_input()
         // todo: check if implementation needs to change when slashing is implemented
     }
 }
@@ -608,10 +611,10 @@ impl<const T: usize> HpUfixedWrapper<T> {
     }
 }
 
-impl<const P: usize> RandomOracleInput for HpUfixedWrapper<P> {
+impl<const P: usize> TranscriptBuilderInput for HpUfixedWrapper<P> {
     const TYPE: &'static str = "HpUfixed";
 
-    fn to_random_oracle_input(&self) -> Vec<u8> {
+    fn to_transcript_builder_input(&self) -> Vec<u8> {
         let mut input = Vec::new();
 
         // Append the precision value as a byte

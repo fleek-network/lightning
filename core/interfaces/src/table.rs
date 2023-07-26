@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use blake3_tree::blake3::derive_key;
 use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSignature, PublicKey};
-use random_oracle::RandomOracle;
+use ink_quill::TranscriptBuilder;
 use serde::{Deserialize, Serialize};
 
 use crate::{SignerInterface, ToDigest, TopologyInterface, WithStartAndShutdown};
@@ -50,12 +50,12 @@ pub struct TableEntry {
 
 impl ToDigest for TableEntry {
     fn to_digest(&self) -> [u8; 32] {
-        let ro = RandomOracle::empty(FN_DHT_ENTRY_DOMAIN)
+        let tb = TranscriptBuilder::empty(FN_DHT_ENTRY_DOMAIN)
             .with("prefix", &(self.prefix as u8))
             .with("key", &self.key)
             .with("value", &self.value)
             .with("source", &self.source.0);
-        derive_key(ro.get_domain(), &ro.compile())
+        derive_key(tb.get_domain(), &tb.compile())
     }
 }
 
