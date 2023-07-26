@@ -319,7 +319,7 @@ impl<const N: usize> RandomOracleInput for [u8; N] {
 
 #[cfg(test)]
 mod tests {
-    use blake3_tree::blake3::derive_key;
+    use blake3::derive_key;
 
     use super::*;
 
