@@ -1,41 +1,26 @@
 use anyhow::Result;
 use fleek_crypto::NodeNetworkingPublicKey;
+use thiserror::Error;
+use tokio::sync::{mpsc::Receiver, oneshot};
 
-use crate::query::NodeInfo;
+use crate::{
+    bucket::{Bucket, Node, MAX_BUCKETS},
+    query::NodeInfo,
+};
 
-pub const MAX_BUCKET_SIZE: usize = 6;
-pub const MAX_BUCKETS: usize = HASH_LEN * 8;
-pub const HASH_LEN: usize = 32;
+#[derive(Debug, Error)]
+#[error("querying the table failed: {0}")]
+pub struct QueryError(String);
 
-#[derive(Clone)]
-pub struct Node {
-    info: NodeInfo,
-}
-
-pub struct Bucket {
-    inner: Vec<Node>,
-}
-
-impl Bucket {
-    fn new() -> Self {
-        Bucket { inner: Vec::new() }
-    }
-
-    fn into_iter(self) -> impl Iterator<Item = Node> {
-        self.inner.into_iter()
-    }
-
-    fn iter(&self) -> impl Iterator<Item = &Node> {
-        self.inner.iter()
-    }
-
-    fn add_node(&mut self, node: &Node) -> bool {
-        if self.inner.len() == MAX_BUCKET_SIZE {
-            return false;
-        }
-        self.inner.push(node.clone());
-        true
-    }
+pub enum TableQuery {
+    ClosestNodes {
+        key: NodeNetworkingPublicKey,
+        tx: oneshot::Sender<Result<Vec<NodeInfo>, QueryError>>,
+    },
+    AddNode {
+        node: Node,
+        tx: oneshot::Sender<Result<(), QueryError>>,
+    },
 }
 
 pub struct Table {
@@ -44,21 +29,29 @@ pub struct Table {
 }
 
 impl Table {
+    pub fn new(local_node_key: NodeNetworkingPublicKey) -> Self {
+        Self {
+            local_node_key,
+            buckets: Vec::new(),
+        }
+    }
+
     pub fn closest_nodes(&self, target: &NodeNetworkingPublicKey) -> Vec<NodeInfo> {
         let index = leading_zero_bits(&self.local_node_key, target);
         // Todo: Filter good vs bad nodes based on some criteria.
         // Todo: Return all our nodes from closest to furthest to target.
         self.buckets[index]
-            .iter()
+            .nodes()
             .map(|node| node.info.clone())
             .collect()
     }
 
-    fn add_node(&self, node: Node) -> Result<()> {
+    fn add_node(&mut self, node: Node) -> Result<()> {
         if node.info.key == self.local_node_key {
             // We don't add ourselves to the routing table.
             return Ok(());
         }
+        self._add_node(node);
         Ok(())
     }
 
@@ -67,10 +60,8 @@ impl Table {
         let index = leading_zero_bits(&self.local_node_key, &node.info.key);
         assert_ne!(index, MAX_BUCKETS);
         let bucket_index = calculate_bucket_index(self.buckets.len(), index);
-        if !self.buckets[bucket_index].add_node(&node) {
-            if self.split_bucket(bucket_index) {
-                self._add_node(node)
-            }
+        if !self.buckets[bucket_index].add_node(&node) && self.split_bucket(bucket_index) {
+            self._add_node(node)
         }
     }
 
@@ -87,7 +78,7 @@ impl Table {
         self.buckets.push(Bucket::new());
         self.buckets.push(Bucket::new());
 
-        for node in bucket.into_iter() {
+        for node in bucket.into_nodes() {
             self._add_node(node)
         }
         true
@@ -118,4 +109,24 @@ fn leading_zero_bits(key_a: &NodeNetworkingPublicKey, key_b: &NodeNetworkingPubl
         }
     }
     index as usize
+}
+
+pub async fn start_server(mut rx: Receiver<TableQuery>, local_key: NodeNetworkingPublicKey) {
+    let mut table = Table::new(local_key);
+    while let Some(query) = rx.recv().await {
+        match query {
+            TableQuery::ClosestNodes { key, tx } => {
+                let nodes = table.closest_nodes(&key);
+                if tx.send(Ok(nodes)).is_err() {
+                    tracing::error!("failed to send Table query response")
+                }
+            },
+            TableQuery::AddNode { node, tx } => {
+                let nodes = table.add_node(node).map_err(|e| QueryError(e.to_string()));
+                if tx.send(nodes).is_err() {
+                    tracing::error!("failed to send Table query response")
+                }
+            },
+        }
+    }
 }

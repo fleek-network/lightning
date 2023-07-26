@@ -1,3 +1,4 @@
-mod handler;
+pub mod bucket;
+pub mod handler;
 mod query;
-mod routing;
+pub(crate) mod table;

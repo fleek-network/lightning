@@ -4,7 +4,7 @@ use draco_interfaces::Blake3Hash;
 use fleek_crypto::NodeNetworkingPublicKey;
 use serde::{Deserialize, Serialize};
 
-pub type TableHash = Blake3Hash;
+pub type ValueHash = Blake3Hash;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NodeInfo {
@@ -20,7 +20,7 @@ pub enum Query {
     },
     Find {
         key: NodeNetworkingPublicKey,
-        target: TableHash,
+        target: ValueHash,
     },
     Store {
         key: Vec<u8>,
@@ -45,10 +45,4 @@ pub struct Message {
 pub enum Response {
     NodeInfo(Vec<NodeInfo>),
     Pong,
-}
-
-#[derive(Debug)]
-pub enum Command {
-    Get { key: Vec<u8> },
-    Put { key: Vec<u8>, value: Vec<u8> },
 }
