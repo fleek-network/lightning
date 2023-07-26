@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 draco-interfaces = {path="../interfaces"}
 fleek-crypto.workspace = true
-hp-float.workspace = true
+hp-fixed.workspace = true
 
 [dev-dependencies]
 draco-test-utils = {path="../test-utils"}

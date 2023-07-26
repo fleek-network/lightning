@@ -19,7 +19,7 @@ use fleek_crypto::{
     ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodePublicKey, PublicKey,
     TransactionSender, TransactionSignature,
 };
-use hp_float::unsigned::HpUfloat;
+use hp_fixed::unsigned::HpUfixed;
 use lazy_static::lazy_static;
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
@@ -47,7 +47,7 @@ const DEFAULT_REP_QUANTILE: f64 = 0.1;
 const REP_EWMA_WEIGHT: f64 = 0.7;
 
 lazy_static! {
-    static ref BIG_HUNDRED: HpUfloat<18> = HpUfloat::<18>::from(100_u64);
+    static ref BIG_HUNDRED: HpUfixed<18> = HpUfixed::<18>::from(100_u64);
 }
 
 /// The state of the Application
@@ -69,7 +69,7 @@ pub struct State<B: Backend> {
     pub last_epoch_served: B::Ref<NodePublicKey, NodeServed>,
     pub total_served: B::Ref<Epoch, TotalServed>,
     pub service_revenue: B::Ref<ServiceId, ServiceRevenue>,
-    pub commodity_prices: B::Ref<CommodityTypes, HpUfloat<6>>,
+    pub commodity_prices: B::Ref<CommodityTypes, HpUfixed<6>>,
     pub backend: B,
 }
 
@@ -235,7 +235,7 @@ impl<B: Backend> State<B> {
                 total_served.served.push(0);
             }
         }
-        let commodity_to_big: HpUfloat<6> = commodity.into();
+        let commodity_to_big: HpUfixed<6> = commodity.into();
         let revenue = &commodity_to_big * &commodity_prices;
 
         node_served.served[commodity_index] += commodity;
@@ -260,7 +260,7 @@ impl<B: Backend> State<B> {
         &self,
         _sender: TransactionSender,
         _reciever: EthAddress,
-        _amount: HpUfloat<18>,
+        _amount: HpUfixed<18>,
         _token: Tokens,
     ) -> TransactionResponse {
         todo!()
@@ -270,7 +270,7 @@ impl<B: Backend> State<B> {
         &self,
         sender: TransactionSender,
         proof: ProofOfConsensus,
-        amount: HpUfloat<18>,
+        amount: HpUfixed<18>,
         token: Tokens,
     ) -> TransactionResponse {
         // This transaction is only callable by AccountOwners and not nodes
@@ -301,7 +301,7 @@ impl<B: Backend> State<B> {
     fn stake(
         &self,
         sender: TransactionSender,
-        amount: HpUfloat<18>,
+        amount: HpUfixed<18>,
         node_public_key: NodePublicKey,
         node_network_key: Option<NodeNetworkingPublicKey>,
         node_domain: Option<String>,
@@ -461,7 +461,7 @@ impl<B: Backend> State<B> {
             return TransactionResponse::Revert(ExecutionError::NotNodeOwner);
         }
         // check if node has stakes to be locked
-        if node.stake.staked == HpUfloat::zero() {
+        if node.stake.staked == HpUfixed::zero() {
             return TransactionResponse::Revert(ExecutionError::InsufficientStakesToLock);
         }
 
@@ -491,7 +491,7 @@ impl<B: Backend> State<B> {
     fn unstake(
         &self,
         sender: TransactionSender,
-        amount: HpUfloat<18>,
+        amount: HpUfixed<18>,
         node_public_key: NodePublicKey,
     ) -> TransactionResponse {
         // This transaction is only callable by AccountOwners and not nodes
@@ -568,7 +568,7 @@ impl<B: Backend> State<B> {
             _ => 0,
         };
         // Make sure the node has locked tokens and that the lock time is passed
-        if node.stake.locked == HpUfloat::zero() {
+        if node.stake.locked == HpUfixed::zero() {
             return TransactionResponse::Revert(ExecutionError::NoLockedTokens);
         }
         if node.stake.locked_until > current_epoch {
@@ -583,7 +583,7 @@ impl<B: Backend> State<B> {
         // no need to reset locked_until on the node because that will get adjusted the next time
         // the node unstakes
         reciever.flk_balance += node.stake.locked;
-        node.stake.locked = HpUfloat::zero();
+        node.stake.locked = HpUfixed::zero();
 
         // Todo(dalton): if the nodes stake+locked are equal to 0 here should we remove him from the
         // state tables completly?
@@ -827,10 +827,10 @@ impl<B: Backend> State<B> {
             .reward_pool;
 
         // if reward is 0, no commodity under any service was served
-        if reward_pool == HpUfloat::zero() {
+        if reward_pool == HpUfixed::zero() {
             return;
         }
-        let node_percentage: HpUfloat<18> = self
+        let node_percentage: HpUfixed<18> = self
             .parameters
             .get(&ProtocolParams::NodeShare)
             .unwrap_or_default()
@@ -839,8 +839,8 @@ impl<B: Backend> State<B> {
         let emissions = self.calculate_emissions();
         let emissions_for_node = &emissions * &node_share;
 
-        let mut total_reward_share: HpUfloat<18> = HpUfloat::from(0_u64);
-        let mut local_shares_map: HashMap<NodePublicKey, HpUfloat<18>> = HashMap::new();
+        let mut total_reward_share: HpUfixed<18> = HpUfixed::from(0_u64);
+        let mut local_shares_map: HashMap<NodePublicKey, HpUfixed<18>> = HashMap::new();
         let mut node_info_map: HashMap<NodePublicKey, NodeInfo> = HashMap::new();
 
         for node in self.current_epoch_served.keys() {
@@ -849,7 +849,7 @@ impl<B: Backend> State<B> {
             let node_info = self.node_info.get(&node).unwrap();
             node_info_map.insert(node, node_info.clone());
 
-            let stables_revenue: HpUfloat<6> = self
+            let stables_revenue: HpUfixed<6> = self
                 .current_epoch_served
                 .get(&node)
                 .unwrap_or_default()
@@ -863,7 +863,7 @@ impl<B: Backend> State<B> {
             );
 
             let locked_until = node_info.stake.stake_locked_until;
-            let local_boost: HpUfloat<3> = self.get_boost(locked_until, &epoch);
+            let local_boost: HpUfixed<3> = self.get_boost(locked_until, &epoch);
             let local_share = node_service_proportion * &local_boost.convert_precision();
             total_reward_share = total_reward_share + &local_share;
             local_shares_map.insert(node, local_share);
@@ -881,7 +881,7 @@ impl<B: Backend> State<B> {
         }
 
         // todo: add service builders revenue
-        let service_share: HpUfloat<18> = &(self
+        let service_share: HpUfixed<18> = &(self
             .parameters
             .get(&ProtocolParams::ServiceBuilderShare)
             .unwrap_or_default()
@@ -892,7 +892,7 @@ impl<B: Backend> State<B> {
         for service_id in self.service_revenue.keys() {
             let service_owner = self.services.get(&service_id).unwrap().owner;
             let service_revenue = self.service_revenue.get(&service_id).unwrap_or_default();
-            let revenue_proportion: HpUfloat<18> =
+            let revenue_proportion: HpUfixed<18> =
                 &service_revenue.convert_precision() / &reward_pool.convert_precision();
             self.mint_and_transfer_stables(
                 &services_stable_reward_pool * &revenue_proportion.convert_precision(),
@@ -906,7 +906,7 @@ impl<B: Backend> State<B> {
         }
 
         // protcols share for rewards
-        let protocol_share: HpUfloat<18> = &(self
+        let protocol_share: HpUfixed<18> = &(self
             .parameters
             .get(&ProtocolParams::ProtocolShare)
             .unwrap_or_default()
@@ -924,46 +924,46 @@ impl<B: Backend> State<B> {
         self.mint_and_transfer_flk(&emissions * &protocol_share, protocol_owner);
     }
 
-    fn calculate_emissions(&self) -> HpUfloat<18> {
-        let percentage_divisor = HpUfloat::<18>::from(100_u64);
-        let inflation_percent: HpUfloat<18> = self
+    fn calculate_emissions(&self) -> HpUfixed<18> {
+        let percentage_divisor = HpUfixed::<18>::from(100_u64);
+        let inflation_percent: HpUfixed<18> = self
             .parameters
             .get(&ProtocolParams::MaxInflation)
             .unwrap_or(0)
             .into();
-        let inflation: HpUfloat<18> =
+        let inflation: HpUfixed<18> =
             (&inflation_percent / &percentage_divisor).convert_precision();
 
         let supply_at_year_start = match self.metadata.get(&Metadata::SupplyYearStart) {
-            Some(Value::HpUfloat(supply)) => supply,
+            Some(Value::HpUfixed(supply)) => supply,
             _ => panic!("SupplyYearStart is set genesis and should never be empty"),
         };
 
         (&inflation * &supply_at_year_start.convert_precision()) / &365.0.into()
     }
 
-    fn mint_and_transfer_stables(&self, amount: HpUfloat<6>, owner: EthAddress) {
+    fn mint_and_transfer_stables(&self, amount: HpUfixed<6>, owner: EthAddress) {
         let mut account = self.account_info.get(&owner).unwrap_or_default();
 
         account.stables_balance += amount;
         self.account_info.set(owner, account);
     }
 
-    fn mint_and_transfer_flk(&self, amount: HpUfloat<18>, owner: EthAddress) {
+    fn mint_and_transfer_flk(&self, amount: HpUfixed<18>, owner: EthAddress) {
         let mut account = self.account_info.get(&owner).unwrap_or_default();
         account.flk_balance += amount.clone();
 
         self.account_info.set(owner, account);
 
         let mut current_supply = match self.metadata.get(&Metadata::TotalSupply) {
-            Some(Value::HpUfloat(supply)) => supply,
+            Some(Value::HpUfixed(supply)) => supply,
             _ => panic!("TotalSupply is set genesis and should never be empty"),
         };
 
         current_supply += amount;
         self.metadata.set(
             Metadata::TotalSupply,
-            Value::HpUfloat(current_supply.clone()),
+            Value::HpUfixed(current_supply.clone()),
         );
 
         let current_epoch = match self.metadata.get(&Metadata::Epoch) {
@@ -973,7 +973,7 @@ impl<B: Backend> State<B> {
 
         if (current_epoch + 1) % 365_u64 == 0_u64 {
             self.metadata
-                .set(Metadata::SupplyYearStart, Value::HpUfloat(current_supply));
+                .set(Metadata::SupplyYearStart, Value::HpUfixed(current_supply));
         }
     }
 
@@ -999,21 +999,21 @@ impl<B: Backend> State<B> {
     ///
     /// Returns:
     /// - The calculated boost factor for the current rewards.
-    fn get_boost(&self, locked_until: u64, current_epoch: &Epoch) -> HpUfloat<3> {
-        let max_boost: HpUfloat<3> = self
+    fn get_boost(&self, locked_until: u64, current_epoch: &Epoch) -> HpUfixed<3> {
+        let max_boost: HpUfixed<3> = self
             .parameters
             .get(&ProtocolParams::MaxBoost)
             .unwrap_or(1)
             .into();
-        let max_lock_time: HpUfloat<3> = self
+        let max_lock_time: HpUfixed<3> = self
             .parameters
             .get(&ProtocolParams::MaxLockTime)
             .unwrap_or(1)
             .into();
-        let min_boost = HpUfloat::from(1_u64);
-        let locking_period: HpUfloat<3> = (locked_until.saturating_sub(*current_epoch)).into();
+        let min_boost = HpUfixed::from(1_u64);
+        let locking_period: HpUfixed<3> = (locked_until.saturating_sub(*current_epoch)).into();
         let boost = &min_boost + (&max_boost - &min_boost) * (&locking_period / &max_lock_time);
-        HpUfloat::<3>::min(&max_boost, &boost).to_owned()
+        HpUfixed::<3>::min(&max_boost, &boost).to_owned()
     }
 
     fn choose_new_committee(&self) -> Vec<NodePublicKey> {

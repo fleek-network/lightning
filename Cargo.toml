@@ -38,7 +38,7 @@ lazy_static = "1.4.0"
 affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
 fleek-crypto = { path = "lib/fleek-crypto" }
-hp-float = { path= "lib/hp-float" }
+hp-fixed = { path= "lib/hp-fixed" }
 blake3-tree = { path= "lib/blake3-tree" }
 random-oracle = { path= "lib/random-oracle" }
 

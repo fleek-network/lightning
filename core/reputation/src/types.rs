@@ -5,18 +5,18 @@ use std::{
 
 use draco_interfaces::types::ReputationMeasurements;
 use fleek_crypto::NodePublicKey;
-use hp_float::signed::HpFloat;
+use hp_fixed::signed::HpFixed;
 
 use crate::{statistics, PRECISION};
 
 pub trait WeightedValue {
-    fn get_weighted_value(&self) -> HpFloat<PRECISION>;
+    fn get_weighted_value(&self) -> HpFixed<PRECISION>;
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct WeightedFloat {
-    pub(crate) value: HpFloat<PRECISION>,
-    pub(crate) weight: HpFloat<PRECISION>,
+    pub(crate) value: HpFixed<PRECISION>,
+    pub(crate) weight: HpFixed<PRECISION>,
 }
 
 impl From<usize> for WeightedFloat {
@@ -29,7 +29,7 @@ impl From<usize> for WeightedFloat {
 }
 
 impl WeightedValue for WeightedFloat {
-    fn get_weighted_value(&self) -> HpFloat<PRECISION> {
+    fn get_weighted_value(&self) -> HpFixed<PRECISION> {
         self.value.clone() * self.weight.clone()
     }
 }
@@ -96,8 +96,8 @@ impl From<f64> for WeightedFloat {
     }
 }
 
-impl From<HpFloat<PRECISION>> for WeightedFloat {
-    fn from(value: HpFloat<PRECISION>) -> Self {
+impl From<HpFixed<PRECISION>> for WeightedFloat {
+    fn from(value: HpFixed<PRECISION>) -> Self {
         WeightedFloat {
             value,
             weight: 1.0.into(),
@@ -135,22 +135,22 @@ pub(crate) struct CollectedMeasurements {
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct NormalizedMeasurements {
-    pub latency: Option<HpFloat<PRECISION>>,
-    pub interactions: Option<HpFloat<PRECISION>>,
-    pub inbound_bandwidth: Option<HpFloat<PRECISION>>,
-    pub outbound_bandwidth: Option<HpFloat<PRECISION>>,
-    pub bytes_received: Option<HpFloat<PRECISION>>,
-    pub bytes_sent: Option<HpFloat<PRECISION>>,
+    pub latency: Option<HpFixed<PRECISION>>,
+    pub interactions: Option<HpFixed<PRECISION>>,
+    pub inbound_bandwidth: Option<HpFixed<PRECISION>>,
+    pub outbound_bandwidth: Option<HpFixed<PRECISION>>,
+    pub bytes_received: Option<HpFixed<PRECISION>>,
+    pub bytes_sent: Option<HpFixed<PRECISION>>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Values {
-    latency: HpFloat<PRECISION>,
-    interactions: HpFloat<PRECISION>,
-    inbound_bandwidth: HpFloat<PRECISION>,
-    outbound_bandwidth: HpFloat<PRECISION>,
-    bytes_received: HpFloat<PRECISION>,
-    bytes_sent: HpFloat<PRECISION>,
+    latency: HpFixed<PRECISION>,
+    interactions: HpFixed<PRECISION>,
+    inbound_bandwidth: HpFixed<PRECISION>,
+    outbound_bandwidth: HpFixed<PRECISION>,
+    bytes_received: HpFixed<PRECISION>,
+    bytes_sent: HpFixed<PRECISION>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -161,12 +161,12 @@ pub(crate) struct MinMaxValues {
 
 impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
     fn from(weighted_measurements: Vec<WeightedReputationMeasurements>) -> Self {
-        let mut weight_sum_latency: HpFloat<PRECISION> = 0.0.into();
-        let mut weight_sum_interactions: HpFloat<PRECISION> = 0.0.into();
-        let mut weight_sum_inbound_bandwidth: HpFloat<PRECISION> = 0.0.into();
-        let mut weight_sum_outbound_bandwidth: HpFloat<PRECISION> = 0.0.into();
-        let mut weight_sum_bytes_received: HpFloat<PRECISION> = 0.0.into();
-        let mut weight_sum_bytes_sent: HpFloat<PRECISION> = 0.0.into();
+        let mut weight_sum_latency: HpFixed<PRECISION> = 0.0.into();
+        let mut weight_sum_interactions: HpFixed<PRECISION> = 0.0.into();
+        let mut weight_sum_inbound_bandwidth: HpFixed<PRECISION> = 0.0.into();
+        let mut weight_sum_outbound_bandwidth: HpFixed<PRECISION> = 0.0.into();
+        let mut weight_sum_bytes_received: HpFixed<PRECISION> = 0.0.into();
+        let mut weight_sum_bytes_sent: HpFixed<PRECISION> = 0.0.into();
 
         let mut count_latency = 0;
         let mut count_interactions = 0;
@@ -204,9 +204,9 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
         weighted_measurements.into_iter().for_each(|m| {
             if let Some(latency) = m.measurements.latency {
                 let weight = if weight_sum_latency == 0.into() {
-                    HpFloat::<PRECISION>::from(1) / HpFloat::<PRECISION>::from(count_latency)
+                    HpFixed::<PRECISION>::from(1) / HpFixed::<PRECISION>::from(count_latency)
                 } else {
-                    HpFloat::<PRECISION>::from(m.weight as i16) / weight_sum_latency.clone()
+                    HpFixed::<PRECISION>::from(m.weight as i16) / weight_sum_latency.clone()
                 };
                 measurements.latency.push(WeightedFloat {
                     value: i128::try_from(latency.as_millis())
@@ -217,9 +217,9 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
             }
             if let Some(interactions) = m.measurements.interactions {
                 let weight = if weight_sum_interactions == 0.into() {
-                    HpFloat::<PRECISION>::from(1) / HpFloat::<PRECISION>::from(count_interactions)
+                    HpFixed::<PRECISION>::from(1) / HpFixed::<PRECISION>::from(count_interactions)
                 } else {
-                    HpFloat::<PRECISION>::from(m.weight as i16) / weight_sum_interactions.clone()
+                    HpFixed::<PRECISION>::from(m.weight as i16) / weight_sum_interactions.clone()
                 };
                 measurements.interactions.push(WeightedFloat {
                     value: interactions.into(),
@@ -228,10 +228,10 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
             }
             if let Some(inbound_bandwidth) = m.measurements.inbound_bandwidth {
                 let weight = if weight_sum_inbound_bandwidth == 0.into() {
-                    HpFloat::<PRECISION>::from(1)
-                        / HpFloat::<PRECISION>::from(count_inbound_bandwidth)
+                    HpFixed::<PRECISION>::from(1)
+                        / HpFixed::<PRECISION>::from(count_inbound_bandwidth)
                 } else {
-                    HpFloat::<PRECISION>::from(m.weight as i16)
+                    HpFixed::<PRECISION>::from(m.weight as i16)
                         / weight_sum_inbound_bandwidth.clone()
                 };
                 measurements.inbound_bandwidth.push(WeightedFloat {
@@ -243,10 +243,10 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
             }
             if let Some(outbound_bandwidth) = m.measurements.outbound_bandwidth {
                 let weight = if weight_sum_outbound_bandwidth == 0.into() {
-                    HpFloat::<PRECISION>::from(1)
-                        / HpFloat::<PRECISION>::from(count_outbound_bandwidth)
+                    HpFixed::<PRECISION>::from(1)
+                        / HpFixed::<PRECISION>::from(count_outbound_bandwidth)
                 } else {
-                    HpFloat::<PRECISION>::from(m.weight as i16)
+                    HpFixed::<PRECISION>::from(m.weight as i16)
                         / weight_sum_outbound_bandwidth.clone()
                 };
                 measurements.outbound_bandwidth.push(WeightedFloat {
@@ -258,9 +258,9 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
             }
             if let Some(bytes_received) = m.measurements.bytes_received {
                 let weight = if weight_sum_bytes_received == 0.into() {
-                    HpFloat::<PRECISION>::from(1) / HpFloat::<PRECISION>::from(count_bytes_received)
+                    HpFixed::<PRECISION>::from(1) / HpFixed::<PRECISION>::from(count_bytes_received)
                 } else {
-                    HpFloat::<PRECISION>::from(m.weight as i16) / weight_sum_bytes_received.clone()
+                    HpFixed::<PRECISION>::from(m.weight as i16) / weight_sum_bytes_received.clone()
                 };
                 measurements.bytes_received.push(WeightedFloat {
                     value: i128::try_from(bytes_received).unwrap_or(i128::MAX).into(),
@@ -269,9 +269,9 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
             }
             if let Some(bytes_sent) = m.measurements.bytes_sent {
                 let weight = if weight_sum_bytes_sent == 0.into() {
-                    HpFloat::<PRECISION>::from(1) / HpFloat::<PRECISION>::from(count_bytes_sent)
+                    HpFixed::<PRECISION>::from(1) / HpFixed::<PRECISION>::from(count_bytes_sent)
                 } else {
-                    HpFloat::<PRECISION>::from(m.weight as i16) / weight_sum_bytes_sent.clone()
+                    HpFixed::<PRECISION>::from(m.weight as i16) / weight_sum_bytes_sent.clone()
                 };
                 measurements.bytes_sent.push(WeightedFloat {
                     value: i128::try_from(bytes_sent).unwrap_or(i128::MAX).into(),
@@ -289,12 +289,12 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
             let inverse_weight_sum = measurements
                 .latency
                 .iter()
-                .fold(HpFloat::<PRECISION>::from(0), |acc, w| {
-                    acc + (HpFloat::<PRECISION>::from(1) - w.weight.clone())
+                .fold(HpFixed::<PRECISION>::from(0), |acc, w| {
+                    acc + (HpFixed::<PRECISION>::from(1) - w.weight.clone())
                 });
             measurements.latency.iter_mut().for_each(|w| {
                 w.weight =
-                    (HpFloat::<PRECISION>::from(1) - w.weight.clone()) / inverse_weight_sum.clone();
+                    (HpFixed::<PRECISION>::from(1) - w.weight.clone()) / inverse_weight_sum.clone();
             });
         }
         measurements
@@ -304,20 +304,20 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
 impl From<&HashMap<NodePublicKey, NormalizedMeasurements>> for MinMaxValues {
     fn from(normalized_measurements: &HashMap<NodePublicKey, NormalizedMeasurements>) -> Self {
         let min_values = Values {
-            latency: HpFloat::<PRECISION>::from(f64::MAX),
-            interactions: HpFloat::<PRECISION>::from(f64::MAX),
-            inbound_bandwidth: HpFloat::<PRECISION>::from(f64::MAX),
-            outbound_bandwidth: HpFloat::<PRECISION>::from(f64::MAX),
-            bytes_received: HpFloat::<PRECISION>::from(f64::MAX),
-            bytes_sent: HpFloat::<PRECISION>::from(f64::MAX),
+            latency: HpFixed::<PRECISION>::from(f64::MAX),
+            interactions: HpFixed::<PRECISION>::from(f64::MAX),
+            inbound_bandwidth: HpFixed::<PRECISION>::from(f64::MAX),
+            outbound_bandwidth: HpFixed::<PRECISION>::from(f64::MAX),
+            bytes_received: HpFixed::<PRECISION>::from(f64::MAX),
+            bytes_sent: HpFixed::<PRECISION>::from(f64::MAX),
         };
         let max_values = Values {
-            latency: HpFloat::<PRECISION>::from(f64::MIN),
-            interactions: HpFloat::<PRECISION>::from(f64::MIN),
-            inbound_bandwidth: HpFloat::<PRECISION>::from(f64::MIN),
-            outbound_bandwidth: HpFloat::<PRECISION>::from(f64::MIN),
-            bytes_received: HpFloat::<PRECISION>::from(f64::MIN),
-            bytes_sent: HpFloat::<PRECISION>::from(f64::MIN),
+            latency: HpFixed::<PRECISION>::from(f64::MIN),
+            interactions: HpFixed::<PRECISION>::from(f64::MIN),
+            inbound_bandwidth: HpFixed::<PRECISION>::from(f64::MIN),
+            outbound_bandwidth: HpFixed::<PRECISION>::from(f64::MIN),
+            bytes_received: HpFixed::<PRECISION>::from(f64::MIN),
+            bytes_sent: HpFixed::<PRECISION>::from(f64::MIN),
         };
         let mut min_max_vals = MinMaxValues {
             min_values,
@@ -470,10 +470,10 @@ impl NormalizedMeasurements {
     }
 
     pub fn calculate_score(&self) -> Option<u8> {
-        let mut score = HpFloat::<PRECISION>::from(0);
+        let mut score = HpFixed::<PRECISION>::from(0);
         let mut count = 0;
         if let Some(latency) = &self.latency {
-            score += HpFloat::<PRECISION>::from(1) - latency;
+            score += HpFixed::<PRECISION>::from(1) - latency;
             count += 1;
         }
         if let Some(interactions) = &self.interactions {
@@ -501,8 +501,8 @@ impl NormalizedMeasurements {
             return None;
         }
         // This value will be in the range [0, 1]
-        score = score / HpFloat::<PRECISION>::from(count);
-        let score: i128 = (score * HpFloat::<PRECISION>::from(100)).try_into().ok()?;
+        score = score / HpFixed::<PRECISION>::from(count);
+        let score: i128 = (score * HpFixed::<PRECISION>::from(100)).try_into().ok()?;
         // The value of score will be in range [0, 100]
         Some(score.min(100) as u8)
     }

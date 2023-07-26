@@ -17,7 +17,7 @@ use fleek_crypto::{
     ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey,
     NodeSecretKey, NodeSignature,
 };
-use hp_float::unsigned::HpUfloat;
+use hp_fixed::unsigned::HpUfixed;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::{mpsc, Notify};
 
@@ -287,20 +287,20 @@ impl SyncQueryRunnerInterface for MockQueryRunner {
         0
     }
 
-    fn get_flk_balance(&self, _account: &EthAddress) -> HpUfloat<18> {
-        HpUfloat::from(0_u64)
+    fn get_flk_balance(&self, _account: &EthAddress) -> HpUfixed<18> {
+        HpUfixed::from(0_u64)
     }
 
-    fn get_stables_balance(&self, _account: &EthAddress) -> HpUfloat<6> {
-        HpUfloat::from(0_u64)
+    fn get_stables_balance(&self, _account: &EthAddress) -> HpUfixed<6> {
+        HpUfixed::from(0_u64)
     }
 
-    fn get_staked(&self, _node: &NodePublicKey) -> HpUfloat<18> {
-        HpUfloat::from(0_u64)
+    fn get_staked(&self, _node: &NodePublicKey) -> HpUfixed<18> {
+        HpUfixed::from(0_u64)
     }
 
-    fn get_locked(&self, _node: &NodePublicKey) -> HpUfloat<18> {
-        HpUfloat::from(0_u64)
+    fn get_locked(&self, _node: &NodePublicKey) -> HpUfixed<18> {
+        HpUfixed::from(0_u64)
     }
 
     fn get_stake_locked_until(&self, _node: &NodePublicKey) -> Epoch {
@@ -362,7 +362,7 @@ impl SyncQueryRunnerInterface for MockQueryRunner {
     fn get_total_served(&self, _epoch: Epoch) -> TotalServed {
         TotalServed {
             served: Vec::new(),
-            reward_pool: HpUfloat::from(0_u64),
+            reward_pool: HpUfixed::from(0_u64),
         }
     }
 
@@ -370,12 +370,12 @@ impl SyncQueryRunnerInterface for MockQueryRunner {
         NodeServed::default()
     }
 
-    fn get_total_supply(&self) -> HpUfloat<18> {
-        HpUfloat::from(0_u64)
+    fn get_total_supply(&self) -> HpUfixed<18> {
+        HpUfixed::from(0_u64)
     }
 
-    fn get_year_start_supply(&self) -> HpUfloat<18> {
-        HpUfloat::from(0_u64)
+    fn get_year_start_supply(&self) -> HpUfixed<18> {
+        HpUfixed::from(0_u64)
     }
 
     fn get_protocol_fund_address(&self) -> EthAddress {

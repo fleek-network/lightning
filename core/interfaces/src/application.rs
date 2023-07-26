@@ -3,7 +3,7 @@ use std::{collections::HashMap, time::Duration};
 use affair::Socket;
 use async_trait::async_trait;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
-use hp_float::unsigned::HpUfloat;
+use hp_fixed::unsigned::HpUfixed;
 
 use crate::{
     common::WithStartAndShutdown,
@@ -80,16 +80,16 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_client_balance(&self, client: &ClientPublicKey) -> u128;
 
     /// Returns the latest FLK balance of an account
-    fn get_flk_balance(&self, account: &EthAddress) -> HpUfloat<18>;
+    fn get_flk_balance(&self, account: &EthAddress) -> HpUfixed<18>;
 
     /// Returns the latest stables balance of an account
-    fn get_stables_balance(&self, account: &EthAddress) -> HpUfloat<6>;
+    fn get_stables_balance(&self, account: &EthAddress) -> HpUfixed<6>;
 
     /// Returns the amount of flk a node has staked
-    fn get_staked(&self, node: &NodePublicKey) -> HpUfloat<18>;
+    fn get_staked(&self, node: &NodePublicKey) -> HpUfixed<18>;
 
     /// Returns the amount of locked tokens a node has
-    fn get_locked(&self, node: &NodePublicKey) -> HpUfloat<18>;
+    fn get_locked(&self, node: &NodePublicKey) -> HpUfixed<18>;
 
     /// Returns the epoch number until which the stakes are locked
     fn get_stake_locked_until(&self, node: &NodePublicKey) -> Epoch;
@@ -143,10 +143,10 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_node_served(&self, node: &NodePublicKey) -> NodeServed;
 
     /// Return the current total supply of FLK tokens
-    fn get_total_supply(&self) -> HpUfloat<18>;
+    fn get_total_supply(&self) -> HpUfixed<18>;
 
     /// Return the total supply at year start point used for inflation
-    fn get_year_start_supply(&self) -> HpUfloat<18>;
+    fn get_year_start_supply(&self) -> HpUfixed<18>;
 
     /// Return the foundation address where protocol fund goes to
     fn get_protocol_fund_address(&self) -> EthAddress;

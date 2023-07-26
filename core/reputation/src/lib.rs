@@ -48,7 +48,7 @@ fn calculate_normalized_measurements(
 mod tests {
 
     use draco_test_utils::random;
-    use hp_float::signed::HpFloat;
+    use hp_fixed::signed::HpFixed;
     use rand::Rng;
 
     use super::*;
@@ -113,31 +113,31 @@ mod tests {
         let weighted_measurements = generate_weighted_measurements(10, Some(rng));
         let collected_measurements: CollectedMeasurements = weighted_measurements.into();
 
-        let mut weight_sum = HpFloat::<PRECISION>::from(0);
+        let mut weight_sum = HpFixed::<PRECISION>::from(0);
         collected_measurements.latency.iter().for_each(|w| {
             assert!((0.0.into()..=1.0.into()).contains(&w.weight));
             weight_sum += w.weight.clone();
         });
         assert!(
-            (weight_sum - HpFloat::<PRECISION>::from(1))
+            (weight_sum - HpFixed::<PRECISION>::from(1))
                 .try_abs()
                 .unwrap()
                 < EPSILON.into()
         );
 
-        let mut weight_sum = HpFloat::<PRECISION>::from(0);
+        let mut weight_sum = HpFixed::<PRECISION>::from(0);
         collected_measurements.latency.iter().for_each(|w| {
             assert!((0.0.into()..=1.0.into()).contains(&w.weight));
             weight_sum += w.weight.clone();
         });
         assert!(
-            (weight_sum - HpFloat::<PRECISION>::from(1))
+            (weight_sum - HpFixed::<PRECISION>::from(1))
                 .try_abs()
                 .unwrap()
                 < EPSILON.into()
         );
 
-        let mut weight_sum = HpFloat::<PRECISION>::from(0);
+        let mut weight_sum = HpFixed::<PRECISION>::from(0);
         collected_measurements
             .inbound_bandwidth
             .iter()
@@ -146,13 +146,13 @@ mod tests {
                 weight_sum += w.weight.clone();
             });
         assert!(
-            (weight_sum - HpFloat::<PRECISION>::from(1))
+            (weight_sum - HpFixed::<PRECISION>::from(1))
                 .try_abs()
                 .unwrap()
                 < EPSILON.into()
         );
 
-        let mut weight_sum = HpFloat::<PRECISION>::from(0);
+        let mut weight_sum = HpFixed::<PRECISION>::from(0);
         collected_measurements
             .outbound_bandwidth
             .iter()
@@ -161,31 +161,31 @@ mod tests {
                 weight_sum += w.weight.clone();
             });
         assert!(
-            (weight_sum - HpFloat::<PRECISION>::from(1))
+            (weight_sum - HpFixed::<PRECISION>::from(1))
                 .try_abs()
                 .unwrap()
                 < EPSILON.into()
         );
 
-        let mut weight_sum = HpFloat::<PRECISION>::from(0);
+        let mut weight_sum = HpFixed::<PRECISION>::from(0);
         collected_measurements.bytes_received.iter().for_each(|w| {
             assert!((0.0.into()..=1.0.into()).contains(&w.weight));
             weight_sum += w.weight.clone();
         });
         assert!(
-            (weight_sum - HpFloat::<PRECISION>::from(1))
+            (weight_sum - HpFixed::<PRECISION>::from(1))
                 .try_abs()
                 .unwrap()
                 < EPSILON.into()
         );
 
-        let mut weight_sum = HpFloat::<PRECISION>::from(0);
+        let mut weight_sum = HpFixed::<PRECISION>::from(0);
         collected_measurements.bytes_sent.iter().for_each(|w| {
             assert!((0.0.into()..=1.0.into()).contains(&w.weight));
             weight_sum += w.weight.clone();
         });
         assert!(
-            (weight_sum - HpFloat::<PRECISION>::from(1))
+            (weight_sum - HpFixed::<PRECISION>::from(1))
                 .try_abs()
                 .unwrap()
                 < EPSILON.into()
@@ -199,37 +199,37 @@ mod tests {
         let collected_measurements: CollectedMeasurements = weighted_measurements.clone().into();
         if let Some(latency) = weighted_measurements[0].measurements.latency {
             assert_eq!(
-                HpFloat::<PRECISION>::from(i128::try_from(latency.as_millis()).unwrap()),
+                HpFixed::<PRECISION>::from(i128::try_from(latency.as_millis()).unwrap()),
                 collected_measurements.latency[0].value
             );
         }
         if let Some(interactions) = weighted_measurements[0].measurements.interactions {
             assert_eq!(
-                HpFloat::<PRECISION>::from(interactions),
+                HpFixed::<PRECISION>::from(interactions),
                 collected_measurements.interactions[0].value
             );
         }
         if let Some(inbound_bandwidth) = weighted_measurements[0].measurements.inbound_bandwidth {
             assert_eq!(
-                HpFloat::<PRECISION>::from(i128::try_from(inbound_bandwidth).unwrap()),
+                HpFixed::<PRECISION>::from(i128::try_from(inbound_bandwidth).unwrap()),
                 collected_measurements.inbound_bandwidth[0].value
             );
         }
         if let Some(outbound_bandwidth) = weighted_measurements[0].measurements.outbound_bandwidth {
             assert_eq!(
-                HpFloat::<PRECISION>::from(i128::try_from(outbound_bandwidth).unwrap()),
+                HpFixed::<PRECISION>::from(i128::try_from(outbound_bandwidth).unwrap()),
                 collected_measurements.outbound_bandwidth[0].value
             );
         }
         if let Some(bytes_received) = weighted_measurements[0].measurements.bytes_received {
             assert_eq!(
-                HpFloat::<PRECISION>::from(i128::try_from(bytes_received).unwrap()),
+                HpFixed::<PRECISION>::from(i128::try_from(bytes_received).unwrap()),
                 collected_measurements.bytes_received[0].value
             );
         }
         if let Some(bytes_sent) = weighted_measurements[0].measurements.bytes_sent {
             assert_eq!(
-                HpFloat::<PRECISION>::from(i128::try_from(bytes_sent).unwrap()),
+                HpFixed::<PRECISION>::from(i128::try_from(bytes_sent).unwrap()),
                 collected_measurements.bytes_sent[0].value
             );
         }

@@ -18,7 +18,7 @@ tokio.workspace = true
 
 affair.workspace = true
 fleek-crypto.workspace = true
-hp-float.workspace = true
+hp-fixed.workspace = true
 
 [dev-dependencies]
 reqwest = { workspace = true, features = ["json"] }

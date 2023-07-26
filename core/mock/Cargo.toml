@@ -15,7 +15,7 @@ rand.workspace = true
 serde.workspace = true
 tokio.workspace = true
 scc.workspace = true
-hp-float.workspace = true
+hp-fixed.workspace = true
 
 axum.workspace = true
 serde_json.workspace = true

@@ -2157,7 +2157,7 @@ dependencies = [
  "draco-reputation",
  "draco-test-utils",
  "fleek-crypto",
- "hp-float",
+ "hp-fixed",
  "lazy_static",
  "multiaddr",
  "num-traits",
@@ -2250,7 +2250,7 @@ dependencies = [
  "blake3-tree",
  "bytes",
  "fleek-crypto",
- "hp-float",
+ "hp-fixed",
  "multiaddr",
  "num-bigint",
  "num-derive",
@@ -2369,7 +2369,7 @@ dependencies = [
  "draco-interfaces",
  "draco-test-utils",
  "fleek-crypto",
- "hp-float",
+ "hp-fixed",
  "rand 0.8.5",
 ]
 
@@ -2385,7 +2385,7 @@ dependencies = [
  "draco-application",
  "draco-interfaces",
  "fleek-crypto",
- "hp-float",
+ "hp-fixed",
  "jsonrpc-v2",
  "reqwest",
  "serde",
@@ -2414,7 +2414,7 @@ dependencies = [
  "draco-interfaces",
  "draco-test-utils",
  "fleek-crypto",
- "hp-float",
+ "hp-fixed",
  "log",
  "serde",
  "tokio",
@@ -2432,7 +2432,7 @@ dependencies = [
  "draco-handshake",
  "draco-interfaces",
  "fleek-crypto",
- "hp-float",
+ "hp-fixed",
  "rand 0.8.5",
  "scc",
  "serde",
@@ -3264,7 +3264,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77e806677ce663d0a199541030c816847b36e8dc095f70dae4a4f4ad63da5383"
 
 [[package]]
-name = "hp-float"
+name = "hp-fixed"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3870,7 +3870,7 @@ dependencies = [
  "axum",
  "draco-interfaces",
  "fleek-crypto",
- "hp-float",
+ "hp-fixed",
  "log",
  "rand 0.8.5",
  "rand_chacha 0.3.1",

@@ -16,7 +16,7 @@ use fleek_crypto::{
     AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
     SecretKey,
 };
-use hp_float::unsigned::HpUfloat;
+use hp_fixed::unsigned::HpUfixed;
 use tokio::test;
 
 use crate::{
@@ -234,7 +234,7 @@ async fn run_transaction(
 }
 
 async fn deposit(
-    amount: HpUfloat<18>,
+    amount: HpUfixed<18>,
     token: Tokens,
     secret_key: AccountOwnerSecretKey,
     update_socket: &Socket<Block, BlockExecutionResponse>,
@@ -270,7 +270,7 @@ async fn stake_lock(
 }
 
 async fn stake(
-    amount: HpUfloat<18>,
+    amount: HpUfixed<18>,
     node_public_key: NodePublicKey,
     secret_key: AccountOwnerSecretKey,
     update_socket: &Socket<Block, BlockExecutionResponse>,
@@ -309,7 +309,7 @@ async fn test_genesis() {
     // Query to make sure that holds true
     for node in genesis_committee {
         let balance = query_runner.get_staked(&node.public_key);
-        assert_eq!(HpUfloat::<18>::from(genesis.min_stake), balance);
+        assert_eq!(HpUfixed::<18>::from(genesis.min_stake), balance);
     }
 }
 
@@ -658,12 +658,12 @@ async fn test_distribute_rewards() {
     .await;
 
     // get params for emission calculations
-    let percentage_divisor: HpUfloat<18> = 100_u16.into();
-    let supply_at_year_start: HpUfloat<18> = supply_at_genesis.into();
-    let inflation: HpUfloat<18> = HpUfloat::from(max_inflation) / &percentage_divisor;
-    let node_share = HpUfloat::from(node_part) / &percentage_divisor;
-    let protocol_share = HpUfloat::from(protocol_part) / &percentage_divisor;
-    let service_share = HpUfloat::from(service_part) / &percentage_divisor;
+    let percentage_divisor: HpUfixed<18> = 100_u16.into();
+    let supply_at_year_start: HpUfixed<18> = supply_at_genesis.into();
+    let inflation: HpUfixed<18> = HpUfixed::from(max_inflation) / &percentage_divisor;
+    let node_share = HpUfixed::from(node_part) / &percentage_divisor;
+    let protocol_share = HpUfixed::from(protocol_part) / &percentage_divisor;
+    let service_share = HpUfixed::from(service_part) / &percentage_divisor;
 
     let owner_secret_key1 = AccountOwnerSecretKey::generate();
     let node_secret_key1 = NodeSecretKey::generate();
@@ -720,14 +720,14 @@ async fn test_distribute_rewards() {
 
     let node_1_usd = 0.1 * 12_800_f64 + 0.2 * 3_600_f64; // 2_000 in revenue
     let node_2_usd = 0.2 * 5_000_f64; // 1_000 in revenue
-    let reward_pool: HpUfloat<6> = (node_1_usd + node_2_usd).into();
+    let reward_pool: HpUfixed<6> = (node_1_usd + node_2_usd).into();
 
-    let node_1_proportion: HpUfloat<18> = HpUfloat::from(2000_u64) / HpUfloat::from(3000_u64);
-    let node_2_proportion: HpUfloat<18> = HpUfloat::from(1000_u64) / HpUfloat::from(3000_u64);
+    let node_1_proportion: HpUfixed<18> = HpUfixed::from(2000_u64) / HpUfixed::from(3000_u64);
+    let node_2_proportion: HpUfixed<18> = HpUfixed::from(1000_u64) / HpUfixed::from(3000_u64);
 
-    let service_proportions: Vec<HpUfloat<18>> = vec![
-        HpUfloat::from(1280_u64) / HpUfloat::from(3000_u64),
-        HpUfloat::from(1720_u64) / HpUfloat::from(3000_u64),
+    let service_proportions: Vec<HpUfixed<18>> = vec![
+        HpUfixed::from(1280_u64) / HpUfixed::from(3000_u64),
+        HpUfixed::from(1720_u64) / HpUfixed::from(3000_u64),
     ];
     // run the delivery ack transaction
     if let Err(e) = run_transaction(vec![pod_10, pod11, pod_21], &update_socket).await {
@@ -743,19 +743,19 @@ async fn test_distribute_rewards() {
     let stables_balance = query_runner.get_stables_balance(&owner_secret_key1.to_pk().into());
     assert_eq!(
         stables_balance,
-        <f64 as Into<HpUfloat<6>>>::into(node_1_usd) * node_share.convert_precision()
+        <f64 as Into<HpUfixed<6>>>::into(node_1_usd) * node_share.convert_precision()
     );
     let stables_balance2 = query_runner.get_stables_balance(&owner_secret_key2.to_pk().into());
     assert_eq!(
         stables_balance2,
-        <f64 as Into<HpUfloat<6>>>::into(node_2_usd) * node_share.convert_precision()
+        <f64 as Into<HpUfixed<6>>>::into(node_2_usd) * node_share.convert_precision()
     );
 
     let total_share =
-        &node_1_proportion * HpUfloat::from(1_u64) + &node_2_proportion * HpUfloat::from(4_u64);
+        &node_1_proportion * HpUfixed::from(1_u64) + &node_2_proportion * HpUfixed::from(4_u64);
 
     // calculate emissions per unit
-    let emissions: HpUfloat<18> = (inflation * supply_at_year_start) / &365.0.into();
+    let emissions: HpUfixed<18> = (inflation * supply_at_year_start) / &365.0.into();
     let emissions_for_node = &emissions * &node_share;
 
     // assert flk balances node 1
@@ -765,8 +765,8 @@ async fn test_distribute_rewards() {
 
     // assert flk balances node 2
     let node_flk_balance2 = query_runner.get_flk_balance(&owner_secret_key2.to_pk().into());
-    let node_flk_rewards2: HpUfloat<18> =
-        (&emissions_for_node * (&node_2_proportion * HpUfloat::from(4_u64))) / &total_share;
+    let node_flk_rewards2: HpUfixed<18> =
+        (&emissions_for_node * (&node_2_proportion * HpUfixed::from(4_u64))) / &total_share;
     assert_eq!(node_flk_balance2, node_flk_rewards2);
 
     // assert protocols share
@@ -941,12 +941,12 @@ async fn test_supply_across_epoch() {
     .await;
 
     // get params for emission calculations
-    let percentage_divisor: HpUfloat<18> = 100_u16.into();
-    let supply_at_year_start: HpUfloat<18> = supply_at_genesis.into();
-    let inflation: HpUfloat<18> = HpUfloat::from(max_inflation) / &percentage_divisor;
-    let node_share = HpUfloat::from(node_part) / &percentage_divisor;
-    let protocol_share = HpUfloat::from(protocol_part) / &percentage_divisor;
-    let service_share = HpUfloat::from(service_part) / &percentage_divisor;
+    let percentage_divisor: HpUfixed<18> = 100_u16.into();
+    let supply_at_year_start: HpUfixed<18> = supply_at_genesis.into();
+    let inflation: HpUfixed<18> = HpUfixed::from(max_inflation) / &percentage_divisor;
+    let node_share = HpUfixed::from(node_part) / &percentage_divisor;
+    let protocol_share = HpUfixed::from(protocol_part) / &percentage_divisor;
+    let service_share = HpUfixed::from(service_part) / &percentage_divisor;
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_secret_key = NodeSecretKey::generate();
@@ -973,7 +973,7 @@ async fn test_supply_across_epoch() {
     let _node_1_usd = 0.1 * 10000_f64;
 
     // calculate emissions per unit
-    let emissions_per_epoch: HpUfloat<18> = (&inflation * &supply_at_year_start) / &365.0.into();
+    let emissions_per_epoch: HpUfixed<18> = (&inflation * &supply_at_year_start) / &365.0.into();
 
     let mut supply = supply_at_year_start;
 

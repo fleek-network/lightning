@@ -20,4 +20,4 @@ affair.workspace = true
 
 [dev-dependencies]
 draco-test-utils = { path = "../test-utils" }
-hp-float.workspace = true
+hp-fixed.workspace = true

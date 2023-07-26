@@ -1,6 +1,6 @@
 use std::ops::{Add, Div, Mul, Sub};
 
-use hp_float::signed::HpFloat;
+use hp_fixed::signed::HpFixed;
 
 use crate::{types::WeightedValue, PRECISION};
 
@@ -111,7 +111,7 @@ where
     }
 }
 
-fn calculate_weighted_mean<T>(values: &[T]) -> Option<HpFloat<PRECISION>>
+fn calculate_weighted_mean<T>(values: &[T]) -> Option<HpFixed<PRECISION>>
 where
     T: Default
         + WeightedValue
@@ -125,7 +125,7 @@ where
         let mean = values
             .iter()
             .cloned()
-            .fold(0.0.into(), |acc: HpFloat<PRECISION>, v| {
+            .fold(0.0.into(), |acc: HpFixed<PRECISION>, v| {
                 acc + v.get_weighted_value()
             });
         Some(mean)
@@ -134,7 +134,7 @@ where
     }
 }
 
-pub fn calculate_z_normalized_weighted_mean<T>(mut values: Vec<T>) -> Option<HpFloat<PRECISION>>
+pub fn calculate_z_normalized_weighted_mean<T>(mut values: Vec<T>) -> Option<HpFixed<PRECISION>>
 where
     T: Default
         + WeightedValue

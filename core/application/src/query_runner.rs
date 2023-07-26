@@ -10,7 +10,7 @@ use draco_interfaces::{
     },
 };
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
-use hp_float::unsigned::HpUfloat;
+use hp_fixed::unsigned::HpUfixed;
 
 use crate::{
     state::{Committee, State},
@@ -34,7 +34,7 @@ pub struct QueryRunner {
     _last_epoch_served: ResolvedTableReference<NodePublicKey, NodeServed>,
     total_served_table: ResolvedTableReference<Epoch, TotalServed>,
     _service_revenue: ResolvedTableReference<ServiceId, ServiceRevenue>,
-    _commodity_price: ResolvedTableReference<CommodityTypes, HpUfloat<6>>,
+    _commodity_price: ResolvedTableReference<CommodityTypes, HpUfixed<6>>,
 }
 
 impl QueryRunner {
@@ -55,7 +55,7 @@ impl QueryRunner {
             rep_scores: atomo.resolve::<NodePublicKey, u8>("rep_scores"),
             _last_epoch_served: atomo.resolve::<NodePublicKey, NodeServed>("last_epoch_served"),
             total_served_table: atomo.resolve::<Epoch, TotalServed>("total_served"),
-            _commodity_price: atomo.resolve::<CommodityTypes, HpUfloat<6>>("commodity_prices"),
+            _commodity_price: atomo.resolve::<CommodityTypes, HpUfixed<6>>("commodity_prices"),
             _service_revenue: atomo.resolve::<ServiceId, ServiceRevenue>("service_revenue"),
             inner: atomo,
         }
@@ -86,43 +86,43 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn get_flk_balance(&self, account: &EthAddress) -> HpUfloat<18> {
+    fn get_flk_balance(&self, account: &EthAddress) -> HpUfixed<18> {
         self.inner.run(|ctx| {
             self.account_table
                 .get(ctx)
                 .get(account)
                 .map(|account| account.flk_balance)
-                .unwrap_or(HpUfloat::<18>::zero())
+                .unwrap_or(HpUfixed::<18>::zero())
         })
     }
 
-    fn get_stables_balance(&self, account: &EthAddress) -> HpUfloat<6> {
+    fn get_stables_balance(&self, account: &EthAddress) -> HpUfixed<6> {
         self.inner.run(|ctx| {
             self.account_table
                 .get(ctx)
                 .get(account)
                 .map(|account| account.stables_balance)
-                .unwrap_or(HpUfloat::<6>::zero())
+                .unwrap_or(HpUfixed::<6>::zero())
         })
     }
 
-    fn get_staked(&self, node: &NodePublicKey) -> HpUfloat<18> {
+    fn get_staked(&self, node: &NodePublicKey) -> HpUfixed<18> {
         self.inner.run(|ctx| {
             self.node_table
                 .get(ctx)
                 .get(node)
                 .map(|node| node.stake.staked)
-                .unwrap_or(HpUfloat::zero())
+                .unwrap_or(HpUfixed::zero())
         })
     }
 
-    fn get_locked(&self, node: &NodePublicKey) -> HpUfloat<18> {
+    fn get_locked(&self, node: &NodePublicKey) -> HpUfixed<18> {
         self.inner.run(|ctx| {
             self.node_table
                 .get(ctx)
                 .get(node)
                 .map(|node| node.stake.locked)
-                .unwrap_or(HpUfloat::zero())
+                .unwrap_or(HpUfixed::zero())
         })
     }
 
@@ -266,19 +266,19 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn get_total_supply(&self) -> HpUfloat<18> {
+    fn get_total_supply(&self) -> HpUfixed<18> {
         self.inner.run(|ctx| {
             let supply = match self.metadata_table.get(ctx).get(&Metadata::TotalSupply) {
-                Some(Value::HpUfloat(s)) => s,
+                Some(Value::HpUfixed(s)) => s,
                 _ => panic!("TotalSupply is set genesis and should never be empty"),
             };
             supply
         })
     }
-    fn get_year_start_supply(&self) -> HpUfloat<18> {
+    fn get_year_start_supply(&self) -> HpUfixed<18> {
         self.inner.run(|ctx| {
             let supply = match self.metadata_table.get(ctx).get(&Metadata::SupplyYearStart) {
-                Some(Value::HpUfloat(s)) => s,
+                Some(Value::HpUfixed(s)) => s,
                 _ => panic!("SupplyYearStart is set genesis and should never be empty"),
             };
             supply

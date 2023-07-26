@@ -5,7 +5,7 @@ use fleek_crypto::{
     EthAddress, NodeNetworkingPublicKey, NodePublicKey, PublicKey, TransactionSender,
     TransactionSignature,
 };
-use hp_float::unsigned::HpUfloat;
+use hp_fixed::unsigned::HpUfixed;
 use multiaddr::Multiaddr;
 use num_bigint::BigUint;
 use num_derive::FromPrimitive;
@@ -45,7 +45,7 @@ pub enum Tokens {
 pub enum Value {
     Epoch(u64),
     String(String),
-    HpUfloat(HpUfloat<18>),
+    HpUfixed(HpUfixed<18>),
     AccountPublicKey(EthAddress),
 }
 
@@ -62,18 +62,18 @@ pub enum CommodityTypes {
 /// This is commodity served by each of the commodity types
 type CommodityServed = Vec<u128>;
 
-pub type ServiceRevenue = HpUfloat<6>;
+pub type ServiceRevenue = HpUfixed<6>;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
 pub struct NodeServed {
     pub served: CommodityServed,
-    pub stables_revenue: HpUfloat<6>,
+    pub stables_revenue: HpUfixed<6>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
 pub struct TotalServed {
     pub served: CommodityServed,
-    pub reward_pool: HpUfloat<6>,
+    pub reward_pool: HpUfixed<6>,
 }
 
 /// Placeholder
@@ -130,7 +130,7 @@ pub enum UpdateMethod {
     /// Withdraw tokens from the network back to the L2
     Withdraw {
         /// The amount to withdrawl
-        amount: HpUfloat<18>,
+        amount: HpUfixed<18>,
         /// Which token to withdrawl
         token: Tokens,
         /// The address to recieve these tokens on the L2
@@ -143,12 +143,12 @@ pub enum UpdateMethod {
         /// Which token was bridged
         token: Tokens,
         /// Amount bridged
-        amount: HpUfloat<18>,
+        amount: HpUfixed<18>,
     },
     /// Stake FLK in network
     Stake {
         /// Amount to stake
-        amount: HpUfloat<18>,
+        amount: HpUfixed<18>,
         /// Node Public Key
         node_public_key: NodePublicKey,
         /// Node networking key for narwhal
@@ -171,7 +171,7 @@ pub enum UpdateMethod {
     /// Unstake FLK, the tokens will be locked for a set amount of
     /// time(ProtocolParameter::LockTime) before they can be withdrawn
     Unstake {
-        amount: HpUfloat<18>,
+        amount: HpUfixed<18>,
         node: NodePublicKey,
     },
     /// Withdraw tokens from a node after lock period has passed
@@ -252,9 +252,9 @@ pub enum ExecutionError {
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
 pub struct AccountInfo {
     /// The accounts FLK balance
-    pub flk_balance: HpUfloat<18>,
+    pub flk_balance: HpUfixed<18>,
     /// the accounts stable coin balance
-    pub stables_balance: HpUfloat<6>,
+    pub stables_balance: HpUfixed<6>,
     /// The accounts stables/bandwidth balance
     pub bandwidth_balance: u128,
     /// The nonce of the account. Added to each transaction before signed to prevent replays and
@@ -266,11 +266,11 @@ pub struct AccountInfo {
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
 pub struct Staking {
     /// How much FLK that is currently staked
-    pub staked: HpUfloat<18>,
+    pub staked: HpUfixed<18>,
     /// The epoch until all stakes are locked for boosting rewards
     pub stake_locked_until: u64,
     /// How much FLK is locked pending withdrawl
-    pub locked: HpUfloat<18>,
+    pub locked: HpUfixed<18>,
     /// The epoch the locked FLK is elegible to be withdrawn
     pub locked_until: u64,
 }
@@ -402,7 +402,7 @@ impl ToDigest for UpdatePayload {
                     .with("transaction_name", &"deposit")
                     .with_prefix("input".to_owned())
                     .with("token", token)
-                    .with("amount", &HpUfloatWrapper(amount.clone()));
+                    .with("amount", &HpUfixedWrapper(amount.clone()));
                 //.with("method.proof", proof);
             },
 
@@ -431,7 +431,7 @@ impl ToDigest for UpdatePayload {
                 random_oracle = random_oracle
                     .with("transaction_name", &"withdraw")
                     .with_prefix("input".to_owned())
-                    .with("amount", &HpUfloatWrapper(amount.clone()))
+                    .with("amount", &HpUfixedWrapper(amount.clone()))
                     .with("token", token)
                     .with("receiving_address", &receiving_address.0);
             },
@@ -447,7 +447,7 @@ impl ToDigest for UpdatePayload {
                 random_oracle = random_oracle
                     .with("transaction_name", &"stake")
                     .with_prefix("input".to_owned())
-                    .with("amount", &HpUfloatWrapper(amount.clone()))
+                    .with("amount", &HpUfixedWrapper(amount.clone()))
                     .with("node_public_key", &node_public_key.0)
                     .with(
                         "node_network_key",
@@ -473,7 +473,7 @@ impl ToDigest for UpdatePayload {
                     .with("transaction_name", &"unstake")
                     .with_prefix("input".to_owned())
                     .with("node", &node.0)
-                    .with("amount", &HpUfloatWrapper(amount.clone()));
+                    .with("amount", &HpUfixedWrapper(amount.clone()));
             },
             UpdateMethod::WithdrawUnstaked { node, recipient } => {
                 random_oracle = random_oracle
@@ -600,16 +600,16 @@ impl RandomOracleInput for Service {
     }
 }
 
-pub struct HpUfloatWrapper<const T: usize>(HpUfloat<T>);
+pub struct HpUfixedWrapper<const T: usize>(HpUfixed<T>);
 
-impl<const T: usize> HpUfloatWrapper<T> {
+impl<const T: usize> HpUfixedWrapper<T> {
     pub fn get_value(&self) -> &BigUint {
         self.0.get_value()
     }
 }
 
-impl<const P: usize> RandomOracleInput for HpUfloatWrapper<P> {
-    const TYPE: &'static str = "HpUfloat";
+impl<const P: usize> RandomOracleInput for HpUfixedWrapper<P> {
+    const TYPE: &'static str = "HpUfixed";
 
     fn to_random_oracle_input(&self) -> Vec<u8> {
         let mut input = Vec::new();

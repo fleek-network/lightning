@@ -11,7 +11,7 @@ use draco_interfaces::{
     BlockExecutionResponse,
 };
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, EthAddress, NodePublicKey, PublicKey};
-use hp_float::unsigned::HpUfloat;
+use hp_fixed::unsigned::HpUfixed;
 
 use crate::{
     config::{Config, Mode},
@@ -41,7 +41,7 @@ impl Env<UpdatePerm> {
             .with_table::<NodePublicKey, NodeServed>("current_epoch_served")
             .with_table::<NodePublicKey, NodeServed>("last_epoch_served")
             .with_table::<Epoch, TotalServed>("total_served")
-            .with_table::<CommodityTypes, HpUfloat<6>>("commodity_prices")
+            .with_table::<CommodityTypes, HpUfixed<6>>("commodity_prices")
             .with_table::<ServiceId, ServiceRevenue>("service_revenue")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
@@ -130,7 +130,7 @@ impl Env<UpdatePerm> {
             let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
             let mut metadata_table = ctx.get_table::<Metadata, Value>("metadata");
             let mut commodity_prices_table =
-                ctx.get_table::<CommodityTypes, HpUfloat<6>>("commodity_prices");
+                ctx.get_table::<CommodityTypes, HpUfixed<6>>("commodity_prices");
             let mut rep_scores_table = ctx.get_table::<NodePublicKey, u8>("rep_scores");
             let mut total_served_table = ctx.get_table::<Epoch, TotalServed>("total_served");
             let mut current_epoch_served_table =
@@ -143,14 +143,14 @@ impl Env<UpdatePerm> {
                 Value::AccountPublicKey(protocol_fund_address.into()),
             );
 
-            let supply_at_genesis: HpUfloat<18> = HpUfloat::from(genesis.supply_at_genesis);
+            let supply_at_genesis: HpUfixed<18> = HpUfixed::from(genesis.supply_at_genesis);
             metadata_table.insert(
                 Metadata::TotalSupply,
-                Value::HpUfloat(supply_at_genesis.clone()),
+                Value::HpUfixed(supply_at_genesis.clone()),
             );
             metadata_table.insert(
                 Metadata::SupplyYearStart,
-                Value::HpUfloat(supply_at_genesis),
+                Value::HpUfixed(supply_at_genesis),
             );
             param_table.insert(ProtocolParams::MaxBoost, genesis.max_boost as u128);
             param_table.insert(ProtocolParams::MaxLockTime, genesis.max_lock_time as u128);
@@ -185,7 +185,7 @@ impl Env<UpdatePerm> {
 
             for node in &genesis.committee {
                 let mut node_info: NodeInfo = node.into();
-                node_info.stake.staked = HpUfloat::<18>::from(genesis.min_stake);
+                node_info.stake.staked = HpUfixed::<18>::from(genesis.min_stake);
                 committee_members.push(node_info.public_key);
 
                 node_table.insert(node_info.public_key, node_info);
@@ -226,7 +226,7 @@ impl Env<UpdatePerm> {
             // add commodity prices
             for commodity_price in genesis.commodity_prices {
                 let GenesisPrices { commodity, price } = commodity_price;
-                let big_price: HpUfloat<6> = price.into();
+                let big_price: HpUfixed<6> = price.into();
                 commodity_prices_table.insert(commodity, big_price);
             }
 

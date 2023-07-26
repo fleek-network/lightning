@@ -7,7 +7,7 @@ pub mod signed;
 pub mod unsigned;
 
 #[derive(Debug)]
-pub enum HpFloatConversionError {
+pub enum HpFixedConversionError {
     PrecisionLevelNotSupported,
     Overflow,
     Underflow,
@@ -15,7 +15,7 @@ pub enum HpFloatConversionError {
     FloatParseError,
 }
 
-fn format_hp_float<T, const P: usize>(value: &T, f: &mut fmt::Formatter<'_>) -> fmt::Result
+fn format_hp_fixed<T, const P: usize>(value: &T, f: &mut fmt::Formatter<'_>) -> fmt::Result
 where
     T: fmt::Display + fmt::Debug + Zero + PartialEq,
 {
@@ -37,7 +37,7 @@ where
             }
         }
         formatted = formatted.chars().rev().collect();
-        write!(f, "HpUfloat<{P}>({formatted})")
+        write!(f, "HpUfixed<{P}>({formatted})")
     }
 }
 

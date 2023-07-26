@@ -11,24 +11,24 @@ use num_bigint::{
 use num_traits::{FromPrimitive, Signed, ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
 
-use crate::{format_hp_float, get_float_parts, HpFloatConversionError};
+use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
 
 #[derive(Clone, Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Default)]
 
-/// A high-precision floating-point number backed by a `BigInt`.
+/// A high-precision fixed-point number backed by a `BigInt`.
 ///
-/// `HpFloat` is parameterized over the precision `P`, which determines
+/// `HpFixed` is parameterized over the precision `P`, which determines
 /// the number of digits maintained after the decimal point.
 ///
 /// # Examples
 ///
 /// ```
-/// use hp_float::signed::HpFloat;
+/// use hp_fixed::signed::HpFixed;
 ///
-/// let x = HpFloat::<5>::from(10.12345);
-/// let y = HpFloat::<5>::from(20.12345);
+/// let x = HpFixed::<5>::from(10.12345);
+/// let y = HpFixed::<5>::from(20.12345);
 ///
-/// assert_eq!(x + y, HpFloat::<5>::from(30.24690));
+/// assert_eq!(x + y, HpFixed::<5>::from(30.24690));
 /// ```
 ///
 /// # Notes
@@ -40,25 +40,25 @@ use crate::{format_hp_float, get_float_parts, HpFloatConversionError};
 ///
 /// # Type Parameters
 ///
-/// * `P`: The number of digits to maintain after the decimal point in this `HpFloat`. Must be a
+/// * `P`: The number of digits to maintain after the decimal point in this `HpFixed`. Must be a
 ///   constant that is known at compile time.
 ///
 /// # Attributes
 ///
-/// * `BigInt`: The underlying large signed integer value that the `HpFloat` wraps around.
-pub struct HpFloat<const P: usize>(BigInt);
+/// * `BigInt`: The underlying large signed integer value that the `HpFixed` wraps around.
+pub struct HpFixed<const P: usize>(BigInt);
 
-impl<const P: usize> HpFloat<P> {
+impl<const P: usize> HpFixed<P> {
     pub fn new(value: BigInt) -> Self {
         let ten: BigInt = BigUint::from(10u32).into();
-        HpFloat::<P>(value * ten.pow(P.try_into().unwrap()))
+        HpFixed::<P>(value * ten.pow(P.try_into().unwrap()))
     }
 
-    pub fn zero() -> HpFloat<P> {
-        HpFloat::new(BigInt::zero())
+    pub fn zero() -> HpFixed<P> {
+        HpFixed::new(BigInt::zero())
     }
 
-    pub fn convert_precision<const Q: usize>(&self) -> HpFloat<Q> {
+    pub fn convert_precision<const Q: usize>(&self) -> HpFixed<Q> {
         let current_value: &BigInt = &self.0;
         let precision_diff: i32 = P as i32 - Q as i32;
         let ten: BigInt = BigUint::from(10u32).into();
@@ -69,7 +69,7 @@ impl<const P: usize> HpFloat<P> {
             current_value * ten.pow((-precision_diff) as u32)
         };
 
-        HpFloat::<Q>(scaled_value)
+        HpFixed::<Q>(scaled_value)
     }
 
     pub fn min<'a>(&'a self, rhs: &'a Self) -> &'a Self {
@@ -80,215 +80,215 @@ impl<const P: usize> HpFloat<P> {
         if self.0 >= rhs.0 { self } else { rhs }
     }
 
-    pub fn try_abs(&self) -> Option<HpFloat<P>> {
+    pub fn try_abs(&self) -> Option<HpFixed<P>> {
         let big_int = BigInt::try_from(self.clone()).ok()?;
         Some(Self::from(big_int.abs()))
     }
 }
 
-impl<const P: usize> fmt::Display for HpFloat<P> {
+impl<const P: usize> fmt::Display for HpFixed<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        format_hp_float::<BigInt, P>(&self.0, f)
+        format_hp_fixed::<BigInt, P>(&self.0, f)
     }
 }
 
-impl<const P: usize> Add<HpFloat<P>> for HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Add<HpFixed<P>> for HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn add(self, rhs: HpFloat<P>) -> Self::Output {
-        HpFloat::<P>(&self.0 + &rhs.0)
+    fn add(self, rhs: HpFixed<P>) -> Self::Output {
+        HpFixed::<P>(&self.0 + &rhs.0)
     }
 }
 
-impl<const P: usize> Add<HpFloat<P>> for &HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Add<HpFixed<P>> for &HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn add(self, rhs: HpFloat<P>) -> Self::Output {
-        HpFloat::<P>(&self.0 + &rhs.0)
+    fn add(self, rhs: HpFixed<P>) -> Self::Output {
+        HpFixed::<P>(&self.0 + &rhs.0)
     }
 }
 
-impl<const P: usize> Add<&HpFloat<P>> for HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Add<&HpFixed<P>> for HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn add(self, rhs: &HpFloat<P>) -> Self::Output {
-        HpFloat::<P>(&self.0 + &rhs.0)
+    fn add(self, rhs: &HpFixed<P>) -> Self::Output {
+        HpFixed::<P>(&self.0 + &rhs.0)
     }
 }
 
-impl<const P: usize> Add<&HpFloat<P>> for &HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Add<&HpFixed<P>> for &HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn add(self, rhs: &HpFloat<P>) -> Self::Output {
-        HpFloat::<P>(&self.0 + &rhs.0)
+    fn add(self, rhs: &HpFixed<P>) -> Self::Output {
+        HpFixed::<P>(&self.0 + &rhs.0)
     }
 }
 
-impl<const P: usize> Sub<HpFloat<P>> for HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Sub<HpFixed<P>> for HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn sub(self, rhs: HpFloat<P>) -> Self::Output {
-        HpFloat::<P>(&self.0 - &rhs.0)
+    fn sub(self, rhs: HpFixed<P>) -> Self::Output {
+        HpFixed::<P>(&self.0 - &rhs.0)
     }
 }
 
-impl<const P: usize> Sub<HpFloat<P>> for &HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Sub<HpFixed<P>> for &HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn sub(self, rhs: HpFloat<P>) -> Self::Output {
-        HpFloat::<P>(&self.0 - &rhs.0)
+    fn sub(self, rhs: HpFixed<P>) -> Self::Output {
+        HpFixed::<P>(&self.0 - &rhs.0)
     }
 }
 
-impl<const P: usize> Sub<&HpFloat<P>> for HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Sub<&HpFixed<P>> for HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn sub(self, rhs: &HpFloat<P>) -> Self::Output {
-        HpFloat::<P>(&self.0 - &rhs.0)
+    fn sub(self, rhs: &HpFixed<P>) -> Self::Output {
+        HpFixed::<P>(&self.0 - &rhs.0)
     }
 }
 
-impl<const P: usize> Sub<&HpFloat<P>> for &HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Sub<&HpFixed<P>> for &HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn sub(self, rhs: &HpFloat<P>) -> Self::Output {
-        HpFloat::<P>(&self.0 - &rhs.0)
+    fn sub(self, rhs: &HpFixed<P>) -> Self::Output {
+        HpFixed::<P>(&self.0 - &rhs.0)
     }
 }
 
-impl<const P: usize> Mul<HpFloat<P>> for HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Mul<HpFixed<P>> for HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn mul(self, rhs: HpFloat<P>) -> Self::Output {
+    fn mul(self, rhs: HpFixed<P>) -> Self::Output {
         let product = &self.0 * &rhs.0;
         let scale_factor: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
-        HpFloat::<P>(product / scale_factor)
+        HpFixed::<P>(product / scale_factor)
     }
 }
-impl<const P: usize> Mul<HpFloat<P>> for &HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Mul<HpFixed<P>> for &HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn mul(self, rhs: HpFloat<P>) -> Self::Output {
+    fn mul(self, rhs: HpFixed<P>) -> Self::Output {
         let product = &self.0 * &rhs.0;
         let scale_factor: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
-        HpFloat::<P>(product / scale_factor)
+        HpFixed::<P>(product / scale_factor)
     }
 }
-impl<const P: usize> Mul<&HpFloat<P>> for HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Mul<&HpFixed<P>> for HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn mul(self, rhs: &HpFloat<P>) -> Self::Output {
+    fn mul(self, rhs: &HpFixed<P>) -> Self::Output {
         let product = &self.0 * &rhs.0;
         let scale_factor: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
-        HpFloat::<P>(product / scale_factor)
+        HpFixed::<P>(product / scale_factor)
     }
 }
-impl<const P: usize> Mul<&HpFloat<P>> for &HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Mul<&HpFixed<P>> for &HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn mul(self, rhs: &HpFloat<P>) -> Self::Output {
+    fn mul(self, rhs: &HpFixed<P>) -> Self::Output {
         let product = &self.0 * &rhs.0;
         let scale_factor: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
-        HpFloat::<P>(product / scale_factor)
+        HpFixed::<P>(product / scale_factor)
     }
 }
 
-impl<const P: usize> Div<HpFloat<P>> for HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Div<HpFixed<P>> for HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn div(self, rhs: HpFloat<P>) -> Self::Output {
+    fn div(self, rhs: HpFixed<P>) -> Self::Output {
         let scale_factor: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
         let dividend = &self.0 * scale_factor;
-        HpFloat::<P>(dividend / &rhs.0)
+        HpFixed::<P>(dividend / &rhs.0)
     }
 }
-impl<const P: usize> Div<HpFloat<P>> for &HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Div<HpFixed<P>> for &HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn div(self, rhs: HpFloat<P>) -> Self::Output {
+    fn div(self, rhs: HpFixed<P>) -> Self::Output {
         let scale_factor: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
         let dividend = &self.0 * scale_factor;
-        HpFloat::<P>(dividend / &rhs.0)
+        HpFixed::<P>(dividend / &rhs.0)
     }
 }
-impl<const P: usize> Div<&HpFloat<P>> for HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Div<&HpFixed<P>> for HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn div(self, rhs: &HpFloat<P>) -> Self::Output {
+    fn div(self, rhs: &HpFixed<P>) -> Self::Output {
         let scale_factor: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
         let dividend = &self.0 * scale_factor;
-        HpFloat::<P>(dividend / &rhs.0)
+        HpFixed::<P>(dividend / &rhs.0)
     }
 }
-impl<const P: usize> Div<&HpFloat<P>> for &HpFloat<P> {
-    type Output = HpFloat<P>;
+impl<const P: usize> Div<&HpFixed<P>> for &HpFixed<P> {
+    type Output = HpFixed<P>;
 
-    fn div(self, rhs: &HpFloat<P>) -> Self::Output {
+    fn div(self, rhs: &HpFixed<P>) -> Self::Output {
         let scale_factor: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
         let dividend = &self.0 * scale_factor;
-        HpFloat::<P>(dividend / &rhs.0)
+        HpFixed::<P>(dividend / &rhs.0)
     }
 }
 
-impl<const P: usize> AddAssign for HpFloat<P> {
+impl<const P: usize> AddAssign for HpFixed<P> {
     fn add_assign(&mut self, rhs: Self) {
         self.0 += rhs.0;
     }
 }
 
-impl<const P: usize> SubAssign for HpFloat<P> {
+impl<const P: usize> SubAssign for HpFixed<P> {
     fn sub_assign(&mut self, rhs: Self) {
         self.0 -= rhs.0;
     }
 }
 
-impl<const P: usize> From<BigInt> for HpFloat<P> {
+impl<const P: usize> From<BigInt> for HpFixed<P> {
     fn from(value: BigInt) -> Self {
         let scale: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
-        HpFloat(value * scale)
+        HpFixed(value * scale)
     }
 }
 
-impl<const P: usize> From<i16> for HpFloat<P> {
+impl<const P: usize> From<i16> for HpFixed<P> {
     fn from(value: i16) -> Self {
         let scale: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
         let value_to_big: BigInt = BigInt::from_i16(value).unwrap();
-        HpFloat(value_to_big * scale)
+        HpFixed(value_to_big * scale)
     }
 }
-impl<const P: usize> From<i32> for HpFloat<P> {
+impl<const P: usize> From<i32> for HpFixed<P> {
     fn from(value: i32) -> Self {
         let scale: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
         let value_to_big: BigInt = BigInt::from_i32(value).unwrap();
-        HpFloat(value_to_big * scale)
+        HpFixed(value_to_big * scale)
     }
 }
 
-impl<const P: usize> From<i64> for HpFloat<P> {
+impl<const P: usize> From<i64> for HpFixed<P> {
     fn from(value: i64) -> Self {
         let scale: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
         let value_to_big: BigInt = BigInt::from_i64(value).unwrap();
-        HpFloat(value_to_big * scale)
+        HpFixed(value_to_big * scale)
     }
 }
 
-impl<const P: usize> From<i128> for HpFloat<P> {
+impl<const P: usize> From<i128> for HpFixed<P> {
     fn from(value: i128) -> Self {
         let scale: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
         let value_to_big: BigInt = BigInt::from_i128(value).unwrap();
-        HpFloat(value_to_big * scale)
+        HpFixed(value_to_big * scale)
     }
 }
 
-impl<const P: usize> From<isize> for HpFloat<P> {
+impl<const P: usize> From<isize> for HpFixed<P> {
     fn from(value: isize) -> Self {
         let scale: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
         let value_to_big: BigInt = BigInt::from_isize(value).unwrap();
-        HpFloat(value_to_big * scale)
+        HpFixed(value_to_big * scale)
     }
 }
 
-impl<const P: usize> From<f64> for HpFloat<P> {
+impl<const P: usize> From<f64> for HpFixed<P> {
     fn from(value: f64) -> Self {
         let scale = BigUint::from(10u32).pow(P.try_into().unwrap());
         let mut s = format!("{value}");
@@ -304,131 +304,131 @@ impl<const P: usize> From<f64> for HpFloat<P> {
 
         let (integer_part, fraction_part) = get_float_parts::<P>(&s);
         let result = (integer_part * scale) + fraction_part;
-        HpFloat(BigInt::from_biguint(sign, result))
+        HpFixed(BigInt::from_biguint(sign, result))
     }
 }
 
-impl<const P: usize> TryFrom<HpFloat<P>> for i32 {
-    type Error = HpFloatConversionError;
+impl<const P: usize> TryFrom<HpFixed<P>> for i32 {
+    type Error = HpFixedConversionError;
 
-    fn try_from(value: HpFloat<P>) -> Result<Self, Self::Error> {
+    fn try_from(value: HpFixed<P>) -> Result<Self, Self::Error> {
         let divisor = BigInt::from(10u32).pow(
             P.try_into()
-                .map_err(|_| HpFloatConversionError::PrecisionLevelNotSupported)?,
+                .map_err(|_| HpFixedConversionError::PrecisionLevelNotSupported)?,
         );
         let interim = value
             .0
             .checked_div(&divisor)
-            .ok_or(HpFloatConversionError::DivisionError)?;
+            .ok_or(HpFixedConversionError::DivisionError)?;
         if interim > i32::MAX.into() {
-            return Err(HpFloatConversionError::Overflow);
+            return Err(HpFixedConversionError::Overflow);
         } else if interim < i32::MIN.into() {
-            return Err(HpFloatConversionError::Underflow);
+            return Err(HpFixedConversionError::Underflow);
         }
         Ok(interim.to_i32().unwrap())
     }
 }
 
-impl<const P: usize> TryFrom<HpFloat<P>> for i64 {
-    type Error = HpFloatConversionError;
+impl<const P: usize> TryFrom<HpFixed<P>> for i64 {
+    type Error = HpFixedConversionError;
 
-    fn try_from(value: HpFloat<P>) -> Result<Self, Self::Error> {
+    fn try_from(value: HpFixed<P>) -> Result<Self, Self::Error> {
         let divisor = BigInt::from(10u32).pow(
             P.try_into()
-                .map_err(|_| HpFloatConversionError::PrecisionLevelNotSupported)?,
+                .map_err(|_| HpFixedConversionError::PrecisionLevelNotSupported)?,
         );
         let interim = value
             .0
             .checked_div(&divisor)
-            .ok_or(HpFloatConversionError::DivisionError)?;
+            .ok_or(HpFixedConversionError::DivisionError)?;
         if interim > i64::MAX.into() {
-            return Err(HpFloatConversionError::Overflow);
+            return Err(HpFixedConversionError::Overflow);
         } else if interim < i64::MIN.into() {
-            return Err(HpFloatConversionError::Underflow);
+            return Err(HpFixedConversionError::Underflow);
         }
         Ok(interim.to_i64().unwrap())
     }
 }
 
-impl<const P: usize> TryFrom<HpFloat<P>> for i128 {
-    type Error = HpFloatConversionError;
+impl<const P: usize> TryFrom<HpFixed<P>> for i128 {
+    type Error = HpFixedConversionError;
 
-    fn try_from(value: HpFloat<P>) -> Result<Self, Self::Error> {
+    fn try_from(value: HpFixed<P>) -> Result<Self, Self::Error> {
         let divisor = BigInt::from(10u32).pow(
             P.try_into()
-                .map_err(|_| HpFloatConversionError::PrecisionLevelNotSupported)?,
+                .map_err(|_| HpFixedConversionError::PrecisionLevelNotSupported)?,
         );
         let interim = value
             .0
             .checked_div(&divisor)
-            .ok_or(HpFloatConversionError::DivisionError)?;
+            .ok_or(HpFixedConversionError::DivisionError)?;
         if interim > i128::MAX.into() {
-            return Err(HpFloatConversionError::Overflow);
+            return Err(HpFixedConversionError::Overflow);
         } else if interim < i128::MIN.into() {
-            return Err(HpFloatConversionError::Underflow);
+            return Err(HpFixedConversionError::Underflow);
         }
         Ok(interim.to_i128().unwrap())
     }
 }
 
-impl<const P: usize> TryFrom<HpFloat<P>> for isize {
-    type Error = HpFloatConversionError;
+impl<const P: usize> TryFrom<HpFixed<P>> for isize {
+    type Error = HpFixedConversionError;
 
-    fn try_from(value: HpFloat<P>) -> Result<Self, Self::Error> {
+    fn try_from(value: HpFixed<P>) -> Result<Self, Self::Error> {
         let divisor = BigInt::from(10u32).pow(
             P.try_into()
-                .map_err(|_| HpFloatConversionError::PrecisionLevelNotSupported)?,
+                .map_err(|_| HpFixedConversionError::PrecisionLevelNotSupported)?,
         );
         let interim = value
             .0
             .checked_div(&divisor)
-            .ok_or(HpFloatConversionError::DivisionError)?;
+            .ok_or(HpFixedConversionError::DivisionError)?;
 
         if interim > isize::MAX.into() {
-            return Err(HpFloatConversionError::Overflow);
+            return Err(HpFixedConversionError::Overflow);
         } else if interim < isize::MIN.into() {
-            return Err(HpFloatConversionError::Underflow);
+            return Err(HpFixedConversionError::Underflow);
         }
         Ok(interim.to_isize().unwrap())
     }
 }
 
-impl<const P: usize> TryFrom<HpFloat<P>> for BigInt {
-    type Error = HpFloatConversionError;
+impl<const P: usize> TryFrom<HpFixed<P>> for BigInt {
+    type Error = HpFixedConversionError;
 
-    fn try_from(value: HpFloat<P>) -> Result<Self, Self::Error> {
+    fn try_from(value: HpFixed<P>) -> Result<Self, Self::Error> {
         let divisor = BigInt::from(10u32).pow(
             P.try_into()
-                .map_err(|_| HpFloatConversionError::PrecisionLevelNotSupported)?,
+                .map_err(|_| HpFixedConversionError::PrecisionLevelNotSupported)?,
         );
         value
             .0
             .checked_div(&divisor)
-            .ok_or(HpFloatConversionError::DivisionError)
+            .ok_or(HpFixedConversionError::DivisionError)
     }
 }
 
-impl<const P: usize> TryFrom<HpFloat<P>> for f64 {
-    type Error = HpFloatConversionError;
+impl<const P: usize> TryFrom<HpFixed<P>> for f64 {
+    type Error = HpFixedConversionError;
 
-    fn try_from(value: HpFloat<P>) -> Result<Self, Self::Error> {
+    fn try_from(value: HpFixed<P>) -> Result<Self, Self::Error> {
         let divisor = BigInt::from(10u32).pow(
             P.try_into()
-                .map_err(|_| HpFloatConversionError::PrecisionLevelNotSupported)?,
+                .map_err(|_| HpFixedConversionError::PrecisionLevelNotSupported)?,
         );
         let fraction_part = value.0.abs() % divisor.clone();
         let integer_part = value
             .0
             .checked_div(&divisor)
-            .ok_or(HpFloatConversionError::DivisionError)?;
+            .ok_or(HpFixedConversionError::DivisionError)?;
         let s = format!("{integer_part}.{fraction_part}");
 
-        // WARNING: Truncation occurs when converting from HpFloat to f64 if the string
+        // WARNING: Truncation occurs when converting from HpFixed to f64 if the string
         // representation is longer than 18 digits. This is expected behavior due to the
         // limited precision of f64. Exercise caution and consider the potential loss of
         // precision for longer decimal values.
         s.parse::<f64>()
-            .map_err(|_| HpFloatConversionError::FloatParseError)
+            .map_err(|_| HpFixedConversionError::FloatParseError)
     }
 }
 
@@ -438,22 +438,22 @@ mod tests {
 
     #[test]
     fn test_try_into() {
-        let large = HpFloat::<20>::new(BigInt::from(std::i64::MIN as i128 - 1));
-        let medium = HpFloat::<19>::new(BigInt::from(std::i32::MAX as i64 + 1));
-        let small = HpFloat::<18>::new(BigInt::from(std::i16::MAX as i32 + 1));
+        let large = HpFixed::<20>::new(BigInt::from(std::i64::MIN as i128 - 1));
+        let medium = HpFixed::<19>::new(BigInt::from(std::i32::MAX as i64 + 1));
+        let small = HpFixed::<18>::new(BigInt::from(std::i16::MAX as i32 + 1));
 
         assert_eq!(std::i64::MIN as i128 - 1, large.clone().try_into().unwrap());
         assert!(matches!(
             TryInto::<isize>::try_into(large.clone()),
-            Err(HpFloatConversionError::Underflow)
+            Err(HpFixedConversionError::Underflow)
         ));
         assert!(matches!(
             TryInto::<i64>::try_into(large.clone()),
-            Err(HpFloatConversionError::Underflow)
+            Err(HpFixedConversionError::Underflow)
         ));
         assert!(matches!(
             TryInto::<i32>::try_into(large.clone()),
-            Err(HpFloatConversionError::Underflow)
+            Err(HpFixedConversionError::Underflow)
         ));
 
         assert_eq!(
@@ -470,7 +470,7 @@ mod tests {
         );
         assert!(matches!(
             TryInto::<i32>::try_into(medium),
-            Err(HpFloatConversionError::Overflow)
+            Err(HpFixedConversionError::Overflow)
         ));
 
         assert_eq!(
@@ -479,7 +479,7 @@ mod tests {
         );
         assert_eq!(
             TryInto::<isize>::try_into(small.clone()).unwrap(),
-            std::i16::MAX as isize + 1
+            std::i16::MAX as isize + 1_isize
         );
         assert_eq!(
             TryInto::<i64>::try_into(small.clone()).unwrap(),
@@ -496,16 +496,16 @@ mod tests {
         assert_eq!(163.84, small_float);
 
         let large_by_2 = &large / &200_000_000i64.try_into().unwrap();
-        // large_by_2 is HpFloat<20>(-4_611_686_018_427_387_904_500_000_000_000)
+        // large_by_2 is HpFixed<20>(-4_611_686_018_427_387_904_500_000_000_000)
         // warn: truncation happens
         let large_float: f64 = large_by_2.try_into().unwrap();
         assert_eq!(-46116860184.27388, large_float)
     }
 
     #[test]
-    fn test_hp_float_add() {
-        let decimal1: HpFloat<18> = 1_000_000_000_000_000_000_i64.into();
-        let decimal2: HpFloat<18> = 2_000_000_000_000_000_000_i64.into();
+    fn test_hp_fixed_add() {
+        let decimal1: HpFixed<18> = 1_000_000_000_000_000_000_i64.into();
+        let decimal2: HpFixed<18> = 2_000_000_000_000_000_000_i64.into();
         let res: BigInt =
             BigUint::from(3_000_000_000_000_000_000_000_000_000_000_000_000_u128).into();
 
@@ -520,9 +520,9 @@ mod tests {
     }
 
     #[test]
-    fn test_hp_float_sub() {
-        let decimal1: HpFloat<18> = (-9_000_000_000_000_000_000i64).into();
-        let decimal2: HpFloat<18> = (6_000_000_000_000_000_000_i64).into();
+    fn test_hp_fixed_sub() {
+        let decimal1: HpFixed<18> = (-9_000_000_000_000_000_000i64).into();
+        let decimal2: HpFixed<18> = (6_000_000_000_000_000_000_i64).into();
         let res: BigInt = BigInt::from(-15_000_000_000_000_000_000_000_000_000_000_000_000i128);
 
         let both_ref = &decimal1 - &decimal2;
@@ -536,9 +536,9 @@ mod tests {
     }
 
     #[test]
-    fn test_hp_float_mul() {
-        let decimal1: HpFloat<18> = 5_000_000.into();
-        let decimal2: HpFloat<18> = 2_000_000.into();
+    fn test_hp_fixed_mul() {
+        let decimal1: HpFixed<18> = 5_000_000.into();
+        let decimal2: HpFixed<18> = 2_000_000.into();
         let res = BigUint::from(10_000_000_000_000_000_000_000_000_000_000u128).into();
 
         let both_ref = &decimal1 * &decimal2;
@@ -552,9 +552,9 @@ mod tests {
     }
 
     #[test]
-    fn test_hp_float_div() {
-        let decimal1: HpFloat<18> = 1.into();
-        let decimal2: HpFloat<18> = 50.into();
+    fn test_hp_fixed_div() {
+        let decimal1: HpFixed<18> = 1.into();
+        let decimal2: HpFixed<18> = 50.into();
         let res = BigUint::from(20_000_000_000_000_000u128).into();
 
         let both_ref = &decimal1 / &decimal2;
@@ -568,23 +568,23 @@ mod tests {
     }
 
     #[test]
-    fn test_hp_float_from_f64() {
+    fn test_hp_fixed_from_f64() {
         let decimal: f64 = -1234.567891234567;
-        let result = HpFloat::<18>::from(decimal);
+        let result = HpFixed::<18>::from(decimal);
         assert_eq!(result.0, BigInt::from(-1_234_567_891_234_567_000_000i128));
     }
     #[test]
-    fn test_hp_float_from_f64_truncation() {
+    fn test_hp_fixed_from_f64_truncation() {
         #[allow(clippy::excessive_precision)]
         let decimal: f64 = 1234.5678912345678909;
-        let result = HpFloat::<18>::from(decimal);
+        let result = HpFixed::<18>::from(decimal);
         assert_eq!(result.0, BigInt::from(1_234_567_891_234_568_000_000u128));
     }
 
     #[test]
     fn test_convert_precsion_up() {
         let decimal: f64 = -1234.123456;
-        let decimal1 = HpFloat::<6>::from(decimal);
+        let decimal1 = HpFixed::<6>::from(decimal);
         let result = decimal1.convert_precision::<18>();
         assert_eq!(result.0, BigInt::from(-1_234_123_456_000_000_000_000_i128));
     }
@@ -592,15 +592,15 @@ mod tests {
     #[test]
     fn test_convert_precsion_down() {
         let decimal: f64 = -1234.123456;
-        let decimal1 = HpFloat::<6>::from(decimal);
+        let decimal1 = HpFixed::<6>::from(decimal);
         let result = decimal1.convert_precision::<2>();
         assert_eq!(result.0, BigInt::from(-123_412_i128));
     }
 
     #[test]
     fn test_try_abs() {
-        let num = HpFloat::<18>::from(-10);
-        let target = HpFloat::<18>::from(10);
+        let num = HpFixed::<18>::from(-10);
+        let target = HpFixed::<18>::from(10);
         assert_eq!(num.try_abs().unwrap(), target);
     }
 }

@@ -20,7 +20,7 @@ use fleek_crypto::{
     AccountOwnerSecretKey, EthAddress, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey,
     PublicKey, SecretKey,
 };
-use hp_float::unsigned::HpUfloat;
+use hp_fixed::unsigned::HpUfixed;
 use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -187,9 +187,9 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
         let value: Value = response.json().await?;
         if value.get("result").is_some() {
             // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<HpUfloat<18>> = serde_json::from_value(value)?;
+            let success_response: RpcSuccessResponse<HpUfixed<18>> = serde_json::from_value(value)?;
             assert_eq!(
-                HpUfloat::<18>::new(1_000_u32.into()),
+                HpUfixed::<18>::new(1_000_u32.into()),
                 success_response.result
             );
         } else {
@@ -334,9 +334,9 @@ async fn test_rpc_get_staked() -> Result<()> {
         let value: Value = response.json().await?;
         if value.get("result").is_some() {
             // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<HpUfloat<18>> = serde_json::from_value(value)?;
+            let success_response: RpcSuccessResponse<HpUfixed<18>> = serde_json::from_value(value)?;
             assert_eq!(
-                HpUfloat::<18>::new(1_000_u32.into()),
+                HpUfixed::<18>::new(1_000_u32.into()),
                 success_response.result
             );
         } else {
@@ -401,8 +401,8 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
         let value: Value = response.json().await?;
         if value.get("result").is_some() {
             // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<HpUfloat<6>> = serde_json::from_value(value)?;
-            assert_eq!(HpUfloat::<6>::new(2_00_u32.into()), success_response.result);
+            let success_response: RpcSuccessResponse<HpUfixed<6>> = serde_json::from_value(value)?;
+            assert_eq!(HpUfixed::<6>::new(2_00_u32.into()), success_response.result);
         } else {
             panic!("Rpc Error: {value}")
         }
@@ -659,8 +659,8 @@ async fn test_rpc_get_locked() -> Result<()> {
         let value: Value = response.json().await?;
         if value.get("result").is_some() {
             // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<HpUfloat<18>> = serde_json::from_value(value)?;
-            assert_eq!(HpUfloat::<18>::new(500_u32.into()), success_response.result);
+            let success_response: RpcSuccessResponse<HpUfixed<18>> = serde_json::from_value(value)?;
+            assert_eq!(HpUfixed::<18>::new(500_u32.into()), success_response.result);
         } else {
             panic!("Rpc Error: {value}")
         }
@@ -1043,7 +1043,7 @@ async fn test_rpc_get_total_supply() -> Result<()> {
         let value: Value = response.json().await?;
         if value.get("result").is_some() {
             // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<HpUfloat<18>> = serde_json::from_value(value)?;
+            let success_response: RpcSuccessResponse<HpUfixed<18>> = serde_json::from_value(value)?;
             assert_eq!(query_runner.get_total_supply(), success_response.result);
         } else {
             panic!("Rpc Error: {value}")
@@ -1089,7 +1089,7 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
         let value: Value = response.json().await?;
         if value.get("result").is_some() {
             // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<HpUfloat<18>> = serde_json::from_value(value)?;
+            let success_response: RpcSuccessResponse<HpUfixed<18>> = serde_json::from_value(value)?;
             assert_eq!(
                 query_runner.get_year_start_supply(),
                 success_response.result

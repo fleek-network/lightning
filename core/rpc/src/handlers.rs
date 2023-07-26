@@ -6,7 +6,7 @@ use draco_interfaces::{
     SyncQueryRunnerInterface,
 };
 use fleek_crypto::{EthAddress, NodePublicKey};
-use hp_float::unsigned::HpUfloat;
+use hp_fixed::unsigned::HpUfixed;
 use jsonrpc_v2::{Data, Error, MapRouter, Params, RequestObject, ResponseObjects, Server};
 
 use crate::{
@@ -84,7 +84,7 @@ pub async fn ping_handler<Q: SyncQueryRunnerInterface>() -> Result<String> {
 pub async fn get_flk_balance_handler<Q: SyncQueryRunnerInterface>(
     data: Data<Arc<RpcData<Q>>>,
     Params(params): Params<PublicKeyParam>,
-) -> Result<HpUfloat<18>> {
+) -> Result<HpUfixed<18>> {
     Ok(data.0.query_runner.get_flk_balance(&params.public_key))
 }
 
@@ -98,14 +98,14 @@ pub async fn get_bandwidth_balance_handler<Q: SyncQueryRunnerInterface>(
 pub async fn get_locked_handler<Q: SyncQueryRunnerInterface>(
     data: Data<Arc<RpcData<Q>>>,
     Params(params): Params<NodeKeyParam>,
-) -> Result<HpUfloat<18>> {
+) -> Result<HpUfixed<18>> {
     Ok(data.0.query_runner.get_locked(&params.public_key))
 }
 
 pub async fn get_staked_handler<Q: SyncQueryRunnerInterface>(
     data: Data<Arc<RpcData<Q>>>,
     Params(params): Params<NodeKeyParam>,
-) -> Result<HpUfloat<18>> {
+) -> Result<HpUfixed<18>> {
     Ok(data.0.query_runner.get_staked(&params.public_key))
 }
 
@@ -119,7 +119,7 @@ pub async fn get_reputation_handler<Q: SyncQueryRunnerInterface>(
 pub async fn get_stables_balance_handler<Q: SyncQueryRunnerInterface>(
     data: Data<Arc<RpcData<Q>>>,
     Params(params): Params<PublicKeyParam>,
-) -> Result<HpUfloat<6>> {
+) -> Result<HpUfixed<6>> {
     Ok(data.0.query_runner.get_stables_balance(&params.public_key))
 }
 
@@ -173,13 +173,13 @@ pub async fn get_epoch_info_handler<Q: SyncQueryRunnerInterface>(
 
 pub async fn get_total_supply_handler<Q: SyncQueryRunnerInterface>(
     data: Data<Arc<RpcData<Q>>>,
-) -> Result<HpUfloat<18>> {
+) -> Result<HpUfixed<18>> {
     Ok(data.0.query_runner.get_total_supply())
 }
 
 pub async fn get_year_start_supply_handler<Q: SyncQueryRunnerInterface>(
     data: Data<Arc<RpcData<Q>>>,
-) -> Result<HpUfloat<18>> {
+) -> Result<HpUfixed<18>> {
     Ok(data.0.query_runner.get_year_start_supply())
 }
 
