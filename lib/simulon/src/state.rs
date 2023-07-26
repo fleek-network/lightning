@@ -122,6 +122,7 @@ pub struct ResourceId(pub(crate) usize);
 pub enum Resource {
     PendingConnection {
         waker: DeferredFutureWaker<Result<ResourceId, ConnectError>>,
+        queue: VecDeque<Vec<u8>>,
     },
     EstablishedConnection {
         recv: Option<DeferredFutureWaker<Option<Vec<u8>>>>,
@@ -177,6 +178,7 @@ impl NodeState {
         let future = DeferredFuture::new();
         let resource = Resource::PendingConnection {
             waker: future.waker(),
+            queue: VecDeque::default(),
         };
 
         let message = Message {
@@ -343,10 +345,12 @@ impl NodeState {
             .get_mut(&our_rid)
             .expect("process_message: Resource not found.");
 
-        let (recv, queue) = if let Resource::EstablishedConnection { recv, queue } = resource {
-            (recv, queue)
-        } else {
-            panic!("Invalid resource type.");
+        let (recv, queue) = match resource {
+            Resource::EstablishedConnection { recv, queue } => (recv, queue),
+            Resource::PendingConnection { queue, .. } => {
+                queue.push_back(data);
+                return;
+            },
         };
 
         if let Some(waker) = recv.take() {
@@ -423,18 +427,18 @@ impl NodeState {
     ) {
         let resource = self.resources.remove(&our_rid).unwrap();
 
+        let queue = if let Resource::PendingConnection { waker, queue } = resource {
+            waker.wake(result);
+            queue
+        } else {
+            VecDeque::new()
+        };
+
         if result.is_ok() {
             self.resources.insert(
                 our_rid,
-                Resource::EstablishedConnection {
-                    recv: None,
-                    queue: VecDeque::new(),
-                },
+                Resource::EstablishedConnection { recv: None, queue },
             );
-        }
-
-        if let Resource::PendingConnection { waker } = resource {
-            waker.wake(result);
         }
     }
 

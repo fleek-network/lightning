@@ -1,6 +1,6 @@
 [package]
 name = "simulon"
-version = "0.0.7"
+version = "0.0.8"
 edition = "2021"
 authors = ["Parsa Ghadimi <parsa@fleek.xyz>"]
 description = "A simulation engine for distributed algorithms"

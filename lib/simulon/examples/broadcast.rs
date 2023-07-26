@@ -178,14 +178,15 @@ fn exec(n: usize) {
 pub fn main() {
     const N: usize = 1500;
 
-    let report = SimulationBuilder::new(|| exec(N))
+    let time = std::time::Instant::now();
+    SimulationBuilder::new(|| exec(N))
         .with_nodes(N + 1)
+        // .with_workers(1)
         // .set_latency_provider(simulon::latency::ConstLatencyProvider(
         //     Duration::from_millis(1),
         // ))
         .set_node_metrics_rate(Duration::ZERO)
         .enable_progress_bar()
         .run(Duration::from_secs(120));
-
-    println!("{:#?}", report.log);
+    println!("Took {} ms", time.elapsed().as_millis());
 }
