@@ -126,7 +126,7 @@ impl Handler {
         match message.payload {
             MessagePayload::Query(query) => match query {
                 Query::FindNode { key, .. } => {
-                    let nodes = self.find_node(&key).await?;
+                    let nodes = self.closest_nodes(&key).await?;
                     let query = Message {
                         id: message_id,
                         payload: MessagePayload::Response(Response::NodeInfo(nodes)),
@@ -154,7 +154,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn find_node(&self, target: &NodeNetworkingPublicKey) -> Result<Vec<NodeInfo>> {
+    async fn closest_nodes(&self, target: &NodeNetworkingPublicKey) -> Result<Vec<NodeInfo>> {
         let (tx, rx) = oneshot::channel();
         if self
             .table_tx
@@ -168,6 +168,10 @@ impl Handler {
             Ok(nodes) => nodes.map_err(Into::into),
             Err(e) => bail!("{e}"),
         }
+    }
+
+    async fn look_up(&self, target: ValueHash) -> Result<()> {
+        todo!()
     }
 
     async fn find_value(&self, _: ValueHash) -> Result<Vec<u8>> {
