@@ -5,7 +5,7 @@ use fleek_crypto::NodeNetworkingPublicKey;
 use tokio::{net::UdpSocket, select, sync::mpsc::Receiver};
 
 use crate::{
-    query::{Command, Message, NodeInfo, Query, Response},
+    query::{Command, Message, MessagePayload, NodeInfo, Query, Response},
     routing::Table,
 };
 
@@ -45,37 +45,41 @@ impl Handler {
 
     async fn handle_command(&self, command: Command) {
         match command {
-            Command::Get => {},
-            Command::Put => {},
+            Command::Get { .. } => todo!(),
+            Command::Put { .. } => todo!(),
         }
     }
 
     async fn handle_incoming_datagram(&self, datagram: Vec<u8>, address: SocketAddr) -> Result<()> {
         let message: Message = bincode::deserialize(datagram.as_slice())?;
-        match message {
-            Message::Query { id, payload, .. } => match payload {
-                Query::FindNode { key } => {
+        let message_id = message.id;
+        match message.payload {
+            MessagePayload::Query(query) => match query {
+                Query::FindNode { key, .. } => {
                     let nodes = self.handle_find_node(&key).await?;
-                    let query = Message::Response {
-                        id,
-                        payload: Response::NodeInfo(nodes),
+                    let query = Message {
+                        id: message_id,
+                        payload: MessagePayload::Response(Response::NodeInfo(nodes)),
                     };
                     let bytes = bincode::serialize(&query)?;
                     send_to(&self.socket, bytes.as_slice(), address).await?;
                 },
-                Query::Store { key, value } => {
-                    self.handle_store(key, value).await?;
+                Query::Find { .. } => {
+                    todo!()
+                },
+                Query::Store { .. } => {
+                    todo!()
                 },
                 Query::Ping => {
-                    let query = Message::Response {
-                        id,
-                        payload: Response::Pong,
+                    let query = Message {
+                        id: message_id,
+                        payload: MessagePayload::Response(Response::Pong),
                     };
                     let bytes = bincode::serialize(&query)?;
                     send_to(&self.socket, bytes.as_slice(), address).await?;
                 },
             },
-            Message::Response { .. } => {},
+            MessagePayload::Response(_) => {},
         }
         Ok(())
     }
@@ -83,13 +87,10 @@ impl Handler {
     async fn handle_find_node(&self, target: &NodeNetworkingPublicKey) -> Result<Vec<NodeInfo>> {
         Ok(self.table.closest_nodes(target))
     }
-
-    async fn handle_store(&self, _: Vec<u8>, _: Vec<u8>) -> Result<()> {
-        todo!()
-    }
 }
 
 async fn recv_from(socket: &UdpSocket) -> std::io::Result<(Vec<u8>, SocketAddr)> {
+    // Todo: Let's make sure that our messages can fit in one datagram.
     let mut buf = vec![0u8; 64 * 1024];
     let (size, address) = socket.recv_from(&mut buf).await?;
     buf.truncate(size);

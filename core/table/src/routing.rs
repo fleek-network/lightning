@@ -47,8 +47,7 @@ impl Table {
     pub fn closest_nodes(&self, target: &NodeNetworkingPublicKey) -> Vec<NodeInfo> {
         let index = leading_zero_bits(&self.local_node_key, target);
         // Todo: Filter good vs bad nodes based on some criteria.
-        // Todo: We only return nodes from this bucket but should we also return from other buckets?
-        // Maybe we could return all our nodes from closest to furthest.
+        // Todo: Return all our nodes from closest to furthest to target.
         self.buckets[index]
             .iter()
             .map(|node| node.info.clone())
