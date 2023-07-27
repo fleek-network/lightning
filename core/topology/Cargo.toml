@@ -1,0 +1,30 @@
+[package]
+name = "freek-topology"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ndarray = "0.15.6"
+ndarray-rand = "0.14.0"
+num-traits = "0.2.9"
+mcmf = "2.0.0"
+rand = "0.8.5"
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+csv = "1.2.2"
+serde_json = "1.0"
+plotters = "0.3.3"
+base64 = "0.21.2"
+simulon = { path = "../../lib/simulon" }
+fxhash = "0.2.1"
+rand_chacha = "0.3.1"
+
+[[bench]]
+name = "clustering"
+harness = false
+
+[[bench]]
+name = "hierarchy"
+harness = false

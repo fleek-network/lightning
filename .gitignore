@@ -1,1 +1,4 @@
 target
+*.html
+*.json
+**/data
