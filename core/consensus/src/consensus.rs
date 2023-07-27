@@ -10,7 +10,7 @@ use std::{
 
 use affair::{Executor, TokioSpawn};
 use async_trait::async_trait;
-use draco_interfaces::{
+use freek_interfaces::{
     application::ExecutionEngineSocket,
     common::WithStartAndShutdown,
     config::ConfigConsumer,

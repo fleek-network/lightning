@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use draco_interfaces::types::ReputationMeasurements;
+use freek_interfaces::types::ReputationMeasurements;
 use rand::{rngs::StdRng, Rng};
 
 pub fn generate_reputation_measurements(

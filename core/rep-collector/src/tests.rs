@@ -3,12 +3,12 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use draco_application::{
+use freek_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
     genesis::{Genesis, GenesisCommittee},
 };
-use draco_interfaces::{
+use freek_interfaces::{
     application::ApplicationInterface,
     common::WithStartAndShutdown,
     consensus::ConsensusInterface,
@@ -18,9 +18,9 @@ use draco_interfaces::{
     types::{Block, UpdateMethod, UpdatePayload, UpdateRequest},
     GossipInterface, ReputationQueryInteface, SyncQueryRunnerInterface, ToDigest, Topic, Weight,
 };
-use draco_notifier::Notifier;
-use draco_signer::{Config as SignerConfig, Signer};
-use draco_test_utils::{
+use freek_notifier::Notifier;
+use freek_signer::{Config as SignerConfig, Signer};
+use freek_test_utils::{
     consensus::{Config as ConsensusConfig, MockConsensus},
     empty_interfaces::MockGossip,
 };

@@ -2,7 +2,7 @@ use std::{marker::PhantomData, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use clap::{arg, ArgAction, Parser, Subcommand};
-use draco_interfaces::{ConfigProviderInterface, DracoTypes, Node, WithStartAndShutdown};
+use freek_interfaces::{ConfigProviderInterface, FreekTypes, Node, WithStartAndShutdown};
 
 use crate::{config::TomlConfigProvider, shutdown::ShutdownController};
 
@@ -10,7 +10,7 @@ use crate::{config::TomlConfigProvider, shutdown::ShutdownController};
 #[command(about, version)]
 pub struct CliArgs {
     /// Path to the toml configuration file
-    #[arg(short, long, default_value = "draco.toml")]
+    #[arg(short, long, default_value = "freek.toml")]
     pub config: PathBuf,
     /// Determines that we should be using the mock consensus backend.
     #[arg(long)]
@@ -40,15 +40,15 @@ pub enum Command {
 }
 
 /// Create a new command line application.
-pub struct Cli<T: DracoTypes>(CliArgs, PhantomData<T>);
+pub struct Cli<T: FreekTypes>(CliArgs, PhantomData<T>);
 
-impl<T: DracoTypes> Cli<T> {
+impl<T: FreekTypes> Cli<T> {
     pub fn new(args: CliArgs) -> Self {
         Self(args, PhantomData)
     }
 }
 
-impl<T: DracoTypes<ConfigProvider = TomlConfigProvider>> Cli<T>
+impl<T: FreekTypes<ConfigProvider = TomlConfigProvider>> Cli<T>
 where
     Node<T>: Send + Sync,
 {

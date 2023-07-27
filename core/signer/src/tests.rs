@@ -3,16 +3,16 @@ use std::{
     time::Duration,
 };
 
-use draco_application::{
+use freek_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
     genesis::{Genesis, GenesisCommittee},
 };
-use draco_interfaces::{
+use freek_interfaces::{
     application::ApplicationInterface, common::WithStartAndShutdown, consensus::ConsensusInterface,
     signer::SignerInterface, types::UpdateMethod, GossipInterface, SyncQueryRunnerInterface, Topic,
 };
-use draco_test_utils::{
+use freek_test_utils::{
     consensus::{Config as ConsensusConfig, MockConsensus},
     empty_interfaces::MockGossip,
 };

@@ -11,7 +11,7 @@ use std::{
 use affair::AsyncWorker;
 use anyhow::{bail, Result};
 use async_trait::async_trait;
-use draco_interfaces::{
+use freek_interfaces::{
     types::{Epoch, EpochInfo, NodeInfo, UpdateRequest},
     SyncQueryRunnerInterface,
 };

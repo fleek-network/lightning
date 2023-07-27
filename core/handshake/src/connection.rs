@@ -6,7 +6,7 @@ use arrayref::array_ref;
 use arrayvec::ArrayVec;
 use bytes::BytesMut;
 use consts::*;
-use draco_interfaces::{types::ServiceId, CompressionAlgoSet};
+use freek_interfaces::{types::ServiceId, CompressionAlgoSet};
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
 use futures::executor::block_on;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -16,7 +16,7 @@ use crate::types::{BlsSignature, Nonce};
 /// Constant values for the codec.
 pub mod consts {
     /// Network byte prefix in [`super::UrsaFrame::HandshakeRequest`]
-    pub const NETWORK: [u8; 5] = *b"DRACO";
+    pub const NETWORK: [u8; 5] = *b"FREEK";
     /// Maximum size for a frame
     pub const MAX_FRAME_SIZE: usize = 1024;
     /// Maximum number of lanes for a single client

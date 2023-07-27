@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Result};
 use blake3_tree::{blake3::tree::BlockHasher, IncrementalVerifier};
 use bytes::{BufMut, Bytes, BytesMut};
-use draco_handshake::client::HandshakeClient;
-use draco_interfaces::Blake3Hash;
+use freek_handshake::client::HandshakeClient;
+use freek_interfaces::Blake3Hash;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use tokio::io::{AsyncRead, AsyncWrite};
 

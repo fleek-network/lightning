@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use draco_interfaces::{types::ServiceId, CompressionAlgoSet};
+use freek_interfaces::{types::ServiceId, CompressionAlgoSet};
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use tokio::io::{AsyncRead, AsyncWrite};
 

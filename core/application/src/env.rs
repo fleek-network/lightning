@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime};
 
 use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
-use draco_interfaces::{
+use freek_interfaces::{
     types::{
         AccountInfo, Block, CommodityTypes, Epoch, ExecutionData, Metadata, NodeInfo, NodeServed,
         ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, ServiceRevenue,

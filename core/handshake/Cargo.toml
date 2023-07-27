@@ -1,5 +1,5 @@
 [package]
-name = "draco-handshake"
+name = "freek-handshake"
 version = "0.0.0"
 edition = "2021"
 
@@ -18,7 +18,7 @@ futures = "0.3"
 fleek-crypto = { path = "../../lib/fleek-crypto" }
 
 # Server
-draco-interfaces = { path = "../interfaces", optional = true }
+freek-interfaces = { path = "../interfaces", optional = true }
 dashmap = { version = "5.4", optional = true }
 
 [dev-dependencies]
@@ -27,7 +27,7 @@ affair.workspace = true
 
 [features]
 default = ["server", "client"]
-server = ["draco-interfaces", "dashmap"]
+server = ["freek-interfaces", "dashmap"]
 client = []
 
 [[bench]]

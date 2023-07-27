@@ -1,15 +1,15 @@
 [package]
-name = "draco-rep-collector"
+name = "freek-rep-collector"
 version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-draco-interfaces = {path="../interfaces"}
-draco-application = {path="../application"}
-draco-reputation = {path="../reputation"}
-draco-notifier = {path="../notifier"}
+freek-interfaces = {path="../interfaces"}
+freek-application = {path="../application"}
+freek-reputation = {path="../reputation"}
+freek-notifier = {path="../notifier"}
 anyhow.workspace = true
 serde.workspace = true
 async-trait.workspace = true
@@ -19,7 +19,7 @@ lru.workspace = true
 scc.workspace = true
 
 [dev-dependencies]
-draco-test-utils = {path="../test-utils"}
-draco-signer = {path="../signer"}
-draco-application = {path="../application", features = ["test"]}
+freek-test-utils = {path="../test-utils"}
+freek-signer = {path="../signer"}
+freek-application = {path="../application", features = ["test"]}
 rand.workspace = true

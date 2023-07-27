@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{Extension, Json};
-use draco_interfaces::{
+use freek_interfaces::{
     types::{EpochInfo, NodeInfo, NodeServed, ProtocolParams, TotalServed, UpdateRequest},
     SyncQueryRunnerInterface,
 };

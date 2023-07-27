@@ -7,7 +7,7 @@ The draft protocol specification can be found [here](SPEC.md).
 
 ## Standalone Example
 
-An example server is included that provides a mocked version of a draco node running the
+An example server is included that provides a mocked version of a freek node running the
 cdn service. It can be run with:
 
 ```bash

@@ -47,7 +47,7 @@ pub trait SecretKey: Sized {
     fn to_pk(&self) -> Self::PublicKey;
 }
 
-const BLS12_381_PEM_LABEL: &str = "DRACO BLS12_381 PRIVATE KEY";
+const BLS12_381_PEM_LABEL: &str = "FREEK BLS12_381 PRIVATE KEY";
 
 /// A node's BLS 12-381 public key
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]

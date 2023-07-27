@@ -1,12 +1,12 @@
 [package]
-name = "draco-blockstore"
+name = "freek-blockstore"
 version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-draco-interfaces = { path="../interfaces" }
+freek-interfaces = { path="../interfaces" }
 bincode.workspace = true
 blake3-tree = { path = "../../lib/blake3-tree"}
 anyhow.workspace = true

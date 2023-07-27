@@ -11,7 +11,7 @@ use crate::{
     rpc::RpcInterface, signer::SignerInterface, GossipInterface, TopologyInterface,
 };
 
-pub trait DracoTypes: Send + Sync {
+pub trait FreekTypes: Send + Sync {
     type ConfigProvider: ConfigProviderInterface;
     type Consensus: ConsensusInterface<
         QueryRunner = <Self::Application as ApplicationInterface>::SyncExecutor,
@@ -44,7 +44,7 @@ pub trait DracoTypes: Send + Sync {
     >;
 }
 
-pub struct Node<T: DracoTypes> {
+pub struct Node<T: FreekTypes> {
     pub configuration: Arc<T::ConfigProvider>,
     pub consensus: T::Consensus,
     pub application: T::Application,
@@ -62,7 +62,7 @@ pub struct Node<T: DracoTypes> {
     pub notifier: PhantomData<T::Notifier>,
 }
 
-impl<T: DracoTypes> Node<T> {
+impl<T: FreekTypes> Node<T> {
     pub async fn init(configuration: Arc<T::ConfigProvider>) -> anyhow::Result<Self> {
         let application = T::Application::init(configuration.get::<T::Application>()).await?;
 
@@ -178,7 +178,7 @@ impl<T: DracoTypes> Node<T> {
 }
 
 #[async_trait]
-impl<T: DracoTypes> WithStartAndShutdown for Node<T>
+impl<T: FreekTypes> WithStartAndShutdown for Node<T>
 where
     Self: Send,
     for<'a> &'a Self: Send,
@@ -216,21 +216,21 @@ pub mod transformers {
 
     #[rustfmt::skip]
     pub struct WithConsensus<
-        T: DracoTypes,
+        T: FreekTypes,
         Consensus: ConsensusInterface<
             QueryRunner = <T::Application as ApplicationInterface>::SyncExecutor
                 >,
             >(T, PhantomData<Consensus>);
 
     impl<
-        T: DracoTypes,
+        T: FreekTypes,
         Consensus: ConsensusInterface<
             QueryRunner = <T::Application as ApplicationInterface>::SyncExecutor,
             PubSub = <T::Gossip as GossipInterface>::PubSub<
                 <Consensus as ConsensusInterface>::Certificate,
             >,
         >,
-    > DracoTypes for WithConsensus<T, Consensus>
+    > FreekTypes for WithConsensus<T, Consensus>
     {
         type ConfigProvider = T::ConfigProvider;
         type Consensus = Consensus;

@@ -3,7 +3,7 @@ use std::{collections::HashMap, marker::PhantomData, sync::Arc, time::Duration};
 use affair::Socket;
 use anyhow::Result;
 use async_trait::async_trait;
-use draco_interfaces::{
+use freek_interfaces::{
     types::{
         Epoch, EpochInfo, NodeInfo, NodeServed, ProtocolParams, ReportedReputationMeasurements,
         Service, ServiceId, TotalServed, TransactionResponse, UpdateRequest,
@@ -399,7 +399,7 @@ impl SyncQueryRunnerInterface for MockQueryRunner {
     fn get_service_info(&self, _service_id: ServiceId) -> Service {
         Service {
             owner: EthAddress([0; 20]),
-            commodity_type: draco_interfaces::types::CommodityTypes::Bandwidth,
+            commodity_type: freek_interfaces::types::CommodityTypes::Bandwidth,
             slashing: (),
         }
     }

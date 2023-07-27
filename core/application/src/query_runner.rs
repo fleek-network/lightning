@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use atomo::{Atomo, QueryPerm, ResolvedTableReference};
-use draco_interfaces::{
+use freek_interfaces::{
     application::SyncQueryRunnerInterface,
     types::{
         AccountInfo, CommodityTypes, Epoch, EpochInfo, Metadata, NodeInfo, NodeServed,

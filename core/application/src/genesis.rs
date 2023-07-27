@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result};
-use draco_interfaces::types::{
+use freek_interfaces::types::{
     CommodityTypes, Epoch, NodeInfo, NodeServed, Staking, TotalServed, Worker,
 };
 use fleek_crypto::{AccountOwnerPublicKey, NodeNetworkingPublicKey, NodePublicKey, PublicKey};

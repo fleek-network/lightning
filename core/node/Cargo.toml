@@ -1,22 +1,22 @@
 [package]
-name = "draco-node"
+name = "freek-node"
 version = "0.1.0"
 edition = "2021"
-default-run = "draco-node"
+default-run = "freek-node"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-draco-application = { path = "../application" }
-draco-blockstore = { path = "../blockstore" }
-draco-handshake = { path = "../handshake" }
-draco-interfaces = { path = "../interfaces" }
-draco-rep-collector = { path = "../rep-collector" }
-draco-consensus = { path = "../consensus" }
-draco-notifier = { path = "../notifier" }
-draco-rpc = { path = "../rpc" }
-draco-signer = { path = "../signer" }
-draco-test-utils = { path = "../test-utils" }
+freek-application = { path = "../application" }
+freek-blockstore = { path = "../blockstore" }
+freek-handshake = { path = "../handshake" }
+freek-interfaces = { path = "../interfaces" }
+freek-rep-collector = { path = "../rep-collector" }
+freek-consensus = { path = "../consensus" }
+freek-notifier = { path = "../notifier" }
+freek-rpc = { path = "../rpc" }
+freek-signer = { path = "../signer" }
+freek-test-utils = { path = "../test-utils" }
 mock = { path = "../mock" }
 anyhow.workspace = true
 clap = { version = "4.2", features = ["derive"] }

@@ -1,7 +1,7 @@
 use affair::{Executor, TokioSpawn};
 use anyhow::Result;
 use async_trait::async_trait;
-use draco_interfaces::{
+use freek_interfaces::{
     application::{ApplicationInterface, ExecutionEngineSocket},
     common::WithStartAndShutdown,
     config::ConfigConsumer,

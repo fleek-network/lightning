@@ -1,8 +1,8 @@
 use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use draco_application::query_runner::QueryRunner;
-use draco_interfaces::{
+use freek_application::query_runner::QueryRunner;
+use freek_interfaces::{
     config::ConfigConsumer,
     notifier::{Notification, NotifierInterface},
     reputation::ReputationAggregatorInterface,
@@ -10,7 +10,7 @@ use draco_interfaces::{
     types::UpdateMethod,
     ReputationQueryInteface, ReputationReporterInterface, Weight,
 };
-use draco_notifier::Notifier;
+use freek_notifier::Notifier;
 use fleek_crypto::NodePublicKey;
 use tokio::sync::mpsc;
 

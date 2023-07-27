@@ -1,5 +1,5 @@
 [package]
-name = "draco-table"
+name = "freek-table"
 version = "0.0.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 anyhow.workspace = true
 bincode.workspace = true
-draco-interfaces = { path="../interfaces" }
+freek-interfaces = { path="../interfaces" }
 fleek-crypto.workspace = true
 serde.workspace = true
 thiserror.workspace = true

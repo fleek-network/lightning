@@ -12,8 +12,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            node_key_path: "~/.draco/keystore/node.pem".into(),
-            network_key_path: "~/.draco/keystore/network.pem".into(),
+            node_key_path: "~/.freek/keystore/node.pem".into(),
+            network_key_path: "~/.freek/keystore/network.pem".into(),
         }
     }
 }

@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use draco_interfaces::{
+use freek_interfaces::{
     types::{
         AccountInfo, CommodityTypes, Epoch, ExecutionData, ExecutionError, Metadata, NodeInfo,
         NodeServed, ProofOfConsensus, ProofOfMisbehavior, ProtocolParams,
@@ -14,7 +14,7 @@ use draco_interfaces::{
     },
     DeliveryAcknowledgment, ToDigest,
 };
-use draco_reputation::{statistics, types::WeightedReputationMeasurements};
+use freek_reputation::{statistics, types::WeightedReputationMeasurements};
 use fleek_crypto::{
     ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodePublicKey, PublicKey,
     TransactionSender, TransactionSignature,
@@ -697,7 +697,7 @@ impl<B: Backend> State<B> {
                 }
             }
         }
-        let new_rep_scores = draco_reputation::calculate_reputation_scores(map);
+        let new_rep_scores = freek_reputation::calculate_reputation_scores(map);
         // Store new scores in application state.
         new_rep_scores.iter().for_each(|(node, new_score)| {
             let old_score = rep_scores.get(node).unwrap_or(&0);

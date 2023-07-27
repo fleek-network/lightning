@@ -1,8 +1,8 @@
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
-use draco_application::query_runner::QueryRunner;
-use draco_interfaces::{
+use freek_application::query_runner::QueryRunner;
+use freek_interfaces::{
     application::SyncQueryRunnerInterface,
     notifier::{Notification, NotifierInterface},
 };
@@ -56,13 +56,13 @@ impl NotifierInterface for Notifier {
 
 #[cfg(test)]
 mod tests {
-    use draco_application::{
+    use freek_application::{
         app::Application,
         config::{Config, Mode},
         genesis::Genesis,
         query_runner::QueryRunner,
     };
-    use draco_interfaces::application::{ApplicationInterface, ExecutionEngineSocket};
+    use freek_interfaces::application::{ApplicationInterface, ExecutionEngineSocket};
 
     use super::*;
 

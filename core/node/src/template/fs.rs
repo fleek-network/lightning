@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use draco_blockstore::memory::MemoryBlockStore;
-use draco_interfaces::{
+use freek_blockstore::memory::MemoryBlockStore;
+use freek_interfaces::{
     blockstore::BlockStoreInterface, common::WithStartAndShutdown, config::ConfigConsumer,
     fs::FileSystemInterface, Blake3Hash, Blake3Tree, CompressionAlgoSet, ContentChunk,
 };

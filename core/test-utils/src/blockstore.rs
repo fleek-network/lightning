@@ -1,1 +1,1 @@
-pub use draco_blockstore::{config::Config, memory::MemoryBlockStore};
+pub use freek_blockstore::{config::Config, memory::MemoryBlockStore};

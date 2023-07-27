@@ -11,7 +11,7 @@ use axum::{
     routing::{get, post},
     Extension, Router,
 };
-use draco_interfaces::{
+use freek_interfaces::{
     common::WithStartAndShutdown, config::ConfigConsumer, MempoolSocket, RpcInterface,
     SyncQueryRunnerInterface,
 };

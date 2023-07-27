@@ -1,16 +1,16 @@
 [package]
-name = "draco-reputation"
+name = "freek-reputation"
 version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-draco-interfaces = {path="../interfaces"}
+freek-interfaces = {path="../interfaces"}
 fleek-crypto.workspace = true
 hp-fixed.workspace = true
 
 [dev-dependencies]
-draco-test-utils = {path="../test-utils"}
+freek-test-utils = {path="../test-utils"}
 rand.workspace = true
 

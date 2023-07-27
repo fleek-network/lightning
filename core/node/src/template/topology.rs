@@ -1,7 +1,7 @@
 use std::{marker::PhantomData, sync::Arc};
 
 use async_trait::async_trait;
-use draco_interfaces::{ConfigConsumer, SyncQueryRunnerInterface, TopologyInterface};
+use freek_interfaces::{ConfigConsumer, SyncQueryRunnerInterface, TopologyInterface};
 use fleek_crypto::NodePublicKey;
 
 use super::config::Config;

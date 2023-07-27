@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, time::SystemTime, vec};
 
 use affair::Socket;
 use anyhow::{anyhow, Result};
-use draco_interfaces::{
+use freek_interfaces::{
     application::ExecutionEngineSocket,
     types::{
         Block, Epoch, ExecutionError, NodeInfo, ProofOfConsensus, Tokens, TotalServed,
@@ -11,7 +11,7 @@ use draco_interfaces::{
     ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
     ToDigest,
 };
-use draco_test_utils::{random, reputation};
+use freek_test_utils::{random, reputation};
 use fleek_crypto::{
     AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
     SecretKey,

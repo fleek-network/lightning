@@ -12,8 +12,8 @@ pub mod tests;
 use affair::{Socket, Task};
 use async_trait::async_trait;
 pub use config::Config;
-use draco_application::query_runner::QueryRunner;
-use draco_interfaces::{
+use freek_application::query_runner::QueryRunner;
+use freek_interfaces::{
     common::{ToDigest, WithStartAndShutdown},
     config::ConfigConsumer,
     signer::{SignerInterface, SubmitTxSocket},

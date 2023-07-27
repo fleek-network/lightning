@@ -4,7 +4,7 @@ use blake3_tree::{
     IncrementalVerifier,
 };
 use bytes::{BufMut, Bytes, BytesMut};
-use draco_interfaces::{
+use freek_interfaces::{
     Blake3Hash, CompressionAlgorithm, ContentChunk, IncrementalPutInterface, PutFeedProofError,
     PutFinalizeError, PutWriteError,
 };

@@ -1,5 +1,5 @@
 [package]
-name = "draco-consensus"
+name = "freek-consensus"
 version = "0.0.0"
 edition = "2021"
 
@@ -10,7 +10,7 @@ affair.workspace = true
 fleek-crypto.workspace = true
 async-trait.workspace = true
 bincode.workspace = true
-draco-interfaces = { path = "../interfaces" }
+freek-interfaces = { path = "../interfaces" }
 futures.workspace = true
 anyhow.workspace = true
 log.workspace = true

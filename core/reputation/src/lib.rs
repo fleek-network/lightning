@@ -47,7 +47,7 @@ fn calculate_normalized_measurements(
 #[cfg(test)]
 mod tests {
 
-    use draco_test_utils::random;
+    use freek_test_utils::random;
     use hp_fixed::signed::HpFixed;
     use rand::Rng;
 

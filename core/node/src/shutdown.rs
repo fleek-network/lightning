@@ -1,5 +1,5 @@
 //! The shutdown module makes it easy for us to have one source for sending shutdowns
-//! signal to every sub service and have proper and graceful shutdowns in all of Draco
+//! signal to every sub service and have proper and graceful shutdowns in all of Freek
 //! services.
 
 use std::sync::Arc;

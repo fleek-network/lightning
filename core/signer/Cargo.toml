@@ -1,13 +1,13 @@
 [package]
-name = "draco-signer"
+name = "freek-signer"
 version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-draco-interfaces = { path = "../interfaces" }
-draco-application = { path = "../application" }
+freek-interfaces = { path = "../interfaces" }
+freek-application = { path = "../application" }
 anyhow.workspace = true
 async-trait.workspace = true
 log.workspace = true
@@ -19,5 +19,5 @@ fleek-crypto.workspace = true
 affair.workspace = true
 
 [dev-dependencies]
-draco-test-utils = { path = "../test-utils" }
+freek-test-utils = { path = "../test-utils" }
 hp-fixed.workspace = true

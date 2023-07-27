@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use draco_test_utils::{random, reputation};
+use freek_test_utils::{random, reputation};
 use fleek_crypto::NodePublicKey;
 use rand::{rngs::StdRng, Rng};
 

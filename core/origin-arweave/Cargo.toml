@@ -1,11 +1,11 @@
 [package]
-name = "draco-origin-arweave"
+name = "freek-origin-arweave"
 version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-draco-interfaces = {path="../interfaces"}
+freek-interfaces = {path="../interfaces"}
 anyhow.workspace = true
 serde.workspace = true

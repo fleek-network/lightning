@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use draco_interfaces::{
+use freek_interfaces::{
     common::WithStartAndShutdown, config::ConfigConsumer, pod::DeliveryAcknowledgmentSocket,
     signer::SubmitTxSocket, DeliveryAcknowledgmentAggregatorInterface,
 };

@@ -3,7 +3,7 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use draco_interfaces::types::ReputationMeasurements;
+use freek_interfaces::types::ReputationMeasurements;
 use fleek_crypto::NodePublicKey;
 use hp_fixed::signed::HpFixed;
 

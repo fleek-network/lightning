@@ -6,7 +6,7 @@ use std::{
 
 use affair::{Socket, Task};
 use async_trait::async_trait;
-use draco_interfaces::{
+use freek_interfaces::{
     application::{ExecutionEngineSocket, SyncQueryRunnerInterface},
     config::ConfigConsumer,
     consensus::{ConsensusInterface, MempoolSocket},

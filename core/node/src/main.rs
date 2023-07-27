@@ -10,7 +10,7 @@ use anyhow::Result;
 use chrono::Local;
 use clap::Parser;
 use cli::Cli;
-use draco_interfaces::{transformers, ApplicationInterface, DracoTypes, GossipInterface};
+use freek_interfaces::{transformers, ApplicationInterface, FreekTypes, GossipInterface};
 use log::LevelFilter;
 use mock::consensus::MockConsensus;
 use simplelog::{
@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
 
     let date = Local::now();
     let log_file =
-        std::env::temp_dir().join(format!("draco-{}.log", date.format("%Y-%m-%d-%H:%M:%S")));
+        std::env::temp_dir().join(format!("freek-{}.log", date.format("%Y-%m-%d-%H:%M:%S")));
 
     CombinedLogger::init(vec![
         TermLogger::new(
@@ -69,8 +69,8 @@ async fn main() -> Result<()> {
         type Node = transformers::WithConsensus<
             FinalTypes,
             MockConsensus<
-                <<FinalTypes as DracoTypes>::Application as ApplicationInterface>::SyncExecutor,
-                <<FinalTypes as DracoTypes>::Gossip as GossipInterface>::PubSub<()>,
+                <<FinalTypes as FreekTypes>::Application as ApplicationInterface>::SyncExecutor,
+                <<FinalTypes as FreekTypes>::Gossip as GossipInterface>::PubSub<()>,
             >,
         >;
 

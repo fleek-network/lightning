@@ -2145,305 +2145,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 
 [[package]]
-name = "draco-application"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "atomo",
- "bincode",
- "draco-interfaces",
- "draco-reputation",
- "draco-test-utils",
- "fleek-crypto",
- "hp-fixed",
- "lazy_static",
- "multiaddr",
- "num-traits",
- "rand 0.8.5",
- "serde",
- "tokio",
- "toml 0.7.6",
-]
-
-[[package]]
-name = "draco-blockstore"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "bincode",
- "blake3-tree",
- "bytes",
- "draco-interfaces",
- "parking_lot",
- "serde",
- "tempdir",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "draco-consensus"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "bincode",
- "draco-interfaces",
- "fastcrypto",
- "fleek-crypto",
- "futures",
- "log",
- "multiaddr",
- "mysten-metrics",
- "mysten-network",
- "narwhal-config",
- "narwhal-consensus",
- "narwhal-crypto",
- "narwhal-executor",
- "narwhal-network",
- "narwhal-node",
- "narwhal-primary",
- "narwhal-types",
- "narwhal-worker",
- "prometheus",
- "rand 0.8.5",
- "resolve-path",
- "serde",
- "sui-protocol-config",
- "tokio",
- "tonic",
-]
-
-[[package]]
-name = "draco-handshake"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "arrayref",
- "arrayvec",
- "async-trait",
- "bytes",
- "criterion 0.4.0",
- "dashmap",
- "draco-interfaces",
- "fleek-crypto",
- "futures",
- "serde",
- "tokio",
-]
-
-[[package]]
-name = "draco-interfaces"
-version = "0.1.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "atomo",
- "blake3-tree",
- "bytes",
- "fleek-crypto",
- "hp-fixed",
- "ink-quill",
- "multiaddr",
- "num-bigint",
- "num-derive",
- "num-traits",
- "serde",
- "serde-big-array",
- "thiserror",
- "tokio",
- "tokio-stream",
- "zeroize",
-]
-
-[[package]]
-name = "draco-node"
-version = "0.1.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "bytes",
- "chrono",
- "clap 4.3.17",
- "draco-application",
- "draco-blockstore",
- "draco-consensus",
- "draco-handshake",
- "draco-interfaces",
- "draco-notifier",
- "draco-rep-collector",
- "draco-rpc",
- "draco-signer",
- "draco-test-utils",
- "fleek-crypto",
- "log",
- "mock",
- "mockall",
- "serde",
- "simplelog",
- "tokio",
- "tokio-stream",
- "toml 0.7.6",
- "tracing",
-]
-
-[[package]]
-name = "draco-notifier"
-version = "0.0.0"
-dependencies = [
- "async-trait",
- "draco-application",
- "draco-interfaces",
- "tokio",
-]
-
-[[package]]
-name = "draco-origin-arweave"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "draco-interfaces",
- "serde",
-]
-
-[[package]]
-name = "draco-origin-filecoin"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "draco-interfaces",
- "serde",
-]
-
-[[package]]
-name = "draco-origin-ipfs"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "draco-interfaces",
- "serde",
-]
-
-[[package]]
-name = "draco-pod"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "draco-interfaces",
- "serde",
-]
-
-[[package]]
-name = "draco-rep-collector"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "draco-application",
- "draco-interfaces",
- "draco-notifier",
- "draco-reputation",
- "draco-signer",
- "draco-test-utils",
- "fleek-crypto",
- "lru",
- "rand 0.8.5",
- "scc",
- "serde",
- "tokio",
-]
-
-[[package]]
-name = "draco-reputation"
-version = "0.0.0"
-dependencies = [
- "draco-interfaces",
- "draco-test-utils",
- "fleek-crypto",
- "hp-fixed",
- "rand 0.8.5",
-]
-
-[[package]]
-name = "draco-rpc"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "axum",
- "bincode",
- "draco-application",
- "draco-interfaces",
- "fleek-crypto",
- "hp-fixed",
- "jsonrpc-v2",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "draco-signer"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "dirs 5.0.1",
- "draco-application",
- "draco-interfaces",
- "draco-test-utils",
- "fleek-crypto",
- "hp-fixed",
- "log",
- "serde",
- "tokio",
-]
-
-[[package]]
-name = "draco-table"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "bincode",
- "draco-interfaces",
- "fleek-crypto",
- "serde",
- "thiserror",
- "tokio",
- "tokio-util 0.7.8",
- "tracing",
-]
-
-[[package]]
-name = "draco-test-utils"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "draco-application",
- "draco-blockstore",
- "draco-handshake",
- "draco-interfaces",
- "fleek-crypto",
- "hp-fixed",
- "rand 0.8.5",
- "scc",
- "serde",
- "tokio",
-]
-
-[[package]]
 name = "dyn-clone"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2843,10 +2544,10 @@ dependencies = [
  "blake3-tree",
  "bytes",
  "criterion 0.4.0",
- "draco-handshake",
- "draco-interfaces",
- "draco-test-utils",
  "fleek-crypto",
+ "freek-handshake",
+ "freek-interfaces",
+ "freek-test-utils",
  "futures",
  "rand 0.8.5",
  "serde",
@@ -2926,6 +2627,305 @@ name = "fragile"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c2141d6d6c8512188a7891b4b01590a45f6dac67afb4f255c4124dbb86d4eaa"
+
+[[package]]
+name = "freek-application"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "atomo",
+ "bincode",
+ "fleek-crypto",
+ "freek-interfaces",
+ "freek-reputation",
+ "freek-test-utils",
+ "hp-fixed",
+ "lazy_static",
+ "multiaddr",
+ "num-traits",
+ "rand 0.8.5",
+ "serde",
+ "tokio",
+ "toml 0.7.6",
+]
+
+[[package]]
+name = "freek-blockstore"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "blake3-tree",
+ "bytes",
+ "freek-interfaces",
+ "parking_lot",
+ "serde",
+ "tempdir",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "freek-consensus"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "fastcrypto",
+ "fleek-crypto",
+ "freek-interfaces",
+ "futures",
+ "log",
+ "multiaddr",
+ "mysten-metrics",
+ "mysten-network",
+ "narwhal-config",
+ "narwhal-consensus",
+ "narwhal-crypto",
+ "narwhal-executor",
+ "narwhal-network",
+ "narwhal-node",
+ "narwhal-primary",
+ "narwhal-types",
+ "narwhal-worker",
+ "prometheus",
+ "rand 0.8.5",
+ "resolve-path",
+ "serde",
+ "sui-protocol-config",
+ "tokio",
+ "tonic",
+]
+
+[[package]]
+name = "freek-handshake"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "arrayref",
+ "arrayvec",
+ "async-trait",
+ "bytes",
+ "criterion 0.4.0",
+ "dashmap",
+ "fleek-crypto",
+ "freek-interfaces",
+ "futures",
+ "serde",
+ "tokio",
+]
+
+[[package]]
+name = "freek-interfaces"
+version = "0.1.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "atomo",
+ "blake3-tree",
+ "bytes",
+ "fleek-crypto",
+ "hp-fixed",
+ "ink-quill",
+ "multiaddr",
+ "num-bigint",
+ "num-derive",
+ "num-traits",
+ "serde",
+ "serde-big-array",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "zeroize",
+]
+
+[[package]]
+name = "freek-node"
+version = "0.1.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "chrono",
+ "clap 4.3.17",
+ "fleek-crypto",
+ "freek-application",
+ "freek-blockstore",
+ "freek-consensus",
+ "freek-handshake",
+ "freek-interfaces",
+ "freek-notifier",
+ "freek-rep-collector",
+ "freek-rpc",
+ "freek-signer",
+ "freek-test-utils",
+ "log",
+ "mock",
+ "mockall",
+ "serde",
+ "simplelog",
+ "tokio",
+ "tokio-stream",
+ "toml 0.7.6",
+ "tracing",
+]
+
+[[package]]
+name = "freek-notifier"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "freek-application",
+ "freek-interfaces",
+ "tokio",
+]
+
+[[package]]
+name = "freek-origin-arweave"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "freek-interfaces",
+ "serde",
+]
+
+[[package]]
+name = "freek-origin-filecoin"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "freek-interfaces",
+ "serde",
+]
+
+[[package]]
+name = "freek-origin-ipfs"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "freek-interfaces",
+ "serde",
+]
+
+[[package]]
+name = "freek-pod"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "freek-interfaces",
+ "serde",
+]
+
+[[package]]
+name = "freek-rep-collector"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "fleek-crypto",
+ "freek-application",
+ "freek-interfaces",
+ "freek-notifier",
+ "freek-reputation",
+ "freek-signer",
+ "freek-test-utils",
+ "lru",
+ "rand 0.8.5",
+ "scc",
+ "serde",
+ "tokio",
+]
+
+[[package]]
+name = "freek-reputation"
+version = "0.0.0"
+dependencies = [
+ "fleek-crypto",
+ "freek-interfaces",
+ "freek-test-utils",
+ "hp-fixed",
+ "rand 0.8.5",
+]
+
+[[package]]
+name = "freek-rpc"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "axum",
+ "bincode",
+ "fleek-crypto",
+ "freek-application",
+ "freek-interfaces",
+ "hp-fixed",
+ "jsonrpc-v2",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "freek-signer"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "dirs 5.0.1",
+ "fleek-crypto",
+ "freek-application",
+ "freek-interfaces",
+ "freek-test-utils",
+ "hp-fixed",
+ "log",
+ "serde",
+ "tokio",
+]
+
+[[package]]
+name = "freek-table"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "fleek-crypto",
+ "freek-interfaces",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tokio-util 0.7.8",
+ "tracing",
+]
+
+[[package]]
+name = "freek-test-utils"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "fleek-crypto",
+ "freek-application",
+ "freek-blockstore",
+ "freek-handshake",
+ "freek-interfaces",
+ "hp-fixed",
+ "rand 0.8.5",
+ "scc",
+ "serde",
+ "tokio",
+]
 
 [[package]]
 name = "fuchsia-cprng"
@@ -3890,8 +3890,8 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum",
- "draco-interfaces",
  "fleek-crypto",
+ "freek-interfaces",
  "hp-fixed",
  "log",
  "rand 0.8.5",

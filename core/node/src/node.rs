@@ -1,12 +1,12 @@
-use draco_application::{app::Application, query_runner::QueryRunner};
-use draco_blockstore::memory::MemoryBlockStore;
-use draco_consensus::consensus::{Consensus, PubSubMsg};
-use draco_handshake::server::TcpHandshakeServer;
-use draco_interfaces::{DracoTypes, GossipInterface};
-use draco_notifier::Notifier;
-use draco_rep_collector::ReputationAggregator;
-use draco_rpc::server::Rpc;
-use draco_signer::Signer;
+use freek_application::{app::Application, query_runner::QueryRunner};
+use freek_blockstore::memory::MemoryBlockStore;
+use freek_consensus::consensus::{Consensus, PubSubMsg};
+use freek_handshake::server::TcpHandshakeServer;
+use freek_interfaces::{FreekTypes, GossipInterface};
+use freek_notifier::Notifier;
+use freek_rep_collector::ReputationAggregator;
+use freek_rpc::server::Rpc;
+use freek_signer::Signer;
 
 use crate::{
     config::TomlConfigProvider,
@@ -16,10 +16,10 @@ use crate::{
     },
 };
 
-/// Finalized type bindings for Draco.
+/// Finalized type bindings for Freek.
 pub struct FinalTypes;
 
-impl DracoTypes for FinalTypes {
+impl FreekTypes for FinalTypes {
     type ConfigProvider = TomlConfigProvider;
     type Consensus = Consensus<QueryRunner, <Self::Gossip as GossipInterface>::PubSub<PubSubMsg>>;
     type Application = Application;

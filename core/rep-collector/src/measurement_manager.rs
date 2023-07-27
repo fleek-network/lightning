@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, num::NonZeroUsize, sync::Arc, time::Duration};
 
-use draco_interfaces::{types::ReputationMeasurements, Weight};
-use draco_reputation::statistics::try_min_max_normalize;
+use freek_interfaces::{types::ReputationMeasurements, Weight};
+use freek_reputation::statistics::try_min_max_normalize;
 use fleek_crypto::NodePublicKey;
 use lru::LruCache;
 
@@ -741,8 +741,8 @@ impl NormalizedMeasurements {
 
 #[cfg(test)]
 mod tests {
-    use draco_interfaces::{types::ReputationMeasurements, Weight};
-    use draco_test_utils::{random, reputation};
+    use freek_interfaces::{types::ReputationMeasurements, Weight};
+    use freek_test_utils::{random, reputation};
     use fleek_crypto::NodePublicKey;
     use rand::Rng;
 

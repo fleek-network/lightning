@@ -2,13 +2,13 @@ use std::{thread, time::Duration};
 
 use affair::{Executor, TokioSpawn, Worker};
 use anyhow::Result;
-use draco_application::{
+use freek_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
     genesis::{Genesis, GenesisAccount},
     query_runner::QueryRunner,
 };
-use draco_interfaces::{
+use freek_interfaces::{
     types::{
         EpochInfo, NodeInfo, NodeServed, ProtocolParams, Staking, TotalServed, UpdateRequest,
         Worker as NodeWorker,

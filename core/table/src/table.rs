@@ -1,5 +1,5 @@
 use anyhow::Result;
-use draco_interfaces::Blake3Hash;
+use freek_interfaces::Blake3Hash;
 use fleek_crypto::NodeNetworkingPublicKey;
 use thiserror::Error;
 use tokio::sync::{mpsc::Receiver, oneshot};
