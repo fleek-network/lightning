@@ -2,6 +2,10 @@ use std::{collections::BTreeMap, time::SystemTime, vec};
 
 use affair::Socket;
 use anyhow::{anyhow, Result};
+use fleek_crypto::{
+    AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
+    SecretKey,
+};
 use freek_interfaces::{
     application::ExecutionEngineSocket,
     types::{
@@ -12,10 +16,6 @@ use freek_interfaces::{
     ToDigest,
 };
 use freek_test_utils::{random, reputation};
-use fleek_crypto::{
-    AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
-    SecretKey,
-};
 use hp_fixed::unsigned::HpUfixed;
 use tokio::test;
 

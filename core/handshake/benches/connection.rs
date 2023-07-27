@@ -3,9 +3,9 @@
 use std::time::Duration;
 
 use criterion::{measurement::Measurement, *};
+use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
 use freek_handshake::connection::{HandshakeConnection, HandshakeFrame, Reason};
 use freek_interfaces::CompressionAlgoSet;
-use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
 use futures::executor::block_on;
 use tokio::sync::Mutex;
 

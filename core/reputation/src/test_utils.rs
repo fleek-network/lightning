@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use freek_test_utils::{random, reputation};
 use fleek_crypto::NodePublicKey;
+use freek_test_utils::{random, reputation};
 use rand::{rngs::StdRng, Rng};
 
 use crate::{NormalizedMeasurements, WeightedReputationMeasurements};

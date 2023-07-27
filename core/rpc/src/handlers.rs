@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use axum::{Extension, Json};
+use fleek_crypto::{EthAddress, NodePublicKey};
 use freek_interfaces::{
     types::{EpochInfo, NodeInfo, NodeServed, ProtocolParams, TotalServed, UpdateRequest},
     SyncQueryRunnerInterface,
 };
-use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use jsonrpc_v2::{Data, Error, MapRouter, Params, RequestObject, ResponseObjects, Server};
 

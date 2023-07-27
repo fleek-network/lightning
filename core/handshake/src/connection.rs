@@ -6,8 +6,8 @@ use arrayref::array_ref;
 use arrayvec::ArrayVec;
 use bytes::BytesMut;
 use consts::*;
-use freek_interfaces::{types::ServiceId, CompressionAlgoSet};
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
+use freek_interfaces::{types::ServiceId, CompressionAlgoSet};
 use futures::executor::block_on;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 

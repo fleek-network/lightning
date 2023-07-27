@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
+use fleek_crypto::NodePublicKey;
 use freek_application::query_runner::QueryRunner;
 use freek_interfaces::{
     config::ConfigConsumer,
@@ -11,7 +12,6 @@ use freek_interfaces::{
     ReputationQueryInteface, ReputationReporterInterface, Weight,
 };
 use freek_notifier::Notifier;
-use fleek_crypto::NodePublicKey;
 use tokio::sync::mpsc;
 
 use crate::{buffered_mpsc, config::Config, measurement_manager::MeasurementManager};

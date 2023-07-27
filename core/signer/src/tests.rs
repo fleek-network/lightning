@@ -3,6 +3,7 @@ use std::{
     time::Duration,
 };
 
+use fleek_crypto::{AccountOwnerSecretKey, PublicKey, SecretKey};
 use freek_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
@@ -16,7 +17,6 @@ use freek_test_utils::{
     consensus::{Config as ConsensusConfig, MockConsensus},
     empty_interfaces::MockGossip,
 };
-use fleek_crypto::{AccountOwnerSecretKey, PublicKey, SecretKey};
 
 use crate::{config::Config, Signer};
 

@@ -3,6 +3,10 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use fleek_crypto::{
+    AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
+    SecretKey,
+};
 use freek_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
@@ -23,10 +27,6 @@ use freek_signer::{Config as SignerConfig, Signer};
 use freek_test_utils::{
     consensus::{Config as ConsensusConfig, MockConsensus},
     empty_interfaces::MockGossip,
-};
-use fleek_crypto::{
-    AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
-    SecretKey,
 };
 
 use crate::{aggregator::ReputationAggregator, config::Config, measurement_manager::Interactions};

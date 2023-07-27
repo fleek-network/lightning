@@ -7,11 +7,11 @@ use std::{
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dashmap::DashMap;
+use fleek_crypto::{ClientPublicKey, NodePublicKey};
 use freek_interfaces::{
     handshake::HandshakeInterface, CompressionAlgoSet, ConfigConsumer, ConnectionInterface,
     WithStartAndShutdown,
 };
-use fleek_crypto::{ClientPublicKey, NodePublicKey};
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncRead, AsyncWrite},

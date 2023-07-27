@@ -3,6 +3,10 @@ use std::{collections::HashMap, marker::PhantomData, sync::Arc, time::Duration};
 use affair::Socket;
 use anyhow::Result;
 use async_trait::async_trait;
+use fleek_crypto::{
+    ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey,
+    NodeSecretKey, NodeSignature,
+};
 use freek_interfaces::{
     types::{
         Epoch, EpochInfo, NodeInfo, NodeServed, ProtocolParams, ReportedReputationMeasurements,
@@ -12,10 +16,6 @@ use freek_interfaces::{
     NotifierInterface, PubSub, ReputationAggregatorInterface, ReputationQueryInteface,
     ReputationReporterInterface, SignerInterface, SubmitTxSocket, SyncQueryRunnerInterface, Topic,
     TopologyInterface, Weight, WithStartAndShutdown,
-};
-use fleek_crypto::{
-    ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey,
-    NodeSecretKey, NodeSignature,
 };
 use hp_fixed::unsigned::HpUfixed;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};

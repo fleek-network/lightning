@@ -3,8 +3,8 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use freek_interfaces::types::ReputationMeasurements;
 use fleek_crypto::NodePublicKey;
+use freek_interfaces::types::ReputationMeasurements;
 use hp_fixed::signed::HpFixed;
 
 use crate::{statistics, PRECISION};

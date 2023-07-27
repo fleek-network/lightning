@@ -2,6 +2,7 @@ use std::time::{Duration, SystemTime};
 
 use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
+use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, EthAddress, NodePublicKey, PublicKey};
 use freek_interfaces::{
     types::{
         AccountInfo, Block, CommodityTypes, Epoch, ExecutionData, Metadata, NodeInfo, NodeServed,
@@ -10,7 +11,6 @@ use freek_interfaces::{
     },
     BlockExecutionResponse,
 };
-use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, EthAddress, NodePublicKey, PublicKey};
 use hp_fixed::unsigned::HpUfixed;
 
 use crate::{

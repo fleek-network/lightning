@@ -2,6 +2,10 @@ use std::{thread, time::Duration};
 
 use affair::{Executor, TokioSpawn, Worker};
 use anyhow::Result;
+use fleek_crypto::{
+    AccountOwnerSecretKey, EthAddress, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey,
+    PublicKey, SecretKey,
+};
 use freek_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
@@ -15,10 +19,6 @@ use freek_interfaces::{
     },
     ApplicationInterface, MempoolSocket, RpcInterface, SyncQueryRunnerInterface,
     WithStartAndShutdown,
-};
-use fleek_crypto::{
-    AccountOwnerSecretKey, EthAddress, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey,
-    PublicKey, SecretKey,
 };
 use hp_fixed::unsigned::HpUfixed;
 use reqwest::{Client, Response};

@@ -1,6 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use atomo::{Atomo, QueryPerm, ResolvedTableReference};
+use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use freek_interfaces::{
     application::SyncQueryRunnerInterface,
     types::{
@@ -9,7 +10,6 @@ use freek_interfaces::{
         TotalServed, TransactionResponse, UpdateRequest, Value,
     },
 };
-use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 
 use crate::{

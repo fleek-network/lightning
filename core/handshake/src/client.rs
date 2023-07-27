@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
-use freek_interfaces::{types::ServiceId, CompressionAlgoSet};
 use fleek_crypto::{ClientPublicKey, ClientSignature};
+use freek_interfaces::{types::ServiceId, CompressionAlgoSet};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::connection::{

@@ -1,8 +1,8 @@
 use std::{marker::PhantomData, sync::Arc};
 
 use async_trait::async_trait;
-use freek_interfaces::{ConfigConsumer, SyncQueryRunnerInterface, TopologyInterface};
 use fleek_crypto::NodePublicKey;
+use freek_interfaces::{ConfigConsumer, SyncQueryRunnerInterface, TopologyInterface};
 
 use super::config::Config;
 

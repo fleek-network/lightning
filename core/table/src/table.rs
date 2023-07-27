@@ -1,6 +1,6 @@
 use anyhow::Result;
-use freek_interfaces::Blake3Hash;
 use fleek_crypto::NodeNetworkingPublicKey;
+use freek_interfaces::Blake3Hash;
 use thiserror::Error;
 use tokio::sync::{mpsc::Receiver, oneshot};
 

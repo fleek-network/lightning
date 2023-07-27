@@ -4,6 +4,10 @@ use std::{
     time::Duration,
 };
 
+use fleek_crypto::{
+    ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodePublicKey, PublicKey,
+    TransactionSender, TransactionSignature,
+};
 use freek_interfaces::{
     types::{
         AccountInfo, CommodityTypes, Epoch, ExecutionData, ExecutionError, Metadata, NodeInfo,
@@ -15,10 +19,6 @@ use freek_interfaces::{
     DeliveryAcknowledgment, ToDigest,
 };
 use freek_reputation::{statistics, types::WeightedReputationMeasurements};
-use fleek_crypto::{
-    ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodePublicKey, PublicKey,
-    TransactionSender, TransactionSignature,
-};
 use hp_fixed::unsigned::HpUfixed;
 use lazy_static::lazy_static;
 use multiaddr::Multiaddr;

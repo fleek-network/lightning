@@ -11,12 +11,12 @@ use std::{
 use affair::AsyncWorker;
 use anyhow::{bail, Result};
 use async_trait::async_trait;
+use fastcrypto::bls12381::min_sig::BLS12381PublicKey;
+use fleek_crypto::NodePublicKey;
 use freek_interfaces::{
     types::{Epoch, EpochInfo, NodeInfo, UpdateRequest},
     SyncQueryRunnerInterface,
 };
-use fastcrypto::bls12381::min_sig::BLS12381PublicKey;
-use fleek_crypto::NodePublicKey;
 use log::error;
 use narwhal_types::{TransactionProto, TransactionsClient};
 use rand::seq::SliceRandom;

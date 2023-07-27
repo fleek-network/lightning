@@ -12,6 +12,10 @@ pub mod tests;
 use affair::{Socket, Task};
 use async_trait::async_trait;
 pub use config::Config;
+use fleek_crypto::{
+    NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
+    SecretKey, TransactionSender,
+};
 use freek_application::query_runner::QueryRunner;
 use freek_interfaces::{
     common::{ToDigest, WithStartAndShutdown},
@@ -19,10 +23,6 @@ use freek_interfaces::{
     signer::{SignerInterface, SubmitTxSocket},
     types::{TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest},
     MempoolSocket, SyncQueryRunnerInterface,
-};
-use fleek_crypto::{
-    NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
-    SecretKey, TransactionSender,
 };
 use log::warn;
 use tokio::sync::{mpsc, Notify};

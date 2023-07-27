@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, num::NonZeroUsize, sync::Arc, time::Duration};
 
+use fleek_crypto::NodePublicKey;
 use freek_interfaces::{types::ReputationMeasurements, Weight};
 use freek_reputation::statistics::try_min_max_normalize;
-use fleek_crypto::NodePublicKey;
 use lru::LruCache;
 
 /// Maximum capacity for the lru cache that stores the peer measurements.
@@ -741,9 +741,9 @@ impl NormalizedMeasurements {
 
 #[cfg(test)]
 mod tests {
+    use fleek_crypto::NodePublicKey;
     use freek_interfaces::{types::ReputationMeasurements, Weight};
     use freek_test_utils::{random, reputation};
-    use fleek_crypto::NodePublicKey;
     use rand::Rng;
 
     use super::*;
