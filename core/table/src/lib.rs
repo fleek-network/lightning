@@ -1,5 +1,7 @@
 pub mod bucket;
+mod distance;
 pub mod handler;
-mod lookup;
+pub mod lookup;
 mod query;
+mod socket;
 pub(crate) mod table;

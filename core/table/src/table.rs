@@ -1,12 +1,16 @@
 use anyhow::Result;
+use draco_interfaces::Blake3Hash;
 use fleek_crypto::NodeNetworkingPublicKey;
 use thiserror::Error;
 use tokio::sync::{mpsc::Receiver, oneshot};
 
 use crate::{
     bucket::{Bucket, Node, MAX_BUCKETS},
+    distance,
     query::NodeInfo,
 };
+
+pub type TableKey = Blake3Hash;
 
 #[derive(Debug, Error)]
 #[error("querying the table failed: {0}")]
@@ -14,7 +18,7 @@ pub struct QueryError(String);
 
 pub enum TableQuery {
     ClosestNodes {
-        key: NodeNetworkingPublicKey,
+        target: TableKey,
         tx: oneshot::Sender<Result<Vec<NodeInfo>, QueryError>>,
     },
     AddNode {
@@ -36,8 +40,8 @@ impl Table {
         }
     }
 
-    pub fn closest_nodes(&self, target: &NodeNetworkingPublicKey) -> Vec<NodeInfo> {
-        let index = leading_zero_bits(&self.local_node_key, target);
+    pub fn closest_nodes(&self, target: &TableKey) -> Vec<NodeInfo> {
+        let index = distance::leading_zero_bits(&self.local_node_key.0, target);
         // Todo: Filter good vs bad nodes based on some criteria.
         // Todo: Return all our nodes from closest to furthest to target.
         self.buckets[index]
@@ -57,7 +61,7 @@ impl Table {
 
     fn _add_node(&mut self, node: Node) {
         // Get index of bucket.
-        let index = leading_zero_bits(&self.local_node_key, &node.info.key);
+        let index = distance::leading_zero_bits(&self.local_node_key.0, &node.info.key.0);
         assert_ne!(index, MAX_BUCKETS);
         let bucket_index = calculate_bucket_index(self.buckets.len(), index);
         if !self.buckets[bucket_index].add_node(&node) && self.split_bucket(bucket_index) {
@@ -93,29 +97,11 @@ fn calculate_bucket_index(bucket_count: usize, possible_index: usize) -> usize {
     }
 }
 
-fn leading_zero_bits(key_a: &NodeNetworkingPublicKey, key_b: &NodeNetworkingPublicKey) -> usize {
-    let distance = key_a
-        .0
-        .iter()
-        .zip(key_b.0.iter())
-        .map(|(a, b)| a ^ b)
-        .collect::<Vec<_>>();
-    let mut index = 0;
-    for byte in distance {
-        let leading_zeros = byte.leading_zeros();
-        index += leading_zeros;
-        if leading_zeros < 8 {
-            break;
-        }
-    }
-    index as usize
-}
-
 pub async fn start_server(mut rx: Receiver<TableQuery>, local_key: NodeNetworkingPublicKey) {
     let mut table = Table::new(local_key);
     while let Some(query) = rx.recv().await {
         match query {
-            TableQuery::ClosestNodes { key, tx } => {
+            TableQuery::ClosestNodes { target: key, tx } => {
                 let nodes = table.closest_nodes(&key);
                 if tx.send(Ok(nodes)).is_err() {
                     tracing::error!("failed to send Table query response")

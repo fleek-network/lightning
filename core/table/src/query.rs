@@ -1,10 +1,9 @@
 use std::net::SocketAddr;
 
-use draco_interfaces::Blake3Hash;
 use fleek_crypto::NodeNetworkingPublicKey;
 use serde::{Deserialize, Serialize};
 
-pub type ValueHash = Blake3Hash;
+use crate::table::TableKey;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NodeInfo {
@@ -14,13 +13,9 @@ pub struct NodeInfo {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Query {
-    FindNode {
-        key: NodeNetworkingPublicKey,
-        target: NodeNetworkingPublicKey,
-    },
     Find {
-        key: NodeNetworkingPublicKey,
-        target: ValueHash,
+        sender_id: NodeNetworkingPublicKey,
+        target: TableKey,
     },
     Store {
         key: Vec<u8>,

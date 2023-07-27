@@ -17,8 +17,9 @@ use tokio::{
 };
 
 use crate::{
-    query::{Message, MessagePayload, NodeInfo, Query, Response, ValueHash},
-    table::{self, TableQuery},
+    query::{Message, MessagePayload, NodeInfo, Query, Response},
+    socket,
+    table::{self, TableKey, TableQuery},
 };
 
 #[derive(Debug)]
@@ -65,7 +66,7 @@ pub async fn start_server(
                     None => break,
                 }
             }
-            incoming = recv_from(&socket) => {
+            incoming = socket::recv_from(&socket) => {
                 match incoming {
                     Ok((datagram, address)) => {
                         task::spawn(async move {
@@ -97,7 +98,7 @@ impl Handler {
     async fn handle_command(&self, command: Command) -> Result<()> {
         match command {
             Command::Get { key, tx } => {
-                let hash = match ValueHash::try_from(key) {
+                let hash = match TableKey::try_from(key) {
                     Ok(hash) => hash,
                     Err(key) => {
                         tracing::error!("invalid key: {key:?}");
@@ -125,17 +126,14 @@ impl Handler {
         let message_id = message.id;
         match message.payload {
             MessagePayload::Query(query) => match query {
-                Query::FindNode { key, .. } => {
+                Query::Find { sender_id: key, .. } => {
                     let nodes = self.closest_nodes(&key).await?;
                     let query = Message {
                         id: message_id,
                         payload: MessagePayload::Response(Response::NodeInfo(nodes)),
                     };
                     let bytes = bincode::serialize(&query)?;
-                    send_to(&self.socket, bytes.as_slice(), address).await?;
-                },
-                Query::Find { .. } => {
-                    todo!()
+                    socket::send_to(&self.socket, bytes.as_slice(), address).await?;
                 },
                 Query::Store { .. } => {
                     todo!()
@@ -146,7 +144,7 @@ impl Handler {
                         payload: MessagePayload::Response(Response::Pong),
                     };
                     let bytes = bincode::serialize(&query)?;
-                    send_to(&self.socket, bytes.as_slice(), address).await?;
+                    socket::send_to(&self.socket, bytes.as_slice(), address).await?;
                 },
             },
             MessagePayload::Response(_) => {},
@@ -158,7 +156,10 @@ impl Handler {
         let (tx, rx) = oneshot::channel();
         if self
             .table_tx
-            .send(TableQuery::ClosestNodes { key: *target, tx })
+            .send(TableQuery::ClosestNodes {
+                target: target.0,
+                tx,
+            })
             .await
             .is_err()
         {
@@ -170,24 +171,11 @@ impl Handler {
         }
     }
 
-    async fn look_up(&self, target: ValueHash) -> Result<()> {
+    async fn _look_up(&self, _: TableKey) -> Result<()> {
         todo!()
     }
 
-    async fn find_value(&self, _: ValueHash) -> Result<Vec<u8>> {
+    async fn find_value(&self, _: TableKey) -> Result<Vec<u8>> {
         todo!()
     }
-}
-
-async fn recv_from(socket: &UdpSocket) -> std::io::Result<(Vec<u8>, SocketAddr)> {
-    // Todo: Let's make sure that our messages can fit in one datagram.
-    let mut buf = vec![0u8; 64 * 1024];
-    let (size, address) = socket.recv_from(&mut buf).await?;
-    buf.truncate(size);
-    Ok((buf, address))
-}
-
-async fn send_to(socket: &UdpSocket, buf: &[u8], peer: SocketAddr) -> std::io::Result<()> {
-    socket.send_to(buf, peer).await?;
-    Ok(())
 }
