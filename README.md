@@ -1,4 +1,4 @@
-# Fleek Network
+# Freek - Fleek Network Node
 
 [![Commits](https://github.com/fleek-network/freek/actions/workflows/commits.yml/badge.svg)](https://github.com/fleek-network/freek/actions/workflows/commits.yml)
 [![Build & Tests](https://github.com/fleek-network/freek/actions/workflows/cron.yml/badge.svg)](https://github.com/fleek-network/freek/actions/workflows/cron.yml)
