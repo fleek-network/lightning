@@ -37,10 +37,7 @@ pub struct Message {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub enum Response {
-    Find {
-        sender_id: TableKey,
-        nodes: Vec<NodeInfo>,
-    },
-    Pong,
+pub struct Response {
+    pub sender_id: TableKey,
+    pub nodes: Vec<NodeInfo>,
 }

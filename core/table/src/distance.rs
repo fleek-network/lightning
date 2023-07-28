@@ -1,10 +1,6 @@
-use std::{
-    cmp::Ordering,
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
-use crate::{query::NodeInfo, table::TableKey};
+use crate::table::TableKey;
 
 pub type Distance = TableKey;
 

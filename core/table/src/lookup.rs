@@ -1,8 +1,4 @@
-use std::{
-    cmp::Ordering,
-    collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use fleek_crypto::NodeNetworkingPublicKey;
 use thiserror::Error;
@@ -18,9 +14,8 @@ use tokio::{
 use tokio_util::time::DelayQueue;
 
 use crate::{
-    bucket::{MAX_BUCKETS, MAX_BUCKET_SIZE},
-    distance,
-    distance::{Distance, DistanceMap, MAX_DISTANCE},
+    bucket::MAX_BUCKETS,
+    distance::DistanceMap,
     query::{Message, MessagePayload, NodeInfo, Query, Response},
     socket,
     table::{TableKey, TableQuery},
@@ -77,6 +72,7 @@ pub async fn _start_server(
 
 /// Kademlia's lookup procedure.
 async fn run_lookup(mut lookup: LookUp) {
+    // Get initial K closest nodes.
     let (tx, rx) = oneshot::channel();
     let table_query = TableQuery::ClosestNodes {
         target: lookup.target,
@@ -114,9 +110,11 @@ async fn run_lookup(mut lookup: LookUp) {
         .collect();
 
     lookup.closest_nodes.add_nodes(nodes);
+
     let mut pending = HashMap::new();
     loop {
         let mut closer_exists = false;
+        // Pending is empty when a round has finished.
         if pending.is_empty() {
             for node in lookup
                 .closest_nodes
@@ -126,23 +124,21 @@ async fn run_lookup(mut lookup: LookUp) {
                 .filter(|node| node.status == Status::Initial)
                 .take(3)
             {
-                if node.status != Status::Queried {
-                    let message = Message {
-                        // Todo: Generate random transaction ID.
-                        id: 0,
-                        payload: MessagePayload::Query(Query::Find {
-                            sender_id: lookup.local_id,
-                            target: lookup.target,
-                        }),
-                    };
-                    let bytes = bincode::serialize(&message).unwrap();
-                    socket::send_to(&lookup.socket, bytes.as_slice(), node.inner.address)
-                        .await
-                        .unwrap();
-                    node.status = Status::Queried;
-                    pending.insert(node.inner.key, node.inner.key);
-                    closer_exists = true;
-                }
+                let message = Message {
+                    // Todo: Generate random transaction ID.
+                    id: 0,
+                    payload: MessagePayload::Query(Query::Find {
+                        sender_id: lookup.local_id,
+                        target: lookup.target,
+                    }),
+                };
+                let bytes = bincode::serialize(&message).unwrap();
+                socket::send_to(&lookup.socket, bytes.as_slice(), node.inner.address)
+                    .await
+                    .unwrap();
+                node.status = Status::Queried;
+                pending.insert(node.inner.key, node.inner.key);
+                closer_exists = true;
             }
         }
 
@@ -150,25 +146,20 @@ async fn run_lookup(mut lookup: LookUp) {
         match lookup.server_rx.recv().await {
             None => panic!("Server dropped the network response channel"),
             Some(response) => {
-                match response {
-                    Response::Find { nodes, .. } => {
-                        let nodes = nodes
-                            .into_iter()
-                            .map(|node| {
-                                (
-                                    node.key.0,
-                                    LookupNode {
-                                        inner: node,
-                                        status: Status::Initial,
-                                    },
-                                )
-                            })
-                            .collect();
-                        lookup.closest_nodes.add_nodes(nodes);
-                    },
-                    // Todo: Fix this.
-                    Response::Pong => unreachable!(),
-                }
+                let nodes = response
+                    .nodes
+                    .into_iter()
+                    .map(|node| {
+                        (
+                            node.key.0,
+                            LookupNode {
+                                inner: node,
+                                status: Status::Initial,
+                            },
+                        )
+                    })
+                    .collect();
+                lookup.closest_nodes.add_nodes(nodes);
             },
         }
 

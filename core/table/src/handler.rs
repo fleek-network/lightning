@@ -40,6 +40,7 @@ pub struct Handler {
     /// Inflight messages.
     _inflight: Arc<Mutex<HashSet<u64>>>,
     table_tx: Sender<TableQuery>,
+    node_id: NodeNetworkingPublicKey,
 }
 
 pub async fn start_server(
@@ -50,7 +51,7 @@ pub async fn start_server(
     // Todo: Make configurable.
     let (table_tx, table_rx) = tokio::sync::mpsc::channel(10000);
     task::spawn(table::start_server(table_rx, local_key));
-    let main_hanlder = Handler::new(socket.clone(), table_tx);
+    let main_hanlder = Handler::new(socket.clone(), table_tx, local_key);
     loop {
         let handler = main_hanlder.clone();
         select! {
@@ -87,11 +88,16 @@ pub async fn start_server(
 }
 
 impl Handler {
-    pub fn new(socket: Arc<UdpSocket>, table_tx: Sender<TableQuery>) -> Self {
+    pub fn new(
+        socket: Arc<UdpSocket>,
+        table_tx: Sender<TableQuery>,
+        node_id: NodeNetworkingPublicKey,
+    ) -> Self {
         Self {
             socket,
             _inflight: Arc::new(Default::default()),
             table_tx,
+            node_id,
         }
     }
 
@@ -130,7 +136,7 @@ impl Handler {
                     let nodes = self.closest_nodes(&key).await?;
                     let query = Message {
                         id: message_id,
-                        payload: MessagePayload::Response(Response::Find {
+                        payload: MessagePayload::Response(Response {
                             sender_id: key.0,
                             nodes,
                         }),
@@ -144,7 +150,10 @@ impl Handler {
                 Query::Ping => {
                     let query = Message {
                         id: message_id,
-                        payload: MessagePayload::Response(Response::Pong),
+                        payload: MessagePayload::Response(Response {
+                            sender_id: self.node_id.0,
+                            nodes: Default::default(),
+                        }),
                     };
                     let bytes = bincode::serialize(&query)?;
                     socket::send_to(&self.socket, bytes.as_slice(), address).await?;
