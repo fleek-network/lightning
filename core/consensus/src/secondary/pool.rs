@@ -1,36 +1,64 @@
 use std::{sync::Arc, time::Instant};
 
+use dashmap::DashMap;
 use fastcrypto::hash::Hash;
+use fxhash::FxHashMap;
 use narwhal_types::{Batch, BatchDigest};
-use typed_store::rocks::DBMap;
+use tokio::sync::Notify;
+use typed_store::{rocks::DBMap, Map, TypedStoreError};
 
 /// A batch pool can be used to resolve batches.
 #[derive(Clone)]
 pub struct BatchPool {
     store: DBMap<BatchDigest, Batch>,
-}
-
-pub struct PendingBatch {
-    pub digest: BatchDigest,
-    pub time_requested: Instant,
+    pending_futures: Arc<DashMap<BatchDigest, (Arc<Notify>, Instant)>>,
 }
 
 impl BatchPool {
+    /// Create a new batch pool.
     pub fn new(store: DBMap<BatchDigest, Batch>) -> Self {
-        Self { store }
+        Self {
+            store,
+            pending_futures: Arc::new(DashMap::with_capacity(512)),
+        }
     }
 
-    pub async fn recv(&self, digest: &BatchDigest) -> Batch {
-        todo!()
+    /// Receive a batch by its digest. If the batch does not exist returns a future
+    /// that will be resolved once someone inserts the batch into the database making
+    /// it available.
+    pub async fn get(&self, digest: BatchDigest) -> Batch {
+        loop {
+            // Get the lock on the digest entry so a parallel store would not have access
+            // to get the data, since it might get `None` right before we get to insert the
+            // notifier.
+            let entry = self.pending_futures.entry(digest);
+
+            // TODO(qti3e): Maybe handle the error.
+            if let Ok(Some(batch)) = self.store.get(&digest) {
+                return batch;
+            }
+
+            let v_ref = entry.or_insert_with(|| (Arc::new(Notify::const_new()), Instant::now()));
+            let notify = v_ref.0.clone();
+
+            // Don't hold the lock anymore.
+            drop(v_ref);
+
+            // Wait until the wake up, which would indicate an store has completed.
+            notify.notified().await;
+        }
     }
 
-    /// Return a list of pending batches that we're interested in.
-    pub async fn get_pending(&self) -> Vec<PendingBatch> {
-        todo!()
-    }
-
-    pub async fn store(&self, batch: Batch) {
+    /// Store a batch into the database and resolve possible waiters.
+    pub fn store(&self, batch: Batch) -> Result<(), TypedStoreError> {
         let digest = batch.digest();
-        todo!()
+        self.store.insert(&digest, &batch)?;
+
+        // Wake up anyone who was interested in this batch.
+        if let Some(v_ref) = self.pending_futures.get(&digest) {
+            v_ref.0.notify_waiters();
+        }
+
+        Ok(())
     }
 }
