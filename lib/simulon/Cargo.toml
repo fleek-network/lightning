@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Parsa Ghadimi <parsa@fleek.xyz>"]
 description = "A simulation engine for distributed algorithms"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/fleek-network/freek"
+repository = "https://github.com/fleek-network/lightning"
 include = [
     "**/*.rs",
     "Cargo.toml",

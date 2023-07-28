@@ -6,7 +6,7 @@ use std::{
 
 use affair::{Socket, Task};
 use async_trait::async_trait;
-use freek_interfaces::{
+use lightning_interfaces::{
     application::{ExecutionEngineSocket, SyncQueryRunnerInterface},
     config::ConfigConsumer,
     consensus::{ConsensusInterface, MempoolSocket},

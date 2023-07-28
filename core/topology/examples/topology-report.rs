@@ -6,7 +6,7 @@ use std::{
 
 use base64::Engine;
 use csv::ReaderBuilder;
-use freek_topology::{clustering, divisive::DivisiveHierarchy};
+use lightning_topology::{clustering, divisive::DivisiveHierarchy};
 use ndarray::{Array, Dim};
 use ndarray_rand::rand_distr::{Distribution, UnitDisc};
 use plotters::prelude::*;

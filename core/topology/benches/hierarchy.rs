@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use freek_topology::divisive::DivisiveHierarchy;
+use lightning_topology::divisive::DivisiveHierarchy;
 use ndarray::Array2;
 use ndarray_rand::rand_distr::{Distribution, UnitDisc};
 use rand::{self, Rng};

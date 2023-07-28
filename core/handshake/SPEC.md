@@ -52,7 +52,7 @@ Termination Reasons:
 ```
 TAG = 0x01 << 0
 
-[ TAG . b"FREEK" . version (u8) . supported compression bitmap (u8) . pubkey (48 bytes) . optional unlock lane (u8) ]
+[ TAG . b"LIGHTNING" . version (u8) . supported compression bitmap (u8) . pubkey (48 bytes) . optional unlock lane (u8) ]
 
 Length: 57 bytes
 

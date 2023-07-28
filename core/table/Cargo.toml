@@ -1,5 +1,5 @@
 [package]
-name = "freek-table"
+name = "lightning-table"
 version = "0.0.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 anyhow.workspace = true
 bincode.workspace = true
-freek-interfaces = { path="../interfaces" }
+lightning-interfaces = { path="../interfaces" }
 fleek-crypto.workspace = true
 serde.workspace = true
 thiserror.workspace = true

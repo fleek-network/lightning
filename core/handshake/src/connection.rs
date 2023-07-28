@@ -7,8 +7,8 @@ use arrayvec::ArrayVec;
 use bytes::BytesMut;
 use consts::*;
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
-use freek_interfaces::{types::ServiceId, CompressionAlgoSet};
 use futures::executor::block_on;
+use lightning_interfaces::{types::ServiceId, CompressionAlgoSet};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::types::{BlsSignature, Nonce};
@@ -16,7 +16,7 @@ use crate::types::{BlsSignature, Nonce};
 /// Constant values for the codec.
 pub mod consts {
     /// Network byte prefix in [`super::UrsaFrame::HandshakeRequest`]
-    pub const NETWORK: [u8; 5] = *b"FREEK";
+    pub const NETWORK: [u8; 9] = *b"LIGHTNING";
     /// Maximum size for a frame
     pub const MAX_FRAME_SIZE: usize = 1024;
     /// Maximum number of lanes for a single client
@@ -114,7 +114,7 @@ impl FrameTag {
     #[inline(always)]
     pub fn size_hint(&self) -> usize {
         match self {
-            FrameTag::HandshakeRequest => 29,
+            FrameTag::HandshakeRequest => 33,
             FrameTag::HandshakeResponse => 106,
             FrameTag::HandshakeResponseUnlock => 214,
             FrameTag::DeliveryAcknowledgement => 97,
@@ -244,8 +244,8 @@ where
                 supported_compression_set, // 1
                 resume_lane: lane,         // 1
             } => {
-                let mut buf = ArrayVec::<u8, 30>::new_const();
-                debug_assert_eq!(NETWORK.len(), 5);
+                let mut buf = ArrayVec::<u8, 34>::new_const();
+                debug_assert_eq!(NETWORK.len(), 9);
 
                 buf.push(FrameTag::HandshakeRequest as u8);
                 buf.write_all(&NETWORK).unwrap();
@@ -380,18 +380,18 @@ where
         match tag {
             FrameTag::HandshakeRequest => {
                 let buf = self.buffer.split_to(size_hint);
-                let network = &buf[1..6];
+                let network = &buf[1..10];
                 if network != NETWORK {
                     return Err(HandshakeCodecError::InvalidNetwork.into());
                 }
 
-                let version = buf[6];
-                let supported_compression_set = buf[7].into();
-                let lane = match buf[8] {
+                let version = buf[10];
+                let supported_compression_set = buf[11].into();
+                let lane = match buf[12] {
                     0xFF => None,
                     v => Some(v),
                 };
-                let pubkey = ClientPublicKey(*array_ref!(buf, 9, 20));
+                let pubkey = ClientPublicKey(*array_ref!(buf, 13, 20));
 
                 Ok(Some(HandshakeFrame::HandshakeRequest {
                     version,

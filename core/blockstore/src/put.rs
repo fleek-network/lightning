@@ -4,7 +4,7 @@ use blake3_tree::{
     IncrementalVerifier,
 };
 use bytes::{BufMut, Bytes, BytesMut};
-use freek_interfaces::{
+use lightning_interfaces::{
     Blake3Hash, CompressionAlgorithm, ContentChunk, IncrementalPutInterface, PutFeedProofError,
     PutFinalizeError, PutWriteError,
 };

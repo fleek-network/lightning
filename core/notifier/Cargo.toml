@@ -1,12 +1,12 @@
 [package]
-name = "freek-notifier"
+name = "lightning-notifier"
 version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-freek-interfaces = {path="../interfaces"}
-freek-application = {path="../application"}
+lightning-interfaces = {path="../interfaces"}
+lightning-application = {path="../application"}
 tokio.workspace = true
 async-trait = "0.1"

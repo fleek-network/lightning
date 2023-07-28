@@ -10,7 +10,7 @@ use anyhow::Result;
 use chrono::Local;
 use clap::Parser;
 use cli::Cli;
-use freek_interfaces::{transformers, ApplicationInterface, FreekTypes, GossipInterface};
+use lightning_interfaces::{transformers, ApplicationInterface, GossipInterface, LightningTypes};
 use log::LevelFilter;
 use mock::consensus::MockConsensus;
 use simplelog::{
@@ -45,8 +45,10 @@ async fn main() -> Result<()> {
         .build();
 
     let date = Local::now();
-    let log_file =
-        std::env::temp_dir().join(format!("freek-{}.log", date.format("%Y-%m-%d-%H:%M:%S")));
+    let log_file = std::env::temp_dir().join(format!(
+        "lightning-{}.log",
+        date.format("%Y-%m-%d-%H:%M:%S")
+    ));
 
     CombinedLogger::init(vec![
         TermLogger::new(
@@ -69,8 +71,8 @@ async fn main() -> Result<()> {
         type Node = transformers::WithConsensus<
             FinalTypes,
             MockConsensus<
-                <<FinalTypes as FreekTypes>::Application as ApplicationInterface>::SyncExecutor,
-                <<FinalTypes as FreekTypes>::Gossip as GossipInterface>::PubSub<()>,
+                <<FinalTypes as LightningTypes>::Application as ApplicationInterface>::SyncExecutor,
+                <<FinalTypes as LightningTypes>::Gossip as GossipInterface>::PubSub<()>,
             >,
         >;
 

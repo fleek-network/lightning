@@ -1,5 +1,5 @@
 [package]
-name = "freek-application"
+name = "lightning-application"
 version = "0.0.0"
 edition = "2021"
 
@@ -13,8 +13,8 @@ lazy_static.workspace = true
 serde.workspace = true
 toml = "0.7.4"
 multiaddr = "0.17.1"
-freek-interfaces = { path = "../interfaces" }
-freek-reputation = { path = "../reputation" }
+lightning-interfaces = { path = "../interfaces" }
+lightning-reputation = { path = "../reputation" }
 num-traits.workspace = true
 
 # Our libraries
@@ -25,7 +25,7 @@ hp-fixed.workspace = true
 
 
 [dev-dependencies]
-freek-test-utils = { path = "../test-utils" }
+lightning-test-utils = { path = "../test-utils" }
 tokio.workspace = true
 rand.workspace = true
 

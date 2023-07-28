@@ -11,7 +11,7 @@ use axum::{
     routing::{get, post},
     Extension, Router,
 };
-use freek_interfaces::{
+use lightning_interfaces::{
     common::WithStartAndShutdown, config::ConfigConsumer, MempoolSocket, RpcInterface,
     SyncQueryRunnerInterface,
 };

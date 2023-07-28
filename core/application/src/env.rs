@@ -3,7 +3,8 @@ use std::time::{Duration, SystemTime};
 use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, EthAddress, NodePublicKey, PublicKey};
-use freek_interfaces::{
+use hp_fixed::unsigned::HpUfixed;
+use lightning_interfaces::{
     types::{
         AccountInfo, Block, CommodityTypes, Epoch, ExecutionData, Metadata, NodeInfo, NodeServed,
         ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, ServiceRevenue,
@@ -11,7 +12,6 @@ use freek_interfaces::{
     },
     BlockExecutionResponse,
 };
-use hp_fixed::unsigned::HpUfixed;
 
 use crate::{
     config::{Config, Mode},

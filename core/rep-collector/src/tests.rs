@@ -7,12 +7,12 @@ use fleek_crypto::{
     AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
     SecretKey,
 };
-use freek_application::{
+use lightning_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
     genesis::{Genesis, GenesisCommittee},
 };
-use freek_interfaces::{
+use lightning_interfaces::{
     application::ApplicationInterface,
     common::WithStartAndShutdown,
     consensus::ConsensusInterface,
@@ -22,9 +22,9 @@ use freek_interfaces::{
     types::{Block, UpdateMethod, UpdatePayload, UpdateRequest},
     GossipInterface, ReputationQueryInteface, SyncQueryRunnerInterface, ToDigest, Topic, Weight,
 };
-use freek_notifier::Notifier;
-use freek_signer::{Config as SignerConfig, Signer};
-use freek_test_utils::{
+use lightning_notifier::Notifier;
+use lightning_signer::{Config as SignerConfig, Signer};
+use lightning_test_utils::{
     consensus::{Config as ConsensusConfig, MockConsensus},
     empty_interfaces::MockGossip,
 };

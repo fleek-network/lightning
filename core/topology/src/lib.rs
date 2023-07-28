@@ -14,7 +14,7 @@ use std::{
 use async_trait::async_trait;
 pub use config::Config;
 use fleek_crypto::NodePublicKey;
-use freek_interfaces::{ConfigConsumer, SyncQueryRunnerInterface, TopologyInterface};
+use lightning_interfaces::{ConfigConsumer, SyncQueryRunnerInterface, TopologyInterface};
 use ndarray::{Array, Array2};
 
 pub struct Topology<Q: SyncQueryRunnerInterface> {

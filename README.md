@@ -1,8 +1,8 @@
-# Freek - Fleek Network Node
+# Lightning - Fleek Network Node
 
-[![Commits](https://github.com/fleek-network/freek/actions/workflows/commits.yml/badge.svg)](https://github.com/fleek-network/freek/actions/workflows/commits.yml)
-[![Build & Tests](https://github.com/fleek-network/freek/actions/workflows/cron.yml/badge.svg)](https://github.com/fleek-network/freek/actions/workflows/cron.yml)
-[![Code Coverage](https://codecov.io/github/fleek-network/freek/branch/main/graph/badge.svg?token=7SN9432OHC)](https://codecov.io/github/fleek-network/freek)
+[![Commits](https://github.com/fleek-network/lightning/actions/workflows/commits.yml/badge.svg)](https://github.com/fleek-network/lightning/actions/workflows/commits.yml)
+[![Build & Tests](https://github.com/fleek-network/lightning/actions/workflows/cron.yml/badge.svg)](https://github.com/fleek-network/lightning/actions/workflows/cron.yml)
+[![Code Coverage](https://codecov.io/github/fleek-network/lightning/branch/main/graph/badge.svg?token=7SN9432OHC)](https://codecov.io/github/fleek-network/lightning)
 
 This repository contains the source code for the implementation of the *Fleek Network*. A
 multi-service edge network.
@@ -10,7 +10,7 @@ multi-service edge network.
 Here is the directory schema:
 
 ```txt
-freek
+lightning
 ├── lib
 │   ├── affair
 │   ├── atomo

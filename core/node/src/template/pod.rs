@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use freek_interfaces::{
+use lightning_interfaces::{
     common::WithStartAndShutdown, config::ConfigConsumer, pod::DeliveryAcknowledgmentSocket,
     signer::SubmitTxSocket, DeliveryAcknowledgmentAggregatorInterface,
 };

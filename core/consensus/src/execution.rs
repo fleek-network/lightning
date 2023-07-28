@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use freek_interfaces::{
+use lightning_interfaces::{
     types::{Block, UpdateRequest},
     ExecutionEngineSocket, PubSub,
 };

@@ -2,7 +2,8 @@ use std::{collections::HashMap, time::Duration};
 
 use atomo::{Atomo, QueryPerm, ResolvedTableReference};
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
-use freek_interfaces::{
+use hp_fixed::unsigned::HpUfixed;
+use lightning_interfaces::{
     application::SyncQueryRunnerInterface,
     types::{
         AccountInfo, CommodityTypes, Epoch, EpochInfo, Metadata, NodeInfo, NodeServed,
@@ -10,7 +11,6 @@ use freek_interfaces::{
         TotalServed, TransactionResponse, UpdateRequest, Value,
     },
 };
-use hp_fixed::unsigned::HpUfixed;
 
 use crate::{
     state::{Committee, State},

@@ -4,7 +4,7 @@ pub mod memory;
 pub mod put;
 mod store;
 
-use freek_interfaces::Blake3Hash;
+use lightning_interfaces::Blake3Hash;
 use serde::{Deserialize, Serialize};
 
 const BLAKE3_CHUNK_SIZE: usize = 256 * 1024;
@@ -37,7 +37,7 @@ mod tests {
         blake3::tree::{BlockHasher, HashTree, HashTreeBuilder},
         ProofBuf,
     };
-    use freek_interfaces::{
+    use lightning_interfaces::{
         Blake3Hash, BlockStoreInterface, CompressionAlgoSet, CompressionAlgorithm,
         IncrementalPutInterface,
     };

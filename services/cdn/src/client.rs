@@ -2,8 +2,8 @@ use anyhow::{anyhow, Result};
 use blake3_tree::{blake3::tree::BlockHasher, IncrementalVerifier};
 use bytes::{BufMut, Bytes, BytesMut};
 use fleek_crypto::{ClientPublicKey, ClientSignature};
-use freek_handshake::client::HandshakeClient;
-use freek_interfaces::Blake3Hash;
+use lightning_handshake::client::HandshakeClient;
+use lightning_interfaces::Blake3Hash;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::connection::{consts::RESPONSE_BLOCK_TAG, CdnConnection, CdnFrame, ServiceMode};

@@ -11,7 +11,7 @@ use std::{
 use affair::{AsyncWorker, Executor, TokioSpawn};
 use async_trait::async_trait;
 use axum::{extract::State, routing::post, Json, Router};
-use freek_interfaces::{
+use lightning_interfaces::{
     gossip::PubSub,
     types::{Block, UpdateRequest},
     ConfigConsumer, ConsensusInterface, ExecutionEngineSocket, MempoolSocket, SignerInterface,

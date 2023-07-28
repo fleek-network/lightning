@@ -8,7 +8,9 @@ use fleek_crypto::{
     ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodePublicKey, PublicKey,
     TransactionSender, TransactionSignature,
 };
-use freek_interfaces::{
+use hp_fixed::unsigned::HpUfixed;
+use lazy_static::lazy_static;
+use lightning_interfaces::{
     types::{
         AccountInfo, CommodityTypes, Epoch, ExecutionData, ExecutionError, Metadata, NodeInfo,
         NodeServed, ProofOfConsensus, ProofOfMisbehavior, ProtocolParams,
@@ -18,9 +20,7 @@ use freek_interfaces::{
     },
     DeliveryAcknowledgment, ToDigest,
 };
-use freek_reputation::{statistics, types::WeightedReputationMeasurements};
-use hp_fixed::unsigned::HpUfixed;
-use lazy_static::lazy_static;
+use lightning_reputation::{statistics, types::WeightedReputationMeasurements};
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
 
@@ -697,7 +697,7 @@ impl<B: Backend> State<B> {
                 }
             }
         }
-        let new_rep_scores = freek_reputation::calculate_reputation_scores(map);
+        let new_rep_scores = lightning_reputation::calculate_reputation_scores(map);
         // Store new scores in application state.
         new_rep_scores.iter().for_each(|(node, new_score)| {
             let old_score = rep_scores.get(node).unwrap_or(&default_score);

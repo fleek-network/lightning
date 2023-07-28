@@ -4,13 +4,13 @@ fn main() {}
 // use std::net::SocketAddr;
 //
 // use anyhow::Result;
-// use freek_handshake::server::{HandshakeServerConfig, RawLaneConnection, TcpHandshakeServer};
-// use freek_interfaces::{
+// use lightning_handshake::server::{HandshakeServerConfig, RawLaneConnection, TcpHandshakeServer};
+// use lightning_interfaces::{
 //     ApplicationInterface, BlockStoreInterface, CompressionAlgorithm, ConnectionInterface,
 //     FileSystemInterface, HandshakeInterface, IncrementalPutInterface, SdkInterface,
 //     SignerInterface, WithStartAndShutdown,
 // };
-// use freek_test_utils::{
+// use lightning_test_utils::{
 //     app::app::Application,
 //     blockstore::MemoryBlockStore,
 //     empty_interfaces::{
@@ -34,7 +34,7 @@ fn main() {}
 //     let server_addr: SocketAddr = ([0; 4], 6969).into();
 //
 //     // setup blockstore with some content
-//     let blockstore = MemoryBlockStore::init(freek_test_utils::blockstore::Config {}).await?;
+//     let blockstore = MemoryBlockStore::init(lightning_test_utils::blockstore::Config {}).await?;
 //     let content = create_content();
 //     let mut putter = blockstore.put(None);
 //     putter
@@ -44,9 +44,9 @@ fn main() {}
 //     println!("content hash: {hash:?}");
 //
 //     // setup sdk and friends
-//     let app = Application::init(freek_test_utils::app::config::Config {
+//     let app = Application::init(lightning_test_utils::app::config::Config {
 //         genesis: None,
-//         mode: freek_test_utils::app::config::Mode::Test,
+//         mode: lightning_test_utils::app::config::Mode::Test,
 //     })
 //     .await?;
 //     let signer = MockSigner::init(MockConfig {}, MockQueryRunner {}).await?;

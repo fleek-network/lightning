@@ -1,11 +1,11 @@
 [package]
-name = "freek-origin-filecoin"
+name = "lightning-origin-filecoin"
 version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-freek-interfaces = {path="../interfaces"}
+lightning-interfaces = {path="../interfaces"}
 anyhow.workspace = true
 serde.workspace = true

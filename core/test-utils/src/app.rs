@@ -1,1 +1,1 @@
-pub use freek_application::*;
+pub use lightning_application::*;

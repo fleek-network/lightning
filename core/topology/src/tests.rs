@@ -4,12 +4,12 @@ use fleek_crypto::{
     AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
     SecretKey,
 };
-use freek_application::{
+use lightning_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
     genesis::{Genesis, GenesisCommittee, GenesisLatency},
 };
-use freek_interfaces::{ApplicationInterface, TopologyInterface, WithStartAndShutdown};
+use lightning_interfaces::{ApplicationInterface, TopologyInterface, WithStartAndShutdown};
 
 use crate::{config::Config, Topology};
 

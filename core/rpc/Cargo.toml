@@ -1,12 +1,12 @@
 [package]
-name = "freek-rpc"
+name = "lightning-rpc"
 version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-freek-interfaces = { path = "../interfaces" }
+lightning-interfaces = { path = "../interfaces" }
 axum.workspace = true
 anyhow.workspace = true
 jsonrpc-v2.workspace = true
@@ -22,5 +22,5 @@ hp-fixed.workspace = true
 
 [dev-dependencies]
 reqwest = { workspace = true, features = ["json"] }
-freek-application = { path = "../application" }
-#freek-consensus = {path="../consensus"}
+lightning-application = { path = "../application" }
+#lightning-consensus = {path="../consensus"}

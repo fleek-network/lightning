@@ -2653,10 +2653,10 @@ dependencies = [
  "bytes",
  "criterion 0.4.0",
  "fleek-crypto",
- "freek-handshake",
- "freek-interfaces",
- "freek-test-utils",
  "futures",
+ "lightning-handshake",
+ "lightning-interfaces",
+ "lightning-test-utils",
  "rand 0.8.5",
  "serde",
  "tokio",
@@ -2766,336 +2766,6 @@ name = "fragile"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c2141d6d6c8512188a7891b4b01590a45f6dac67afb4f255c4124dbb86d4eaa"
-
-[[package]]
-name = "freek-application"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "atomo",
- "bincode",
- "fleek-crypto",
- "freek-interfaces",
- "freek-reputation",
- "freek-test-utils",
- "hp-fixed",
- "lazy_static",
- "multiaddr",
- "num-traits",
- "rand 0.8.5",
- "serde",
- "tokio",
- "toml 0.7.6",
-]
-
-[[package]]
-name = "freek-blockstore"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "bincode",
- "blake3-tree",
- "bytes",
- "freek-interfaces",
- "parking_lot",
- "serde",
- "tempdir",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "freek-consensus"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "bincode",
- "dashmap",
- "derive_more",
- "fastcrypto",
- "fleek-crypto",
- "freek-interfaces",
- "futures",
- "futures-util",
- "fxhash",
- "log",
- "multiaddr",
- "mysten-metrics",
- "mysten-network",
- "narwhal-config",
- "narwhal-consensus",
- "narwhal-crypto",
- "narwhal-executor",
- "narwhal-network",
- "narwhal-node",
- "narwhal-primary",
- "narwhal-types",
- "narwhal-worker",
- "prometheus",
- "rand 0.8.5",
- "resolve-path",
- "serde",
- "sui-protocol-config",
- "tokio",
- "tonic",
- "typed-store",
-]
-
-[[package]]
-name = "freek-handshake"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "arrayref",
- "arrayvec",
- "async-trait",
- "bytes",
- "criterion 0.4.0",
- "dashmap",
- "fleek-crypto",
- "freek-interfaces",
- "futures",
- "serde",
- "tokio",
-]
-
-[[package]]
-name = "freek-interfaces"
-version = "0.1.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "atomo",
- "blake3-tree",
- "bytes",
- "fleek-crypto",
- "hp-fixed",
- "ink-quill",
- "multiaddr",
- "num-bigint",
- "num-derive",
- "num-traits",
- "serde",
- "serde-big-array",
- "thiserror",
- "tokio",
- "tokio-stream",
- "zeroize",
-]
-
-[[package]]
-name = "freek-node"
-version = "0.1.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "bytes",
- "chrono",
- "clap 4.3.17",
- "fleek-crypto",
- "freek-application",
- "freek-blockstore",
- "freek-consensus",
- "freek-handshake",
- "freek-interfaces",
- "freek-notifier",
- "freek-rep-collector",
- "freek-rpc",
- "freek-signer",
- "freek-test-utils",
- "log",
- "mock",
- "mockall",
- "serde",
- "simplelog",
- "tokio",
- "tokio-stream",
- "toml 0.7.6",
- "tracing",
-]
-
-[[package]]
-name = "freek-notifier"
-version = "0.0.0"
-dependencies = [
- "async-trait",
- "freek-application",
- "freek-interfaces",
- "tokio",
-]
-
-[[package]]
-name = "freek-origin-arweave"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "freek-interfaces",
- "serde",
-]
-
-[[package]]
-name = "freek-origin-filecoin"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "freek-interfaces",
- "serde",
-]
-
-[[package]]
-name = "freek-origin-ipfs"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "freek-interfaces",
- "serde",
-]
-
-[[package]]
-name = "freek-pod"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "freek-interfaces",
- "serde",
-]
-
-[[package]]
-name = "freek-rep-collector"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "fleek-crypto",
- "freek-application",
- "freek-interfaces",
- "freek-notifier",
- "freek-reputation",
- "freek-signer",
- "freek-test-utils",
- "lru",
- "rand 0.8.5",
- "scc",
- "serde",
- "tokio",
-]
-
-[[package]]
-name = "freek-reputation"
-version = "0.0.0"
-dependencies = [
- "fleek-crypto",
- "freek-interfaces",
- "freek-test-utils",
- "hp-fixed",
- "rand 0.8.5",
-]
-
-[[package]]
-name = "freek-rpc"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "axum",
- "bincode",
- "fleek-crypto",
- "freek-application",
- "freek-interfaces",
- "hp-fixed",
- "jsonrpc-v2",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "freek-signer"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "dirs 5.0.1",
- "fleek-crypto",
- "freek-application",
- "freek-interfaces",
- "freek-test-utils",
- "hp-fixed",
- "log",
- "serde",
- "tokio",
-]
-
-[[package]]
-name = "freek-table"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "bincode",
- "fleek-crypto",
- "freek-interfaces",
- "serde",
- "thiserror",
- "tokio",
- "tokio-util 0.7.8",
- "tracing",
-]
-
-[[package]]
-name = "freek-test-utils"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "fleek-crypto",
- "freek-application",
- "freek-blockstore",
- "freek-handshake",
- "freek-interfaces",
- "hp-fixed",
- "rand 0.8.5",
- "scc",
- "serde",
- "tokio",
-]
-
-[[package]]
-name = "freek-topology"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.21.2",
- "criterion 0.5.1",
- "csv",
- "fleek-crypto",
- "freek-application",
- "freek-interfaces",
- "fxhash",
- "mcmf",
- "ndarray",
- "ndarray-rand",
- "num-traits",
- "plotters",
- "rand 0.8.5",
- "rand_chacha 0.3.1",
- "serde",
- "serde_json",
- "simulon",
- "tokio",
-]
 
 [[package]]
 name = "freetype"
@@ -3946,6 +3616,336 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-application"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "atomo",
+ "bincode",
+ "fleek-crypto",
+ "hp-fixed",
+ "lazy_static",
+ "lightning-interfaces",
+ "lightning-reputation",
+ "lightning-test-utils",
+ "multiaddr",
+ "num-traits",
+ "rand 0.8.5",
+ "serde",
+ "tokio",
+ "toml 0.7.6",
+]
+
+[[package]]
+name = "lightning-blockstore"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "blake3-tree",
+ "bytes",
+ "lightning-interfaces",
+ "parking_lot",
+ "serde",
+ "tempdir",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "lightning-consensus"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "dashmap",
+ "derive_more",
+ "fastcrypto",
+ "fleek-crypto",
+ "futures",
+ "futures-util",
+ "fxhash",
+ "lightning-interfaces",
+ "log",
+ "multiaddr",
+ "mysten-metrics",
+ "mysten-network",
+ "narwhal-config",
+ "narwhal-consensus",
+ "narwhal-crypto",
+ "narwhal-executor",
+ "narwhal-network",
+ "narwhal-node",
+ "narwhal-primary",
+ "narwhal-types",
+ "narwhal-worker",
+ "prometheus",
+ "rand 0.8.5",
+ "resolve-path",
+ "serde",
+ "sui-protocol-config",
+ "tokio",
+ "tonic",
+ "typed-store",
+]
+
+[[package]]
+name = "lightning-handshake"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "arrayref",
+ "arrayvec",
+ "async-trait",
+ "bytes",
+ "criterion 0.4.0",
+ "dashmap",
+ "fleek-crypto",
+ "futures",
+ "lightning-interfaces",
+ "serde",
+ "tokio",
+]
+
+[[package]]
+name = "lightning-interfaces"
+version = "0.1.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "atomo",
+ "blake3-tree",
+ "bytes",
+ "fleek-crypto",
+ "hp-fixed",
+ "ink-quill",
+ "multiaddr",
+ "num-bigint",
+ "num-derive",
+ "num-traits",
+ "serde",
+ "serde-big-array",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "zeroize",
+]
+
+[[package]]
+name = "lightning-node"
+version = "0.1.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "chrono",
+ "clap 4.3.17",
+ "fleek-crypto",
+ "lightning-application",
+ "lightning-blockstore",
+ "lightning-consensus",
+ "lightning-handshake",
+ "lightning-interfaces",
+ "lightning-notifier",
+ "lightning-rep-collector",
+ "lightning-rpc",
+ "lightning-signer",
+ "lightning-test-utils",
+ "log",
+ "mock",
+ "mockall",
+ "serde",
+ "simplelog",
+ "tokio",
+ "tokio-stream",
+ "toml 0.7.6",
+ "tracing",
+]
+
+[[package]]
+name = "lightning-notifier"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "lightning-application",
+ "lightning-interfaces",
+ "tokio",
+]
+
+[[package]]
+name = "lightning-origin-arweave"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "lightning-interfaces",
+ "serde",
+]
+
+[[package]]
+name = "lightning-origin-filecoin"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "lightning-interfaces",
+ "serde",
+]
+
+[[package]]
+name = "lightning-origin-ipfs"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "lightning-interfaces",
+ "serde",
+]
+
+[[package]]
+name = "lightning-pod"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "lightning-interfaces",
+ "serde",
+]
+
+[[package]]
+name = "lightning-rep-collector"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "fleek-crypto",
+ "lightning-application",
+ "lightning-interfaces",
+ "lightning-notifier",
+ "lightning-reputation",
+ "lightning-signer",
+ "lightning-test-utils",
+ "lru",
+ "rand 0.8.5",
+ "scc",
+ "serde",
+ "tokio",
+]
+
+[[package]]
+name = "lightning-reputation"
+version = "0.0.0"
+dependencies = [
+ "fleek-crypto",
+ "hp-fixed",
+ "lightning-interfaces",
+ "lightning-test-utils",
+ "rand 0.8.5",
+]
+
+[[package]]
+name = "lightning-rpc"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "axum",
+ "bincode",
+ "fleek-crypto",
+ "hp-fixed",
+ "jsonrpc-v2",
+ "lightning-application",
+ "lightning-interfaces",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "lightning-signer"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "dirs 5.0.1",
+ "fleek-crypto",
+ "hp-fixed",
+ "lightning-application",
+ "lightning-interfaces",
+ "lightning-test-utils",
+ "log",
+ "serde",
+ "tokio",
+]
+
+[[package]]
+name = "lightning-table"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "fleek-crypto",
+ "lightning-interfaces",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tokio-util 0.7.8",
+ "tracing",
+]
+
+[[package]]
+name = "lightning-test-utils"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "fleek-crypto",
+ "hp-fixed",
+ "lightning-application",
+ "lightning-blockstore",
+ "lightning-handshake",
+ "lightning-interfaces",
+ "rand 0.8.5",
+ "scc",
+ "serde",
+ "tokio",
+]
+
+[[package]]
+name = "lightning-topology"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.21.2",
+ "criterion 0.5.1",
+ "csv",
+ "fleek-crypto",
+ "fxhash",
+ "lightning-application",
+ "lightning-interfaces",
+ "mcmf",
+ "ndarray",
+ "ndarray-rand",
+ "num-traits",
+ "plotters",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "serde",
+ "serde_json",
+ "simulon",
+ "tokio",
+]
+
+[[package]]
 name = "linked-hash-map"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4141,8 +4141,8 @@ dependencies = [
  "async-trait",
  "axum",
  "fleek-crypto",
- "freek-interfaces",
  "hp-fixed",
+ "lightning-interfaces",
  "log",
  "rand 0.8.5",
  "rand_chacha 0.3.1",

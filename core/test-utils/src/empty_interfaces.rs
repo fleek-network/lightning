@@ -7,7 +7,8 @@ use fleek_crypto::{
     ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey,
     NodeSecretKey, NodeSignature,
 };
-use freek_interfaces::{
+use hp_fixed::unsigned::HpUfixed;
+use lightning_interfaces::{
     types::{
         Epoch, EpochInfo, NodeInfo, NodeServed, ProtocolParams, ReportedReputationMeasurements,
         Service, ServiceId, TotalServed, TransactionResponse, UpdateRequest,
@@ -17,7 +18,6 @@ use freek_interfaces::{
     ReputationReporterInterface, SignerInterface, SubmitTxSocket, SyncQueryRunnerInterface, Topic,
     TopologyInterface, Weight, WithStartAndShutdown,
 };
-use hp_fixed::unsigned::HpUfixed;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::{mpsc, Notify};
 
@@ -399,7 +399,7 @@ impl SyncQueryRunnerInterface for MockQueryRunner {
     fn get_service_info(&self, _service_id: ServiceId) -> Service {
         Service {
             owner: EthAddress([0; 20]),
-            commodity_type: freek_interfaces::types::CommodityTypes::Bandwidth,
+            commodity_type: lightning_interfaces::types::CommodityTypes::Bandwidth,
             slashing: (),
         }
     }

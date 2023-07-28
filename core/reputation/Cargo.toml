@@ -1,16 +1,16 @@
 [package]
-name = "freek-reputation"
+name = "lightning-reputation"
 version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-freek-interfaces = {path="../interfaces"}
+lightning-interfaces = {path="../interfaces"}
 fleek-crypto.workspace = true
 hp-fixed.workspace = true
 
 [dev-dependencies]
-freek-test-utils = {path="../test-utils"}
+lightning-test-utils = {path="../test-utils"}
 rand.workspace = true
 

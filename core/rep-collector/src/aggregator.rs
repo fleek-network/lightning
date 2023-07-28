@@ -2,8 +2,8 @@ use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
-use freek_application::query_runner::QueryRunner;
-use freek_interfaces::{
+use lightning_application::query_runner::QueryRunner;
+use lightning_interfaces::{
     config::ConfigConsumer,
     notifier::{Notification, NotifierInterface},
     reputation::ReputationAggregatorInterface,
@@ -11,7 +11,7 @@ use freek_interfaces::{
     types::UpdateMethod,
     ReputationQueryInteface, ReputationReporterInterface, Weight,
 };
-use freek_notifier::Notifier;
+use lightning_notifier::Notifier;
 use tokio::sync::mpsc;
 
 use crate::{buffered_mpsc, config::Config, measurement_manager::MeasurementManager};

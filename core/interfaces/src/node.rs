@@ -11,7 +11,7 @@ use crate::{
     rpc::RpcInterface, signer::SignerInterface, GossipInterface, TopologyInterface,
 };
 
-pub trait FreekTypes: Send + Sync {
+pub trait LightningTypes: Send + Sync {
     type ConfigProvider: ConfigProviderInterface;
     type Consensus: ConsensusInterface<
         QueryRunner = <Self::Application as ApplicationInterface>::SyncExecutor,
@@ -44,7 +44,7 @@ pub trait FreekTypes: Send + Sync {
     >;
 }
 
-pub struct Node<T: FreekTypes> {
+pub struct Node<T: LightningTypes> {
     pub configuration: Arc<T::ConfigProvider>,
     pub consensus: T::Consensus,
     pub application: T::Application,
@@ -62,7 +62,7 @@ pub struct Node<T: FreekTypes> {
     pub notifier: PhantomData<T::Notifier>,
 }
 
-impl<T: FreekTypes> Node<T> {
+impl<T: LightningTypes> Node<T> {
     pub async fn init(configuration: Arc<T::ConfigProvider>) -> anyhow::Result<Self> {
         let application = T::Application::init(configuration.get::<T::Application>()).await?;
 
@@ -178,7 +178,7 @@ impl<T: FreekTypes> Node<T> {
 }
 
 #[async_trait]
-impl<T: FreekTypes> WithStartAndShutdown for Node<T>
+impl<T: LightningTypes> WithStartAndShutdown for Node<T>
 where
     Self: Send,
     for<'a> &'a Self: Send,
@@ -216,21 +216,21 @@ pub mod transformers {
 
     #[rustfmt::skip]
     pub struct WithConsensus<
-        T: FreekTypes,
+        T: LightningTypes,
         Consensus: ConsensusInterface<
             QueryRunner = <T::Application as ApplicationInterface>::SyncExecutor
                 >,
             >(T, PhantomData<Consensus>);
 
     impl<
-        T: FreekTypes,
+        T: LightningTypes,
         Consensus: ConsensusInterface<
             QueryRunner = <T::Application as ApplicationInterface>::SyncExecutor,
             PubSub = <T::Gossip as GossipInterface>::PubSub<
                 <Consensus as ConsensusInterface>::Certificate,
             >,
         >,
-    > FreekTypes for WithConsensus<T, Consensus>
+    > LightningTypes for WithConsensus<T, Consensus>
     {
         type ConfigProvider = T::ConfigProvider;
         type Consensus = Consensus;

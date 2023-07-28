@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use freek_interfaces::types::ReputationMeasurements;
+use lightning_interfaces::types::ReputationMeasurements;
 use rand::{rngs::StdRng, Rng};
 
 pub fn generate_reputation_measurements(

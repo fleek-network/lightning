@@ -6,7 +6,8 @@ use fleek_crypto::{
     AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
     SecretKey,
 };
-use freek_interfaces::{
+use hp_fixed::unsigned::HpUfixed;
+use lightning_interfaces::{
     application::ExecutionEngineSocket,
     types::{
         Block, Epoch, ExecutionError, NodeInfo, ProofOfConsensus, Tokens, TotalServed,
@@ -15,8 +16,7 @@ use freek_interfaces::{
     ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
     ToDigest,
 };
-use freek_test_utils::{random, reputation};
-use hp_fixed::unsigned::HpUfixed;
+use lightning_test_utils::{random, reputation};
 use tokio::test;
 
 use crate::{

@@ -50,5 +50,5 @@ impl TranscriptBuilderInput for MyData {
 Contributions to ink_quill are welcomed. Please make sure to run the test suite before opening a pull request
 
 ## License
-[MIT](https://github.com/fleek-network/freek/blob/main/lib/ink-quill/LICENSE-MIT)
-[APACHE 2.0](https://github.com/fleek-network/freek/blob/main/lib/ink-quill/LICENSE-APACHE)
+[MIT](https://github.com/fleek-network/lightning/blob/main/lib/ink-quill/LICENSE-MIT)
+[APACHE 2.0](https://github.com/fleek-network/lightning/blob/main/lib/ink-quill/LICENSE-APACHE)

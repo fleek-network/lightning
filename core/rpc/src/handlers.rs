@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use axum::{Extension, Json};
 use fleek_crypto::{EthAddress, NodePublicKey};
-use freek_interfaces::{
+use hp_fixed::unsigned::HpUfixed;
+use jsonrpc_v2::{Data, Error, MapRouter, Params, RequestObject, ResponseObjects, Server};
+use lightning_interfaces::{
     types::{EpochInfo, NodeInfo, NodeServed, ProtocolParams, TotalServed, UpdateRequest},
     SyncQueryRunnerInterface,
 };
-use hp_fixed::unsigned::HpUfixed;
-use jsonrpc_v2::{Data, Error, MapRouter, Params, RequestObject, ResponseObjects, Server};
 
 use crate::{
     server::RpcData,

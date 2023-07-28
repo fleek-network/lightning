@@ -6,13 +6,14 @@ use fleek_crypto::{
     AccountOwnerSecretKey, EthAddress, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey,
     PublicKey, SecretKey,
 };
-use freek_application::{
+use hp_fixed::unsigned::HpUfixed;
+use lightning_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
     genesis::{Genesis, GenesisAccount},
     query_runner::QueryRunner,
 };
-use freek_interfaces::{
+use lightning_interfaces::{
     types::{
         EpochInfo, NodeInfo, NodeServed, ProtocolParams, Staking, TotalServed, UpdateRequest,
         Worker as NodeWorker,
@@ -20,7 +21,6 @@ use freek_interfaces::{
     ApplicationInterface, MempoolSocket, RpcInterface, SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
-use hp_fixed::unsigned::HpUfixed;
 use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};

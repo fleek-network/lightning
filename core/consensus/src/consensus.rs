@@ -10,7 +10,7 @@ use std::{
 
 use affair::{Executor, TokioSpawn};
 use async_trait::async_trait;
-use freek_interfaces::{
+use lightning_interfaces::{
     application::ExecutionEngineSocket,
     common::WithStartAndShutdown,
     config::ConfigConsumer,

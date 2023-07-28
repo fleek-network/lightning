@@ -1,4 +1,4 @@
-use freek_interfaces::PubSub;
+use lightning_interfaces::PubSub;
 use narwhal_config::{Committee, Parameters, WorkerCache};
 use narwhal_executor::ExecutionState;
 use narwhal_node::NodeStorage;

@@ -4,16 +4,16 @@ use std::{
 };
 
 use fleek_crypto::{AccountOwnerSecretKey, PublicKey, SecretKey};
-use freek_application::{
+use lightning_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
     genesis::{Genesis, GenesisCommittee},
 };
-use freek_interfaces::{
+use lightning_interfaces::{
     application::ApplicationInterface, common::WithStartAndShutdown, consensus::ConsensusInterface,
     signer::SignerInterface, types::UpdateMethod, GossipInterface, SyncQueryRunnerInterface, Topic,
 };
-use freek_test_utils::{
+use lightning_test_utils::{
     consensus::{Config as ConsensusConfig, MockConsensus},
     empty_interfaces::MockGossip,
 };

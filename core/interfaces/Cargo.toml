@@ -1,5 +1,5 @@
 [package]
-name = "freek-interfaces"
+name = "lightning-interfaces"
 version = "0.1.0"
 edition = "2021"
 

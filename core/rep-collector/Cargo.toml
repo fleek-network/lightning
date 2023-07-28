@@ -1,15 +1,15 @@
 [package]
-name = "freek-rep-collector"
+name = "lightning-rep-collector"
 version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-freek-interfaces = {path="../interfaces"}
-freek-application = {path="../application"}
-freek-reputation = {path="../reputation"}
-freek-notifier = {path="../notifier"}
+lightning-interfaces = {path="../interfaces"}
+lightning-application = {path="../application"}
+lightning-reputation = {path="../reputation"}
+lightning-notifier = {path="../notifier"}
 anyhow.workspace = true
 serde.workspace = true
 async-trait.workspace = true
@@ -19,7 +19,7 @@ lru.workspace = true
 scc.workspace = true
 
 [dev-dependencies]
-freek-test-utils = {path="../test-utils"}
-freek-signer = {path="../signer"}
-freek-application = {path="../application", features = ["test"]}
+lightning-test-utils = {path="../test-utils"}
+lightning-signer = {path="../signer"}
+lightning-application = {path="../application", features = ["test"]}
 rand.workspace = true

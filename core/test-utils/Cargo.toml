@@ -1,12 +1,12 @@
 [package]
-name = "freek-test-utils"
+name = "lightning-test-utils"
 version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-freek-interfaces = {path="../interfaces"}
+lightning-interfaces = {path="../interfaces"}
 async-trait.workspace = true
 fleek-crypto.workspace = true
 affair.workspace = true
@@ -17,6 +17,6 @@ tokio.workspace = true
 scc.workspace = true
 hp-fixed.workspace = true
 
-freek-handshake = { path = "../handshake" }
-freek-application = { path = "../application" }
-freek-blockstore = { path = "../blockstore" }
+lightning-handshake = { path = "../handshake" }
+lightning-application = { path = "../application" }
+lightning-blockstore = { path = "../blockstore" }

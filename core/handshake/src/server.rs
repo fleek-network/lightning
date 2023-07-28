@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use fleek_crypto::{ClientPublicKey, NodePublicKey};
-use freek_interfaces::{
+use lightning_interfaces::{
     handshake::HandshakeInterface, CompressionAlgoSet, ConfigConsumer, ConnectionInterface,
     WithStartAndShutdown,
 };
@@ -327,7 +327,7 @@ impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> Co
     fn get_client(&self) -> &ClientPublicKey {
         &self.client_id
     }
-    fn get_compression_set(&self) -> freek_interfaces::CompressionAlgoSet {
+    fn get_compression_set(&self) -> lightning_interfaces::CompressionAlgoSet {
         self.compression_set
     }
 }
@@ -337,8 +337,8 @@ impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> Co
 // #[cfg(test)]
 // mod tests {
 //     use affair::{Executor, TokioSpawn};
-//     use freek_application::{app::Application, config::Config};
-//     use freek_interfaces::ApplicationInterface;
+//     use lightning_application::{app::Application, config::Config};
+//     use lightning_interfaces::ApplicationInterface;
 //     use fleek_crypto::ClientSignature;
 //     use tokio::{
 //         self,
@@ -378,7 +378,7 @@ impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> Co
 //         server.register_service_request_handler(0, sdk, |_, mut conn| {
 //             Box::pin(async move {
 //                 let writer = conn.writer();
-//                 writer.write_all(b"hello freek").await.unwrap();
+//                 writer.write_all(b"hello lightning").await.unwrap();
 //             })
 //         });
 //
@@ -403,7 +403,7 @@ impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> Co
 //         // service subprotocol
 //         let mut buf = [0u8; 11];
 //         r.read_exact(&mut buf).await?;
-//         assert_eq!(String::from_utf8_lossy(&buf), "hello freek");
+//         assert_eq!(String::from_utf8_lossy(&buf), "hello lightning");
 //
 //         server.shutdown().await;
 //         assert!(!server.is_running());
@@ -428,7 +428,7 @@ impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> Co
 //         server.register_service_request_handler(0, sdk, |_, mut conn| {
 //             Box::pin(async move {
 //                 let writer = conn.writer();
-//                 writer.write_all(b"hello freek").await.unwrap();
+//                 writer.write_all(b"hello lightning").await.unwrap();
 //             })
 //         });
 //
@@ -453,7 +453,7 @@ impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> Co
 //         // service subprotocol
 //         let mut buf = [0u8; 11];
 //         r.read_exact(&mut buf).await?;
-//         assert_eq!(String::from_utf8_lossy(&buf), "hello freek");
+//         assert_eq!(String::from_utf8_lossy(&buf), "hello lightning");
 //
 //         server.shutdown().await;
 //         assert!(!server.is_running());

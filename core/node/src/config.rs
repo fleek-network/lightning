@@ -1,7 +1,7 @@
 use std::{fs, path::Path, sync::Mutex};
 
 use anyhow::Context;
-use freek_interfaces::config::ConfigProviderInterface;
+use lightning_interfaces::config::ConfigProviderInterface;
 use toml::{Table, Value};
 
 /// The implementation of a configuration loader that uses the `toml` backend.
@@ -42,7 +42,7 @@ impl TomlConfigProvider {
 }
 
 impl ConfigProviderInterface for TomlConfigProvider {
-    fn get<S: freek_interfaces::config::ConfigConsumer>(&self) -> S::Config {
+    fn get<S: lightning_interfaces::config::ConfigConsumer>(&self) -> S::Config {
         let mut table = self.table.lock().expect("failed to acquire lock");
 
         // Parse the table value into S::Config, or use the default in the event it doesn't exist.

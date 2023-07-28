@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use blake3_tree::ProofBuf;
-use freek_handshake::server::RawLaneConnection;
-use freek_interfaces::{ConnectionInterface, FileSystemInterface, HandlerFn, SdkInterface};
+use lightning_handshake::server::RawLaneConnection;
+use lightning_interfaces::{ConnectionInterface, FileSystemInterface, HandlerFn, SdkInterface};
 use futures::FutureExt;
 use tokio::io::{AsyncRead, AsyncWrite};
 
@@ -123,13 +123,13 @@ mod tests {
     use std::net::SocketAddr;
 
     use anyhow::Result;
-    use freek_handshake::server::{HandshakeServer, HandshakeServerConfig, TcpHandshakeServer};
-    use freek_interfaces::{
+    use lightning_handshake::server::{HandshakeServer, HandshakeServerConfig, TcpHandshakeServer};
+    use lightning_interfaces::{
         ApplicationInterface, BlockStoreInterface, CompressionAlgorithm, FileSystemInterface,
         HandshakeInterface, IncrementalPutInterface, SdkInterface, SignerInterface,
         WithStartAndShutdown,
     };
-    use freek_test_utils::{
+    use lightning_test_utils::{
         app::app::Application,
         blockstore::MemoryBlockStore,
         empty_interfaces::{
@@ -161,7 +161,7 @@ mod tests {
         [u8; 32],
     )> {
         // setup blockstore with some content
-        let blockstore = MemoryBlockStore::init(freek_test_utils::blockstore::Config {}).await?;
+        let blockstore = MemoryBlockStore::init(lightning_test_utils::blockstore::Config {}).await?;
         let content = create_content();
         let mut putter = blockstore.put(None);
         putter
@@ -171,9 +171,9 @@ mod tests {
 
         // setup sdk and friends
         let signer = MockSigner::init(MockConfig {}, MockQueryRunner {}).await?;
-        let app = Application::init(freek_test_utils::app::config::Config {
+        let app = Application::init(lightning_test_utils::app::config::Config {
             genesis: None,
-            mode: freek_test_utils::app::config::Mode::Test,
+            mode: lightning_test_utils::app::config::Mode::Test,
         })
         .await?;
         let sdk = MockSdk::<OwnedReadHalf, OwnedWriteHalf>::new(

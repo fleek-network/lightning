@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use freek_blockstore::memory::MemoryBlockStore;
-use freek_interfaces::{
+use lightning_blockstore::memory::MemoryBlockStore;
+use lightning_interfaces::{
     Blake3Hash, Blake3Tree, BlockStoreInterface, CompressionAlgoSet, ConfigConsumer, ContentChunk,
     FileSystemInterface, WithStartAndShutdown,
 };

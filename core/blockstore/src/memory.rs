@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use freek_interfaces::{
+use lightning_interfaces::{
     Blake3Hash, Blake3Tree, BlockStoreInterface, CompressionAlgoSet, CompressionAlgorithm,
     ConfigConsumer, ContentChunk,
 };

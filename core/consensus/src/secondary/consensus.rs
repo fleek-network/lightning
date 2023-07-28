@@ -1,8 +1,8 @@
 use std::{marker::PhantomData, sync::Arc};
 
-use freek_interfaces::PubSub;
 use futures::StreamExt;
 use futures_util::stream::FuturesOrdered;
+use lightning_interfaces::PubSub;
 use mysten_metrics::metered_channel;
 use narwhal_config::{committee, Committee, Parameters, WorkerCache};
 use narwhal_consensus::{

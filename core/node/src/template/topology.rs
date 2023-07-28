@@ -2,7 +2,7 @@ use std::{marker::PhantomData, sync::Arc};
 
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
-use freek_interfaces::{ConfigConsumer, SyncQueryRunnerInterface, TopologyInterface};
+use lightning_interfaces::{ConfigConsumer, SyncQueryRunnerInterface, TopologyInterface};
 
 use super::config::Config;
 

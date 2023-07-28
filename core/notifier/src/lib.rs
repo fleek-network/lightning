@@ -1,8 +1,8 @@
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
-use freek_application::query_runner::QueryRunner;
-use freek_interfaces::{
+use lightning_application::query_runner::QueryRunner;
+use lightning_interfaces::{
     application::SyncQueryRunnerInterface,
     notifier::{Notification, NotifierInterface},
 };
@@ -56,13 +56,13 @@ impl NotifierInterface for Notifier {
 
 #[cfg(test)]
 mod tests {
-    use freek_application::{
+    use lightning_application::{
         app::Application,
         config::{Config, Mode},
         genesis::Genesis,
         query_runner::QueryRunner,
     };
-    use freek_interfaces::application::{ApplicationInterface, ExecutionEngineSocket};
+    use lightning_interfaces::application::{ApplicationInterface, ExecutionEngineSocket};
 
     use super::*;
 

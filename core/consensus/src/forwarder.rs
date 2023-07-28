@@ -13,7 +13,7 @@ use anyhow::{bail, Result};
 use async_trait::async_trait;
 use fastcrypto::bls12381::min_sig::BLS12381PublicKey;
 use fleek_crypto::NodePublicKey;
-use freek_interfaces::{
+use lightning_interfaces::{
     types::{Epoch, EpochInfo, NodeInfo, UpdateRequest},
     SyncQueryRunnerInterface,
 };

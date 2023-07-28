@@ -4,9 +4,9 @@ use std::time::Duration;
 
 use criterion::{measurement::Measurement, *};
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
-use freek_handshake::connection::{HandshakeConnection, HandshakeFrame, Reason};
-use freek_interfaces::CompressionAlgoSet;
 use futures::executor::block_on;
+use lightning_handshake::connection::{HandshakeConnection, HandshakeFrame, Reason};
+use lightning_interfaces::CompressionAlgoSet;
 use tokio::sync::Mutex;
 
 mod transport {

@@ -1,22 +1,22 @@
 [package]
-name = "freek-node"
+name = "lightning-node"
 version = "0.1.0"
 edition = "2021"
-default-run = "freek-node"
+default-run = "lightning-node"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-freek-application = { path = "../application" }
-freek-blockstore = { path = "../blockstore" }
-freek-handshake = { path = "../handshake" }
-freek-interfaces = { path = "../interfaces" }
-freek-rep-collector = { path = "../rep-collector" }
-freek-consensus = { path = "../consensus" }
-freek-notifier = { path = "../notifier" }
-freek-rpc = { path = "../rpc" }
-freek-signer = { path = "../signer" }
-freek-test-utils = { path = "../test-utils" }
+lightning-application = { path = "../application" }
+lightning-blockstore = { path = "../blockstore" }
+lightning-handshake = { path = "../handshake" }
+lightning-interfaces = { path = "../interfaces" }
+lightning-rep-collector = { path = "../rep-collector" }
+lightning-consensus = { path = "../consensus" }
+lightning-notifier = { path = "../notifier" }
+lightning-rpc = { path = "../rpc" }
+lightning-signer = { path = "../signer" }
+lightning-test-utils = { path = "../test-utils" }
 mock = { path = "../mock" }
 anyhow.workspace = true
 clap = { version = "4.2", features = ["derive"] }

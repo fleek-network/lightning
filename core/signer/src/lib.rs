@@ -16,8 +16,8 @@ use fleek_crypto::{
     NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
     SecretKey, TransactionSender,
 };
-use freek_application::query_runner::QueryRunner;
-use freek_interfaces::{
+use lightning_application::query_runner::QueryRunner;
+use lightning_interfaces::{
     common::{ToDigest, WithStartAndShutdown},
     config::ConfigConsumer,
     signer::{SignerInterface, SubmitTxSocket},

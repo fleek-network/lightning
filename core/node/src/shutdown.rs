@@ -1,5 +1,5 @@
 //! The shutdown module makes it easy for us to have one source for sending shutdowns
-//! signal to every sub service and have proper and graceful shutdowns in all of Freek
+//! signal to every sub service and have proper and graceful shutdowns in all of Lightning
 //! services.
 
 use std::sync::Arc;

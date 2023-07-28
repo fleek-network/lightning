@@ -4,8 +4,8 @@ use std::{
 };
 
 use fleek_crypto::NodePublicKey;
-use freek_interfaces::types::ReputationMeasurements;
 use hp_fixed::signed::HpFixed;
+use lightning_interfaces::types::ReputationMeasurements;
 
 use crate::{statistics, PRECISION};
 
