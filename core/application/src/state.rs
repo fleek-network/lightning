@@ -36,9 +36,9 @@ const MIN_NUM_MEASUREMENTS: usize = 2;
 /// Reported measurements are weighted by the reputation score of the reporting node.
 /// If there is no reputation score for the reporting node, we use a quantile from the array
 /// of all reputation scores.
-/// For example, if `DEFAULT_REP_QUANTILE = 0.1`, then we use the reputation score that is higher
-/// than 10% of scores and lower than 90% of scores.
-const DEFAULT_REP_QUANTILE: f64 = 0.1;
+/// For example, if `DEFAULT_REP_QUANTILE = 0.15`, then we use the reputation score that is higher
+/// than 15% of scores and lower than 75% of scores.
+const DEFAULT_REP_QUANTILE: f64 = 0.15;
 
 /// The rep score of a node is the exponentially weighted moving average of its rep scores over the
 /// past epochs.
@@ -672,7 +672,7 @@ impl<B: Backend> State<B> {
             rep_scores.values().copied().collect(),
             DEFAULT_REP_QUANTILE,
         )
-        .unwrap_or(0);
+        .unwrap_or(15);
 
         let mut map = HashMap::new();
         for node in self.rep_measurements.keys() {
@@ -700,7 +700,7 @@ impl<B: Backend> State<B> {
         let new_rep_scores = freek_reputation::calculate_reputation_scores(map);
         // Store new scores in application state.
         new_rep_scores.iter().for_each(|(node, new_score)| {
-            let old_score = rep_scores.get(node).unwrap_or(&0);
+            let old_score = rep_scores.get(node).unwrap_or(&default_score);
             let score =
                 *old_score as f64 * REP_EWMA_WEIGHT + (1.0 - REP_EWMA_WEIGHT) * *new_score as f64;
             self.rep_scores.set(*node, score as u8)
