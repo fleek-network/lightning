@@ -27,14 +27,22 @@ impl<Q: SyncQueryRunnerInterface> Topology<Q> {
     #[allow(dead_code)]
     fn build_latency_matrix(&self) -> (Array2<i32>, HashMap<usize, NodePublicKey>, Option<usize>) {
         let latencies = self.query.get_latencies();
+        let valid_pubkeys: BTreeSet<NodePublicKey> = self
+            .query
+            .get_node_registry()
+            .into_iter()
+            .map(|node_info| node_info.public_key)
+            .collect();
+
         let latency_count = latencies.len();
         let mut latency_map: HashMap<NodePublicKey, HashMap<NodePublicKey, Duration>> =
             HashMap::new();
-        let mut pubkeys = BTreeSet::new();
         let mut latency_sum = Duration::ZERO;
         for ((pubkey_lhs, pubkey_rhs), latency) in latencies {
-            pubkeys.insert(pubkey_lhs);
-            pubkeys.insert(pubkey_rhs);
+            if !valid_pubkeys.contains(&pubkey_lhs) || !valid_pubkeys.contains(&pubkey_rhs) {
+                continue;
+            }
+
             latency_sum += latency;
             let opposite_dir_latency = latency_map
                 .get(&pubkey_rhs)
@@ -60,9 +68,9 @@ impl<Q: SyncQueryRunnerInterface> Topology<Q> {
         let mean_latency = latency_sum / latency_count as u32; // why do we have to cast to u32?
         let mean_latency: i32 = mean_latency.as_micros().try_into().unwrap_or(i32::MAX);
 
-        let mut matrix = Array::zeros((pubkeys.len(), pubkeys.len()));
-        for (index_lhs, pubkey_lhs) in pubkeys.iter().enumerate() {
-            for (index_rhs, pubkey_rhs) in pubkeys.iter().enumerate() {
+        let mut matrix = Array::zeros((valid_pubkeys.len(), valid_pubkeys.len()));
+        for (index_lhs, pubkey_lhs) in valid_pubkeys.iter().enumerate() {
+            for (index_rhs, pubkey_rhs) in valid_pubkeys.iter().enumerate() {
                 if index_lhs != index_rhs {
                     matrix[[index_lhs, index_rhs]] = mean_latency;
                     matrix[[index_rhs, index_lhs]] = mean_latency;
@@ -86,7 +94,7 @@ impl<Q: SyncQueryRunnerInterface> Topology<Q> {
             }
         }
         let mut our_index = None;
-        let index_to_pubkey: HashMap<usize, NodePublicKey> = pubkeys
+        let index_to_pubkey: HashMap<usize, NodePublicKey> = valid_pubkeys
             .into_iter()
             .enumerate()
             .map(|(index, pubkey)| {

@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 
-use fleek_crypto::{NodePublicKey, NodeSecretKey, PublicKey, SecretKey};
+use fleek_crypto::{
+    AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
+    SecretKey,
+};
 use freek_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
-    genesis::{Genesis, GenesisLatency},
+    genesis::{Genesis, GenesisCommittee, GenesisLatency},
 };
 use freek_interfaces::{ApplicationInterface, TopologyInterface, WithStartAndShutdown};
 
@@ -12,17 +15,61 @@ use crate::{config::Config, Topology};
 
 #[tokio::test]
 async fn test_build_latency_matrix() {
+    let our_owner_secret_key = AccountOwnerSecretKey::generate();
+    let our_owner_public_key = our_owner_secret_key.to_pk();
     let our_secret_key = NodeSecretKey::generate();
     let our_public_key = our_secret_key.to_pk();
+    let our_network_secret_key = NodeNetworkingSecretKey::generate();
+    let our_network_public_key = our_network_secret_key.to_pk();
 
+    let node_owner_secret_key1 = AccountOwnerSecretKey::generate();
+    let node_owner_public_key1 = node_owner_secret_key1.to_pk();
     let node_secret_key1 = NodeSecretKey::generate();
     let node_public_key1 = node_secret_key1.to_pk();
+    let node_network_secret_key1 = NodeNetworkingSecretKey::generate();
+    let node_network_public_key1 = node_network_secret_key1.to_pk();
 
+    let node_owner_secret_key2 = AccountOwnerSecretKey::generate();
+    let node_owner_public_key2 = node_owner_secret_key2.to_pk();
     let node_secret_key2 = NodeSecretKey::generate();
     let node_public_key2 = node_secret_key2.to_pk();
+    let node_network_secret_key2 = NodeNetworkingSecretKey::generate();
+    let node_network_public_key2 = node_network_secret_key2.to_pk();
 
     // Init application service and store node info in application state.
     let mut genesis = Genesis::load().unwrap();
+    genesis.committee = vec![
+        GenesisCommittee::new(
+            our_owner_public_key.to_base64(),
+            our_public_key.to_base64(),
+            "/ip4/127.0.0.1/udp/48000".to_owned(),
+            our_network_public_key.to_base64(),
+            "/ip4/127.0.0.1/udp/48101/http".to_owned(),
+            our_network_public_key.to_base64(),
+            "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
+            None,
+        ),
+        GenesisCommittee::new(
+            node_owner_public_key1.to_base64(),
+            node_public_key1.to_base64(),
+            "/ip4/127.0.0.1/udp/38000".to_owned(),
+            node_network_public_key1.to_base64(),
+            "/ip4/127.0.0.1/udp/38101/http".to_owned(),
+            node_network_public_key1.to_base64(),
+            "/ip4/127.0.0.1/tcp/38102/http".to_owned(),
+            None,
+        ),
+        GenesisCommittee::new(
+            node_owner_public_key2.to_base64(),
+            node_public_key2.to_base64(),
+            "/ip4/127.0.0.1/udp/28000".to_owned(),
+            node_network_public_key2.to_base64(),
+            "/ip4/127.0.0.1/udp/28101/http".to_owned(),
+            node_network_public_key2.to_base64(),
+            "/ip4/127.0.0.1/tcp/28102/http".to_owned(),
+            None,
+        ),
+    ];
 
     genesis.latencies.push(GenesisLatency {
         node_public_key_lhs: our_public_key.to_base64(),
