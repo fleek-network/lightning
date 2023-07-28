@@ -3070,9 +3070,14 @@ dependencies = [
 name = "freek-topology"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "base64 0.21.2",
  "criterion 0.5.1",
  "csv",
+ "fleek-crypto",
+ "freek-application",
+ "freek-interfaces",
  "fxhash",
  "mcmf",
  "ndarray",

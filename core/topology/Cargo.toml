@@ -4,11 +4,16 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+freek-interfaces = { path = "../interfaces" }
+freek-application = { path = "../application" }
+anyhow = "1.0"
 ndarray = "0.15.6"
 num-traits = "0.2.9"
 mcmf = "2.0.0"
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
+async-trait = "0.1"
+fleek-crypto.workspace = true
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
