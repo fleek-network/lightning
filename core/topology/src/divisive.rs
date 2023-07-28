@@ -6,13 +6,16 @@ use serde::Serialize;
 
 use crate::{clustering::constrained_fasterpam, pairing::greedy_pairs};
 
-/// A divisive hierarchy strategy
+/// A divisive hierarchy strategy that recursively uses constrained fasterpam to cluster nodes at
+/// each depth.
 #[derive(Debug, Clone, Serialize)]
 pub enum DivisiveHierarchy {
-    Group {
+    SuperCluster {
         id: String,
         total: usize,
         children: Vec<DivisiveHierarchy>,
+        // TODO: dont store this and instead traverse the tree at each depth for collecting cluster
+        // assignments
         nodes: Vec<Node>,
     },
     Cluster {
@@ -21,35 +24,36 @@ pub enum DivisiveHierarchy {
     },
 }
 
+/// A node in the hierarchy containing it's index in the dissimilarity matrix, and a list of
+/// connections at each depth of the tree (starting from the top)
 #[derive(Debug, Clone, Serialize)]
 pub struct Node {
     id: usize,
     connections: BTreeMap<usize, Vec<usize>>,
 }
 
+/// A path along the tree, used internally
 #[derive(Debug, Clone)]
-pub struct HierarchyPath(Vec<u8>);
-
+struct HierarchyPath(Vec<u8>);
 impl HierarchyPath {
-    pub fn root() -> Self {
+    fn root() -> Self {
         Self(vec![])
     }
-    pub fn depth(&self) -> usize {
+    fn depth(&self) -> usize {
         self.0.len()
     }
 }
-
 impl Display for HierarchyPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let strings: Vec<_> = self.0.iter().map(|v| v.to_string()).collect();
-        if strings.is_empty() {
-            write!(f, "root")
-        } else {
-            write!(f, "{}", strings.join("."))
-        }
+        strings
+            .is_empty()
+            .then_some(write!(f, "root"))
+            .unwrap_or(write!(f, "{}", strings.join(".")))
     }
 }
 
+// add a connection pair to a list of indeces
 fn add_connection(indeces: &mut [Node], depth: usize, i: usize, j: usize) {
     let jid = indeces[j].id;
     let left = &mut indeces[i];
@@ -61,20 +65,22 @@ fn add_connection(indeces: &mut [Node], depth: usize, i: usize, j: usize) {
 
 impl DivisiveHierarchy {
     /// Create a new divisive hierarchy using constrained fasterpam and selecting random medoids.
-    /// The algorithm divides the nodes into k "superclusters", aka "groups", until it cannot
+    /// For deterministic results, a fast seedable rng source such as ChaCha is recommended.
+    /// The algorithm divides the nodes into k "superclusters" until it cannot
     /// anymore, and finally divides the last superclusters into an optimal number of final
     /// clusters with k nodes in them.
     pub fn new<R: Rng>(rng: &mut R, dissim_matrix: &Array2<i32>, k: usize) -> Self {
-        let nodes: Vec<_> = (0..dissim_matrix.nrows())
+        let indeces: Vec<_> = (0..dissim_matrix.nrows())
             .map(|i| Node {
                 id: i,
                 connections: BTreeMap::new(),
             })
             .collect();
 
-        Self::new_inner(rng, dissim_matrix, nodes, &HierarchyPath::root(), k)
+        Self::new_inner(rng, dissim_matrix, indeces, &HierarchyPath::root(), k)
     }
 
+    /// Recursive function for each depth.
     fn new_inner<R: Rng>(
         rng: &mut R,
         dissim_matrix: &Array2<i32>,
@@ -159,11 +165,11 @@ impl DivisiveHierarchy {
                 children.push(child);
             }
 
-            Self::Group {
+            Self::SuperCluster {
                 id: current_path.to_string(),
                 total: indeces.len(),
-                nodes: indeces,
                 children,
+                nodes: indeces,
             }
         }
     }
@@ -171,7 +177,7 @@ impl DivisiveHierarchy {
     /// Get the total number of nodes in the hierarchy
     pub fn n_nodes(&self) -> usize {
         match self {
-            Self::Group { total, .. } => *total,
+            Self::SuperCluster { total, .. } => *total,
             Self::Cluster { nodes, .. } => nodes.len(),
         }
     }
@@ -189,7 +195,7 @@ impl DivisiveHierarchy {
             let current = *counter;
             *counter += 1;
             match item {
-                DivisiveHierarchy::Group {
+                DivisiveHierarchy::SuperCluster {
                     children, nodes, ..
                 } => {
                     // set assignments

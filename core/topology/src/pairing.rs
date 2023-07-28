@@ -114,7 +114,6 @@ fn test_greedy_pairing() {
     let cluster2 = sample_cluster(100., 100., 1000., 1000., 10);
     let data =
         ndarray::concatenate(ndarray::Axis(0), &[(&cluster1).into(), (&cluster2).into()]).unwrap();
-
     let dis_matrix = get_distance_matrix(&data);
 
     let indeces: Vec<_> = (0..dis_matrix.nrows()).collect();

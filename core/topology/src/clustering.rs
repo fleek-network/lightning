@@ -1,3 +1,5 @@
+//! Novel constrained fasterpam (k-medoids) implementation for clustering.
+//!
 //! This file has largely been adapted from the [kmedoids](https://github.com/kno10/rust-kmedoids)
 //! crate, which provides a fasterpam implementation based off the ENKI codebase. The original code
 //! is licensed under GNU GPLv3 and can be found [here](https://github.com/kno10/rust-kmedoids/blob/main/LICENSE).
