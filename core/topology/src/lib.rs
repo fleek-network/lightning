@@ -20,11 +20,12 @@ use ndarray::{Array, Array2};
 pub struct Topology<Q: SyncQueryRunnerInterface> {
     #[allow(dead_code)]
     query: Q,
+    our_public_key: NodePublicKey,
 }
 
 impl<Q: SyncQueryRunnerInterface> Topology<Q> {
     #[allow(dead_code)]
-    fn build_latency_matrix(&self) -> (Array2<i32>, HashMap<usize, NodePublicKey>) {
+    fn build_latency_matrix(&self) -> (Array2<i32>, HashMap<usize, NodePublicKey>, Option<usize>) {
         let latencies = self.query.get_latencies();
         let latency_count = latencies.len();
         let mut latency_map: HashMap<NodePublicKey, HashMap<NodePublicKey, Duration>> =
@@ -84,9 +85,18 @@ impl<Q: SyncQueryRunnerInterface> Topology<Q> {
                 }
             }
         }
-        let index_to_pubkey: HashMap<usize, NodePublicKey> =
-            pubkeys.into_iter().enumerate().collect();
-        (matrix, index_to_pubkey)
+        let mut our_index = None;
+        let index_to_pubkey: HashMap<usize, NodePublicKey> = pubkeys
+            .into_iter()
+            .enumerate()
+            .map(|(index, pubkey)| {
+                if pubkey == self.our_public_key {
+                    our_index = Some(index);
+                }
+                (index, pubkey)
+            })
+            .collect();
+        (matrix, index_to_pubkey, our_index)
     }
 }
 
@@ -96,11 +106,12 @@ impl<Q: SyncQueryRunnerInterface> TopologyInterface for Topology<Q> {
 
     async fn init(
         _config: Self::Config,
-        _our_public_key: NodePublicKey,
+        our_public_key: NodePublicKey,
         query_runner: Self::SyncQuery,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             query: query_runner,
+            our_public_key,
         })
     }
 

@@ -60,11 +60,16 @@ async fn test_build_latency_matrix() {
     let topology = Topology::init(Config::default(), our_public_key, query_runner)
         .await
         .unwrap();
-    let (matrix, index_to_pubkey) = topology.build_latency_matrix();
+    let (matrix, index_to_pubkey, our_index) = topology.build_latency_matrix();
     let pubkey_to_index: HashMap<NodePublicKey, usize> = index_to_pubkey
         .iter()
         .map(|(index, pubkey)| (*pubkey, *index))
         .collect();
+
+    assert_eq!(
+        our_index.unwrap(),
+        *pubkey_to_index.get(&our_public_key).unwrap()
+    );
 
     let our_index = *pubkey_to_index.get(&our_public_key).unwrap();
     let index1 = *pubkey_to_index.get(&node_public_key1).unwrap();
