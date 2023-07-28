@@ -26,7 +26,7 @@ async fn main() {
 
     assert_eq!(z, HpFixed::<5>::from(30.24690)); 
 
-    let value = HpFixed::<19>::new(BigInt::from(std::i32::MAX as i64 + 1));
+    let value = HpFixed::<19>::from(std::i32::MAX as i64 + 1);
     assert_eq!(
     TryInto::<isize>::try_into(value.clone()).unwrap(),
     std::i32::MAX as isize + 1
@@ -44,13 +44,13 @@ async fn main() {
     use hp_fixed::unsigned::HpUfixed;
     use num_bigint::BigUint;
     
-    let a = HpUfixed::<5>::new(BigUint::from(10u32));
-    let b = HpUfixed::<5>::new(BigUint::from(20u32));
+    let a = HpUfixed::<5>::from(10u32);
+    let b = HpUfixed::<5>::from(20u32);
     let c = a + b;
     
-    assert_eq!(c, HpUfixed::<5>::new(BigUint::from(30u32)));
+    assert_eq!(c, HpUfixed::<5>::from(30u32));
     
-    let value = HpUfixed::<20>::new(BigUint::from(std::u64::MAX as u128 + 1_u128));
+    let value = HpUfixed::<20>::from(std::u64::MAX as u128 + 1_u128);
     assert_eq!(
         std::u64::MAX as u128 + 1_u128,
         value.clone().try_into().unwrap()

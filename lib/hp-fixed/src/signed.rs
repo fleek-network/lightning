@@ -2,6 +2,7 @@ use std::{
     convert::TryInto,
     fmt,
     ops::{Add, AddAssign, Div, Mul, Sub, SubAssign},
+    str::FromStr,
 };
 
 use num_bigint::{
@@ -9,11 +10,11 @@ use num_bigint::{
     Sign::{Minus, Plus},
 };
 use num_traits::{FromPrimitive, Signed, ToPrimitive, Zero};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
 
-#[derive(Clone, Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Default)]
 
 /// A high-precision fixed-point number backed by a `BigInt`.
 ///
@@ -50,8 +51,7 @@ pub struct HpFixed<const P: usize>(BigInt);
 
 impl<const P: usize> HpFixed<P> {
     pub fn new(value: BigInt) -> Self {
-        let ten: BigInt = BigUint::from(10u32).into();
-        HpFixed::<P>(value * ten.pow(P.try_into().unwrap()))
+        HpFixed::<P>(value)
     }
 
     pub fn zero() -> HpFixed<P> {
@@ -89,6 +89,40 @@ impl<const P: usize> HpFixed<P> {
 impl<const P: usize> fmt::Display for HpFixed<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         format_hp_fixed::<BigInt, P>(&self.0, f)
+    }
+}
+
+impl<const P: usize> FromStr for HpFixed<P> {
+    type Err = HpFixedConversionError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let value = BigInt::from_str(s).map_err(|_| HpFixedConversionError::ParseError)?;
+
+        Ok(HpFixed::new(value))
+    }
+}
+
+impl<const P: usize> Serialize for HpFixed<P> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let s = &self.to_string();
+        let cleaned_s = s.replace('_', "");
+        let parts: Vec<&str> = cleaned_s.split('<').collect();
+        let final_string = parts[0].to_string();
+
+        serializer.serialize_str(&final_string)
+    }
+}
+
+impl<'de, const P: usize> Deserialize<'de> for HpFixed<P> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse::<HpFixed<P>>()
+            .map_err(|_| serde::de::Error::custom("Failed to deserialize HpFixed"))
     }
 }
 
@@ -438,9 +472,9 @@ mod tests {
 
     #[test]
     fn test_try_into() {
-        let large = HpFixed::<20>::new(BigInt::from(std::i64::MIN as i128 - 1));
-        let medium = HpFixed::<19>::new(BigInt::from(std::i32::MAX as i64 + 1));
-        let small = HpFixed::<18>::new(BigInt::from(std::i16::MAX as i32 + 1));
+        let large = HpFixed::<20>::from(BigInt::from(std::i64::MIN as i128 - 1));
+        let medium = HpFixed::<19>::from(BigInt::from(std::i32::MAX as i64 + 1));
+        let small = HpFixed::<18>::from(BigInt::from(std::i16::MAX as i32 + 1));
 
         assert_eq!(std::i64::MIN as i128 - 1, large.clone().try_into().unwrap());
         assert!(matches!(

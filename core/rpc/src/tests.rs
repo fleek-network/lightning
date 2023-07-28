@@ -188,10 +188,7 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
         if value.get("result").is_some() {
             // Parse the response as a successful response
             let success_response: RpcSuccessResponse<HpUfixed<18>> = serde_json::from_value(value)?;
-            assert_eq!(
-                HpUfixed::<18>::new(1_000_u32.into()),
-                success_response.result
-            );
+            assert_eq!(HpUfixed::<18>::from(1_000_u32), success_response.result);
         } else {
             panic!("Rpc Error: {value}")
         }
@@ -315,12 +312,10 @@ async fn test_rpc_get_staked() -> Result<()> {
     )
     .await?;
     rpc.config.port = port;
-
     task::spawn(async move {
         rpc.start().await;
     });
     wait_for_server_start(port).await?;
-
     let req = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_staked",
@@ -333,12 +328,9 @@ async fn test_rpc_get_staked() -> Result<()> {
     if response.status().is_success() {
         let value: Value = response.json().await?;
         if value.get("result").is_some() {
-            // Parse the response as a successful response
+            //Parse the response as a successful response
             let success_response: RpcSuccessResponse<HpUfixed<18>> = serde_json::from_value(value)?;
-            assert_eq!(
-                HpUfixed::<18>::new(1_000_u32.into()),
-                success_response.result
-            );
+            assert_eq!(HpUfixed::<18>::from(1_000_u32), success_response.result);
         } else {
             panic!("Rpc Error: {value}")
         }
@@ -402,7 +394,7 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
         if value.get("result").is_some() {
             // Parse the response as a successful response
             let success_response: RpcSuccessResponse<HpUfixed<6>> = serde_json::from_value(value)?;
-            assert_eq!(HpUfixed::<6>::new(2_00_u32.into()), success_response.result);
+            assert_eq!(HpUfixed::<6>::from(2_00_u32), success_response.result);
         } else {
             panic!("Rpc Error: {value}")
         }
@@ -660,7 +652,7 @@ async fn test_rpc_get_locked() -> Result<()> {
         if value.get("result").is_some() {
             // Parse the response as a successful response
             let success_response: RpcSuccessResponse<HpUfixed<18>> = serde_json::from_value(value)?;
-            assert_eq!(HpUfixed::<18>::new(500_u32.into()), success_response.result);
+            assert_eq!(HpUfixed::<18>::from(500_u32), success_response.result);
         } else {
             panic!("Rpc Error: {value}")
         }

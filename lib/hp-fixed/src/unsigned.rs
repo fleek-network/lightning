@@ -1,11 +1,12 @@
 use std::{
     fmt,
     ops::{Add, AddAssign, Div, Mul, Sub, SubAssign},
+    str::FromStr,
 };
 
 use num_bigint::BigUint;
-use num_traits::{zero, CheckedDiv, FromPrimitive, ToPrimitive};
-use serde::{Deserialize, Serialize};
+use num_traits::{CheckedDiv, FromPrimitive, ToPrimitive, Zero};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
 
@@ -42,16 +43,16 @@ use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
 ///
 /// * `BigUint`: The underlying large unsigned integer value that the `HpUfixed` wraps around.
 
-#[derive(Clone, Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Default)]
 pub struct HpUfixed<const P: usize>(BigUint);
 
 impl<const P: usize> HpUfixed<P> {
     pub fn new(value: BigUint) -> Self {
-        HpUfixed::<P>(value * BigUint::from(10u32).pow(P.try_into().unwrap()))
+        HpUfixed::<P>(value)
     }
 
     pub fn zero() -> HpUfixed<P> {
-        HpUfixed::new(zero())
+        HpUfixed::new(BigUint::zero())
     }
     pub fn convert_precision<const Q: usize>(&self) -> HpUfixed<Q> {
         let current_value: &BigUint = &self.0;
@@ -83,6 +84,39 @@ impl<const P: usize> HpUfixed<P> {
 impl<const P: usize> fmt::Display for HpUfixed<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         format_hp_fixed::<BigUint, P>(&self.0, f)
+    }
+}
+
+impl<const P: usize> FromStr for HpUfixed<P> {
+    type Err = HpFixedConversionError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let value = BigUint::from_str(s).map_err(|_| HpFixedConversionError::ParseError)?;
+
+        Ok(HpUfixed::new(value))
+    }
+}
+
+impl<const P: usize> Serialize for HpUfixed<P> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let s = &self.to_string();
+        let cleaned_s = s.replace('_', "");
+        let parts: Vec<&str> = cleaned_s.split('<').collect();
+        let final_string = parts[0].to_string();
+        serializer.serialize_str(&final_string)
+    }
+}
+
+impl<'de, const P: usize> Deserialize<'de> for HpUfixed<P> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse::<HpUfixed<P>>()
+            .map_err(|_| serde::de::Error::custom("Failed to deserialize HpUfixed"))
     }
 }
 
@@ -379,9 +413,9 @@ mod tests {
 
     #[test]
     fn test_try_into() {
-        let large = HpUfixed::<20>::new(BigUint::from(std::u64::MAX as u128 + 1_u128));
-        let medium = HpUfixed::<19>::new(BigUint::from(std::u32::MAX as u64 + 1_u64));
-        let small = HpUfixed::<18>::new(BigUint::from(std::u16::MAX as u32 + 1_u32));
+        let large = HpUfixed::<20>::from(BigUint::from(std::u64::MAX as u128 + 1_u128));
+        let medium = HpUfixed::<19>::from(BigUint::from(std::u32::MAX as u64 + 1_u64));
+        let small = HpUfixed::<18>::from(BigUint::from(std::u16::MAX as u32 + 1_u32));
 
         assert_eq!(
             std::u64::MAX as u128 + 1_u128,
@@ -533,5 +567,22 @@ mod tests {
         let decimal1 = HpUfixed::<6>::from(decimal);
         let result = decimal1.convert_precision::<2>();
         assert_eq!(result.0, BigUint::from(123_412_u128));
+    }
+
+    #[test]
+    fn test_serde() {
+        let decimal: HpUfixed<18> = HpUfixed::from(10_f64);
+        let ser = serde_json::to_string(&decimal).unwrap();
+        let decimal2: HpUfixed<18> = serde_json::from_str(&ser).unwrap();
+        assert_eq!(decimal, decimal2);
+    }
+
+    #[test]
+    fn bincode_serde_test() {
+        let decimal: HpUfixed<18> = HpUfixed::from(10_f64);
+        let serialized = bincode::serialize(&decimal).expect("Failed to serialize using bincode");
+        let deserialized: HpUfixed<18> =
+            bincode::deserialize(&serialized).expect("Failed to deserialize using bincode");
+        assert_eq!(decimal, deserialized);
     }
 }

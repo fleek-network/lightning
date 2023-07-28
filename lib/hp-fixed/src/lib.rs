@@ -13,6 +13,32 @@ pub enum HpFixedConversionError {
     Underflow,
     DivisionError,
     FloatParseError,
+    ParseError,
+}
+
+impl fmt::Display for HpFixedConversionError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            HpFixedConversionError::PrecisionLevelNotSupported => {
+                write!(f, "Precision level not supported")
+            },
+            HpFixedConversionError::Overflow => {
+                write!(f, "Overflow")
+            },
+            HpFixedConversionError::Underflow => {
+                write!(f, "Underflow")
+            },
+            HpFixedConversionError::DivisionError => {
+                write!(f, "Division error")
+            },
+            HpFixedConversionError::FloatParseError => {
+                write!(f, "Float parse error")
+            },
+            HpFixedConversionError::ParseError => {
+                write!(f, "Parse error")
+            },
+        }
+    }
 }
 
 fn format_hp_fixed<T, const P: usize>(value: &T, f: &mut fmt::Formatter<'_>) -> fmt::Result
@@ -37,7 +63,7 @@ where
             }
         }
         formatted = formatted.chars().rev().collect();
-        write!(f, "HpUfixed<{P}>({formatted})")
+        write!(f, "{formatted}<{P}>")
     }
 }
 

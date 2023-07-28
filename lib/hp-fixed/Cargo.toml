@@ -12,3 +12,6 @@ num-bigint = {version = "0.4.3", features=["serde"]}
 num-traits ="0.2.15"
 serde = { version = "1.0", features = ["derive"] }
 
+[dev-dependencies]
+serde_json.workspace = true
+bincode.workspace = true
