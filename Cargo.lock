@@ -2815,10 +2815,12 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
+ "derive_more",
  "fastcrypto",
  "fleek-crypto",
  "freek-interfaces",
  "futures",
+ "futures-util",
  "log",
  "multiaddr",
  "mysten-metrics",
@@ -2839,6 +2841,7 @@ dependencies = [
  "sui-protocol-config",
  "tokio",
  "tonic",
+ "typed-store",
 ]
 
 [[package]]
