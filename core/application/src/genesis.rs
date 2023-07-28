@@ -33,6 +33,7 @@ pub struct Genesis {
     pub node_info: HashMap<String, NodeInfo>,
     pub total_served: HashMap<Epoch, TotalServed>,
     pub current_epoch_served: HashMap<String, NodeServed>,
+    pub latencies: Vec<GenesisLatency>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -66,6 +67,13 @@ pub struct GenesisCommittee {
 pub struct GenesisPrices {
     pub commodity: CommodityTypes,
     pub price: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GenesisLatency {
+    pub node_public_key_lhs: String,
+    pub node_public_key_rhs: String,
+    pub latency_in_microseconds: u64,
 }
 
 impl Genesis {

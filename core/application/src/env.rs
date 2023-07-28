@@ -135,6 +135,8 @@ impl Env<UpdatePerm> {
             let mut total_served_table = ctx.get_table::<Epoch, TotalServed>("total_served");
             let mut current_epoch_served_table =
                 ctx.get_table::<NodePublicKey, NodeServed>("current_epoch_served");
+            let mut latencies_table =
+                ctx.get_table::<(NodePublicKey, NodePublicKey), Duration>("latencies");
 
             let protocol_fund_address =
                 AccountOwnerPublicKey::from_base64(&genesis.protocol_fund_address).unwrap();
@@ -258,6 +260,18 @@ impl Env<UpdatePerm> {
                 let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
                     .expect("Failed to parse node public key from genesis.");
                 current_epoch_served_table.insert(node_public_key, commodity_served);
+            }
+
+            // add latencies
+            for latency in genesis.latencies {
+                let node_public_key_lhs = NodePublicKey::from_base64(&latency.node_public_key_lhs)
+                    .expect("Failed to parse node public key from genesis.");
+                let node_public_key_rhs = NodePublicKey::from_base64(&latency.node_public_key_rhs)
+                    .expect("Failed to parse node public key from genesis.");
+                latencies_table.insert(
+                    (node_public_key_lhs, node_public_key_rhs),
+                    Duration::from_micros(latency.latency_in_microseconds),
+                );
             }
         })
     }
