@@ -1,5 +1,6 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    cmp::Ordering,
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -17,8 +18,9 @@ use tokio::{
 use tokio_util::time::DelayQueue;
 
 use crate::{
-    bucket::{HASH_LEN, MAX_BUCKET_SIZE},
+    bucket::{MAX_BUCKETS, MAX_BUCKET_SIZE},
     distance,
+    distance::{Distance, DistanceMap, MAX_DISTANCE},
     query::{Message, MessagePayload, NodeInfo, Query, Response},
     socket,
     table::{TableKey, TableQuery},
@@ -61,6 +63,7 @@ pub async fn _start_server(
                         server_rx:task_rx,
                         _inflight: HashMap::new(),
                         socket: socket.clone(),
+                        closest_nodes: DistanceMap::new(request.target),
                     };
                     tokio::spawn(run_lookup(lookup));
                 }
@@ -84,7 +87,7 @@ async fn run_lookup(mut lookup: LookUp) {
         .send(table_query)
         .await
         .expect("Table to not drop the channel");
-    let closest_nodes = match rx.await.expect("Table to not drop the channel") {
+    let nodes = match rx.await.expect("Table to not drop the channel") {
         Ok(nodes) => nodes,
         Err(e) => {
             tracing::error!("failed to get closest nodes: {e:?}");
@@ -97,104 +100,104 @@ async fn run_lookup(mut lookup: LookUp) {
         },
     };
 
-    let mut query_list = QueryList {
-        inner: BTreeMap::new(),
-        min_distance_seen: HASH_LEN * 8,
-        target: lookup.target,
-    };
-    query_list.add_nodes(closest_nodes);
+    let nodes = nodes
+        .into_iter()
+        .map(|node| {
+            (
+                node.key.0,
+                LookupNode {
+                    inner: node,
+                    status: Status::Initial,
+                },
+            )
+        })
+        .collect();
+
+    lookup.closest_nodes.add_nodes(nodes);
+    let mut pending = HashMap::new();
     loop {
-        // Todo: Choose alpha.
-        for querying in query_list.nodes_mut().take(MAX_BUCKET_SIZE) {
-            if !querying.queried {
-                let message = Message {
-                    id: 0,
-                    payload: MessagePayload::Query(Query::Find {
-                        sender_id: lookup.local_id,
-                        target: lookup.target,
-                    }),
-                };
-                let bytes = bincode::serialize(&message).unwrap();
-                socket::send_to(&lookup.socket, bytes.as_slice(), querying.node.address)
-                    .await
-                    .unwrap();
-                querying.queried = true;
+        let mut closer_exists = false;
+        if pending.is_empty() {
+            for node in lookup
+                .closest_nodes
+                .nodes_mut()
+                .filter(|node| node.status == Status::Initial || node.status == Status::Responded)
+                .take(MAX_BUCKETS)
+                .filter(|node| node.status == Status::Initial)
+                .take(3)
+            {
+                if node.status != Status::Queried {
+                    let message = Message {
+                        // Todo: Generate random transaction ID.
+                        id: 0,
+                        payload: MessagePayload::Query(Query::Find {
+                            sender_id: lookup.local_id,
+                            target: lookup.target,
+                        }),
+                    };
+                    let bytes = bincode::serialize(&message).unwrap();
+                    socket::send_to(&lookup.socket, bytes.as_slice(), node.inner.address)
+                        .await
+                        .unwrap();
+                    node.status = Status::Queried;
+                    pending.insert(node.inner.key, node.inner.key);
+                    closer_exists = true;
+                }
             }
         }
+
         // Maybe we should put a timer in case we never get anything from the network.
         match lookup.server_rx.recv().await {
             None => panic!("Server dropped the network response channel"),
             Some(response) => {
                 match response {
-                    Response::NodeInfo(closest_nodes) => {
-                        let new_closer_nodes = query_list.add_nodes(closest_nodes);
-                        if !new_closer_nodes {
-                            break;
-                        }
+                    Response::Find { nodes, .. } => {
+                        let nodes = nodes
+                            .into_iter()
+                            .map(|node| {
+                                (
+                                    node.key.0,
+                                    LookupNode {
+                                        inner: node,
+                                        status: Status::Initial,
+                                    },
+                                )
+                            })
+                            .collect();
+                        lookup.closest_nodes.add_nodes(nodes);
                     },
                     // Todo: Fix this.
                     Response::Pong => unreachable!(),
                 }
             },
         }
-    }
-    lookup
-        .server_tx
-        .send(Ok(query_list
-            .nodes()
-            .next()
-            .map(|state| state.node.key.0)
-            .unwrap()))
-        .await
-        .unwrap();
-}
 
-struct QueryList {
-    target: TableKey,
-    min_distance_seen: usize,
-    inner: BTreeMap<usize, QueryingNode>,
-}
-
-impl QueryList {
-    /// Returns true if at least one of the nodes added is closer to target,
-    /// otherwise, it returns false.
-    pub fn add_nodes(&mut self, nodes: Vec<NodeInfo>) -> bool {
-        for node in nodes {
-            let distance = distance::leading_zero_bits(&node.key.0, &self.target);
-            self.inner.insert(
-                distance,
-                QueryingNode {
-                    node,
-                    queried: false,
-                },
-            );
-        }
-        let current_distance = match self.inner.first_key_value() {
-            Some((distance, _)) => *distance,
-            None => {
-                panic!("empty query list");
-            },
-        };
-        if current_distance < self.min_distance_seen {
-            self.min_distance_seen = current_distance;
-            true
-        } else {
-            false
+        if !closer_exists && pending.is_empty() {
+            lookup
+                .server_tx
+                .send(Ok(lookup
+                    .closest_nodes
+                    .nodes()
+                    .next()
+                    .map(|node| node.inner.key.0)
+                    .unwrap()))
+                .await
+                .unwrap();
+            break;
         }
     }
-
-    fn nodes(&self) -> impl Iterator<Item = &QueryingNode> {
-        self.inner.values()
-    }
-
-    fn nodes_mut(&mut self) -> impl Iterator<Item = &mut QueryingNode> {
-        self.inner.values_mut()
-    }
 }
 
-pub struct QueryingNode {
-    node: NodeInfo,
-    queried: bool,
+#[derive(PartialEq)]
+enum Status {
+    Initial,
+    Queried,
+    Responded,
+}
+
+pub struct LookupNode {
+    inner: NodeInfo,
+    status: Status,
 }
 
 #[derive(Debug, Error)]
@@ -218,6 +221,8 @@ pub struct LookupResponse {
 }
 
 pub struct LookUp {
+    // Closest nodes.
+    closest_nodes: DistanceMap<LookupNode>,
     // Our node's local key.
     local_id: NodeNetworkingPublicKey,
     // Target that we're looking for.

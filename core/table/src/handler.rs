@@ -130,7 +130,10 @@ impl Handler {
                     let nodes = self.closest_nodes(&key).await?;
                     let query = Message {
                         id: message_id,
-                        payload: MessagePayload::Response(Response::NodeInfo(nodes)),
+                        payload: MessagePayload::Response(Response::Find {
+                            sender_id: key.0,
+                            nodes,
+                        }),
                     };
                     let bytes = bincode::serialize(&query)?;
                     socket::send_to(&self.socket, bytes.as_slice(), address).await?;
