@@ -2,6 +2,8 @@ pub mod clustering;
 mod config;
 pub mod divisive;
 pub mod pairing;
+#[cfg(test)]
+mod tests;
 
 use std::{
     collections::{BTreeSet, HashMap},
