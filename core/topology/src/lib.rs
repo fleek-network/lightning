@@ -13,14 +13,20 @@ use std::{
 
 use async_trait::async_trait;
 pub use config::Config;
+use divisive::DivisiveHierarchy;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::{ConfigConsumer, SyncQueryRunnerInterface, TopologyInterface};
 use ndarray::{Array, Array2};
+use rand::SeedableRng;
 
 pub struct Topology<Q: SyncQueryRunnerInterface> {
     #[allow(dead_code)]
     query: Q,
     our_public_key: NodePublicKey,
+    current_peers: Arc<Vec<Vec<NodePublicKey>>>,
+    current_epoch: u64,
+    target_k: usize,
+    min_nodes: usize,
 }
 
 impl<Q: SyncQueryRunnerInterface> Topology<Q> {
@@ -113,23 +119,60 @@ impl<Q: SyncQueryRunnerInterface> TopologyInterface for Topology<Q> {
     type SyncQuery = Q;
 
     async fn init(
-        _config: Self::Config,
+        config: Self::Config,
         our_public_key: NodePublicKey,
         query_runner: Self::SyncQuery,
     ) -> anyhow::Result<Self> {
         Ok(Self {
+            target_k: config.testing_target_k,
+            min_nodes: config.testing_min_nodes,
             query: query_runner,
+            current_epoch: u64::MAX,
+            current_peers: Arc::new(Vec::new()),
             our_public_key,
         })
     }
 
-    fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>> {
-        todo!()
+    fn suggest_connections(&mut self) -> Arc<Vec<Vec<NodePublicKey>>> {
+        let epoch = self.query.get_epoch();
+
+        // if it's the initial epoch or the epoch has changed
+        if epoch == u64::MAX || epoch > self.current_epoch {
+            let (matrix, mappings, our_index) = self.build_latency_matrix();
+
+            self.current_peers = if let Some(our_index) = our_index {
+                // Included in the topology: collect assignments and build output
+
+                if mappings.len() < self.min_nodes {
+                    // Fallback to returning all nodes, since we're less than the minimum
+                    Arc::new(vec![mappings.into_values().collect()])
+                } else {
+                    let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(epoch);
+                    let hierarchy = DivisiveHierarchy::new(&mut rng, &matrix, self.target_k);
+
+                    // TODO: add depth support
+                    Arc::new(vec![
+                        hierarchy.assignments()[our_index]
+                            .iter()
+                            .map(|idx| mappings[idx])
+                            .collect(),
+                    ])
+                }
+            } else {
+                // Not in the topology: return all random nodes to bootstrap from
+                Arc::new(vec![mappings.into_values().collect()])
+            };
+
+            self.current_epoch = epoch;
+        }
+
+        // return the current peers
+        self.current_peers.clone()
     }
 }
 
 impl<Q: SyncQueryRunnerInterface> ConfigConsumer for Topology<Q> {
     type Config = Config;
 
-    const KEY: &'static str = "TOPOLOGY";
+    const KEY: &'static str = "topology";
 }

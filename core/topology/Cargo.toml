@@ -10,6 +10,7 @@ ndarray = "0.15.6"
 num-traits = "0.2.9"
 mcmf = "2.0.0"
 rand = "0.8.5"
+rand_chacha = "0.3.1"
 serde = { version = "1.0", features = ["derive"] }
 async-trait = "0.1"
 fleek-crypto.workspace = true
@@ -23,7 +24,6 @@ csv = "1.2.2"
 plotters = "0.3.3"
 base64 = "0.21.2"
 fxhash = "0.2.1"
-rand_chacha = "0.3.1"
 ndarray-rand = "0.14.0"
 tokio.workspace = true
 
