@@ -23,7 +23,7 @@ use sec1::{
     pkcs8::{der::EncodePem, AlgorithmIdentifierRef, ObjectIdentifier, PrivateKeyInfo},
     EcParameters, EcPrivateKey,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_big_array::BigArray;
 
 #[cfg(test)]
@@ -50,8 +50,8 @@ pub trait SecretKey: Sized {
 const BLS12_381_PEM_LABEL: &str = "LIGHTNING BLS12_381 PRIVATE KEY";
 
 /// A node's BLS 12-381 public key
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct NodePublicKey(#[serde(with = "BigArray")] pub [u8; 96]);
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy)]
+pub struct NodePublicKey(pub [u8; 96]);
 
 impl From<[u8; 96]> for NodePublicKey {
     fn from(value: [u8; 96]) -> Self {
@@ -94,6 +94,44 @@ impl PublicKey for NodePublicKey {
 impl Display for NodePublicKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", hex::encode(self.0))
+    }
+}
+
+impl Serialize for NodePublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl FromStr for NodePublicKey {
+    type Err = std::io::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let bytes = hex::decode(s)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
+
+        if bytes.len() != 96 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Expected 96 bytes",
+            ));
+        }
+
+        let mut address = [0u8; 96];
+        address.copy_from_slice(&bytes);
+        Ok(NodePublicKey(address))
+    }
+}
+
+impl<'de> Deserialize<'de> for NodePublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse::<NodePublicKey>().map_err(serde::de::Error::custom)
     }
 }
 
@@ -170,7 +208,7 @@ impl From<&NodeSignature> for BLS12381Signature {
 }
 
 /// A node's ed25519 networking public key
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy)]
 pub struct NodeNetworkingPublicKey(pub [u8; 32]);
 
 impl From<[u8; 32]> for NodeNetworkingPublicKey {
@@ -214,6 +252,45 @@ impl PublicKey for NodeNetworkingPublicKey {
 impl Display for NodeNetworkingPublicKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", hex::encode(self.0))
+    }
+}
+
+impl Serialize for NodeNetworkingPublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl FromStr for NodeNetworkingPublicKey {
+    type Err = std::io::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let bytes = hex::decode(s)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
+
+        if bytes.len() != 32 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Expected 32 bytes",
+            ));
+        }
+
+        let mut address = [0u8; 32];
+        address.copy_from_slice(&bytes);
+        Ok(NodeNetworkingPublicKey(address))
+    }
+}
+
+impl<'de> Deserialize<'de> for NodeNetworkingPublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse::<NodeNetworkingPublicKey>()
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -302,7 +379,7 @@ impl From<&NodeNetworkingSignature> for Ed25519Signature {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy)]
 pub struct ClientPublicKey(pub [u8; 20]);
 
 impl PublicKey for ClientPublicKey {
@@ -325,6 +402,45 @@ impl PublicKey for ClientPublicKey {
 impl Display for ClientPublicKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", hex::encode(self.0))
+    }
+}
+
+impl Serialize for ClientPublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl FromStr for ClientPublicKey {
+    type Err = std::io::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let bytes = hex::decode(s)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
+
+        if bytes.len() != 20 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Expected 20 bytes",
+            ));
+        }
+
+        let mut address = [0u8; 20];
+        address.copy_from_slice(&bytes);
+        Ok(ClientPublicKey(address))
+    }
+}
+
+impl<'de> Deserialize<'de> for ClientPublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse::<ClientPublicKey>()
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -405,7 +521,7 @@ impl Display for AccountOwnerPublicKey {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy)]
 pub struct EthAddress(pub [u8; 20]);
 
 impl AsRef<[u8]> for EthAddress {
@@ -426,9 +542,54 @@ impl<A: Borrow<AccountOwnerPublicKey>> From<A> for EthAddress {
     }
 }
 
+impl FromStr for EthAddress {
+    type Err = std::io::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = match s.starts_with("0x") {
+            true => &s[2..],
+            false => s,
+        };
+
+        let bytes = hex::decode(s)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
+
+        if bytes.len() != 20 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Expected 20 bytes",
+            ));
+        }
+
+        let mut address = [0u8; 20];
+        address.copy_from_slice(&bytes);
+        Ok(EthAddress(address))
+    }
+}
+
+impl<'de> Deserialize<'de> for EthAddress {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse::<EthAddress>().map_err(serde::de::Error::custom)
+    }
+}
+
 impl Display for EthAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "0x{}", hex::encode(self))
+    }
+}
+
+impl Serialize for EthAddress {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let s = &self.to_string();
+        let final_string = &s[2..];
+        serializer.serialize_str(final_string)
     }
 }
 
