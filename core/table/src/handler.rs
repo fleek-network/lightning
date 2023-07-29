@@ -43,7 +43,7 @@ pub async fn start_server(
     local_key: NodeNetworkingPublicKey,
 ) {
     // Todo: Make configurable.
-    let (table_tx, table_rx) = tokio::sync::mpsc::channel(10000);
+    let (table_tx, table_rx) = mpsc::channel(10000);
     task::spawn(table::start_server(table_rx, local_key));
     let main_hanlder = Handler::new(socket.clone(), table_tx, local_key);
     loop {
@@ -131,6 +131,9 @@ impl Handler {
                 let message = Message {
                     id: 0,
                     sender_key: self.node_id,
+                    // Todo: Store handlers do not need this.
+                    // Maybe we make it optional?
+                    channel_id: 0,
                     payload: MessagePayload::Query(Query::Store {
                         key: table_key,
                         value,
@@ -149,6 +152,7 @@ impl Handler {
         let message: Message = bincode::deserialize(datagram.as_slice())?;
         let message_id = message.id;
         let sender_key = message.sender_key;
+        let channel_id = message.channel_id;
         match message.payload {
             MessagePayload::Query(query) => match query {
                 Query::Find { find_value, target } => {
@@ -160,12 +164,9 @@ impl Handler {
                     let nodes = self.closest_nodes(&target).await?;
                     let query = Message {
                         id: message_id,
+                        channel_id,
                         sender_key: self.node_id,
-                        payload: MessagePayload::Response(Response {
-                            nodes,
-                            id: 0,
-                            value,
-                        }),
+                        payload: MessagePayload::Response(Response { nodes, value }),
                     };
                     let bytes = bincode::serialize(&query)?;
                     socket::send_to(&self.socket, bytes.as_slice(), address).await?;
@@ -177,10 +178,10 @@ impl Handler {
                 Query::Ping => {
                     let query = Message {
                         id: message_id,
+                        channel_id,
                         sender_key: self.node_id,
                         payload: MessagePayload::Response(Response {
                             nodes: Vec::new(),
-                            id: 0,
                             value: None,
                         }),
                     };
@@ -189,7 +190,7 @@ impl Handler {
                 },
             },
             MessagePayload::Response(response) => {
-                let task_tx = match self.pending_lookups.read().unwrap().get(&response.id) {
+                let task_tx = match self.pending_lookups.read().unwrap().get(&channel_id) {
                     None => {
                         tracing::warn!("received unsolicited response");
                         return Ok(());
@@ -225,10 +226,10 @@ impl Handler {
 
     async fn find_node(&self, target: TableKey) -> Result<Vec<NodeInfo>> {
         let (task_tx, task_rx) = mpsc::channel(1000000);
-        // Todo: Randomly generate id/breadcrumb.
-        let task_id = 0;
+        // Todo: Randomly generate id/breadcrumb. Check if it exists.
+        let channel_id = 0;
         let task = LookupTask::new(
-            task_id,
+            channel_id,
             false,
             self.node_id,
             target,
@@ -240,7 +241,7 @@ impl Handler {
         self.pending_lookups
             .write()
             .unwrap()
-            .insert(task_id, handle);
+            .insert(channel_id, handle);
         match lookup::lookup(task)
             .await
             .map_err(Into::<anyhow::Error>::into)?
@@ -252,10 +253,10 @@ impl Handler {
 
     async fn find_value(&self, target: TableKey) -> Result<Option<Vec<u8>>> {
         let (task_tx, task_rx) = mpsc::channel(1000000);
-        // Todo: Randomly generate id/breadcrumb.
-        let task_id = 0;
+        // Todo: Randomly generate id/breadcrumb. Check if it exists.
+        let channel_id = 0;
         let task = LookupTask::new(
-            task_id,
+            channel_id,
             true,
             self.node_id,
             target,
@@ -267,7 +268,7 @@ impl Handler {
         self.pending_lookups
             .write()
             .unwrap()
-            .insert(task_id, handle);
+            .insert(channel_id, handle);
         match lookup::lookup(task)
             .await
             .map_err(Into::<anyhow::Error>::into)?

@@ -72,8 +72,9 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
             {
                 let message = Message {
                     // Todo: Generate random transaction ID.
-                    // Message: Maybe we need to add breadcrumb to message.
-                    id: lookup.id,
+                    // Todo: We need to validate that the response sends this value.
+                    id: 0,
+                    channel_id: lookup.id,
                     sender_key: lookup.local_key,
                     payload: MessagePayload::Query(Query::Find {
                         find_value: lookup.find_value_lookup,

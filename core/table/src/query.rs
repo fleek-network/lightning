@@ -26,14 +26,18 @@ pub enum MessagePayload {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Message {
+    // Random value used that must be returned in response.
     pub id: u64,
+    // Channel on which to route the response.
+    pub channel_id: u64,
+    // Sender's public key.
     pub sender_key: NodeNetworkingPublicKey,
+    // Payload of message.
     pub payload: MessagePayload,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Response {
-    pub id: u64,
     pub nodes: Vec<NodeInfo>,
     pub value: Option<Vec<u8>>,
 }
