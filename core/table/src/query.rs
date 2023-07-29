@@ -14,6 +14,7 @@ pub struct NodeInfo {
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Query {
     Find {
+        find_value: bool,
         sender_id: NodeNetworkingPublicKey,
         target: TableKey,
     },
@@ -41,4 +42,5 @@ pub struct Response {
     pub sender_id: TableKey,
     pub nodes: Vec<NodeInfo>,
     pub breadcrumb: u64,
+    pub value: Option<Vec<u8>>,
 }

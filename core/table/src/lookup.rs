@@ -25,7 +25,7 @@ use crate::{
 };
 
 /// Kademlia's lookup procedure.
-pub async fn lookup(mut lookup: LookupTask) -> Result<Vec<NodeInfo>, LookUpError> {
+pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError> {
     // Get initial K closest nodes from our local table.
     let (tx, rx) = oneshot::channel();
     let table_query = TableQuery::ClosestNodes {
@@ -73,8 +73,9 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<Vec<NodeInfo>, LookUpError
                 let message = Message {
                     // Todo: Generate random transaction ID.
                     // Message: Maybe we need to add breadcrumb to message.
-                    id: lookup.task_id,
+                    id: lookup.id,
                     payload: MessagePayload::Query(Query::Find {
+                        find_value: lookup.find_value_lookup,
                         sender_id: lookup.local_key,
                         target: lookup.target,
                     }),
@@ -98,8 +99,8 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<Vec<NodeInfo>, LookUpError
             // Timeout for round.
             _ = timeout.tick() => {
                 if pending.is_empty() {
-                    // This can't be empty at this point because
-                    // it should have been filled at the start of the loop.
+                    // This can't be empty at this point if we found closer nodes in the last round
+                    // because it should have been filled at the start of the loop.
                     break;
                 }
                 for (key, node) in pending.into_iter() {
@@ -113,6 +114,10 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<Vec<NodeInfo>, LookUpError
                 let response = response.unwrap();
                 let sender_id = response.sender_id;
                 if pending.contains_key(&sender_id) || late.contains_key(&sender_id) {
+                    // If this is look up is a find a value, we check if the value is in the response.
+                    if lookup.find_value_lookup && response.value.is_some() {
+                        return Ok(LookupResult::Value(response.value));
+                    }
                     let nodes = response
                         .nodes
                         .into_iter()
@@ -151,12 +156,18 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<Vec<NodeInfo>, LookUpError
         }
     }
 
-    Ok(lookup
-        .closest_nodes
-        .into_nodes()
-        .map(|lookup_node| lookup_node.inner)
-        .take(MAX_BUCKETS)
-        .collect())
+    if lookup.find_value_lookup {
+        Ok(LookupResult::Value(None))
+    } else {
+        Ok(LookupResult::Nodes(
+            lookup
+                .closest_nodes
+                .into_nodes()
+                .map(|lookup_node| lookup_node.inner)
+                .take(MAX_BUCKETS)
+                .collect(),
+        ))
+    }
 }
 
 #[derive(Debug, Error)]
@@ -167,7 +178,10 @@ pub struct LookUpError(String);
 pub struct LookupHandle(pub Sender<Response>);
 
 pub struct LookupTask {
-    task_id: u64,
+    // Task identifier.
+    id: u64,
+    // True if this is a `find value` look up.
+    find_value_lookup: bool,
     // Closest nodes.
     closest_nodes: LookupMap<LookupNode>,
     // Our node's local key.
@@ -185,6 +199,7 @@ pub struct LookupTask {
 impl LookupTask {
     pub fn new(
         task_id: u64,
+        find_value_lookup: bool,
         local_key: NodeNetworkingPublicKey,
         target: TableKey,
         table_tx: Sender<TableQuery>,
@@ -192,7 +207,8 @@ impl LookupTask {
         socket: Arc<UdpSocket>,
     ) -> Self {
         Self {
-            task_id,
+            id: task_id,
+            find_value_lookup,
             closest_nodes: LookupMap::new(target),
             local_key,
             target,
@@ -273,4 +289,9 @@ enum Status {
 pub struct LookupNode {
     inner: NodeInfo,
     status: Status,
+}
+
+pub enum LookupResult {
+    Nodes(Vec<NodeInfo>),
+    Value(Option<Vec<u8>>),
 }

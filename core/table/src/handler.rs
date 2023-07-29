@@ -19,10 +19,9 @@ use tokio::{
 
 use crate::{
     lookup,
-    lookup::{LookupHandle, LookupTask},
+    lookup::{LookupHandle, LookupResult, LookupTask},
     query::{Message, MessagePayload, NodeInfo, Query, Response},
     socket,
-    socket::send_to,
     table::{self, TableKey, TableQuery},
 };
 
@@ -30,7 +29,7 @@ use crate::{
 pub enum Command {
     Get {
         key: Vec<u8>,
-        tx: oneshot::Sender<Result<Vec<u8>, ()>>,
+        tx: oneshot::Sender<Result<Option<Vec<u8>>, ()>>,
     },
     Put {
         key: Vec<u8>,
@@ -138,7 +137,7 @@ impl Handler {
                 };
                 let bytes = bincode::serialize(&message)?;
                 for node in nodes {
-                    send_to(&self.socket, &bytes, node.address).await?;
+                    socket::send_to(&self.socket, &bytes, node.address).await?;
                 }
             },
         }
@@ -150,14 +149,24 @@ impl Handler {
         let message_id = message.id;
         match message.payload {
             MessagePayload::Query(query) => match query {
-                Query::Find { sender_id: key, .. } => {
-                    let nodes = self.closest_nodes(&key).await?;
+                Query::Find {
+                    sender_id,
+                    find_value,
+                    target,
+                } => {
+                    let value = match find_value {
+                        // Todo: Check from local store.
+                        true => todo!(),
+                        false => None,
+                    };
+                    let nodes = self.closest_nodes(&target).await?;
                     let query = Message {
                         id: message_id,
                         payload: MessagePayload::Response(Response {
-                            sender_id: key.0,
+                            sender_id: sender_id.0,
                             nodes,
                             breadcrumb: 0,
+                            value,
                         }),
                     };
                     let bytes = bincode::serialize(&query)?;
@@ -171,8 +180,9 @@ impl Handler {
                         id: message_id,
                         payload: MessagePayload::Response(Response {
                             sender_id: self.node_id.0,
-                            nodes: Default::default(),
+                            nodes: Vec::new(),
                             breadcrumb: 0,
+                            value: None,
                         }),
                     };
                     let bytes = bincode::serialize(&query)?;
@@ -200,12 +210,12 @@ impl Handler {
         Ok(())
     }
 
-    async fn closest_nodes(&self, target: &NodeNetworkingPublicKey) -> Result<Vec<NodeInfo>> {
+    async fn closest_nodes(&self, target: &TableKey) -> Result<Vec<NodeInfo>> {
         let (tx, rx) = oneshot::channel();
         if self
             .table_tx
             .send(TableQuery::ClosestNodes {
-                target: target.0,
+                target: *target,
                 tx,
             })
             .await
@@ -225,6 +235,7 @@ impl Handler {
         let task_id = 0;
         let task = LookupTask::new(
             task_id,
+            false,
             self.node_id,
             target,
             self.table_tx.clone(),
@@ -236,10 +247,39 @@ impl Handler {
             .write()
             .unwrap()
             .insert(task_id, handle);
-        lookup::lookup(task).await.map_err(Into::into)
+        match lookup::lookup(task)
+            .await
+            .map_err(Into::<anyhow::Error>::into)?
+        {
+            LookupResult::Nodes(nodes) => Ok(nodes),
+            LookupResult::Value(_) => panic!("we did not request for a value"),
+        }
     }
 
-    async fn _find_value(&self, _: TableKey) -> Result<Vec<u8>> {
-        todo!()
+    async fn _find_value(&self, target: TableKey) -> Result<Option<Vec<u8>>> {
+        let (task_tx, task_rx) = mpsc::channel(1000000);
+        // Todo: Randomly generate id/breadcrumb.
+        let task_id = 0;
+        let task = LookupTask::new(
+            task_id,
+            true,
+            self.node_id,
+            target,
+            self.table_tx.clone(),
+            task_rx,
+            self.socket.clone(),
+        );
+        let handle = LookupHandle(task_tx);
+        self.pending_lookups
+            .write()
+            .unwrap()
+            .insert(task_id, handle);
+        match lookup::lookup(task)
+            .await
+            .map_err(Into::<anyhow::Error>::into)?
+        {
+            LookupResult::Nodes(_) => panic!("we did not request for a nodes"),
+            LookupResult::Value(value) => Ok(value),
+        }
     }
 }
