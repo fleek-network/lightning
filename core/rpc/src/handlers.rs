@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fs, sync::Arc};
 
 use axum::{Extension, Json};
 use fleek_crypto::{EthAddress, NodePublicKey};
@@ -13,6 +13,7 @@ use crate::{
     server::RpcData,
     types::{NodeKeyParam, PublicKeyParam},
 };
+static OPEN_RPC_DOCS: &str = "../../docs/openrpc.json";
 
 pub type Result<T> = anyhow::Result<T, Error>;
 
@@ -34,6 +35,7 @@ impl RpcServer {
     {
         let server = Server::new()
             .with_data(Data::new(interface))
+            .with_method("rpc.discover", discovery_handler::<Q>)
             .with_method("flk_ping", ping_handler::<Q>)
             .with_method("flk_get_flk_balance", get_flk_balance_handler::<Q>)
             .with_method(
@@ -77,6 +79,12 @@ impl RpcServer {
     }
 }
 
+pub async fn discovery_handler<Q: SyncQueryRunnerInterface>() -> Result<String> {
+    match fs::read_to_string(OPEN_RPC_DOCS) {
+        Ok(contents) => Ok(contents),
+        Err(e) => Err(Error::internal(e)),
+    }
+}
 pub async fn ping_handler<Q: SyncQueryRunnerInterface>() -> Result<String> {
     Ok("pong".to_string())
 }
@@ -232,4 +240,7 @@ pub async fn send_txn<Q: SyncQueryRunnerInterface>(
         .run(param)
         .await
         .map_err(Error::internal)
+
+    // println!("{:?}", param);
+    //Ok(())
 }
