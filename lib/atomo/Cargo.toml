@@ -1,6 +1,6 @@
 [package]
 name = "atomo"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2021"
 authors = ["Parsa Ghadimi <parsa@fleek.xyz>"]
 description = "reserved for atomic snapshots"

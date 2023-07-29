@@ -11,11 +11,13 @@ use crate::{
     DefaultSerdeBackend,
 };
 
+/// The builder API to use for opening an [`Atomo`] database.
 pub struct AtomoBuilder<S: SerdeBackend = DefaultSerdeBackend> {
     atomo: AtomoInner<S>,
 }
 
 impl<S: SerdeBackend> AtomoBuilder<S> {
+    /// Create an empty builder.
     #[must_use = "Creating a builder does not perform anything."]
     pub fn new() -> Self {
         Self {
@@ -86,6 +88,7 @@ impl<S: SerdeBackend> AtomoBuilder<S> {
         panic!("Table {name} is not defined.");
     }
 
+    /// Finish the construction and returns an [`Atomo`] with [`UpdatePerm`] permission.
     #[must_use = "Creating a Atomo without using it is probably a mistake."]
     pub fn build(self) -> Atomo<UpdatePerm, S> {
         Atomo::new(Arc::new(self.atomo))

@@ -241,7 +241,7 @@ dependencies = [
 
 [[package]]
 name = "affair"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "futures",
@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "atomo"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "arc-swap",
  "bincode",

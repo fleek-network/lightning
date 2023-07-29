@@ -1,3 +1,7 @@
+//! Atomo is an atomic execution engine for Rust. At its core it is a database
+//! wrapper that enhances any backend storage engine with an optimized snapshot
+//! functionality.
+
 mod batch;
 mod builder;
 mod db;
@@ -19,8 +23,3 @@ pub use once_ptr::OncePtr;
 pub use serder::{BincodeSerde, SerdeBackend};
 pub use table::{ResolvedTableReference, TableRef, TableSelector};
 
-#[deprecated = "`MtAtomo` is deprecated. Use `Atomo` instead."]
-pub type MtAtomo<O, S> = Atomo<O, S>;
-
-#[deprecated = "`MtAtomoBuilder` is deprecated. Use `AtomoBuilder` instead."]
-pub type MtAtomoBuilder<S> = AtomoBuilder<S>;

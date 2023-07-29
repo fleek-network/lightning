@@ -76,6 +76,7 @@ impl<O, S: SerdeBackend> Atomo<O, S> {
 }
 
 impl<S: SerdeBackend> Atomo<QueryPerm, S> {
+    /// Run a query on the database.
     pub fn run<F, R>(&self, query: F) -> R
     where
         F: Fn(&mut TableSelector<S>) -> R,
@@ -86,6 +87,7 @@ impl<S: SerdeBackend> Atomo<QueryPerm, S> {
 }
 
 impl<S: SerdeBackend> Atomo<UpdatePerm, S> {
+    /// Run an update on the database.
     pub fn run<F, R>(&mut self, mutation: F) -> R
     where
         F: Fn(&mut TableSelector<S>) -> R,
@@ -101,4 +103,32 @@ impl<S: SerdeBackend> Atomo<UpdatePerm, S> {
 
         response
     }
+}
+
+mod doc_tests {
+    /// This should compile fine since it is an attempt to clone an Atomo instance with
+    /// query permissions.
+    ///
+    /// ```
+    /// use atomo::*;
+    ///
+    /// fn is_clone<T: Clone>() {}
+    ///
+    /// fn ensure_atomo_is_clone<S: SerdeBackend>() {
+    ///     is_clone::<Atomo<QueryPerm, S>>()
+    /// }
+    /// ```
+    ///
+    /// This compilation MUST fail since we don't want UpdatePerm to allow for clone.
+    ///
+    /// ```compile_fail
+    /// use atomo::*;
+    ///
+    /// fn is_clone<T: Clone>() {}
+    ///
+    /// fn ensure_atomo_is_clone<S: SerdeBackend>() {
+    ///     is_clone::<Atomo<UpdatePerm, S>>()
+    /// }
+    /// ```
+    fn _ensure_update_perm_not_clone() {}
 }
