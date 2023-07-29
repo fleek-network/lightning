@@ -1,7 +1,7 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     net::SocketAddr,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, RwLock},
 };
 
 use anyhow::{bail, Result};
@@ -35,16 +35,6 @@ pub enum Command {
         key: Vec<u8>,
         value: Vec<u8>,
     },
-}
-
-#[derive(Clone)]
-pub struct Handler {
-    socket: Arc<UdpSocket>,
-    /// Inflight messages.
-    _inflight: Arc<Mutex<HashSet<u64>>>,
-    table_tx: Sender<TableQuery>,
-    node_id: NodeNetworkingPublicKey,
-    pending_lookups: Arc<RwLock<HashMap<u64, LookupHandle>>>,
 }
 
 pub async fn start_server(
@@ -91,6 +81,14 @@ pub async fn start_server(
     }
 }
 
+#[derive(Clone)]
+pub struct Handler {
+    socket: Arc<UdpSocket>,
+    table_tx: Sender<TableQuery>,
+    node_id: NodeNetworkingPublicKey,
+    pending_lookups: Arc<RwLock<HashMap<u64, LookupHandle>>>,
+}
+
 impl Handler {
     pub fn new(
         socket: Arc<UdpSocket>,
@@ -99,7 +97,6 @@ impl Handler {
     ) -> Self {
         Self {
             socket,
-            _inflight: Arc::new(Default::default()),
             table_tx,
             node_id,
             pending_lookups: Default::default(),
@@ -117,7 +114,7 @@ impl Handler {
                         return Err(anyhow::anyhow!("failed"));
                     },
                 };
-                match self._find_value(hash).await {
+                match self.find_value(hash).await {
                     Ok(value) => {
                         tx.send(Ok(value)).unwrap();
                     },
@@ -129,11 +126,15 @@ impl Handler {
             },
             Command::Put { key, value } => {
                 let table_key = TableKey::try_from(key.as_slice())?;
-                let nodes = self._find_node(table_key).await?;
+                let nodes = self.find_node(table_key).await?;
                 // Todo: Add sender information in message.
                 let message = Message {
                     id: 0,
-                    payload: MessagePayload::Query(Query::Store { key, value }),
+                    sender_key: self.node_id,
+                    payload: MessagePayload::Query(Query::Store {
+                        key: table_key,
+                        value,
+                    }),
                 };
                 let bytes = bincode::serialize(&message)?;
                 for node in nodes {
@@ -147,13 +148,10 @@ impl Handler {
     async fn handle_incoming_datagram(&self, datagram: Vec<u8>, address: SocketAddr) -> Result<()> {
         let message: Message = bincode::deserialize(datagram.as_slice())?;
         let message_id = message.id;
+        let sender_key = message.sender_key;
         match message.payload {
             MessagePayload::Query(query) => match query {
-                Query::Find {
-                    sender_id,
-                    find_value,
-                    target,
-                } => {
+                Query::Find { find_value, target } => {
                     let value = match find_value {
                         // Todo: Check from local store.
                         true => todo!(),
@@ -162,10 +160,10 @@ impl Handler {
                     let nodes = self.closest_nodes(&target).await?;
                     let query = Message {
                         id: message_id,
+                        sender_key: self.node_id,
                         payload: MessagePayload::Response(Response {
-                            sender_id: sender_id.0,
                             nodes,
-                            breadcrumb: 0,
+                            id: 0,
                             value,
                         }),
                     };
@@ -173,15 +171,16 @@ impl Handler {
                     socket::send_to(&self.socket, bytes.as_slice(), address).await?;
                 },
                 Query::Store { .. } => {
+                    // Todo: How do we avoid someone sending tons of Store queries.
                     todo!()
                 },
                 Query::Ping => {
                     let query = Message {
                         id: message_id,
+                        sender_key: self.node_id,
                         payload: MessagePayload::Response(Response {
-                            sender_id: self.node_id.0,
                             nodes: Vec::new(),
-                            breadcrumb: 0,
+                            id: 0,
                             value: None,
                         }),
                     };
@@ -190,19 +189,14 @@ impl Handler {
                 },
             },
             MessagePayload::Response(response) => {
-                let task_tx = match self
-                    .pending_lookups
-                    .read()
-                    .unwrap()
-                    .get(&response.breadcrumb)
-                {
+                let task_tx = match self.pending_lookups.read().unwrap().get(&response.id) {
                     None => {
                         tracing::warn!("received unsolicited response");
                         return Ok(());
                     },
                     Some(handle) => handle.0.clone(),
                 };
-                if task_tx.send(response).await.is_err() {
+                if task_tx.send((sender_key, response)).await.is_err() {
                     tracing::error!("failed to send response to task")
                 }
             },
@@ -229,7 +223,7 @@ impl Handler {
         }
     }
 
-    async fn _find_node(&self, target: TableKey) -> Result<Vec<NodeInfo>> {
+    async fn find_node(&self, target: TableKey) -> Result<Vec<NodeInfo>> {
         let (task_tx, task_rx) = mpsc::channel(1000000);
         // Todo: Randomly generate id/breadcrumb.
         let task_id = 0;
@@ -256,7 +250,7 @@ impl Handler {
         }
     }
 
-    async fn _find_value(&self, target: TableKey) -> Result<Option<Vec<u8>>> {
+    async fn find_value(&self, target: TableKey) -> Result<Option<Vec<u8>>> {
         let (task_tx, task_rx) = mpsc::channel(1000000);
         // Todo: Randomly generate id/breadcrumb.
         let task_id = 0;

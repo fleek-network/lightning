@@ -13,15 +13,8 @@ pub struct NodeInfo {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Query {
-    Find {
-        find_value: bool,
-        sender_id: NodeNetworkingPublicKey,
-        target: TableKey,
-    },
-    Store {
-        key: Vec<u8>,
-        value: Vec<u8>,
-    },
+    Find { find_value: bool, target: TableKey },
+    Store { key: TableKey, value: Vec<u8> },
     Ping,
 }
 
@@ -34,13 +27,13 @@ pub enum MessagePayload {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Message {
     pub id: u64,
+    pub sender_key: NodeNetworkingPublicKey,
     pub payload: MessagePayload,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Response {
-    pub sender_id: TableKey,
+    pub id: u64,
     pub nodes: Vec<NodeInfo>,
-    pub breadcrumb: u64,
     pub value: Option<Vec<u8>>,
 }

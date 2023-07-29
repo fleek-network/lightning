@@ -74,9 +74,9 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                     // Todo: Generate random transaction ID.
                     // Message: Maybe we need to add breadcrumb to message.
                     id: lookup.id,
+                    sender_key: lookup.local_key,
                     payload: MessagePayload::Query(Query::Find {
                         find_value: lookup.find_value_lookup,
-                        sender_id: lookup.local_key,
                         target: lookup.target,
                     }),
                 };
@@ -84,7 +84,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                 socket::send_to(&lookup.socket, bytes.as_slice(), node.inner.address)
                     .await
                     .unwrap();
-                pending.insert(node.inner.key.0, node.inner);
+                pending.insert(node.inner.key, node.inner);
             }
             if !pending.is_empty() {
                 // We have found closer nodes so we start another round.
@@ -110,10 +110,9 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                 continue;
             }
             // Incoming K nodes from peers.
-            response = lookup.main_rx.recv() => {
-                let response = response.unwrap();
-                let sender_id = response.sender_id;
-                if pending.contains_key(&sender_id) || late.contains_key(&sender_id) {
+            message = lookup.main_rx.recv() => {
+                let (sender_key, response) = message.unwrap();
+                if pending.contains_key(&sender_key) || late.contains_key(&sender_key) {
                     // If this is look up is a find a value, we check if the value is in the response.
                     if lookup.find_value_lookup && response.value.is_some() {
                         return Ok(LookupResult::Value(response.value));
@@ -136,9 +135,9 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                     lookup.closest_nodes.insert_new_entries(nodes);
 
                     // Remove sender from pending list.
-                    let node = match pending.remove(&sender_id) {
+                    let node = match pending.remove(&sender_key) {
                         Some(node) => node,
-                        None => late.remove(&sender_id).unwrap(),
+                        None => late.remove(&sender_key).unwrap(),
                     };
 
                     // Put this node back to closest nodes list.
@@ -150,7 +149,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                         }
                     ).is_none());
                 } else {
-                    tracing::warn!("received unsolicited list of nodes from {sender_id:?}");
+                    tracing::warn!("received unsolicited list of nodes from {sender_key:?}");
                 }
             }
         }
@@ -175,7 +174,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
 pub struct LookUpError(String);
 
 #[derive(Clone)]
-pub struct LookupHandle(pub Sender<Response>);
+pub struct LookupHandle(pub Sender<(NodeNetworkingPublicKey, Response)>);
 
 pub struct LookupTask {
     // Task identifier.
@@ -191,7 +190,7 @@ pub struct LookupTask {
     // Send queries to table server.
     table_tx: Sender<TableQuery>,
     // Receive messages from server.
-    main_rx: Receiver<Response>,
+    main_rx: Receiver<(NodeNetworkingPublicKey, Response)>,
     // Socket to send queries over the network.
     socket: Arc<UdpSocket>,
 }
@@ -203,7 +202,7 @@ impl LookupTask {
         local_key: NodeNetworkingPublicKey,
         target: TableKey,
         table_tx: Sender<TableQuery>,
-        main_rx: Receiver<Response>,
+        main_rx: Receiver<(NodeNetworkingPublicKey, Response)>,
         socket: Arc<UdpSocket>,
     ) -> Self {
         Self {
