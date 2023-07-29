@@ -193,7 +193,7 @@ impl DivisiveHierarchy {
                 },
                 DivisiveHierarchy::Cluster { nodes, .. } => {
                     for node in nodes {
-                        let conns: Vec<_> = node.connections.values().cloned().collect();
+                        let conns: Vec<_> = node.connections.values().rev().cloned().collect();
                         data[node.id] = conns;
                     }
                 },
