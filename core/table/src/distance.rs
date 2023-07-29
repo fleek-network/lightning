@@ -2,8 +2,6 @@ use crate::table::TableKey;
 
 pub type Distance = TableKey;
 
-pub const MAX_DISTANCE: [u8; 32] = [255u8; 32];
-
 pub fn leading_zero_bits(key_a: &TableKey, key_b: &TableKey) -> usize {
     let distance = distance(key_a, key_b);
     let mut index = 0;

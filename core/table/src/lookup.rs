@@ -19,6 +19,7 @@ use tokio::{
 use tokio_util::time::DelayQueue;
 
 use crate::{
+    bucket::MAX_BUCKETS,
     distance::{self, Distance},
     query::{Message, MessagePayload, NodeInfo, Query, Response},
     socket,
@@ -88,7 +89,18 @@ async fn run_lookup(mut lookup: LookUp) {
         .await
         .expect("Table to not drop the channel");
     let nodes = match rx.await.expect("Table to not drop the channel") {
-        Ok(nodes) => nodes,
+        Ok(nodes) => nodes
+            .into_iter()
+            .map(|node| {
+                (
+                    node.key.0,
+                    LookupNode {
+                        inner: node,
+                        status: Status::Initial,
+                    },
+                )
+            })
+            .collect(),
         Err(e) => {
             tracing::error!("failed to get closest nodes: {e:?}");
             lookup
@@ -99,34 +111,21 @@ async fn run_lookup(mut lookup: LookUp) {
             return;
         },
     };
-
-    let nodes = nodes
-        .into_iter()
-        .map(|node| {
-            (
-                node.key.0,
-                LookupNode {
-                    inner: node,
-                    status: Status::Initial,
-                },
-            )
-        })
-        .collect();
-
     lookup.closest_nodes.insert_new_entries(nodes);
 
     // Nodes on which we are waiting for a response.
     let mut pending = HashMap::new();
     // Nodes that didn't send a response in time.
     let mut late = HashMap::new();
+    // Timeout for every round.
     let mut timeout = time::interval(Duration::from_secs(4));
+    let mut done = false;
     loop {
-        let mut closer_exists = false;
         // Pending is empty when a round has finished.
         if pending.is_empty() {
             for node in lookup
                 .closest_nodes
-                .prune(3, |node| node.status == Status::Initial)
+                .pickout(MAX_BUCKETS, 3, |node| node.status == Status::Initial)
             {
                 let message = Message {
                     // Todo: Generate random transaction ID.
@@ -141,12 +140,32 @@ async fn run_lookup(mut lookup: LookUp) {
                     .await
                     .unwrap();
                 pending.insert(node.inner.key.0, node.inner);
-                closer_exists = true;
             }
-            timeout.reset();
+            if !pending.is_empty() {
+                // We have found closer nodes so we start another round.
+                timeout.reset();
+            } else {
+                // Round finished and first K closest nodes have responded so we're done.
+                done = true
+            }
         }
 
         select! {
+            // We want timeout to be polled first to control round switches
+            // and avoid network channel always being ready.
+            biased;
+            // Timeout for round.
+            _ = timeout.tick() => {
+                if done {
+                    break;
+                }
+                for (key, node) in pending.into_iter() {
+                    late.insert(key, node);
+                }
+                pending = HashMap::new();
+                continue;
+            }
+            // Incoming K nodes from peers.
             response = lookup.server_rx.recv() => {
                 let response = response.unwrap();
                 let sender_id = response.sender_id;
@@ -186,29 +205,19 @@ async fn run_lookup(mut lookup: LookUp) {
                     tracing::warn!("received unsolicited list of nodes from {sender_id:?}");
                 }
             }
-            _ = timeout.tick() => {
-                for (key, node) in pending.into_iter() {
-                    late.insert(key, node);
-                }
-                pending = HashMap::new();
-                continue;
-            }
-        }
-
-        if !closer_exists && pending.is_empty() {
-            lookup
-                .server_tx
-                .send(Ok(lookup
-                    .closest_nodes
-                    .nodes()
-                    .next()
-                    .map(|node| node.inner.key.0)
-                    .unwrap()))
-                .await
-                .unwrap();
-            break;
         }
     }
+
+    lookup
+        .server_tx
+        .send(Ok(lookup
+            .closest_nodes
+            .nodes()
+            .next()
+            .map(|node| node.inner.key.0)
+            .unwrap()))
+        .await
+        .unwrap();
 }
 
 #[derive(Clone, PartialEq)]
@@ -312,15 +321,15 @@ impl<V: Clone> LookupMap<V> {
         self.closest.insert(distance, value)
     }
 
-    /// Removes and returns the first alpha values from the map for those values
-    /// such that `predicate(value) == true`.
-    fn prune<P>(&mut self, alpha: usize, mut predicate: P) -> Vec<V>
+    // /// Removes and returns the first alpha values from the map for those values
+    // /// such that `predicate(value) == true`.
+    fn pickout<P>(&mut self, k: usize, alpha: usize, mut predicate: P) -> Vec<V>
     where
         P: FnMut(&V) -> bool,
     {
         let mut pruned = Vec::with_capacity(alpha);
         let mut count = 0;
-        for (distance, value) in self.closest.iter() {
+        for (distance, value) in self.closest.iter().take(k) {
             if count >= alpha {
                 break;
             }
