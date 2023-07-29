@@ -40,4 +40,5 @@ pub struct Message {
 pub struct Response {
     pub sender_id: TableKey,
     pub nodes: Vec<NodeInfo>,
+    pub breadcrumb: u64,
 }

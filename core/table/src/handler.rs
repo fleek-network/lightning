@@ -1,7 +1,7 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     net::SocketAddr,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use anyhow::{bail, Result};
@@ -10,6 +10,7 @@ use tokio::{
     net::UdpSocket,
     select,
     sync::{
+        mpsc,
         mpsc::{Receiver, Sender},
         oneshot,
     },
@@ -17,8 +18,11 @@ use tokio::{
 };
 
 use crate::{
+    lookup,
+    lookup::{LookupHandle, LookupTask},
     query::{Message, MessagePayload, NodeInfo, Query, Response},
     socket,
+    socket::send_to,
     table::{self, TableKey, TableQuery},
 };
 
@@ -41,6 +45,7 @@ pub struct Handler {
     _inflight: Arc<Mutex<HashSet<u64>>>,
     table_tx: Sender<TableQuery>,
     node_id: NodeNetworkingPublicKey,
+    pending_lookups: Arc<RwLock<HashMap<u64, LookupHandle>>>,
 }
 
 pub async fn start_server(
@@ -98,6 +103,7 @@ impl Handler {
             _inflight: Arc::new(Default::default()),
             table_tx,
             node_id,
+            pending_lookups: Default::default(),
         }
     }
 
@@ -112,7 +118,7 @@ impl Handler {
                         return Err(anyhow::anyhow!("failed"));
                     },
                 };
-                match self.find_value(hash).await {
+                match self._find_value(hash).await {
                     Ok(value) => {
                         tx.send(Ok(value)).unwrap();
                     },
@@ -122,7 +128,19 @@ impl Handler {
                     },
                 }
             },
-            Command::Put { .. } => todo!(),
+            Command::Put { key, value } => {
+                let table_key = TableKey::try_from(key.as_slice())?;
+                let nodes = self._find_node(table_key).await?;
+                // Todo: Add sender information in message.
+                let message = Message {
+                    id: 0,
+                    payload: MessagePayload::Query(Query::Store { key, value }),
+                };
+                let bytes = bincode::serialize(&message)?;
+                for node in nodes {
+                    send_to(&self.socket, &bytes, node.address).await?;
+                }
+            },
         }
         Ok(())
     }
@@ -139,6 +157,7 @@ impl Handler {
                         payload: MessagePayload::Response(Response {
                             sender_id: key.0,
                             nodes,
+                            breadcrumb: 0,
                         }),
                     };
                     let bytes = bincode::serialize(&query)?;
@@ -153,13 +172,30 @@ impl Handler {
                         payload: MessagePayload::Response(Response {
                             sender_id: self.node_id.0,
                             nodes: Default::default(),
+                            breadcrumb: 0,
                         }),
                     };
                     let bytes = bincode::serialize(&query)?;
                     socket::send_to(&self.socket, bytes.as_slice(), address).await?;
                 },
             },
-            MessagePayload::Response(_) => {},
+            MessagePayload::Response(response) => {
+                let task_tx = match self
+                    .pending_lookups
+                    .read()
+                    .unwrap()
+                    .get(&response.breadcrumb)
+                {
+                    None => {
+                        tracing::warn!("received unsolicited response");
+                        return Ok(());
+                    },
+                    Some(handle) => handle.0.clone(),
+                };
+                if task_tx.send(response).await.is_err() {
+                    tracing::error!("failed to send response to task")
+                }
+            },
         }
         Ok(())
     }
@@ -183,11 +219,27 @@ impl Handler {
         }
     }
 
-    async fn _look_up(&self, _: TableKey) -> Result<()> {
-        todo!()
+    async fn _find_node(&self, target: TableKey) -> Result<Vec<NodeInfo>> {
+        let (task_tx, task_rx) = mpsc::channel(1000000);
+        // Todo: Randomly generate id/breadcrumb.
+        let task_id = 0;
+        let task = LookupTask::new(
+            task_id,
+            self.node_id,
+            target,
+            self.table_tx.clone(),
+            task_rx,
+            self.socket.clone(),
+        );
+        let handle = LookupHandle(task_tx);
+        self.pending_lookups
+            .write()
+            .unwrap()
+            .insert(task_id, handle);
+        lookup::lookup(task).await.map_err(Into::into)
     }
 
-    async fn find_value(&self, _: TableKey) -> Result<Vec<u8>> {
+    async fn _find_value(&self, _: TableKey) -> Result<Vec<u8>> {
         todo!()
     }
 }

@@ -7,16 +7,14 @@ use std::{
 use fleek_crypto::NodeNetworkingPublicKey;
 use thiserror::Error;
 use tokio::{
-    macros::support::poll_fn,
     net::UdpSocket,
     select,
     sync::{
-        mpsc::{self, Receiver, Sender},
+        mpsc::{Receiver, Sender},
         oneshot,
     },
     time,
 };
-use tokio_util::time::DelayQueue;
 
 use crate::{
     bucket::MAX_BUCKETS,
@@ -26,58 +24,9 @@ use crate::{
     table::{TableKey, TableQuery},
 };
 
-pub async fn _start_server(
-    // Send lookup responses.
-    response_tx: Sender<LookupResponse>,
-    // Receive lookup requests.
-    mut request_rx: Receiver<LookupRequest>,
-    // Receive responses from the network routed by handler.
-    mut network_rx: Receiver<Response>,
-    // Send queries to table server.
-    table_tx: Sender<TableQuery>,
-    // Socket to send queries over the network.
-    socket: Arc<UdpSocket>,
-    // Local node's public key.
-    key: NodeNetworkingPublicKey,
-) {
-    let main_server = LookUpServer::new(response_tx);
-    // Todo: add delay queue to server.
-    let mut expired: DelayQueue<u64> = Default::default();
-    let (server_tx, mut server_rx) = mpsc::channel(10000);
-    loop {
-        let mut server = main_server.clone();
-        select! {
-            request = request_rx.recv() => {
-                let request = request.unwrap();
-                if server.pending.get(&request.target).is_none() {
-                    let (task_tx, task_rx) = mpsc::channel(10000);
-                    server.pending.insert(
-                        request.target,
-                        LookupHandle { _request: request.clone(), _task_tx: task_tx }
-                    );
-                    let lookup = LookUp {
-                        local_id: key,
-                        target: request.target,
-                        table_tx: table_tx.clone(),
-                        server_tx: server_tx.clone(),
-                        server_rx:task_rx,
-                        _inflight: HashMap::new(),
-                        socket: socket.clone(),
-                        closest_nodes: LookupMap::new(request.target),
-                    };
-                    tokio::spawn(run_lookup(lookup));
-                }
-            }
-            _network_response = network_rx.recv() => {}
-            _exp = poll_fn(|cx| expired.poll_expired(cx)) => {}
-            _update = server_rx.recv() => {}
-        }
-    }
-}
-
 /// Kademlia's lookup procedure.
-async fn run_lookup(mut lookup: LookUp) {
-    // Get initial K closest nodes.
+pub async fn lookup(mut lookup: LookupTask) -> Result<Vec<NodeInfo>, LookUpError> {
+    // Get initial K closest nodes from our local table.
     let (tx, rx) = oneshot::channel();
     let table_query = TableQuery::ClosestNodes {
         target: lookup.target,
@@ -88,29 +37,24 @@ async fn run_lookup(mut lookup: LookUp) {
         .send(table_query)
         .await
         .expect("Table to not drop the channel");
-    let nodes = match rx.await.expect("Table to not drop the channel") {
-        Ok(nodes) => nodes
-            .into_iter()
-            .map(|node| {
-                (
-                    node.key.0,
-                    LookupNode {
-                        inner: node,
-                        status: Status::Initial,
-                    },
-                )
-            })
-            .collect(),
-        Err(e) => {
+    let nodes = rx
+        .await
+        .map_err(|e| LookUpError(e.to_string()))?
+        .map_err(|e| {
             tracing::error!("failed to get closest nodes: {e:?}");
-            lookup
-                .server_tx
-                .send(Err(LookUpError))
-                .await
-                .expect("Server to not drop the channel");
-            return;
-        },
-    };
+            LookUpError(e.to_string())
+        })?
+        .into_iter()
+        .map(|node| {
+            (
+                node.key.0,
+                LookupNode {
+                    inner: node,
+                    status: Status::Initial,
+                },
+            )
+        })
+        .collect();
     lookup.closest_nodes.insert_new_entries(nodes);
 
     // Nodes on which we are waiting for a response.
@@ -119,7 +63,6 @@ async fn run_lookup(mut lookup: LookUp) {
     let mut late = HashMap::new();
     // Timeout for every round.
     let mut timeout = time::interval(Duration::from_secs(4));
-    let mut done = false;
     loop {
         // Pending is empty when a round has finished.
         if pending.is_empty() {
@@ -129,9 +72,10 @@ async fn run_lookup(mut lookup: LookUp) {
             {
                 let message = Message {
                     // Todo: Generate random transaction ID.
-                    id: 0,
+                    // Message: Maybe we need to add breadcrumb to message.
+                    id: lookup.task_id,
                     payload: MessagePayload::Query(Query::Find {
-                        sender_id: lookup.local_id,
+                        sender_id: lookup.local_key,
                         target: lookup.target,
                     }),
                 };
@@ -144,9 +88,6 @@ async fn run_lookup(mut lookup: LookUp) {
             if !pending.is_empty() {
                 // We have found closer nodes so we start another round.
                 timeout.reset();
-            } else {
-                // Round finished and first K closest nodes have responded so we're done.
-                done = true
             }
         }
 
@@ -156,7 +97,9 @@ async fn run_lookup(mut lookup: LookUp) {
             biased;
             // Timeout for round.
             _ = timeout.tick() => {
-                if done {
+                if pending.is_empty() {
+                    // This can't be empty at this point because
+                    // it should have been filled at the start of the loop.
                     break;
                 }
                 for (key, node) in pending.into_iter() {
@@ -166,7 +109,7 @@ async fn run_lookup(mut lookup: LookUp) {
                 continue;
             }
             // Incoming K nodes from peers.
-            response = lookup.server_rx.recv() => {
+            response = lookup.main_rx.recv() => {
                 let response = response.unwrap();
                 let sender_id = response.sender_id;
                 if pending.contains_key(&sender_id) || late.contains_key(&sender_id) {
@@ -208,83 +151,54 @@ async fn run_lookup(mut lookup: LookUp) {
         }
     }
 
-    lookup
-        .server_tx
-        .send(Ok(lookup
-            .closest_nodes
-            .nodes()
-            .next()
-            .map(|node| node.inner.key.0)
-            .unwrap()))
-        .await
-        .unwrap();
-}
-
-#[derive(Clone, PartialEq)]
-enum Status {
-    Initial,
-    Responded,
-}
-
-#[derive(Clone)]
-pub struct LookupNode {
-    inner: NodeInfo,
-    status: Status,
+    Ok(lookup
+        .closest_nodes
+        .into_nodes()
+        .map(|lookup_node| lookup_node.inner)
+        .take(MAX_BUCKETS)
+        .collect())
 }
 
 #[derive(Debug, Error)]
-#[error("Lookup procedure failed")]
-pub struct LookUpError;
+#[error("lookup procedure failed: {0}")]
+pub struct LookUpError(String);
 
 #[derive(Clone)]
-pub struct LookupHandle {
-    _request: LookupRequest,
-    _task_tx: Sender<Response>,
-}
+pub struct LookupHandle(pub Sender<Response>);
 
-#[derive(Clone)]
-pub struct LookupRequest {
-    pub target: TableKey,
-}
-
-pub struct LookupResponse {
-    pub target: TableKey,
-    pub nodes: Vec<NodeInfo>,
-}
-
-pub struct LookUp {
+pub struct LookupTask {
+    task_id: u64,
     // Closest nodes.
     closest_nodes: LookupMap<LookupNode>,
     // Our node's local key.
-    local_id: NodeNetworkingPublicKey,
+    local_key: NodeNetworkingPublicKey,
     // Target that we're looking for.
     target: TableKey,
     // Send queries to table server.
     table_tx: Sender<TableQuery>,
-    // Channel to send messages to server.
-    // At the moment, we just tell the server we're done.
-    server_tx: Sender<Result<TableKey, LookUpError>>,
     // Receive messages from server.
-    server_rx: Receiver<Response>,
-    // Inflight requests.
-    _inflight: HashMap<u64, LookUp>,
+    main_rx: Receiver<Response>,
     // Socket to send queries over the network.
     socket: Arc<UdpSocket>,
 }
 
-#[derive(Clone)]
-pub struct LookUpServer {
-    // Ongoing lookups.
-    pending: HashMap<TableKey, LookupHandle>,
-    // Send lookup responses.
-    _response_tx: Sender<LookupResponse>,
-}
-
-impl LookUpServer {
-    fn new(response_tx: Sender<LookupResponse>) -> Self {
+impl LookupTask {
+    pub fn new(
+        task_id: u64,
+        local_key: NodeNetworkingPublicKey,
+        target: TableKey,
+        table_tx: Sender<TableQuery>,
+        main_rx: Receiver<Response>,
+        socket: Arc<UdpSocket>,
+    ) -> Self {
         Self {
-            _response_tx: response_tx,
-            pending: HashMap::new(),
+            task_id,
+            closest_nodes: LookupMap::new(target),
+            local_key,
+            target,
+            table_tx,
+            main_rx,
+            socket,
         }
     }
 }
@@ -321,8 +235,8 @@ impl<V: Clone> LookupMap<V> {
         self.closest.insert(distance, value)
     }
 
-    // /// Removes and returns the first alpha values from the map for those values
-    // /// such that `predicate(value) == true`.
+    /// Removes and returns the first alpha values from the map for those values
+    /// such that `predicate(value) == true`.
     fn pickout<P>(&mut self, k: usize, alpha: usize, mut predicate: P) -> Vec<V>
     where
         P: FnMut(&V) -> bool,
@@ -344,7 +258,19 @@ impl<V: Clone> LookupMap<V> {
         pruned.into_iter().map(|(_, v)| v).collect()
     }
 
-    fn nodes(&self) -> impl Iterator<Item = &V> {
-        self.closest.values()
+    fn into_nodes(self) -> impl Iterator<Item = V> {
+        self.closest.into_values()
     }
+}
+
+#[derive(Clone, PartialEq)]
+enum Status {
+    Initial,
+    Responded,
+}
+
+#[derive(Clone)]
+pub struct LookupNode {
+    inner: NodeInfo,
+    status: Status,
 }
