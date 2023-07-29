@@ -182,6 +182,29 @@ impl DivisiveHierarchy {
         }
     }
 
+    /// Collect connections for each node at all depths of the hierarchy.
+    pub fn connections(&self) -> Vec<Vec<Vec<usize>>> {
+        fn inner(item: &DivisiveHierarchy, data: &mut Vec<Vec<Vec<usize>>>) {
+            match item {
+                DivisiveHierarchy::SuperCluster { children, .. } => {
+                    for child in children {
+                        inner(child, data)
+                    }
+                },
+                DivisiveHierarchy::Cluster { nodes, .. } => {
+                    for node in nodes {
+                        let conns: Vec<_> = node.connections.values().cloned().collect();
+                        data[node.id] = conns;
+                    }
+                },
+            }
+        }
+
+        let mut data = vec![vec![]; self.n_nodes()];
+        inner(self, &mut data);
+        data
+    }
+
     /// Collect assignments for each node at each depth of the hierarchy. The last vec of
     /// assignments is the final tree depth.
     pub fn assignments(&self) -> Vec<Vec<usize>> {

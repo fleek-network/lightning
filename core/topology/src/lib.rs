@@ -149,13 +149,12 @@ impl<Q: SyncQueryRunnerInterface> TopologyInterface for Topology<Q> {
                     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(epoch);
                     let hierarchy = DivisiveHierarchy::new(&mut rng, &matrix, self.target_k);
 
-                    // TODO: add depth support
-                    Arc::new(vec![
-                        hierarchy.assignments()[our_index]
+                    Arc::new(
+                        hierarchy.connections()[our_index]
                             .iter()
-                            .map(|idx| mappings[idx])
+                            .map(|ids| ids.iter().map(|idx| mappings[idx]).collect())
                             .collect(),
-                    ])
+                    )
                 }
             } else {
                 // Not in the topology: return all nodes to bootstrap from
