@@ -1,7 +1,8 @@
 pub mod clustering;
-mod config;
+pub mod config;
 pub mod divisive;
 pub mod pairing;
+
 #[cfg(test)]
 mod tests;
 
@@ -20,7 +21,6 @@ use ndarray::{Array, Array2};
 use rand::SeedableRng;
 
 pub struct Topology<Q: SyncQueryRunnerInterface> {
-    #[allow(dead_code)]
     query: Q,
     our_public_key: NodePublicKey,
     current_peers: Arc<Vec<Vec<NodePublicKey>>>,
@@ -30,7 +30,6 @@ pub struct Topology<Q: SyncQueryRunnerInterface> {
 }
 
 impl<Q: SyncQueryRunnerInterface> Topology<Q> {
-    #[allow(dead_code)]
     fn build_latency_matrix(&self) -> (Array2<i32>, HashMap<usize, NodePublicKey>, Option<usize>) {
         let latencies = self.query.get_latencies();
         let valid_pubkeys: BTreeSet<NodePublicKey> = self
@@ -159,7 +158,7 @@ impl<Q: SyncQueryRunnerInterface> TopologyInterface for Topology<Q> {
                     ])
                 }
             } else {
-                // Not in the topology: return all random nodes to bootstrap from
+                // Not in the topology: return all nodes to bootstrap from
                 Arc::new(vec![mappings.into_values().collect()])
             };
 
