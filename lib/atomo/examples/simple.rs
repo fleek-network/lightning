@@ -45,7 +45,7 @@ fn main() {
         let mut table_ref = table_res.get(ctx);
         // Or if we didn't have a `ResolvedTableReference`.
         // let mut table_ref = ctx.get_table::<Key, Value>("name-of-table");
-        
+
         table_ref.insert(0, 17);
     });
 
@@ -98,7 +98,7 @@ fn main() {
     db.run(|ctx: _| {
         let mut table_ref = table_res.get(ctx);
 
-        // Update the value and then allow the 
+        // Update the value and then allow the
         table_ref.insert(0, 12);
         println!("Value updated to 12");
     });

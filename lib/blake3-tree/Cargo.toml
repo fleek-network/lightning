@@ -3,7 +3,8 @@ name = "blake3-tree"
 license = "MIT OR Apache-2.0"
 version = "0.1.0"
 edition = "2021"
-authors = ["qti3e <i@parsa.oo>"]
+authors = ["Parsa Ghadimi <parsa@fleek.xyz>"]
+description = "Blake3 supercharged"
 
 [dependencies]
 fleek-blake3 = "1.3"

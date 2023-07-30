@@ -1123,8 +1123,8 @@ version = "0.1.0"
 dependencies = [
  "arrayref",
  "arrayvec",
- "blake3 1.3.3",
  "criterion 0.5.1",
+ "fleek-blake3",
  "rand 0.8.5",
  "thiserror",
 ]
@@ -2639,6 +2639,20 @@ checksum = "3b9429470923de8e8cbd4d2dc513535400b4b3fef0319fb5c4e1f520a7bef743"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
+]
+
+[[package]]
+name = "fleek-blake3"
+version = "1.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4081786ba5ee2c9134b425710dbe49eb3d3a32f5b25456c199b5e9ae854d204e"
+dependencies = [
+ "arrayref",
+ "arrayvec",
+ "cc",
+ "cfg-if",
+ "constant_time_eq 0.2.6",
+ "digest 0.10.7",
 ]
 
 [[package]]
