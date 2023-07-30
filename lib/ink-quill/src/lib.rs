@@ -133,6 +133,11 @@ impl TranscriptBuilder {
         }
         result
     }
+
+    /// Returns the hash of the value using the default blake3 hasher.
+    pub fn hash(&self) -> [u8; 32] {
+        fleek_blake3::derive_key(self.get_domain(), &self.compile())
+    }
 }
 
 impl TranscriptBuilderInput for Option<i32> {
@@ -332,7 +337,7 @@ impl<const N: usize> TranscriptBuilderInput for [u8; N] {
 
 #[cfg(test)]
 mod tests {
-    use blake3::derive_key;
+    use fleek_blake3::derive_key;
 
     use super::*;
 

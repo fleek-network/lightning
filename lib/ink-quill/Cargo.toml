@@ -3,11 +3,11 @@ name = "ink-quill"
 license = "MIT OR Apache-2.0"
 version = "0.1.0"
 edition = "2021"
+authors = ["Parsa Ghadimi <parsa@fleek.xyz>", "Mahmoud Arsalan <arsalan@fleek.xyz>"]
+description = "Another transcript library"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-
-[dev-dependencies]
-blake3 = { git="https://github.com/fleek-network/BLAKE3.git", rev="0e15418f195d138a52f5b86210d721fcb4f370d5" }
+fleek-blake3 = "1.3"
 
