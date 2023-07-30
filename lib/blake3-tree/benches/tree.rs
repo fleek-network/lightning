@@ -1,3 +1,4 @@
+use blake3::tree::BlockHasher;
 use blake3_tree::*;
 use criterion::*;
 use rand::{thread_rng, Rng};
@@ -13,16 +14,23 @@ fn bench_tree(c: &mut Criterion) {
         (0..size).for_each(|i| tree_builder.update(&block_data(i)));
         let output = tree_builder.finalize();
 
-        g.bench_with_input(BenchmarkId::new("gen-proof/new", size), &size, |b, size| {
-            let mut rng = thread_rng();
-            b.iter(|| {
-                let proof = ProofBuf::new(&output.tree, rng.gen::<usize>() % size);
-                black_box(proof);
-            })
-        });
+        // It's always one block.
+        g.throughput(Throughput::Bytes(256 * 1024));
 
         g.bench_with_input(
-            BenchmarkId::new("gen-proof/resume", size),
+            BenchmarkId::new("gen-proof-beginning", size),
+            &size,
+            |b, size| {
+                let mut rng = thread_rng();
+                b.iter(|| {
+                    let proof = ProofBuf::new(&output.tree, rng.gen::<usize>() % size);
+                    black_box(proof);
+                })
+            },
+        );
+
+        g.bench_with_input(
+            BenchmarkId::new("gen-proof-resume", size),
             &size,
             |b, size| {
                 let mut rng = thread_rng();
@@ -35,7 +43,7 @@ fn bench_tree(c: &mut Criterion) {
         );
 
         g.bench_with_input(
-            BenchmarkId::new("verifier/feed-proof", size),
+            BenchmarkId::new("verify-proof-beginning", size),
             &size,
             |b, size| {
                 let mut rng = thread_rng();
@@ -48,6 +56,36 @@ fn bench_tree(c: &mut Criterion) {
                     verifier.feed_proof(proof.as_slice()).unwrap();
                     black_box(verifier);
                 })
+            },
+        );
+
+        g.bench_with_input(
+            BenchmarkId::new("verify-proof-resume", size),
+            &size,
+            |b, size| {
+                let mut rng = thread_rng();
+
+                let i = rng.gen::<usize>() % (size - 1);
+                let proof_initial = ProofBuf::new(&output.tree, i);
+                let proof = ProofBuf::resume(&output.tree, i + 1);
+
+                let mut block_hasher = BlockHasher::new();
+                block_hasher.set_block(i);
+                block_hasher.update(&block_data(i));
+
+                b.iter_batched(
+                    || {
+                        let mut verifier = IncrementalVerifier::new(*output.hash.as_bytes(), i);
+                        verifier.feed_proof(proof_initial.as_slice()).unwrap();
+                        verifier.verify(block_hasher.clone()).unwrap();
+                        verifier
+                    },
+                    |mut verifier| {
+                        verifier.feed_proof(proof.as_slice()).unwrap();
+                        black_box(verifier);
+                    },
+                    BatchSize::LargeInput,
+                );
             },
         );
     }
