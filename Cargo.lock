@@ -2693,11 +2693,11 @@ checksum = "7bad48618fdb549078c333a7a8528acb57af271d0433bdecd523eb620628364e"
 
 [[package]]
 name = "fn-sdk"
-version = "0.0.1"
+version = "0.0.0"
 
 [[package]]
 name = "fn-sdk-macros"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "lazy_static",
  "proc-macro2 1.0.66",

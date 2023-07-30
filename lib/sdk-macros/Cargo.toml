@@ -2,7 +2,7 @@
 name = "fn-sdk-macros"
 authors = ["Parsa Ghadimi <parsa@fleek.xyz>"]
 description = "Fleek Network SDK Macros"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
 license = "GPL-3.0"
 

@@ -1,6 +1,6 @@
 [package]
 name = "fn-sdk"
-version = "0.0.1"
+version = "0.0.0"
 edition = "2021"
 authors = ["Parsa Ghadimi <parsa@fleek.xyz>"]
 description = "Fleek Network SDK"
