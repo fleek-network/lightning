@@ -2,7 +2,7 @@ use std::{borrow::Borrow, cmp::Ordering, fmt::Debug, ptr};
 
 use arrayref::array_ref;
 use arrayvec::ArrayVec;
-pub use blake3;
+pub use fleek_blake3 as blake3;
 use thiserror::Error;
 
 // Debug only code for testing against memory leaks.
