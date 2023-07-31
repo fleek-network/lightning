@@ -17,25 +17,36 @@ lightning
 ├── lib
 │   ├── affair
 │   ├── atomo
-│   └── blake3-tree
+│   ├── blake3-stream
+│   ├── blake3-tree
+│   ├── fleek-crypto
+│   ├── hp-fixed
+│   ├── ink-quill
+│   ├── sdk
+│   ├── sdk-macros
+│   └── simulon
 ├── core
-│   ├── node
-│   ├── interfaces
 │   ├── application
 │   ├── blockstore
 │   ├── consensus
 │   ├── handshake
-│   ├── identity
+│   ├── interfaces
+│   ├── mock
+│   ├── node
+│   ├── notifier
 │   ├── origin-arweave
 │   ├── origin-filecoin
 │   ├── origin-ipfs
 │   ├── pod
+│   ├── rep-collector
 │   ├── reputation
 │   ├── rpc
-│   └── sdk
+│   ├── signer
+│   ├── table
+│   ├── test-utils
+│   └── topology
 └── services
     └── cdn
-
 ```
 
 There are 3 top level directories `lib` & `core` and `services`:
