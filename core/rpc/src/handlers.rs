@@ -13,7 +13,7 @@ use crate::{
     server::RpcData,
     types::{NodeKeyParam, PublicKeyParam},
 };
-static OPEN_RPC_DOCS: &str = "../../docs/openrpc.json";
+static OPEN_RPC_DOCS: &str = "../../docs/rpc/openrpc.json";
 
 pub type Result<T> = anyhow::Result<T, Error>;
 
@@ -96,18 +96,18 @@ pub async fn get_flk_balance_handler<Q: SyncQueryRunnerInterface>(
     Ok(data.0.query_runner.get_flk_balance(&params.public_key))
 }
 
+pub async fn get_stables_balance_handler<Q: SyncQueryRunnerInterface>(
+    data: Data<Arc<RpcData<Q>>>,
+    Params(params): Params<PublicKeyParam>,
+) -> Result<HpUfixed<6>> {
+    Ok(data.0.query_runner.get_stables_balance(&params.public_key))
+}
+
 pub async fn get_bandwidth_balance_handler<Q: SyncQueryRunnerInterface>(
     data: Data<Arc<RpcData<Q>>>,
     Params(params): Params<PublicKeyParam>,
 ) -> Result<u128> {
     Ok(data.0.query_runner.get_account_balance(&params.public_key))
-}
-
-pub async fn get_locked_handler<Q: SyncQueryRunnerInterface>(
-    data: Data<Arc<RpcData<Q>>>,
-    Params(params): Params<NodeKeyParam>,
-) -> Result<HpUfixed<18>> {
-    Ok(data.0.query_runner.get_locked(&params.public_key))
 }
 
 pub async fn get_staked_handler<Q: SyncQueryRunnerInterface>(
@@ -117,18 +117,11 @@ pub async fn get_staked_handler<Q: SyncQueryRunnerInterface>(
     Ok(data.0.query_runner.get_staked(&params.public_key))
 }
 
-pub async fn get_reputation_handler<Q: SyncQueryRunnerInterface>(
+pub async fn get_locked_handler<Q: SyncQueryRunnerInterface>(
     data: Data<Arc<RpcData<Q>>>,
     Params(params): Params<NodeKeyParam>,
-) -> Result<Option<u8>> {
-    Ok(data.0.query_runner.get_reputation(&params.public_key))
-}
-
-pub async fn get_stables_balance_handler<Q: SyncQueryRunnerInterface>(
-    data: Data<Arc<RpcData<Q>>>,
-    Params(params): Params<PublicKeyParam>,
-) -> Result<HpUfixed<6>> {
-    Ok(data.0.query_runner.get_stables_balance(&params.public_key))
+) -> Result<HpUfixed<18>> {
+    Ok(data.0.query_runner.get_locked(&params.public_key))
 }
 
 pub async fn get_stake_locked_until_handler<Q: SyncQueryRunnerInterface>(
@@ -153,6 +146,13 @@ pub async fn get_node_info_handler<Q: SyncQueryRunnerInterface>(
     Params(params): Params<NodeKeyParam>,
 ) -> Result<Option<NodeInfo>> {
     Ok(data.0.query_runner.get_node_info(&params.public_key))
+}
+
+pub async fn get_reputation_handler<Q: SyncQueryRunnerInterface>(
+    data: Data<Arc<RpcData<Q>>>,
+    Params(params): Params<NodeKeyParam>,
+) -> Result<Option<u8>> {
+    Ok(data.0.query_runner.get_reputation(&params.public_key))
 }
 
 pub async fn get_staking_amount_handler<Q: SyncQueryRunnerInterface>(

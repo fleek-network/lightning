@@ -167,7 +167,7 @@ impl Env<UpdatePerm> {
                 Value::HpUfixed(supply_at_genesis),
             );
             param_table.insert(ProtocolParams::MaxBoost, genesis.max_boost as u128);
-            param_table.insert(ProtocolParams::MaxLockTime, genesis.max_lock_time as u128);
+            param_table.insert(ProtocolParams::MaxStakeLockTime, genesis.max_lock_time as u128);
             param_table.insert(ProtocolParams::EpochTime, genesis.epoch_time as u128);
             param_table.insert(ProtocolParams::MinimumNodeStake, genesis.min_stake as u128);
             param_table.insert(ProtocolParams::LockTime, genesis.lock_time as u128);
@@ -184,10 +184,6 @@ impl Env<UpdatePerm> {
             param_table.insert(
                 ProtocolParams::EligibilityTime,
                 genesis.eligibility_time as u128,
-            );
-            param_table.insert(
-                ProtocolParams::ConsumerRebate,
-                genesis.consumer_rebate as u128,
             );
             param_table.insert(
                 ProtocolParams::CommitteeSize,

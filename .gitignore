@@ -1,4 +1,5 @@
 target
 *.html
 *.json
+!openrpc.json
 **/data

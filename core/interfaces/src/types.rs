@@ -243,7 +243,7 @@ pub enum ExecutionError {
     OnlyNode,
     InvalidServiceId,
     InsufficientStakesToLock,
-    LockExceededMaxLockTime,
+    LockExceededMaxStakeLockTime,
     LockedTokensUnstakeForbidden,
     EpochAlreadyChanged,
     EpochHasNotStarted,
@@ -351,12 +351,10 @@ pub enum ProtocolParams {
     ServiceBuilderShare = 7,
     /// The maximum targed inflation rate in a year
     MaxInflation = 8,
-    /// The amount of FLK minted per GB they consume.
-    ConsumerRebate = 9,
     /// The max multiplier on rewards for locking
-    MaxBoost = 10,
+    MaxBoost = 9,
     /// The max amount of time tokens can be locked
-    MaxLockTime = 11,
+    MaxStakeLockTime = 10,
 }
 
 /// The physical address of a node where it can be reached, the port numbers are

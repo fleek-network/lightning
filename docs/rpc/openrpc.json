@@ -1,0 +1,802 @@
+{
+  "openrpc": "1.2.6",
+  "info": {
+    "version": "1.0.0",
+    "title": "Fleek Network JSON-RPC",
+    "description": "This API enables JSON-RPC interaction with Fleek Network Node",
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    }
+  },
+  "methods": [
+    {
+      "name": "flk_ping",
+      "summary": "Returns a 'pong' message",
+      "params": [],
+      "result": {
+        "name": "pingResult",
+        "description": "The result of the ping, which is a 'pong' string",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "name": "flk_get_flk_balance",
+      "summary": "Get balance for the provided ETH address",
+      "params": [
+        {
+          "name": "public_key",
+          "description": "The ETH address",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Address"
+          }
+        }
+      ],
+      "result": {
+        "name": "balance",
+        "description": "The balance of the ETH address",
+        "schema": {
+          "$ref": "#/components/schemas/HpFixed18"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_flk_balanceExample",
+          "params": [
+            {
+              "name": "public_key",
+              "value": "0x123456789abcdef0123456789abcdef01234567"
+            }
+          ],
+          "result": {
+            "name": "balance",
+            "value": "1000000000000000000"
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_stables_balance",
+      "summary": "Get stablecoin balance for the provided ETH address",
+      "params": [
+        {
+          "name": "public_key",
+          "description": "The ETH address",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Address"
+          }
+        }
+      ],
+      "result": {
+        "name": "stablesBalance",
+        "description": "The stablecoin balance of the ETH address in HpFixed6 format",
+        "schema": {
+          "$ref": "#/components/schemas/HpFixed6"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_stables_balanceExample",
+          "params": [
+            {
+              "name": "public_key",
+              "value": "0x123456789abcdef0123456789abcdef01234567"
+            }
+          ],
+          "result": {
+            "name": "stablesBalance",
+            "value": "1000000"
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_staked",
+      "summary": "Get staked amount for the provided node public key",
+      "params": [
+        {
+          "name": "public_key",
+          "description": "The node public key",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "stakedAmount",
+        "description": "The staked amount of the node in HpFixed18 format",
+        "schema": {
+          "$ref": "#/components/schemas/HpFixed18"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_stakedExample",
+          "params": [
+            {
+              "name": "public_key",
+              "value": "node_public_key"
+            }
+          ],
+          "result": {
+            "name": "stakedAmount",
+            "value": "100000000000000000000"
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_locked",
+      "summary": "Get the number of locked FLK tokens due to unstake operation for the provided public key",
+      "params": [
+        {
+          "name": "public_key",
+          "description": "The node public key",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "lockedFlkTokens",
+        "description": "The number of locked FLK tokens due to unstake operations. It's in HpFixed18 format.",
+        "schema": {
+          "$ref": "#/components/schemas/HpFixed18"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_lockedExample",
+          "params": [
+            {
+              "name": "public_key",
+              "value": "node_public_key"
+            }
+          ],
+          "result": {
+            "name": "lockedFlkTokens",
+            "value": "1000000000000000000"
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_stake_locked_until",
+      "summary": "Get the epoch until which stakes are locked for boosts for the provided public key",
+      "params": [
+        {
+          "name": "public_key",
+          "description": "The node public key",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "lockedUntilEpoch",
+        "description": "The epoch until which stakes are locked for boosts. It's represented as a stringified u64 number.",
+        "schema": {
+          "$ref": "#/components/schemas/Epoch"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_stake_locked_untilExample",
+          "params": [
+            {
+              "name": "public_key",
+              "value": "node_public_key"
+            }
+          ],
+          "result": {
+            "name": "lockedUntilEpoch",
+            "value": "730"
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_locked_time",
+      "summary": "Get the epoch until which a node's stake is locked due to an unstake operation",
+      "params": [
+        {
+          "name": "public_key",
+          "description": "The node public key",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "lockedUntilEpoch",
+        "description": "The epoch until which a node's stake is locked due to an unstake operation. It's represented as a stringified u64 number.",
+        "schema": {
+          "$ref": "#/components/schemas/Epoch"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_locked_timeExample",
+          "params": [
+            {
+              "name": "public_key",
+              "value": "node_public_key"
+            }
+          ],
+          "result": {
+            "name": "lockedUntilEpoch",
+            "value": "199"
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_node_info",
+      "summary": "Retrieves information about a node given its public key.",
+      "params": [
+        {
+          "name": "public_key",
+          "description": "The public key of the node",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "nodeInfo",
+        "description": "Detailed information about the node",
+        "schema": {
+          "$ref": "#/components/schemas/NodeInfo"
+        }
+      }
+    },
+    {
+      "name": "flk_get_reputation",
+      "summary": "Get reputation for the provided public key",
+      "params": [
+        {
+          "name": "public_key",
+          "description": "The node public key",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "reputation",
+        "description": "The reputation of the node",
+        "schema": {
+          "$ref": "#/components/schemas/IntegerOrNull"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_reputationExample",
+          "params": [
+            {
+              "name": "public_key",
+              "value": "node_public_key"
+            }
+          ],
+          "result": {
+            "name": "reputation",
+            "value": 10
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_staking_amount",
+      "summary": "Get the minimum staking amount required to run a node",
+      "params": [],
+      "result": {
+        "name": "stakingAmount",
+        "description": "The minimum staking amount required to run a node. This value is a number and transactions happens in HpFixed18",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_staking_amountExample",
+          "params": [],
+          "result": {
+            "name": "stakingAmount",
+            "value": 1000
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_committee_members",
+      "summary": "Get the committee members",
+      "params": [],
+      "result": {
+        "name": "committeeMembers",
+        "description": "The public keys of the nodes that are committee members",
+        "schema": {
+          "type": "array",
+          "items": {
+            "schema": {
+              "$ref": "#/components/schemas/NodePublicKey"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "flk_get_epoch",
+      "summary": "Get the current epoch",
+      "params": [],
+      "result": {
+        "name": "currentEpoch",
+        "description": "The current epoch represented as a u64 number.",
+        "schema": {
+          "$ref": "#/components/schemas/Epoch"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_epochExample",
+          "params": [],
+          "result": {
+            "name": "currentEpoch",
+            "value": 299
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_epoch_info",
+      "summary": "Get the current epoch information",
+      "params": [],
+      "result": {
+        "name": "epochInfo",
+        "description": "The information of the current epoch",
+        "schema": {
+          "$ref": "#/components/schemas/EpochInfo"
+        }
+      }
+    },
+    {
+      "name": "flk_get_year_start_supply",
+      "summary": "Get the year start supply used for inflation",
+      "params": [],
+      "result": {
+        "name": "yearStartSupply",
+        "description": "The year start supply represented as a high-precision fixed-point (18 decimals) number",
+        "schema": {
+          "$ref": "#/components/schemas/HpFixed18"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_year_start_supplyExample",
+          "params": [],
+          "result": {
+            "name": "yearStartSupply",
+            "value": "1000000000000000000000"
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_total_supply",
+      "summary": "Get the total supply at any point",
+      "params": [],
+      "result": {
+        "name": "totalSupply",
+        "description": "The total supply at any point represented as a high-precision fixed-point (18 decimals) number",
+        "schema": {
+          "$ref": "#/components/schemas/HpFixed18"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_total_supplyExample",
+          "params": [],
+          "result": {
+            "name": "totalSupply",
+            "value": "1000000000000000000000"
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_protocol_fund_address",
+      "summary": "Get the foundation address where foundation rewards will be transferred to",
+      "params": [],
+      "result": {
+        "name": "fundAddress",
+        "description": "The foundation address",
+        "schema": {
+          "$ref": "#/components/schemas/Address"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_protocol_fund_addressExample",
+          "params": [],
+          "result": {
+            "name": "fundAddress",
+            "value": "0x123456789abcdef0123456789abcdef01234567"
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_protocol_params",
+      "summary": "Get the specified protocol parameter",
+      "params": [
+        {
+          "name": "parameter",
+          "description": "The name of the protocol parameter",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/ProtocolParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "protocolParameterValue",
+        "description": "The value of the specified protocol parameter, represented as an integer.",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_protocol_paramsExample",
+          "params": [
+            {
+              "name": "parameter",
+              "value": "lock_time"
+            }
+          ],
+          "result": {
+            "name": "protocolParameterValue",
+            "value": 300
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_total_served",
+      "summary": "Get total served information",
+      "params": [],
+      "result": {
+        "name": "totalServed",
+        "description": "Total served and reward pool information",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "served": {
+              "$ref": "#/components/schemas/CommodityServed"
+            },
+            "reward_pool": {
+              "$ref": "#/components/schemas/HpFixed6"
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_total_servedExample",
+          "params": [],
+          "result": {
+            "name": "totalServed",
+            "value": {
+              "served": [
+                100000,
+                200000,
+                300000
+              ],
+              "reward_pool": "100000000000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_node_served",
+      "summary": "Get the commodity served and stables revenue for the specified node",
+      "params": [
+        {
+          "name": "public_key",
+          "description": "The public key of the node",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "nodeServed",
+        "description": "The commodity served and stables revenue of the node",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "served": {
+              "$ref": "#/components/schemas/CommodityServed"
+            },
+            "stables_revenue": {
+              "$ref": "#/components/schemas/HpFixed6"
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_node_servedExample",
+          "params": [
+            {
+              "name": "public_key",
+              "value": "0x123456789abcdef0123456789abcdef01234567"
+            }
+          ],
+          "result": {
+            "name": "nodeServed",
+            "value": {
+              "served": [
+                1000,
+                2000,
+                3000
+              ],
+              "stables_revenue": "1500000123456"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_is_valid_node",
+      "summary": "Check if a node is staking the minimum required amount",
+      "params": [
+        {
+          "name": "public_key",
+          "description": "The public key of the node",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "isValidNode",
+        "description": "true if the node is staking the minimum required amount, false otherwise.",
+        "schema": {
+          "type": "boolean"
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_is_valid_nodeExample",
+          "params": [
+            {
+              "name": "public_key",
+              "value": "node_public_key"
+            }
+          ],
+          "result": {
+            "name": "isValidNode",
+            "value": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "flk_get_node_registry",
+      "summary": "Get the registry of valid nodes",
+      "params": [],
+      "result": {
+        "name": "nodeRegistry",
+        "description": "The registry of valid nodes",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/NodeInfo"
+          }
+        }
+      }
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Address": {
+        "type": "string",
+        "pattern": "^0x[a-fA-F0-9]{40}$"
+      },
+      "NodePublicKey": {
+        "type": "string",
+        "pattern": "^[a-fA-F0-9]{192}$"
+      },
+      "NodeNetworkingPublicKey": {
+        "type": "string",
+        "pattern": "^[a-fA-F0-9]{64}$"
+      },
+      "HpFixed18": {
+        "type": "string",
+        "pattern": "^[0-9]$",
+        "description": "A high-precision unsigned fixed-point number with 18 digits of precision, serialized to a string without a decimal point."
+      },
+      "HpFixed6": {
+        "type": "string",
+        "pattern": "^[0-9]$",
+        "description": "A high-precision unsigned fixed-point number with 6 digits of precision, serialized to a string without a decimal point."
+      },
+      "Epoch": {
+        "type": "integer",
+        "description": "An integer representing the epoch."
+      },
+      "ProtocolParams": {
+        "type": "string",
+        "enum": [
+          "epoch_time",
+          "committee_size",
+          "minimum_node_stake",
+          "eligibility_time",
+          "lock_time",
+          "protocol_share",
+          "node_share",
+          "service_builder_share",
+          "max_inflation",
+          "max_boost",
+          "max_stake_lock_time"
+        ]
+      },
+      "Null": {
+        "title": "null",
+        "type": "null",
+        "description": "Null"
+      },
+      "IntegerOrNull": {
+        "title": "integerOrNull",
+        "oneOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "$ref": "#/components/schemas/Null"
+          }
+        ]
+      },
+      "NodeInfo": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "public_key": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          },
+          "network_key": {
+            "$ref": "#/components/schemas/NodeNetworkingPublicKey"
+          },
+          "staked_since": {
+            "$ref": "#/components/schemas/Epoch"
+          },
+          "stake": {
+            "$ref": "#/components/schemas/Staking"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/Multiaddr"
+          },
+          "workers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Worker"
+            }
+          },
+          "nonce": {
+            "type": "integer",
+            "format": "uint64"
+          }
+        },
+        "required": [
+          "owner",
+          "public_key",
+          "network_key",
+          "staked_since",
+          "stake",
+          "domain",
+          "workers",
+          "nonce"
+        ]
+      },
+      "Worker": {
+        "type": "object",
+        "properties": {
+          "public_key": {
+            "$ref": "#/components/schemas/NodeNetworkingPublicKey"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Multiaddr"
+          },
+          "mempool": {
+            "$ref": "#/components/schemas/Multiaddr"
+          }
+        },
+        "required": [
+          "public_key",
+          "address",
+          "mempool"
+        ]
+      },
+      "Multiaddr": {
+        "type": "string",
+        "description": "A network address, which includes the IP address, the protocol (TCP/UDP), the port, and optionally a protocol path. For example: '/ip4/127.0.0.1/tcp/38102/http'."
+      },
+      "Staking": {
+        "type": "object",
+        "properties": {
+          "staked": {
+            "$ref": "#/components/schemas/HpFixed18",
+            "description": "The amount of tokens staked."
+          },
+          "stake_locked_until": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The epoch until which the stake is locked to get boost."
+          },
+          "locked": {
+            "$ref": "#/components/schemas/HpFixed18",
+            "description": "The amount of tokens locked due to unstake txn."
+          },
+          "locked_until": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The epoch until which the tokens are locked due to unstake txn."
+          }
+        },
+        "required": [
+          "staked",
+          "stake_locked_until",
+          "locked",
+          "locked_until"
+        ]
+      },
+      "CommodityServed": {
+        "type": "array",
+        "items": {
+          "type": "integer"
+        },
+        "description": "Array of amount commodities served, the indexes of served commodites array corresponds to the array [Bandwidth ,Compute, Gpu]"
+      },
+      "EpochInfo": {
+        "type": "object",
+        "properties": {
+          "committee": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeInfo"
+            },
+            "description": "List of committee members"
+          },
+          "epoch": {
+            "$ref": "#/components/schemas/Epoch",
+            "description": "The current epoch number"
+          },
+          "epoch_end": {
+            "type": "integer",
+            "description": "Timestamp when the epoch ends"
+          }
+        },
+        "required": [
+          "committee",
+          "epoch",
+          "epoch_end"
+        ]
+      }
+    }
+  }
+}

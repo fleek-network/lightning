@@ -486,12 +486,12 @@ impl<B: Backend> State<B> {
 
         let max_lock_time = self
             .parameters
-            .get(&ProtocolParams::MaxLockTime)
+            .get(&ProtocolParams::MaxStakeLockTime)
             .unwrap_or(1);
 
         // check if total locking is greater than max locking
         if current_lock + locked_for > max_lock_time as u64 {
-            return TransactionResponse::Revert(ExecutionError::LockExceededMaxLockTime);
+            return TransactionResponse::Revert(ExecutionError::LockExceededMaxStakeLockTime);
         }
 
         node.stake.stake_locked_until += locked_for;
@@ -1059,7 +1059,7 @@ impl<B: Backend> State<B> {
             .into();
         let max_lock_time: HpUfixed<3> = self
             .parameters
-            .get(&ProtocolParams::MaxLockTime)
+            .get(&ProtocolParams::MaxStakeLockTime)
             .unwrap_or(1)
             .into();
         let min_boost = HpUfixed::from(1_u64);
