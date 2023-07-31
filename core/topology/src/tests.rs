@@ -71,29 +71,40 @@ async fn test_build_latency_matrix() {
         ),
     ];
 
-    genesis.latencies.push(GenesisLatency {
-        node_public_key_lhs: our_public_key.to_base64(),
-        node_public_key_rhs: node_public_key1.to_base64(),
+    let mut latencies = Vec::new();
+    let (node_lhs, node_rhs) = if our_public_key < node_public_key1 {
+        (our_public_key.to_base64(), node_public_key1.to_base64())
+    } else {
+        (node_public_key1.to_base64(), our_public_key.to_base64())
+    };
+    latencies.push(GenesisLatency {
+        node_public_key_lhs: node_lhs,
+        node_public_key_rhs: node_rhs,
         latency_in_microseconds: 100000,
     });
 
-    genesis.latencies.push(GenesisLatency {
-        node_public_key_lhs: our_public_key.to_base64(),
-        node_public_key_rhs: node_public_key2.to_base64(),
+    let (node_lhs, node_rhs) = if our_public_key < node_public_key2 {
+        (our_public_key.to_base64(), node_public_key2.to_base64())
+    } else {
+        (node_public_key2.to_base64(), our_public_key.to_base64())
+    };
+    latencies.push(GenesisLatency {
+        node_public_key_lhs: node_lhs,
+        node_public_key_rhs: node_rhs,
         latency_in_microseconds: 300000,
     });
 
-    genesis.latencies.push(GenesisLatency {
-        node_public_key_lhs: node_public_key1.to_base64(),
-        node_public_key_rhs: node_public_key2.to_base64(),
+    let (node_lhs, node_rhs) = if node_public_key1 < node_public_key2 {
+        (node_public_key1.to_base64(), node_public_key2.to_base64())
+    } else {
+        (node_public_key2.to_base64(), node_public_key1.to_base64())
+    };
+    latencies.push(GenesisLatency {
+        node_public_key_lhs: node_lhs,
+        node_public_key_rhs: node_rhs,
         latency_in_microseconds: 200000,
     });
-
-    genesis.latencies.push(GenesisLatency {
-        node_public_key_lhs: node_public_key2.to_base64(),
-        node_public_key_rhs: node_public_key1.to_base64(),
-        latency_in_microseconds: 300000,
-    });
+    genesis.latencies = latencies;
 
     let app = Application::init(AppConfig {
         genesis: Some(genesis),
@@ -113,6 +124,8 @@ async fn test_build_latency_matrix() {
         .map(|(index, pubkey)| (*pubkey, *index))
         .collect();
 
+    assert_eq!(matrix.shape()[0], matrix.shape()[1]);
+    assert_eq!(matrix.shape()[0], index_to_pubkey.len());
     assert_eq!(
         our_index.unwrap(),
         *pubkey_to_index.get(&our_public_key).unwrap()
@@ -123,5 +136,5 @@ async fn test_build_latency_matrix() {
     let index2 = *pubkey_to_index.get(&node_public_key2).unwrap();
     assert_eq!(matrix[[our_index, index1]], 100000);
     assert_eq!(matrix[[our_index, index2]], 300000);
-    assert_eq!(matrix[[index1, index2]], 250000);
+    assert_eq!(matrix[[index1, index2]], 200000);
 }

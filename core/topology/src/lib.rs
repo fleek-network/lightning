@@ -39,76 +39,36 @@ impl<Q: SyncQueryRunnerInterface> Topology<Q> {
             .map(|node_info| node_info.public_key)
             .collect();
 
-        let latency_count = latencies.len();
-        let mut latency_map: HashMap<NodePublicKey, HashMap<NodePublicKey, Duration>> =
-            HashMap::new();
         let mut latency_sum = Duration::ZERO;
-        for ((pubkey_lhs, pubkey_rhs), latency) in latencies {
-            if !valid_pubkeys.contains(&pubkey_lhs) || !valid_pubkeys.contains(&pubkey_rhs) {
-                continue;
-            }
-
-            latency_sum += latency;
-            let opposite_dir_latency = latency_map
-                .get(&pubkey_rhs)
-                .and_then(|latency_row| latency_row.get(&pubkey_lhs));
-
-            let latency = if let Some(opp_latency) = opposite_dir_latency {
-                // If a latency measurement for the opposite direction exists, we use the average
-                // of both latency measurements.
-                let avg_latency = (latency + *opp_latency) / 2;
-                latency_map
-                    .entry(pubkey_rhs)
-                    .or_insert(HashMap::new())
-                    .insert(pubkey_lhs, avg_latency);
-                avg_latency
-            } else {
-                latency
-            };
-            latency_map
-                .entry(pubkey_lhs)
-                .or_insert(HashMap::new())
-                .insert(pubkey_rhs, latency);
-        }
-        let mean_latency = latency_sum / latency_count as u32; // why do we have to cast to u32?
+        latencies
+            .values()
+            .for_each(|latency| latency_sum += *latency);
+        let mean_latency = latency_sum / latencies.len() as u32; // why do we have to cast to u32?
         let mean_latency: i32 = mean_latency.as_micros().try_into().unwrap_or(i32::MAX);
 
         let mut matrix = Array::zeros((valid_pubkeys.len(), valid_pubkeys.len()));
-        for (index_lhs, pubkey_lhs) in valid_pubkeys.iter().enumerate() {
-            for (index_rhs, pubkey_rhs) in valid_pubkeys.iter().enumerate() {
-                if index_lhs != index_rhs {
-                    matrix[[index_lhs, index_rhs]] = mean_latency;
-                    matrix[[index_rhs, index_lhs]] = mean_latency;
-                    if let Some(latency) = latency_map
-                        .get(pubkey_lhs)
-                        .and_then(|latency_row| latency_row.get(pubkey_rhs))
-                    {
-                        let latency: i32 = latency.as_micros().try_into().unwrap_or(i32::MAX);
-                        matrix[[index_lhs, index_rhs]] = latency;
-                        matrix[[index_rhs, index_lhs]] = latency;
-                    }
-                    if let Some(latency) = latency_map
-                        .get(pubkey_rhs)
-                        .and_then(|latency_row| latency_row.get(pubkey_lhs))
-                    {
-                        let latency: i32 = latency.as_micros().try_into().unwrap_or(i32::MAX);
-                        matrix[[index_lhs, index_rhs]] = latency;
-                        matrix[[index_rhs, index_lhs]] = latency;
-                    }
+        let pubkeys: Vec<(usize, NodePublicKey)> =
+            valid_pubkeys.iter().copied().enumerate().collect();
+
+        let mut our_index = None;
+        let mut index_to_pubkey = HashMap::new();
+        for (index_lhs, pubkey_lhs) in pubkeys.iter() {
+            index_to_pubkey.insert(*index_lhs, *pubkey_lhs);
+            if *pubkey_lhs == self.our_public_key {
+                our_index = Some(*index_lhs);
+            }
+            for (index_rhs, pubkey_rhs) in pubkeys[index_lhs + 1..].iter() {
+                if let Some(latency) = latencies.get(&(*pubkey_lhs, *pubkey_rhs)) {
+                    let latency: i32 = latency.as_micros().try_into().unwrap_or(i32::MAX);
+                    matrix[[*index_lhs, *index_rhs]] = latency;
+                    matrix[[*index_rhs, *index_lhs]] = latency;
+                } else {
+                    matrix[[*index_lhs, *index_rhs]] = mean_latency;
+                    matrix[[*index_rhs, *index_lhs]] = mean_latency;
                 }
             }
         }
-        let mut our_index = None;
-        let index_to_pubkey: HashMap<usize, NodePublicKey> = valid_pubkeys
-            .into_iter()
-            .enumerate()
-            .map(|(index, pubkey)| {
-                if pubkey == self.our_public_key {
-                    our_index = Some(index);
-                }
-                (index, pubkey)
-            })
-            .collect();
+
         (matrix, index_to_pubkey, our_index)
     }
 }

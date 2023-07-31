@@ -268,6 +268,7 @@ impl Env<UpdatePerm> {
                     .expect("Failed to parse node public key from genesis.");
                 let node_public_key_rhs = NodePublicKey::from_base64(&latency.node_public_key_rhs)
                     .expect("Failed to parse node public key from genesis.");
+                assert!(node_public_key_lhs < node_public_key_rhs, "Invalid latency entry, node_public_key_lhs must be smaller than node_public_key_rhs");
                 latencies_table.insert(
                     (node_public_key_lhs, node_public_key_rhs),
                     Duration::from_micros(latency.latency_in_microseconds),

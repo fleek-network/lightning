@@ -89,7 +89,7 @@ node_public_key_rhs = "qipezx5pzmPFWICevMx+SL5+bIjG4yw3A9ieYKKwf2wTEvK0gMRYOln9+
 latency_in_microseconds = 100000
 
 [[latencies]]
-node_public_key_lhs = "qipezx5pzmPFWICevMx+SL5+bIjG4yw3A9ieYKKwf2wTEvK0gMRYOln9+KmbNRB3FRbVQBLuCEWIHT0V9GxATT9VeJ+HT88vh/B/6dj7CbWBdWbZ4QXzo0q+uyGchopl"
-node_public_key_rhs = "mAT9YIKvBhmi8L3e50/pr/dna1EaYELYTBuTwWgc7qoj5GrJ86/+7aX2mubVYOMxCUr2CO4H5nCgBBssNJ2u/buAPeM4MmEl+wmPgrX0uAAMzHyUOYQKVHCBFeFWsHJR"
+node_public_key_lhs = "mAT9YIKvBhmi8L3e50/pr/dna1EaYELYTBuTwWgc7qoj5GrJ86/+7aX2mubVYOMxCUr2CO4H5nCgBBssNJ2u/buAPeM4MmEl+wmPgrX0uAAMzHyUOYQKVHCBFeFWsHJR"
+node_public_key_rhs = "qipezx5pzmPFWICevMx+SL5+bIjG4yw3A9ieYKKwf2wTEvK0gMRYOln9+KmbNRB3FRbVQBLuCEWIHT0V9GxATT9VeJ+HT88vh/B/6dj7CbWBdWbZ4QXzo0q+uyGchopl"
 latency_in_microseconds = 200000
 

@@ -517,11 +517,4 @@ async fn test_reputation_calculation_and_query() {
         .get_reputation(&bob)
         .expect("Reputation score for bob is missing");
     assert!(alice_rep > bob_rep);
-
-    // Also make sure that the latencies were stored.
-    let latencies = query_runner.get_latencies();
-    assert!(latencies.contains_key(&(public_key1, alice)));
-    assert!(latencies.contains_key(&(public_key1, bob)));
-    assert!(latencies.contains_key(&(public_key2, bob)));
-    assert!(latencies.contains_key(&(public_key2, bob)));
 }

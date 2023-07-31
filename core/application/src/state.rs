@@ -725,22 +725,55 @@ impl<B: Backend> State<B> {
     }
 
     fn update_latencies(&self) {
-        // Remove latency measurements from previous epoch.
-        // TODO(matthias): Should we keep latencies for node pairs for which we don't have
-        // latencies in the new epoch?
-        let keys = self.latencies.keys();
-        keys.for_each(|key| self.latencies.remove(&key));
+        // Remove latency measurements from invalid nodes.
+        let node_registry = self.get_node_registry();
+        for (node_lhs, node_rhs) in self.latencies.keys() {
+            if !node_registry.contains_key(&node_lhs) || !node_registry.contains_key(&node_rhs) {
+                self.latencies.remove(&(node_lhs, node_rhs));
+            }
+        }
 
+        // Process latency measurements. If latency measurements are available for both directions
+        // between two nodes, we use the average.
+        let mut latency_map = HashMap::new();
         for node in self.rep_measurements.keys() {
             if let Some(reported_measurements) = self.rep_measurements.get(&node) {
                 for measurement in reported_measurements {
                     if let Some(latency) = measurement.measurements.latency {
-                        self.latencies
-                            .set((measurement.reporting_node, node), latency);
+                        let (node_lhs, node_rhs) = if node < measurement.reporting_node {
+                            (node, measurement.reporting_node)
+                        } else {
+                            (measurement.reporting_node, node)
+                        };
+                        let latency =
+                            if let Some(opp_latency) = latency_map.get(&(node_lhs, node_rhs)) {
+                                (latency + *opp_latency) / 2
+                            } else {
+                                latency
+                            };
+                        latency_map.insert((node_lhs, node_rhs), latency);
                     }
                 }
             }
         }
+
+        // Store the latencies that were reported in this epoch.
+        // This will potentially overwrite latency measurements from previous epochs.
+        for (key, latency) in latency_map {
+            self.latencies.set(key, latency);
+        }
+    }
+
+    fn get_node_registry(&self) -> HashMap<NodePublicKey, NodeInfo> {
+        let minimum_stake = self
+            .parameters
+            .get(&ProtocolParams::MinimumNodeStake)
+            .unwrap_or(0);
+        self.node_info
+            .keys()
+            .filter_map(|key| self.node_info.get(&key).map(|node| (key, node)))
+            .filter(|(_, node)| node.stake.staked >= minimum_stake.into())
+            .collect()
     }
 
     fn add_service(
