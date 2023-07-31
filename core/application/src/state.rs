@@ -178,6 +178,17 @@ impl<B: Backend> State<B> {
                 self.submit_reputation_measurements(txn.sender, measurements)
             },
         };
+
+        #[cfg(debug_assertions)]
+        {
+            let node_info_len = self.node_info.keys().count();
+            let index_to_pubkey_len = self.index_to_pubkey.keys().count();
+            let pubkey_to_index_len = self.pubkey_to_index.keys().count();
+            assert_eq!(node_info_len, index_to_pubkey_len);
+            assert_eq!(node_info_len, pubkey_to_index_len);
+            assert_eq!(index_to_pubkey_len, pubkey_to_index_len);
+        }
+
         // Increment nonce of the sender
         self.increment_nonce(txn.sender);
         // Return the response
@@ -1146,6 +1157,10 @@ impl<B: Backend> State<B> {
         self.pubkey_to_index.set(node.public_key, node_index);
         self.index_to_pubkey.set(node_index, node.public_key);
         self.node_info.set(node.public_key, node);
+        self.metadata.set(
+            Metadata::NextNodeIndex,
+            Value::NextNodeIndex(node_index + 1),
+        );
         true
     }
 

@@ -27,7 +27,7 @@ pub struct Env<P> {
 
 impl Env<UpdatePerm> {
     pub fn new() -> Self {
-        let atomo = AtomoBuilder::<DefaultSerdeBackend>::new()
+        let mut atomo = AtomoBuilder::<DefaultSerdeBackend>::new()
             .with_table::<Metadata, Value>("metadata")
             .with_table::<EthAddress, AccountInfo>("account")
             .with_table::<ClientPublicKey, EthAddress>("client_keys")
@@ -50,10 +50,18 @@ impl Env<UpdatePerm> {
             .enable_iter("rep_scores")
             .enable_iter("latencies")
             .enable_iter("node")
-            .enable_iter("service_revenue")
-            .build();
+            .enable_iter("service_revenue");
 
-        Self { inner: atomo }
+        #[cfg(debug_assertions)]
+        {
+            atomo = atomo
+                .enable_iter("pubkey_to_index")
+                .enable_iter("index_to_pubkey");
+        }
+
+        Self {
+            inner: atomo.build(),
+        }
     }
     fn run(&mut self, block: Block) -> BlockExecutionResponse {
         self.inner.run(move |ctx| {
