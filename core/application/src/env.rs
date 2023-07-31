@@ -32,11 +32,13 @@ impl Env<UpdatePerm> {
             .with_table::<EthAddress, AccountInfo>("account")
             .with_table::<ClientPublicKey, EthAddress>("client_keys")
             .with_table::<NodePublicKey, NodeInfo>("node")
+            .with_table::<NodePublicKey, u64>("pubkey_to_index")
+            .with_table::<u64, NodePublicKey>("index_to_pubkey")
+            .with_table::<(u64, u64), Duration>("latencies")
             .with_table::<Epoch, Committee>("committee")
             .with_table::<ServiceId, Service>("service")
             .with_table::<ProtocolParams, u128>("parameter")
             .with_table::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements")
-            .with_table::<(NodePublicKey, NodePublicKey), Duration>("latencies")
             .with_table::<NodePublicKey, u8>("rep_scores")
             .with_table::<NodePublicKey, NodeServed>("current_epoch_served")
             .with_table::<NodePublicKey, NodeServed>("last_epoch_served")
@@ -136,7 +138,9 @@ impl Env<UpdatePerm> {
             let mut current_epoch_served_table =
                 ctx.get_table::<NodePublicKey, NodeServed>("current_epoch_served");
             let mut latencies_table =
-                ctx.get_table::<(NodePublicKey, NodePublicKey), Duration>("latencies");
+                ctx.get_table::<(u64, u64), Duration>("latencies");
+            let mut pubkey_to_index_table = ctx.get_table::<NodePublicKey, u64>("pubkey_to_index");
+            let mut index_to_pubkey_table = ctx.get_table::<u64, NodePublicKey>("index_to_pubkey");
 
             let protocol_fund_address =
                 AccountOwnerPublicKey::from_base64(&genesis.protocol_fund_address).unwrap();
@@ -190,7 +194,17 @@ impl Env<UpdatePerm> {
                 node_info.stake.staked = HpUfixed::<18>::from(genesis.min_stake);
                 committee_members.push(node_info.public_key);
 
+                let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
+                    Some(Value::NextNodeIndex(index)) => index,
+                    _ => 0,
+                };
+                pubkey_to_index_table.insert(node_info.public_key, node_index);
+                index_to_pubkey_table.insert(node_index, node_info.public_key);
                 node_table.insert(node_info.public_key, node_info);
+                metadata_table.insert(
+                    Metadata::NextNodeIndex,
+                    Value::NextNodeIndex(node_index + 1),
+                );
             }
 
             committee_table.insert(
@@ -271,8 +285,12 @@ impl Env<UpdatePerm> {
                         .expect("Failed to parse node public key from genesis.");
                     assert!(node_public_key_lhs < node_public_key_rhs,
                         "Invalid latency entry, node_public_key_lhs must be smaller than node_public_key_rhs");
+                    let index_lhs = pubkey_to_index_table.get(node_public_key_lhs)
+                        .expect("Invalid latency entry, node doesn't have an index.");
+                    let index_rhs = pubkey_to_index_table.get(node_public_key_rhs)
+                        .expect("Invalid latency entry, node doesn't have an index.");
                     latencies_table.insert(
-                        (node_public_key_lhs, node_public_key_rhs),
+                        (index_lhs, index_rhs),
                         Duration::from_micros(lat.latency_in_microseconds),
                     );
                 }

@@ -59,11 +59,13 @@ pub struct State<B: Backend> {
     pub account_info: B::Ref<EthAddress, AccountInfo>,
     pub client_keys: B::Ref<ClientPublicKey, EthAddress>,
     pub node_info: B::Ref<NodePublicKey, NodeInfo>,
+    pub pubkey_to_index: B::Ref<NodePublicKey, u64>,
+    pub index_to_pubkey: B::Ref<u64, NodePublicKey>,
+    pub latencies: B::Ref<(u64, u64), Duration>,
     pub committee_info: B::Ref<Epoch, Committee>,
     pub services: B::Ref<ServiceId, Service>,
     pub parameters: B::Ref<ProtocolParams, u128>,
     pub rep_measurements: B::Ref<NodePublicKey, Vec<ReportedReputationMeasurements>>,
-    pub latencies: B::Ref<(NodePublicKey, NodePublicKey), Duration>,
     pub rep_scores: B::Ref<NodePublicKey, u8>,
     pub current_epoch_served: B::Ref<NodePublicKey, NodeServed>,
     pub last_epoch_served: B::Ref<NodePublicKey, NodeServed>,
@@ -87,6 +89,8 @@ impl<B: Backend> State<B> {
             account_info: backend.get_table_reference("account"),
             client_keys: backend.get_table_reference("client_keys"),
             node_info: backend.get_table_reference("node"),
+            index_to_pubkey: backend.get_table_reference("index_to_pubkey"),
+            pubkey_to_index: backend.get_table_reference("pubkey_to_index"),
             committee_info: backend.get_table_reference("committee"),
             services: backend.get_table_reference("service"),
             parameters: backend.get_table_reference("parameter"),
@@ -361,7 +365,7 @@ impl<B: Backend> State<B> {
             None => None,
         };
 
-        let node = match self.node_info.get(&node_public_key) {
+        match self.node_info.get(&node_public_key) {
             Some(mut node) => {
                 // Todo(dalton): should we stop people from staking on a node they do not own??
 
@@ -385,8 +389,7 @@ impl<B: Backend> State<B> {
 
                 // Increase the nodes stake by the amount being staked
                 node.stake.staked += amount.clone();
-
-                node
+                self.node_info.set(node_public_key, node);
             },
             None => {
                 // If the node doesnt Exist, create it. But check if they provided all the required
@@ -404,7 +407,7 @@ impl<B: Backend> State<B> {
                     worker_domain,
                     worker_mempool_address,
                 ) {
-                    NodeInfo {
+                    let node = NodeInfo {
                         owner: sender,
                         public_key: node_public_key,
                         network_key,
@@ -421,20 +424,19 @@ impl<B: Backend> State<B> {
                         }]
                         .into(),
                         nonce: 0,
-                    }
+                    };
+                    self.create_node(node);
                 } else {
                     return TransactionResponse::Revert(ExecutionError::InsufficientNodeDetails);
                 }
             },
-        };
+        }
 
         // decrement the owners balance
         owner.flk_balance -= amount;
 
-        // Commit changes to the node and the owner
+        // Commit changes to the owner
         self.account_info.set(sender, owner);
-        self.node_info.set(node_public_key, node);
-
         TransactionResponse::Success(ExecutionData::None)
     }
 
@@ -727,9 +729,11 @@ impl<B: Backend> State<B> {
     fn update_latencies(&self) {
         // Remove latency measurements from invalid nodes.
         let node_registry = self.get_node_registry();
-        for (node_lhs, node_rhs) in self.latencies.keys() {
+        for (index_lhs, index_rhs) in self.latencies.keys() {
+            let node_lhs = self.index_to_pubkey.get(&index_lhs).unwrap();
+            let node_rhs = self.index_to_pubkey.get(&index_rhs).unwrap();
             if !node_registry.contains_key(&node_lhs) || !node_registry.contains_key(&node_rhs) {
-                self.latencies.remove(&(node_lhs, node_rhs));
+                self.latencies.remove(&(index_lhs, index_rhs));
             }
         }
 
@@ -759,8 +763,12 @@ impl<B: Backend> State<B> {
 
         // Store the latencies that were reported in this epoch.
         // This will potentially overwrite latency measurements from previous epochs.
-        for (key, latency) in latency_map {
-            self.latencies.set(key, latency);
+        for ((node_lhs, node_rhs), latency) in latency_map {
+            let index_lhs = self.pubkey_to_index.get(&node_lhs);
+            let index_rhs = self.pubkey_to_index.get(&node_rhs);
+            if let (Some(index_lhs), Some(index_rhs)) = (index_lhs, index_rhs) {
+                self.latencies.set((index_lhs, index_rhs), latency);
+            }
         }
     }
 
@@ -1124,6 +1132,37 @@ impl<B: Backend> State<B> {
     /// Takes in a zk Proof Of Consensus and returns true if valid
     fn verify_proof_of_consensus(&self, _proof: ProofOfConsensus) -> bool {
         true
+    }
+
+    /// Creates a new node. A new node should only be created through this function.
+    fn create_node(&self, node: NodeInfo) -> bool {
+        if self.node_info.get(&node.public_key).is_some() {
+            return false;
+        }
+        let node_index = match self.metadata.get(&Metadata::NextNodeIndex) {
+            Some(Value::NextNodeIndex(index)) => index,
+            _ => 0,
+        };
+        self.pubkey_to_index.set(node.public_key, node_index);
+        self.index_to_pubkey.set(node_index, node.public_key);
+        self.node_info.set(node.public_key, node);
+        true
+    }
+
+    /// Remove a node. A node should only be removed through this function.
+    #[allow(unused)]
+    fn remove_node(&self, node: NodePublicKey) -> bool {
+        if self.node_info.get(&node).is_none() {
+            return false;
+        }
+        if let Some(node_index) = self.pubkey_to_index.get(&node) {
+            self.node_info.remove(&node);
+            self.pubkey_to_index.remove(&node);
+            self.index_to_pubkey.remove(&node_index);
+            true
+        } else {
+            false
+        }
     }
 
     /// Called internally at the end of every transaction to increment the senders nonce.

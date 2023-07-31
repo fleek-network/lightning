@@ -47,6 +47,7 @@ pub enum Value {
     String(String),
     HpUfixed(HpUfixed<18>),
     AccountPublicKey(EthAddress),
+    NextNodeIndex(u64),
 }
 
 /// This is commodities served by different services in Fleek Network.
@@ -325,6 +326,7 @@ pub enum Metadata {
     SupplyYearStart,
     TotalSupply,
     ProtocolFundAddress,
+    NextNodeIndex,
 }
 
 /// Adjustable paramaters that are stored in the blockchain

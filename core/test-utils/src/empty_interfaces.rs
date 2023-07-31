@@ -403,6 +403,14 @@ impl SyncQueryRunnerInterface for MockQueryRunner {
             slashing: (),
         }
     }
+
+    fn pubkey_to_index(&self, _node: NodePublicKey) -> Option<u64> {
+        None
+    }
+
+    fn index_to_pubkey(&self, _node_index: u64) -> Option<NodePublicKey> {
+        None
+    }
 }
 
 impl NotifierInterface for MockNotifier {

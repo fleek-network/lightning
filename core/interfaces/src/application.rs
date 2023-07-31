@@ -161,6 +161,10 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration>;
     /// returns the service information for a given serviceid
     fn get_service_info(&self, service_id: ServiceId) -> Service;
+
+    fn pubkey_to_index(&self, node: NodePublicKey) -> Option<u64>;
+
+    fn index_to_pubkey(&self, node_index: u64) -> Option<NodePublicKey>;
 }
 
 #[derive(Clone, Debug)]
