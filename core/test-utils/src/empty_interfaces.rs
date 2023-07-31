@@ -13,7 +13,7 @@ use lightning_interfaces::{
         Epoch, EpochInfo, NodeInfo, NodeServed, ProtocolParams, ReportedReputationMeasurements,
         Service, ServiceId, TotalServed, TransactionResponse, UpdateRequest,
     },
-    Blake3Hash, ConfigConsumer, GossipInterface, IndexerInterface, MempoolSocket, Notification,
+    Blake3Hash, BroadcastInterface, ConfigConsumer, IndexerInterface, MempoolSocket, Notification,
     NotifierInterface, PubSub, ReputationAggregatorInterface, ReputationQueryInteface,
     ReputationReporterInterface, SignerInterface, SubmitTxSocket, SyncQueryRunnerInterface, Topic,
     TopologyInterface, Weight, WithStartAndShutdown,
@@ -21,7 +21,7 @@ use lightning_interfaces::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::{mpsc, Notify};
 
-pub struct MockGossip {}
+pub struct MockBroadcast {}
 pub struct MockSubscriber {}
 pub struct MockSigner {
     socket: SubmitTxSocket,
@@ -159,7 +159,7 @@ impl ConfigConsumer for MockReputationAggregator {
 }
 
 #[async_trait]
-impl WithStartAndShutdown for MockGossip {
+impl WithStartAndShutdown for MockBroadcast {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         true
@@ -173,14 +173,14 @@ impl WithStartAndShutdown for MockGossip {
     async fn shutdown(&self) {}
 }
 
-impl ConfigConsumer for MockGossip {
+impl ConfigConsumer for MockBroadcast {
     const KEY: &'static str = "mock_gossip";
 
     type Config = MockConfig;
 }
 
 #[async_trait]
-impl GossipInterface for MockGossip {
+impl BroadcastInterface for MockBroadcast {
     type Topology = MockTopology;
 
     /// The notifier that allows us to refresh the connections once the epoch changes.

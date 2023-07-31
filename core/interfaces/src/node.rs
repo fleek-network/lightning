@@ -8,14 +8,14 @@ use crate::{
     fs::FileSystemInterface, handshake::HandshakeInterface, indexer::IndexerInterface,
     notifier::NotifierInterface, origin::OriginProviderInterface,
     pod::DeliveryAcknowledgmentAggregatorInterface, reputation::ReputationAggregatorInterface,
-    rpc::RpcInterface, signer::SignerInterface, GossipInterface, TopologyInterface,
+    rpc::RpcInterface, signer::SignerInterface, BroadcastInterface, TopologyInterface,
 };
 
 pub trait LightningTypes: Send + Sync {
     type ConfigProvider: ConfigProviderInterface;
     type Consensus: ConsensusInterface<
         QueryRunner = <Self::Application as ApplicationInterface>::SyncExecutor,
-        PubSub = <Self::Gossip as GossipInterface>::PubSub<
+        PubSub = <Self::Broadcast as BroadcastInterface>::PubSub<
             <Self::Consensus as ConsensusInterface>::Certificate,
         >,
     >;
@@ -37,7 +37,7 @@ pub trait LightningTypes: Send + Sync {
     type Topology: TopologyInterface<
         SyncQuery = <Self::Application as ApplicationInterface>::SyncExecutor,
     >;
-    type Gossip: GossipInterface<
+    type Broadcast: BroadcastInterface<
         Topology = Self::Topology,
         Notifier = Self::Notifier,
         Signer = Self::Signer,
@@ -58,7 +58,7 @@ pub struct Node<T: LightningTypes> {
     pub reputation_aggregator: T::ReputationAggregator,
     pub handshake: T::Handshake,
     pub topology: Arc<T::Topology>,
-    pub gossip: T::Gossip,
+    pub gossip: T::Broadcast,
     pub notifier: PhantomData<T::Notifier>,
 }
 
@@ -78,8 +78,12 @@ impl<T: LightningTypes> Node<T> {
             .await?,
         );
 
-        let gossip =
-            T::Gossip::init(configuration.get::<T::Gossip>(), topology.clone(), &signer).await?;
+        let gossip = T::Broadcast::init(
+            configuration.get::<T::Broadcast>(),
+            topology.clone(),
+            &signer,
+        )
+        .await?;
         let consensus_pubsub = gossip.get_pubsub(crate::Topic::Consensus);
 
         let consensus = T::Consensus::init(
@@ -226,7 +230,7 @@ pub mod transformers {
         T: LightningTypes,
         Consensus: ConsensusInterface<
             QueryRunner = <T::Application as ApplicationInterface>::SyncExecutor,
-            PubSub = <T::Gossip as GossipInterface>::PubSub<
+            PubSub = <T::Broadcast as BroadcastInterface>::PubSub<
                 <Consensus as ConsensusInterface>::Certificate,
             >,
         >,
@@ -246,6 +250,6 @@ pub mod transformers {
         type Rpc = T::Rpc;
         type Handshake = T::Handshake;
         type Topology = T::Topology;
-        type Gossip = T::Gossip;
+        type Broadcast = T::Broadcast;
     }
 }

@@ -20,7 +20,7 @@ pub enum Topic {
 /// The gossip system in Fleek Network implements the functionality of broadcasting
 /// messages to the rest of the nodes in the network.
 #[async_trait]
-pub trait GossipInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
+pub trait BroadcastInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
     /// The implementation of the topology algorithm in use.
     type Topology: TopologyInterface;
 

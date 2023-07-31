@@ -3,14 +3,14 @@ use std::{marker::PhantomData, sync::Arc};
 use anyhow::Result;
 use async_trait::async_trait;
 use lightning_interfaces::{
-    signer::SignerInterface, ConfigConsumer, GossipInterface, NotifierInterface, PubSub, Topic,
+    signer::SignerInterface, BroadcastInterface, ConfigConsumer, NotifierInterface, PubSub, Topic,
     TopologyInterface, WithStartAndShutdown,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::config::Config;
 
-pub struct Gossip<S: SignerInterface, Topo: TopologyInterface, N: NotifierInterface> {
+pub struct Broadcast<S: SignerInterface, Topo: TopologyInterface, N: NotifierInterface> {
     signer: PhantomData<S>,
     topology: PhantomData<Topo>,
     notifier: PhantomData<N>,
@@ -18,7 +18,7 @@ pub struct Gossip<S: SignerInterface, Topo: TopologyInterface, N: NotifierInterf
 
 #[async_trait]
 impl<S: SignerInterface, Topo: TopologyInterface, N: NotifierInterface + Send + Sync>
-    WithStartAndShutdown for Gossip<S, Topo, N>
+    WithStartAndShutdown for Broadcast<S, Topo, N>
 {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
@@ -39,7 +39,7 @@ impl<S: SignerInterface, Topo: TopologyInterface, N: NotifierInterface + Send + 
 
 #[async_trait]
 impl<S: SignerInterface, Topo: TopologyInterface, N: NotifierInterface + Send + Sync>
-    GossipInterface for Gossip<S, Topo, N>
+    BroadcastInterface for Broadcast<S, Topo, N>
 {
     type Signer = S;
 
@@ -70,7 +70,7 @@ impl<S: SignerInterface, Topo: TopologyInterface, N: NotifierInterface + Send + 
 }
 
 impl<S: SignerInterface, Topo: TopologyInterface, N: NotifierInterface> ConfigConsumer
-    for Gossip<S, Topo, N>
+    for Broadcast<S, Topo, N>
 {
     type Config = Config;
 

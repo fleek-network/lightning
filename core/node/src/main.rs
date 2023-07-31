@@ -10,7 +10,9 @@ use anyhow::Result;
 use chrono::Local;
 use clap::Parser;
 use cli::Cli;
-use lightning_interfaces::{transformers, ApplicationInterface, GossipInterface, LightningTypes};
+use lightning_interfaces::{
+    transformers, ApplicationInterface, BroadcastInterface, LightningTypes,
+};
 use log::LevelFilter;
 use mock::consensus::MockConsensus;
 use simplelog::{
@@ -72,7 +74,7 @@ async fn main() -> Result<()> {
             FinalTypes,
             MockConsensus<
                 <<FinalTypes as LightningTypes>::Application as ApplicationInterface>::SyncExecutor,
-                <<FinalTypes as LightningTypes>::Gossip as GossipInterface>::PubSub<()>,
+                <<FinalTypes as LightningTypes>::Broadcast as BroadcastInterface>::PubSub<()>,
             >,
         >;
 

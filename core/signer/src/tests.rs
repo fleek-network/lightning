@@ -11,11 +11,12 @@ use lightning_application::{
 };
 use lightning_interfaces::{
     application::ApplicationInterface, common::WithStartAndShutdown, consensus::ConsensusInterface,
-    signer::SignerInterface, types::UpdateMethod, GossipInterface, SyncQueryRunnerInterface, Topic,
+    signer::SignerInterface, types::UpdateMethod, BroadcastInterface, SyncQueryRunnerInterface,
+    Topic,
 };
 use lightning_test_utils::{
     consensus::{Config as ConsensusConfig, MockConsensus},
-    empty_interfaces::MockGossip,
+    empty_interfaces::MockBroadcast,
 };
 
 use crate::{config::Config, Signer};
@@ -69,7 +70,7 @@ async fn test_send_two_txs_in_a_row() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        MockGossip {}.get_pubsub(Topic::Consensus),
+        MockBroadcast {}.get_pubsub(Topic::Consensus),
     )
     .await
     .unwrap();
@@ -148,7 +149,7 @@ async fn test_retry_send() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        MockGossip {}.get_pubsub(Topic::Consensus),
+        MockBroadcast {}.get_pubsub(Topic::Consensus),
     )
     .await
     .unwrap();
@@ -198,7 +199,7 @@ async fn test_shutdown() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        MockGossip {}.get_pubsub(Topic::Consensus),
+        MockBroadcast {}.get_pubsub(Topic::Consensus),
     )
     .await
     .unwrap();
@@ -224,7 +225,7 @@ async fn test_sign_raw_digest() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        MockGossip {}.get_pubsub(Topic::Consensus),
+        MockBroadcast {}.get_pubsub(Topic::Consensus),
     )
     .await
     .unwrap();
