@@ -33,7 +33,7 @@ pub struct Genesis {
     pub node_info: HashMap<String, NodeInfo>,
     pub total_served: HashMap<Epoch, TotalServed>,
     pub current_epoch_served: HashMap<String, NodeServed>,
-    pub latencies: Vec<GenesisLatency>,
+    pub latencies: Option<Vec<GenesisLatency>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

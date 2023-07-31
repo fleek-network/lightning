@@ -104,7 +104,7 @@ async fn test_build_latency_matrix() {
         node_public_key_rhs: node_rhs,
         latency_in_microseconds: 200000,
     });
-    genesis.latencies = latencies;
+    genesis.latencies = Some(latencies);
 
     let app = Application::init(AppConfig {
         genesis: Some(genesis),

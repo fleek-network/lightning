@@ -263,17 +263,21 @@ impl Env<UpdatePerm> {
             }
 
             // add latencies
-            for latency in genesis.latencies {
-                let node_public_key_lhs = NodePublicKey::from_base64(&latency.node_public_key_lhs)
-                    .expect("Failed to parse node public key from genesis.");
-                let node_public_key_rhs = NodePublicKey::from_base64(&latency.node_public_key_rhs)
-                    .expect("Failed to parse node public key from genesis.");
-                assert!(node_public_key_lhs < node_public_key_rhs, "Invalid latency entry, node_public_key_lhs must be smaller than node_public_key_rhs");
-                latencies_table.insert(
-                    (node_public_key_lhs, node_public_key_rhs),
-                    Duration::from_micros(latency.latency_in_microseconds),
-                );
+            if let Some(latencies) = genesis.latencies {
+                for lat in latencies {
+                    let node_public_key_lhs = NodePublicKey::from_base64(&lat.node_public_key_lhs)
+                        .expect("Failed to parse node public key from genesis.");
+                    let node_public_key_rhs = NodePublicKey::from_base64(&lat.node_public_key_rhs)
+                        .expect("Failed to parse node public key from genesis.");
+                    assert!(node_public_key_lhs < node_public_key_rhs,
+                        "Invalid latency entry, node_public_key_lhs must be smaller than node_public_key_rhs");
+                    latencies_table.insert(
+                        (node_public_key_lhs, node_public_key_rhs),
+                        Duration::from_micros(lat.latency_in_microseconds),
+                    );
+                }
             }
+
         })
     }
 }
