@@ -10,6 +10,7 @@ use std::{
 
 use affair::{Executor, TokioSpawn};
 use async_trait::async_trait;
+use derive_more::{From, IsVariant, TryInto};
 use lightning_interfaces::{
     application::ExecutionEngineSocket,
     common::WithStartAndShutdown,
@@ -28,8 +29,8 @@ use narwhal_crypto::{
     KeyPair, NetworkKeyPair, NetworkPublicKey, PublicKey,
 };
 use narwhal_node::NodeStorage;
-use narwhal_types::{Batch, Certificate};
 use prometheus::Registry;
+use serde::{Deserialize, Serialize};
 use tokio::{
     pin, select,
     sync::{Mutex, Notify},
@@ -38,20 +39,17 @@ use tokio::{
 
 use crate::{
     config::Config,
+    edge_node::EdgeService,
     execution::Execution,
     forwarder::Forwarder,
     narwhal::{NarwhalArgs, NarwhalService},
 };
-
-pub type PubSubMsg = (Certificate, Vec<Batch>);
 
 pub struct Consensus<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     /// Inner state of the consensus
     /// todo(dalton): We can probably get a little more effecient then a mutex here
     /// maybe a once box
     epoch_state: Mutex<Option<EpochState<Q, P>>>,
-    /// Interface for sending messages through the gossip layer
-    _pubsub: P,
     /// This socket recieves signed transactions and forwards them to an active committee member to
     /// be ordered
     mempool_socket: MempoolSocket,
@@ -68,9 +66,9 @@ pub struct Consensus<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static
 }
 
 /// This struct contains mutable state only for the current epoch.
-struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> {
+struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     /// The Narwhal service for the current epoch.
-    narwhal: Option<NarwhalService>,
+    consensus: Option<ConsensusService<P>>,
     /// Used to query the application data
     query_runner: Q,
     /// This narwhal node data
@@ -84,6 +82,25 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> {
     /// so its not always sending     a transaction to its own mempool. The signer interface
     /// also takes care of nonce bookkeeping and retry logic
     txn_socket: SubmitTxSocket,
+    /// Interface for sending messages through the gossip layer
+    pub_sub: P,
+}
+
+#[derive(From)]
+enum ConsensusService<P: PubSub<PubSubMsg> + 'static> {
+    /// A node that is on the narwhal committee
+    Narwhal(NarwhalService),
+    /// A node that is not running narwhal because its not on the committee
+    EdgeNode(EdgeService<P>),
+}
+
+impl<P: PubSub<PubSubMsg>> ConsensusService<P> {
+    async fn shutdown(&mut self) {
+        match self {
+            ConsensusService::Narwhal(narwhal) => narwhal.shutdown().await,
+            ConsensusService::EdgeNode(edge) => edge.shutdown().await,
+        }
+    }
 }
 
 impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, P> {
@@ -93,29 +110,23 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         store_path: PathBuf,
         execution_state: Arc<Execution<P>>,
         txn_socket: SubmitTxSocket,
+        pub_sub: P,
     ) -> Self {
         Self {
-            narwhal: None,
+            consensus: None,
             query_runner,
             narwhal_args,
             store_path,
             execution_state,
             txn_socket,
+            pub_sub,
         }
     }
 
     async fn start_current_epoch(&mut self) {
         // Get current epoch information
         let (committee, worker_cache, epoch, epoch_end) = self.get_epoch_info();
-        if committee
-            .authority_by_key(self.narwhal_args.primary_keypair.public())
-            .is_none()
-        {
-            info!("Not on narwhal committee running edge node service");
-            self.run_edge_node();
-            return;
-        }
-        info!("Node is on current committee, starting narwhal.");
+
         // Make or open store specific to current epoch
         let mut store_path = self.store_path.clone();
         store_path.push(format!("{epoch}"));
@@ -123,30 +134,19 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         // on hits/miss
         let store = NodeStorage::reopen(store_path, None);
 
-        // If you are on the committee start the timer to signal when your node thinks its ready
-        // to change epochs.
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
-        let until_epoch_ends: u64 = (epoch_end as u128).saturating_sub(now).try_into().unwrap();
-        let time_until_epoch_change = Duration::from_millis(until_epoch_ends);
-
-        self.wait_to_signal_epoch_change(time_until_epoch_change, epoch)
-            .await;
-
-        // Create the narwhal service
-        let service =
-            NarwhalService::new(self.narwhal_args.clone(), store, committee, worker_cache);
-
-        let tmp = self.execution_state.clone();
-        service.start(tmp).await;
-
-        self.narwhal = Some(service)
+        if committee
+            .authority_by_key(self.narwhal_args.primary_keypair.public())
+            .is_some()
+        {
+            self.run_narwhal(store, epoch_end, epoch, committee, worker_cache)
+                .await
+        } else {
+            self.run_edge_node(store, committee, worker_cache).await
+        }
     }
 
     async fn move_to_next_epoch(&mut self) {
-        if let Some(state) = self.narwhal.take() {
+        if let Some(mut state) = self.consensus.take() {
             state.shutdown().await
         }
 
@@ -234,8 +234,53 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         });
     }
 
-    fn run_edge_node(&self) {
-        // todo
+    async fn run_edge_node(
+        &mut self,
+        store: NodeStorage,
+        committee: Committee,
+        worker_cache: WorkerCache,
+    ) {
+        info!("Not on narwhal committee running edge node service");
+
+        // Let the execution state know you are not on committee
+        self.execution_state.set_committee_status(false);
+
+        let mut edge_service =
+            EdgeService::new(store, committee, worker_cache, self.pub_sub.clone());
+
+        edge_service.start(self.execution_state.clone()).await;
+
+        self.consensus = Some(edge_service.into());
+    }
+
+    async fn run_narwhal(
+        &mut self,
+        store: NodeStorage,
+        epoch_end: u64,
+        epoch: u64,
+        committee: Committee,
+        worker_cache: WorkerCache,
+    ) {
+        info!("Node is on current committee, starting narwhal.");
+        // If you are on the committee start the timer to signal when your node thinks its ready
+        // to change epochs.
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let until_epoch_ends: u64 = (epoch_end as u128).saturating_sub(now).try_into().unwrap();
+        let time_until_epoch_change = Duration::from_millis(until_epoch_ends);
+
+        self.wait_to_signal_epoch_change(time_until_epoch_change, epoch)
+            .await;
+
+        // Create the narwhal service
+        let service =
+            NarwhalService::new(self.narwhal_args.clone(), store, committee, worker_cache);
+
+        service.start(self.execution_state.clone()).await;
+
+        self.consensus = Some(service.into())
     }
 }
 
@@ -270,8 +315,8 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> WithStartAndShutdown for
 
                 select! {
                     _ = shutdown_future => {
-                        if let Some(narwhal) = epoch_state.narwhal.take() {
-                            narwhal.shutdown().await;
+                        if let Some(mut consensus) = epoch_state.consensus.take() {
+                            consensus.shutdown().await;
                         }
                         break
                     }
@@ -338,10 +383,10 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> ConsensusInterface for C
             config.store_path,
             execution_state,
             signer.get_socket(),
+            pubsub,
         );
         Ok(Self {
             epoch_state: Mutex::new(Some(epoch_state)),
-            _pubsub: pubsub,
             mempool_socket: TokioSpawn::spawn_async(forwarder),
             reconfigure_notify,
             new_block_notify,
@@ -360,4 +405,10 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> ConsensusInterface for C
     fn new_block_notifier(&self) -> Arc<Notify> {
         self.new_block_notify.clone()
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, IsVariant, From, TryInto)]
+pub enum PubSubMsg {
+    Certificate(narwhal_types::Certificate),
+    Batch(narwhal_types::Batch),
 }

@@ -1,42 +1,45 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 
 use futures::StreamExt;
 use futures_util::stream::FuturesOrdered;
 use lightning_interfaces::PubSub;
 use mysten_metrics::metered_channel;
-use narwhal_config::{committee, Committee, Parameters, WorkerCache};
+use narwhal_config::{Committee, Parameters, WorkerCache};
 use narwhal_consensus::{
     bullshark::Bullshark,
     consensus::ConsensusRound,
     metrics::{ChannelMetrics, ConsensusMetrics},
     Consensus,
 };
+use narwhal_executor::ExecutionState;
 use narwhal_node::{metrics::new_registry, NodeStorage};
 use narwhal_primary::PrimaryChannelMetrics;
 use narwhal_types::{
-    Certificate, CommittedSubDag, ConditionalBroadcastReceiver, ConsensusOutput,
-    PreSubscribedBroadcastSender,
+    Certificate, CertificateAPI, CommittedSubDag, ConditionalBroadcastReceiver, ConsensusOutput,
+    HeaderAPI, PreSubscribedBroadcastSender,
 };
 use prometheus::IntGauge;
 use tokio::{sync::watch, task::JoinHandle};
 
-use super::{pool::BatchPool, types::PubSubMessage};
+use super::pool::BatchPool;
+use crate::{consensus::PubSubMsg, execution::Execution};
 
-pub struct SecondaryConsensus {
+pub struct EdgeConsensus {
     handles: Vec<JoinHandle<()>>,
     tx_shutdown: PreSubscribedBroadcastSender,
 }
 
-impl SecondaryConsensus {
+impl EdgeConsensus {
     const CHANNEL_CAPACITY: usize = 1000;
     const CONSENSUS_SCHEDULE_CHANGE_SUB_DAGS: u64 = 300;
 
-    fn spawn(
-        pub_sub: impl PubSub<PubSubMessage> + 'static,
+    pub fn spawn<P: PubSub<PubSubMsg> + 'static>(
+        pub_sub: P,
         parameters: Parameters,
         store: &NodeStorage,
         committee: Committee,
         worker_cache: WorkerCache,
+        execution: Arc<Execution<P>>,
     ) -> Self {
         // Collect the handle to each tokio::spawn that happens.
         let mut handles = Vec::with_capacity(3);
@@ -72,9 +75,11 @@ impl SecondaryConsensus {
         )
         .unwrap();
 
-        let (tx_committed_certificates, rx_committed_certificates) =
-            metered_channel::channel(Self::CHANNEL_CAPACITY, &committed_certificates_counter);
-
+        let (tx_committed_certificates, mut rx_committed_certificates) =
+            metered_channel::channel(20, &committed_certificates_counter);
+        // todo(dalton): we dont need the other end of this reciever so no op it so channel doesnt
+        // get full
+        tokio::spawn(async move { while rx_committed_certificates.recv().await.is_some() {} });
         let ordering_engine = Bullshark::new(
             committee.clone(),
             store.consensus_store.clone(),
@@ -103,6 +108,7 @@ impl SecondaryConsensus {
             shutdown_receivers.pop().unwrap(),
             rx_sequence,
             pool.clone(),
+            execution,
         ));
 
         // Spawn the event loop that listens for new messages from the pubsub and passes processes
@@ -140,7 +146,7 @@ impl SecondaryConsensus {
 
 /// Creates and event loop which consumes messages from pubsub and sends them to the
 /// right destination.
-async fn message_receiver_worker<P: PubSub<PubSubMessage>>(
+async fn message_receiver_worker<P: PubSub<PubSubMsg>>(
     committee: Committee,
     worker_cache: WorkerCache,
     mut pub_sub: P,
@@ -148,16 +154,16 @@ async fn message_receiver_worker<P: PubSub<PubSubMessage>>(
     tx_new_certificates: metered_channel::Sender<Certificate>,
     pool: BatchPool,
 ) {
-    let handle = |msg: PubSubMessage| async {
+    let handle = |msg: PubSubMsg| async {
         match msg {
-            PubSubMessage::Batch(batch) => {
+            PubSubMsg::Batch(batch) => {
                 // TODO(qti3e): The gossip recv should return the originator of the message
                 // so we can verify that it is a committee member here.
 
                 // Store the batch. This will wake the interested getters up.
                 pool.store(batch);
             },
-            PubSubMessage::Certificate(certificate)
+            PubSubMsg::Certificate(certificate)
                 if certificate.verify(&committee, &worker_cache).is_ok() =>
             {
                 tx_new_certificates
@@ -185,10 +191,11 @@ async fn message_receiver_worker<P: PubSub<PubSubMessage>>(
 /// output producer.
 // TODO(qti3e): This function should get a sender which we can use to emit the produced
 // ConsensusOutput
-async fn consensus_output_producer_worker(
+async fn consensus_output_producer_worker<P: PubSub<PubSubMsg> + 'static>(
     mut rx_shutdown: ConditionalBroadcastReceiver,
     mut rx_sequence: metered_channel::Receiver<CommittedSubDag>,
-    mut pool: BatchPool,
+    pool: BatchPool,
+    execution: Arc<Execution<P>>,
 ) {
     // This queue gets a Future by a push API and will give the resolved futures out
     // in the same order as the insertion happened.
@@ -203,12 +210,33 @@ async fn consensus_output_producer_worker(
                 waiting.push_back(fetch(pool.clone(), committed_sub_dag));
             }
             Some(output) = waiting.next() => {
-                // TODO(qti3e): Send this output to the channel.
+                execution.handle_consensus_output(output).await;
             }
         }
     }
 }
 
 async fn fetch(pool: BatchPool, sub_dag: CommittedSubDag) -> ConsensusOutput {
-    todo!()
+    // todo(dalton): Lets look into futures::join_all() and make sure nested join_all() isnt crazy
+    // memory overhead
+    //
+    // we are using join_all to put all the requests into the pool at once, and that way if we
+    // resort to asking peers for these batches we know all of the ones we need
+    let batches = futures::future::join_all(sub_dag.certificates.iter().map(|cert| async {
+        // for every certificate in the committed sub dag, try to grab every batch in it
+        let cert_batches = futures::future::join_all(
+            cert.header()
+                .payload()
+                .keys()
+                .map(|digest| pool.get(*digest)),
+        )
+        .await;
+        (cert.clone(), cert_batches)
+    }))
+    .await;
+
+    ConsensusOutput {
+        sub_dag: Arc::new(sub_dag),
+        batches,
+    }
 }

@@ -2,10 +2,9 @@ use std::{sync::Arc, time::Instant};
 
 use dashmap::DashMap;
 use fastcrypto::hash::Hash;
-use fxhash::FxHashMap;
 use narwhal_types::{Batch, BatchDigest};
 use tokio::sync::Notify;
-use typed_store::{rocks::DBMap, Map, TypedStoreError};
+use typed_store::{rocks::DBMap, Map};
 
 /// A batch pool can be used to resolve batches.
 #[derive(Clone)]
@@ -50,15 +49,16 @@ impl BatchPool {
     }
 
     /// Store a batch into the database and resolve possible waiters.
-    pub fn store(&self, batch: Batch) -> Result<(), TypedStoreError> {
+    pub fn store(&self, batch: Batch) {
         let digest = batch.digest();
-        self.store.insert(&digest, &batch)?;
+
+        // todo(dalton): This unwrap basically means rocksdb is messing up, lets retry a few times
+        // and figure out whats going on here if it fails. Shouldnt fail though
+        self.store.insert(&digest, &batch).unwrap();
 
         // Wake up anyone who was interested in this batch.
         if let Some(v_ref) = self.pending_futures.get(&digest) {
             v_ref.0.notify_waiters();
         }
-
-        Ok(())
     }
 }

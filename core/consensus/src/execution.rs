@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use async_trait::async_trait;
 use lightning_interfaces::{
@@ -7,7 +10,7 @@ use lightning_interfaces::{
 };
 use log::info;
 use narwhal_executor::ExecutionState;
-use narwhal_types::{Batch, BatchAPI, Certificate, ConsensusOutput};
+use narwhal_types::{Batch, BatchAPI, ConsensusOutput};
 use tokio::sync::Notify;
 
 use crate::consensus::PubSubMsg;
@@ -17,10 +20,11 @@ pub struct Execution<P: PubSub<PubSubMsg>> {
     executor: ExecutionEngineSocket,
     reconfigure_notify: Arc<Notify>,
     new_block_notify: Arc<Notify>,
-    _pub_sub: P,
+    pub_sub: P,
+    is_committee: AtomicBool,
 }
 
-impl<P: PubSub<(Certificate, Vec<Batch>)>> Execution<P> {
+impl<P: PubSub<PubSubMsg>> Execution<P> {
     pub fn new(
         executor: ExecutionEngineSocket,
         reconfigure_notify: Arc<Notify>,
@@ -31,7 +35,8 @@ impl<P: PubSub<(Certificate, Vec<Batch>)>> Execution<P> {
             executor,
             reconfigure_notify,
             new_block_notify,
-            _pub_sub: pub_sub,
+            pub_sub,
+            is_committee: AtomicBool::new(false),
         }
     }
 
@@ -57,12 +62,27 @@ impl<P: PubSub<(Certificate, Vec<Batch>)>> Execution<P> {
             self.reconfigure_notify.notify_waiters();
         }
     }
+
+    pub fn set_committee_status(&self, on_committee: bool) {
+        self.is_committee.store(on_committee, Ordering::Relaxed)
+    }
 }
 
 #[async_trait]
-impl<P: PubSub<(Certificate, Vec<Batch>)>> ExecutionState for Execution<P> {
+impl<P: PubSub<PubSubMsg>> ExecutionState for Execution<P> {
     async fn handle_consensus_output(&self, consensus_output: ConsensusOutput) {
-        for (_, batches) in consensus_output.batches {
+        for (certificate, batches) in consensus_output.batches {
+            // If node is on committee they should broadcast this certificate and batches through
+            // gossip
+            if self.is_committee.load(Ordering::Relaxed) {
+                self.pub_sub.send(&certificate.into());
+
+                for batch in &batches {
+                    // todo(dalton): Find a way to not clone batches here
+                    self.pub_sub.send(&batch.clone().into());
+                }
+            }
+
             self.submit_batch(batches).await
         }
     }
