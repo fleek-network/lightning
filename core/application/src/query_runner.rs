@@ -24,14 +24,14 @@ pub struct QueryRunner {
     account_table: ResolvedTableReference<EthAddress, AccountInfo>,
     client_table: ResolvedTableReference<ClientPublicKey, EthAddress>,
     node_table: ResolvedTableReference<NodePublicKey, NodeInfo>,
-    pubkey_to_index: ResolvedTableReference<NodePublicKey, u64>,
-    index_to_pubkey: ResolvedTableReference<u64, NodePublicKey>,
+    pubkey_to_index: ResolvedTableReference<NodePublicKey, u32>,
+    index_to_pubkey: ResolvedTableReference<u32, NodePublicKey>,
     committee_table: ResolvedTableReference<Epoch, Committee>,
     services_table: ResolvedTableReference<ServiceId, Service>,
     param_table: ResolvedTableReference<ProtocolParams, u128>,
     current_epoch_served: ResolvedTableReference<NodePublicKey, NodeServed>,
     rep_measurements: ResolvedTableReference<NodePublicKey, Vec<ReportedReputationMeasurements>>,
-    latencies: ResolvedTableReference<(u64, u64), Duration>,
+    latencies: ResolvedTableReference<(u32, u32), Duration>,
     rep_scores: ResolvedTableReference<NodePublicKey, u8>,
     _last_epoch_served: ResolvedTableReference<NodePublicKey, NodeServed>,
     total_served_table: ResolvedTableReference<Epoch, TotalServed>,
@@ -46,8 +46,8 @@ impl QueryRunner {
             account_table: atomo.resolve::<EthAddress, AccountInfo>("account"),
             client_table: atomo.resolve::<ClientPublicKey, EthAddress>("client_keys"),
             node_table: atomo.resolve::<NodePublicKey, NodeInfo>("node"),
-            pubkey_to_index: atomo.resolve::<NodePublicKey, u64>("pubkey_to_index"),
-            index_to_pubkey: atomo.resolve::<u64, NodePublicKey>("index_to_pubkey"),
+            pubkey_to_index: atomo.resolve::<NodePublicKey, u32>("pubkey_to_index"),
+            index_to_pubkey: atomo.resolve::<u32, NodePublicKey>("index_to_pubkey"),
             committee_table: atomo.resolve::<Epoch, Committee>("committee"),
             services_table: atomo.resolve::<ServiceId, Service>("service"),
             param_table: atomo.resolve::<ProtocolParams, u128>("parameter"),
@@ -55,7 +55,7 @@ impl QueryRunner {
                 .resolve::<NodePublicKey, NodeServed>("current_epoch_served"),
             rep_measurements: atomo
                 .resolve::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements"),
-            latencies: atomo.resolve::<(u64, u64), Duration>("latencies"),
+            latencies: atomo.resolve::<(u32, u32), Duration>("latencies"),
             rep_scores: atomo.resolve::<NodePublicKey, u8>("rep_scores"),
             _last_epoch_served: atomo.resolve::<NodePublicKey, NodeServed>("last_epoch_served"),
             total_served_table: atomo.resolve::<Epoch, TotalServed>("total_served"),
@@ -322,7 +322,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     fn get_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration> {
-        let keys: Vec<(u64, u64)> = self
+        let keys: Vec<(u32, u32)> = self
             .inner
             .run(|ctx| self.latencies.get(ctx).keys())
             .collect();
@@ -351,12 +351,12 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .run(|ctx| self.services_table.get(ctx).get(service_id).unwrap())
     }
 
-    fn pubkey_to_index(&self, node: NodePublicKey) -> Option<u64> {
+    fn pubkey_to_index(&self, node: NodePublicKey) -> Option<u32> {
         self.inner
             .run(|ctx| self.pubkey_to_index.get(ctx).get(node))
     }
 
-    fn index_to_pubkey(&self, node_index: u64) -> Option<NodePublicKey> {
+    fn index_to_pubkey(&self, node_index: u32) -> Option<NodePublicKey> {
         self.inner
             .run(|ctx| self.index_to_pubkey.get(ctx).get(node_index))
     }

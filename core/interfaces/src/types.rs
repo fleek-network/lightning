@@ -47,7 +47,7 @@ pub enum Value {
     String(String),
     HpUfixed(HpUfixed<18>),
     AccountPublicKey(EthAddress),
-    NextNodeIndex(u64),
+    NextNodeIndex(u32),
 }
 
 /// This is commodities served by different services in Fleek Network.

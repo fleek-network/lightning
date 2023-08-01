@@ -32,9 +32,9 @@ impl Env<UpdatePerm> {
             .with_table::<EthAddress, AccountInfo>("account")
             .with_table::<ClientPublicKey, EthAddress>("client_keys")
             .with_table::<NodePublicKey, NodeInfo>("node")
-            .with_table::<NodePublicKey, u64>("pubkey_to_index")
-            .with_table::<u64, NodePublicKey>("index_to_pubkey")
-            .with_table::<(u64, u64), Duration>("latencies")
+            .with_table::<NodePublicKey, u32>("pubkey_to_index")
+            .with_table::<u32, NodePublicKey>("index_to_pubkey")
+            .with_table::<(u32, u32), Duration>("latencies")
             .with_table::<Epoch, Committee>("committee")
             .with_table::<ServiceId, Service>("service")
             .with_table::<ProtocolParams, u128>("parameter")
@@ -146,9 +146,9 @@ impl Env<UpdatePerm> {
             let mut current_epoch_served_table =
                 ctx.get_table::<NodePublicKey, NodeServed>("current_epoch_served");
             let mut latencies_table =
-                ctx.get_table::<(u64, u64), Duration>("latencies");
-            let mut pubkey_to_index_table = ctx.get_table::<NodePublicKey, u64>("pubkey_to_index");
-            let mut index_to_pubkey_table = ctx.get_table::<u64, NodePublicKey>("index_to_pubkey");
+                ctx.get_table::<(u32, u32), Duration>("latencies");
+            let mut pubkey_to_index_table = ctx.get_table::<NodePublicKey, u32>("pubkey_to_index");
+            let mut index_to_pubkey_table = ctx.get_table::<u32, NodePublicKey>("index_to_pubkey");
 
             let protocol_fund_address =
                 AccountOwnerPublicKey::from_base64(&genesis.protocol_fund_address).unwrap();

@@ -404,11 +404,11 @@ impl SyncQueryRunnerInterface for MockQueryRunner {
         }
     }
 
-    fn pubkey_to_index(&self, _node: NodePublicKey) -> Option<u64> {
+    fn pubkey_to_index(&self, _node: NodePublicKey) -> Option<u32> {
         None
     }
 
-    fn index_to_pubkey(&self, _node_index: u64) -> Option<NodePublicKey> {
+    fn index_to_pubkey(&self, _node_index: u32) -> Option<NodePublicKey> {
         None
     }
 }
