@@ -2,6 +2,7 @@ use std::{sync::Arc, time::Instant};
 
 use dashmap::DashMap;
 use fastcrypto::hash::Hash;
+use log::error;
 use narwhal_types::{Batch, BatchDigest};
 use tokio::sync::Notify;
 use typed_store::{rocks::DBMap, Map};
@@ -54,7 +55,10 @@ impl BatchPool {
 
         // todo(dalton): This unwrap basically means rocksdb is messing up, lets retry a few times
         // and figure out whats going on here if it fails. Shouldnt fail though
-        self.store.insert(&digest, &batch).unwrap();
+        if let Err(e) = self.store.insert(&digest, &batch) {
+            error!("Failed inserting digest in pool store, trying again : {e:?}");
+            self.store.insert(&digest, &batch).unwrap();
+        }
 
         // Wake up anyone who was interested in this batch.
         if let Some(v_ref) = self.pending_futures.get(&digest) {

@@ -189,8 +189,6 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>>(
 
 /// The task worker which consumes [`CommittedSubDag`] produced by consensus and feeds them to the
 /// output producer.
-// TODO(qti3e): This function should get a sender which we can use to emit the produced
-// ConsensusOutput
 async fn consensus_output_producer_worker<P: PubSub<PubSubMsg> + 'static>(
     mut rx_shutdown: ConditionalBroadcastReceiver,
     mut rx_sequence: metered_channel::Receiver<CommittedSubDag>,
