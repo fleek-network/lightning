@@ -247,6 +247,7 @@ pub enum ExecutionError {
     NonExistingService,
     OnlyAccountOwner,
     OnlyNode,
+    OnlyGovernance,
     InvalidServiceId,
     InsufficientStakesToLock,
     LockExceededMaxStakeLockTime,

@@ -1259,7 +1259,7 @@ async fn test_change_protocol_params() {
         .unwrap();
     assert_eq!(
         response.txn_receipts[0],
-        TransactionResponse::Revert(ExecutionError::InvalidSignature)
+        TransactionResponse::Revert(ExecutionError::OnlyGovernance)
     );
     // Lock time should still be 8.
     assert_eq!(

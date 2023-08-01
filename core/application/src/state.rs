@@ -805,8 +805,7 @@ impl<B: Backend> State<B> {
             _ => panic!("Governance address is missing from state."),
         };
         if sender != governance_address {
-            // TODO(matthias): should we add a enew ExecutionError option?
-            return TransactionResponse::Revert(ExecutionError::InvalidSignature);
+            return TransactionResponse::Revert(ExecutionError::OnlyGovernance);
         }
         self.parameters.set(param, value);
         TransactionResponse::Success(ExecutionData::None)
