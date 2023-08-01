@@ -183,7 +183,9 @@ pub enum UpdateMethod {
         recipient: Option<EthAddress>,
     },
     /// Sent by committee member to signal he is ready to change epoch
-    ChangeEpoch { epoch: Epoch },
+    ChangeEpoch {
+        epoch: Epoch,
+    },
     /// Adding a new service to the protocol
     AddService {
         service: Service,
@@ -205,6 +207,10 @@ pub enum UpdateMethod {
     },
     SubmitReputationMeasurements {
         measurements: BTreeMap<NodePublicKey, ReputationMeasurements>,
+    },
+    ChangeProtocolParam {
+        param: ProtocolParams,
+        value: u128,
     },
 }
 
@@ -327,10 +333,11 @@ pub enum Metadata {
     TotalSupply,
     ProtocolFundAddress,
     NextNodeIndex,
+    GovernanceAddress,
 }
 
 /// Adjustable paramaters that are stored in the blockchain
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]
 #[repr(u8)]
 pub enum ProtocolParams {
     /// The time in seconds that an epoch lasts for. Genesis 24 hours(86400)
@@ -531,6 +538,13 @@ impl ToDigest for UpdatePayload {
                         .with("bytes_sent", &value.bytes_sent)
                         .with("hops", &value.hops);
                 }
+            },
+            UpdateMethod::ChangeProtocolParam { param, value } => {
+                transcript_builder = transcript_builder
+                    .with("transaction_name", &"change_protocol_param")
+                    .with_prefix("input".to_owned())
+                    .with("param", &(param.clone() as u8))
+                    .with("value", value);
             },
         }
 

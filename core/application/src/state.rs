@@ -177,6 +177,9 @@ impl<B: Backend> State<B> {
             UpdateMethod::SubmitReputationMeasurements { measurements } => {
                 self.submit_reputation_measurements(txn.sender, measurements)
             },
+            UpdateMethod::ChangeProtocolParam { param, value } => {
+                self.change_protocol_param(txn.sender, param, value)
+            },
         };
 
         #[cfg(debug_assertions)]
@@ -781,6 +784,32 @@ impl<B: Backend> State<B> {
                 self.latencies.set((index_lhs, index_rhs), latency);
             }
         }
+    }
+
+    // This method can panic if the governance address wasn't previously stored in the application
+    // state. The governance address should be seeded though the genesis.
+    fn change_protocol_param(
+        &self,
+        sender: TransactionSender,
+        param: ProtocolParams,
+        value: u128,
+    ) -> TransactionResponse {
+        let sender = match self.only_account_owner(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+        // TODO(matthias): should be panic here or revert? Since the governance address will be
+        // seeded though genesis, this should never happen.
+        let governance_address = match self.metadata.get(&Metadata::GovernanceAddress) {
+            Some(Value::AccountPublicKey(address)) => address,
+            _ => panic!("Governance address is missing from state."),
+        };
+        if sender != governance_address {
+            // TODO(matthias): should we add a enew ExecutionError option?
+            return TransactionResponse::Revert(ExecutionError::InvalidSignature);
+        }
+        self.parameters.set(param, value);
+        TransactionResponse::Success(ExecutionData::None)
     }
 
     fn get_node_registry(&self) -> HashMap<NodePublicKey, NodeInfo> {

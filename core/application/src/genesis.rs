@@ -29,6 +29,7 @@ pub struct Genesis {
     pub commodity_prices: Vec<GenesisPrices>,
     pub supply_at_genesis: u64,
     pub protocol_fund_address: String,
+    pub governance_address: String,
     pub rep_scores: HashMap<String, u8>,
     pub node_info: HashMap<String, NodeInfo>,
     pub total_served: HashMap<Epoch, TotalServed>,

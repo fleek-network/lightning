@@ -13,6 +13,7 @@ max_boost = 4
 max_lock_time = 1460                                                   # 1460 days(epoch) meaning 4 years
 supply_at_genesis = 1000000                                            # set to 1 million for testing, to be determined when initial allocations are set
 protocol_fund_address = "Agio046PQ/xQ3UnqxlhSaoHVtJTWXegU/TdpLwnEMIFW"
+governance_address = "A4MYU1tUEF1Keq5gwI/EX5aHGBtP38YlvRp1P6c5f+11"
 
 [[committee]]
 owner = "Atw4vg1vuqs1yFA+POhP2IM8H+f+bHkxq2Y4pBhUQfbP"

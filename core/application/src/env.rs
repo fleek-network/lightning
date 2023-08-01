@@ -157,6 +157,19 @@ impl Env<UpdatePerm> {
                 Value::AccountPublicKey(protocol_fund_address.into()),
             );
 
+            let governance_address = AccountOwnerPublicKey::from_base64(&genesis.governance_address)
+                .expect("Invalid governance address in genesis, must be a Secp256k1 public key.");
+            let governance_address: EthAddress = governance_address.into();
+            metadata_table.insert(Metadata::GovernanceAddress,
+                Value::AccountPublicKey(governance_address));
+            let governance_account = AccountInfo {
+                flk_balance: 0u64.into(),
+                stables_balance: 0u64.into(),
+                bandwidth_balance: 0u64.into(),
+                nonce: 0,
+            };
+            account_table.insert(governance_address,  governance_account);
+
             let supply_at_genesis: HpUfixed<18> = HpUfixed::from(genesis.supply_at_genesis);
             metadata_table.insert(
                 Metadata::TotalSupply,
@@ -203,7 +216,7 @@ impl Env<UpdatePerm> {
                     _ => 0,
                 };
                 pubkey_to_index_table.insert(node_info.public_key, node_index);
-                index_to_pubkey_table.insert(node_index, node_info.public_key);
+        index_to_pubkey_table.insert(node_index, node_info.public_key);
                 node_table.insert(node_info.public_key, node_info);
                 metadata_table.insert(
                     Metadata::NextNodeIndex,

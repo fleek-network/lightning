@@ -10,8 +10,8 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::{
     application::ExecutionEngineSocket,
     types::{
-        Block, Epoch, ExecutionError, NodeInfo, ProofOfConsensus, Tokens, TotalServed,
-        TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
+        Block, Epoch, ExecutionError, NodeInfo, ProofOfConsensus, ProtocolParams, Tokens,
+        TotalServed, TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
     },
     ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
     ToDigest,
@@ -1196,4 +1196,74 @@ async fn test_get_node_registry() {
         .unwrap();
     // Node registry contains the second valid node
     assert!(valid_nodes.contains(&node_info3));
+}
+
+#[test]
+async fn test_change_protocol_params() {
+    let governance_secret_key = AccountOwnerSecretKey::generate();
+    let governance_public_key = governance_secret_key.to_pk();
+
+    let mut genesis = Genesis::load().unwrap();
+    genesis.governance_address = governance_public_key.to_base64();
+
+    let (update_socket, query_runner) = init_app(Some(Config {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+    }))
+    .await;
+
+    let update_method = UpdateMethod::ChangeProtocolParam {
+        param: ProtocolParams::LockTime,
+        value: 5,
+    };
+    let update_request = get_update_request_account(update_method, governance_secret_key, 1);
+    run_transaction(vec![update_request], &update_socket)
+        .await
+        .unwrap();
+    assert_eq!(
+        query_runner.get_protocol_params(ProtocolParams::LockTime),
+        5
+    );
+    let update_method = UpdateMethod::ChangeProtocolParam {
+        param: ProtocolParams::LockTime,
+        value: 8,
+    };
+    let update_request = get_update_request_account(update_method, governance_secret_key, 2);
+    run_transaction(vec![update_request], &update_socket)
+        .await
+        .unwrap();
+    assert_eq!(
+        query_runner.get_protocol_params(ProtocolParams::LockTime),
+        8
+    );
+    // Make sure that another private key cannot change protocol parameters.
+    let some_secret_key = AccountOwnerSecretKey::generate();
+
+    let minimum_stake_amount = query_runner.get_staking_amount();
+    deposit(
+        minimum_stake_amount.into(),
+        Tokens::FLK,
+        some_secret_key,
+        &update_socket,
+        1,
+    )
+    .await;
+
+    let update_method = UpdateMethod::ChangeProtocolParam {
+        param: ProtocolParams::LockTime,
+        value: 1,
+    };
+    let update_request = get_update_request_account(update_method, some_secret_key, 2);
+    let response = run_transaction(vec![update_request], &update_socket)
+        .await
+        .unwrap();
+    assert_eq!(
+        response.txn_receipts[0],
+        TransactionResponse::Revert(ExecutionError::InvalidSignature)
+    );
+    // Lock time should still be 8.
+    assert_eq!(
+        query_runner.get_protocol_params(ProtocolParams::LockTime),
+        8
+    );
 }
