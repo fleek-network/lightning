@@ -4,9 +4,8 @@ use std::{
     sync::atomic::{AtomicPtr, AtomicUsize, Ordering},
 };
 
+use once_ptr::OncePtr;
 use seize::{reclaim, Collector, Linked};
-
-use crate::once_ptr::OncePtr;
 
 /// The snapshot list data structure is used to maintain a concurrent and garbage-collected
 /// linked-list of snapshots.

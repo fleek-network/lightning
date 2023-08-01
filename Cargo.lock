@@ -782,6 +782,7 @@ dependencies = [
  "dashmap",
  "fxhash",
  "im",
+ "once-ptr 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.8.5",
  "seize",
  "serde",
@@ -5190,6 +5191,12 @@ dependencies = [
 [[package]]
 name = "once-ptr"
 version = "0.1.0"
+
+[[package]]
+name = "once-ptr"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4458afdb067b4412fb5ef9dec22074b5bb67e2b2bebddb0568834e56d0fd5d4"
 
 [[package]]
 name = "once_cell"
