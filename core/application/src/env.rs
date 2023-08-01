@@ -216,7 +216,7 @@ impl Env<UpdatePerm> {
                     _ => 0,
                 };
                 pubkey_to_index_table.insert(node_info.public_key, node_index);
-        index_to_pubkey_table.insert(node_index, node_info.public_key);
+                index_to_pubkey_table.insert(node_index, node_info.public_key);
                 node_table.insert(node_info.public_key, node_info);
                 metadata_table.insert(
                     Metadata::NextNodeIndex,
