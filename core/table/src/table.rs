@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use anyhow::Result;
 use fleek_crypto::NodeNetworkingPublicKey;
 use lightning_interfaces::Blake3Hash;
@@ -5,7 +7,7 @@ use thiserror::Error;
 use tokio::sync::{mpsc::Receiver, oneshot};
 
 use crate::{
-    bucket::{Bucket, Node, MAX_BUCKETS},
+    bucket::{Bucket, Node, MAX_BUCKETS, MAX_BUCKET_SIZE},
     distance,
     query::NodeInfo,
 };
@@ -41,13 +43,42 @@ impl Table {
     }
 
     pub fn closest_nodes(&self, target: &TableKey) -> Vec<NodeInfo> {
-        let index = distance::leading_zero_bits(&self.local_node_key.0, target);
         // Todo: Filter good vs bad nodes based on some criteria.
-        // Todo: Return all our nodes from closest to furthest to target.
-        self.buckets[index]
-            .nodes()
-            .map(|node| node.info.clone())
-            .collect()
+        let mut closest = BTreeMap::new();
+        let distance = distance::distance(&self.local_node_key.0, target);
+        let mut zero_bit_indexes = Vec::new();
+        // First, visit every bucket, such that its corresponding bit in the XORed value is 1,
+        // in decreasing order from MSB.
+        for (count, byte) in distance.iter().enumerate() {
+            let mask = 128u8;
+            for shift in 0..8u8 {
+                let index = count * 8 + shift as usize;
+                if (byte & (mask >> shift)) > 0 {
+                    for node in self.buckets[index].nodes() {
+                        let distance = distance::distance(target, &node.info.key.0);
+                        closest.insert(distance, node.info.clone());
+                        if closest.len() >= MAX_BUCKET_SIZE {
+                            return closest.into_values().collect();
+                        }
+                    }
+                } else {
+                    zero_bit_indexes.push(index)
+                }
+            }
+        }
+
+        // Second, visit every bucket, such that its corresponding bit in the XORed value is 0,
+        // in increasing order from LSB.
+        for index in zero_bit_indexes.iter().rev() {
+            for node in self.buckets[*index].nodes() {
+                let distance = distance::distance(target, &node.info.key.0);
+                closest.insert(distance, node.info.clone());
+                if closest.len() >= MAX_BUCKET_SIZE {
+                    return closest.into_values().collect();
+                }
+            }
+        }
+        closest.into_values().collect()
     }
 
     fn add_node(&mut self, node: Node) -> Result<()> {

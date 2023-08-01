@@ -45,9 +45,9 @@ pub async fn start_server(
     // Todo: Make configurable.
     let (table_tx, table_rx) = mpsc::channel(10000);
     task::spawn(table::start_server(table_rx, local_key));
-    let main_hanlder = Handler::new(socket.clone(), table_tx, local_key);
+    let main_handler = Handler::new(socket.clone(), table_tx, local_key);
     loop {
-        let handler = main_hanlder.clone();
+        let handler = main_handler.clone();
         select! {
             command = command_rx.recv() => {
                 match command {

@@ -17,7 +17,7 @@ use tokio::{
 };
 
 use crate::{
-    bucket::MAX_BUCKETS,
+    bucket::MAX_BUCKET_SIZE,
     distance::{self, Distance},
     query::{Message, MessagePayload, NodeInfo, Query, Response},
     socket,
@@ -68,7 +68,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
         if pending.is_empty() {
             for node in lookup
                 .closest_nodes
-                .pickout(MAX_BUCKETS, 3, |node| node.status == Status::Initial)
+                .pickout(MAX_BUCKET_SIZE, 3, |node| node.status == Status::Initial)
             {
                 let message = Message {
                     // Todo: Generate random transaction ID.
@@ -164,7 +164,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                 .closest_nodes
                 .into_nodes()
                 .map(|lookup_node| lookup_node.inner)
-                .take(MAX_BUCKETS)
+                .take(MAX_BUCKET_SIZE)
                 .collect(),
         ))
     }
