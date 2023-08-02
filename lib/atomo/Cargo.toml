@@ -19,3 +19,7 @@ rand = "0.8"
 seize = "0.2"
 im = "15.1"
 once-ptr = "0.1"
+
+[features]
+reliable-snapshot = []
+fuzz = []

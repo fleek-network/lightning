@@ -16,6 +16,9 @@ pub type DefaultSerdeBackend = serder::BincodeSerde;
 
 pub use builder::AtomoBuilder;
 pub use db::{Atomo, QueryPerm, UpdatePerm};
+#[cfg(fuzz)]
+#[doc(hidden)]
+pub use inner::AtomoInner;
 pub use key_iterator::KeyIterator;
 pub use serder::{BincodeSerde, SerdeBackend};
 pub use table::{ResolvedTableReference, TableRef, TableSelector};

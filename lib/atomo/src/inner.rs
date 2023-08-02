@@ -105,7 +105,7 @@ impl<S: SerdeBackend> AtomoInner<S> {
         ResolvedTableReference::<K, V>::new(self.id, index)
     }
 
-    /// Given a vertical batch (which we intent to commit) compute the inverse of the batch. The
+    /// Given a vertical batch (which we intend to commit) compute the inverse of the batch. The
     /// inverse of a batch is another batch that when executed reverts the changes.
     #[inline]
     pub fn compute_inverse(&self, batch: &VerticalBatch) -> VerticalBatch {
