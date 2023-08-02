@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use anyhow::Result;
 use fleek_crypto::NodeNetworkingPublicKey;
@@ -46,13 +46,20 @@ impl Table {
         // Todo: Filter good vs bad nodes based on some criteria.
         let mut closest = BTreeMap::new();
         let distance = distance::distance(&self.local_node_key.0, target);
+        // We use this set to avoid traversing a bucket more than once since
+        // some bits in the XORed value could be mapped to the same bucket.
+        let mut visited = HashSet::new();
         let mut zero_bit_indexes = Vec::new();
         // First, visit every bucket, such that its corresponding bit in the XORed value is 1,
         // in decreasing order from MSB.
         for (count, byte) in distance.iter().enumerate() {
             let mask = 128u8;
             for shift in 0..8u8 {
-                let index = count * 8 + shift as usize;
+                let possible_index = count * 8 + shift as usize;
+                let index = calculate_bucket_index(self.buckets.len(), possible_index);
+                if visited.contains(&index) {
+                    continue;
+                }
                 if (byte & (mask >> shift)) > 0 {
                     for node in self.buckets[index].nodes() {
                         let distance = distance::distance(target, &node.info.key.0);
@@ -64,6 +71,7 @@ impl Table {
                 } else {
                     zero_bit_indexes.push(index)
                 }
+                visited.insert(index);
             }
         }
 
