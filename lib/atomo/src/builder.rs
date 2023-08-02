@@ -93,6 +93,12 @@ impl<S: SerdeBackend> AtomoBuilder<S> {
     pub fn build(self) -> Atomo<UpdatePerm, S> {
         Atomo::new(Arc::new(self.atomo))
     }
+
+    /// Build and return the internal [`AtomoInner`]. Used for testing purposes.
+    #[cfg(test)]
+    pub(crate) fn build_inner(self) -> AtomoInner<S> {
+        self.atomo
+    }
 }
 
 impl<S: SerdeBackend> Default for AtomoBuilder<S> {

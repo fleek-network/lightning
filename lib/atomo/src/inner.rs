@@ -65,6 +65,15 @@ impl<S: SerdeBackend> AtomoInner<S> {
         }
     }
 
+    /// Given the name of a table as an input string returns a [`ResolvedTableReference`].
+    ///
+    /// # Panics
+    ///
+    /// This method panics if:
+    ///
+    /// 1. The table with the given name does not exists.
+    /// 2. The generic types passed for the key-value pair mismatch from the type that was used
+    ///    when constructing atomo.
     #[inline]
     pub fn resolve<K, V>(&self, name: impl AsRef<str>) -> ResolvedTableReference<K, V>
     where
@@ -90,12 +99,14 @@ impl<S: SerdeBackend> AtomoInner<S> {
 
         assert_eq!(
             info.v_id, v_id,
-            "Could not resolve table '{name}' with key type '{v_str}'."
+            "Could not resolve table '{name}' with value type '{v_str}'."
         );
 
         ResolvedTableReference::<K, V>::new(self.id, index)
     }
 
+    /// Given a vertical batch (which we intent to commit) compute the inverse of the batch. The
+    /// inverse of a batch is another batch that when executed reverts the changes.
     #[inline]
     pub fn compute_inverse(&self, batch: &VerticalBatch) -> VerticalBatch {
         let num_tables = self.tables.len();
@@ -153,5 +164,192 @@ impl<S: SerdeBackend> AtomoInner<S> {
     /// Returns true if the key exists.
     pub fn contains_key(&self, tid: TableId, key: &[u8]) -> bool {
         self.persistence[tid as usize].contains_key(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        batch::{Operation, VerticalBatch},
+        AtomoBuilder, BincodeSerde,
+    };
+
+    #[test]
+    fn resolve_valid_should_work() {
+        let inner = AtomoBuilder::<BincodeSerde>::new()
+            .with_table::<String, usize>("TABLE")
+            .build_inner();
+
+        inner.resolve::<String, usize>("TABLE");
+    }
+
+    #[test]
+    #[should_panic]
+    fn resolve_key_type_mismatch_should_panic() {
+        let inner = AtomoBuilder::<BincodeSerde>::new()
+            .with_table::<String, usize>("TABLE")
+            .build_inner();
+
+        inner.resolve::<Vec<u8>, usize>("TABLE");
+    }
+
+    #[test]
+    #[should_panic]
+    fn resolve_value_type_mismatch_should_panic() {
+        let inner = AtomoBuilder::<BincodeSerde>::new()
+            .with_table::<String, usize>("TABLE")
+            .build_inner();
+
+        inner.resolve::<String, u8>("TABLE");
+    }
+
+    #[test]
+    #[should_panic]
+    fn resolve_undefined_table_should_panic() {
+        let inner = AtomoBuilder::<BincodeSerde>::new()
+            .with_table::<String, usize>("TABLE")
+            .build_inner();
+
+        inner.resolve::<String, usize>("TABLE-X");
+    }
+
+    #[test]
+    fn perform_batch() {
+        let inner = AtomoBuilder::<BincodeSerde>::new()
+            .with_table::<Vec<u8>, usize>("TABLE")
+            .build_inner();
+
+        let mut batch = VerticalBatch::new(1);
+        let map = batch.get_mut(0);
+        map.insert(
+            vec![0].into_boxed_slice(),
+            Operation::Insert(vec![1].into_boxed_slice()),
+        );
+        map.insert(
+            vec![1].into_boxed_slice(),
+            Operation::Insert(vec![2].into_boxed_slice()),
+        );
+        map.insert(
+            vec![2].into_boxed_slice(),
+            Operation::Insert(vec![3].into_boxed_slice()),
+        );
+        inner.perform_batch(batch);
+
+        assert_eq!(inner.get_raw(0, &[0]), Some(vec![1]));
+        assert_eq!(inner.get_raw(0, &[1]), Some(vec![2]));
+        assert_eq!(inner.get_raw(0, &[2]), Some(vec![3]));
+        assert_eq!(inner.get_raw(0, &[3]), None);
+        assert!(inner.contains_key(0, &[0]));
+        assert!(inner.contains_key(0, &[1]));
+        assert!(inner.contains_key(0, &[2]));
+        assert!(!inner.contains_key(0, &[3]));
+
+        let mut batch = VerticalBatch::new(1);
+        let map = batch.get_mut(0);
+        // update
+        map.insert(
+            vec![0].into_boxed_slice(),
+            Operation::Insert(vec![4].into_boxed_slice()),
+        );
+        map.insert(vec![1].into_boxed_slice(), Operation::Remove);
+        // new insert
+        map.insert(
+            vec![3].into_boxed_slice(),
+            Operation::Insert(vec![5].into_boxed_slice()),
+        );
+        inner.perform_batch(batch);
+
+        assert_eq!(inner.get_raw(0, &[0]), Some(vec![4]));
+        assert_eq!(inner.get_raw(0, &[1]), None);
+        assert_eq!(inner.get_raw(0, &[2]), Some(vec![3]));
+        assert_eq!(inner.get_raw(0, &[3]), Some(vec![5]));
+        assert!(inner.contains_key(0, &[0]));
+        assert!(!inner.contains_key(0, &[1]));
+        assert!(inner.contains_key(0, &[2]));
+        assert!(inner.contains_key(0, &[3]));
+    }
+
+    #[test]
+    fn compute_inverse() {
+        let inner = AtomoBuilder::<BincodeSerde>::new()
+            .with_table::<Vec<u8>, usize>("TABLE")
+            .build_inner();
+
+        let mut batch = VerticalBatch::new(1);
+        let map = batch.get_mut(0);
+        map.insert(
+            vec![0].into_boxed_slice(),
+            Operation::Insert(vec![1].into_boxed_slice()),
+        );
+        map.insert(
+            vec![1].into_boxed_slice(),
+            Operation::Insert(vec![2].into_boxed_slice()),
+        );
+        map.insert(
+            vec![2].into_boxed_slice(),
+            Operation::Insert(vec![3].into_boxed_slice()),
+        );
+        inner.perform_batch(batch);
+
+        let mut batch = VerticalBatch::new(1);
+        let map = batch.get_mut(0);
+        // update key
+        map.insert(
+            vec![0].into_boxed_slice(),
+            Operation::Insert(vec![4].into_boxed_slice()),
+        );
+        // remove key
+        map.insert(vec![1].into_boxed_slice(), Operation::Remove);
+        // for key=2 preserve it.
+        // and insert a new key.
+        map.insert(
+            vec![3].into_boxed_slice(),
+            Operation::Insert(vec![5].into_boxed_slice()),
+        );
+        let inverse = inner.compute_inverse(&batch);
+        inner.perform_batch(batch);
+
+        // Check if the batch was actually performed.
+        assert_eq!(inner.get_raw(0, &[0]), Some(vec![4]));
+        assert_eq!(inner.get_raw(0, &[1]), None);
+        assert_eq!(inner.get_raw(0, &[2]), Some(vec![3]));
+        assert_eq!(inner.get_raw(0, &[3]), Some(vec![5]));
+
+        // now revert should put us back to where we started.
+        inner.perform_batch(inverse);
+        assert_eq!(inner.get_raw(0, &[0]), Some(vec![1]));
+        assert_eq!(inner.get_raw(0, &[1]), Some(vec![2]));
+        assert_eq!(inner.get_raw(0, &[2]), Some(vec![3]));
+        assert_eq!(inner.get_raw(0, &[3]), None);
+    }
+
+    #[test]
+    fn compute_inverse_on_empty_db() {
+        let inner = AtomoBuilder::<BincodeSerde>::new()
+            .with_table::<Vec<u8>, usize>("TABLE")
+            .build_inner();
+
+        let mut batch = VerticalBatch::new(1);
+        let map = batch.get_mut(0);
+        map.insert(
+            vec![0].into_boxed_slice(),
+            Operation::Insert(vec![1].into_boxed_slice()),
+        );
+        map.insert(
+            vec![1].into_boxed_slice(),
+            Operation::Insert(vec![2].into_boxed_slice()),
+        );
+        map.insert(
+            vec![2].into_boxed_slice(),
+            Operation::Insert(vec![3].into_boxed_slice()),
+        );
+        let inverse = inner.compute_inverse(&batch);
+        inner.perform_batch(batch);
+        inner.perform_batch(inverse);
+
+        assert_eq!(inner.get_raw(0, &[0]), None);
+        assert_eq!(inner.get_raw(0, &[1]), None);
+        assert_eq!(inner.get_raw(0, &[2]), None);
+        assert_eq!(inner.get_raw(0, &[3]), None);
     }
 }
