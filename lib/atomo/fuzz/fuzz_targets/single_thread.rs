@@ -1,7 +1,6 @@
 #![no_main]
 
 use arbitrary::Arbitrary;
-
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: Input| {
@@ -10,24 +9,14 @@ fuzz_target!(|data: Input| {
 
 #[derive(Arbitrary, Debug)]
 struct Input {
-    operations: Vec<Op>
+    operations: Vec<Op>,
 }
 
 #[derive(Arbitrary, Debug, Copy, Clone)]
 enum Op {
-    Insert {
-        table: u8,
-        key: u8,
-        value: u64
-    },
-    Remove {
-        table: u8,
-        key: u8
-    },
-    Check {
-        table: u8,
-        key: u8
-    },
+    Insert { table: u8, key: u8, value: u64 },
+    Remove { table: u8, key: u8 },
+    Check { table: u8, key: u8 },
 }
 
 fn fuzz(input: Input) {
@@ -39,13 +28,11 @@ fn fuzz(input: Input) {
         .with_table::<u8, u64>("TABLE_5")
         .build();
 
-
-    let tables = (1..=5).map(|i| db.resolve::<u8, u64>(&format!("TABLE_{i}"))).collect::<Vec<_>>();
+    let tables = (1..=5)
+        .map(|i| db.resolve::<u8, u64>(&format!("TABLE_{i}")))
+        .collect::<Vec<_>>();
     let result = db.run(move |ctx| {
-        let mut reimp_tables = vec![
-            fxhash::FxHashMap::<u8, u64>::default();
-        5
-        ];
+        let mut reimp_tables = vec![fxhash::FxHashMap::<u8, u64>::default(); 5];
 
         let mut atomo_tables = tables.iter().map(|r| r.get(ctx)).collect::<Vec<_>>();
 
@@ -66,7 +53,7 @@ fn fuzz(input: Input) {
                     let tid = (table % 5) as usize;
                     reimp_tables[tid].remove(key);
                     atomo_tables[tid].remove(key);
-                }
+                },
             }
         }
 
@@ -75,5 +62,3 @@ fn fuzz(input: Input) {
 
     assert!(result);
 }
-
-

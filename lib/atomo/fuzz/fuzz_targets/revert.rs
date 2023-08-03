@@ -6,7 +6,6 @@ fuzz_target!(|data: usize| {
     fuzz(data);
 });
 
-
 fn fuzz(n: usize) {
     let n = n % 10_000;
 
@@ -35,10 +34,7 @@ fn fuzz(n: usize) {
             assert_eq!(table.get(1), Some(27));
             table.remove(1);
         });
-
     }
 
     handle.join().expect("Query thread failed");
 }
-
-

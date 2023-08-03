@@ -24,6 +24,12 @@ members = ["."]
 debug = 1
 
 [[bin]]
+name = "atomicity"
+path = "fuzz_targets/atomicity.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "consistency"
 path = "fuzz_targets/consistency.rs"
 test = false

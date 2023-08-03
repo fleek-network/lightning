@@ -1,8 +1,8 @@
 #![no_main]
 
 use std::iter::repeat;
-use arbitrary::{Arbitrary, Unstructured};
 
+use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: Input| {
