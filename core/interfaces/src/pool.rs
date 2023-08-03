@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use derive_more::IsVariant;
 use fleek_crypto::NodePublicKey;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use lightning_schema::LightningMessage;
+use serde::{Deserialize, Serialize};
 
 use crate::{ConfigConsumer, SyncQueryRunnerInterface, WithStartAndShutdown};
 
@@ -47,16 +48,16 @@ pub trait ConnectionPool: ConfigConsumer + WithStartAndShutdown + Sized + Send +
     // same type for the sender/receiver.
 
     /// Listener object implemented by this connection pool.
-    type Listener<T: Serialize + DeserializeOwned>: Listener<T, ConnectionPool = Self>;
+    type Listener<T: LightningMessage>: Listener<T, ConnectionPool = Self>;
 
     /// Connector object implemented by this connection pool.
-    type Connector<T: Serialize + DeserializeOwned>: Connector<T, ConnectionPool = Self>;
+    type Connector<T: LightningMessage>: Connector<T, ConnectionPool = Self>;
 
     /// The sender struct used across the sender and connector.
-    type Sender<T: Serialize + DeserializeOwned>: Sender<T>;
+    type Sender<T: LightningMessage>: Sender<T>;
 
     /// The receiver struct used across the sender and connector.
-    type Receiver<T: Serialize + DeserializeOwned>: Receiver<T>;
+    type Receiver<T: LightningMessage>: Receiver<T>;
 
     /// Provide ownership to an scope in the connection pool.
     ///
@@ -65,13 +66,13 @@ pub trait ConnectionPool: ConfigConsumer + WithStartAndShutdown + Sized + Send +
     /// If this scope is already claimed.
     fn bind<T>(&self, scope: ServiceScope) -> (Self::Listener<T>, Self::Connector<T>)
     where
-        T: Serialize + DeserializeOwned;
+        T: LightningMessage;
 }
 
 /// The connector can be used to connect to other peers under the scope.
 pub trait Connector<T>: Send + Sync + Sized + Clone
 where
-    T: Serialize + DeserializeOwned,
+    T: LightningMessage,
 {
     /// Link to the actual connection pool.
     type ConnectionPool: ConnectionPool;
@@ -90,7 +91,7 @@ where
 #[async_trait]
 pub trait Listener<T>
 where
-    T: Serialize + DeserializeOwned,
+    T: LightningMessage,
 {
     /// Link to the actual connection pool.
     type ConnectionPool: ConnectionPool;
@@ -110,7 +111,7 @@ where
 #[async_trait]
 pub trait Sender<T>: Send + Sync
 where
-    T: Serialize + DeserializeOwned,
+    T: LightningMessage,
 {
     /// Return the public key associated with this connection.
     fn pk(&self) -> &NodePublicKey;
@@ -134,7 +135,7 @@ where
 #[async_trait]
 pub trait Receiver<T>: Send + Sync
 where
-    T: Serialize + DeserializeOwned,
+    T: LightningMessage,
 {
     /// Return the public key associated with this connection.
     fn pk(&self) -> &NodePublicKey;

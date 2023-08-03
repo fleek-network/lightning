@@ -3742,6 +3742,7 @@ dependencies = [
  "fleek-crypto",
  "hp-fixed",
  "ink-quill",
+ "lightning-schema",
  "multiaddr",
  "num-bigint",
  "num-derive",
