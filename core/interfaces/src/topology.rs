@@ -37,5 +37,5 @@ pub trait TopologyInterface: ConfigConsumer + Sized + Send + Sync {
     ///
     /// This should return the result for the latest epoch. The [`TopologyInterface`] is poll
     /// based and implementations are recommended to cache the result of this computation.
-    fn suggest_connections(&mut self) -> Arc<Vec<Vec<NodePublicKey>>>;
+    fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>>;
 }

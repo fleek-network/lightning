@@ -443,7 +443,7 @@ impl TopologyInterface for MockTopology {
         Ok(Self {})
     }
 
-    fn suggest_connections(&mut self) -> Arc<Vec<Vec<NodePublicKey>>> {
+    fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>> {
         Arc::new(Vec::new())
     }
 }

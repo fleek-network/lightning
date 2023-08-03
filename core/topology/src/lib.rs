@@ -8,7 +8,7 @@ mod tests;
 
 use std::{
     collections::{BTreeSet, HashMap},
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
@@ -23,8 +23,8 @@ use rand::SeedableRng;
 pub struct Topology<Q: SyncQueryRunnerInterface> {
     query: Q,
     our_public_key: NodePublicKey,
-    current_peers: Arc<Vec<Vec<NodePublicKey>>>,
-    current_epoch: u64,
+    current_peers: Mutex<Arc<Vec<Vec<NodePublicKey>>>>,
+    current_epoch: Mutex<u64>,
     target_k: usize,
     min_nodes: usize,
 }
@@ -86,46 +86,48 @@ impl<Q: SyncQueryRunnerInterface> TopologyInterface for Topology<Q> {
             target_k: config.testing_target_k,
             min_nodes: config.testing_min_nodes,
             query: query_runner,
-            current_epoch: u64::MAX,
-            current_peers: Arc::new(Vec::new()),
+            current_epoch: Mutex::new(u64::MAX),
+            current_peers: Mutex::new(Arc::new(Vec::new())),
             our_public_key,
         })
     }
 
-    fn suggest_connections(&mut self) -> Arc<Vec<Vec<NodePublicKey>>> {
+    fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>> {
         let epoch = self.query.get_epoch();
 
+        let mut current = self.current_peers.lock().expect("failed to acquire lock");
+        let mut current_epoch = self.current_epoch.lock().expect("failed to acquire lock");
+
         // if it's the initial epoch or the epoch has changed
-        if epoch == u64::MAX || epoch > self.current_epoch {
+        if epoch == u64::MAX || epoch > *current_epoch {
             let (matrix, mappings, our_index) = self.build_latency_matrix();
 
-            self.current_peers = if let Some(our_index) = our_index {
+            *current = if let Some(our_index) = our_index {
                 // Included in the topology: collect assignments and build output
 
                 if mappings.len() < self.min_nodes {
                     // Fallback to returning all nodes, since we're less than the minimum
-                    Arc::new(vec![mappings.into_values().collect()])
+                    vec![mappings.into_values().collect()]
                 } else {
                     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(epoch);
                     let hierarchy = DivisiveHierarchy::new(&mut rng, &matrix, self.target_k);
 
-                    Arc::new(
-                        hierarchy.connections()[our_index]
-                            .iter()
-                            .map(|ids| ids.iter().map(|idx| mappings[idx]).collect())
-                            .collect(),
-                    )
+                    hierarchy.connections()[our_index]
+                        .iter()
+                        .map(|ids| ids.iter().map(|idx| mappings[idx]).collect())
+                        .collect()
                 }
             } else {
                 // Not in the topology: return all nodes to bootstrap from
-                Arc::new(vec![mappings.into_values().collect()])
-            };
+                vec![mappings.into_values().collect()]
+            }
+            .into();
 
-            self.current_epoch = epoch;
+            *current_epoch = epoch;
         }
 
         // return the current peers
-        self.current_peers.clone()
+        current.clone()
     }
 }
 
