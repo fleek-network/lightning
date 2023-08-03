@@ -19,14 +19,14 @@ pub enum ServiceScope {
 
 /// Type alias for the return type of accept and connect.
 pub type SenderReceiver<C, T> = (
-    <C as ConnectionPool>::Sender<T>,
-    <C as ConnectionPool>::Receiver<T>,
+    <C as ConnectionPoolInterface>::Sender<T>,
+    <C as ConnectionPoolInterface>::Receiver<T>,
 );
 
 /// Type alias for the return type of bind.
 pub type ListenerConnector<C, T> = (
-    <C as ConnectionPool>::Listener<T>,
-    <C as ConnectionPool>::Connector<T>,
+    <C as ConnectionPoolInterface>::Listener<T>,
+    <C as ConnectionPoolInterface>::Connector<T>,
 );
 
 /// The connection pool provides the basic functionality for a node to node communication.
@@ -35,7 +35,9 @@ pub type ListenerConnector<C, T> = (
 /// parameter. However the [`ListenerConnector`] is a valid input. In other terms each interface
 /// that is in need of connections should get a listener/connector for the scope that it
 /// cares about during the node bootstrap life cycle.
-pub trait ConnectionPool: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
+pub trait ConnectionPoolInterface:
+    ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
+{
     // -- Generic input
 
     /// The query runner on the application to provide the information about a node
@@ -48,16 +50,16 @@ pub trait ConnectionPool: ConfigConsumer + WithStartAndShutdown + Sized + Send +
     // same type for the sender/receiver.
 
     /// Listener object implemented by this connection pool.
-    type Listener<T: LightningMessage>: Listener<T, ConnectionPool = Self>;
+    type Listener<T: LightningMessage>: ListenerInterface<T, ConnectionPool = Self>;
 
     /// Connector object implemented by this connection pool.
-    type Connector<T: LightningMessage>: Connector<T, ConnectionPool = Self>;
+    type Connector<T: LightningMessage>: ConnectorInterface<T, ConnectionPool = Self>;
 
     /// The sender struct used across the sender and connector.
-    type Sender<T: LightningMessage>: Sender<T>;
+    type Sender<T: LightningMessage>: SenderInterface<T>;
 
     /// The receiver struct used across the sender and connector.
-    type Receiver<T: LightningMessage>: Receiver<T>;
+    type Receiver<T: LightningMessage>: ReceiverInterface<T>;
 
     /// Provide ownership to an scope in the connection pool.
     ///
@@ -70,12 +72,12 @@ pub trait ConnectionPool: ConfigConsumer + WithStartAndShutdown + Sized + Send +
 }
 
 /// The connector can be used to connect to other peers under the scope.
-pub trait Connector<T>: Send + Sync + Sized + Clone
+pub trait ConnectorInterface<T>: Send + Sync + Sized + Clone
 where
     T: LightningMessage,
 {
     /// Link to the actual connection pool.
-    type ConnectionPool: ConnectionPool;
+    type ConnectionPool: ConnectionPoolInterface;
 
     /// Create a new connection to the peer with the provided public key. Should return [`None`]
     /// if the connection pool is shutting down.
@@ -89,12 +91,12 @@ where
 /// The implementation of this struct has to provide a custom [`Drop`] implementation
 /// in order to free the scope. So that successive calls to `bind` can succeed.
 #[async_trait]
-pub trait Listener<T>
+pub trait ListenerInterface<T>
 where
     T: LightningMessage,
 {
     /// Link to the actual connection pool.
-    type ConnectionPool: ConnectionPool;
+    type ConnectionPool: ConnectionPoolInterface;
 
     /// Accept a new connection from a peer. Returns [`None`] if we are shutting down.
     async fn accept(&mut self) -> Option<SenderReceiver<Self::ConnectionPool, T>>;
@@ -109,7 +111,7 @@ where
 /// Drop implementation must perform graceful disconnection if there is no sender and receiver
 /// object anymore.
 #[async_trait]
-pub trait Sender<T>: Send + Sync
+pub trait SenderInterface<T>: Send + Sync
 where
     T: LightningMessage,
 {
@@ -133,7 +135,7 @@ where
 /// Drop implementation must perform graceful disconnection if there is no sender and receiver
 /// object anymore.
 #[async_trait]
-pub trait Receiver<T>: Send + Sync
+pub trait ReceiverInterface<T>: Send + Sync
 where
     T: LightningMessage,
 {
