@@ -92,23 +92,23 @@ impl IPFSOriginInner {
         mut rx: mpsc::Receiver<Task<Vec<u8>, anyhow::Result<IPFSStream>>>,
         shutdown_notify: Arc<Notify>,
     ) {
+        // Prepare the TLS client config
+        let tls = rustls::ClientConfig::builder()
+            .with_safe_defaults()
+            .with_native_roots()
+            .with_no_client_auth();
+
+        // Prepare the HTTPS connector
+        let https = hyper_rustls::HttpsConnectorBuilder::new()
+            .with_tls_config(tls)
+            .https_or_http()
+            .enable_http1()
+            .build();
+
+        // Build the hyper client from the HTTPS connector.
+        let client: client::Client<_, hyper::Body> = client::Client::builder().build(https);
+
         loop {
-            // Prepare the TLS client config
-            let tls = rustls::ClientConfig::builder()
-                .with_safe_defaults()
-                .with_native_roots()
-                .with_no_client_auth();
-
-            // Prepare the HTTPS connector
-            let https = hyper_rustls::HttpsConnectorBuilder::new()
-                .with_tls_config(tls)
-                .https_or_http()
-                .enable_http1()
-                .build();
-
-            // Build the hyper client from the HTTPS connector.
-            let client: client::Client<_, hyper::Body> = client::Client::builder().build(https);
-
             tokio::select! {
                 task = rx.recv() => {
                     let task = task.expect("Failed to receive fetch request.");

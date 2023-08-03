@@ -8,6 +8,7 @@ use cid::{
     multihash::{Code, MultihashDigest},
     Cid,
 };
+use futures::ready;
 use hyper::Body;
 use lightning_interfaces::UntrustedStream;
 
@@ -38,21 +39,19 @@ impl tokio_stream::Stream for IPFSStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let body = Pin::new(&mut self.body);
-        match body.poll_next(cx) {
-            Poll::Ready(data) => match data {
-                Some(Ok(bytes)) => {
-                    self.data.extend(bytes.as_ref());
-                    Poll::Ready(Some(Ok(bytes)))
-                },
-                Some(Err(err)) => {
-                    Poll::Ready(Some(Err(io::Error::new(ErrorKind::Other, Box::new(err)))))
-                },
-                None => {
-                    self.done = true;
-                    Poll::Ready(None)
-                },
+
+        match ready!(body.poll_next(cx)) {
+            Some(Ok(bytes)) => {
+                self.data.extend(bytes.as_ref());
+                Poll::Ready(Some(Ok(bytes)))
             },
-            Poll::Pending => Poll::Pending,
+            Some(Err(err)) => {
+                Poll::Ready(Some(Err(io::Error::new(ErrorKind::Other, Box::new(err)))))
+            },
+            None => {
+                self.done = true;
+                Poll::Ready(None)
+            },
         }
     }
 }

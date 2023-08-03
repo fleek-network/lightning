@@ -3861,6 +3861,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "cid",
+ "futures",
  "hyper",
  "hyper-rustls",
  "lightning-interfaces",
