@@ -18,6 +18,7 @@ tokio.workspace = true
 hyper = { version = "0.14.27", features = ["stream"]}
 rustls = "0.21.5"
 hyper-rustls = "0.24.1"
+affair.workspace = true
 
 
 [dev-dependencies]

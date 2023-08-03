@@ -1,13 +1,24 @@
+use affair::Socket;
+use anyhow;
 use async_trait::async_trait;
+
+use crate::{ConfigConsumer, WithStartAndShutdown};
+
+/// A socket for submitting a fetch fequest to an origin.
+pub type OriginProviderSocket<Stream> = Socket<Vec<u8>, anyhow::Result<Stream>>;
 
 /// The abstraction layer for different origins and how we handle them in the codebase in
 /// a modular way, and [`OriginProvider`] can be something like a provider for resolving
 /// *IPFS* files.
 #[async_trait]
-pub trait OriginProviderInterface<Stream: UntrustedStream>: Send + Sync {
-    /// Fetch the content from the provided `uri`. A uri is anything the origin
-    /// accepts.
-    async fn fetch(&self, uri: &[u8]) -> anyhow::Result<Stream>;
+pub trait OriginProviderInterface<Stream: UntrustedStream>:
+    ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
+{
+    /// Initialize the signature service.
+    async fn init(config: Self::Config) -> anyhow::Result<Self>;
+
+    /// Returns a socket for submitting a fetch fequest to an origin.
+    fn get_socket(&self) -> OriginProviderSocket<Stream>;
 }
 
 /// An untrusted stream to an origin, this allows the origin provider to start the

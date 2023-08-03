@@ -6,7 +6,7 @@ use crate::{
     application::ApplicationInterface, blockstore::BlockStoreInterface,
     common::WithStartAndShutdown, config::ConfigProviderInterface, consensus::ConsensusInterface,
     fs::FileSystemInterface, handshake::HandshakeInterface, indexer::IndexerInterface,
-    notifier::NotifierInterface, origin::OriginProviderInterface,
+    notifier::NotifierInterface, origin::OriginProviderSocket,
     pod::DeliveryAcknowledgmentAggregatorInterface, reputation::ReputationAggregatorInterface,
     rpc::RpcInterface, signer::SignerInterface, BroadcastInterface, TopologyInterface,
 };
@@ -52,7 +52,7 @@ pub struct Node<T: LightningTypes> {
     pub indexer: T::Indexer,
     pub fs: T::FileSystem,
     pub signer: T::Signer,
-    pub origin_providers: HashMap<String, Box<dyn OriginProviderInterface<T::Stream>>>,
+    pub origin_providers: HashMap<String, OriginProviderSocket<T::Stream>>,
     pub rpc: T::Rpc,
     pub delivery_acknowledgment_aggregator: T::DeliveryAcknowledgmentAggregator,
     pub reputation_aggregator: T::ReputationAggregator,
@@ -151,7 +151,7 @@ impl<T: LightningTypes> Node<T> {
     pub fn register_origin_provider(
         &mut self,
         name: String,
-        provider: Box<dyn OriginProviderInterface<T::Stream>>,
+        provider: OriginProviderSocket<T::Stream>,
     ) {
         if self.origin_providers.insert(name, provider).is_some() {
             panic!("Duplicate origin provider.");
