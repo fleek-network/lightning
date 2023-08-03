@@ -20,6 +20,7 @@ num-bigint = { workspace = true, features=["serde"]}
 num-traits.workspace = true
 num-derive.workspace = true
 blake3-tree = { path = "../../lib/blake3-tree"}
+derive_more = "0.99"
 
 
 # Our libraries

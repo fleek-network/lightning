@@ -3725,6 +3725,7 @@ dependencies = [
  "atomo",
  "blake3-tree",
  "bytes",
+ "derive_more",
  "fleek-crypto",
  "hp-fixed",
  "ink-quill",

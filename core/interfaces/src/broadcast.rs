@@ -17,6 +17,7 @@ pub enum Topic {
     /// The gossip topic for Fleek Network's indexer DHT.
     DistributedHashTable,
 }
+
 /// The gossip system in Fleek Network implements the functionality of broadcasting
 /// messages to the rest of the nodes in the network.
 #[async_trait]
