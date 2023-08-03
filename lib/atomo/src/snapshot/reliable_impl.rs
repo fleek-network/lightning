@@ -1,17 +1,13 @@
-use std::{
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::sync::{Arc, RwLock};
 
 use once_ptr::OncePtr;
 
 pub struct SnapshotList<T, U> {
     head: RwLock<Snapshot<T, U>>,
-    lock: Arc<RwLock<()>>,
 }
 
 /// The snapshot object.
-pub struct Snapshot<T, U>(Arc<SnapshotInner<T, U>>, Arc<RwLock<()>>);
+pub struct Snapshot<T, U>(Arc<SnapshotInner<T, U>>);
 
 struct SnapshotInner<T, U> {
     next: OncePtr<Snapshot<T, U>>,
@@ -31,19 +27,14 @@ where
 impl<T, U> SnapshotList<T, U> {
     /// Create a new empty snapshot list.
     pub fn new(metadata: U) -> Self {
-        let lock = Arc::new(RwLock::new(()));
-        let snapshot = Snapshot(
-            Arc::new(SnapshotInner {
-                next: OncePtr::null(),
-                data: OncePtr::null(),
-                metadata,
-            }),
-            lock.clone(),
-        );
+        let snapshot = Snapshot(Arc::new(SnapshotInner {
+            next: OncePtr::null(),
+            data: OncePtr::null(),
+            metadata,
+        }));
 
         Self {
             head: RwLock::new(snapshot),
-            lock,
         }
     }
 
@@ -58,22 +49,16 @@ impl<T, U> SnapshotList<T, U> {
     where
         F: FnOnce(),
     {
-        let _guard = self.lock.write().expect("Failed to get write guard");
-
-        let next_head = Snapshot(
-            Arc::new(SnapshotInner {
-                next: OncePtr::null(),
-                data: OncePtr::null(),
-                metadata,
-            }),
-            self.lock.clone(),
-        );
+        let next_head = Snapshot(Arc::new(SnapshotInner {
+            next: OncePtr::null(),
+            data: OncePtr::null(),
+            metadata,
+        }));
 
         let current = self.current();
         current.0.data.store(data);
         current.0.next.store(next_head.clone());
 
-        std::thread::sleep(Duration::from_micros(2));
         transition();
 
         let mut guard = self.head.write().expect("Could not acquire the lock");
@@ -108,8 +93,6 @@ impl<T, U> Snapshot<T, U> {
     where
         F: Fn(&'a T) -> Option<R>,
     {
-        let _guard = self.1.read().expect("Failed to get guard.");
-
         let mut current = self;
 
         loop {
@@ -136,6 +119,6 @@ impl<T, U> Snapshot<T, U> {
 
 impl<T, U> Clone for Snapshot<T, U> {
     fn clone(&self) -> Self {
-        Self(self.0.clone(), self.1.clone())
+        Self(self.0.clone())
     }
 }
