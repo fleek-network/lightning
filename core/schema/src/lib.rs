@@ -53,3 +53,28 @@ impl<T: AutoImplSerde> LightningMessage for T {
         writer.write(ser.view())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+    struct Person {
+        name: String,
+        age: u8,
+    }
+
+    impl AutoImplSerde for Person {}
+
+    #[test]
+    fn encdec_should_work() {
+        let person = Person {
+            name: "Fleek".into(),
+            age: 54,
+        };
+        let mut buffer = Vec::new();
+        person.encode(&mut buffer).expect("Failed to write.");
+        let decoded = Person::decode(buffer.as_slice()).unwrap();
+        assert_eq!(decoded, person);
+    }
+}
