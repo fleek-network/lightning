@@ -223,7 +223,10 @@ where
     /// [`None`] is returned.
     pub fn get(&self, key: impl Borrow<K>) -> Option<V> {
         let k = S::serialize(key.borrow()).into_boxed_slice();
-
+        // We get the underlying value before checking snapshots to fix a race condition where a
+        // value is updated after checking the snapshot and before we grab the data
+        // todo: optimize this
+        let tmp = self.selector.atomo.get::<V>(self.tid, &k);
         match self.batch.get(&k) {
             Some(Operation::Insert(value)) => return Some(S::deserialize(value)),
             Some(Operation::Remove) => return None,
@@ -242,7 +245,7 @@ where
             };
         }
 
-        self.selector.atomo.get::<V>(self.tid, &k)
+        tmp
     }
 
     /// Returns `true` if the key exists in the table.
