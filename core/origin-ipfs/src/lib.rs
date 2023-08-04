@@ -4,7 +4,7 @@ use std::{
 };
 
 use affair::{Socket, Task};
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use async_trait::async_trait;
 use cid::Cid;
 use hyper::{
@@ -145,7 +145,12 @@ impl IPFSOriginInner {
                     let body = res.into_body();
                     return Ok(IPFSStream::new(requested_cid, body));
                 },
-                Ok(Err(err)) => return Err(anyhow!("Failed to fetch from IPFS gateway: {err:?}")),
+                Ok(Err(_err)) => {
+                    // TODO(matthias): log this error?
+                    //return Err(anyhow!("Failed to fetch from IPFS gateway: {err:?}"))
+                    // error while fetching, onto the next gateway
+                    continue;
+                },
                 Err(_) => {
                     // timeout, onto the next gateway
                     continue;
