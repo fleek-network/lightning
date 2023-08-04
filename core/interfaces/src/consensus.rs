@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use affair::Socket;
 use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Serialize};
+use lightning_schema::LightningMessage;
 use tokio::sync::Notify;
 
 use crate::{
@@ -23,7 +23,7 @@ pub type MempoolSocket = Socket<UpdateRequest, ()>;
 #[async_trait]
 pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
     type QueryRunner: SyncQueryRunnerInterface;
-    type Certificate: Send + Sync + Clone + Serialize + DeserializeOwned;
+    type Certificate: LightningMessage + Clone;
     type PubSub: PubSub<Self::Certificate>;
 
     /// Create a new consensus service with the provided config and executor.

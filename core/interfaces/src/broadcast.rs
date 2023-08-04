@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Serialize};
+use lightning_schema::LightningMessage;
 
 use crate::{
-    signer::SignerInterface, topology::TopologyInterface, ConfigConsumer, NotifierInterface,
-    WithStartAndShutdown,
+    signer::SignerInterface, topology::TopologyInterface, ConfigConsumer, ConnectionPoolInterface,
+    ListenerConnector, NotifierInterface, WithStartAndShutdown,
 };
 
 /// Numerical value for different gossip topics used by Fleek Network.
@@ -22,6 +22,8 @@ pub enum Topic {
 /// messages to the rest of the nodes in the network.
 #[async_trait]
 pub trait BroadcastInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
+    // -- Generic types
+
     /// The implementation of the topology algorithm in use.
     type Topology: TopologyInterface;
 
@@ -31,26 +33,32 @@ pub trait BroadcastInterface: WithStartAndShutdown + ConfigConsumer + Sized + Se
     /// The signer that we can used to sign and submit messages.
     type Signer: SignerInterface;
 
-    type PubSub<T: Serialize + DeserializeOwned + Send + Sync + Clone>: PubSub<T>;
+    /// The networking connection pool.
+    type ConnectionPool: ConnectionPoolInterface;
+
+    // -- Implementation
+
+    /// The message type to be encoded/decoded for networking.
+    type Message: LightningMessage;
+
+    /// Pubsub topic for sending and receiving messages on a topic
+    type PubSub<T: LightningMessage + Clone>: PubSub<T>;
 
     /// Initialize the gossip system with the config and the topology object..
     async fn init(
         config: Self::Config,
+        listener_connector: ListenerConnector<Self::ConnectionPool, Self::Message>,
         topology: Arc<Self::Topology>,
         signer: &Self::Signer,
+        notifier: Self::Notifier,
     ) -> Result<Self>;
 
-    ///
-    fn get_pubsub<T: Serialize + DeserializeOwned + Send + Sync + Clone>(
-        &self,
-        topic: Topic,
-    ) -> Self::PubSub<T>;
+    /// Get a send and receiver for messages in a pub-sub topic.
+    fn get_pubsub<T: LightningMessage + Clone>(&self, topic: Topic) -> Self::PubSub<T>;
 }
 
 #[async_trait]
-pub trait PubSub<T: Serialize + DeserializeOwned + Send + Sync + Clone>:
-    Clone + Send + Sync
-{
+pub trait PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
     /// Publish a message.
     fn send(&self, msg: &T);
 

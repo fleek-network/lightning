@@ -20,6 +20,7 @@ use lightning_interfaces::{
     types::{Epoch, EpochInfo, UpdateMethod},
     PubSub, SyncQueryRunnerInterface,
 };
+use lightning_schema::AutoImplSerde;
 use log::{error, info};
 use mysten_metrics::RegistryService;
 use mysten_network::Multiaddr;
@@ -412,3 +413,4 @@ pub enum PubSubMsg {
     Certificate(narwhal_types::Certificate),
     Batch(narwhal_types::Batch),
 }
+impl AutoImplSerde for PubSubMsg {}

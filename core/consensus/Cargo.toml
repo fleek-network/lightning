@@ -11,6 +11,7 @@ fleek-crypto.workspace = true
 async-trait.workspace = true
 bincode.workspace = true
 lightning-interfaces = { path = "../interfaces" }
+lightning-schema = { path = "../schema" }
 futures.workspace = true
 anyhow.workspace = true
 log.workspace = true

@@ -61,6 +61,9 @@ pub trait ConnectionPoolInterface:
     /// The receiver struct used across the sender and connector.
     type Receiver<T: LightningMessage>: ReceiverInterface<T>;
 
+    /// Initialize the pool with the given configuration.
+    fn init(config: Self::Config) -> Self;
+
     /// Provide ownership to an scope in the connection pool.
     ///
     /// # Panics

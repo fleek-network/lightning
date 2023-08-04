@@ -8,7 +8,8 @@ use crate::{
     fs::FileSystemInterface, handshake::HandshakeInterface, indexer::IndexerInterface,
     notifier::NotifierInterface, origin::OriginProviderSocket,
     pod::DeliveryAcknowledgmentAggregatorInterface, reputation::ReputationAggregatorInterface,
-    rpc::RpcInterface, signer::SignerInterface, BroadcastInterface, TopologyInterface,
+    rpc::RpcInterface, signer::SignerInterface, BroadcastInterface, ConnectionPoolInterface,
+    ServiceScope, TopologyInterface,
 };
 
 pub trait LightningTypes: Send + Sync {
@@ -41,11 +42,16 @@ pub trait LightningTypes: Send + Sync {
         Topology = Self::Topology,
         Notifier = Self::Notifier,
         Signer = Self::Signer,
+        ConnectionPool = Self::ConnectionPool,
+    >;
+    type ConnectionPool: ConnectionPoolInterface<
+        QueryRunner = <Self::Application as ApplicationInterface>::SyncExecutor,
     >;
 }
 
 pub struct Node<T: LightningTypes> {
     pub configuration: Arc<T::ConfigProvider>,
+    pub connection_pool: T::ConnectionPool,
     pub consensus: T::Consensus,
     pub application: T::Application,
     pub store: T::BlockStore,
@@ -58,7 +64,7 @@ pub struct Node<T: LightningTypes> {
     pub reputation_aggregator: T::ReputationAggregator,
     pub handshake: T::Handshake,
     pub topology: Arc<T::Topology>,
-    pub gossip: T::Broadcast,
+    pub broadcast: T::Broadcast,
     pub notifier: PhantomData<T::Notifier>,
 }
 
@@ -78,13 +84,20 @@ impl<T: LightningTypes> Node<T> {
             .await?,
         );
 
-        let gossip = T::Broadcast::init(
+        let notifier = T::Notifier::init(application.sync_query());
+
+        let connection_pool = T::ConnectionPool::init(configuration.get::<T::ConnectionPool>());
+        let broadcast_pool = connection_pool.bind(ServiceScope::Broadcast);
+
+        let broadcast = T::Broadcast::init(
             configuration.get::<T::Broadcast>(),
+            broadcast_pool,
             topology.clone(),
             &signer,
+            notifier,
         )
         .await?;
-        let consensus_pubsub = gossip.get_pubsub(crate::Topic::Consensus);
+        let consensus_pubsub = broadcast.get_pubsub(crate::Topic::Consensus);
 
         let consensus = T::Consensus::init(
             configuration.get::<T::Consensus>(),
@@ -131,6 +144,7 @@ impl<T: LightningTypes> Node<T> {
 
         Ok(Self {
             configuration,
+            connection_pool,
             consensus,
             application,
             store,
@@ -143,7 +157,7 @@ impl<T: LightningTypes> Node<T> {
             reputation_aggregator,
             handshake,
             topology,
-            gossip,
+            broadcast,
             notifier: PhantomData,
         })
     }
@@ -251,5 +265,6 @@ pub mod transformers {
         type Handshake = T::Handshake;
         type Topology = T::Topology;
         type Broadcast = T::Broadcast;
+        type ConnectionPool = T::ConnectionPool;
     }
 }
