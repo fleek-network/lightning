@@ -21,7 +21,10 @@ pub struct Connector<Q: SyncQueryRunnerInterface, T> {
 
 impl<Q: SyncQueryRunnerInterface, T> Clone for Connector<Q, T> {
     fn clone(&self) -> Self {
-        todo!()
+        Self {
+            _q: self._q,
+            _x: self._x,
+        }
     }
 }
 
@@ -52,7 +55,7 @@ impl<Q: SyncQueryRunnerInterface> ConnectionPoolInterface for ConnectionPool<Q> 
     type Receiver<T: LightningMessage> = Receiver<T>;
 
     fn init(_config: Self::Config) -> Self {
-        todo!()
+        Self { _q: PhantomData }
     }
 
     fn bind<T>(
@@ -62,7 +65,16 @@ impl<Q: SyncQueryRunnerInterface> ConnectionPoolInterface for ConnectionPool<Q> 
     where
         T: LightningMessage,
     {
-        todo!()
+        (
+            Listener {
+                _q: PhantomData,
+                _x: PhantomData,
+            },
+            Connector {
+                _q: PhantomData,
+                _x: PhantomData,
+            },
+        )
     }
 }
 
@@ -94,7 +106,7 @@ impl<Q: SyncQueryRunnerInterface, T: LightningMessage> ConnectorInterface<T> for
         &self,
         _to: &fleek_crypto::NodePublicKey,
     ) -> Option<lightning_interfaces::SenderReceiver<Self::ConnectionPool, T>> {
-        todo!()
+        None
     }
 }
 
@@ -103,28 +115,28 @@ impl<Q: SyncQueryRunnerInterface, T: LightningMessage> ListenerInterface<T> for 
     type ConnectionPool = ConnectionPool<Q>;
 
     async fn accept(&mut self) -> Option<SenderReceiver<Self::ConnectionPool, T>> {
-        todo!()
+        None
     }
 }
 
 #[async_trait]
 impl<T: LightningMessage> SenderInterface<T> for Sender<T> {
     fn pk(&self) -> &fleek_crypto::NodePublicKey {
-        todo!()
+        &fleek_crypto::NodePublicKey([0; 96])
     }
 
     async fn send(&self, _msg: &T) -> bool {
-        todo!()
+        false
     }
 }
 
 #[async_trait]
 impl<T: LightningMessage> ReceiverInterface<T> for Receiver<T> {
     fn pk(&self) -> &fleek_crypto::NodePublicKey {
-        todo!()
+        &fleek_crypto::NodePublicKey([0; 96])
     }
 
     async fn recv(&mut self) -> Option<T> {
-        todo!()
+        None
     }
 }
