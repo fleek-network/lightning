@@ -2,7 +2,7 @@ use cid::{
     multihash::{Code, MultihashDigest},
     Cid,
 };
-use lightning_interfaces::{OriginProviderInterface, WithStartAndShutdown};
+use lightning_interfaces::{OriginProviderInterface, UntrustedStream, WithStartAndShutdown};
 use tokio::io::AsyncReadExt;
 use tokio_util::io::StreamReader;
 
@@ -17,6 +17,8 @@ async fn test_origin() {
 
     let socket = ipfs_origin.get_socket();
     let stream = socket.run(req_cid.to_bytes()).await.unwrap().unwrap();
+
+    assert_eq!(stream.was_content_valid(), None);
 
     let mut read = StreamReader::new(stream);
     let mut buf = [0; 1024];

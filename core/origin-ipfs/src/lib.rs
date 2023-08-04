@@ -21,7 +21,7 @@ use tokio::{
 };
 
 mod config;
-use config::Config;
+use config::{Config, Gateway};
 mod ipfs_stream;
 use ipfs_stream::IPFSStream;
 #[cfg(test)]
@@ -83,7 +83,7 @@ impl WithStartAndShutdown for IPFSOrigin {
 }
 
 struct IPFSOriginInner {
-    gateways: Vec<String>,
+    gateways: Vec<Gateway>,
 }
 
 impl IPFSOriginInner {
@@ -129,8 +129,8 @@ impl IPFSOriginInner {
 
         for gateway in self.gateways.iter() {
             let url = Uri::builder()
-                .scheme("https")
-                .authority(gateway.as_str())
+                .scheme(gateway.protocol.as_str())
+                .authority(gateway.authority.as_str())
                 .path_and_query(format!("/ipfs/{requested_cid}"))
                 .build()?;
 
