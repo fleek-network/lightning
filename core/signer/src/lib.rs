@@ -38,7 +38,6 @@ const TIMEOUT: Duration = Duration::from_secs(3);
 #[allow(clippy::type_complexity)]
 pub struct Signer {
     inner: Arc<SignerInner>,
-    shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
     socket: Socket<UpdateMethod, u64>,
     is_running: Arc<Mutex<bool>>,
     // `rx` is only parked here for the time from the call to `ìnit` to the call to `start`,
@@ -54,6 +53,7 @@ pub struct Signer {
     // `new_block_notify` is only parked here for the time from the call to
     // `provide_new_block_notify` to the call to `start`, when it is moved into SignerInner.
     new_block_notify: Arc<Mutex<Option<Arc<Notify>>>>,
+    shutdown_notify: Arc<Notify>,
 }
 
 #[async_trait]
@@ -67,34 +67,30 @@ impl WithStartAndShutdown for Signer {
     /// started.
     async fn start(&self) {
         if !*self.is_running.lock().unwrap() {
-            let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
             let inner = self.inner.clone();
             let rx = self.rx.lock().unwrap().take().unwrap();
             let mempool_socket = self.get_mempool_socket();
             let query_runner = self.get_query_runner();
             let new_block_notify = self.get_new_block_notify();
+            let shutdown_notify = self.shutdown_notify.clone();
             tokio::spawn(async move {
                 inner
                     .handle(
                         rx,
-                        shutdown_rx,
+                        shutdown_notify,
                         mempool_socket,
                         query_runner,
                         new_block_notify,
                     )
                     .await
             });
-            *self.shutdown_tx.lock().unwrap() = Some(shutdown_tx);
             *self.is_running.lock().unwrap() = true;
         }
     }
 
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
-        let shutdown_tx = self.get_shutdown_tx();
-        if let Some(shutdown_tx) = shutdown_tx {
-            shutdown_tx.send(()).await.unwrap();
-        }
+        self.shutdown_notify.notify_one();
         *self.is_running.lock().unwrap() = false;
     }
 }
@@ -109,13 +105,13 @@ impl SignerInterface for Signer {
         let (socket, rx) = Socket::raw_bounded(2048);
         Ok(Self {
             inner: Arc::new(inner),
-            shutdown_tx: Arc::new(Mutex::new(None)),
             socket,
             is_running: Arc::new(Mutex::new(false)),
             rx: Arc::new(Mutex::new(Some(rx))),
             mempool_socket: Arc::new(Mutex::new(None)),
             query_runner: Arc::new(Mutex::new(Some(query_runner))),
             new_block_notify: Arc::new(Mutex::new(None)),
+            shutdown_notify: Arc::new(Notify::new()),
         })
     }
 
@@ -176,10 +172,6 @@ impl SignerInterface for Signer {
 }
 
 impl Signer {
-    fn get_shutdown_tx(&self) -> Option<mpsc::Sender<()>> {
-        self.shutdown_tx.lock().unwrap().take()
-    }
-
     fn get_mempool_socket(&self) -> MempoolSocket {
         self.mempool_socket
             .lock()
@@ -271,7 +263,7 @@ impl SignerInner {
     async fn handle(
         self: Arc<Self>,
         mut rx: mpsc::Receiver<Task<UpdateMethod, u64>>,
-        mut shutdown_rx: mpsc::Receiver<()>,
+        shutdown_notify: Arc<Notify>,
         mempool_socket: MempoolSocket,
         query_runner: QueryRunner,
         new_block_notify: Arc<Notify>,
@@ -328,7 +320,7 @@ impl SignerInner {
                         &mut pending_transactions
                     ).await;
                 }
-                _ = shutdown_rx.recv() => break,
+                _ = shutdown_notify.notified() => break,
             }
         }
     }
