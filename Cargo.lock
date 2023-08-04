@@ -3723,6 +3723,7 @@ dependencies = [
  "futures-util",
  "fxhash",
  "lightning-interfaces",
+ "lightning-schema",
  "log",
  "multiaddr",
  "mysten-metrics",

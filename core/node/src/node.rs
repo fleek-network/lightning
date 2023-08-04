@@ -12,7 +12,7 @@ use crate::{
     config::TomlConfigProvider,
     template::{
         broadcast::Broadcast, fs::FileSystem, indexer::Indexer, origin::MyStream,
-        pod::DeliveryAcknowledgmentAggregator, topology::Topology,
+        pod::DeliveryAcknowledgmentAggregator, pool::ConnectionPool, topology::Topology,
     },
 };
 
@@ -35,5 +35,6 @@ impl LightningTypes for FinalTypes {
     type Rpc = Rpc<QueryRunner>;
     type Handshake = TcpHandshakeServer;
     type Topology = Topology<QueryRunner>;
-    type Broadcast = Broadcast<Signer, Topology<QueryRunner>, Notifier>;
+    type Broadcast = Broadcast<QueryRunner, Signer, Topology<QueryRunner>, Notifier>;
+    type ConnectionPool = ConnectionPool<QueryRunner>;
 }

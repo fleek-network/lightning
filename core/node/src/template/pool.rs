@@ -51,6 +51,10 @@ impl<Q: SyncQueryRunnerInterface> ConnectionPoolInterface for ConnectionPool<Q> 
     /// The receiver struct used across the sender and connector.
     type Receiver<T: LightningMessage> = Receiver<T>;
 
+    fn init(_config: Self::Config) -> Self {
+        todo!()
+    }
+
     fn bind<T>(
         &self,
         _scope: lightning_interfaces::ServiceScope,

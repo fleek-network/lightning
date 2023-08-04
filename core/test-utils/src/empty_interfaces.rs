@@ -9,17 +9,141 @@ use fleek_crypto::{
 };
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::{
+    schema::LightningMessage,
     types::{
         Epoch, EpochInfo, NodeInfo, NodeServed, ProtocolParams, ReportedReputationMeasurements,
         Service, ServiceId, TotalServed, TransactionResponse, UpdateRequest,
     },
-    Blake3Hash, BroadcastInterface, ConfigConsumer, IndexerInterface, MempoolSocket, Notification,
-    NotifierInterface, PubSub, ReputationAggregatorInterface, ReputationQueryInteface,
-    ReputationReporterInterface, SignerInterface, SubmitTxSocket, SyncQueryRunnerInterface, Topic,
-    TopologyInterface, Weight, WithStartAndShutdown,
+    Blake3Hash, BroadcastInterface, ConfigConsumer, ConnectionPoolInterface, ConnectorInterface,
+    IndexerInterface, ListenerConnector, ListenerInterface, MempoolSocket, Notification,
+    NotifierInterface, PubSub, ReceiverInterface, ReputationAggregatorInterface,
+    ReputationQueryInteface, ReputationReporterInterface, SenderInterface, SenderReceiver,
+    SignerInterface, SubmitTxSocket, SyncQueryRunnerInterface, Topic, TopologyInterface, Weight,
+    WithStartAndShutdown,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Notify};
+
+pub struct ConnectionPool<Q: SyncQueryRunnerInterface> {
+    _q: PhantomData<Q>,
+}
+
+#[derive(Debug)]
+pub struct Connector<Q: SyncQueryRunnerInterface, T> {
+    _q: PhantomData<Q>,
+    _x: PhantomData<T>,
+}
+
+impl<Q: SyncQueryRunnerInterface, T> Clone for Connector<Q, T> {
+    fn clone(&self) -> Self {
+        todo!()
+    }
+}
+
+pub struct Listener<Q: SyncQueryRunnerInterface, T> {
+    _q: PhantomData<Q>,
+    _x: PhantomData<T>,
+}
+
+pub struct Receiver<T> {
+    _x: PhantomData<T>,
+}
+
+pub struct Sender<T> {
+    _x: PhantomData<T>,
+}
+
+impl<Q: SyncQueryRunnerInterface> ConnectionPoolInterface for ConnectionPool<Q> {
+    type QueryRunner = Q;
+
+    type Connector<T: LightningMessage> = Connector<Q, T>;
+
+    type Listener<T: LightningMessage> = Listener<Q, T>;
+
+    /// The sender struct used across the sender and connector.
+    type Sender<T: LightningMessage> = Sender<T>;
+
+    /// The receiver struct used across the sender and connector.
+    type Receiver<T: LightningMessage> = Receiver<T>;
+
+    /// Initialize the pool with the given configuration.
+    fn init(_config: Self::Config) -> Self {
+        todo!()
+    }
+
+    fn bind<T>(
+        &self,
+        _scope: lightning_interfaces::ServiceScope,
+    ) -> (Self::Listener<T>, Self::Connector<T>)
+    where
+        T: LightningMessage,
+    {
+        todo!()
+    }
+}
+
+impl<Q: SyncQueryRunnerInterface> ConfigConsumer for ConnectionPool<Q> {
+    const KEY: &'static str = "connection-pool";
+
+    type Config = MockConfig;
+}
+
+#[async_trait]
+impl<Q: SyncQueryRunnerInterface> WithStartAndShutdown for ConnectionPool<Q> {
+    /// Returns true if this system is running or not.
+    fn is_running(&self) -> bool {
+        true
+    }
+
+    /// Start the system, should not do anything if the system is already
+    /// started.
+    async fn start(&self) {}
+
+    /// Send the shutdown signal to the system.
+    async fn shutdown(&self) {}
+}
+
+impl<Q: SyncQueryRunnerInterface, T: LightningMessage> ConnectorInterface<T> for Connector<Q, T> {
+    type ConnectionPool = ConnectionPool<Q>;
+
+    fn connect(
+        &self,
+        _to: &fleek_crypto::NodePublicKey,
+    ) -> Option<lightning_interfaces::SenderReceiver<Self::ConnectionPool, T>> {
+        todo!()
+    }
+}
+
+#[async_trait]
+impl<Q: SyncQueryRunnerInterface, T: LightningMessage> ListenerInterface<T> for Listener<Q, T> {
+    type ConnectionPool = ConnectionPool<Q>;
+
+    async fn accept(&mut self) -> Option<SenderReceiver<Self::ConnectionPool, T>> {
+        todo!()
+    }
+}
+
+#[async_trait]
+impl<T: LightningMessage> SenderInterface<T> for Sender<T> {
+    fn pk(&self) -> &fleek_crypto::NodePublicKey {
+        todo!()
+    }
+
+    async fn send(&self, _msg: &T) -> bool {
+        todo!()
+    }
+}
+
+#[async_trait]
+impl<T: LightningMessage> ReceiverInterface<T> for Receiver<T> {
+    fn pk(&self) -> &fleek_crypto::NodePublicKey {
+        todo!()
+    }
+
+    async fn recv(&mut self) -> Option<T> {
+        todo!()
+    }
+}
 
 pub struct MockBroadcast {}
 pub struct MockSubscriber {}
@@ -41,7 +165,7 @@ pub struct MockConfig {}
 #[derive(Clone)]
 pub struct MockIndexer {}
 #[derive(Clone, Serialize)]
-pub struct MockPubSub<T: Serialize + DeserializeOwned + Send + Sync + Clone> {
+pub struct MockPubSub<T: LightningMessage + Send + Sync + Clone> {
     pub _data: PhantomData<T>,
 }
 
@@ -189,18 +313,23 @@ impl BroadcastInterface for MockBroadcast {
     /// The signer that we can used to sign and submit messages.
     type Signer = MockSigner;
 
-    type PubSub<T: Serialize + DeserializeOwned + Send + Sync + Clone> = MockPubSub<T>;
+    type PubSub<T: LightningMessage + Send + Sync + Clone> = MockPubSub<T>;
+
+    type ConnectionPool = ConnectionPool<MockQueryRunner>;
+    type Message = ();
 
     /// Initialize the gossip system with the config and the topology object..
     async fn init(
         _config: Self::Config,
+        _listener_connector: ListenerConnector<Self::ConnectionPool, Self::Message>,
         _topology: Arc<Self::Topology>,
         _signer: &Self::Signer,
+        _notify: Self::Notifier,
     ) -> Result<Self> {
         Ok(Self {})
     }
 
-    fn get_pubsub<T: Serialize + DeserializeOwned + Send + Sync + Clone>(
+    fn get_pubsub<T: LightningMessage + Send + Sync + Clone>(
         &self,
         _topic: Topic,
     ) -> Self::PubSub<T> {
@@ -217,7 +346,7 @@ impl ConfigConsumer for MockSigner {
 }
 
 #[async_trait]
-impl<T: Serialize + DeserializeOwned + Send + Sync + Clone> PubSub<T> for MockPubSub<T> {
+impl<T: LightningMessage + Send + Sync + Clone> PubSub<T> for MockPubSub<T> {
     /// Publish a message.
     fn send(&self, _msg: &T) {}
 
