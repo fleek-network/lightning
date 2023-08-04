@@ -203,6 +203,7 @@ where
 {
     fn is_running(&self) -> bool {
         self.application.is_running()
+            && self.connection_pool.is_running()
             && self.consensus.is_running()
             && self.delivery_acknowledgment_aggregator.is_running()
             && self.indexer.is_running()
@@ -211,6 +212,7 @@ where
 
     async fn start(&self) {
         self.application.start().await;
+        self.connection_pool.start().await;
         self.signer.start().await;
         self.consensus.start().await;
         self.delivery_acknowledgment_aggregator.start().await;
@@ -221,6 +223,7 @@ where
 
     async fn shutdown(&self) {
         self.application.shutdown().await;
+        self.connection_pool.shutdown().await;
         self.consensus.shutdown().await;
         self.delivery_acknowledgment_aggregator.shutdown().await;
         self.indexer.shutdown().await;
