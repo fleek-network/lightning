@@ -4,6 +4,11 @@ use crate::{common::WithStartAndShutdown, config::ConfigConsumer, ConnectionInte
 
 #[async_trait]
 pub trait HandshakeInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
+    // -- DYNAMIC TYPES
+    // empty
+
+    // -- BOUNDED TYPES
+
     /// The connection type that this handshake implementation offers.
     type Connection: ConnectionInterface;
 

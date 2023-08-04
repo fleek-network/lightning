@@ -10,14 +10,18 @@ use crate::{
 
 #[async_trait]
 pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
+    // -- DYNAMIC TYPES
+
+    /// The notifier can be used to receive notifications on and before epoch changes.
+    type Notifier: NotifierInterface;
+
+    // -- BOUNDED TYPES
+
     /// The reputation reporter can be used by our system to report the reputation of other
     type ReputationReporter: ReputationReporterInterface;
 
     /// The query runner can be used to query the local reputation of other nodes.
     type ReputationQuery: ReputationQueryInteface;
-
-    /// The notifier can be used to receive notifications on and before epoch changes.
-    type Notifier: NotifierInterface;
 
     /// Create a new reputation
     async fn init(

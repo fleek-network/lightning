@@ -8,11 +8,15 @@ use crate::{
 
 #[async_trait]
 pub trait FileSystemInterface: Send + Sync + Clone {
+    // -- DYNAMIC TYPES
+
     /// The block store used for this file system.
     type BlockStore: BlockStoreInterface;
 
     /// The indexer used for this file system.
     type Indexer: IndexerInterface;
+
+    // -- BOUNDED TYPES
 
     fn new(store: &Self::BlockStore, indexer: &Self::Indexer) -> Self;
 

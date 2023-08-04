@@ -25,7 +25,7 @@ pub struct BlockExecutionResponse {
     pub change_epoch: bool,
     /// The changes to the node registry.
     pub node_registry_delta: Vec<(NodePublicKey, NodeRegistryChange)>,
-    /// Reciepts of all executed transactions
+    /// Receipts of all executed transactions
     pub txn_receipts: Vec<TransactionResponse>,
 }
 
@@ -138,10 +138,11 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Returns just the current epoch
     fn get_epoch(&self) -> Epoch;
+
     /// Returns all the information on the current epoch that Narwhal needs to run
     fn get_epoch_info(&self) -> EpochInfo;
 
-    /// Returns total served for all commodites from the state for a given epoch
+    /// Returns total served for all commodities from the state for a given epoch
     fn get_total_served(&self, epoch: Epoch) -> TotalServed;
 
     /// Return all commodity served for a give node for current epoch
@@ -164,7 +165,8 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Return all latencies measurements for the current epoch.
     fn get_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration>;
-    /// returns the service information for a given serviceid
+
+    /// returns the service information for a given [`ServiceId`]
     fn get_service_info(&self, service_id: ServiceId) -> Service;
 
     fn pubkey_to_index(&self, node: NodePublicKey) -> Option<u32>;

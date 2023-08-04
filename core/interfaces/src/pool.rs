@@ -38,13 +38,13 @@ pub type ListenerConnector<C, T> = (
 pub trait ConnectionPoolInterface:
     ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
 {
-    // -- Generic input
+    // -- DYNAMIC TYPES
 
     /// The query runner on the application to provide the information about a node
     /// to this connection pool. Should be a generic on this implementation.
     type QueryRunner: SyncQueryRunnerInterface;
 
-    // -- Implementations provided by this interface.
+    // -- BOUNDED TYPES
     // The existence of Sender/Receiver at this layer and the link back to this connection
     // pool from listener and connector is to force the listener and connector to use the
     // same type for the sender/receiver.

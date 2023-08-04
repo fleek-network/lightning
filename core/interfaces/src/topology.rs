@@ -11,9 +11,14 @@ use crate::{ConfigConsumer, SyncQueryRunnerInterface};
 /// algorithm generates.
 #[async_trait]
 pub trait TopologyInterface: ConfigConsumer + Sized + Send + Sync {
+    // -- DYNAMIC TYPES
+
     /// Topology requires the query runner in order to access reputation data as well as the
     /// node registry in order to create the connection graph for the epoch.
     type SyncQuery: SyncQueryRunnerInterface;
+
+    // -- BOUNDED TYPES
+    // empty
 
     /// Create an instance of the structure from the provided configuration and public key.
     /// The public key is supposed to be the public key of our own node. This can be obtained

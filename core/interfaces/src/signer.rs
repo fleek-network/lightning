@@ -21,7 +21,12 @@ pub type SubmitTxSocket = Socket<UpdateMethod, u64>;
 /// the node.
 #[async_trait]
 pub trait SignerInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
+    // -- DYNAMIC TYPES
+
     type SyncQuery: SyncQueryRunnerInterface;
+
+    // -- BOUNDED TYPES
+    // empty
 
     /// Initialize the signature service.
     async fn init(config: Self::Config, query_runner: Self::SyncQuery) -> anyhow::Result<Self>;

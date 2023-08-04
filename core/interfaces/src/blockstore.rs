@@ -88,6 +88,7 @@ pub trait BlockStoreInterface: Clone + Send + Sync + ConfigConsumer {
     // empty
 
     // -- BOUNDED TYPES
+
     /// The block store has the ability to use a smart pointer to avoid duplicating
     /// the same content multiple times in memory, this can be used for when multiple
     /// services want access to the same buffer of data.

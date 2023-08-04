@@ -1,6 +1,11 @@
 use crate::{types::ServiceId, ConfigConsumer, ConnectionInterface, WithStartAndShutdown};
 
 pub trait ServiceExecutorInterface: WithStartAndShutdown + ConfigConsumer + Send + Sync {
+    // -- DYNAMIC TYPES
+    // empty
+
+    // -- BOUNDED TYPES
+
     /// The connector object that this service executor provides.
     type Connector: ServiceConnectorInterface;
 
