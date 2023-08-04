@@ -14,6 +14,43 @@ use crate::{
 
 pub type TableKey = Blake3Hash;
 
+pub async fn start_server(mut rx: Receiver<TableQuery>, local_key: NodeNetworkingPublicKey) {
+    let mut table = Table::new(local_key);
+    while let Some(query) = rx.recv().await {
+        match query {
+            TableQuery::ClosestNodes { target: key, tx } => {
+                let nodes = table.closest_nodes(&key);
+                if tx.send(Ok(nodes)).is_err() {
+                    tracing::error!("failed to send Table query response")
+                }
+            },
+            TableQuery::AddNode { node, tx } => {
+                let nodes = table.add_node(node).map_err(|e| QueryError(e.to_string()));
+                if tx.send(nodes).is_err() {
+                    tracing::error!("failed to send Table query response")
+                }
+            },
+            TableQuery::FirstNonEmptyBucket { tx } => {
+                let local_key = table.local_node_key;
+                let closest = table.closest_nodes(&local_key.0);
+                match &closest.first() {
+                    Some(node) => {
+                        let index = distance::leading_zero_bits(&node.key.0, &local_key.0);
+                        if tx.send(Some(index)).is_err() {
+                            tracing::error!("failed to send ondex of next bucket")
+                        }
+                    },
+                    None => {
+                        if tx.send(None).is_err() {
+                            tracing::error!("failed to send ondex of next bucket")
+                        }
+                    },
+                }
+            },
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 #[error("querying the table failed: {0}")]
 pub struct QueryError(String);
@@ -26,6 +63,10 @@ pub enum TableQuery {
     AddNode {
         node: Node,
         tx: oneshot::Sender<Result<(), QueryError>>,
+    },
+    // Returns index for non-empty bucket containing closest nodes. Used for bootstrapping.
+    FirstNonEmptyBucket {
+        tx: oneshot::Sender<Option<usize>>,
     },
 }
 
@@ -42,6 +83,7 @@ impl Table {
         }
     }
 
+    // Returns closest nodes to target in increasing order.
     pub fn closest_nodes(&self, target: &TableKey) -> Vec<NodeInfo> {
         // Todo: Filter good vs bad nodes based on some criteria.
         let mut closest = BTreeMap::new();
@@ -133,25 +175,5 @@ fn calculate_bucket_index(bucket_count: usize, possible_index: usize) -> usize {
         bucket_count - 1
     } else {
         possible_index
-    }
-}
-
-pub async fn start_server(mut rx: Receiver<TableQuery>, local_key: NodeNetworkingPublicKey) {
-    let mut table = Table::new(local_key);
-    while let Some(query) = rx.recv().await {
-        match query {
-            TableQuery::ClosestNodes { target: key, tx } => {
-                let nodes = table.closest_nodes(&key);
-                if tx.send(Ok(nodes)).is_err() {
-                    tracing::error!("failed to send Table query response")
-                }
-            },
-            TableQuery::AddNode { node, tx } => {
-                let nodes = table.add_node(node).map_err(|e| QueryError(e.to_string()));
-                if tx.send(nodes).is_err() {
-                    tracing::error!("failed to send Table query response")
-                }
-            },
-        }
     }
 }

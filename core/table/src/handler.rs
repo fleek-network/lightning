@@ -35,6 +35,10 @@ pub enum Command {
         key: Vec<u8>,
         value: Vec<u8>,
     },
+    FindNode {
+        target: NodeNetworkingPublicKey,
+        tx: oneshot::Sender<Result<Vec<NodeInfo>, ()>>,
+    },
 }
 
 pub async fn start_server(
@@ -103,6 +107,7 @@ impl Handler {
         }
     }
 
+    // Todo: Remove unwraps here. It is possible for clients to drop their handles.
     async fn handle_command(&self, command: Command) -> Result<()> {
         match command {
             Command::Get { key, tx } => {
@@ -143,6 +148,10 @@ impl Handler {
                 for node in nodes {
                     socket::send_to(&self.socket, &bytes, node.address).await?;
                 }
+            },
+            Command::FindNode { target, tx } => {
+                let nodes = self.find_node(target.0).await?;
+                tx.send(Ok(nodes)).unwrap();
             },
         }
         Ok(())

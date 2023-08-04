@@ -1,3 +1,4 @@
+mod bootstrap;
 pub mod bucket;
 mod distance;
 pub mod handler;
