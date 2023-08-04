@@ -5,8 +5,7 @@ use async_trait::async_trait;
 use crate::{
     application::ApplicationInterface, blockstore::BlockStoreInterface,
     common::WithStartAndShutdown, config::ConfigProviderInterface, consensus::ConsensusInterface,
-    fs::FileSystemInterface, handshake::HandshakeInterface, indexer::IndexerInterface,
-    notifier::NotifierInterface, origin::OriginProviderSocket,
+    handshake::HandshakeInterface, notifier::NotifierInterface, origin::OriginProviderSocket,
     pod::DeliveryAcknowledgmentAggregatorInterface, reputation::ReputationAggregatorInterface,
     rpc::RpcInterface, signer::SignerInterface, BroadcastInterface, ConnectionPoolInterface,
     ServiceScope, TopologyInterface,
@@ -22,8 +21,6 @@ pub trait LightningTypes: Send + Sync {
     >;
     type Application: ApplicationInterface;
     type BlockStore: BlockStoreInterface;
-    type Indexer: IndexerInterface;
-    type FileSystem: FileSystemInterface<BlockStore = Self::BlockStore, Indexer = Self::Indexer>;
     type Signer: SignerInterface<
         SyncQuery = <Self::Application as ApplicationInterface>::SyncExecutor,
     >;
@@ -55,8 +52,6 @@ pub struct Node<T: LightningTypes> {
     pub consensus: T::Consensus,
     pub application: T::Application,
     pub store: T::BlockStore,
-    pub indexer: T::Indexer,
-    pub fs: T::FileSystem,
     pub signer: T::Signer,
     pub origin_providers: HashMap<String, OriginProviderSocket<T::Stream>>,
     pub rpc: T::Rpc,
@@ -114,10 +109,6 @@ impl<T: LightningTypes> Node<T> {
 
         let store = T::BlockStore::init(configuration.get::<T::BlockStore>()).await?;
 
-        let indexer = T::Indexer::init(configuration.get::<T::Indexer>()).await?;
-
-        let fs = T::FileSystem::new(&store, &indexer);
-
         let delivery_acknowledgment_aggregator = T::DeliveryAcknowledgmentAggregator::init(
             configuration.get::<T::DeliveryAcknowledgmentAggregator>(),
             signer.get_socket(),
@@ -148,8 +139,6 @@ impl<T: LightningTypes> Node<T> {
             consensus,
             application,
             store,
-            indexer,
-            fs,
             signer,
             origin_providers: HashMap::new(),
             rpc,
@@ -186,7 +175,6 @@ impl<T: LightningTypes> Node<T> {
         configuration.get::<T::Consensus>();
         configuration.get::<T::Application>();
         configuration.get::<T::BlockStore>();
-        configuration.get::<T::Indexer>();
         configuration.get::<T::Signer>();
         configuration.get::<T::DeliveryAcknowledgmentAggregator>();
         configuration.get::<T::ReputationAggregator>();
@@ -206,7 +194,6 @@ where
             && self.connection_pool.is_running()
             && self.consensus.is_running()
             && self.delivery_acknowledgment_aggregator.is_running()
-            && self.indexer.is_running()
             && self.handshake.is_running()
     }
 
@@ -216,7 +203,6 @@ where
         self.signer.start().await;
         self.consensus.start().await;
         self.delivery_acknowledgment_aggregator.start().await;
-        self.indexer.start().await;
         self.handshake.start().await;
         self.rpc.start().await;
     }
@@ -226,7 +212,6 @@ where
         self.connection_pool.shutdown().await;
         self.consensus.shutdown().await;
         self.delivery_acknowledgment_aggregator.shutdown().await;
-        self.indexer.shutdown().await;
         self.handshake.shutdown().await;
         self.rpc.shutdown().await;
     }
@@ -257,8 +242,6 @@ pub mod transformers {
         type Consensus = Consensus;
         type Application = T::Application;
         type BlockStore = T::BlockStore;
-        type Indexer = T::Indexer;
-        type FileSystem = T::FileSystem;
         type Signer = T::Signer;
         type Stream = T::Stream;
         type DeliveryAcknowledgmentAggregator = T::DeliveryAcknowledgmentAggregator;

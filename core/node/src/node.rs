@@ -11,8 +11,8 @@ use lightning_signer::Signer;
 use crate::{
     config::TomlConfigProvider,
     template::{
-        broadcast::Broadcast, fs::FileSystem, indexer::Indexer, origin::MyStream,
-        pod::DeliveryAcknowledgmentAggregator, pool::ConnectionPool, topology::Topology,
+        broadcast::Broadcast, origin::MyStream, pod::DeliveryAcknowledgmentAggregator,
+        pool::ConnectionPool, topology::Topology,
     },
 };
 
@@ -25,8 +25,6 @@ impl LightningTypes for FinalTypes {
         Consensus<QueryRunner, <Self::Broadcast as BroadcastInterface>::PubSub<PubSubMsg>>;
     type Application = Application;
     type BlockStore = MemoryBlockStore;
-    type Indexer = Indexer;
-    type FileSystem = FileSystem;
     type Signer = Signer;
     type Stream = MyStream;
     type DeliveryAcknowledgmentAggregator = DeliveryAcknowledgmentAggregator;

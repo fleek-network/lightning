@@ -19,7 +19,7 @@ use simplelog::{
     ColorChoice, CombinedLogger, ConfigBuilder, TermLogger, TerminalMode, WriteLogger,
 };
 
-use crate::{cli::CliArgs, node::FinalTypes, template::indexer::Indexer};
+use crate::{cli::CliArgs, node::FinalTypes};
 
 #[tokio::main]
 async fn main() -> Result<()> {
