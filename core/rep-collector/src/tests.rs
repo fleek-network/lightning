@@ -20,14 +20,11 @@ use lightning_interfaces::{
     reputation::{ReputationAggregatorInterface, ReputationReporterInterface},
     signer::SignerInterface,
     types::{Block, UpdateMethod, UpdatePayload, UpdateRequest},
-    BroadcastInterface, ReputationQueryInteface, SyncQueryRunnerInterface, ToDigest, Topic, Weight,
+    ReputationQueryInteface, SyncQueryRunnerInterface, ToDigest, Weight,
 };
 use lightning_notifier::Notifier;
 use lightning_signer::{Config as SignerConfig, Signer};
-use lightning_test_utils::{
-    consensus::{Config as ConsensusConfig, MockConsensus},
-    empty_interfaces::MockBroadcast,
-};
+use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockPubSub};
 
 use crate::{aggregator::ReputationAggregator, config::Config, measurement_manager::Interactions};
 
@@ -121,7 +118,7 @@ async fn test_query() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        MockBroadcast {}.get_pubsub(Topic::Consensus),
+        MockPubSub {},
     )
     .await
     .unwrap();
@@ -233,7 +230,7 @@ async fn test_submit_measurements() {
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        MockBroadcast {}.get_pubsub(Topic::Consensus),
+        MockPubSub {},
     )
     .await
     .unwrap();
@@ -379,7 +376,7 @@ async fn test_reputation_calculation_and_query() {
         .await
         .unwrap();
 
-    let mock_gossip = MockBroadcast {}.get_pubsub(Topic::Consensus);
+    let mock_gossip = MockPubSub {};
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 1,

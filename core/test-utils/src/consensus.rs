@@ -12,7 +12,7 @@ use lightning_interfaces::{
     consensus::{ConsensusInterface, MempoolSocket},
     signer::SignerInterface,
     types::{Block, UpdateRequest},
-    WithStartAndShutdown,
+    PubSub, WithStartAndShutdown,
 };
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,21 @@ use tokio::{
     time::{interval, sleep},
 };
 
-use crate::empty_interfaces::MockPubSub;
+#[derive(Serialize, Deserialize, Clone)]
+pub struct MockPubSub {}
+
+#[async_trait]
+impl PubSub<()> for MockPubSub {
+    /// Publish a message.
+    fn send(&self, _msg: &()) {}
+
+    /// Await the next message in the topic, should only return `None` if there are
+    /// no longer any new messages coming. (indicating that the gossip instance is
+    /// shutdown.)
+    async fn recv(&mut self) -> Option<()> {
+        None
+    }
+}
 
 #[allow(clippy::type_complexity)]
 pub struct MockConsensus<Q: SyncQueryRunnerInterface + 'static> {
@@ -44,7 +58,7 @@ struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static> {
 impl<Q: SyncQueryRunnerInterface> ConsensusInterface for MockConsensus<Q> {
     type QueryRunner = Q;
     type Certificate = ();
-    type PubSub = MockPubSub<()>;
+    type PubSub = MockPubSub;
 
     /// Create a new consensus service with the provided config and executor.
     async fn init<S: SignerInterface>(
