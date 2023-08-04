@@ -3748,6 +3748,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-dht"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "fleek-crypto",
+ "futures",
+ "lightning-application",
+ "lightning-interfaces",
+ "lightning-topology",
+ "rand 0.8.5",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tokio-util 0.7.8",
+ "tracing",
+]
+
+[[package]]
 name = "lightning-handshake"
 version = "0.0.0"
 dependencies = [
@@ -3959,26 +3979,6 @@ dependencies = [
  "log",
  "serde",
  "tokio",
-]
-
-[[package]]
-name = "lightning-table"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "bincode",
- "fleek-crypto",
- "futures",
- "lightning-application",
- "lightning-interfaces",
- "lightning-topology",
- "rand 0.8.5",
- "serde",
- "thiserror",
- "tokio",
- "tokio-util 0.7.8",
- "tracing",
 ]
 
 [[package]]

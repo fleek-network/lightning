@@ -1,5 +1,5 @@
 [package]
-name = "lightning-table"
+name = "lightning-dht"
 version = "0.0.0"
 edition = "2021"
 

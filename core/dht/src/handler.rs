@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::{bail, Result};
 use fleek_crypto::NodeNetworkingPublicKey;
-use lightning_interfaces::table::{TableEntry, TablePrefix};
+use lightning_interfaces::dht::{TableEntry, TablePrefix};
 use tokio::{
     net::UdpSocket,
     select,

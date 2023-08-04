@@ -12,7 +12,7 @@ const FN_DHT_ENTRY_DOMAIN: &str = "FLEEK_NETWORK_DHT_ENTRY";
 
 /// The distributed hash table for Fleek Network.
 #[async_trait]
-pub trait TableInterface: WithStartAndShutdown + Sized {
+pub trait DHTInterface: WithStartAndShutdown + Sized {
     // -- DYNAMIC TYPES
 
     type Topology: TopologyInterface;
