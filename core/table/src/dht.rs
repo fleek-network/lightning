@@ -1,7 +1,14 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::Result;
+use async_trait::async_trait;
 use fleek_crypto::NodeNetworkingPublicKey;
+use lightning_application::query_runner::QueryRunner;
+use lightning_interfaces::{
+    table::{TableEntry, TableInterface, TablePrefix},
+    SignerInterface, WithStartAndShutdown,
+};
+use lightning_topology::Topology;
 use tokio::{
     net::UdpSocket,
     sync::{mpsc, oneshot},
@@ -10,6 +17,7 @@ use tokio::{
 use crate::{bootstrap, bootstrap::Query, handler, handler::Command, query::NodeInfo, table};
 
 /// Builds the DHT.
+#[derive(Default)]
 pub struct Builder {
     nodes: Vec<NodeInfo>,
     node_key: Option<NodeNetworkingPublicKey>,
@@ -84,7 +92,7 @@ pub struct Dht {
 
 impl Dht {
     /// Return one value associated with the given key.
-    pub async fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+    pub async fn get(&self, key: &[u8]) -> Option<TableEntry> {
         let (tx, rx) = oneshot::channel();
         if self
             .handler_tx
@@ -152,5 +160,38 @@ impl Dht {
             tracing::error!("failed to send to bootstrap task");
         }
         rx.await.unwrap_or(false)
+    }
+}
+
+#[async_trait]
+impl WithStartAndShutdown for Dht {
+    fn is_running(&self) -> bool {
+        todo!()
+    }
+
+    async fn start(&self) {
+        todo!()
+    }
+
+    async fn shutdown(&self) {
+        todo!()
+    }
+}
+
+// Todo: Rename interface.
+#[async_trait]
+impl TableInterface for Dht {
+    type Topology = Topology<QueryRunner>;
+
+    async fn init<S: SignerInterface>(_: &S, _: Arc<Self::Topology>) -> Result<Self> {
+        Builder::default().build().await
+    }
+
+    fn put(&self, _: TablePrefix, key: &[u8], value: &[u8]) {
+        self.put(key, value)
+    }
+
+    async fn get(&self, _: TablePrefix, key: &[u8]) -> Option<TableEntry> {
+        self.get(key).await
     }
 }

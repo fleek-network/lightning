@@ -3966,10 +3966,13 @@ name = "lightning-table"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "bincode",
  "fleek-crypto",
  "futures",
+ "lightning-application",
  "lightning-interfaces",
+ "lightning-topology",
  "rand 0.8.5",
  "serde",
  "thiserror",

@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::{bail, Result};
 use fleek_crypto::NodeNetworkingPublicKey;
+use lightning_interfaces::table::{TableEntry, TablePrefix};
 use tokio::{
     net::UdpSocket,
     select,
@@ -73,7 +74,7 @@ pub async fn start_server(
 pub enum Command {
     Get {
         key: Vec<u8>,
-        tx: oneshot::Sender<Result<Option<Vec<u8>>, ()>>,
+        tx: oneshot::Sender<Result<Option<TableEntry>, ()>>,
     },
     Put {
         key: Vec<u8>,
@@ -111,7 +112,7 @@ impl Handler {
     async fn handle_command(&self, command: Command) -> Result<()> {
         match command {
             Command::Get { key, tx } => {
-                let hash = match TableKey::try_from(key) {
+                let hash = match TableKey::try_from(key.as_slice()) {
                     Ok(hash) => hash,
                     Err(key) => {
                         tracing::error!("invalid key: {key:?}");
@@ -121,7 +122,15 @@ impl Handler {
                 };
                 match self.find_value(hash).await {
                     Ok(value) => {
-                        tx.send(Ok(value)).unwrap();
+                        let entry = TableEntry {
+                            prefix: TablePrefix::ContentRegistry,
+                            key,
+                            value: value.unwrap_or_default(),
+                            // Todo: make sure we keep track of source.
+                            source: NodeNetworkingPublicKey(rand::random()),
+                            signature: None,
+                        };
+                        tx.send(Ok(Some(entry))).unwrap();
                     },
                     Err(e) => {
                         tracing::error!("failed to find value: {e:?}");

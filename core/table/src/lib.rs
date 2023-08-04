@@ -1,10 +1,11 @@
 mod bootstrap;
-pub mod bucket;
-pub mod dht;
+mod bucket;
 mod distance;
-pub mod handler;
-pub mod lookup;
+mod handler;
+mod lookup;
 mod query;
 mod socket;
-pub(crate) mod table;
+mod table;
 mod task;
+
+pub mod dht;
