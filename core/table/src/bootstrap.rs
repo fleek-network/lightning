@@ -9,7 +9,7 @@ use crate::{
     bucket::{Node, MAX_BUCKETS},
     handler::Command,
     query::NodeInfo,
-    table::{TableKey, TableQuery},
+    table::TableQuery,
     task,
 };
 
@@ -23,15 +23,6 @@ pub enum State {
     Initial,
     Bootstrapping,
     Bootstrapped,
-}
-
-#[derive(Clone)]
-struct Bootstrap {
-    command_tx: Sender<Command>,
-    // Send queries to table server.
-    table_tx: Sender<TableQuery>,
-    boostrap_nodes: Vec<NodeInfo>,
-    local_key: NodeNetworkingPublicKey,
 }
 
 pub async fn start_server(

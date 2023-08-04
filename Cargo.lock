@@ -3968,6 +3968,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "fleek-crypto",
+ "futures",
  "lightning-interfaces",
  "rand 0.8.5",
  "serde",

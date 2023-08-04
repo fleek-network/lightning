@@ -22,7 +22,7 @@ use crate::{
     lookup::{LookupHandle, LookupResult, LookupTask},
     query::{Message, MessagePayload, NodeInfo, Query, Response},
     socket,
-    table::{self, TableKey, TableQuery},
+    table::{TableKey, TableQuery},
 };
 
 #[derive(Debug)]

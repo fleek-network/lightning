@@ -2,7 +2,10 @@ use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::Result;
 use fleek_crypto::NodeNetworkingPublicKey;
-use tokio::{net::UdpSocket, sync::mpsc};
+use tokio::{
+    net::UdpSocket,
+    sync::{mpsc, oneshot},
+};
 
 use crate::{bootstrap, bootstrap::Query, handler, handler::Command, query::NodeInfo, table};
 
@@ -25,7 +28,7 @@ impl Builder {
         self.node_key = Some(key);
     }
 
-    /// Set address to bind to.
+    /// Set address to bind the node's socket to.
     pub fn set_address(&mut self, address: SocketAddr) {
         self.address = Some(address);
     }
@@ -73,7 +76,81 @@ impl Builder {
     }
 }
 
+/// Maintains the DHT.
 pub struct Dht {
     handler_tx: mpsc::Sender<Command>,
     bootstrap_tx: mpsc::Sender<Query>,
+}
+
+impl Dht {
+    /// Return one value associated with the given key.
+    pub async fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+        let (tx, rx) = oneshot::channel();
+        if self
+            .handler_tx
+            .send(Command::Get {
+                key: key.to_vec(),
+                tx,
+            })
+            .await
+            .is_err()
+        {
+            tracing::error!("failed to send to handler task");
+        }
+        match rx.await {
+            Ok(value) => value.unwrap_or_else(|_| {
+                tracing::trace!("unexpected error when attempting to get {key:?}");
+                None
+            }),
+            Err(_) => {
+                tracing::error!("sender was dropped unexpectedly");
+                None
+            },
+        }
+    }
+
+    /// Put a key-value pair into the DHT.
+    pub fn put(&self, key: &[u8], value: &[u8]) {
+        // Todo: Maybe we should make `put` async.
+        futures::executor::block_on(async {
+            if self
+                .handler_tx
+                .send(Command::Put {
+                    key: key.to_vec(),
+                    value: value.to_vec(),
+                })
+                .await
+                .is_err()
+            {
+                tracing::error!("failed to send to handler task");
+            }
+        });
+    }
+
+    // Todo: Let's return a proper error to users.
+    /// Start bootstrap task.
+    pub async fn bootstrap(&self) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        if self.bootstrap_tx.send(Query::Start { tx }).await.is_err() {
+            tracing::error!("failed to send to bootstrap task");
+        }
+        if rx.await.unwrap_or(false) {
+            tracing::warn!("failed to start bootstrap");
+        }
+        Ok(())
+    }
+
+    /// Returns true if the node is bootstrapped and false otherwise.
+    pub async fn is_bootstrapped(&self) -> bool {
+        let (tx, rx) = oneshot::channel();
+        if self
+            .bootstrap_tx
+            .send(Query::DoneBootstrapping { tx })
+            .await
+            .is_err()
+        {
+            tracing::error!("failed to send to bootstrap task");
+        }
+        rx.await.unwrap_or(false)
+    }
 }

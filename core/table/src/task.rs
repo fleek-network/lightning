@@ -36,13 +36,14 @@ pub async fn closest_nodes(
 
 pub fn random_key_in_bucket(mut index: usize) -> NodeNetworkingPublicKey {
     let mut key: TableKey = rand::random();
-    for mut byte in key.iter_mut() {
+    for byte in key.iter_mut() {
         if index > 7 {
-            byte = &mut 0;
+            *byte = 0;
         } else {
-            byte = &mut ((*byte | 128u8) >> index as u8);
+            *byte = (*byte | 128u8) >> index as u8;
             break;
         }
+        index -= 8;
     }
     NodeNetworkingPublicKey(key)
 }
