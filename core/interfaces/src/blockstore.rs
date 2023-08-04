@@ -84,6 +84,10 @@ pub struct ContentChunk {
 /// we chunk first, and compress each chunk later for obvious technical reasons.
 #[async_trait]
 pub trait BlockStoreInterface: Clone + Send + Sync + ConfigConsumer {
+    // -- DYNAMIC TYPES
+    // empty
+
+    // -- BOUNDED TYPES
     /// The block store has the ability to use a smart pointer to avoid duplicating
     /// the same content multiple times in memory, this can be used for when multiple
     /// services want access to the same buffer of data.

@@ -22,9 +22,15 @@ pub type MempoolSocket = Socket<UpdateRequest, ()>;
 
 #[async_trait]
 pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
+    // -- DYNAMIC TYPES
+
     type QueryRunner: SyncQueryRunnerInterface;
-    type Certificate: LightningMessage + Clone;
+
     type PubSub: PubSub<Self::Certificate>;
+
+    // -- BOUNDED TYPES
+
+    type Certificate: LightningMessage + Clone;
 
     /// Create a new consensus service with the provided config and executor.
     async fn init<S: SignerInterface>(

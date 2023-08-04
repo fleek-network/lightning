@@ -50,6 +50,11 @@ pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
 pub trait ApplicationInterface:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
+    // -- DYNAMIC TYPES
+    // empty: Application layer does not need any generic.
+
+    // -- BOUNDED TYPES
+
     /// The type for the sync query executor.
     type SyncExecutor: SyncQueryRunnerInterface;
 

@@ -13,7 +13,11 @@ pub enum Notification {
 
 #[async_trait]
 pub trait NotifierInterface {
+    // -- DYNAMIC TYPES
     type SyncQuery: SyncQueryRunnerInterface;
+
+    // -- BOUNDED TYPES
+    // empty
 
     fn init(query_runner: Self::SyncQuery) -> Self;
 

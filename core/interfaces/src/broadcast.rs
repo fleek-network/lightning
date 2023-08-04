@@ -23,11 +23,20 @@ pub enum Topic {
     DistributedHashTable,
 }
 
+impl ink_quill::TranscriptBuilderInput for Topic {
+    const TYPE: &'static str = "TOPIC";
+
+    fn to_transcript_builder_input(&self) -> Vec<u8> {
+        let value = *self as u8;
+        vec![value]
+    }
+}
+
 /// The gossip system in Fleek Network implements the functionality of broadcasting
 /// messages to the rest of the nodes in the network.
 #[async_trait]
 pub trait BroadcastInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
-    // -- Generic types
+    // -- DYNAMIC TYPES
 
     /// The implementation of the topology algorithm in use.
     type Topology: TopologyInterface;
@@ -41,7 +50,7 @@ pub trait BroadcastInterface: WithStartAndShutdown + ConfigConsumer + Sized + Se
     /// The networking connection pool.
     type ConnectionPool: ConnectionPoolInterface;
 
-    // -- Implementation
+    // -- BOUNDED TYPES
 
     /// The message type to be encoded/decoded for networking.
     type Message: LightningMessage;
