@@ -3,6 +3,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use lightning_schema::LightningMessage;
+use derive_more::IsVariant;
+use serde::{Serialize, Deserialize};
 
 use crate::{
     signer::SignerInterface, topology::TopologyInterface, ConfigConsumer, ConnectionPoolInterface,
@@ -11,6 +13,9 @@ use crate::{
 
 /// Numerical value for different gossip topics used by Fleek Network.
 // New topics can be added as the system grows.
+#[derive(
+    Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Serialize, Deserialize, IsVariant,
+)]
 pub enum Topic {
     /// The gossip topic for
     Consensus,
