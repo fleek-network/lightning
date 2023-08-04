@@ -25,21 +25,7 @@ use crate::{
     table::{TableKey, TableQuery},
 };
 
-#[derive(Debug)]
-pub enum Command {
-    Get {
-        key: Vec<u8>,
-        tx: oneshot::Sender<Result<Option<Vec<u8>>, ()>>,
-    },
-    Put {
-        key: Vec<u8>,
-        value: Vec<u8>,
-    },
-    FindNode {
-        target: NodeNetworkingPublicKey,
-        tx: oneshot::Sender<Result<Vec<NodeInfo>, ()>>,
-    },
-}
+pub const NO_REPLY_CHANNEL_ID: u64 = 0;
 
 pub async fn start_server(
     mut command_rx: Receiver<Command>,
@@ -81,6 +67,22 @@ pub async fn start_server(
             }
         }
     }
+}
+
+#[derive(Debug)]
+pub enum Command {
+    Get {
+        key: Vec<u8>,
+        tx: oneshot::Sender<Result<Option<Vec<u8>>, ()>>,
+    },
+    Put {
+        key: Vec<u8>,
+        value: Vec<u8>,
+    },
+    FindNode {
+        target: NodeNetworkingPublicKey,
+        tx: oneshot::Sender<Result<Vec<NodeInfo>, ()>>,
+    },
 }
 
 #[derive(Clone)]
@@ -134,9 +136,7 @@ impl Handler {
                 let message = Message {
                     id: 0,
                     sender_key: self.node_id,
-                    // Todo: Store handlers do not need this.
-                    // Maybe we make it optional?
-                    channel_id: 0,
+                    channel_id: NO_REPLY_CHANNEL_ID,
                     payload: MessagePayload::Query(Query::Store {
                         key: table_key,
                         value,
@@ -234,7 +234,7 @@ impl Handler {
     async fn find_node(&self, target: TableKey) -> Result<Vec<NodeInfo>> {
         let (task_tx, task_rx) = mpsc::channel(1000000);
         // Todo: Randomly generate id/breadcrumb. Check if it exists.
-        let channel_id = 0;
+        let channel_id = rand::random();
         let task = LookupTask::new(
             channel_id,
             false,
@@ -260,8 +260,7 @@ impl Handler {
 
     async fn find_value(&self, target: TableKey) -> Result<Option<Vec<u8>>> {
         let (task_tx, task_rx) = mpsc::channel(1000000);
-        // Todo: Randomly generate id/breadcrumb. Check if it exists.
-        let channel_id = 0;
+        let channel_id = rand::random();
         let task = LookupTask::new(
             channel_id,
             true,

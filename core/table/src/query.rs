@@ -14,6 +14,9 @@ pub struct NodeInfo {
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Query {
     Find { find_value: bool, target: TableKey },
+    // Todo: This may not fit on a datagram
+    // but we will delegate this task to an
+    // encrypted channel.
     Store { key: TableKey, value: Vec<u8> },
     Ping,
 }
