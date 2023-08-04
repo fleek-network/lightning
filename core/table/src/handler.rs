@@ -43,12 +43,10 @@ pub enum Command {
 
 pub async fn start_server(
     mut command_rx: Receiver<Command>,
+    table_tx: Sender<TableQuery>,
     socket: Arc<UdpSocket>,
     local_key: NodeNetworkingPublicKey,
 ) {
-    // Todo: Make configurable.
-    let (table_tx, table_rx) = mpsc::channel(10000);
-    task::spawn(table::start_server(table_rx, local_key));
     let main_handler = Handler::new(socket.clone(), table_tx, local_key);
     loop {
         let handler = main_handler.clone();

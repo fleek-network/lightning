@@ -1,5 +1,6 @@
 mod bootstrap;
 pub mod bucket;
+pub mod dht;
 mod distance;
 pub mod handler;
 pub mod lookup;
