@@ -20,7 +20,7 @@ pub mod broadcast;
 pub mod dht;
 
 /// Any networking message that can be serialized and deserialized.
-pub trait LightningMessage: Sized {
+pub trait LightningMessage: Sized + Send + Sync {
     /// Decode the message. Returns an error if we can't deserialize.
     fn decode(buffer: &[u8]) -> anyhow::Result<Self>;
 
@@ -31,7 +31,7 @@ pub trait LightningMessage: Sized {
 /// A marker type which enables auto implementation for serde serialize and deserialize. This
 /// allows us to skip the auto-trait implementation in case we prefer a custom serialization
 /// for a single type. But any other type should have the `impl AutoImplSerde for T`.
-pub trait AutoImplSerde: Serialize + for<'a> Deserialize<'a> + Sized {}
+pub trait AutoImplSerde: Serialize + for<'a> Deserialize<'a> + Send + Sync + Sized {}
 
 // Auto implement the lighting message for any serde type using flex buffer.
 // This is to allow us to move forward without a fixed schema for the time being and to

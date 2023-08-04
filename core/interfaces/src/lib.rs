@@ -43,3 +43,7 @@ pub use rpc::*;
 pub use service::*;
 pub use signer::*;
 pub use topology::*;
+
+// Re-export schema.
+#[rustfmt::skip]
+pub use lightning_schema as schema;

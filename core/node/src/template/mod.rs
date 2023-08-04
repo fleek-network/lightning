@@ -4,4 +4,5 @@ pub mod fs;
 pub mod indexer;
 pub mod origin;
 pub mod pod;
+pub mod pool;
 pub mod topology;
