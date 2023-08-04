@@ -1,12 +1,8 @@
-
-
 use anyhow::{anyhow, Result};
 use fleek_crypto::NodeNetworkingPublicKey;
-use tokio::{
-    sync::{
-        mpsc::{Receiver, Sender},
-        oneshot,
-    },
+use tokio::sync::{
+    mpsc::{Receiver, Sender},
+    oneshot,
 };
 
 use crate::{
@@ -14,6 +10,7 @@ use crate::{
     handler::Command,
     query::NodeInfo,
     table::{TableKey, TableQuery},
+    task,
 };
 
 pub enum Query {
@@ -57,10 +54,12 @@ pub async fn start_server(
                             table_tx.clone(),
                             &bootstrap_nodes,
                             local_key,
-                        ).await {
+                        )
+                        .await
+                        {
                             Ok(()) => {
                                 state = State::Bootstrapped;
-                            }
+                            },
                             Err(e) => tracing::error!("failed to start bootstrapping: {e}"),
                         }
                     }
@@ -96,7 +95,7 @@ async fn bootstrap(
     }
 
     let mut target = local_key;
-    closest_nodes(target, command_tx.clone(), table_tx.clone()).await?;
+    task::closest_nodes(target, command_tx.clone(), table_tx.clone()).await?;
 
     let (tx, rx) = oneshot::channel();
     table_tx
@@ -108,41 +107,10 @@ async fn bootstrap(
         .ok_or_else(|| anyhow!("failed to find next bucket"))?;
 
     while index < MAX_BUCKETS {
-        target = random_key_in_bucket(index);
-        closest_nodes(target, command_tx.clone(), table_tx.clone()).await?;
+        target = task::random_key_in_bucket(index);
+        task::closest_nodes(target, command_tx.clone(), table_tx.clone()).await?;
         index += 1
     }
 
     Ok(())
-}
-
-pub async fn closest_nodes(
-    target: NodeNetworkingPublicKey,
-    command_tx: Sender<Command>,
-    table_tx: Sender<TableQuery>,
-) -> Result<()> {
-    let (tx, rx) = oneshot::channel();
-    command_tx.send(Command::FindNode { target, tx }).await?;
-    let nodes = rx.await?.unwrap();
-
-    for node in nodes {
-        let (tx, rx) = oneshot::channel();
-        table_tx
-            .send(TableQuery::AddNode {
-                node: Node { info: node },
-                tx,
-            })
-            .await
-            .unwrap();
-        if let Ok(Err(e)) = rx.await {
-            tracing::error!("unexpected error while querying table: {e:?}");
-        }
-    }
-
-    Ok(())
-}
-
-fn random_key_in_bucket(_: usize) -> NodeNetworkingPublicKey {
-    let key: TableKey = rand::random();
-    NodeNetworkingPublicKey(key)
 }

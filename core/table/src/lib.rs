@@ -6,3 +6,4 @@ pub mod lookup;
 mod query;
 mod socket;
 pub(crate) mod table;
+mod task;
