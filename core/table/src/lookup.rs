@@ -70,10 +70,11 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                 .closest_nodes
                 .pickout(MAX_BUCKET_SIZE, 3, |node| node.status == Status::Initial)
             {
+                let id = rand::random();
                 let message = Message {
                     // Todo: Generate random transaction ID.
                     // Todo: We need to validate that the response sends this value.
-                    id: 0,
+                    id,
                     channel_id: lookup.id,
                     sender_key: lookup.local_key,
                     payload: MessagePayload::Query(Query::Find {
@@ -85,7 +86,13 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                 socket::send_to(&lookup.socket, bytes.as_slice(), node.inner.address)
                     .await
                     .unwrap();
-                pending.insert(node.inner.key, node.inner);
+                pending.insert(
+                    node.inner.key,
+                    PendingResponse {
+                        node: node.inner,
+                        id,
+                    },
+                );
             }
             if !pending.is_empty() {
                 // We have found closer nodes so we start another round.
@@ -112,12 +119,28 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
             }
             // Incoming K nodes from peers.
             message = lookup.main_rx.recv() => {
-                let (sender_key, response) = message.unwrap();
+                let response_event = message.unwrap();
+                let sender_key = response_event.sender_key;
+                let response_id = response_event.id;
+                let response = response_event.response;
                 if pending.contains_key(&sender_key) || late.contains_key(&sender_key) {
+                    // Validate id in response.
+                    let expected_id = match pending.get(&sender_key) {
+                        Some(pending) => pending.id,
+                        None => late.get(&sender_key).unwrap().id,
+                    };
+
+                    // If the id does not match, we ignore this response.
+                    if expected_id != response_id {
+                        tracing::trace!("expected id {expected_id} but received instead {response_id}");
+                        continue;
+                    }
+
                     // If this is look up is a find a value, we check if the value is in the response.
                     if lookup.find_value_lookup && response.value.is_some() {
                         return Ok(LookupResult::Value(response.value));
                     }
+
                     let nodes = response
                         .nodes
                         .into_iter()
@@ -137,8 +160,8 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
 
                     // Remove sender from pending list.
                     let node = match pending.remove(&sender_key) {
-                        Some(node) => node,
-                        None => late.remove(&sender_key).unwrap(),
+                        Some(pending) => pending.node,
+                        None => late.remove(&sender_key).unwrap().node,
                     };
 
                     // Put this node back to closest nodes list.
@@ -175,7 +198,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
 pub struct LookUpError(String);
 
 #[derive(Clone)]
-pub struct LookupHandle(pub Sender<(NodeNetworkingPublicKey, Response)>);
+pub struct LookupHandle(pub Sender<ResponseEvent>);
 
 pub struct LookupTask {
     // Task identifier.
@@ -190,8 +213,8 @@ pub struct LookupTask {
     target: TableKey,
     // Send queries to table server.
     table_tx: Sender<TableQuery>,
-    // Receive messages from server.
-    main_rx: Receiver<(NodeNetworkingPublicKey, Response)>,
+    // Receive events about responses received from the network.
+    main_rx: Receiver<ResponseEvent>,
     // Socket to send queries over the network.
     socket: Arc<UdpSocket>,
 }
@@ -203,7 +226,7 @@ impl LookupTask {
         local_key: NodeNetworkingPublicKey,
         target: TableKey,
         table_tx: Sender<TableQuery>,
-        main_rx: Receiver<(NodeNetworkingPublicKey, Response)>,
+        main_rx: Receiver<ResponseEvent>,
         socket: Arc<UdpSocket>,
     ) -> Self {
         Self {
@@ -294,4 +317,15 @@ pub struct LookupNode {
 pub enum LookupResult {
     Nodes(Vec<NodeInfo>),
     Value(Option<Vec<u8>>),
+}
+
+struct PendingResponse {
+    node: NodeInfo,
+    id: u64,
+}
+
+pub struct ResponseEvent {
+    pub id: u64,
+    pub sender_key: NodeNetworkingPublicKey,
+    pub response: Response,
 }

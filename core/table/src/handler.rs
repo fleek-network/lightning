@@ -19,7 +19,7 @@ use tokio::{
 
 use crate::{
     lookup,
-    lookup::{LookupHandle, LookupResult, LookupTask},
+    lookup::{LookupHandle, LookupResult, LookupTask, ResponseEvent},
     query::{Message, MessagePayload, NodeInfo, Query, Response},
     socket,
     table::{TableKey, TableQuery},
@@ -134,7 +134,7 @@ impl Handler {
                 let nodes = self.find_node(table_key).await?;
                 // Todo: Add sender information in message.
                 let message = Message {
-                    id: 0,
+                    id: rand::random(),
                     sender_key: self.node_id,
                     channel_id: NO_REPLY_CHANNEL_ID,
                     payload: MessagePayload::Query(Query::Store {
@@ -204,7 +204,15 @@ impl Handler {
                     },
                     Some(handle) => handle.0.clone(),
                 };
-                if task_tx.send((sender_key, response)).await.is_err() {
+                if task_tx
+                    .send(ResponseEvent {
+                        id: message_id,
+                        sender_key,
+                        response,
+                    })
+                    .await
+                    .is_err()
+                {
                     tracing::error!("failed to send response to task")
                 }
             },

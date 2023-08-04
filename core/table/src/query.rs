@@ -39,6 +39,8 @@ pub struct Message {
     pub payload: MessagePayload,
 }
 
+// Todo: Create some chunking strategy
+// to avoid sending datagrams larger than 512.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Response {
     pub nodes: Vec<NodeInfo>,
