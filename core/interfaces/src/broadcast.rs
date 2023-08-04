@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use lightning_schema::LightningMessage;
 use derive_more::IsVariant;
-use serde::{Serialize, Deserialize};
+use lightning_schema::LightningMessage;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     signer::SignerInterface, topology::TopologyInterface, ConfigConsumer, ConnectionPoolInterface,
