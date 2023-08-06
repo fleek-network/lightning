@@ -6,6 +6,7 @@ pub mod compression;
 pub mod config;
 pub mod connection;
 pub mod consensus;
+pub mod dht;
 pub mod handshake;
 pub mod node;
 pub mod notifier;
@@ -16,7 +17,6 @@ pub mod reputation;
 pub mod rpc;
 pub mod service;
 pub mod signer;
-pub mod dht;
 pub mod topology;
 pub mod types;
 

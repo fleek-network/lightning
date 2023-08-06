@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use fleek_crypto::NodeNetworkingPublicKey;
 use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::{
-    dht::{TableEntry, DHTInterface, TablePrefix},
+    dht::{DHTInterface, TableEntry, TablePrefix},
     SignerInterface, WithStartAndShutdown,
 };
 use lightning_topology::Topology;
