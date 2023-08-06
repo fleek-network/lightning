@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use fleek_crypto::NodeNetworkingPublicKey;
 use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::{
-    dht::{DHTInterface, TableEntry, TablePrefix},
+    dht::{DhtInterface, TableEntry, TablePrefix},
     SignerInterface, WithStartAndShutdown,
 };
 use lightning_topology::Topology;
@@ -180,7 +180,7 @@ impl WithStartAndShutdown for Dht {
 
 // Todo: Rename interface.
 #[async_trait]
-impl DHTInterface for Dht {
+impl DhtInterface for Dht {
     type Topology = Topology<QueryRunner>;
 
     async fn init<S: SignerInterface>(_: &S, _: Arc<Self::Topology>) -> Result<Self> {
