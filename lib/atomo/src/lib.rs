@@ -2,7 +2,7 @@
 //! wrapper that enhances any backend storage engine with an optimized snapshot
 //! functionality.
 
-mod batch;
+pub mod batch;
 mod builder;
 mod db;
 mod inner;
@@ -10,15 +10,13 @@ mod key_iterator;
 mod keys;
 mod serder;
 mod snapshot;
+pub mod storage;
 mod table;
 
 pub type DefaultSerdeBackend = serder::BincodeSerde;
 
 pub use builder::AtomoBuilder;
 pub use db::{Atomo, QueryPerm, UpdatePerm};
-#[cfg(fuzz)]
-#[doc(hidden)]
-pub use inner::AtomoInner;
 pub use key_iterator::KeyIterator;
 pub use serder::{BincodeSerde, SerdeBackend};
 pub use table::{ResolvedTableReference, TableRef, TableSelector};

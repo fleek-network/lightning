@@ -54,14 +54,14 @@ impl VerticalBatch {
     /// 1. The index is only claimed once.
     /// 2. The reference's lifetime is bounded to this [`VerticalBatch`].
     #[inline(always)]
-    pub unsafe fn claim(&self, index: usize) -> BatchReference {
+    pub(crate) unsafe fn claim(&self, index: usize) -> BatchReference {
         let x = self.0.get_unchecked(index) as *const BatchHashMap as *mut BatchHashMap;
         BatchReference(x)
     }
 }
 
 /// The reference to a single batch slot.
-pub struct BatchReference(*mut BatchHashMap);
+pub(crate) struct BatchReference(*mut BatchHashMap);
 
 impl BatchReference {
     #[inline(always)]
