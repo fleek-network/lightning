@@ -43,6 +43,7 @@ pub trait LightningTypes: Send + Sync {
     >;
     type ConnectionPool: ConnectionPoolInterface<
         QueryRunner = <Self::Application as ApplicationInterface>::SyncExecutor,
+        Signer = Self::Signer,
     >;
 }
 
@@ -81,7 +82,11 @@ impl<T: LightningTypes> Node<T> {
 
         let notifier = T::Notifier::init(application.sync_query());
 
-        let connection_pool = T::ConnectionPool::init(configuration.get::<T::ConnectionPool>());
+        let connection_pool = T::ConnectionPool::init(
+            configuration.get::<T::ConnectionPool>(),
+            &signer,
+            application.sync_query(),
+        );
         let broadcast_pool = connection_pool.bind(ServiceScope::Broadcast);
 
         let broadcast = T::Broadcast::init(

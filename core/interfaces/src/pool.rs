@@ -4,7 +4,7 @@ use fleek_crypto::NodePublicKey;
 use lightning_schema::LightningMessage;
 use serde::{Deserialize, Serialize};
 
-use crate::{ConfigConsumer, SyncQueryRunnerInterface, WithStartAndShutdown};
+use crate::{ConfigConsumer, SignerInterface, SyncQueryRunnerInterface, WithStartAndShutdown};
 
 /// The protocol pre-defined connection scopes.
 // Feel free to add more variant to the end on a need-to-have basis.
@@ -44,6 +44,8 @@ pub trait ConnectionPoolInterface:
     /// to this connection pool. Should be a generic on this implementation.
     type QueryRunner: SyncQueryRunnerInterface;
 
+    type Signer: SignerInterface;
+
     // -- BOUNDED TYPES
     // The existence of Sender/Receiver at this layer and the link back to this connection
     // pool from listener and connector is to force the listener and connector to use the
@@ -62,7 +64,7 @@ pub trait ConnectionPoolInterface:
     type Receiver<T: LightningMessage>: ReceiverInterface<T>;
 
     /// Initialize the pool with the given configuration.
-    fn init(config: Self::Config) -> Self;
+    fn init(config: Self::Config, signer: &Self::Signer, query_runner: Self::QueryRunner) -> Self;
 
     /// Provide ownership to an scope in the connection pool.
     ///
@@ -75,6 +77,7 @@ pub trait ConnectionPoolInterface:
 }
 
 /// The connector can be used to connect to other peers under the scope.
+#[async_trait]
 pub trait ConnectorInterface<T>: Send + Sync + Sized + Clone
 where
     T: LightningMessage,
@@ -84,7 +87,7 @@ where
 
     /// Create a new connection to the peer with the provided public key. Should return [`None`]
     /// if the connection pool is shutting down.
-    fn connect(&self, to: &NodePublicKey) -> Option<SenderReceiver<Self::ConnectionPool, T>>;
+    async fn connect(&self, to: &NodePublicKey) -> Option<SenderReceiver<Self::ConnectionPool, T>>;
 }
 
 /// The listener object
@@ -94,7 +97,7 @@ where
 /// The implementation of this struct has to provide a custom [`Drop`] implementation
 /// in order to free the scope. So that successive calls to `bind` can succeed.
 #[async_trait]
-pub trait ListenerInterface<T>
+pub trait ListenerInterface<T>: Send
 where
     T: LightningMessage,
 {
@@ -127,7 +130,7 @@ where
     /// # Shutdown behavior
     ///
     /// If we are shutting down this function should return `false`.
-    async fn send(&self, msg: &T) -> bool;
+    async fn send(&self, msg: T) -> bool;
 }
 
 /// The scoped receiver owns an entire scope to itself and allows the holder to
