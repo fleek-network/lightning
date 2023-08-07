@@ -34,5 +34,5 @@ impl LightningTypes for FinalTypes {
     type Handshake = TcpHandshakeServer;
     type Topology = Topology<QueryRunner>;
     type Broadcast = Broadcast<QueryRunner, Signer, Topology<QueryRunner>, Notifier>;
-    type ConnectionPool = ConnectionPool<QueryRunner>;
+    type ConnectionPool = ConnectionPool<QueryRunner, Signer>;
 }

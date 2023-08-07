@@ -3,23 +3,23 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 use lightning_interfaces::{
     schema::LightningMessage, ConfigConsumer, ConnectionPoolInterface, ConnectorInterface,
-    ListenerInterface, ReceiverInterface, SenderInterface, SenderReceiver,
+    ListenerInterface, ReceiverInterface, SenderInterface, SenderReceiver, SignerInterface,
     SyncQueryRunnerInterface, WithStartAndShutdown,
 };
 
 use super::config::Config;
 
-pub struct ConnectionPool<Q: SyncQueryRunnerInterface> {
-    _q: PhantomData<Q>,
+pub struct ConnectionPool<Q: SyncQueryRunnerInterface, S: SignerInterface> {
+    _q: PhantomData<(Q, S)>,
 }
 
 #[derive(Debug)]
-pub struct Connector<Q: SyncQueryRunnerInterface, T> {
+pub struct Connector<Q: SyncQueryRunnerInterface, S: SignerInterface, T> {
     _q: PhantomData<Q>,
-    _x: PhantomData<T>,
+    _x: PhantomData<(S, T)>,
 }
 
-impl<Q: SyncQueryRunnerInterface, T> Clone for Connector<Q, T> {
+impl<Q: SyncQueryRunnerInterface, S: SignerInterface, T> Clone for Connector<Q, S, T> {
     fn clone(&self) -> Self {
         Self {
             _q: self._q,
@@ -28,9 +28,9 @@ impl<Q: SyncQueryRunnerInterface, T> Clone for Connector<Q, T> {
     }
 }
 
-pub struct Listener<Q: SyncQueryRunnerInterface, T> {
+pub struct Listener<Q: SyncQueryRunnerInterface, S: SignerInterface, T> {
     _q: PhantomData<Q>,
-    _x: PhantomData<T>,
+    _x: PhantomData<(S, T)>,
 }
 
 pub struct Receiver<T> {
@@ -41,12 +41,15 @@ pub struct Sender<T> {
     _x: PhantomData<T>,
 }
 
-impl<Q: SyncQueryRunnerInterface> ConnectionPoolInterface for ConnectionPool<Q> {
+impl<Q: SyncQueryRunnerInterface, S: SignerInterface> ConnectionPoolInterface
+    for ConnectionPool<Q, S>
+{
     type QueryRunner = Q;
+    type Signer = S;
 
-    type Connector<T: LightningMessage> = Connector<Q, T>;
+    type Connector<T: LightningMessage> = Connector<Q, S, T>;
 
-    type Listener<T: LightningMessage> = Listener<Q, T>;
+    type Listener<T: LightningMessage> = Listener<Q, S, T>;
 
     /// The sender struct used across the sender and connector.
     type Sender<T: LightningMessage> = Sender<T>;
@@ -54,7 +57,11 @@ impl<Q: SyncQueryRunnerInterface> ConnectionPoolInterface for ConnectionPool<Q> 
     /// The receiver struct used across the sender and connector.
     type Receiver<T: LightningMessage> = Receiver<T>;
 
-    fn init(_config: Self::Config) -> Self {
+    fn init(
+        _config: Self::Config,
+        _signer: &Self::Signer,
+        _query_runner: Self::QueryRunner,
+    ) -> Self {
         Self { _q: PhantomData }
     }
 
@@ -78,14 +85,16 @@ impl<Q: SyncQueryRunnerInterface> ConnectionPoolInterface for ConnectionPool<Q> 
     }
 }
 
-impl<Q: SyncQueryRunnerInterface> ConfigConsumer for ConnectionPool<Q> {
+impl<Q: SyncQueryRunnerInterface, S: SignerInterface> ConfigConsumer for ConnectionPool<Q, S> {
     const KEY: &'static str = "connection-pool";
 
     type Config = Config;
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface> WithStartAndShutdown for ConnectionPool<Q> {
+impl<Q: SyncQueryRunnerInterface, S: SignerInterface> WithStartAndShutdown
+    for ConnectionPool<Q, S>
+{
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         true
@@ -99,10 +108,13 @@ impl<Q: SyncQueryRunnerInterface> WithStartAndShutdown for ConnectionPool<Q> {
     async fn shutdown(&self) {}
 }
 
-impl<Q: SyncQueryRunnerInterface, T: LightningMessage> ConnectorInterface<T> for Connector<Q, T> {
-    type ConnectionPool = ConnectionPool<Q>;
+#[async_trait]
+impl<Q: SyncQueryRunnerInterface, S: SignerInterface, T: LightningMessage> ConnectorInterface<T>
+    for Connector<Q, S, T>
+{
+    type ConnectionPool = ConnectionPool<Q, S>;
 
-    fn connect(
+    async fn connect(
         &self,
         _to: &fleek_crypto::NodePublicKey,
     ) -> Option<lightning_interfaces::SenderReceiver<Self::ConnectionPool, T>> {
@@ -111,8 +123,10 @@ impl<Q: SyncQueryRunnerInterface, T: LightningMessage> ConnectorInterface<T> for
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface, T: LightningMessage> ListenerInterface<T> for Listener<Q, T> {
-    type ConnectionPool = ConnectionPool<Q>;
+impl<Q: SyncQueryRunnerInterface, S: SignerInterface, T: LightningMessage> ListenerInterface<T>
+    for Listener<Q, S, T>
+{
+    type ConnectionPool = ConnectionPool<Q, S>;
 
     async fn accept(&mut self) -> Option<SenderReceiver<Self::ConnectionPool, T>> {
         None
@@ -125,7 +139,7 @@ impl<T: LightningMessage> SenderInterface<T> for Sender<T> {
         &fleek_crypto::NodePublicKey([0; 96])
     }
 
-    async fn send(&self, _msg: &T) -> bool {
+    async fn send(&self, _msg: T) -> bool {
         false
     }
 }

@@ -63,7 +63,7 @@ impl<
 
     type PubSub<T: Clone + LightningMessage> = MockPubSub<T>;
 
-    type ConnectionPool = ConnectionPool<Q>;
+    type ConnectionPool = ConnectionPool<Q, S>;
     type Message = ();
 
     /// Initialize the gossip system with the config and the topology object..
