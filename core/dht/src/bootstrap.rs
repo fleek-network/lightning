@@ -7,10 +7,9 @@ use tokio::sync::{
 
 use crate::{
     bucket::{Node, MAX_BUCKETS},
-    handler::Command,
+    handler::Task,
     query::NodeInfo,
-    table::TableQuery,
-    task,
+    table::{TableKey, TableQuery},
 };
 
 pub enum Query {
@@ -25,10 +24,10 @@ pub enum State {
     Bootstrapped,
 }
 
-pub async fn start_server(
+pub async fn start_worker(
     mut server_rx: Receiver<Query>,
     table_tx: Sender<TableQuery>,
-    command_tx: Sender<Command>,
+    command_tx: Sender<Task>,
     local_key: NodeNetworkingPublicKey,
     bootstrap_nodes: Vec<NodeInfo>,
 ) {
@@ -38,7 +37,9 @@ pub async fn start_server(
             match message {
                 Query::Start { tx } => {
                     if state == State::Bootstrapping {
-                        tx.send(false).unwrap();
+                        if tx.send(false).is_err() {
+                            tracing::error!("bootstrap client dropped the channel");
+                        }
                     } else {
                         match bootstrap(
                             command_tx.clone(),
@@ -66,7 +67,7 @@ pub async fn start_server(
 }
 
 async fn bootstrap(
-    command_tx: Sender<Command>,
+    command_tx: Sender<Task>,
     table_tx: Sender<TableQuery>,
     boostrap_nodes: &[NodeInfo],
     local_key: NodeNetworkingPublicKey,
@@ -79,29 +80,76 @@ async fn bootstrap(
                 tx,
             })
             .await
-            .unwrap();
-        if let Ok(Err(e)) = rx.await {
+            .expect("table worker not to drop channel");
+        if let Err(e) = rx.await.expect("table worker not to drop channel") {
             tracing::error!("unexpected error while querying table: {e:?}");
         }
     }
 
     let mut target = local_key;
-    task::closest_nodes(target, command_tx.clone(), table_tx.clone()).await?;
+    closest_nodes(target, command_tx.clone(), table_tx.clone()).await?;
 
     let (tx, rx) = oneshot::channel();
     table_tx
         .send(TableQuery::FirstNonEmptyBucket { tx })
         .await
-        .unwrap();
+        .expect("table worker not to drop channel");
     let mut index = rx
-        .await?
+        .await
+        .expect("table worker not to drop channel")
         .ok_or_else(|| anyhow!("failed to find next bucket"))?;
 
     while index < MAX_BUCKETS {
-        target = task::random_key_in_bucket(index);
-        task::closest_nodes(target, command_tx.clone(), table_tx.clone()).await?;
+        target = random_key_in_bucket(index);
+        closest_nodes(target, command_tx.clone(), table_tx.clone()).await?;
         index += 1
     }
 
     Ok(())
+}
+
+pub async fn closest_nodes(
+    target: NodeNetworkingPublicKey,
+    command_tx: Sender<Task>,
+    table_tx: Sender<TableQuery>,
+) -> Result<()> {
+    let (tx, rx) = oneshot::channel();
+    command_tx
+        .send(Task::FindNode { target, tx })
+        .await
+        .expect("dispatcher worker not to drop channel");
+    let nodes = rx
+        .await
+        .expect("dispatcher worker not to drop channel")
+        .map_err(|_| anyhow!("failed to get closest nodes to {target:?}"))?;
+
+    for node in nodes {
+        let (tx, rx) = oneshot::channel();
+        table_tx
+            .send(TableQuery::AddNode {
+                node: Node { info: node },
+                tx,
+            })
+            .await
+            .expect("table worker not to drop channel");
+        if let Err(e) = rx.await.expect("table worker not to drop channel") {
+            tracing::error!("unexpected error while querying table: {e:?}");
+        }
+    }
+
+    Ok(())
+}
+
+pub fn random_key_in_bucket(mut index: usize) -> NodeNetworkingPublicKey {
+    let mut key: TableKey = rand::random();
+    for byte in key.iter_mut() {
+        if index > 7 {
+            *byte = 0;
+        } else {
+            *byte = (*byte | 128u8) >> index as u8;
+            break;
+        }
+        index -= 8;
+    }
+    NodeNetworkingPublicKey(key)
 }

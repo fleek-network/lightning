@@ -14,21 +14,19 @@ use crate::{
 
 pub type TableKey = Blake3Hash;
 
-pub async fn start_server(mut rx: Receiver<TableQuery>, local_key: NodeNetworkingPublicKey) {
+pub async fn start_worker(mut rx: Receiver<TableQuery>, local_key: NodeNetworkingPublicKey) {
     let mut table = Table::new(local_key);
     while let Some(query) = rx.recv().await {
         match query {
             TableQuery::ClosestNodes { target: key, tx } => {
                 let nodes = table.closest_nodes(&key);
-                if tx.send(Ok(nodes)).is_err() {
-                    tracing::error!("failed to send Table query response")
-                }
+                tx.send(Ok(nodes))
+                    .expect("internal table client not to drop the channel");
             },
             TableQuery::AddNode { node, tx } => {
                 let nodes = table.add_node(node).map_err(|e| QueryError(e.to_string()));
-                if tx.send(nodes).is_err() {
-                    tracing::error!("failed to send Table query response")
-                }
+                tx.send(nodes)
+                    .expect("internal table client not to drop the channel");
             },
             TableQuery::FirstNonEmptyBucket { tx } => {
                 let local_key = table.local_node_key;
@@ -36,14 +34,12 @@ pub async fn start_server(mut rx: Receiver<TableQuery>, local_key: NodeNetworkin
                 match &closest.first() {
                     Some(node) => {
                         let index = distance::leading_zero_bits(&node.key.0, &local_key.0);
-                        if tx.send(Some(index)).is_err() {
-                            tracing::error!("failed to send ondex of next bucket")
-                        }
+                        tx.send(Some(index))
+                            .expect("internal table client not to drop the channel");
                     },
                     None => {
-                        if tx.send(None).is_err() {
-                            tracing::error!("failed to send ondex of next bucket")
-                        }
+                        tx.send(None)
+                            .expect("internal table client not to drop the channel");
                     },
                 }
             },

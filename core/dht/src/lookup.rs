@@ -36,10 +36,10 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
         .table_tx
         .send(table_query)
         .await
-        .expect("Table to not drop the channel");
+        .expect("table worker not to drop the channel");
     let nodes = rx
         .await
-        .map_err(|e| LookUpError(e.to_string()))?
+        .expect("table worker not to drop the channel")
         .map_err(|e| {
             tracing::error!("failed to get closest nodes: {e:?}");
             LookUpError(e.to_string())
@@ -75,7 +75,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                     find_value: lookup.find_value_lookup,
                     target: lookup.target,
                 })
-                .expect("Serialization to succeed");
+                .expect("Query to be valid");
                 let message = Message {
                     // Todo: Generate random transaction ID.
                     // Todo: We need to validate that the response sends this value.
@@ -85,10 +85,10 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                     sender_key: lookup.local_key,
                     payload,
                 };
-                let bytes = bincode::serialize(&message).unwrap();
+                let bytes = bincode::serialize(&message).expect("query to be valid");
                 socket::send_to(&lookup.socket, bytes.as_slice(), node.inner.address)
                     .await
-                    .unwrap();
+                    .map_err(|e| LookUpError(e.to_string()))?;
                 pending.insert(
                     node.inner.key,
                     PendingResponse {
@@ -122,7 +122,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
             }
             // Incoming K nodes from peers.
             message = lookup.main_rx.recv() => {
-                let response_event = message.unwrap();
+                let response_event = message.expect("dispatcher worker not to drop the channel");
                 let sender_key = response_event.sender_key;
                 let response_id = response_event.id;
                 let response = response_event.response;
@@ -130,6 +130,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                     // Validate id in response.
                     let expected_id = match pending.get(&sender_key) {
                         Some(pending) => pending.id,
+                        // It's fine to use unwrap here because of the of condition.
                         None => late.get(&sender_key).unwrap().id,
                     };
 
@@ -164,6 +165,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                     // Remove sender from pending list.
                     let node = match pending.remove(&sender_key) {
                         Some(pending) => pending.node,
+                        // It's fine to use unwrap here because of the of condition.
                         None => late.remove(&sender_key).unwrap().node,
                     };
 
@@ -182,6 +184,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
         }
     }
 
+    // Close channel to indicate to dispatcher that this task is done.
     lookup.main_rx.close();
 
     if lookup.find_value_lookup {
@@ -201,9 +204,6 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
 #[derive(Debug, Error)]
 #[error("lookup procedure failed: {0}")]
 pub struct LookUpError(String);
-
-#[derive(Clone)]
-pub struct LookupHandle(pub Sender<ResponseEvent>);
 
 pub struct LookupTask {
     // Task identifier.

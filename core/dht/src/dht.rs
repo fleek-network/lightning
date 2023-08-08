@@ -14,7 +14,7 @@ use tokio::{
     sync::{mpsc, oneshot},
 };
 
-use crate::{bootstrap, bootstrap::Query, handler, handler::Command, query::NodeInfo, table};
+use crate::{bootstrap, bootstrap::Query, handler, handler::Task, query::NodeInfo, table};
 
 /// Builds the DHT.
 #[derive(Default)]
@@ -49,12 +49,13 @@ impl Builder {
     /// Build and initiates the DHT.
     pub async fn build(self) -> Result<Dht> {
         let buffer_size = self.buffer_size.unwrap_or(10_000);
+
         let node_key = self.node_key.unwrap_or_else(|| {
             tracing::warn!("generating random key");
             NodeNetworkingPublicKey(rand::random())
         });
         let (table_tx, table_rx) = mpsc::channel(buffer_size);
-        tokio::spawn(table::start_server(table_rx, node_key));
+        tokio::spawn(table::start_worker(table_rx, node_key));
 
         let address = self
             .address
@@ -69,7 +70,7 @@ impl Builder {
         ));
 
         let (bootstrap_tx, bootstrap_rx) = mpsc::channel(buffer_size);
-        tokio::spawn(bootstrap::start_server(
+        tokio::spawn(bootstrap::start_worker(
             bootstrap_rx,
             table_tx,
             handler_tx.clone(),
@@ -86,7 +87,7 @@ impl Builder {
 
 /// Maintains the DHT.
 pub struct Dht {
-    handler_tx: mpsc::Sender<Command>,
+    handler_tx: mpsc::Sender<Task>,
     bootstrap_tx: mpsc::Sender<Query>,
 }
 
@@ -96,7 +97,7 @@ impl Dht {
         let (tx, rx) = oneshot::channel();
         if self
             .handler_tx
-            .send(Command::Get {
+            .send(Task::Get {
                 key: key.to_vec(),
                 tx,
             })
@@ -123,7 +124,7 @@ impl Dht {
         futures::executor::block_on(async {
             if self
                 .handler_tx
-                .send(Command::Put {
+                .send(Task::Put {
                     key: key.to_vec(),
                     value: value.to_vec(),
                 })
