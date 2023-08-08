@@ -3,7 +3,7 @@ use std::sync::Arc;
 use futures::StreamExt;
 use futures_util::stream::FuturesOrdered;
 use lightning_interfaces::PubSub;
-use mysten_metrics::metered_channel;
+use mysten_metrics::{metered_channel, RegistryService};
 use narwhal_config::{Committee, Parameters, WorkerCache};
 use narwhal_consensus::{
     bullshark::Bullshark,
@@ -12,7 +12,7 @@ use narwhal_consensus::{
     Consensus,
 };
 use narwhal_executor::ExecutionState;
-use narwhal_node::{metrics::new_registry, NodeStorage};
+use narwhal_node::NodeStorage;
 use narwhal_primary::PrimaryChannelMetrics;
 use narwhal_types::{
     Certificate, CertificateAPI, CommittedSubDag, ConditionalBroadcastReceiver, ConsensusOutput,
@@ -40,13 +40,14 @@ impl EdgeConsensus {
         committee: Committee,
         worker_cache: WorkerCache,
         execution: Arc<Execution<P>>,
+        registry_service: RegistryService,
     ) -> Self {
         // Collect the handle to each tokio::spawn that happens.
         let mut handles = Vec::with_capacity(3);
 
         // Some metric stuff. Here we create a new empty registry for metrics since we don't
         // care about them at the moment.
-        let registry = new_registry();
+        let registry = registry_service.default_registry();
         let consensus_metrics = Arc::new(ConsensusMetrics::new(&registry));
         let channel_metrics = ChannelMetrics::new(&registry);
 

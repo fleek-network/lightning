@@ -37,6 +37,7 @@ use tokio::{
     sync::{Mutex, Notify},
     task, time,
 };
+use typed_store::DBMetrics;
 
 use crate::{
     config::Config,
@@ -246,8 +247,13 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         // Let the execution state know you are not on committee
         self.execution_state.set_committee_status(false);
 
-        let mut edge_service =
-            EdgeService::new(store, committee, worker_cache, self.pub_sub.clone());
+        let mut edge_service = EdgeService::new(
+            store,
+            committee,
+            worker_cache,
+            self.pub_sub.clone(),
+            self.narwhal_args.registry_service.clone(),
+        );
 
         edge_service.start(self.execution_state.clone()).await;
 
@@ -357,6 +363,11 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> ConsensusInterface for C
         query_runner: Q,
         pubsub: P,
     ) -> anyhow::Result<Self> {
+        // Spawn the registry for narwhal
+        let registry = Registry::new();
+        // Init the metrics for narwhal
+        DBMetrics::init(&registry);
+
         let (networking_sk, primary_sk) = signer.get_sk();
         let reconfigure_notify = Arc::new(Notify::new());
         let new_block_notify = Arc::new(Notify::new());
@@ -370,7 +381,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> ConsensusInterface for C
             primary_address: config.address,
             worker_address: config.worker_address,
             worker_mempool: config.mempool_address,
-            registry_service: RegistryService::new(Registry::new()),
+            registry_service: RegistryService::new(registry),
         };
         let execution_state = Arc::new(Execution::new(
             executor,

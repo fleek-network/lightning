@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use lightning_interfaces::PubSub;
+use mysten_metrics::RegistryService;
 use narwhal_config::{Committee, Parameters, WorkerCache};
 use narwhal_node::NodeStorage;
 
@@ -16,6 +17,7 @@ pub struct EdgeService<P: PubSub<PubSubMsg> + 'static> {
     worker_cache: Option<WorkerCache>,
     consensus: Option<EdgeConsensus>,
     pub_sub: P,
+    registry_service: Option<RegistryService>,
 }
 
 impl<P: PubSub<PubSubMsg> + 'static> EdgeService<P> {
@@ -24,6 +26,7 @@ impl<P: PubSub<PubSubMsg> + 'static> EdgeService<P> {
         committee: Committee,
         worker_cache: WorkerCache,
         pub_sub: P,
+        registry_service: RegistryService,
     ) -> Self {
         Self {
             store,
@@ -31,6 +34,7 @@ impl<P: PubSub<PubSubMsg> + 'static> EdgeService<P> {
             worker_cache: Some(worker_cache),
             consensus: None,
             pub_sub,
+            registry_service: Some(registry_service),
         }
     }
 
@@ -46,6 +50,9 @@ impl<P: PubSub<PubSubMsg> + 'static> EdgeService<P> {
                 .take()
                 .expect("Tried starting edge service before calling new"),
             state,
+            self.registry_service
+                .take()
+                .expect("Tried starting edge service before calling new"),
         );
 
         self.consensus = Some(consensus);
