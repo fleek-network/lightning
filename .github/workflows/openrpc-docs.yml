@@ -1,4 +1,4 @@
-name: OpenRPC (Build & Deploy)
+name: OpenRPC (Build & Deploy GitHub pages)
 
 on:
   push:
@@ -93,4 +93,3 @@ jobs:
           # https://github.com/actions/checkout/issues/13#issuecomment-724415212
           user_name: github-actions[bot]
           user_email: 41898282+github-actions[bot]@users.noreply.github.com
-          
