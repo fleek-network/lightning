@@ -3317,6 +3317,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-broadcast"
+version = "0.1.0"
+
+[[package]]
 name = "lightning-consensus"
 version = "0.0.0"
 dependencies = [
