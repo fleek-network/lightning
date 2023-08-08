@@ -182,6 +182,8 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
         }
     }
 
+    lookup.main_rx.close();
+
     if lookup.find_value_lookup {
         Ok(LookupResult::Value(None))
     } else {
