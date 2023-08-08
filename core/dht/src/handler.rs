@@ -1,7 +1,7 @@
 use std::{
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap},
     net::SocketAddr,
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
 use anyhow::{bail, Result};
@@ -15,51 +15,46 @@ use tokio::{
         mpsc::{Receiver, Sender},
         oneshot,
     },
-    task,
 };
 
 use crate::{
     lookup,
-    lookup::{LookupHandle, LookupResult, LookupTask, ResponseEvent},
-    query::{Message, MessagePayload, NodeInfo, Query, Response},
+    lookup::{LookupResult, LookupTask, ResponseEvent},
+    query::{Message, MessageType, NodeInfo, Query, Response},
     socket,
     table::{TableKey, TableQuery},
 };
 
 pub const NO_REPLY_CHANNEL_ID: u64 = 0;
 
-pub async fn start_server(
+pub async fn start_worker(
     mut command_rx: Receiver<Command>,
     table_tx: Sender<TableQuery>,
     socket: Arc<UdpSocket>,
     local_key: NodeNetworkingPublicKey,
 ) {
-    let main_handler = Handler::new(socket.clone(), table_tx, local_key);
+    let mut handler = Handler {
+        pending: HashMap::new(),
+        local_key,
+        table_tx: table_tx.clone(),
+        socket: socket.clone(),
+    };
     loop {
-        let handler = main_handler.clone();
         select! {
             command = command_rx.recv() => {
-                match command {
-                    Some(command) => {
-                        task::spawn(async move {
-                            if let Err(e) = handler.handle_command(command).await {
-                                tracing::error!("command request failed: {e:?}")
-                            }
-                        });
-                    }
-                    None => break,
+                if command.is_none() {
+                    break;
+                }
+                if let Err(e) = handler.handle_command(command.unwrap()) {
+                    tracing::error!("failed to handle incoming datagram: {e:?}");
                 }
             }
             incoming = socket::recv_from(&socket) => {
                 match incoming {
                     Ok((datagram, address)) => {
-                        task::spawn(async move {
-                            if let Err(e) = handler
-                            .handle_incoming_datagram(datagram, address).await
-                            {
-                                tracing::error!("unexpected error when handling incoming message: {e:?}")
-                            }
-                        });
+                        if let Err(e) = handler.handle_incoming(datagram, address) {
+                            tracing::error!("failed to handle incoming datagram: {e:?}");
+                        }
                     }
                     Err(e) => {
                         tracing::error!("unexpected error when reading from socket: {e:?}")
@@ -86,218 +81,241 @@ pub enum Command {
     },
 }
 
-#[derive(Clone)]
-pub struct Handler {
-    socket: Arc<UdpSocket>,
+struct Handler {
+    pending: HashMap<u64, Sender<ResponseEvent>>,
+    local_key: NodeNetworkingPublicKey,
     table_tx: Sender<TableQuery>,
-    node_id: NodeNetworkingPublicKey,
-    pending_lookups: Arc<RwLock<HashMap<u64, LookupHandle>>>,
+    socket: Arc<UdpSocket>,
 }
 
 impl Handler {
-    pub fn new(
-        socket: Arc<UdpSocket>,
-        table_tx: Sender<TableQuery>,
-        node_id: NodeNetworkingPublicKey,
-    ) -> Self {
-        Self {
-            socket,
-            table_tx,
-            node_id,
-            pending_lookups: Default::default(),
-        }
-    }
+    fn handle_command(&mut self, command: Command) -> Result<()> {
+        let (event_tx, event_rx) = mpsc::channel(100);
+        let channel_id = rand::random();
+        self.pending.insert(channel_id, event_tx);
 
-    // Todo: Remove unwraps here. It is possible for clients to drop their handles.
-    async fn handle_command(&self, command: Command) -> Result<()> {
         match command {
             Command::Get { key, tx } => {
-                let hash = match TableKey::try_from(key.as_slice()) {
-                    Ok(hash) => hash,
-                    Err(key) => {
-                        tracing::error!("invalid key: {key:?}");
-                        tx.send(Err(())).unwrap();
-                        return Err(anyhow::anyhow!("failed"));
-                    },
-                };
-                match self.find_value(hash).await {
-                    Ok(value) => {
-                        let entry = TableEntry {
-                            prefix: TablePrefix::ContentRegistry,
-                            key,
-                            value: value.unwrap_or_default(),
-                            // Todo: make sure we keep track of source.
-                            source: NodeNetworkingPublicKey(rand::random()),
-                            signature: None,
-                        };
-                        tx.send(Ok(Some(entry))).unwrap();
-                    },
-                    Err(e) => {
-                        tracing::error!("failed to find value: {e:?}");
-                        tx.send(Err(())).unwrap();
-                    },
-                }
+                let target = TableKey::try_from(key.as_slice())?;
+                let task = LookupTask::new(
+                    channel_id,
+                    true,
+                    self.local_key,
+                    target,
+                    self.table_tx.clone(),
+                    event_rx,
+                    self.socket.clone(),
+                );
+
+                tokio::spawn(async move {
+                    // Todo: refactor lookup to not return an enum.
+                    match lookup::lookup(task).await {
+                        Ok(lookup_result) => {
+                            let value = match lookup_result {
+                                LookupResult::Nodes(_) => panic!("we did not request for a nodes"),
+                                LookupResult::Value(value) => value,
+                            };
+
+                            let entry = TableEntry {
+                                prefix: TablePrefix::ContentRegistry,
+                                key,
+                                value: value.unwrap_or_default(),
+                                // Todo: make sure we keep track of source.
+                                source: NodeNetworkingPublicKey(rand::random()),
+                                signature: None,
+                            };
+
+                            if tx.send(Ok(Some(entry))).is_err() {
+                                tracing::error!("failed to send response for GET command")
+                            }
+                        },
+                        Err(e) => {
+                            tracing::error!("failed to find value: {e:?}");
+                            if tx.send(Err(())).is_err() {
+                                tracing::error!("failed to send error response for GET command")
+                            }
+                        },
+                    }
+                });
             },
             Command::Put { key, value } => {
-                let table_key = TableKey::try_from(key.as_slice())?;
-                let nodes = self.find_node(table_key).await?;
-                // Todo: Add sender information in message.
-                let message = Message {
-                    id: rand::random(),
-                    sender_key: self.node_id,
-                    channel_id: NO_REPLY_CHANNEL_ID,
-                    payload: MessagePayload::Query(Query::Store {
-                        key: table_key,
-                        value,
-                    }),
-                };
-                let bytes = bincode::serialize(&message)?;
-                for node in nodes {
-                    socket::send_to(&self.socket, &bytes, node.address).await?;
-                }
+                let socket_clone = self.socket.clone();
+                let sender_key = self.local_key;
+                let target = TableKey::try_from(key.as_slice())?;
+                let task = LookupTask::new(
+                    channel_id,
+                    false,
+                    self.local_key,
+                    target,
+                    self.table_tx.clone(),
+                    event_rx,
+                    self.socket.clone(),
+                );
+
+                tokio::spawn(async move {
+                    let nodes = match lookup::lookup(task).await {
+                        Ok(lookup_result) => match lookup_result {
+                            LookupResult::Nodes(nodes) => nodes,
+                            LookupResult::Value(_) => panic!("we did not request for a nodes"),
+                        },
+                        Err(_) => {
+                            tracing::error!("failed to handle PUT command: look-up failed");
+                            return;
+                        },
+                    };
+
+                    let payload = bincode::serialize(&Query::Store { key: target, value })
+                        .expect("Serialization to succeed");
+                    // Todo: Add sender information in message.
+                    let message = Message {
+                        ty: MessageType::Query,
+                        id: rand::random(),
+                        sender_key,
+                        channel_id: NO_REPLY_CHANNEL_ID,
+                        payload,
+                    };
+                    let bytes = bincode::serialize(&message).expect("Serialization to succeed");
+
+                    for node in nodes {
+                        if let Err(e) = socket::send_to(&socket_clone, &bytes, node.address).await {
+                            tracing::error!("failed to send datagram {e:?}");
+                        }
+                    }
+                });
             },
             Command::FindNode { target, tx } => {
-                let nodes = self.find_node(target.0).await?;
-                tx.send(Ok(nodes)).unwrap();
+                let task = LookupTask::new(
+                    channel_id,
+                    false,
+                    self.local_key,
+                    target.0,
+                    self.table_tx.clone(),
+                    event_rx,
+                    self.socket.clone(),
+                );
+
+                tokio::spawn(async move {
+                    match lookup::lookup(task).await {
+                        Ok(lookup_result) => {
+                            let nodes = match lookup_result {
+                                LookupResult::Nodes(nodes) => nodes,
+                                LookupResult::Value(_) => panic!("we did not request for a nodes"),
+                            };
+                            if tx.send(Ok(nodes)).is_err() {
+                                tracing::error!("failed to send response for command")
+                            }
+                        },
+                        // Todo: Send an appropriate response.
+                        Err(_) => {
+                            if tx.send(Err(())).is_err() {
+                                tracing::error!("failed to send response for command")
+                            }
+                        },
+                    }
+                });
             },
         }
         Ok(())
     }
 
-    async fn handle_incoming_datagram(&self, datagram: Vec<u8>, address: SocketAddr) -> Result<()> {
+    fn handle_incoming(&mut self, datagram: Vec<u8>, address: SocketAddr) -> Result<()> {
         let message: Message = bincode::deserialize(datagram.as_slice())?;
-        let message_id = message.id;
-        let sender_key = message.sender_key;
-        let channel_id = message.channel_id;
-        match message.payload {
-            MessagePayload::Query(query) => match query {
-                Query::Find { find_value, target } => {
-                    let value = match find_value {
-                        // Todo: Check from local store.
-                        true => todo!(),
-                        false => None,
-                    };
-                    let nodes = self.closest_nodes(&target).await?;
-                    let query = Message {
-                        id: message_id,
-                        channel_id,
-                        sender_key: self.node_id,
-                        payload: MessagePayload::Response(Response { nodes, value }),
-                    };
-                    let bytes = bincode::serialize(&query)?;
-                    socket::send_to(&self.socket, bytes.as_slice(), address).await?;
-                },
-                Query::Store { .. } => {
-                    // Todo: How do we avoid someone sending tons of Store queries.
-                    todo!()
-                },
-                Query::Ping => {
-                    let query = Message {
-                        id: message_id,
-                        channel_id,
-                        sender_key: self.node_id,
-                        payload: MessagePayload::Response(Response {
-                            nodes: Vec::new(),
-                            value: None,
-                        }),
-                    };
-                    let bytes = bincode::serialize(&query)?;
-                    socket::send_to(&self.socket, bytes.as_slice(), address).await?;
-                },
+        match message.ty {
+            MessageType::Query => {
+                tokio::spawn(handle_query(
+                    self.table_tx.clone(),
+                    self.socket.clone(),
+                    self.local_key,
+                    message,
+                    address,
+                ));
             },
-            MessagePayload::Response(response) => {
-                let task_tx = match self.pending_lookups.read().unwrap().get(&channel_id) {
-                    None => {
-                        tracing::warn!("received unsolicited response");
-                        return Ok(());
-                    },
-                    Some(handle) => handle.0.clone(),
-                };
-                if task_tx
-                    .send(ResponseEvent {
-                        id: message_id,
-                        sender_key,
-                        response,
-                    })
-                    .await
-                    .is_err()
-                {
-                    tracing::error!("failed to send response to task")
+            MessageType::Response => {
+                // This should provide some protection against unrequested replies.
+                if let Entry::Occupied(event_tx) = self.pending.entry(message.channel_id) {
+                    if event_tx.get().is_closed() {
+                        event_tx.remove();
+                    } else {
+                        let response: Response = bincode::deserialize(&message.payload)?;
+                        let event_tx = event_tx.get().clone();
+                        let sender_key = self.local_key;
+
+                        tokio::spawn(async move {
+                            if event_tx
+                                .send(ResponseEvent {
+                                    id: message.id,
+                                    sender_key,
+                                    response,
+                                })
+                                .await
+                                .is_err()
+                            {
+                                tracing::error!("failed to send response to task")
+                            }
+                        });
+                    }
                 }
             },
         }
         Ok(())
     }
+}
 
-    async fn closest_nodes(&self, target: &TableKey) -> Result<Vec<NodeInfo>> {
-        let (tx, rx) = oneshot::channel();
-        if self
-            .table_tx
-            .send(TableQuery::ClosestNodes {
-                target: *target,
-                tx,
-            })
-            .await
-            .is_err()
-        {
-            bail!("failed to send query to Table server");
-        }
-        match rx.await {
-            Ok(nodes) => nodes.map_err(Into::into),
-            Err(e) => bail!("{e}"),
-        }
-    }
+async fn handle_query(
+    table_tx: Sender<TableQuery>,
+    socket: Arc<UdpSocket>,
+    local_key: NodeNetworkingPublicKey,
+    message: Message,
+    address: SocketAddr,
+) -> Result<()> {
+    let query: Query = bincode::deserialize(&message.payload)?;
+    match query {
+        Query::Find { find_value, target } => {
+            let (tx, rx) = oneshot::channel();
+            if table_tx
+                .send(TableQuery::ClosestNodes { target, tx })
+                .await
+                .is_err()
+            {
+                bail!("failed to send query to Table server");
+            }
 
-    async fn find_node(&self, target: TableKey) -> Result<Vec<NodeInfo>> {
-        let (task_tx, task_rx) = mpsc::channel(1000000);
-        // Todo: Randomly generate id/breadcrumb. Check if it exists.
-        let channel_id = rand::random();
-        let task = LookupTask::new(
-            channel_id,
-            false,
-            self.node_id,
-            target,
-            self.table_tx.clone(),
-            task_rx,
-            self.socket.clone(),
-        );
-        let handle = LookupHandle(task_tx);
-        self.pending_lookups
-            .write()
-            .unwrap()
-            .insert(channel_id, handle);
-        match lookup::lookup(task)
-            .await
-            .map_err(Into::<anyhow::Error>::into)?
-        {
-            LookupResult::Nodes(nodes) => Ok(nodes),
-            LookupResult::Value(_) => panic!("we did not request for a value"),
-        }
+            let nodes = rx.await.expect("Table worker to not drop")?;
+            let value = match find_value {
+                // Todo: Check from local store.
+                true => todo!(),
+                false => None,
+            };
+            let payload = bincode::serialize(&Response { nodes, value })?;
+            let response = Message {
+                ty: MessageType::Response,
+                id: message.id,
+                channel_id: message.channel_id,
+                sender_key: local_key,
+                payload,
+            };
+            let bytes = bincode::serialize(&response)?;
+            socket::send_to(&socket, bytes.as_slice(), address).await?;
+        },
+        Query::Store { .. } => {
+            // Todo: How do we avoid someone sending tons of Store queries.
+            todo!()
+        },
+        Query::Ping => {
+            let payload = bincode::serialize(&Response {
+                nodes: Vec::new(),
+                value: None,
+            })?;
+            let response = Message {
+                ty: MessageType::Response,
+                id: message.id,
+                channel_id: message.channel_id,
+                sender_key: local_key,
+                payload,
+            };
+            let bytes = bincode::serialize(&response)?;
+            socket::send_to(&socket, bytes.as_slice(), address).await?;
+        },
     }
-
-    async fn find_value(&self, target: TableKey) -> Result<Option<Vec<u8>>> {
-        let (task_tx, task_rx) = mpsc::channel(1000000);
-        let channel_id = rand::random();
-        let task = LookupTask::new(
-            channel_id,
-            true,
-            self.node_id,
-            target,
-            self.table_tx.clone(),
-            task_rx,
-            self.socket.clone(),
-        );
-        let handle = LookupHandle(task_tx);
-        self.pending_lookups
-            .write()
-            .unwrap()
-            .insert(channel_id, handle);
-        match lookup::lookup(task)
-            .await
-            .map_err(Into::<anyhow::Error>::into)?
-        {
-            LookupResult::Nodes(_) => panic!("we did not request for a nodes"),
-            LookupResult::Value(value) => Ok(value),
-        }
-    }
+    Ok(())
 }

@@ -27,8 +27,16 @@ pub enum MessagePayload {
     Response(Response),
 }
 
+#[repr(u8)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+pub enum MessageType {
+    Query = 0x01 << 0,
+    Response = 0x01 << 1,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Message {
+    pub ty: MessageType,
     // Random value used that must be returned in response.
     pub id: u64,
     // Channel on which to route the response.
@@ -36,7 +44,7 @@ pub struct Message {
     // Sender's public key.
     pub sender_key: NodeNetworkingPublicKey,
     // Payload of message.
-    pub payload: MessagePayload,
+    pub payload: Vec<u8>,
 }
 
 // Todo: Create some chunking strategy

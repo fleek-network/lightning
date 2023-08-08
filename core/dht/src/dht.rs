@@ -61,7 +61,7 @@ impl Builder {
             .unwrap_or_else(|| "0.0.0.0:0".parse().expect("Hardcoded address to be valid"));
         let socket = UdpSocket::bind(address).await.map(Arc::new)?;
         let (handler_tx, handler_rx) = mpsc::channel(buffer_size);
-        tokio::spawn(handler::start_server(
+        tokio::spawn(handler::start_worker(
             handler_rx,
             table_tx.clone(),
             socket,

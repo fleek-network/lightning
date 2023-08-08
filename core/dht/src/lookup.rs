@@ -19,7 +19,7 @@ use tokio::{
 use crate::{
     bucket::MAX_BUCKET_SIZE,
     distance::{self, Distance},
-    query::{Message, MessagePayload, NodeInfo, Query, Response},
+    query::{Message, MessageType, NodeInfo, Query, Response},
     socket,
     table::{TableKey, TableQuery},
 };
@@ -71,16 +71,19 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                 .pickout(MAX_BUCKET_SIZE, 3, |node| node.status == Status::Initial)
             {
                 let id = rand::random();
+                let payload = bincode::serialize(&Query::Find {
+                    find_value: lookup.find_value_lookup,
+                    target: lookup.target,
+                })
+                .expect("Serialization to succeed");
                 let message = Message {
                     // Todo: Generate random transaction ID.
                     // Todo: We need to validate that the response sends this value.
+                    ty: MessageType::Query,
                     id,
                     channel_id: lookup.id,
                     sender_key: lookup.local_key,
-                    payload: MessagePayload::Query(Query::Find {
-                        find_value: lookup.find_value_lookup,
-                        target: lookup.target,
-                    }),
+                    payload,
                 };
                 let bytes = bincode::serialize(&message).unwrap();
                 socket::send_to(&lookup.socket, bytes.as_slice(), node.inner.address)
