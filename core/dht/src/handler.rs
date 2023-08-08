@@ -89,8 +89,8 @@ async fn handle_query(
             let payload = bincode::serialize(&Response { nodes, value })?;
             let response = Message {
                 ty: MessageType::Response,
+                token: message.token,
                 id: message.id,
-                channel_id: message.channel_id,
                 sender_key: local_key,
                 payload,
             };
@@ -109,7 +109,7 @@ async fn handle_query(
             let response = Message {
                 ty: MessageType::Response,
                 id: message.id,
-                channel_id: message.channel_id,
+                token: message.token,
                 sender_key: local_key,
                 payload,
             };
@@ -146,14 +146,14 @@ struct Handler {
 impl Handler {
     fn handle_command(&mut self, command: Task) -> Result<()> {
         let (event_tx, event_rx) = mpsc::channel(100);
-        let channel_id = rand::random();
-        self.pending.insert(channel_id, event_tx);
+        let task_id = rand::random();
+        self.pending.insert(task_id, event_tx);
 
         match command {
             Task::Get { key, tx } => {
                 let target = TableKey::try_from(key.as_slice())?;
                 let task = LookupTask::new(
-                    channel_id,
+                    task_id,
                     true,
                     self.local_key,
                     target,
@@ -198,7 +198,7 @@ impl Handler {
                 let sender_key = self.local_key;
                 let target = TableKey::try_from(key.as_slice())?;
                 let task = LookupTask::new(
-                    channel_id,
+                    task_id,
                     false,
                     self.local_key,
                     target,
@@ -224,9 +224,9 @@ impl Handler {
                     // Todo: Add sender information in message.
                     let message = Message {
                         ty: MessageType::Query,
-                        id: rand::random(),
+                        token: rand::random(),
                         sender_key,
-                        channel_id: NO_REPLY_CHANNEL_ID,
+                        id: NO_REPLY_CHANNEL_ID,
                         payload,
                     };
                     let bytes = bincode::serialize(&message).expect("Serialization to succeed");
@@ -239,7 +239,7 @@ impl Handler {
             },
             Task::FindNode { target, tx } => {
                 let task = LookupTask::new(
-                    channel_id,
+                    task_id,
                     false,
                     self.local_key,
                     target.0,
@@ -285,7 +285,7 @@ impl Handler {
             },
             MessageType::Response => {
                 // This should provide some protection against unrequested replies.
-                if let Entry::Occupied(event_tx) = self.pending.entry(message.channel_id) {
+                if let Entry::Occupied(event_tx) = self.pending.entry(message.id) {
                     if event_tx.get().is_closed() {
                         event_tx.remove();
                     } else {
@@ -295,7 +295,7 @@ impl Handler {
                         tokio::spawn(async move {
                             if event_tx
                                 .send(ResponseEvent {
-                                    id: message.id,
+                                    id: message.token,
                                     sender_key,
                                     response,
                                 })

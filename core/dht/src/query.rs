@@ -21,12 +21,6 @@ pub enum Query {
     Ping,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub enum MessagePayload {
-    Query(Query),
-    Response(Response),
-}
-
 #[repr(u8)]
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub enum MessageType {
@@ -37,10 +31,10 @@ pub enum MessageType {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Message {
     pub ty: MessageType,
-    // Random value used that must be returned in response.
-    pub id: u64,
     // Channel on which to route the response.
-    pub channel_id: u64,
+    pub id: u64,
+    // Random value used that must be returned in response.
+    pub token: u64,
     // Sender's public key.
     pub sender_key: NodeNetworkingPublicKey,
     // Payload of message.

@@ -57,9 +57,11 @@ impl Builder {
         let (table_tx, table_rx) = mpsc::channel(buffer_size);
         tokio::spawn(table::start_worker(table_rx, node_key));
 
-        let address = self
-            .address
-            .unwrap_or_else(|| "0.0.0.0:0".parse().expect("Hardcoded address to be valid"));
+        let address = self.address.unwrap_or_else(|| {
+            "0.0.0.0:0"
+                .parse()
+                .expect("hardcoded IP address to be valid")
+        });
         let socket = UdpSocket::bind(address).await.map(Arc::new)?;
         let (handler_tx, handler_rx) = mpsc::channel(buffer_size);
         tokio::spawn(handler::start_worker(

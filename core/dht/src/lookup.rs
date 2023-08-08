@@ -75,13 +75,11 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                     find_value: lookup.find_value_lookup,
                     target: lookup.target,
                 })
-                .expect("Query to be valid");
+                .expect("query to be valid");
                 let message = Message {
-                    // Todo: Generate random transaction ID.
-                    // Todo: We need to validate that the response sends this value.
                     ty: MessageType::Query,
-                    id,
-                    channel_id: lookup.id,
+                    token: id,
+                    id: lookup.id,
                     sender_key: lookup.local_key,
                     payload,
                 };
