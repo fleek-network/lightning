@@ -90,12 +90,13 @@ for builds.
 
 # Development
 
-Up node locally and ping:
+To run the node and perform a simple healthcheck, do the following:
 
 ```bash
-# Up node locally
-$ cargo run run
-# In another terminal, ping
+# Start the node up
+$ cargo run -r -- run
+
+# In another terminal, send a request to the ping rpc endpoint
 $ curl -X POST -H "Content-Type: application/json" -d '{
       "jsonrpc": "2.0",
       "method": "flk_ping",
