@@ -87,3 +87,20 @@ will ease this process.
 So in summary: We use the default that is set in the `rust-toolchain` to have consistent formatting of
 the code. And does not necessarily indicate that it is the version of the compiler we are going to use
 for builds.
+
+# Development
+
+Up node locally and ping:
+
+```bash
+# Up node locally
+$ cargo run run
+# In another terminal, ping
+$ curl -X POST -H "Content-Type: application/json" -d '{
+      "jsonrpc": "2.0",
+      "method": "flk_ping",
+      "params": [],
+      "id": 1
+    }' http://127.0.0.1:4069/rpc/v0
+# Response: {"jsonrpc":"2.0","result":"pong","id":1}
+```
