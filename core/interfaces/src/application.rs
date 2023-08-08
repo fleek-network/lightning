@@ -9,31 +9,11 @@ use crate::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
     types::{
-        Block, Epoch, EpochInfo, NodeInfo, NodeServed, ProtocolParams,
+        Block, BlockExecutionResponse, Epoch, EpochInfo, NodeInfo, NodeServed, ProtocolParams,
         ReportedReputationMeasurements, Service, ServiceId, TotalServed, TransactionResponse,
         UpdateRequest,
     },
 };
-
-/// The response generated from executing an entire batch of transactions (aka a block).
-#[derive(Debug, PartialEq, PartialOrd, Hash, Eq)]
-pub struct BlockExecutionResponse {
-    /// The new block hash
-    pub block_hash: [u8; 32],
-    /// This *flag* is only set to `true` if performing a transaction in the block
-    /// has determined that we should move the epoch forward.
-    pub change_epoch: bool,
-    /// The changes to the node registry.
-    pub node_registry_delta: Vec<(NodePublicKey, NodeRegistryChange)>,
-    /// Receipts of all executed transactions
-    pub txn_receipts: Vec<TransactionResponse>,
-}
-
-#[derive(Debug, PartialEq, PartialOrd, Hash, Eq)]
-pub enum NodeRegistryChange {
-    New,
-    Removed,
-}
 
 /// The socket that is handled by the application layer and fed by consensus (or other
 /// synchronization systems in place) which executes and persists transactions that

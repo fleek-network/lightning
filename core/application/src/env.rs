@@ -4,20 +4,17 @@ use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, EthAddress, NodePublicKey, PublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use lightning_interfaces::{
-    types::{
-        AccountInfo, Block, CommodityTypes, Epoch, ExecutionData, Metadata, NodeInfo, NodeServed,
-        ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, ServiceRevenue,
-        TotalServed, TransactionResponse, Value,
-    },
-    BlockExecutionResponse,
+use lightning_interfaces::types::{
+    AccountInfo, Block, BlockExecutionResponse, Committee, CommodityTypes, Epoch, ExecutionData,
+    Metadata, NodeInfo, NodeServed, ProtocolParams, ReportedReputationMeasurements, Service,
+    ServiceId, ServiceRevenue, TotalServed, TransactionResponse, Value,
 };
 
 use crate::{
     config::{Config, Mode},
     genesis::{Genesis, GenesisPrices},
     query_runner::QueryRunner,
-    state::{Committee, State},
+    state::State,
     table::StateTables,
 };
 

@@ -10,11 +10,11 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::{
     application::ExecutionEngineSocket,
     types::{
-        Block, Epoch, ExecutionError, NodeInfo, ProofOfConsensus, ProtocolParams, Tokens,
-        TotalServed, TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest,
+        Block, BlockExecutionResponse, DeliveryAcknowledgment, Epoch, ExecutionError, NodeInfo,
+        ProofOfConsensus, ProtocolParams, Tokens, TotalServed, TransactionResponse, UpdateMethod,
+        UpdatePayload, UpdateRequest,
     },
-    ApplicationInterface, BlockExecutionResponse, DeliveryAcknowledgment, SyncQueryRunnerInterface,
-    ToDigest,
+    ApplicationInterface, SyncQueryRunnerInterface, ToDigest,
 };
 use lightning_test_utils::{random, reputation};
 use tokio::test;

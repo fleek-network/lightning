@@ -12,17 +12,16 @@ use hp_fixed::unsigned::HpUfixed;
 use lazy_static::lazy_static;
 use lightning_interfaces::{
     types::{
-        AccountInfo, CommodityTypes, Epoch, ExecutionData, ExecutionError, Metadata, NodeInfo,
-        NodeServed, ProofOfConsensus, ProofOfMisbehavior, ProtocolParams,
-        ReportedReputationMeasurements, ReputationMeasurements, Service, ServiceId, ServiceRevenue,
-        Staking, Tokens, TotalServed, TransactionResponse, UpdateMethod, UpdateRequest, Value,
-        Worker,
+        AccountInfo, Committee, CommodityTypes, DeliveryAcknowledgment, Epoch, ExecutionData,
+        ExecutionError, Metadata, NodeInfo, NodeServed, ProofOfConsensus, ProofOfMisbehavior,
+        ProtocolParams, ReportedReputationMeasurements, ReputationMeasurements, Service, ServiceId,
+        ServiceRevenue, Staking, Tokens, TotalServed, TransactionResponse, UpdateMethod,
+        UpdateRequest, Value, Worker,
     },
-    DeliveryAcknowledgment, ToDigest,
+    ToDigest,
 };
 use lightning_reputation::{statistics, types::WeightedReputationMeasurements};
 use multiaddr::Multiaddr;
-use serde::{Deserialize, Serialize};
 
 use crate::table::{Backend, TableRef};
 
@@ -73,13 +72,6 @@ pub struct State<B: Backend> {
     pub service_revenue: B::Ref<ServiceId, ServiceRevenue>,
     pub commodity_prices: B::Ref<CommodityTypes, HpUfixed<6>>,
     pub backend: B,
-}
-
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
-pub struct Committee {
-    pub members: Vec<NodePublicKey>,
-    pub ready_to_change: Vec<NodePublicKey>,
-    pub epoch_end_timestamp: u64,
 }
 
 impl<B: Backend> State<B> {

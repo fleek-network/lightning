@@ -1,8 +1,10 @@
 use affair::Socket;
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 
-use crate::{common::WithStartAndShutdown, config::ConfigConsumer, signer::SubmitTxSocket};
+use crate::{
+    common::WithStartAndShutdown, config::ConfigConsumer, signer::SubmitTxSocket,
+    types::DeliveryAcknowledgment,
+};
 
 /// The socket which upon receiving a delivery acknowledgment can add it to the aggregator
 /// queue which will later roll up a batch of delivery acknowledgments to the consensus.
@@ -20,10 +22,3 @@ pub trait DeliveryAcknowledgmentAggregatorInterface:
 }
 
 pub trait LaneManager {}
-
-/// A batch of delivery acknowledgments.
-#[derive(Serialize, Deserialize, Debug, Hash)]
-pub struct DeliveryAcknowledgmentBatch;
-
-#[derive(Serialize, Deserialize, Debug, Hash, Clone, Default)]
-pub struct DeliveryAcknowledgment;

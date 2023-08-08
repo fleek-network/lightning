@@ -6,16 +6,13 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::{
     application::SyncQueryRunnerInterface,
     types::{
-        AccountInfo, CommodityTypes, Epoch, EpochInfo, Metadata, NodeInfo, NodeServed,
+        AccountInfo, Committee, CommodityTypes, Epoch, EpochInfo, Metadata, NodeInfo, NodeServed,
         ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, ServiceRevenue,
         TotalServed, TransactionResponse, UpdateRequest, Value,
     },
 };
 
-use crate::{
-    state::{Committee, State},
-    table::StateTables,
-};
+use crate::{state::State, table::StateTables};
 
 #[derive(Clone)]
 pub struct QueryRunner {

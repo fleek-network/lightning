@@ -79,6 +79,7 @@ pub trait ReputationReporterInterface: Clone {
     fn report_hops(&self, peer: &NodePublicKey, hops: u8);
 }
 
+// TODO: Move to types/reputation.rs as `ReputationWeight`.
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq)]
 pub enum Weight {
     Weak,
