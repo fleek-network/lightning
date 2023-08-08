@@ -27,3 +27,7 @@ rand_chacha = "0.3"
 lightning-schema = {path="../schema"}
 dashmap = "5.5.0"
 futures.workspace = true
+
+[dev-dependencies]
+lightning-application = { path = "../application" }
+lightning-signer = { path = "../signer" }

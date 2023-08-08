@@ -8,14 +8,28 @@ use fleek_crypto::NodePublicKey;
 use lightning_schema::LightningMessage;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
+use super::CHANNEL_BUFFER_LEN;
+
 /// Shared Memory Transport, should be cloned and passed to all ConnectionPool instances.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct GlobalMemoryTransport<T> {
     /// Map of senders for connection pools to become aware of incoming connections
     nodes: Arc<DashMap<NodePublicKey, Sender<MemoryConnection<T>>>>,
 }
 
+impl<T: LightningMessage + 'static> Default for GlobalMemoryTransport<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: LightningMessage + 'static> GlobalMemoryTransport<T> {
+    pub fn new() -> Self {
+        Self {
+            nodes: DashMap::new().into(),
+        }
+    }
+
     /// Connect to a node in the global transport. Returns None if the node is not found
     pub async fn connect(
         &self,
@@ -55,18 +69,18 @@ pub struct MemoryConnection<T> {
 impl<T: LightningMessage + 'static> MemoryConnection<T> {
     /// Create a new connection pair
     pub fn pair(left: NodePublicKey, right: NodePublicKey) -> (Self, Self) {
-        let (tx0, rx0) = channel(32);
-        let (tx1, rx1) = channel(32);
+        let (tx0, rx1) = channel(CHANNEL_BUFFER_LEN);
+        let (tx1, rx0) = channel(CHANNEL_BUFFER_LEN);
 
         (
             Self {
                 sender: tx0,
-                receiver: rx1,
+                receiver: rx0,
                 node: right,
             },
             Self {
                 sender: tx1,
-                receiver: rx0,
+                receiver: rx1,
                 node: left,
             },
         )

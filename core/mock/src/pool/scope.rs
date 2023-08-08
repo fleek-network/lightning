@@ -15,7 +15,7 @@ use super::{
     handle_raw_receiver,
     schema::ScopedFrame,
     transport::{GlobalMemoryTransport, MemoryConnection},
-    ConnectionPool,
+    ConnectionPool, CHANNEL_BUFFER_LEN,
 };
 
 type ConnectorSocket<C, T> =
@@ -48,21 +48,26 @@ impl<S: SignerInterface + 'static, Q: SyncQueryRunnerInterface, T: LightningMess
         }
 
         // create channel for incoming messages in the scope
-        let (scope_tx, scope_rx) = channel(256);
+        let (scope_tx, scope_rx) = channel(CHANNEL_BUFFER_LEN);
 
         // get an existing sender or create a new connection
         let sender = match self.senders.get(&key) {
-            Some(sender) => sender.clone(),
+            Some(sender) => {
+                self.receivers.insert((key, self.scope), scope_tx);
+                sender.clone()
+            },
             None => {
                 // connect to the node
                 let MemoryConnection {
                     sender, receiver, ..
                 } = self.transport.connect(self.node, key).await?;
+
                 self.senders.insert(key, sender.clone());
+                self.receivers.insert((key, self.scope), scope_tx);
 
                 // spawn task for reading messages
                 tokio::spawn(handle_raw_receiver(
-                    self.node,
+                    key,
                     receiver,
                     self.incoming.clone(),
                     self.senders.clone(),
@@ -72,7 +77,6 @@ impl<S: SignerInterface + 'static, Q: SyncQueryRunnerInterface, T: LightningMess
                 sender
             },
         };
-        self.receivers.insert((key, self.scope), scope_tx);
 
         // send hello message
         sender
@@ -196,7 +200,7 @@ where
         let node = self.channel.recv().await?;
 
         // create new channel for incoming messages and insert it
-        let (tx, receiver) = channel(256);
+        let (tx, receiver) = channel(CHANNEL_BUFFER_LEN);
         self.receivers.insert((node, self.scope), tx);
         let receiver = super::connection::Receiver::new(node, receiver);
 
