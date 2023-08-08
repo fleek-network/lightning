@@ -5,8 +5,8 @@ use blake3_tree::{
 };
 use bytes::{BufMut, Bytes, BytesMut};
 use lightning_interfaces::{
-    Blake3Hash, CompressionAlgorithm, ContentChunk, IncrementalPutInterface, PutFeedProofError,
-    PutFinalizeError, PutWriteError,
+    types::CompressionAlgorithm, Blake3Hash, ContentChunk, IncrementalPutInterface,
+    PutFeedProofError, PutFinalizeError, PutWriteError,
 };
 
 use crate::{store::Store, BlockContent, Key, BLAKE3_CHUNK_SIZE};

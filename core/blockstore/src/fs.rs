@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use lightning_interfaces::{
-    Blake3Hash, Blake3Tree, BlockStoreInterface, CompressionAlgoSet, CompressionAlgorithm,
-    ConfigConsumer, ContentChunk,
+    types::{CompressionAlgoSet, CompressionAlgorithm},
+    Blake3Hash, Blake3Tree, BlockStoreInterface, ConfigConsumer, ContentChunk,
 };
 use serde::{Deserialize, Serialize};
 use tempdir::TempDir;

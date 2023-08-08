@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use fleek_crypto::{ClientPublicKey, ClientSignature};
-use lightning_interfaces::{types::ServiceId, CompressionAlgoSet};
+use lightning_interfaces::types::{CompressionAlgoSet, ServiceId};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::connection::{

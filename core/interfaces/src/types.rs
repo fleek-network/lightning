@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 mod application;
 mod bridge;
+mod compression;
 mod misbehavior;
 mod pod;
 mod reputation;
@@ -11,6 +12,7 @@ mod transaction;
 
 pub use application::*;
 pub use bridge::*;
+pub use compression::*;
 pub use misbehavior::*;
 pub use pod::*;
 pub use reputation::*;

@@ -8,7 +8,7 @@ use bytes::BytesMut;
 use consts::*;
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
 use futures::executor::block_on;
-use lightning_interfaces::{types::ServiceId, CompressionAlgoSet};
+use lightning_interfaces::types::{CompressionAlgoSet, ServiceId};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::types::{BlsSignature, Nonce};

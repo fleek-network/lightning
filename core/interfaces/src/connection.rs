@@ -1,7 +1,7 @@
 use fleek_crypto::ClientPublicKey;
 use tokio::io::{AsyncRead, AsyncWrite};
 
-use crate::CompressionAlgoSet;
+use crate::types::CompressionAlgoSet;
 
 /// The connection type that is offered by the (HandshakeInterface)[crate::HandshakeInterface].
 pub trait ConnectionInterface: Send + Sync {

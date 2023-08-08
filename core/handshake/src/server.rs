@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use fleek_crypto::{ClientPublicKey, NodePublicKey};
 use lightning_interfaces::{
-    handshake::HandshakeInterface, CompressionAlgoSet, ConfigConsumer, ConnectionInterface,
+    handshake::HandshakeInterface, types::CompressionAlgoSet, ConfigConsumer, ConnectionInterface,
     WithStartAndShutdown,
 };
 use serde::{Deserialize, Serialize};
@@ -327,7 +327,7 @@ impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> Co
     fn get_client(&self) -> &ClientPublicKey {
         &self.client_id
     }
-    fn get_compression_set(&self) -> lightning_interfaces::CompressionAlgoSet {
+    fn get_compression_set(&self) -> CompressionAlgoSet {
         self.compression_set
     }
 }

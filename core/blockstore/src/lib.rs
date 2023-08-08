@@ -38,8 +38,8 @@ mod tests {
         ProofBuf,
     };
     use lightning_interfaces::{
-        Blake3Hash, BlockStoreInterface, CompressionAlgoSet, CompressionAlgorithm,
-        IncrementalPutInterface,
+        types::{CompressionAlgoSet, CompressionAlgorithm},
+        Blake3Hash, BlockStoreInterface, IncrementalPutInterface,
     };
     use tokio::test;
 

@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use thiserror::Error;
 
 use crate::{
-    compression::{CompressionAlgoSet, CompressionAlgorithm},
     config::ConfigConsumer,
+    types::{CompressionAlgoSet, CompressionAlgorithm},
 };
 
 pub type Blake3Hash = [u8; 32];
