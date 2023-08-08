@@ -14,7 +14,9 @@ use tokio::{
     sync::{mpsc, oneshot},
 };
 
-use crate::{bootstrap, bootstrap::Query, handler, handler::Command, query::NodeInfo, table};
+use crate::{
+    bootstrap, bootstrap::BootstrapRequest, handler, handler::Command, query::NodeInfo, table,
+};
 
 /// Builds the DHT.
 #[derive(Default)]
@@ -90,7 +92,7 @@ impl Builder {
 /// Maintains the DHT.
 pub struct Dht {
     handler_tx: mpsc::Sender<Command>,
-    bootstrap_tx: mpsc::Sender<Query>,
+    bootstrap_tx: mpsc::Sender<BootstrapRequest>,
 }
 
 impl Dht {
@@ -142,7 +144,12 @@ impl Dht {
     /// Start bootstrap task.
     pub async fn bootstrap(&self) -> Result<()> {
         let (tx, rx) = oneshot::channel();
-        if self.bootstrap_tx.send(Query::Start { tx }).await.is_err() {
+        if self
+            .bootstrap_tx
+            .send(BootstrapRequest::Start { tx })
+            .await
+            .is_err()
+        {
             tracing::error!("failed to send to bootstrap task");
         }
         if rx.await.unwrap_or(false) {
@@ -156,7 +163,7 @@ impl Dht {
         let (tx, rx) = oneshot::channel();
         if self
             .bootstrap_tx
-            .send(Query::DoneBootstrapping { tx })
+            .send(BootstrapRequest::DoneBootstrapping { tx })
             .await
             .is_err()
         {
@@ -177,6 +184,10 @@ impl WithStartAndShutdown for Dht {
     async fn shutdown(&self) {
         self.handler_tx
             .send(Command::Shutdown)
+            .await
+            .expect("handler worker to not drop channel");
+        self.bootstrap_tx
+            .send(BootstrapRequest::Shutdown)
             .await
             .expect("handler worker to not drop channel");
     }

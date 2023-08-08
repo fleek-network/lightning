@@ -42,6 +42,7 @@ pub async fn start_worker(
     };
     loop {
         if handler.received_shutdown {
+            tracing::trace!("shuttind down handler worker");
             break;
         }
         select! {

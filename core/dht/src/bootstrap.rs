@@ -12,9 +12,10 @@ use crate::{
     table::{TableKey, TableQuery},
 };
 
-pub enum Query {
+pub enum BootstrapRequest {
     Start { tx: oneshot::Sender<bool> },
     DoneBootstrapping { tx: oneshot::Sender<bool> },
+    Shutdown,
 }
 
 #[derive(Clone, PartialEq)]
@@ -25,7 +26,7 @@ pub enum State {
 }
 
 pub async fn start_worker(
-    mut server_rx: Receiver<Query>,
+    mut server_rx: Receiver<BootstrapRequest>,
     table_tx: Sender<TableQuery>,
     command_tx: Sender<Command>,
     local_key: NodeNetworkingPublicKey,
@@ -35,7 +36,7 @@ pub async fn start_worker(
     loop {
         while let Some(message) = server_rx.recv().await {
             match message {
-                Query::Start { tx } => {
+                BootstrapRequest::Start { tx } => {
                     if state == State::Bootstrapping {
                         if tx.send(false).is_err() {
                             tracing::error!("bootstrap client dropped the channel");
@@ -56,10 +57,14 @@ pub async fn start_worker(
                         }
                     }
                 },
-                Query::DoneBootstrapping { tx } => {
+                BootstrapRequest::DoneBootstrapping { tx } => {
                     if tx.send(state == State::Bootstrapped).is_err() {
                         tracing::error!("bootstrap client dropped channel");
                     }
+                },
+                BootstrapRequest::Shutdown => {
+                    tracing::trace!("shutting down bootstrap worker");
+                    return;
                 },
             }
         }
