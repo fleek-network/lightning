@@ -2,12 +2,12 @@
 //! place where we define the schema for the messages that are part of the network stack.
 //!
 //! Although serde is great, we want to make it easy to use a schema-based encoder/decoder
-//! in future (such as flatbuffers or protobuff).
+//! in the future (such as flatbuffers or protobuf).
 //!
-//! However that task can be extra development effort at the current stage, so we would
+//! However, that task can be extra development effort at the current stage, so we would
 //! rather use serde for the time being. This crate serves as a layer of abstraction
-//! that works over serde + flexbuffers (schema-less cousin of flatbuffers). And makes
-//! the entire encoding/decoding effort hot-swapable in one place.
+//! that works over serde + flexbuffers (schema-less cousin of flatbuffers), and makes
+//! the entire encoding/decoding effort hot-swappable in one place.
 //!
 //! Anywhere we need to care about serialization and deserialization of messages we can
 //! rely on the [`LightningMessage`] trait to use the encoding and decoding.
@@ -20,7 +20,7 @@ pub mod broadcast;
 pub mod dht;
 
 /// Any networking message that can be serialized and deserialized.
-pub trait LightningMessage: Sized + Send + Sync {
+pub trait LightningMessage: Sized + Send + Sync + 'static {
     /// Decode the message. Returns an error if we can't deserialize.
     fn decode(buffer: &[u8]) -> anyhow::Result<Self>;
 
@@ -36,11 +36,11 @@ pub trait AutoImplSerde: Serialize + for<'a> Deserialize<'a> + Send + Sync + Siz
 // Auto implement the lighting message for any serde type using flex buffer.
 // This is to allow us to move forward without a fixed schema for the time being and to
 // have a faster development. However an schema based approach should be preferred in
-// future. This
+// the future.
 
 impl AutoImplSerde for () {}
 
-impl<T: AutoImplSerde> LightningMessage for T {
+impl<T: AutoImplSerde + 'static> LightningMessage for T {
     #[inline]
     fn decode(buffer: &[u8]) -> anyhow::Result<Self> {
         let der = flexbuffers::Reader::get_root(buffer)?;
