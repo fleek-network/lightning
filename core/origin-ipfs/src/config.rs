@@ -23,7 +23,7 @@ impl Default for Config {
             gateways: vec![
                 Gateway {
                     protocol: Protocol::Https,
-                    authority: "gateway.ipfs.io".to_string(),
+                    authority: "ipfs.io".to_string(),
                 },
                 Gateway {
                     protocol: Protocol::Https,
