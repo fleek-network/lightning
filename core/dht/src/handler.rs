@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::Result;
 use fleek_crypto::NodeNetworkingPublicKey;
-use lightning_interfaces::dht::{TableEntry, TablePrefix};
+use lightning_interfaces::dht::{KeyPrefix, TableEntry};
 use tokio::{
     net::UdpSocket,
     select,
@@ -172,7 +172,7 @@ impl Handler {
                             };
 
                             let entry = TableEntry {
-                                prefix: TablePrefix::ContentRegistry,
+                                prefix: KeyPrefix::ContentRegistry,
                                 key,
                                 value: value.unwrap_or_default(),
                                 // Todo: make sure we keep track of source.

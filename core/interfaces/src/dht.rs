@@ -26,15 +26,15 @@ pub trait DhtInterface: WithStartAndShutdown + Sized {
     ) -> anyhow::Result<Self>;
 
     /// Put a key-value pair into the distributed hash table.
-    fn put(&self, prefix: TablePrefix, key: &[u8], value: &[u8]);
+    fn put(&self, prefix: KeyPrefix, key: &[u8], value: &[u8]);
 
     /// Return one value associated with the given key.
-    async fn get(&self, prefix: TablePrefix, key: &[u8]) -> Option<TableEntry>;
+    async fn get(&self, prefix: KeyPrefix, key: &[u8]) -> Option<TableEntry>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[repr(u8)]
-pub enum TablePrefix {
+pub enum KeyPrefix {
     /// The content registry keys.
     ContentRegistry,
 }
@@ -42,7 +42,7 @@ pub enum TablePrefix {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TableEntry {
     /// The name space of this key-value pair.
-    pub prefix: TablePrefix,
+    pub prefix: KeyPrefix,
     /// The raw key.
     pub key: Vec<u8>,
     /// The raw value.

@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use fleek_crypto::NodeNetworkingPublicKey;
 use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::{
-    dht::{DhtInterface, TableEntry, TablePrefix},
+    dht::{DhtInterface, KeyPrefix, TableEntry},
     SignerInterface, WithStartAndShutdown,
 };
 use lightning_topology::Topology;
@@ -190,11 +190,11 @@ impl DhtInterface for Dht {
         Builder::default().build().await
     }
 
-    fn put(&self, _: TablePrefix, key: &[u8], value: &[u8]) {
+    fn put(&self, _: KeyPrefix, key: &[u8], value: &[u8]) {
         self.put(key, value)
     }
 
-    async fn get(&self, _: TablePrefix, key: &[u8]) -> Option<TableEntry> {
+    async fn get(&self, _: KeyPrefix, key: &[u8]) -> Option<TableEntry> {
         self.get(key).await
     }
 }
