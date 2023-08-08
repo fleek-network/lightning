@@ -79,7 +79,9 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./docs/rpc/docs/gatsby
-        run: npm install
+        run: |
+          npm install
+          npm install gatsby-plugin-ipfs
 
       - name: Build docs
         working-directory: ./docs/rpc/docs/gatsby
