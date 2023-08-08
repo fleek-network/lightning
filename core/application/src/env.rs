@@ -223,7 +223,6 @@ impl Env<UpdatePerm> {
                     Value::NextNodeIndex(node_index + 1),
                 );
             }
-
             committee_table.insert(
                 0,
                 Committee {
@@ -312,7 +311,6 @@ impl Env<UpdatePerm> {
                     );
                 }
             }
-
         })
     }
 }

@@ -41,7 +41,7 @@ pub struct MockConsensus<Q: SyncQueryRunnerInterface, P: PubSub<()>> {
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
-    port: u16,
+    pub port: u16,
     host: std::net::IpAddr,
     mempool_success_rate: f64,
 }

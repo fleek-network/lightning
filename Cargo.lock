@@ -3774,6 +3774,29 @@ dependencies = [
  "tracing",
 ]
 
+[[package]]
+name = "lightning-e2e"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "fleek-crypto",
+ "futures",
+ "lightning-application",
+ "lightning-consensus",
+ "lightning-handshake",
+ "lightning-interfaces",
+ "lightning-node",
+ "lightning-notifier",
+ "lightning-rpc",
+ "lightning-signer",
+ "lightning-topology",
+ "mock",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml 0.7.6",
+]
 
 [[package]]
 name = "lightning-handshake"

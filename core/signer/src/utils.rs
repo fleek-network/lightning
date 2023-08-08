@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::anyhow;
 
-pub(crate) fn save<T: AsRef<[u8]>>(path: &Path, data: T) -> anyhow::Result<()> {
+pub fn save<T: AsRef<[u8]>>(path: &Path, data: T) -> anyhow::Result<()> {
     // Mostly taken from: https://github.com/fleek-network/ursa/blob/feat/pod/crates/ursa/src/ursa/identity.rs
     let path = expand_path(path)?;
     create_dir_all(path.parent().unwrap())?;

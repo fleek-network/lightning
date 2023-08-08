@@ -1,5 +1,5 @@
 mod config;
-mod utils;
+pub mod utils;
 use std::{
     collections::VecDeque,
     fs::read_to_string,
