@@ -80,7 +80,8 @@ jobs:
       - name: Install dependencies
         working-directory: ./docs/rpc/docs/gatsby
         run: |
-          npm install --legacy-peer-deps
+          npm i @mdx-js/react@^1.5.4 -D --legacy-peer-deps
+          npm install --force
           npm install gatsby-plugin-ipfs
 
       - name: Build docs
