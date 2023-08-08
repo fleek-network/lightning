@@ -14,21 +14,21 @@ use crate::{
 
 pub type TableKey = Blake3Hash;
 
-pub async fn start_worker(mut rx: Receiver<TableQuery>, local_key: NodeNetworkingPublicKey) {
+pub async fn start_worker(mut rx: Receiver<TableCommand>, local_key: NodeNetworkingPublicKey) {
     let mut table = Table::new(local_key);
     while let Some(query) = rx.recv().await {
         match query {
-            TableQuery::ClosestNodes { target: key, tx } => {
+            TableCommand::ClosestNodes { target: key, tx } => {
                 let nodes = table.closest_nodes(&key);
                 tx.send(Ok(nodes))
                     .expect("internal table client not to drop the channel");
             },
-            TableQuery::AddNode { node, tx } => {
+            TableCommand::AddNode { node, tx } => {
                 let nodes = table.add_node(node).map_err(|e| QueryError(e.to_string()));
                 tx.send(nodes)
                     .expect("internal table client not to drop the channel");
             },
-            TableQuery::FirstNonEmptyBucket { tx } => {
+            TableCommand::FirstNonEmptyBucket { tx } => {
                 let local_key = table.local_node_key;
                 let closest = table.closest_nodes(&local_key.0);
                 match &closest.first() {
@@ -51,7 +51,7 @@ pub async fn start_worker(mut rx: Receiver<TableQuery>, local_key: NodeNetworkin
 #[error("querying the table failed: {0}")]
 pub struct QueryError(String);
 
-pub enum TableQuery {
+pub enum TableCommand {
     ClosestNodes {
         target: TableKey,
         tx: oneshot::Sender<Result<Vec<NodeInfo>, QueryError>>,

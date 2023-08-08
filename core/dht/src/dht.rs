@@ -15,7 +15,8 @@ use tokio::{
 };
 
 use crate::{
-    bootstrap, bootstrap::BootstrapRequest, handler, handler::Command, query::NodeInfo, table,
+    bootstrap, bootstrap::BootstrapCommand, handler, handler::HandlerCommand, query::NodeInfo,
+    table,
 };
 
 /// Builds the DHT.
@@ -59,11 +60,7 @@ impl Builder {
         let (table_tx, table_rx) = mpsc::channel(buffer_size);
         tokio::spawn(table::start_worker(table_rx, node_key));
 
-        let address = self.address.unwrap_or_else(|| {
-            "0.0.0.0:0"
-                .parse()
-                .expect("hardcoded IP address to be valid")
-        });
+        let address = self.address.unwrap_or_else(|| "0.0.0.0:0".parse().unwrap());
         let socket = UdpSocket::bind(address).await.map(Arc::new)?;
         let (handler_tx, handler_rx) = mpsc::channel(buffer_size);
         tokio::spawn(handler::start_worker(
@@ -91,8 +88,8 @@ impl Builder {
 
 /// Maintains the DHT.
 pub struct Dht {
-    handler_tx: mpsc::Sender<Command>,
-    bootstrap_tx: mpsc::Sender<BootstrapRequest>,
+    handler_tx: mpsc::Sender<HandlerCommand>,
+    bootstrap_tx: mpsc::Sender<BootstrapCommand>,
 }
 
 impl Dht {
@@ -101,36 +98,35 @@ impl Dht {
         let (tx, rx) = oneshot::channel();
         if self
             .handler_tx
-            .send(Command::Get {
+            .send(HandlerCommand::Get {
                 key: key.to_vec(),
                 tx,
             })
             .await
             .is_err()
         {
-            tracing::error!("failed to send to handler task");
+            tracing::error!("failed to send to handler command");
         }
-        match rx.await {
-            Ok(value) => value.unwrap_or_else(|_| {
-                tracing::trace!("unexpected error when attempting to get {key:?}");
+        rx.await
+            .expect("handler worker to not drop the channel")
+            .unwrap_or_else(|e| {
+                tracing::trace!("unexpected error when attempting to get {key:?}: {e:?}");
                 None
-            }),
-            Err(_) => {
-                tracing::error!("sender was dropped unexpectedly");
-                None
-            },
-        }
+            })
     }
 
     /// Put a key-value pair into the DHT.
     pub fn put(&self, key: &[u8], value: &[u8]) {
-        // Todo: Maybe we should make `put` async.
         let handler_tx = self.handler_tx.clone();
         let key = key.to_vec();
         let value = value.to_vec();
         tokio::spawn(async move {
-            if handler_tx.send(Command::Put { key, value }).await.is_err() {
-                tracing::error!("failed to send to handler task");
+            if handler_tx
+                .send(HandlerCommand::Put { key, value })
+                .await
+                .is_err()
+            {
+                tracing::error!("failed to send to handler command");
             }
         });
     }
@@ -141,11 +137,11 @@ impl Dht {
         let (tx, rx) = oneshot::channel();
         if self
             .bootstrap_tx
-            .send(BootstrapRequest::Start { tx })
+            .send(BootstrapCommand::Start { tx })
             .await
             .is_err()
         {
-            tracing::error!("failed to send to bootstrap task");
+            tracing::error!("failed to send to bootstrap command");
         }
         if rx.await.unwrap_or(false) {
             tracing::warn!("failed to start bootstrap");
@@ -158,11 +154,11 @@ impl Dht {
         let (tx, rx) = oneshot::channel();
         if self
             .bootstrap_tx
-            .send(BootstrapRequest::DoneBootstrapping { tx })
+            .send(BootstrapCommand::DoneBootstrapping { tx })
             .await
             .is_err()
         {
-            tracing::error!("failed to send to bootstrap task");
+            tracing::error!("failed to send to bootstrap command");
         }
         rx.await.unwrap_or(false)
     }
@@ -178,13 +174,13 @@ impl WithStartAndShutdown for Dht {
 
     async fn shutdown(&self) {
         self.handler_tx
-            .send(Command::Shutdown)
+            .send(HandlerCommand::Shutdown)
             .await
             .expect("handler worker to not drop channel");
         self.bootstrap_tx
-            .send(BootstrapRequest::Shutdown)
+            .send(BootstrapCommand::Shutdown)
             .await
-            .expect("handler worker to not drop channel");
+            .expect("bootstrap worker to not drop channel");
     }
 }
 

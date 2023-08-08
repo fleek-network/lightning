@@ -21,14 +21,14 @@ use crate::{
     distance::{self, Distance},
     query::{Message, MessageType, NodeInfo, Query, Response},
     socket,
-    table::{TableKey, TableQuery},
+    table::{TableCommand, TableKey},
 };
 
 /// Kademlia's lookup procedure.
 pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError> {
     // Get initial K closest nodes from our local table.
     let (tx, rx) = oneshot::channel();
-    let table_query = TableQuery::ClosestNodes {
+    let table_query = TableCommand::ClosestNodes {
         target: lookup.target,
         tx,
     };
@@ -215,7 +215,7 @@ pub struct LookupTask {
     // Target that we're looking for.
     target: TableKey,
     // Send queries to table server.
-    table_tx: Sender<TableQuery>,
+    table_tx: Sender<TableCommand>,
     // Receive events about responses received from the network.
     main_rx: Receiver<ResponseEvent>,
     // Socket to send queries over the network.
@@ -228,7 +228,7 @@ impl LookupTask {
         find_value_lookup: bool,
         local_key: NodeNetworkingPublicKey,
         target: TableKey,
-        table_tx: Sender<TableQuery>,
+        table_tx: Sender<TableCommand>,
         main_rx: Receiver<ResponseEvent>,
         socket: Arc<UdpSocket>,
     ) -> Self {

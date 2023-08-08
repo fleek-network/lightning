@@ -22,14 +22,14 @@ use crate::{
     lookup::{LookupResult, LookupTask, ResponseEvent},
     query::{Message, MessageType, NodeInfo, Query, Response},
     socket,
-    table::{TableKey, TableQuery},
+    table::{TableCommand, TableKey},
 };
 
 pub const NO_REPLY_CHANNEL_ID: u64 = 0;
 
 pub async fn start_worker(
-    mut command_rx: Receiver<Command>,
-    table_tx: Sender<TableQuery>,
+    mut command_rx: Receiver<HandlerCommand>,
+    table_tx: Sender<TableCommand>,
     socket: Arc<UdpSocket>,
     local_key: NodeNetworkingPublicKey,
 ) {
@@ -42,7 +42,7 @@ pub async fn start_worker(
     };
     loop {
         if handler.received_shutdown {
-            tracing::trace!("shuttind down handler worker");
+            tracing::trace!("shutting down handler worker");
             break;
         }
         select! {
@@ -71,7 +71,7 @@ pub async fn start_worker(
 }
 
 async fn handle_query(
-    table_tx: Sender<TableQuery>,
+    table_tx: Sender<TableCommand>,
     socket: Arc<UdpSocket>,
     local_key: NodeNetworkingPublicKey,
     message: Message,
@@ -82,7 +82,7 @@ async fn handle_query(
         Query::Find { find_value, target } => {
             let (tx, rx) = oneshot::channel();
             table_tx
-                .send(TableQuery::ClosestNodes { target, tx })
+                .send(TableCommand::ClosestNodes { target, tx })
                 .await
                 .expect("table worker to not drop the channel");
             let nodes = rx.await.expect("table worker to not drop the channel")?;
@@ -126,10 +126,10 @@ async fn handle_query(
 }
 
 #[derive(Debug)]
-pub enum Command {
+pub enum HandlerCommand {
     Get {
         key: Vec<u8>,
-        tx: oneshot::Sender<Result<Option<TableEntry>, ()>>,
+        tx: oneshot::Sender<Result<Option<TableEntry>>>,
     },
     Put {
         key: Vec<u8>,
@@ -137,7 +137,7 @@ pub enum Command {
     },
     FindNode {
         target: NodeNetworkingPublicKey,
-        tx: oneshot::Sender<Result<Vec<NodeInfo>, ()>>,
+        tx: oneshot::Sender<Result<Vec<NodeInfo>>>,
     },
     Shutdown,
 }
@@ -145,19 +145,19 @@ pub enum Command {
 struct Handler {
     pending: HashMap<u64, Sender<ResponseEvent>>,
     local_key: NodeNetworkingPublicKey,
-    table_tx: Sender<TableQuery>,
+    table_tx: Sender<TableCommand>,
     socket: Arc<UdpSocket>,
     received_shutdown: bool,
 }
 
 impl Handler {
-    fn handle_command(&mut self, command: Command) -> Result<()> {
+    fn handle_command(&mut self, command: HandlerCommand) -> Result<()> {
         let (event_tx, event_rx) = mpsc::channel(100);
         let task_id = rand::random();
         self.pending.insert(task_id, event_tx);
 
         match command {
-            Command::Get { key, tx } => {
+            HandlerCommand::Get { key, tx } => {
                 let target = TableKey::try_from(key.as_slice())?;
                 let task = LookupTask::new(
                     task_id,
@@ -193,14 +193,14 @@ impl Handler {
                         },
                         Err(e) => {
                             tracing::error!("lookup failed: {e:?}");
-                            if tx.send(Err(())).is_err() {
+                            if tx.send(Err(e.into())).is_err() {
                                 tracing::error!("client dropped channel for Get respose")
                             }
                         },
                     }
                 });
             },
-            Command::Put { key, value } => {
+            HandlerCommand::Put { key, value } => {
                 let socket_clone = self.socket.clone();
                 let sender_key = self.local_key;
                 let target = TableKey::try_from(key.as_slice())?;
@@ -244,7 +244,7 @@ impl Handler {
                     }
                 });
             },
-            Command::FindNode { target, tx } => {
+            HandlerCommand::FindNode { target, tx } => {
                 let task = LookupTask::new(
                     task_id,
                     false,
@@ -265,16 +265,15 @@ impl Handler {
                             tx.send(Ok(nodes))
                                 .expect("client dropped channel for FindNode respose")
                         },
-                        // Todo: Send an appropriate response.
                         Err(e) => {
                             tracing::error!("lookup failed: {e:?}");
-                            tx.send(Err(()))
+                            tx.send(Err(e.into()))
                                 .expect("client dropped channel for FindNode respose");
                         },
                     }
                 });
             },
-            Command::Shutdown => self.received_shutdown = true,
+            HandlerCommand::Shutdown => self.received_shutdown = true,
         }
         Ok(())
     }
