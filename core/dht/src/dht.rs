@@ -14,7 +14,7 @@ use tokio::{
     sync::{mpsc, oneshot},
 };
 
-use crate::{bootstrap, bootstrap::Query, handler, handler::Task, query::NodeInfo, table};
+use crate::{bootstrap, bootstrap::Query, handler, handler::Command, query::NodeInfo, table};
 
 /// Builds the DHT.
 #[derive(Default)]
@@ -89,7 +89,7 @@ impl Builder {
 
 /// Maintains the DHT.
 pub struct Dht {
-    handler_tx: mpsc::Sender<Task>,
+    handler_tx: mpsc::Sender<Command>,
     bootstrap_tx: mpsc::Sender<Query>,
 }
 
@@ -99,7 +99,7 @@ impl Dht {
         let (tx, rx) = oneshot::channel();
         if self
             .handler_tx
-            .send(Task::Get {
+            .send(Command::Get {
                 key: key.to_vec(),
                 tx,
             })
@@ -126,7 +126,7 @@ impl Dht {
         futures::executor::block_on(async {
             if self
                 .handler_tx
-                .send(Task::Put {
+                .send(Command::Put {
                     key: key.to_vec(),
                     value: value.to_vec(),
                 })
@@ -169,19 +169,19 @@ impl Dht {
 #[async_trait]
 impl WithStartAndShutdown for Dht {
     fn is_running(&self) -> bool {
-        todo!()
+        !self.handler_tx.is_closed() && !self.bootstrap_tx.is_closed()
     }
 
-    async fn start(&self) {
-        todo!()
-    }
+    async fn start(&self) {}
 
     async fn shutdown(&self) {
-        todo!()
+        self.handler_tx
+            .send(Command::Shutdown)
+            .await
+            .expect("handler worker to not drop channel");
     }
 }
 
-// Todo: Rename interface.
 #[async_trait]
 impl DhtInterface for Dht {
     type Topology = Topology<QueryRunner>;

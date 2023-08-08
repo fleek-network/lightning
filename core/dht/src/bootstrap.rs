@@ -7,7 +7,7 @@ use tokio::sync::{
 
 use crate::{
     bucket::{Node, MAX_BUCKETS},
-    handler::Task,
+    handler::Command,
     query::NodeInfo,
     table::{TableKey, TableQuery},
 };
@@ -27,7 +27,7 @@ pub enum State {
 pub async fn start_worker(
     mut server_rx: Receiver<Query>,
     table_tx: Sender<TableQuery>,
-    command_tx: Sender<Task>,
+    command_tx: Sender<Command>,
     local_key: NodeNetworkingPublicKey,
     bootstrap_nodes: Vec<NodeInfo>,
 ) {
@@ -67,7 +67,7 @@ pub async fn start_worker(
 }
 
 async fn bootstrap(
-    command_tx: Sender<Task>,
+    command_tx: Sender<Command>,
     table_tx: Sender<TableQuery>,
     boostrap_nodes: &[NodeInfo],
     local_key: NodeNetworkingPublicKey,
@@ -110,12 +110,12 @@ async fn bootstrap(
 
 pub async fn closest_nodes(
     target: NodeNetworkingPublicKey,
-    command_tx: Sender<Task>,
+    command_tx: Sender<Command>,
     table_tx: Sender<TableQuery>,
 ) -> Result<()> {
     let (tx, rx) = oneshot::channel();
     command_tx
-        .send(Task::FindNode { target, tx })
+        .send(Command::FindNode { target, tx })
         .await
         .expect("dispatcher worker not to drop channel");
     let nodes = rx

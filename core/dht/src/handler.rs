@@ -28,7 +28,7 @@ use crate::{
 pub const NO_REPLY_CHANNEL_ID: u64 = 0;
 
 pub async fn start_worker(
-    mut command_rx: Receiver<Task>,
+    mut command_rx: Receiver<Command>,
     table_tx: Sender<TableQuery>,
     socket: Arc<UdpSocket>,
     local_key: NodeNetworkingPublicKey,
@@ -38,8 +38,12 @@ pub async fn start_worker(
         local_key,
         table_tx: table_tx.clone(),
         socket: socket.clone(),
+        received_shutdown: false,
     };
     loop {
+        if handler.received_shutdown {
+            break;
+        }
         select! {
             command = command_rx.recv() => {
                 if command.is_none() {
@@ -121,7 +125,7 @@ async fn handle_query(
 }
 
 #[derive(Debug)]
-pub enum Task {
+pub enum Command {
     Get {
         key: Vec<u8>,
         tx: oneshot::Sender<Result<Option<TableEntry>, ()>>,
@@ -134,6 +138,7 @@ pub enum Task {
         target: NodeNetworkingPublicKey,
         tx: oneshot::Sender<Result<Vec<NodeInfo>, ()>>,
     },
+    Shutdown,
 }
 
 struct Handler {
@@ -141,16 +146,17 @@ struct Handler {
     local_key: NodeNetworkingPublicKey,
     table_tx: Sender<TableQuery>,
     socket: Arc<UdpSocket>,
+    received_shutdown: bool,
 }
 
 impl Handler {
-    fn handle_command(&mut self, command: Task) -> Result<()> {
+    fn handle_command(&mut self, command: Command) -> Result<()> {
         let (event_tx, event_rx) = mpsc::channel(100);
         let task_id = rand::random();
         self.pending.insert(task_id, event_tx);
 
         match command {
-            Task::Get { key, tx } => {
+            Command::Get { key, tx } => {
                 let target = TableKey::try_from(key.as_slice())?;
                 let task = LookupTask::new(
                     task_id,
@@ -193,7 +199,7 @@ impl Handler {
                     }
                 });
             },
-            Task::Put { key, value } => {
+            Command::Put { key, value } => {
                 let socket_clone = self.socket.clone();
                 let sender_key = self.local_key;
                 let target = TableKey::try_from(key.as_slice())?;
@@ -237,7 +243,7 @@ impl Handler {
                     }
                 });
             },
-            Task::FindNode { target, tx } => {
+            Command::FindNode { target, tx } => {
                 let task = LookupTask::new(
                     task_id,
                     false,
@@ -267,6 +273,7 @@ impl Handler {
                     }
                 });
             },
+            Command::Shutdown => self.received_shutdown = true,
         }
         Ok(())
     }
