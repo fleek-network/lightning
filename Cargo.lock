@@ -3762,7 +3762,6 @@ dependencies = [
  "async-trait",
  "bincode",
  "fleek-crypto",
- "futures",
  "lightning-application",
  "lightning-interfaces",
  "lightning-topology",

@@ -125,16 +125,11 @@ impl Dht {
     /// Put a key-value pair into the DHT.
     pub fn put(&self, key: &[u8], value: &[u8]) {
         // Todo: Maybe we should make `put` async.
-        futures::executor::block_on(async {
-            if self
-                .handler_tx
-                .send(Command::Put {
-                    key: key.to_vec(),
-                    value: value.to_vec(),
-                })
-                .await
-                .is_err()
-            {
+        let handler_tx = self.handler_tx.clone();
+        let key = key.to_vec();
+        let value = value.to_vec();
+        tokio::spawn(async move {
+            if handler_tx.send(Command::Put { key, value }).await.is_err() {
                 tracing::error!("failed to send to handler task");
             }
         });

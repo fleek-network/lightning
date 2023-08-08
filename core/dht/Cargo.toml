@@ -12,7 +12,6 @@ lightning-application = { path="../application" }
 lightning-interfaces = { path="../interfaces" }
 lightning-topology = { path="../topology" }
 fleek-crypto.workspace = true
-futures.workspace = true
 serde.workspace = true
 rand.workspace = true
 thiserror.workspace = true
