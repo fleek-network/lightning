@@ -131,22 +131,17 @@ impl Dht {
         });
     }
 
-    // Todo: Let's return a proper error to users.
     /// Start bootstrap task.
-    pub async fn bootstrap(&self) -> Result<()> {
-        let (tx, rx) = oneshot::channel();
+    /// If bootstrapping is in process, this command will be ignored.
+    pub async fn bootstrap(&self) {
         if self
             .bootstrap_tx
-            .send(BootstrapCommand::Start { tx })
+            .send(BootstrapCommand::Start)
             .await
             .is_err()
         {
             tracing::error!("failed to send to bootstrap command");
         }
-        if rx.await.unwrap_or(false) {
-            tracing::warn!("failed to start bootstrap");
-        }
-        Ok(())
     }
 
     /// Returns true if the node is bootstrapped and false otherwise.

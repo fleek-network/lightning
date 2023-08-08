@@ -13,7 +13,7 @@ use crate::{
 };
 
 pub enum BootstrapCommand {
-    Start { tx: oneshot::Sender<bool> },
+    Start,
     DoneBootstrapping { tx: oneshot::Sender<bool> },
     Shutdown,
 }
@@ -36,12 +36,8 @@ pub async fn start_worker(
     loop {
         while let Some(message) = server_rx.recv().await {
             match message {
-                BootstrapCommand::Start { tx } => {
-                    if state == State::Bootstrapping {
-                        if tx.send(false).is_err() {
-                            tracing::error!("bootstrap client dropped the channel");
-                        }
-                    } else {
+                BootstrapCommand::Start => {
+                    if state != State::Bootstrapping {
                         match bootstrap(
                             handler_tx.clone(),
                             table_tx.clone(),
