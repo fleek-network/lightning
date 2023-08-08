@@ -22,3 +22,8 @@ serde_json.workspace = true
 log.workspace = true
 rand_distr = "0.4.3"
 rand_chacha = "0.3"
+
+# Mock Connection Pool
+lightning-schema = {path="../schema"}
+dashmap = "5.5.0"
+futures.workspace = true
