@@ -307,8 +307,8 @@ mod tests {
 
         let signer_b = Signer::init(
             lightning_signer::Config {
-                node_key_path: "core/test-utils/keys/test_node2.pem".into(),
-                network_key_path: "core/test-utils/keys/test_network2.pem".into(),
+                node_key_path: "../test-utils/keys/test_node2.pem".into(),
+                network_key_path: "../test-utils/keys/test_network2.pem".into(),
             },
             query_runner.clone(),
         )
