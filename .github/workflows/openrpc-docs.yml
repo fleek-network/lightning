@@ -31,6 +31,7 @@ jobs:
         run: open-rpc-generator generate -t docs -d openrpc.json -l gatsby
 
       - name: Setup config for IPFS (relative paths)
+        working-directory: ./docs/rpc/docs/gatsby
         run: |
           echo "module.exports = {
               pathPrefix: '__GATSBY_IPFS_PATH_PREFIX__',
@@ -75,7 +76,7 @@ jobs:
                   },
                 }
               ],
-          }" > ./docs/gatsby/gatsby-config.js
+          }" > gatsby-config.js
 
       - name: Install dependencies
         working-directory: ./docs/rpc/docs/gatsby
