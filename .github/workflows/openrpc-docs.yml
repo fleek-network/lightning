@@ -81,7 +81,8 @@ jobs:
         working-directory: ./docs/rpc/docs/gatsby
         run: |
           npm i react@16.13.1 react-dom@16.13.1 -S
-          npm install --legacy-peer-deps
+          npm i monaco-editor@0.15.6 -S
+          npm install --force
           npm install gatsby-plugin-ipfs
 
       - name: Build docs
