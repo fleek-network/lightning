@@ -24,9 +24,11 @@ pub async fn start_worker(mut rx: Receiver<TableCommand>, local_key: NodeNetwork
                     .expect("internal table client not to drop the channel");
             },
             TableCommand::AddNode { node, tx } => {
-                let nodes = table.add_node(node).map_err(|e| QueryError(e.to_string()));
-                tx.send(nodes)
-                    .expect("internal table client not to drop the channel");
+                let result = table.add_node(node).map_err(|e| QueryError(e.to_string()));
+                if let Some(tx) = tx {
+                    tx.send(result)
+                        .expect("internal table client not to drop the channel");
+                }
             },
             TableCommand::FirstNonEmptyBucket { tx } => {
                 let local_key = table.local_node_key;
@@ -58,7 +60,7 @@ pub enum TableCommand {
     },
     AddNode {
         node: NodeInfo,
-        tx: oneshot::Sender<Result<(), QueryError>>,
+        tx: Option<oneshot::Sender<Result<(), QueryError>>>,
     },
     // Returns index for non-empty bucket containing closest nodes. Used for bootstrapping.
     FirstNonEmptyBucket {

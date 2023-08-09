@@ -65,6 +65,8 @@ async fn main() {
 
             dht.put(&key, &value);
 
+            // Todo: Let's remove this loop.
+            // We have this loop so that the spawn task of `put` finishes.
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }

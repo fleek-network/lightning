@@ -93,7 +93,7 @@ async fn bootstrap(
         table_tx
             .send(TableCommand::AddNode {
                 node: node.clone(),
-                tx,
+                tx: Some(tx),
             })
             .await
             .expect("table worker not to drop channel");
@@ -156,7 +156,7 @@ pub async fn closest_nodes(
     for node in nodes {
         let (tx, rx) = oneshot::channel();
         table_tx
-            .send(TableCommand::AddNode { node, tx })
+            .send(TableCommand::AddNode { node, tx: Some(tx) })
             .await
             .expect("table worker not to drop channel");
         if let Err(e) = rx.await.expect("table worker not to drop channel") {

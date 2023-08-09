@@ -146,6 +146,9 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                     let nodes = response
                         .nodes
                         .into_iter()
+                        .filter(|node| {
+                            !pending.contains_key(&node.key) && !late.contains_key(&node.key)
+                        })
                         .map(|node| {
                             (
                                 node.key.0,
@@ -156,6 +159,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
                             )
                         })
                         .collect();
+
 
                     // Add new nodes to closest nodes list.
                     lookup.closest_nodes.insert_new_entries(nodes);

@@ -114,6 +114,22 @@ async fn handle_query(
             };
             let bytes = bincode::serialize(&response)?;
             socket::send_to(&socket, bytes.as_slice(), address).await?;
+
+            tracing::trace!(
+                "discovered new contact {:?} {:?}",
+                message.sender_key,
+                address
+            );
+            table_tx
+                .send(TableCommand::AddNode {
+                    node: NodeInfo {
+                        address,
+                        key: message.sender_key,
+                    },
+                    tx: None,
+                })
+                .await
+                .expect("table worker to not drop the channel");
         },
         Query::Store { key, value } => {
             store_tx
