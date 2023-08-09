@@ -3761,6 +3761,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
+ "clap 4.3.17",
  "fleek-crypto",
  "lightning-application",
  "lightning-interfaces",
