@@ -78,29 +78,23 @@ jobs:
               ],
           }" > gatsby-config.js
 
-      - name: TIAS
+      - name: Install dependencies
+        working-directory: ./docs/rpc/docs/gatsby
         run: |
-          ls -la
-          ls -la ./docs/gatsby
-          cat ./docs/gatsby/gatsby-config.js
+          npm i react@16.13.1 react-dom@16.13.1 -S
+          npm i monaco-editor@0.15.6 -S
+          npm install --force
+          npm install gatsby-plugin-ipfs
 
-      # - name: Install dependencies
-      #   working-directory: ./docs/rpc/docs/gatsby
-      #   run: |
-      #     npm i react@16.13.1 react-dom@16.13.1 -S
-      #     npm i monaco-editor@0.15.6 -S
-      #     npm install --force
-      #     npm install gatsby-plugin-ipfs
+      - name: Build docs
+        working-directory: ./docs/rpc/docs/gatsby
+        run: npm run build
 
-      # - name: Build docs
-      #   working-directory: ./docs/rpc/docs/gatsby
-      #   run: npm run build
-
-      # - name: Deploy to GitHub Pages
-      #   uses: peaceiris/actions-gh-pages@v3
-      #   with:
-      #     github_token: ${{ secrets.GITHUB_TOKEN }}
-      #     publish_dir: ./docs/rpc/docs/gatsby/public
-      #     # https://github.com/actions/checkout/issues/13#issuecomment-724415212
-      #     user_name: github-actions[bot]
-      #     user_email: 41898282+github-actions[bot]@users.noreply.github.com
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/rpc/docs/gatsby/public
+          # https://github.com/actions/checkout/issues/13#issuecomment-724415212
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
