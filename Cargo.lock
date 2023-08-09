@@ -3792,6 +3792,7 @@ dependencies = [
  "lightning-topology",
  "mock",
  "reqwest",
+ "resolve-path",
  "serde",
  "serde_json",
  "tokio",

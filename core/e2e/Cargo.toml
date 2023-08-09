@@ -25,3 +25,4 @@ reqwest = { workspace = true, features = ["json"] }
 serde.workspace = true
 
 toml = "0.7"
+resolve-path = "0.1.0"

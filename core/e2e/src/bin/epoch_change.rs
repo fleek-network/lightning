@@ -3,6 +3,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::Result;
 use lightning_e2e::swarm::Swarm;
 use reqwest::{Client, Response};
+use resolve_path::PathResolveExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -18,7 +19,7 @@ async fn main() -> Result<()> {
         .as_millis() as u64;
 
     let swarm = Swarm::builder()
-        .with_directory("~/.fleek/2e2".into())
+        .with_directory("~/.fleek/2e2".resolve().into())
         .with_num_nodes(4)
         .with_epoch_time(20000)
         .with_epoch_start(epoch_start)

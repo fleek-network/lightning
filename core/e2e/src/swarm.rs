@@ -143,7 +143,7 @@ impl SwarmBuilder {
                 listen_addr: SocketAddr::from_str(&format!("0.0.0.0:{}", 6969 + i)).unwrap(),
             };
 
-            let keys_path = directory.join("keys");
+            let keys_path = node_directory.join("keys");
             let owner_secret_key = AccountOwnerSecretKey::generate();
             let node_secret_key = NodeSecretKey::generate();
             let node_secret_key_path = keys_path.join("node.pem");
@@ -172,11 +172,11 @@ impl SwarmBuilder {
             genesis.borrow_mut().committee.push(GenesisCommittee::new(
                 owner_secret_key.to_pk().to_base64(),
                 node_secret_key.to_pk().to_base64(),
-                format!("/ip4/127.0.0.1/udp/{}", 20000 + num_nodes + i),
+                format!("/ip4/127.0.0.1/udp/{}", 8000 + i),
                 node_net_secret_key.to_pk().to_base64(),
-                format!("/ip4/127.0.0.1/udp/{}/http", 20000 + (2 * num_nodes) + i),
+                format!("/ip4/127.0.0.1/udp/{}/http", 8000 + num_nodes + i),
                 node_net_secret_key.to_pk().to_base64(),
-                format!("/ip4/127.0.0.1/tcp/{}/http", 20000 + (3 * num_nodes) + i),
+                format!("/ip4/127.0.0.1/tcp/{}/http", 8000 + (2 * num_nodes) + i),
                 Some(min_stake),
             ));
 
