@@ -21,14 +21,14 @@ use crate::{
     distance::{self, Distance},
     query::{Message, MessageType, NodeInfo, Query, Response},
     socket,
-    table::{TableCommand, TableKey},
+    table::{TableKey, TableRequest},
 };
 
 /// Kademlia's lookup procedure.
 pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError> {
     // Get initial K closest nodes from our local table.
     let (tx, rx) = oneshot::channel();
-    let table_query = TableCommand::ClosestNodes {
+    let table_query = TableRequest::ClosestNodes {
         target: lookup.target,
         tx,
     };
@@ -120,7 +120,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
             }
             // Incoming K nodes from peers.
             message = lookup.main_rx.recv() => {
-                let response_event = message.expect("dispatcher worker not to drop the channel");
+                let response_event = message.expect("handler worker not to drop the channel");
                 let sender_key = response_event.sender_key;
                 let response_id = response_event.id;
                 let response = response_event.response;
@@ -186,7 +186,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
         }
     }
 
-    // Close channel to indicate to dispatcher that this task is done.
+    // Close channel to indicate to handler that this task is done.
     lookup.main_rx.close();
 
     if lookup.find_value_lookup {
@@ -219,7 +219,7 @@ pub struct LookupTask {
     // Target that we're looking for.
     target: TableKey,
     // Send queries to table server.
-    table_tx: Sender<TableCommand>,
+    table_tx: Sender<TableRequest>,
     // Receive events about responses received from the network.
     main_rx: Receiver<ResponseEvent>,
     // Socket to send queries over the network.
@@ -232,7 +232,7 @@ impl LookupTask {
         find_value_lookup: bool,
         local_key: NodeNetworkingPublicKey,
         target: TableKey,
-        table_tx: Sender<TableCommand>,
+        table_tx: Sender<TableRequest>,
         main_rx: Receiver<ResponseEvent>,
         socket: Arc<UdpSocket>,
     ) -> Self {

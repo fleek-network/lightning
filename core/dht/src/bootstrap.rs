@@ -12,12 +12,12 @@ use tokio::{
 
 use crate::{
     bucket::MAX_BUCKETS,
-    handler::HandlerCommand,
+    handler::HandlerRequest,
     query::NodeInfo,
-    table::{TableCommand, TableKey},
+    table::{TableKey, TableRequest},
 };
 
-pub enum BootstrapCommand {
+pub enum BootstrapRequest {
     Start,
     DoneBootstrapping { tx: oneshot::Sender<bool> },
     Shutdown,
@@ -31,17 +31,17 @@ pub enum State {
 }
 
 pub async fn start_worker(
-    mut server_rx: Receiver<BootstrapCommand>,
-    table_tx: Sender<TableCommand>,
-    handler_tx: Sender<HandlerCommand>,
+    mut server_rx: Receiver<BootstrapRequest>,
+    table_tx: Sender<TableRequest>,
+    handler_tx: Sender<HandlerRequest>,
     local_key: NodeNetworkingPublicKey,
     bootstrap_nodes: Vec<NodeInfo>,
 ) {
     let mut state = State::Idle;
     loop {
-        while let Some(message) = server_rx.recv().await {
-            match message {
-                BootstrapCommand::Start => {
+        while let Some(request) = server_rx.recv().await {
+            match request {
+                BootstrapRequest::Start => {
                     // If we have no bootstrap nodes, it means we are the bootstrap node.
                     // Thus, we mark our node as already bootstrapped.
                     if bootstrap_nodes.is_empty() {
@@ -63,18 +63,18 @@ pub async fn start_worker(
                             },
                             Err(e) => {
                                 state = State::Idle;
-                                tracing::error!("[Bootstrap]: failed to start bootstrapping: {e}")
+                                tracing::error!("failed to start bootstrapping: {e}")
                             },
                         }
                     }
                 },
-                BootstrapCommand::DoneBootstrapping { tx } => {
+                BootstrapRequest::DoneBootstrapping { tx } => {
                     if tx.send(state == State::Bootstrapped).is_err() {
-                        tracing::error!("[Bootstrap]: client dropped the channel");
+                        tracing::error!("client dropped the channel");
                     }
                 },
-                BootstrapCommand::Shutdown => {
-                    tracing::trace!("[Bootstrap]: shutting down bootstrap worker");
+                BootstrapRequest::Shutdown => {
+                    tracing::trace!("shutting down bootstrap worker");
                     return;
                 },
             }
@@ -83,22 +83,22 @@ pub async fn start_worker(
 }
 
 async fn bootstrap(
-    handler_tx: Sender<HandlerCommand>,
-    table_tx: Sender<TableCommand>,
+    handler_tx: Sender<HandlerRequest>,
+    table_tx: Sender<TableRequest>,
     boostrap_nodes: &[NodeInfo],
     local_key: NodeNetworkingPublicKey,
 ) -> Result<()> {
     for node in boostrap_nodes.iter() {
         let (tx, rx) = oneshot::channel();
         table_tx
-            .send(TableCommand::AddNode {
+            .send(TableRequest::AddNode {
                 node: node.clone(),
                 tx: Some(tx),
             })
             .await
             .expect("table worker not to drop channel");
         if let Err(e) = rx.await.expect("table worker not to drop channel") {
-            tracing::error!("[Bootstrap]: unexpected error while querying table: {e:?}");
+            tracing::error!("unexpected error while querying table: {e:?}");
         }
     }
 
@@ -106,7 +106,7 @@ async fn bootstrap(
 
     let (tx, rx) = oneshot::channel();
     table_tx
-        .send(TableCommand::FirstNonEmptyBucket { tx })
+        .send(TableRequest::FirstNonEmptyBucket { tx })
         .await
         .expect("table worker not to drop channel");
     let index = rx
@@ -127,7 +127,7 @@ async fn bootstrap(
         let target = *target;
         task_set.spawn(async move {
             if let Err(e) = closest_nodes(target, handler_tx, table_tx).await {
-                tracing::error!("[Bootstrap]: failed to find closest nodes: {e}");
+                tracing::error!("failed to find closest nodes: {e}");
             }
             target
         });
@@ -143,24 +143,24 @@ async fn bootstrap(
 
 pub async fn closest_nodes(
     target: NodeNetworkingPublicKey,
-    handler_tx: Sender<HandlerCommand>,
-    table_tx: Sender<TableCommand>,
+    handler_tx: Sender<HandlerRequest>,
+    table_tx: Sender<TableRequest>,
 ) -> Result<()> {
     let (tx, rx) = oneshot::channel();
     handler_tx
-        .send(HandlerCommand::FindNode { target, tx })
+        .send(HandlerRequest::FindNode { target, tx })
         .await
-        .expect("dispatcher worker not to drop channel");
-    let nodes = rx.await.expect("dispatcher worker not to drop channel")?;
+        .expect("handler worker not to drop channel");
+    let nodes = rx.await.expect("handler worker not to drop channel")?;
 
     for node in nodes {
         let (tx, rx) = oneshot::channel();
         table_tx
-            .send(TableCommand::AddNode { node, tx: Some(tx) })
+            .send(TableRequest::AddNode { node, tx: Some(tx) })
             .await
             .expect("table worker not to drop channel");
         if let Err(e) = rx.await.expect("table worker not to drop channel") {
-            tracing::error!("[Bootstrap]: unexpected error while querying table: {e:?}");
+            tracing::error!("unexpected error while querying table: {e:?}");
         }
     }
 

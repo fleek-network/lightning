@@ -23,14 +23,14 @@ use crate::{
     query::{Message, MessageType, NodeInfo, Query, Response},
     socket,
     store::StoreRequest,
-    table::{TableCommand, TableKey},
+    table::{TableKey, TableRequest},
 };
 
 pub const NO_REPLY_CHANNEL_ID: u64 = 0;
 
 pub async fn start_worker(
-    mut command_rx: Receiver<HandlerCommand>,
-    table_tx: Sender<TableCommand>,
+    mut request_rx: Receiver<HandlerRequest>,
+    table_tx: Sender<TableRequest>,
     store_tx: Sender<StoreRequest>,
     socket: Arc<UdpSocket>,
     local_key: NodeNetworkingPublicKey,
@@ -49,12 +49,12 @@ pub async fn start_worker(
             break;
         }
         select! {
-            command = command_rx.recv() => {
-                if command.is_none() {
+            request = request_rx.recv() => {
+                if request.is_none() {
                     break;
                 }
-                if let Err(e) = handler.handle_command(command.unwrap()) {
-                    tracing::error!("failed to handle incoming datagram: {e:?}");
+                if let Err(e) = handler.handle_request(request.unwrap()) {
+                    tracing::error!("failed to handle request: {e:?}");
                 }
             }
             incoming = socket::recv_from(&socket) => {
@@ -74,7 +74,7 @@ pub async fn start_worker(
 }
 
 async fn handle_query(
-    table_tx: Sender<TableCommand>,
+    table_tx: Sender<TableRequest>,
     store_tx: Sender<StoreRequest>,
     socket: Arc<UdpSocket>,
     local_key: NodeNetworkingPublicKey,
@@ -86,7 +86,7 @@ async fn handle_query(
         Query::Find { find_value, target } => {
             let (tx, rx) = oneshot::channel();
             table_tx
-                .send(TableCommand::ClosestNodes { target, tx })
+                .send(TableRequest::ClosestNodes { target, tx })
                 .await
                 .expect("table worker to not drop the channel");
             let nodes = rx.await.expect("table worker to not drop the channel")?;
@@ -121,7 +121,7 @@ async fn handle_query(
                 address
             );
             table_tx
-                .send(TableCommand::AddNode {
+                .send(TableRequest::AddNode {
                     node: NodeInfo {
                         address,
                         key: message.sender_key,
@@ -157,7 +157,7 @@ async fn handle_query(
 }
 
 #[derive(Debug)]
-pub enum HandlerCommand {
+pub enum HandlerRequest {
     Get {
         key: Vec<u8>,
         tx: oneshot::Sender<Result<Option<TableEntry>>>,
@@ -176,20 +176,20 @@ pub enum HandlerCommand {
 struct Handler {
     pending: HashMap<u64, Sender<ResponseEvent>>,
     local_key: NodeNetworkingPublicKey,
-    table_tx: Sender<TableCommand>,
+    table_tx: Sender<TableRequest>,
     store_tx: Sender<StoreRequest>,
     socket: Arc<UdpSocket>,
     received_shutdown: bool,
 }
 
 impl Handler {
-    fn handle_command(&mut self, command: HandlerCommand) -> Result<()> {
+    fn handle_request(&mut self, request: HandlerRequest) -> Result<()> {
         let (event_tx, event_rx) = mpsc::channel(100);
         let task_id = rand::random();
         self.pending.insert(task_id, event_tx);
 
-        match command {
-            HandlerCommand::Get { key, tx } => {
+        match request {
+            HandlerRequest::Get { key, tx } => {
                 let target = TableKey::try_from(key.as_slice())?;
                 let task = LookupTask::new(
                     task_id,
@@ -232,7 +232,7 @@ impl Handler {
                     }
                 });
             },
-            HandlerCommand::Put { key, value } => {
+            HandlerRequest::Put { key, value } => {
                 let socket_clone = self.socket.clone();
                 let sender_key = self.local_key;
                 let target = TableKey::try_from(key.as_slice())?;
@@ -253,7 +253,7 @@ impl Handler {
                             LookupResult::Value(_) => panic!("we did not request for a nodes"),
                         },
                         Err(e) => {
-                            tracing::error!("failed to handle PUT command: {e:?}");
+                            tracing::error!("failed to handle PUT request: {e:?}");
                             return;
                         },
                     };
@@ -276,7 +276,7 @@ impl Handler {
                     }
                 });
             },
-            HandlerCommand::FindNode { target, tx } => {
+            HandlerRequest::FindNode { target, tx } => {
                 let task = LookupTask::new(
                     task_id,
                     false,
@@ -305,7 +305,7 @@ impl Handler {
                     }
                 });
             },
-            HandlerCommand::Shutdown => self.received_shutdown = true,
+            HandlerRequest::Shutdown => self.received_shutdown = true,
         }
         Ok(())
     }

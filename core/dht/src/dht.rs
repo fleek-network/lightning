@@ -15,7 +15,7 @@ use tokio::{
 };
 
 use crate::{
-    bootstrap, bootstrap::BootstrapCommand, handler, handler::HandlerCommand, query::NodeInfo,
+    bootstrap, bootstrap::BootstrapRequest, handler, handler::HandlerRequest, query::NodeInfo,
     store, table,
 };
 
@@ -99,8 +99,8 @@ impl Builder {
 
 /// Maintains the DHT.
 pub struct Dht {
-    handler_tx: mpsc::Sender<HandlerCommand>,
-    bootstrap_tx: mpsc::Sender<BootstrapCommand>,
+    handler_tx: mpsc::Sender<HandlerRequest>,
+    bootstrap_tx: mpsc::Sender<BootstrapRequest>,
 }
 
 impl Dht {
@@ -109,14 +109,14 @@ impl Dht {
         let (tx, rx) = oneshot::channel();
         if self
             .handler_tx
-            .send(HandlerCommand::Get {
+            .send(HandlerRequest::Get {
                 key: key.to_vec(),
                 tx,
             })
             .await
             .is_err()
         {
-            tracing::error!("failed to send to handler command");
+            tracing::error!("failed to send to handler request");
         }
         rx.await
             .expect("handler worker to not drop the channel")
@@ -133,25 +133,25 @@ impl Dht {
         let value = value.to_vec();
         tokio::spawn(async move {
             if handler_tx
-                .send(HandlerCommand::Put { key, value })
+                .send(HandlerRequest::Put { key, value })
                 .await
                 .is_err()
             {
-                tracing::error!("failed to send to handler command");
+                tracing::error!("failed to send to handler request");
             }
         });
     }
 
     /// Start bootstrap task.
-    /// If bootstrapping is in process, this command will be ignored.
+    /// If bootstrapping is in process, this request will be ignored.
     pub async fn bootstrap(&self) {
         if self
             .bootstrap_tx
-            .send(BootstrapCommand::Start)
+            .send(BootstrapRequest::Start)
             .await
             .is_err()
         {
-            tracing::error!("failed to send to bootstrap command");
+            tracing::error!("failed to send to bootstrap request");
         }
     }
 
@@ -160,11 +160,11 @@ impl Dht {
         let (tx, rx) = oneshot::channel();
         if self
             .bootstrap_tx
-            .send(BootstrapCommand::DoneBootstrapping { tx })
+            .send(BootstrapRequest::DoneBootstrapping { tx })
             .await
             .is_err()
         {
-            tracing::error!("failed to send to bootstrap command");
+            tracing::error!("failed to send to bootstrap request");
         }
         rx.await.unwrap_or(false)
     }
@@ -183,11 +183,11 @@ impl WithStartAndShutdown for Dht {
         // one of its tasks may be communicating with
         // the handler worker.
         self.bootstrap_tx
-            .send(BootstrapCommand::Shutdown)
+            .send(BootstrapRequest::Shutdown)
             .await
             .expect("bootstrap worker to not drop channel");
         self.handler_tx
-            .send(HandlerCommand::Shutdown)
+            .send(HandlerRequest::Shutdown)
             .await
             .expect("handler worker to not drop channel");
     }
