@@ -88,8 +88,10 @@ jobs:
 
       - name: Build docs
         working-directory: ./docs/rpc/docs/gatsby
-        run: npx gatsby build --prefix-paths
-
+        run: |
+          export NODE_OPTIONS="--max_old_space_size=4096"
+          npx gatsby build --prefix-paths
+  
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
