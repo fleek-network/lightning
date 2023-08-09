@@ -12,23 +12,22 @@ const BOOTSTRAP_KEY: Blake3Hash = [
 
 #[derive(Parser)]
 struct Cli {
+    #[arg(short, long, group = "bootstrap_address")]
+    bootstrapper: Option<String>,
+
     #[command(subcommand)]
     command: Commands,
 }
 
 #[derive(Subcommand)]
+#[group(required = true)]
 enum Commands {
     Get {
         #[arg(short, long)]
         key: String,
-        bootstrapper: String,
     },
-    Put {
-        bootstrapper: String,
-    },
-    Join {
-        bootstrapper: String,
-    },
+    Put,
+    Join,
     Bootstrapper,
 }
 
@@ -39,8 +38,8 @@ async fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Get { key, bootstrapper } => {
-            let address: SocketAddr = bootstrapper.parse().unwrap();
+        Commands::Get { key } => {
+            let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
             let public_key = NodeNetworkingPublicKey(rand::random());
             tracing::info!("public key: {public_key:?}");
             let dht = start_node(public_key, Some((address, BOOTSTRAP_KEY))).await;
@@ -52,8 +51,8 @@ async fn main() {
                 tracing::info!("value found is {:?}", value.value);
             }
         },
-        Commands::Put { bootstrapper } => {
-            let address: SocketAddr = bootstrapper.parse().unwrap();
+        Commands::Put => {
+            let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
             let public_key = NodeNetworkingPublicKey(rand::random());
             tracing::info!("public key: {public_key:?}");
             let dht = start_node(public_key, Some((address, BOOTSTRAP_KEY))).await;
@@ -70,8 +69,8 @@ async fn main() {
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
         },
-        Commands::Join { bootstrapper } => {
-            let address: SocketAddr = bootstrapper.parse().unwrap();
+        Commands::Join => {
+            let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
             let public_key = NodeNetworkingPublicKey(rand::random());
             tracing::info!("public key: {public_key:?}");
             let _ = start_node(public_key, Some((address, BOOTSTRAP_KEY))).await;

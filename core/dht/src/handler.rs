@@ -91,7 +91,6 @@ async fn handle_query(
                 .expect("table worker to not drop the channel");
             let nodes = rx.await.expect("table worker to not drop the channel")?;
             let value = match find_value {
-                // Todo: Check from local store.
                 true => {
                     let (get_tx, get_rx) = oneshot::channel();
                     store_tx
