@@ -6534,6 +6534,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "resolved-pathbuf"
+version = "0.1.1"
+dependencies = [
+ "derive_more",
+ "resolve-path",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "retain_mut"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
