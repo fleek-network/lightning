@@ -141,7 +141,7 @@ impl Table {
         let index = distance::leading_zero_bits(&self.local_node_key.0, &node.key.0);
         assert_ne!(index, MAX_BUCKETS);
         let bucket_index = calculate_bucket_index(self.buckets.len(), index);
-        if !self.buckets[bucket_index].add_node(&node) && self.split_bucket(bucket_index) {
+        if !self.buckets[bucket_index].add_node(node.clone()) && self.split_bucket(bucket_index) {
             self._add_node(node)
         }
     }

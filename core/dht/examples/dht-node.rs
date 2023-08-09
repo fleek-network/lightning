@@ -59,7 +59,7 @@ async fn main() {
             let key: Blake3Hash = rand::random();
             let value: [u8; 4] = rand::random();
 
-            tracing::info!("PUT {value:?} with key {key:?}");
+            tracing::info!("PUT {key:?}:{value:?}");
 
             dht.put(&key, &value);
         },

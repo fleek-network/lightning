@@ -23,11 +23,17 @@ impl Bucket {
     }
 
     // Todo: Handle duplicates.
-    pub fn add_node(&mut self, node: &NodeInfo) -> bool {
+    pub fn add_node(&mut self, node: NodeInfo) -> bool {
         if self.inner.len() == MAX_BUCKET_SIZE {
             return false;
         }
-        self.inner.push(node.clone());
+
+        if let Some(index) = self.inner.iter().position(|member| member.key == node.key) {
+            self.inner.insert(index, node);
+            return true;
+        }
+
+        self.inner.push(node);
         true
     }
 }
