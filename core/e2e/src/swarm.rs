@@ -27,7 +27,10 @@ use lightning_signer::{utils, Config as SignerConfig, Signer};
 use lightning_topology::Topology;
 use toml::Value;
 
-use crate::containerized_node::ContainerizedNode;
+use crate::{
+    containerized_node::ContainerizedNode,
+    utils::networking::{PortAssigner, Transport},
+};
 
 type MyBroadcast = Broadcast<QueryRunner, Signer, Topology<QueryRunner>, Notifier>;
 
@@ -106,9 +109,21 @@ impl SwarmBuilder {
 
         fs::create_dir_all(&directory).expect("Failed to create swarm directory");
 
+        let mut port_assigner = PortAssigner::default();
+
         let min_stake = genesis.min_stake;
         genesis.committee = Vec::new();
         for i in 0..num_nodes {
+            let primary_addr_port = port_assigner
+                .get_port(8000, 40000, Transport::Udp)
+                .expect("Failed to get available port.");
+            let worker_addr_port = port_assigner
+                .get_port(8000, 40000, Transport::Udp)
+                .expect("Failed to get available port.");
+            let mempool_addr_port = port_assigner
+                .get_port(8000, 40000, Transport::Tcp)
+                .expect("Failed to get available port.");
+
             let node_directory = directory.join(format!("swarm/nodes/{i}"));
             fs::create_dir_all(&directory).expect("Failed to create node directory");
 
@@ -122,11 +137,13 @@ impl SwarmBuilder {
             );
 
             let consensus_config = ConsensusConfig {
-                address: format!("/ip4/0.0.0.0/udp/{}", 8000 + i).parse().unwrap(),
-                worker_address: format!("/ip4/0.0.0.0/udp/{}", 8000 + num_nodes + i)
+                address: format!("/ip4/0.0.0.0/udp/{primary_addr_port}")
                     .parse()
                     .unwrap(),
-                mempool_address: format!("/ip4/0.0.0.0/udp/{}", 8000 + (2 * num_nodes) + i)
+                worker_address: format!("/ip4/0.0.0.0/udp/{worker_addr_port}")
+                    .parse()
+                    .unwrap(),
+                mempool_address: format!("/ip4/0.0.0.0/tcp/{mempool_addr_port}")
                     .parse()
                     .unwrap(),
                 store_path: node_directory.join("data/narwhal_store"),
@@ -141,8 +158,12 @@ impl SwarmBuilder {
                 Value::try_from(&consensus_config).unwrap(),
             );
 
+            let handshake_addr_port = port_assigner
+                .get_port(6969, 40000, Transport::Tcp)
+                .expect("Failed to get available port.");
             let handshake_config = HandshakeServerConfig {
-                listen_addr: SocketAddr::from_str(&format!("0.0.0.0:{}", 6969 + i)).unwrap(),
+                listen_addr: SocketAddr::from_str(&format!("0.0.0.0:{handshake_addr_port}"))
+                    .unwrap(),
             };
 
             let keys_path = node_directory.join("keys");
@@ -177,11 +198,11 @@ impl SwarmBuilder {
             genesis.borrow_mut().committee.push(GenesisCommittee::new(
                 owner_secret_key.to_pk().to_base64(),
                 node_secret_key.to_pk().to_base64(),
-                format!("/ip4/127.0.0.1/udp/{}", 8000 + i),
+                format!("/ip4/127.0.0.1/udp/{primary_addr_port}"),
                 node_net_secret_key.to_pk().to_base64(),
-                format!("/ip4/127.0.0.1/udp/{}/http", 8000 + num_nodes + i),
+                format!("/ip4/127.0.0.1/udp/{worker_addr_port}/http"),
                 node_net_secret_key.to_pk().to_base64(),
-                format!("/ip4/127.0.0.1/tcp/{}/http", 8000 + (2 * num_nodes) + i),
+                format!("/ip4/127.0.0.1/tcp/{mempool_addr_port}/http"),
                 Some(min_stake),
             ));
 
