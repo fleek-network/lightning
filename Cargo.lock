@@ -3779,6 +3779,7 @@ name = "lightning-e2e"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "clap 4.3.17",
  "fleek-crypto",
  "futures",
  "lightning-application",

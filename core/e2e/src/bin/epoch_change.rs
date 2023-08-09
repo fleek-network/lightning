@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
         .as_millis() as u64;
 
     let swarm = Swarm::builder()
-        .with_directory("~/.fleek-test/e2e".resolve().into())
+        .with_directory("~/.fleek-test/e2e/epoch-change".resolve().into())
         .with_num_nodes(4)
         .with_epoch_time(20000)
         .with_epoch_start(epoch_start)

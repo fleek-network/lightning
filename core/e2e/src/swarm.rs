@@ -146,7 +146,10 @@ impl SwarmBuilder {
             };
 
             let keys_path = node_directory.join("keys");
+            let owner_secret_key_path = keys_path.join("account.pem");
             let owner_secret_key = AccountOwnerSecretKey::generate();
+            utils::save(&owner_secret_key_path, owner_secret_key.encode_pem())
+                .expect("Failed to save account owner secret key.");
             let node_secret_key = NodeSecretKey::generate();
             let node_secret_key_path = keys_path.join("node.pem");
             utils::save(&node_secret_key_path, node_secret_key.encode_pem())

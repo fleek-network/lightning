@@ -10,7 +10,7 @@ use crate::container::Container;
 
 pub struct ContainerizedNode {
     config: Arc<TomlConfigProvider>,
-    _owner_secret_key: AccountOwnerSecretKey,
+    owner_secret_key: AccountOwnerSecretKey,
     container: Mutex<Option<Container>>,
     runtime_type: RuntimeType,
     index: usize,
@@ -24,7 +24,7 @@ impl ContainerizedNode {
     ) -> Self {
         Self {
             config,
-            _owner_secret_key: owner_secret_key,
+            owner_secret_key,
             container: Default::default(),
             runtime_type: RuntimeType::MultiThreaded,
             index,
@@ -51,8 +51,8 @@ impl ContainerizedNode {
         format!("http://{}:{}/rpc/v0", config.addr, config.port)
     }
 
-    pub fn get_node_public_key(&self) {
-        todo!()
+    pub fn get_owner_secret_key(&self) -> AccountOwnerSecretKey {
+        self.owner_secret_key
     }
 
     pub fn get_index(&self) -> usize {
