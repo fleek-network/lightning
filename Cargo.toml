@@ -1,3 +1,5 @@
+#940 packages
+
 [workspace]
 members = ["core/*", "lib/*", "services/*"]
 
@@ -41,9 +43,9 @@ lazy_static = "1.4.0"
 affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
 fleek-crypto = { path = "lib/fleek-crypto" }
-hp-fixed = { path= "lib/hp-fixed" }
-blake3-tree = { path= "lib/blake3-tree" }
-ink-quill = { path= "lib/ink-quill" }
+hp-fixed = { path = "lib/hp-fixed" }
+blake3-tree = { path = "lib/blake3-tree" }
+ink-quill = { path = "lib/ink-quill" }
 
 # Since MystenLabs uses Hakari in the sui repository, and we bring narwhal in from there, this
 # results into all of their dependencies and packages to be listed in their workspace-hack crate.
@@ -51,6 +53,8 @@ ink-quill = { path= "lib/ink-quill" }
 # empty crate which only depends on `strum` which is the only dependency narwhal cared about.
 [patch.'https://github.com/MystenLabs/sui.git']
 workspace-hack = { git = "https://github.com/fleek-network/empty-workspace-hack.git", rev = "c07eb1e343a455d57a5481b50eada03c62b4f2c6" }
+sui-types = { git = "https://github.com/daltoncoder/narwhal-hack.git" }
+sui-keys = { git = "https://github.com/daltoncoder/narwhal-hack.git" }
 
 [profile.release]
 # 2 full, 0 nothing, 1 good enough.
