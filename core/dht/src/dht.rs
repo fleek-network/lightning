@@ -29,6 +29,10 @@ pub struct Builder {
 }
 
 impl Builder {
+    /// Returns a new [`Builder`].
+    pub fn new() -> Self {
+        Self::default()
+    }
     /// Add node which will be added to routing table.
     pub fn add_node(&mut self, node: NodeInfo) {
         self.nodes.push(node);
@@ -168,14 +172,17 @@ impl WithStartAndShutdown for Dht {
     async fn start(&self) {}
 
     async fn shutdown(&self) {
-        self.handler_tx
-            .send(HandlerCommand::Shutdown)
-            .await
-            .expect("handler worker to not drop channel");
+        // We drop the boostrap worker first because
+        // one of its tasks may be communicating with
+        // the handler worker.
         self.bootstrap_tx
             .send(BootstrapCommand::Shutdown)
             .await
             .expect("bootstrap worker to not drop channel");
+        self.handler_tx
+            .send(HandlerCommand::Shutdown)
+            .await
+            .expect("handler worker to not drop channel");
     }
 }
 
@@ -184,7 +191,7 @@ impl DhtInterface for Dht {
     type Topology = Topology<QueryRunner>;
 
     async fn init<S: SignerInterface>(_: &S, _: Arc<Self::Topology>) -> Result<Self> {
-        Builder::default().build().await
+        Builder::new().build().await
     }
 
     fn put(&self, _: KeyPrefix, key: &[u8], value: &[u8]) {

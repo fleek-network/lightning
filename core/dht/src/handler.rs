@@ -228,12 +228,11 @@ impl Handler {
 
                     let payload = bincode::serialize(&Query::Store { key: target, value })
                         .expect("query to be valid");
-                    // Todo: Add sender information in message.
                     let message = Message {
                         ty: MessageType::Query,
+                        id: NO_REPLY_CHANNEL_ID,
                         token: rand::random(),
                         sender_key,
-                        id: NO_REPLY_CHANNEL_ID,
                         payload,
                     };
                     let bytes = bincode::serialize(&message).expect("Serialization to succeed");

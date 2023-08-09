@@ -20,7 +20,7 @@ pub enum BootstrapCommand {
 
 #[derive(Clone, PartialEq)]
 pub enum State {
-    Initial,
+    Idle,
     Bootstrapping,
     Bootstrapped,
 }
@@ -32,11 +32,18 @@ pub async fn start_worker(
     local_key: NodeNetworkingPublicKey,
     bootstrap_nodes: Vec<NodeInfo>,
 ) {
-    let mut state = State::Initial;
+    let mut state = State::Idle;
     loop {
         while let Some(message) = server_rx.recv().await {
             match message {
                 BootstrapCommand::Start => {
+                    // If we have no bootstrap nodes, it means we are the bootstrap node.
+                    // Thus, we mark our node as already bootstrapped.
+                    if bootstrap_nodes.is_empty() {
+                        state = State::Bootstrapped;
+                        continue;
+                    }
+
                     if state != State::Bootstrapping {
                         match bootstrap(
                             handler_tx.clone(),
@@ -49,7 +56,10 @@ pub async fn start_worker(
                             Ok(()) => {
                                 state = State::Bootstrapped;
                             },
-                            Err(e) => tracing::error!("failed to start bootstrapping: {e}"),
+                            Err(e) => {
+                                state = State::Idle;
+                                tracing::error!("failed to start bootstrapping: {e}")
+                            },
                         }
                     }
                 },
