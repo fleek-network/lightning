@@ -48,7 +48,7 @@ async fn main() {
             let key: Blake3Hash = rand::random();
             let value: [u8; 4] = rand::random();
 
-            tracing::info!("generated key {:?} and value {:?}", key, value);
+            tracing::info!("generated key {key:?} and value {value:?}");
 
             dht.put(&key, &value);
         },
@@ -59,6 +59,8 @@ async fn main() {
             }
         },
     }
+
+    tracing::info!("shutting down dht-node");
 }
 
 async fn start_node(bootstrapper: Option<SocketAddr>) -> Dht {

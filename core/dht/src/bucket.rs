@@ -4,14 +4,9 @@ pub const MAX_BUCKET_SIZE: usize = 6;
 pub const MAX_BUCKETS: usize = HASH_LEN * 8;
 pub const HASH_LEN: usize = 32;
 
-#[derive(Clone)]
-pub struct Node {
-    pub info: NodeInfo,
-}
-
 #[derive(Default)]
 pub struct Bucket {
-    inner: Vec<Node>,
+    inner: Vec<NodeInfo>,
 }
 
 impl Bucket {
@@ -19,15 +14,15 @@ impl Bucket {
         Bucket::default()
     }
 
-    pub fn into_nodes(self) -> impl Iterator<Item = Node> {
+    pub fn into_nodes(self) -> impl Iterator<Item = NodeInfo> {
         self.inner.into_iter()
     }
 
-    pub fn nodes(&self) -> impl Iterator<Item = &Node> {
+    pub fn nodes(&self) -> impl Iterator<Item = &NodeInfo> {
         self.inner.iter()
     }
 
-    pub fn add_node(&mut self, node: &Node) -> bool {
+    pub fn add_node(&mut self, node: &NodeInfo) -> bool {
         if self.inner.len() == MAX_BUCKET_SIZE {
             return false;
         }

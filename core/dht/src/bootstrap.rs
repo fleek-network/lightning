@@ -6,7 +6,7 @@ use tokio::sync::{
 };
 
 use crate::{
-    bucket::{Node, MAX_BUCKETS},
+    bucket::MAX_BUCKETS,
     handler::HandlerCommand,
     query::NodeInfo,
     table::{TableCommand, TableKey},
@@ -87,7 +87,7 @@ async fn bootstrap(
         let (tx, rx) = oneshot::channel();
         table_tx
             .send(TableCommand::AddNode {
-                node: Node { info: node.clone() },
+                node: node.clone(),
                 tx,
             })
             .await
@@ -135,10 +135,7 @@ pub async fn closest_nodes(
     for node in nodes {
         let (tx, rx) = oneshot::channel();
         table_tx
-            .send(TableCommand::AddNode {
-                node: Node { info: node },
-                tx,
-            })
+            .send(TableCommand::AddNode { node, tx })
             .await
             .expect("table worker not to drop channel");
         if let Err(e) = rx.await.expect("table worker not to drop channel") {

@@ -7,7 +7,7 @@ use thiserror::Error;
 use tokio::sync::{mpsc::Receiver, oneshot};
 
 use crate::{
-    bucket::{Bucket, Node, MAX_BUCKETS, MAX_BUCKET_SIZE},
+    bucket::{Bucket, MAX_BUCKETS, MAX_BUCKET_SIZE},
     distance,
     query::NodeInfo,
 };
@@ -57,7 +57,7 @@ pub enum TableCommand {
         tx: oneshot::Sender<Result<Vec<NodeInfo>, QueryError>>,
     },
     AddNode {
-        node: Node,
+        node: NodeInfo,
         tx: oneshot::Sender<Result<(), QueryError>>,
     },
     // Returns index for non-empty bucket containing closest nodes. Used for bootstrapping.
@@ -100,8 +100,8 @@ impl Table {
                 }
                 if (byte & (mask >> shift)) > 0 {
                     for node in self.buckets[index].nodes() {
-                        let distance = distance::distance(target, &node.info.key.0);
-                        closest.insert(distance, node.info.clone());
+                        let distance = distance::distance(target, &node.key.0);
+                        closest.insert(distance, node.clone());
                         if closest.len() >= MAX_BUCKET_SIZE {
                             return closest.into_values().collect();
                         }
@@ -117,8 +117,8 @@ impl Table {
         // in increasing order from LSB.
         for index in zero_bit_indexes.iter().rev() {
             for node in self.buckets[*index].nodes() {
-                let distance = distance::distance(target, &node.info.key.0);
-                closest.insert(distance, node.info.clone());
+                let distance = distance::distance(target, &node.key.0);
+                closest.insert(distance, node.clone());
                 if closest.len() >= MAX_BUCKET_SIZE {
                     return closest.into_values().collect();
                 }
@@ -127,8 +127,8 @@ impl Table {
         closest.into_values().collect()
     }
 
-    fn add_node(&mut self, node: Node) -> Result<()> {
-        if node.info.key == self.local_node_key {
+    fn add_node(&mut self, node: NodeInfo) -> Result<()> {
+        if node.key == self.local_node_key {
             // We don't add ourselves to the routing table.
             return Ok(());
         }
@@ -136,9 +136,9 @@ impl Table {
         Ok(())
     }
 
-    fn _add_node(&mut self, node: Node) {
+    fn _add_node(&mut self, node: NodeInfo) {
         // Get index of bucket.
-        let index = distance::leading_zero_bits(&self.local_node_key.0, &node.info.key.0);
+        let index = distance::leading_zero_bits(&self.local_node_key.0, &node.key.0);
         assert_ne!(index, MAX_BUCKETS);
         let bucket_index = calculate_bucket_index(self.buckets.len(), index);
         if !self.buckets[bucket_index].add_node(&node) && self.split_bucket(bucket_index) {
