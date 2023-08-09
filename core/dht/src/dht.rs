@@ -33,9 +33,10 @@ impl Builder {
     pub fn new() -> Self {
         Self::default()
     }
+
     /// Add node which will be added to routing table.
-    pub fn add_node(&mut self, node: NodeInfo) {
-        self.nodes.push(node);
+    pub fn add_node(&mut self, key: NodeNetworkingPublicKey, address: SocketAddr) {
+        self.nodes.push(NodeInfo { key, address });
     }
 
     /// Set key of this node.
@@ -66,6 +67,8 @@ impl Builder {
 
         let address = self.address.unwrap_or_else(|| "0.0.0.0:0".parse().unwrap());
         let socket = UdpSocket::bind(address).await.map(Arc::new)?;
+        tracing::info!("UDP socket bound to {:?}", socket.local_addr().unwrap());
+
         let (handler_tx, handler_rx) = mpsc::channel(buffer_size);
         tokio::spawn(handler::start_worker(
             handler_rx,

@@ -21,3 +21,4 @@ tracing = "0.1"
 
 [dev-dependencies]
 clap = { version = "4.2", features = ["derive"] }
+env_logger = "0.10"

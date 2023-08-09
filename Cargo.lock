@@ -2159,6 +2159,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_logger"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85cdab6a89accf66733ad5a1693a4dcced6aeff64602b634530dd73c1f3ee9f0"
+dependencies = [
+ "humantime",
+ "is-terminal",
+ "log",
+ "regex",
+ "termcolor",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3368,6 +3381,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "clap 4.3.17",
+ "env_logger 0.10.0",
  "fleek-crypto",
  "lightning-application",
  "lightning-interfaces",
@@ -3918,7 +3932,7 @@ dependencies = [
  "bytes",
  "cc",
  "downcast-rs",
- "env_logger",
+ "env_logger 0.9.3",
  "erasable",
  "futures",
  "lazy_static",

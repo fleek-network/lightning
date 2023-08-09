@@ -297,12 +297,11 @@ impl Handler {
                     } else {
                         let response: Response = bincode::deserialize(&message.payload)?;
                         let event_tx = event_tx.get().clone();
-                        let sender_key = self.local_key;
                         tokio::spawn(async move {
                             if event_tx
                                 .send(ResponseEvent {
                                     id: message.token,
-                                    sender_key,
+                                    sender_key: message.sender_key,
                                     response,
                                 })
                                 .await

@@ -62,7 +62,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<LookupResult, LookUpError>
     // Nodes that didn't send a response in time.
     let mut late = HashMap::new();
     // Timeout for every round.
-    let mut timeout = time::interval(Duration::from_secs(4));
+    let mut timeout = time::interval(Duration::from_secs(2));
     loop {
         // Pending is empty when a round has finished.
         if pending.is_empty() {
@@ -322,11 +322,13 @@ pub enum LookupResult {
     Value(Option<Vec<u8>>),
 }
 
+#[derive(Debug)]
 struct PendingResponse {
     node: NodeInfo,
     id: u64,
 }
 
+#[derive(Debug)]
 pub struct ResponseEvent {
     pub id: u64,
     pub sender_key: NodeNetworkingPublicKey,

@@ -1,8 +1,13 @@
+use std::collections::HashSet;
+
 use anyhow::{anyhow, Result};
 use fleek_crypto::NodeNetworkingPublicKey;
-use tokio::sync::{
-    mpsc::{Receiver, Sender},
-    oneshot,
+use tokio::{
+    sync::{
+        mpsc::{Receiver, Sender},
+        oneshot,
+    },
+    task::JoinSet,
 };
 
 use crate::{
@@ -58,18 +63,18 @@ pub async fn start_worker(
                             },
                             Err(e) => {
                                 state = State::Idle;
-                                tracing::error!("failed to start bootstrapping: {e}")
+                                tracing::error!("[Bootstrap]: failed to start bootstrapping: {e}")
                             },
                         }
                     }
                 },
                 BootstrapCommand::DoneBootstrapping { tx } => {
                     if tx.send(state == State::Bootstrapped).is_err() {
-                        tracing::error!("bootstrap client dropped the channel");
+                        tracing::error!("[Bootstrap]: client dropped the channel");
                     }
                 },
                 BootstrapCommand::Shutdown => {
-                    tracing::trace!("shutting down bootstrap worker");
+                    tracing::trace!("[Bootstrap]: shutting down bootstrap worker");
                     return;
                 },
             }
@@ -93,7 +98,7 @@ async fn bootstrap(
             .await
             .expect("table worker not to drop channel");
         if let Err(e) = rx.await.expect("table worker not to drop channel") {
-            tracing::error!("unexpected error while querying table: {e:?}");
+            tracing::error!("[Bootstrap]: unexpected error while querying table: {e:?}");
         }
     }
 
@@ -104,17 +109,33 @@ async fn bootstrap(
         .send(TableCommand::FirstNonEmptyBucket { tx })
         .await
         .expect("table worker not to drop channel");
-    let mut index = rx
+    let index = rx
         .await
         .expect("table worker not to drop channel")
         .ok_or_else(|| anyhow!("failed to find next bucket"))?;
 
-    let mut target;
+    let mut search_list = (index..MAX_BUCKETS)
+        .map(random_key_in_bucket)
+        .collect::<HashSet<_>>();
 
-    while index < MAX_BUCKETS {
-        target = random_key_in_bucket(index);
-        closest_nodes(target, handler_tx.clone(), table_tx.clone()).await?;
-        index += 1
+    let mut task_set = JoinSet::new();
+
+    // We start our lookup tasks in parallel.
+    for target in search_list.iter() {
+        let handler_tx = handler_tx.clone();
+        let table_tx = table_tx.clone();
+        let target = *target;
+        task_set.spawn(async move {
+            if let Err(e) = closest_nodes(target, handler_tx, table_tx).await {
+                tracing::error!("[Bootstrap]: failed to find closest nodes: {e}");
+            }
+            target
+        });
+    }
+
+    while let Some(target) = task_set.join_next().await {
+        // The spawned task returns the target even if it failed so unwrap is Ok.
+        search_list.remove(&target.unwrap());
     }
 
     Ok(())
@@ -139,7 +160,7 @@ pub async fn closest_nodes(
             .await
             .expect("table worker not to drop channel");
         if let Err(e) = rx.await.expect("table worker not to drop channel") {
-            tracing::error!("unexpected error while querying table: {e:?}");
+            tracing::error!("[Bootstrap]: unexpected error while querying table: {e:?}");
         }
     }
 

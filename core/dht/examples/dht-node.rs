@@ -5,6 +5,11 @@ use fleek_crypto::NodeNetworkingPublicKey;
 use lightning_dht::dht::{Builder, Dht};
 use lightning_interfaces::Blake3Hash;
 
+const BOOTSTRAP_KEY: Blake3Hash = [
+    240, 76, 40, 117, 207, 118, 89, 141, 116, 76, 54, 143, 23, 169, 217, 135, 248, 10, 42, 172, 64,
+    171, 193, 85, 186, 234, 102, 129, 48, 240, 126, 33,
+];
+
 #[derive(Parser)]
 struct Cli {
     #[command(subcommand)]
@@ -26,12 +31,16 @@ enum Commands {
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
     let cli = Cli::parse();
 
     match cli.command {
         Commands::Get { key, bootstrapper } => {
             let address: SocketAddr = bootstrapper.parse().unwrap();
-            let dht = start_node(Some(address)).await;
+            let public_key = NodeNetworkingPublicKey(rand::random());
+            tracing::info!("public key: {public_key:?}");
+            let dht = start_node(public_key, Some((address, BOOTSTRAP_KEY))).await;
 
             tracing::info!("GET {key:?}");
 
@@ -42,18 +51,20 @@ async fn main() {
         },
         Commands::Put { bootstrapper } => {
             let address: SocketAddr = bootstrapper.parse().unwrap();
-            let dht = start_node(Some(address)).await;
+            let public_key = NodeNetworkingPublicKey(rand::random());
+            tracing::info!("public key: {public_key:?}");
+            let dht = start_node(public_key, Some((address, BOOTSTRAP_KEY))).await;
 
             // Todo: get actual hash.
             let key: Blake3Hash = rand::random();
             let value: [u8; 4] = rand::random();
 
-            tracing::info!("generated key {key:?} and value {value:?}");
+            tracing::info!("PUT {value:?} with key {key:?}");
 
             dht.put(&key, &value);
         },
         Commands::Bootstrapper => {
-            let _ = start_node(None).await;
+            let _ = start_node(NodeNetworkingPublicKey(BOOTSTRAP_KEY), None).await;
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
@@ -63,17 +74,17 @@ async fn main() {
     tracing::info!("shutting down dht-node");
 }
 
-async fn start_node(bootstrapper: Option<SocketAddr>) -> Dht {
+async fn start_node(
+    public_key: NodeNetworkingPublicKey,
+    bootstrapper: Option<(SocketAddr, Blake3Hash)>,
+) -> Dht {
     let mut builder = Builder::new();
-
-    let public_key = NodeNetworkingPublicKey(rand::random());
-    tracing::info!("public key: {public_key:?}");
-
-    if let Some(address) = bootstrapper {
-        builder.set_address(address);
-    }
-
     builder.set_node_key(public_key);
+
+    if let Some((address, key)) = bootstrapper {
+        tracing::info!("bootstrapping to {address:?} {key:?}");
+        builder.add_node(NodeNetworkingPublicKey(key), address);
+    }
 
     let dht = builder.build().await.unwrap();
 

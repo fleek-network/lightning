@@ -22,6 +22,7 @@ impl Bucket {
         self.inner.iter()
     }
 
+    // Todo: Handle duplicates.
     pub fn add_node(&mut self, node: &NodeInfo) -> bool {
         if self.inner.len() == MAX_BUCKET_SIZE {
             return false;

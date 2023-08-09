@@ -75,7 +75,7 @@ impl Table {
     pub fn new(local_node_key: NodeNetworkingPublicKey) -> Self {
         Self {
             local_node_key,
-            buckets: Vec::new(),
+            buckets: vec![Bucket::new()],
         }
     }
 
