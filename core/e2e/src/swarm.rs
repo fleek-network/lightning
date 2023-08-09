@@ -33,11 +33,13 @@ type MyBroadcast = Broadcast<QueryRunner, Signer, Topology<QueryRunner>, Notifie
 
 pub struct Swarm {
     nodes: HashMap<NodePublicKey, ContainerizedNode>,
+    directory: PathBuf,
 }
 
 impl Drop for Swarm {
     fn drop(&mut self) {
         self.nodes.values_mut().for_each(|node| node.shutdown());
+        fs::remove_dir_all(&self.directory).expect("Failed to clean up swarm directory.");
     }
 }
 
@@ -183,8 +185,6 @@ impl SwarmBuilder {
             nodes.insert(node_secret_key.to_pk(), (config, owner_secret_key, i));
         }
 
-        println!("{:?}", genesis.committee);
-
         let nodes = nodes
             .into_iter()
             .map(|(node_pub_key, (config, owner_secret_key, index))| {
@@ -205,6 +205,6 @@ impl SwarmBuilder {
             })
             .collect();
 
-        Swarm { nodes }
+        Swarm { nodes, directory }
     }
 }
