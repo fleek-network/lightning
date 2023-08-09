@@ -81,7 +81,8 @@ jobs:
       - name: TIAS
         run: |
           ls -la
-          cat gatsby-config.js
+          ls -la ./docs/rpc/docs/gatsby
+          cat ./docs/rpc/docs/gatsby/gatsby-config.js
 
       # - name: Install dependencies
       #   working-directory: ./docs/rpc/docs/gatsby
