@@ -22,6 +22,7 @@ use crate::{
     lookup::{LookupResult, LookupTask, ResponseEvent},
     query::{Message, MessageType, NodeInfo, Query, Response},
     socket,
+    store::StoreRequest,
     table::{TableCommand, TableKey},
 };
 
@@ -30,6 +31,7 @@ pub const NO_REPLY_CHANNEL_ID: u64 = 0;
 pub async fn start_worker(
     mut command_rx: Receiver<HandlerCommand>,
     table_tx: Sender<TableCommand>,
+    store_tx: Sender<StoreRequest>,
     socket: Arc<UdpSocket>,
     local_key: NodeNetworkingPublicKey,
 ) {
@@ -37,6 +39,7 @@ pub async fn start_worker(
         pending: HashMap::new(),
         local_key,
         table_tx: table_tx.clone(),
+        store_tx,
         socket: socket.clone(),
         received_shutdown: false,
     };
@@ -72,6 +75,7 @@ pub async fn start_worker(
 
 async fn handle_query(
     table_tx: Sender<TableCommand>,
+    store_tx: Sender<StoreRequest>,
     socket: Arc<UdpSocket>,
     local_key: NodeNetworkingPublicKey,
     message: Message,
@@ -88,7 +92,17 @@ async fn handle_query(
             let nodes = rx.await.expect("table worker to not drop the channel")?;
             let value = match find_value {
                 // Todo: Check from local store.
-                true => todo!(),
+                true => {
+                    let (get_tx, get_rx) = oneshot::channel();
+                    store_tx
+                        .send(StoreRequest::Get {
+                            key: target,
+                            tx: get_tx,
+                        })
+                        .await
+                        .expect("store worker not to drop channel");
+                    get_rx.await.expect("store worker not to drop channel")
+                },
                 false => None,
             };
             let payload = bincode::serialize(&Response { nodes, value })?;
@@ -102,9 +116,11 @@ async fn handle_query(
             let bytes = bincode::serialize(&response)?;
             socket::send_to(&socket, bytes.as_slice(), address).await?;
         },
-        Query::Store { .. } => {
-            // Todo: How do we avoid someone sending tons of Store queries.
-            todo!()
+        Query::Store { key, value } => {
+            store_tx
+                .send(StoreRequest::Put { key, value })
+                .await
+                .expect("store worker not to drop channel");
         },
         Query::Ping => {
             let payload = bincode::serialize(&Response {
@@ -146,6 +162,7 @@ struct Handler {
     pending: HashMap<u64, Sender<ResponseEvent>>,
     local_key: NodeNetworkingPublicKey,
     table_tx: Sender<TableCommand>,
+    store_tx: Sender<StoreRequest>,
     socket: Arc<UdpSocket>,
     received_shutdown: bool,
 }
@@ -237,6 +254,7 @@ impl Handler {
                     };
                     let bytes = bincode::serialize(&message).expect("Serialization to succeed");
                     for node in nodes {
+                        tracing::trace!("send STORE to {node:?}");
                         if let Err(e) = socket::send_to(&socket_clone, &bytes, node.address).await {
                             tracing::error!("failed to send datagram {e:?}");
                         }
@@ -283,6 +301,7 @@ impl Handler {
             MessageType::Query => {
                 tokio::spawn(handle_query(
                     self.table_tx.clone(),
+                    self.store_tx.clone(),
                     self.socket.clone(),
                     self.local_key,
                     message,

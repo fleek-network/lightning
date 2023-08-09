@@ -5,6 +5,7 @@ mod handler;
 mod lookup;
 mod query;
 mod socket;
+mod store;
 mod table;
 
 pub mod dht;

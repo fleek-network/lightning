@@ -26,6 +26,9 @@ enum Commands {
     Put {
         bootstrapper: String,
     },
+    Join {
+        bootstrapper: String,
+    },
     Bootstrapper,
 }
 
@@ -44,8 +47,8 @@ async fn main() {
 
             tracing::info!("GET {key:?}");
 
-            let key = key.as_bytes();
-            if let Some(value) = dht.get(key).await {
+            let key = hex::decode(key).unwrap();
+            if let Some(value) = dht.get(&key).await {
                 tracing::info!("value found is {:?}", value.value);
             }
         },
@@ -59,9 +62,22 @@ async fn main() {
             let key: Blake3Hash = rand::random();
             let value: [u8; 4] = rand::random();
 
-            tracing::info!("PUT {key:?}:{value:?}");
+            tracing::info!("PUT {}:{value:?}", hex::encode(key));
 
             dht.put(&key, &value);
+
+            loop {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
+        },
+        Commands::Join { bootstrapper } => {
+            let address: SocketAddr = bootstrapper.parse().unwrap();
+            let public_key = NodeNetworkingPublicKey(rand::random());
+            tracing::info!("public key: {public_key:?}");
+            let _ = start_node(public_key, Some((address, BOOTSTRAP_KEY))).await;
+            loop {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
         },
         Commands::Bootstrapper => {
             let _ = start_node(NodeNetworkingPublicKey(BOOTSTRAP_KEY), None).await;

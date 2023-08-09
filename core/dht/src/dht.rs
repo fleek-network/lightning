@@ -16,7 +16,7 @@ use tokio::{
 
 use crate::{
     bootstrap, bootstrap::BootstrapCommand, handler, handler::HandlerCommand, query::NodeInfo,
-    table,
+    store, table,
 };
 
 /// Builds the DHT.
@@ -65,6 +65,9 @@ impl Builder {
         let (table_tx, table_rx) = mpsc::channel(buffer_size);
         tokio::spawn(table::start_worker(table_rx, node_key));
 
+        let (worker_tx, worker_rx) = mpsc::channel(buffer_size);
+        tokio::spawn(store::start_worker(worker_rx));
+
         let address = self.address.unwrap_or_else(|| "0.0.0.0:0".parse().unwrap());
         let socket = UdpSocket::bind(address).await.map(Arc::new)?;
         tracing::info!("UDP socket bound to {:?}", socket.local_addr().unwrap());
@@ -73,6 +76,7 @@ impl Builder {
         tokio::spawn(handler::start_worker(
             handler_rx,
             table_tx.clone(),
+            worker_tx,
             socket,
             node_key,
         ));
