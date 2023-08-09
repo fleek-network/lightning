@@ -1,11 +1,9 @@
 use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
-use lightning_e2e::swarm::Swarm;
-use reqwest::{Client, Response};
+use lightning_e2e::{swarm::Swarm, utils::rpc};
 use resolve_path::PathResolveExt;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 
 // TODO(matthias): some of the RPC helpers are copied over from the rpc tests.
 // We should probably make that code reusable.
@@ -36,9 +34,11 @@ async fn main() -> Result<()> {
         "id":1,
     });
     for (_, address) in swarm.get_rpc_addresses() {
-        let response = rpc_request(address, request.to_string()).await.unwrap();
+        let response = rpc::rpc_request(address, request.to_string())
+            .await
+            .unwrap();
 
-        let epoch = parse_response::<u64>(response)
+        let epoch = rpc::parse_response::<u64>(response)
             .await
             .expect("Failed to parse response.");
         assert_eq!(epoch, 0);
@@ -55,9 +55,11 @@ async fn main() -> Result<()> {
         "id":1,
     });
     for (_, address) in swarm.get_rpc_addresses() {
-        let response = rpc_request(address, request.to_string()).await.unwrap();
+        let response = rpc::rpc_request(address, request.to_string())
+            .await
+            .unwrap();
 
-        let epoch = parse_response::<u64>(response)
+        let epoch = rpc::parse_response::<u64>(response)
             .await
             .expect("Failed to parse response.");
         assert_eq!(epoch, 1);
@@ -65,34 +67,4 @@ async fn main() -> Result<()> {
 
     println!("Epoch change: test passed");
     Ok(())
-}
-
-async fn parse_response<T: DeserializeOwned>(response: Response) -> Result<T> {
-    if !response.status().is_success() {
-        panic!("Request failed with status: {}", response.status());
-    }
-    let value: Value = response.json().await?;
-    if value.get("result").is_some() {
-        let success_res: RpcSuccessResponse<T> = serde_json::from_value(value)?;
-        Ok(success_res.result)
-    } else {
-        panic!("Rpc Error: {value}")
-    }
-}
-
-async fn rpc_request(address: String, request: String) -> Result<Response> {
-    let client = Client::new();
-    Ok(client
-        .post(address)
-        .header("Content-Type", "application/json")
-        .body(request)
-        .send()
-        .await?)
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct RpcSuccessResponse<T> {
-    jsonrpc: String,
-    id: usize,
-    result: T,
 }
