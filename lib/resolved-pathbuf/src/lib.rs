@@ -37,6 +37,17 @@ impl TryFrom<PathBuf> for ResolvedPathBuf {
     }
 }
 
+impl TryFrom<&str> for ResolvedPathBuf {
+    type Error = std::io::Error;
+
+    fn try_from(path: &str) -> Result<Self, Self::Error> {
+        let original: PathBuf = path.into();
+        let resolved = original.try_resolve()?.to_path_buf();
+        let original = (resolved != original).then_some(original);
+        Ok(Self { resolved, original })
+    }
+}
+
 impl AsRef<Path> for ResolvedPathBuf {
     fn as_ref(&self) -> &Path {
         self.resolved.as_path()
