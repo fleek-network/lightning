@@ -241,6 +241,8 @@ impl<S: SignerInterface + 'static, Q: SyncQueryRunnerInterface + 'static> Connec
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use anyhow::anyhow;
     use lightning_application::config::Mode;
     use lightning_interfaces::{
@@ -276,8 +278,12 @@ mod tests {
         // create pool a
         let signer_a = Signer::init(
             lightning_signer::Config {
-                node_key_path: "../test-utils/keys/test_node.pem".into(),
-                network_key_path: "../test-utils/keys/test_network.pem".into(),
+                node_key_path: PathBuf::from("../test-utils/keys/test_node.pem")
+                    .try_into()
+                    .expect("Failed to resolve path"),
+                network_key_path: PathBuf::from("../test-utils/keys/test_network.pem")
+                    .try_into()
+                    .expect("Failed to resolve path"),
             },
             query_runner.clone(),
         )
@@ -307,8 +313,12 @@ mod tests {
 
         let signer_b = Signer::init(
             lightning_signer::Config {
-                node_key_path: "../test-utils/keys/test_node2.pem".into(),
-                network_key_path: "../test-utils/keys/test_network2.pem".into(),
+                node_key_path: PathBuf::from("../test-utils/keys/test_node2.pem")
+                    .try_into()
+                    .expect("Failed to resolve path"),
+                network_key_path: PathBuf::from("../test-utils/keys/test_network2.pem")
+                    .try_into()
+                    .expect("Failed to resolve path"),
             },
             query_runner.clone(),
         )

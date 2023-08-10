@@ -209,7 +209,7 @@ impl SignerInner {
         let node_secret_key = if config.node_key_path.exists() {
             // read pem file, if we cant read the pem file we should panic
             let encoded =
-                read_to_string(config.node_key_path).expect("Failed to read node pem file");
+                read_to_string(&config.node_key_path).expect("Failed to read node pem file");
             // todo(dalton): We should panic if we cannot decode pem file. But we should try to
             // identify the encoding and try a few different ways first. Also we should
             // support passworded pems
@@ -230,7 +230,7 @@ impl SignerInner {
         let network_secret_key = if config.network_key_path.exists() {
             // read pem file, if we cant read the pem file we should panic
             let encoded =
-                read_to_string(config.network_key_path).expect("Failed to read network pem file");
+                read_to_string(&config.network_key_path).expect("Failed to read network pem file");
             // todo(dalton): We should panic if we cannot decode pem file. But we should try to
             // identify the encoding and try a few different ways first. Also we should
             // support passworded pems

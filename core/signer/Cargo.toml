@@ -13,10 +13,10 @@ async-trait.workspace = true
 log.workspace = true
 serde.workspace = true
 tokio.workspace = true
-dirs.workspace = true
 
 fleek-crypto.workspace = true
 affair.workspace = true
+resolved-pathbuf.workspace = true
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }

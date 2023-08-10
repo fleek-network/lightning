@@ -25,6 +25,7 @@ use lightning_notifier::Notifier;
 use lightning_rpc::{config::Config as RpcConfig, server::Rpc};
 use lightning_signer::{utils, Config as SignerConfig, Signer};
 use lightning_topology::Topology;
+use resolved_pathbuf::ResolvedPathBuf;
 use toml::Value;
 
 use crate::{
@@ -36,7 +37,7 @@ type MyBroadcast = Broadcast<QueryRunner, Signer, Topology<QueryRunner>, Notifie
 
 pub struct Swarm {
     nodes: HashMap<NodePublicKey, ContainerizedNode>,
-    directory: PathBuf,
+    directory: ResolvedPathBuf,
 }
 
 impl Drop for Swarm {
@@ -66,7 +67,7 @@ impl Swarm {
 
 #[derive(Default)]
 pub struct SwarmBuilder {
-    directory: Option<PathBuf>,
+    directory: Option<ResolvedPathBuf>,
     num_nodes: Option<usize>,
     epoch_start: Option<u64>,
     epoch_time: Option<u64>,
@@ -74,7 +75,7 @@ pub struct SwarmBuilder {
 
 impl SwarmBuilder {
     pub fn with_directory(mut self, directory: PathBuf) -> Self {
-        self.directory = Some(directory);
+        self.directory = Some(directory.try_into().expect("Failed to resolve path"));
         self
     }
 
@@ -180,8 +181,12 @@ impl SwarmBuilder {
             utils::save(&node_net_secret_key_path, node_net_secret_key.encode_pem())
                 .expect("Failed to save node secret key.");
             let signer_config = SignerConfig {
-                node_key_path: node_secret_key_path,
-                network_key_path: node_net_secret_key_path,
+                node_key_path: node_secret_key_path
+                    .try_into()
+                    .expect("Failed to resolve path"),
+                network_key_path: node_net_secret_key_path
+                    .try_into()
+                    .expect("Failed to resolve path"),
             };
 
             config
