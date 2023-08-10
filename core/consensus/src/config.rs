@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use multiaddr::Multiaddr;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
@@ -31,7 +29,7 @@ impl Default for Config {
             address: "/ip4/0.0.0.0/udp/8000".parse().unwrap(),
             worker_address: "/ip4/0.0.0.0/udp/8001".parse().unwrap(),
             mempool_address: "/ip4/0.0.0.0/udp/8002".parse().unwrap(),
-            store_path: PathBuf::from("~/.fleek/data/narwhal_store")
+            store_path: "~/.fleek/data/narwhal_store"
                 .try_into()
                 .expect("Failed to resolve path"),
         }

@@ -1,7 +1,6 @@
 use std::{
     collections::{BTreeMap, HashSet},
     fs,
-    path::PathBuf,
     time::Duration,
 };
 
@@ -242,8 +241,8 @@ async fn test_sign_raw_digest() {
 
 #[tokio::test]
 async fn test_load_keys() {
-    let path = ResolvedPathBuf::try_from(PathBuf::from("~/.fleek-signer-test-1/keys"))
-        .expect("Failed to resolve path");
+    let path =
+        ResolvedPathBuf::try_from("~/.fleek-signer-test-1/keys").expect("Failed to resolve path");
 
     // Generate keys and pass the paths to the signer.
     fs::create_dir_all(&path).expect("Failed to create swarm directory");
@@ -273,8 +272,8 @@ async fn test_load_keys() {
 
 #[tokio::test]
 async fn test_fail_to_encode_keys() {
-    let path = ResolvedPathBuf::try_from(PathBuf::from("~/.fleek-signer-test-2/keys"))
-        .expect("Failed to resolve path");
+    let path =
+        ResolvedPathBuf::try_from("~/.fleek-signer-test-2/keys").expect("Failed to resolve path");
 
     // Save broken keys to disk and pass the paths to the signer.
     fs::create_dir_all(&path).expect("Failed to create swarm directory");
@@ -304,8 +303,8 @@ async fn test_fail_to_encode_keys() {
 
 #[tokio::test]
 async fn test_create_keys() {
-    let path = ResolvedPathBuf::try_from(PathBuf::from("~/.fleek-signer-test-3/keys"))
-        .expect("Failed to resolve path");
+    let path =
+        ResolvedPathBuf::try_from("~/.fleek-signer-test-3/keys").expect("Failed to resolve path");
 
     // Make sure this directoy doesn't exist.
     if path.is_dir() {
