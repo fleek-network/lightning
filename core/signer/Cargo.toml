@@ -21,3 +21,4 @@ resolved-pathbuf.workspace = true
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }
 hp-fixed.workspace = true
+futures.workspace = true
