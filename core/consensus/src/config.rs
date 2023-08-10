@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use multiaddr::Multiaddr;
+use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -14,7 +15,7 @@ pub struct Config {
     /// TCP address which the worker is listening on to receive transactions from user space.
     pub mempool_address: Multiaddr,
     /// Path to the database used by the narwhal implementation.
-    pub store_path: PathBuf,
+    pub store_path: ResolvedPathBuf,
 }
 
 impl Default for Config {
@@ -30,7 +31,9 @@ impl Default for Config {
             address: "/ip4/0.0.0.0/udp/8000".parse().unwrap(),
             worker_address: "/ip4/0.0.0.0/udp/8001".parse().unwrap(),
             mempool_address: "/ip4/0.0.0.0/udp/8002".parse().unwrap(),
-            store_path: "~/.fleek/data/narwhal_store".into(),
+            store_path: PathBuf::from("~/.fleek/data/narwhal_store")
+                .try_into()
+                .expect("Failed to resolve path"),
         }
     }
 }

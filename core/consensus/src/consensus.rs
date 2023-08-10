@@ -1,6 +1,5 @@
 use std::{
     collections::BTreeMap,
-    path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -31,6 +30,7 @@ use narwhal_crypto::{
 };
 use narwhal_node::NodeStorage;
 use prometheus::Registry;
+use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::{
     pin, select,
@@ -76,7 +76,7 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     /// This narwhal node data
     narwhal_args: NarwhalArgs,
     /// Path to the database used by the narwhal implementation
-    pub store_path: PathBuf,
+    pub store_path: ResolvedPathBuf,
     /// Narwhal execution state.
     execution_state: Arc<Execution<P>>,
     /// Used to send transactions to consensus
@@ -109,7 +109,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
     fn new(
         query_runner: Q,
         narwhal_args: NarwhalArgs,
-        store_path: PathBuf,
+        store_path: ResolvedPathBuf,
         execution_state: Arc<Execution<P>>,
         txn_socket: SubmitTxSocket,
         pub_sub: P,

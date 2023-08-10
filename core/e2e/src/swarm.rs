@@ -147,7 +147,10 @@ impl SwarmBuilder {
                 mempool_address: format!("/ip4/0.0.0.0/tcp/{mempool_addr_port}")
                     .parse()
                     .unwrap(),
-                store_path: node_directory.join("data/narwhal_store"),
+                store_path: node_directory
+                    .join("data/narwhal_store")
+                    .try_into()
+                    .expect("Failed to resolve path"),
             };
 
             config.table.lock().expect("Failed to aqcuire lock").insert(
