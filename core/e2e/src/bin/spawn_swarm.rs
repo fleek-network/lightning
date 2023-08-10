@@ -9,7 +9,7 @@ use resolve_path::PathResolveExt;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// Number of nodes to spawmn
+    /// Number of nodes to spawn
     #[arg(short, long, default_value_t = 4)]
     num_nodes: usize,
 
@@ -22,7 +22,6 @@ struct Cli {
 async fn main() -> Result<()> {
     let args = Cli::parse();
 
-    // Start epoch now and let it end in 20 seconds.
     let epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()

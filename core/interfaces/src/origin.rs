@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::{ConfigConsumer, WithStartAndShutdown};
 
-/// A socket for submitting a fetch fequest to an origin.
+/// A socket for submitting a fetch request to an origin.
 pub type OriginProviderSocket<Stream> = Socket<Vec<u8>, anyhow::Result<Stream>>;
 
 /// The abstraction layer for different origins and how we handle them in the codebase in
@@ -14,10 +14,10 @@ pub type OriginProviderSocket<Stream> = Socket<Vec<u8>, anyhow::Result<Stream>>;
 pub trait OriginProviderInterface<Stream: UntrustedStream>:
     ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
 {
-    /// Initialize the signature service.
+    /// Initialize the origin service.
     async fn init(config: Self::Config) -> anyhow::Result<Self>;
 
-    /// Returns a socket for submitting a fetch fequest to an origin.
+    /// Returns a socket for submitting a fetch request to an origin.
     fn get_socket(&self) -> OriginProviderSocket<Stream>;
 }
 
@@ -31,6 +31,7 @@ pub trait UntrustedStream:
     tokio_stream::Stream<Item = Result<bytes::Bytes, std::io::Error>>
 {
     /// Returns true if the stream was valid. This is meant to be called at the end
-    /// of the stream.
+    /// of the stream. If this method is called before the end of the stream, it will return
+    /// `None`.
     fn was_content_valid(&self) -> Option<bool>;
 }
