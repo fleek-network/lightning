@@ -3471,6 +3471,7 @@ dependencies = [
  "log",
  "mock",
  "mockall",
+ "resolved-pathbuf",
  "serde",
  "simplelog",
  "tokio",

@@ -3,6 +3,7 @@ use std::{marker::PhantomData, path::PathBuf, sync::Arc};
 use anyhow::Result;
 use clap::{arg, ArgAction, Parser, Subcommand};
 use lightning_interfaces::{ConfigProviderInterface, LightningTypes, Node, WithStartAndShutdown};
+use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::{config::TomlConfigProvider, shutdown::ShutdownController};
 
@@ -56,15 +57,18 @@ where
     pub async fn exec(self) -> Result<()> {
         let args = self.0;
 
+        let config_path =
+            ResolvedPathBuf::try_from(args.config.clone()).expect("Failed to resolve config path");
+
         match args.cmd {
-            Command::Run {} => Self::run(args.config).await,
+            Command::Run {} => Self::run(config_path).await,
             Command::PrintConfig { default } if default => Self::print_default_config().await,
-            Command::PrintConfig { .. } => Self::print_config(args.config).await,
+            Command::PrintConfig { .. } => Self::print_config(config_path).await,
         }
     }
 
     /// Run the node with the provided configuration path.
-    async fn run(config_path: PathBuf) -> Result<()> {
+    async fn run(config_path: ResolvedPathBuf) -> Result<()> {
         let shutdown_controller = ShutdownController::default();
         shutdown_controller.install_ctrl_c_handler();
 
@@ -89,14 +93,14 @@ where
     }
 
     /// Print the configuration from the given path.
-    async fn print_config(config_path: PathBuf) -> Result<()> {
+    async fn print_config(config_path: ResolvedPathBuf) -> Result<()> {
         let config = Self::load_or_write_config(config_path).await?;
         println!("{}", config.serialize_config());
         Ok(())
     }
 
     /// Load the configuration file and write the default to the disk.
-    async fn load_or_write_config(config_path: PathBuf) -> Result<TomlConfigProvider> {
+    async fn load_or_write_config(config_path: ResolvedPathBuf) -> Result<TomlConfigProvider> {
         let config = TomlConfigProvider::open(&config_path)?;
         Node::<T>::fill_configuration(&config);
 
