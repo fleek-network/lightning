@@ -1,8 +1,12 @@
-use std::{marker::PhantomData, path::PathBuf, sync::Arc};
+use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{arg, ArgAction, Parser, Subcommand};
-use lightning_interfaces::{ConfigProviderInterface, LightningTypes, Node, WithStartAndShutdown};
+use fleek_crypto::{NodeNetworkingSecretKey, NodeSecretKey, PublicKey, SecretKey};
+use lightning_interfaces::{
+    ConfigProviderInterface, LightningTypes, Node, SignerInterface, WithStartAndShutdown,
+};
+use lightning_signer::Signer;
 use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::{config::TomlConfigProvider, shutdown::ShutdownController};
@@ -30,6 +34,10 @@ pub struct CliArgs {
 pub enum Command {
     /// Start the node.
     Run,
+    /// Handle keys.
+    #[command(subcommand)]
+    Keys(Keys),
+    ///
     /// Print the loaded configuration.
     ///
     /// By default this command prints the loaded configuration.
@@ -38,6 +46,15 @@ pub enum Command {
         #[arg(long)]
         default: bool,
     },
+}
+
+#[derive(Subcommand)]
+pub enum Keys {
+    /// Print the keys.
+    Show,
+    /// Generate new keys.
+    /// This command will fail if the keys already exist.
+    Generate,
 }
 
 /// Create a new command line application.
@@ -62,6 +79,8 @@ where
 
         match args.cmd {
             Command::Run {} => Self::run(config_path).await,
+            Command::Keys(Keys::Generate) => Self::generate_keys(config_path).await,
+            Command::Keys(Keys::Show) => Self::show_keys(config_path).await,
             Command::PrintConfig { default } if default => Self::print_default_config().await,
             Command::PrintConfig { .. } => Self::print_config(config_path).await,
         }
@@ -109,5 +128,65 @@ where
         }
 
         Ok(config)
+    }
+
+    async fn generate_keys(config_path: ResolvedPathBuf) -> Result<()> {
+        let config = Arc::new(Self::load_or_write_config(config_path).await?);
+        let signer_config = config.get::<Signer>();
+        if signer_config.node_key_path.exists() {
+            eprintln!(
+                "Node secret key already exists at specified path. Not generating a new key."
+            );
+        } else {
+            match Signer::generate_node_key(&signer_config.node_key_path) {
+                Ok(_) => println!(
+                    "Successfully created node secret key at: {:?}",
+                    signer_config.node_key_path
+                ),
+                Err(err) => eprintln!("Failed to create node secret key: {err:?}"),
+            };
+        }
+        if signer_config.network_key_path.exists() {
+            eprintln!(
+                "Network secret key already exists at specified path. Not generating a new key."
+            );
+        } else {
+            match Signer::generate_network_key(&signer_config.network_key_path) {
+                Ok(_) => println!(
+                    "Successfully created network secret key at: {:?}",
+                    signer_config.network_key_path
+                ),
+                Err(err) => eprintln!("Failed to create network secret key: {err:?}"),
+            };
+        }
+        Ok(())
+    }
+
+    async fn show_keys(config_path: ResolvedPathBuf) -> Result<()> {
+        let config = Arc::new(Self::load_or_write_config(config_path).await?);
+        let signer_config = config.get::<Signer>();
+        if signer_config.node_key_path.exists() {
+            let node_secret_key = fs::read_to_string(&signer_config.node_key_path)
+                .with_context(|| "Failed to read node pem file")?;
+            let node_secret_key = NodeSecretKey::decode_pem(&node_secret_key)
+                .with_context(|| "Failed to decode node pem file")?;
+            println!("Node Public Key: {}", node_secret_key.to_pk().to_base64());
+        } else {
+            eprintln!("Node Public Key: does not exist");
+        }
+
+        if signer_config.network_key_path.exists() {
+            let network_secret_key = fs::read_to_string(&signer_config.network_key_path)
+                .with_context(|| "Failed to read network pem file")?;
+            let network_secret_key = NodeNetworkingSecretKey::decode_pem(&network_secret_key)
+                .with_context(|| "Failed to decode network pem file")?;
+            println!(
+                "Networking Public Key: {}",
+                network_secret_key.to_pk().to_base64()
+            );
+        } else {
+            eprintln!("Network Public Key: does not exist");
+        }
+        Ok(())
     }
 }

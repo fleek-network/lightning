@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use affair::Socket;
 use async_trait::async_trait;
@@ -70,4 +70,18 @@ pub trait SignerInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send 
     /// this function is responsible for signing arbitrary messages from other parts of
     /// the system.
     fn sign_raw_digest(&self, digest: &[u8; 32]) -> NodeSignature;
+
+    /// Generates the node secret key.
+    ///
+    /// # Safety
+    ///
+    /// This function will return an error if the key already exists.
+    fn generate_node_key(path: &Path) -> anyhow::Result<()>;
+
+    /// Generates the network secret keys.
+    ///
+    /// # Safety
+    ///
+    /// This function will return an error if the key already exists.
+    fn generate_network_key(path: &Path) -> anyhow::Result<()>;
 }

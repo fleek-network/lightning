@@ -191,7 +191,7 @@ async fn test_retry_send() {
 async fn test_shutdown() {
     let app = Application::init(AppConfig::default()).await.unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-    let mut signer = Signer::init(Config::default(), query_runner.clone())
+    let mut signer = Signer::init(Config::test(), query_runner.clone())
         .await
         .unwrap();
     let consensus = MockConsensus::init(
@@ -217,7 +217,7 @@ async fn test_shutdown() {
 async fn test_sign_raw_digest() {
     let app = Application::init(AppConfig::default()).await.unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-    let mut signer = Signer::init(Config::default(), query_runner.clone())
+    let mut signer = Signer::init(Config::test(), query_runner.clone())
         .await
         .unwrap();
     let consensus = MockConsensus::init(
@@ -302,7 +302,7 @@ async fn test_fail_to_encode_keys() {
 }
 
 #[tokio::test]
-async fn test_create_keys() {
+async fn test_no_keys_exist() {
     let path =
         ResolvedPathBuf::try_from("~/.fleek-signer-test-3/keys").expect("Failed to resolve path");
 
@@ -312,7 +312,6 @@ async fn test_create_keys() {
     }
 
     // Pass the paths to the signer. No keys are in the directory.
-    fs::create_dir_all(&path).expect("Failed to create swarm directory");
     let node_key_path = path.join("node.pem");
     let network_key_path = path.join("network.pem");
 
@@ -329,22 +328,50 @@ async fn test_create_keys() {
 
     let app = Application::init(AppConfig::default()).await.unwrap();
     let (_, query_runner) = (app.transaction_executor(), app.sync_query());
-    let signer = Signer::init(config, query_runner).await.unwrap();
+    let signer = Signer::init(config, query_runner).await;
 
-    // Make sure that the signer generated keys and stored them at the specified location.
-    let (network_secret_key_gen, node_secret_key_gen) = signer.get_sk();
+    // Initiating the signer should return an error if no keys exist.
+    assert!(signer.is_err());
+}
 
+#[tokio::test]
+async fn test_generate_node_key() {
+    let path =
+        ResolvedPathBuf::try_from("~/.fleek-signer-test-4/keys").expect("Failed to resolve path");
+
+    // Make sure this directoy doesn't exist.
+    if path.is_dir() {
+        fs::remove_dir_all(&path).expect("Failed to clean up signer test directory.");
+    }
+
+    let node_key_path = path.join("node.pem");
+    Signer::generate_node_key(&node_key_path).unwrap();
+
+    // Make sure that a valid key was created.
     let node_secret_key = fs::read_to_string(&node_key_path).expect("Failed to read node pem file");
-    let node_secret_key =
-        NodeSecretKey::decode_pem(&node_secret_key).expect("Failed to decode node pem file");
+    let _ = NodeSecretKey::decode_pem(&node_secret_key).expect("Failed to decode node pem file");
 
+    fs::remove_dir_all(&path).expect("Failed to clean up signer test directory.");
+}
+
+#[tokio::test]
+async fn test_generate_network_key() {
+    let path =
+        ResolvedPathBuf::try_from("~/.fleek-signer-test-5/keys").expect("Failed to resolve path");
+
+    // Make sure this directoy doesn't exist.
+    if path.is_dir() {
+        fs::remove_dir_all(&path).expect("Failed to clean up signer test directory.");
+    }
+
+    let network_key_path = path.join("network.pem");
+    Signer::generate_network_key(&network_key_path).unwrap();
+
+    // Make sure that a valid key was created.
     let network_secret_key =
         fs::read_to_string(&network_key_path).expect("Failed to read network pem file");
-    let network_secret_key = NodeNetworkingSecretKey::decode_pem(&network_secret_key)
+    let _ = NodeNetworkingSecretKey::decode_pem(&network_secret_key)
         .expect("Failed to decode network pem file");
-
-    assert_eq!(node_secret_key, node_secret_key_gen);
-    assert_eq!(network_secret_key, network_secret_key_gen);
 
     fs::remove_dir_all(&path).expect("Failed to clean up signer test directory.");
 }

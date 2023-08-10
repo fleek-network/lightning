@@ -3,6 +3,7 @@ pub mod utils;
 use std::{
     collections::VecDeque,
     fs::read_to_string,
+    path::Path,
     sync::{Arc, Mutex},
     time::{Duration, SystemTime},
 };
@@ -10,6 +11,7 @@ use std::{
 pub mod tests;
 
 use affair::{Socket, Task};
+use anyhow::anyhow;
 use async_trait::async_trait;
 pub use config::Config;
 use fleek_crypto::{
@@ -24,7 +26,6 @@ use lightning_interfaces::{
     types::{TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest},
     MempoolSocket, SyncQueryRunnerInterface,
 };
-use log::warn;
 use tokio::sync::{mpsc, Notify};
 
 // If a transaction does not get ordered, the signer will try to resend it.
@@ -101,7 +102,7 @@ impl SignerInterface for Signer {
 
     /// Initialize the signature service.
     async fn init(config: Config, query_runner: Self::SyncQuery) -> anyhow::Result<Self> {
-        let inner = SignerInner::new(config);
+        let inner = SignerInner::init(config)?;
         let (socket, rx) = Socket::raw_bounded(2048);
         Ok(Self {
             inner: Arc::new(inner),
@@ -169,6 +170,36 @@ impl SignerInterface for Signer {
     fn sign_raw_digest(&self, digest: &[u8; 32]) -> NodeSignature {
         self.inner.node_secret_key.sign(digest)
     }
+
+    /// Generates the node secret key.
+    ///
+    /// # Safety
+    ///
+    /// This function will return an error if the key already exists.
+    fn generate_node_key(path: &Path) -> anyhow::Result<()> {
+        if path.exists() {
+            return Err(anyhow!("Node secret key already exists"));
+        } else {
+            let node_secret_key = NodeSecretKey::generate();
+            utils::save(path, node_secret_key.encode_pem())?;
+        }
+        Ok(())
+    }
+
+    /// Generates the network secret keys.
+    ///
+    /// # Safety
+    ///
+    /// This function will return an error if the key already exists.
+    fn generate_network_key(path: &Path) -> anyhow::Result<()> {
+        if path.exists() {
+            return Err(anyhow!("Networking secret key already exists"));
+        } else {
+            let network_secret_key = NodeNetworkingSecretKey::generate();
+            utils::save(path, network_secret_key.encode_pem())?;
+        }
+        Ok(())
+    }
 }
 
 impl Signer {
@@ -205,7 +236,7 @@ struct SignerInner {
 }
 
 impl SignerInner {
-    fn new(config: Config) -> Self {
+    fn init(config: Config) -> anyhow::Result<Self> {
         let node_secret_key = if config.node_key_path.exists() {
             // read pem file, if we cant read the pem file we should panic
             let encoded =
@@ -215,16 +246,9 @@ impl SignerInner {
             // support passworded pems
             NodeSecretKey::decode_pem(&encoded).expect("Failed to decode node pem file")
         } else {
-            // if the path doesn't exist, create a new key
-            warn!(
-                "Path to node key does not exist({}): Generating a new key there",
-                config.node_key_path.to_str().unwrap()
-            );
-            let node_secret_key = NodeSecretKey::generate();
-
-            utils::save(&config.node_key_path, node_secret_key.encode_pem())
-                .expect("Failed to save NodeSecretKey to disk.");
-            node_secret_key
+            return Err(anyhow!(
+                "Node secret key does not exist. Use the CLI to generate keys."
+            ));
         };
 
         let network_secret_key = if config.network_key_path.exists() {
@@ -237,27 +261,20 @@ impl SignerInner {
             NodeNetworkingSecretKey::decode_pem(&encoded)
                 .expect("Failed to decode network pem file")
         } else {
-            // if the path doesn't exist, create a new key
-            warn!(
-                "Path to network key does not exist({}): Generating a new key there",
-                config.network_key_path.to_str().unwrap()
-            );
-            let network_secret_key = NodeNetworkingSecretKey::generate();
-
-            utils::save(&config.network_key_path, network_secret_key.encode_pem())
-                .expect("Failed to save NetworkSecretKey to disk.");
-            network_secret_key
+            return Err(anyhow!(
+                "Networking secret key does not exist. Use the CLI to generate keys."
+            ));
         };
 
         let node_public_key = node_secret_key.to_pk();
 
         let network_public_key = network_secret_key.to_pk();
-        Self {
+        Ok(Self {
             node_secret_key,
             node_public_key,
             network_secret_key,
             network_public_key,
-        }
+        })
     }
 
     async fn handle(
