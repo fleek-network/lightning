@@ -83,6 +83,7 @@ impl Builder {
 }
 
 /// Maintains the DHT.
+#[derive(Clone)]
 pub struct Dht<T: TopologyInterface> {
     inner: Arc<InnerDht<T>>,
 }
