@@ -94,17 +94,15 @@ impl<Q: SyncQueryRunnerInterface> TopologyInterface for Topology<Q> {
 
     fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>> {
         let epoch = self.query.get_epoch();
-
         let mut current = self.current_peers.lock().expect("failed to acquire lock");
         let mut current_epoch = self.current_epoch.lock().expect("failed to acquire lock");
 
         // if it's the initial epoch or the epoch has changed
-        if epoch == u64::MAX || epoch > *current_epoch {
+        if *current_epoch == u64::MAX || *current_epoch < epoch {
             let (matrix, mappings, our_index) = self.build_latency_matrix();
 
             *current = if let Some(our_index) = our_index {
                 // Included in the topology: collect assignments and build output
-
                 if mappings.len() < self.min_nodes {
                     // Fallback to returning all nodes, since we're less than the minimum
                     vec![mappings.into_values().collect()]
@@ -126,7 +124,6 @@ impl<Q: SyncQueryRunnerInterface> TopologyInterface for Topology<Q> {
             *current_epoch = epoch;
         }
 
-        // return the current peers
         current.clone()
     }
 }
