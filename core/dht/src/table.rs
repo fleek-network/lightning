@@ -1,10 +1,13 @@
-use std::collections::{BTreeMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+};
 
 use anyhow::Result;
 use fleek_crypto::NodeNetworkingPublicKey;
 use lightning_interfaces::Blake3Hash;
 use thiserror::Error;
-use tokio::sync::{mpsc::Receiver, oneshot};
+use tokio::sync::{mpsc::Receiver, oneshot, Notify};
 
 use crate::{
     bucket::{Bucket, MAX_BUCKETS, MAX_BUCKET_SIZE},
@@ -14,37 +17,56 @@ use crate::{
 
 pub type TableKey = Blake3Hash;
 
-pub async fn start_worker(mut rx: Receiver<TableRequest>, local_key: NodeNetworkingPublicKey) {
+pub async fn start_worker(
+    mut rx: Receiver<TableRequest>,
+    local_key: NodeNetworkingPublicKey,
+    shutdown_notify: Arc<Notify>,
+) {
     let mut table = Table::new(local_key);
-    while let Some(request) = rx.recv().await {
-        match request {
-            TableRequest::ClosestNodes { target: key, tx } => {
-                let nodes = table.closest_nodes(&key);
-                tx.send(Ok(nodes))
-                    .expect("internal table client not to drop the channel");
-            },
-            TableRequest::AddNode { node, tx } => {
-                let result = table.add_node(node).map_err(|e| QueryError(e.to_string()));
-                if let Some(tx) = tx {
-                    tx.send(result)
-                        .expect("internal table client not to drop the channel");
+    loop {
+        tokio::select! {
+            request = rx.recv() => {
+                if let Some(request) = request {
+                    match request {
+                        TableRequest::ClosestNodes { target: key, tx } => {
+                            let nodes = table.closest_nodes(&key);
+                            tx.send(Ok(nodes))
+                                .expect("internal table client not to drop the channel");
+                        },
+                        TableRequest::AddNode { node, tx } => {
+                            let result = table
+                                .add_node(node)
+                                .map_err(|e| QueryError(e.to_string()));
+                            if let Some(tx) = tx {
+                                tx.send(result)
+                                    .expect("internal table client not to drop the channel");
+                            }
+                        },
+                        TableRequest::FirstNonEmptyBucket { tx } => {
+                            let local_key = table.local_node_key;
+                            let closest = table.closest_nodes(&local_key.0);
+                            match &closest.first() {
+                                Some(node) => {
+                                    let index = distance::leading_zero_bits(
+                                        &node.key.0,
+                                        &local_key.0
+                                    );
+                                    tx.send(Some(index))
+                                        .expect("internal table client not to drop the channel");
+                                },
+                                None => {
+                                    tx.send(None)
+                                        .expect("internal table client not to drop the channel");
+                                },
+                            }
+                        },
+                    }
                 }
-            },
-            TableRequest::FirstNonEmptyBucket { tx } => {
-                let local_key = table.local_node_key;
-                let closest = table.closest_nodes(&local_key.0);
-                match &closest.first() {
-                    Some(node) => {
-                        let index = distance::leading_zero_bits(&node.key.0, &local_key.0);
-                        tx.send(Some(index))
-                            .expect("internal table client not to drop the channel");
-                    },
-                    None => {
-                        tx.send(None)
-                            .expect("internal table client not to drop the channel");
-                    },
-                }
-            },
+            }
+            _ = shutdown_notify.notified() => {
+                tracing::info!("shutting down handler");
+                break;
+            }
         }
     }
 }

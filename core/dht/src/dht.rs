@@ -2,18 +2,21 @@ use std::{
     marker::PhantomData,
     net::SocketAddr,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
+use affair::{Socket, Task};
 use anyhow::Result;
 use async_trait::async_trait;
 use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSecretKey, SecretKey};
 use lightning_interfaces::{
-    dht::{DhtInterface, KeyPrefix, TableEntry},
+    dht::{DhtInterface, DhtSocket},
+    types::{DhtRequest, DhtResponse, TableEntry},
     SignerInterface, TopologyInterface, WithStartAndShutdown,
 };
 use tokio::{
     net::UdpSocket,
-    sync::{mpsc, oneshot},
+    sync::{mpsc, oneshot, Notify},
 };
 
 use crate::{
@@ -60,11 +63,13 @@ impl Builder {
         let buffer_size = self.buffer_size.unwrap_or(10_000);
         let address = self.address.unwrap_or_else(|| "0.0.0.0:0".parse().unwrap());
 
+        let (socket, rx) = Socket::raw_bounded(2048);
         let (handler_tx, handler_rx) = mpsc::channel(buffer_size);
-
         let (bootstrap_tx, bootstrap_rx) = mpsc::channel(buffer_size);
 
-        let signer = InnerDht {
+        Ok(Dht {
+            socket,
+            socket_rx: Arc::new(Mutex::new(Some(rx))),
             nodes: Arc::new(Mutex::new(Some(self.nodes))),
             buffer_size,
             address,
@@ -73,22 +78,18 @@ impl Builder {
             bootstrap_tx,
             handler_rx: Arc::new(Mutex::new(Some(handler_rx))),
             bootstrap_rx: Arc::new(Mutex::new(Some(bootstrap_rx))),
+            is_running: Arc::new(Mutex::new(false)),
+            shutdown_notify: Arc::new(Notify::new()),
             topology: PhantomData,
-        };
-
-        Ok(Dht {
-            inner: Arc::new(signer),
         })
     }
 }
 
 /// Maintains the DHT.
-#[derive(Clone)]
+#[allow(clippy::type_complexity)]
 pub struct Dht<T: TopologyInterface> {
-    inner: Arc<InnerDht<T>>,
-}
-
-struct InnerDht<T: TopologyInterface> {
+    socket: DhtSocket,
+    socket_rx: Arc<Mutex<Option<mpsc::Receiver<Task<DhtRequest, DhtResponse>>>>>,
     buffer_size: usize,
     address: SocketAddr,
     network_secret_key: NodeNetworkingSecretKey,
@@ -97,16 +98,16 @@ struct InnerDht<T: TopologyInterface> {
     handler_rx: Arc<Mutex<Option<mpsc::Receiver<HandlerRequest>>>>,
     bootstrap_rx: Arc<Mutex<Option<mpsc::Receiver<BootstrapRequest>>>>,
     nodes: Arc<Mutex<Option<Vec<NodeInfo>>>>,
+    is_running: Arc<Mutex<bool>>,
+    shutdown_notify: Arc<Notify>,
     topology: PhantomData<T>,
 }
 
 impl<T: TopologyInterface> Dht<T> {
     /// Return one value associated with the given key.
-    pub async fn get(&self, key: &[u8]) -> Option<TableEntry> {
+    pub async fn get(handler_tx: mpsc::Sender<HandlerRequest>, key: &[u8]) -> Option<TableEntry> {
         let (tx, rx) = oneshot::channel();
-        if self
-            .inner
-            .handler_tx
+        if handler_tx
             .send(HandlerRequest::Get {
                 key: key.to_vec(),
                 tx,
@@ -125,8 +126,7 @@ impl<T: TopologyInterface> Dht<T> {
     }
 
     /// Put a key-value pair into the DHT.
-    pub fn put(&self, key: &[u8], value: &[u8]) {
-        let handler_tx = self.inner.handler_tx.clone();
+    pub fn put(handler_tx: mpsc::Sender<HandlerRequest>, key: &[u8], value: &[u8]) {
         let key = key.to_vec();
         let value = value.to_vec();
         tokio::spawn(async move {
@@ -144,7 +144,6 @@ impl<T: TopologyInterface> Dht<T> {
     /// If bootstrapping is in process, this request will be ignored.
     pub async fn bootstrap(&self) {
         if self
-            .inner
             .bootstrap_tx
             .send(BootstrapRequest::Start)
             .await
@@ -158,7 +157,6 @@ impl<T: TopologyInterface> Dht<T> {
     pub async fn is_bootstrapped(&self) -> bool {
         let (tx, rx) = oneshot::channel();
         if self
-            .inner
             .bootstrap_tx
             .send(BootstrapRequest::DoneBootstrapping { tx })
             .await
@@ -173,53 +171,84 @@ impl<T: TopologyInterface> Dht<T> {
 #[async_trait]
 impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
     fn is_running(&self) -> bool {
-        !self.inner.handler_tx.is_closed() && !self.inner.bootstrap_tx.is_closed()
+        *self.is_running.lock().unwrap()
     }
 
     async fn start(&self) {
-        let public_key = self.inner.network_secret_key.to_pk();
-        let (table_tx, table_rx) = mpsc::channel(self.inner.buffer_size);
-        tokio::spawn(table::start_worker(table_rx, public_key));
+        let public_key = self.network_secret_key.to_pk();
+        let (table_tx, table_rx) = mpsc::channel(self.buffer_size);
 
-        let (worker_tx, worker_rx) = mpsc::channel(self.inner.buffer_size);
-        tokio::spawn(store::start_worker(worker_rx));
+        tokio::spawn(table::start_worker(
+            table_rx,
+            public_key,
+            self.shutdown_notify.clone(),
+        ));
 
-        let socket = UdpSocket::bind(self.inner.address)
+        let (worker_tx, worker_rx) = mpsc::channel(self.buffer_size);
+        tokio::spawn(store::start_worker(worker_rx, self.shutdown_notify.clone()));
+
+        let socket = UdpSocket::bind(self.address)
             .await
             .map(Arc::new)
             .expect("Binding to socket failed");
         tracing::info!("UDP socket bound to {:?}", socket.local_addr().unwrap());
 
         tokio::spawn(handler::start_worker(
-            self.inner.handler_rx.lock().unwrap().take().unwrap(),
+            self.handler_rx.lock().unwrap().take().unwrap(),
             table_tx.clone(),
             worker_tx,
             socket,
-            self.inner.network_secret_key.to_pk(),
+            self.network_secret_key.to_pk(),
+            self.shutdown_notify.clone(),
         ));
         tokio::spawn(bootstrap::start_worker(
-            self.inner.bootstrap_rx.lock().unwrap().take().unwrap(),
+            self.bootstrap_rx.lock().unwrap().take().unwrap(),
             table_tx,
-            self.inner.handler_tx.clone(),
-            self.inner.network_secret_key.to_pk(),
-            self.inner.nodes.lock().unwrap().take().unwrap(),
+            self.handler_tx.clone(),
+            self.network_secret_key.to_pk(),
+            self.nodes.lock().unwrap().take().unwrap(),
         ));
+
+        self.bootstrap().await;
+        while !self.is_bootstrapped().await {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+
+        // TODO: this will be refactored soon
+        let mut socket_rx = self.socket_rx.lock().unwrap().take().unwrap();
+        let shutdown_notify = self.shutdown_notify.clone();
+        let handler_tx = self.handler_tx.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    task = socket_rx.recv() => {
+                        if let Some(task) = task {
+                            match task.request.clone() {
+                                DhtRequest::Get { prefix: _, key } => {
+                                    let entry = Dht::<T>::get(handler_tx.clone(), &key).await;
+                                    task.respond(DhtResponse::Get(entry));
+                                }
+                                DhtRequest::Put { prefix: _, key, value } => {
+                                    Dht::<T>::put(handler_tx.clone(), &key, &value);
+                                    task.respond(DhtResponse::Put(()));
+                                }
+                            }
+                        }
+
+                    }
+                    _ = shutdown_notify.notified() => {
+                        break;
+                    }
+                }
+            }
+        });
+
+        *self.is_running.lock().unwrap() = true;
     }
 
     async fn shutdown(&self) {
-        // We drop the boostrap worker first because
-        // one of its tasks may be communicating with
-        // the handler worker.
-        self.inner
-            .bootstrap_tx
-            .send(BootstrapRequest::Shutdown)
-            .await
-            .expect("bootstrap worker to not drop channel");
-        self.inner
-            .handler_tx
-            .send(HandlerRequest::Shutdown)
-            .await
-            .expect("handler worker to not drop channel");
+        self.shutdown_notify.notify_waiters();
+        *self.is_running.lock().unwrap() = false;
     }
 }
 
@@ -232,11 +261,7 @@ impl<T: TopologyInterface> DhtInterface for Dht<T> {
         Builder::new(network_secret_key).build().await
     }
 
-    fn put(&self, _: KeyPrefix, key: &[u8], value: &[u8]) {
-        self.put(key, value)
-    }
-
-    async fn get(&self, _: KeyPrefix, key: &[u8]) -> Option<TableEntry> {
-        self.get(key).await
+    fn get_socket(&self) -> DhtSocket {
+        self.socket.clone()
     }
 }

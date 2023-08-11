@@ -17,6 +17,7 @@ use crate::{
     table::{TableKey, TableRequest},
 };
 
+#[allow(unused)]
 pub enum BootstrapRequest {
     Start,
     DoneBootstrapping { tx: oneshot::Sender<bool> },

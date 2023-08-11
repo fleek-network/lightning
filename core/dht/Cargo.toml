@@ -13,6 +13,7 @@ lightning-interfaces = { path="../interfaces" }
 lightning-topology = { path="../topology" }
 fleek-crypto.workspace = true
 serde.workspace = true
+affair.workspace = true
 rand.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

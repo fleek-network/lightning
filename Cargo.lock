@@ -3382,6 +3382,7 @@ dependencies = [
 name = "lightning-dht"
 version = "0.0.0"
 dependencies = [
+ "affair",
  "anyhow",
  "async-trait",
  "bincode",

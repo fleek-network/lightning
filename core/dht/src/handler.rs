@@ -6,14 +6,14 @@ use std::{
 
 use anyhow::Result;
 use fleek_crypto::NodeNetworkingPublicKey;
-use lightning_interfaces::dht::{KeyPrefix, TableEntry};
+use lightning_interfaces::types::{KeyPrefix, TableEntry};
 use tokio::{
     net::UdpSocket,
     select,
     sync::{
         mpsc,
         mpsc::{Receiver, Sender},
-        oneshot,
+        oneshot, Notify,
     },
 };
 
@@ -34,6 +34,7 @@ pub async fn start_worker(
     store_tx: Sender<StoreRequest>,
     socket: Arc<UdpSocket>,
     local_key: NodeNetworkingPublicKey,
+    shutdown_notify: Arc<Notify>,
 ) {
     let mut handler = Handler {
         pending: HashMap::new(),
@@ -68,6 +69,10 @@ pub async fn start_worker(
                         tracing::error!("unexpected error when reading from socket: {e:?}")
                     }
                 }
+            }
+            _ = shutdown_notify.notified() => {
+                tracing::info!("shutting down handler");
+                break;
             }
         }
     }

@@ -3,8 +3,12 @@ use std::{net::SocketAddr, time::Duration};
 use clap::{Parser, Subcommand};
 use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSecretKey, SecretKey};
 use lightning_application::query_runner::QueryRunner;
-use lightning_dht::dht::{Builder, Dht};
-use lightning_interfaces::{Blake3Hash, TopologyInterface, WithStartAndShutdown};
+use lightning_dht::dht::Builder;
+use lightning_interfaces::{
+    dht::{DhtInterface, DhtSocket},
+    types::{DhtRequest, DhtResponse, KeyPrefix},
+    Blake3Hash, TopologyInterface, WithStartAndShutdown,
+};
 use lightning_topology::Topology;
 
 #[derive(Parser)]
@@ -43,14 +47,23 @@ async fn main() {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
             let secret_key = NodeNetworkingSecretKey::generate();
             tracing::info!("public key: {:?}", secret_key.to_pk());
-            let dht =
+            let dht_socket =
                 start_node::<Topology<QueryRunner>>(secret_key, Some((address, bootstrap_key)))
                     .await;
 
             tracing::info!("GET {key:?}");
 
             let key = hex::decode(key).unwrap();
-            if let Some(value) = dht.get(&key).await {
+
+            let value = dht_socket
+                .run(DhtRequest::Get {
+                    prefix: KeyPrefix::ContentRegistry,
+                    key,
+                })
+                .await
+                .expect("sending get request failed.");
+
+            if let DhtResponse::Get(Some(value)) = value {
                 tracing::info!("value found is {:?}", value.value);
             }
         },
@@ -58,7 +71,7 @@ async fn main() {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
             let secret_key = NodeNetworkingSecretKey::generate();
             tracing::info!("public key: {:?}", secret_key.to_pk());
-            let dht =
+            let dht_socket =
                 start_node::<Topology<QueryRunner>>(secret_key, Some((address, bootstrap_key)))
                     .await;
 
@@ -68,7 +81,14 @@ async fn main() {
 
             tracing::info!("PUT {}:{value:?}", hex::encode(key));
 
-            dht.put(&key, &value);
+            dht_socket
+                .run(DhtRequest::Put {
+                    prefix: KeyPrefix::ContentRegistry,
+                    key: key.to_vec(),
+                    value: value.to_vec(),
+                })
+                .await
+                .expect("sending put request failed.");
 
             // Todo: Let's remove this loop.
             // We have this loop so that the spawn task of `put` finishes.
@@ -87,7 +107,7 @@ async fn main() {
             }
         },
         Commands::Bootstrapper => {
-            let _ = start_node::<Topology<QueryRunner>>(bootstrap_secret_key, None).await;
+            let _socket = start_node::<Topology<QueryRunner>>(bootstrap_secret_key, None).await;
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
@@ -100,7 +120,7 @@ async fn main() {
 async fn start_node<T: TopologyInterface>(
     secret_key: NodeNetworkingSecretKey,
     bootstrapper: Option<(SocketAddr, NodeNetworkingPublicKey)>,
-) -> Dht<T> {
+) -> DhtSocket {
     let mut builder = Builder::new(secret_key);
 
     if let Some((address, key)) = bootstrapper {
@@ -108,17 +128,9 @@ async fn start_node<T: TopologyInterface>(
         builder.add_node(key, address);
     }
 
-    let dht = builder.build().await.unwrap();
+    let dht = builder.build::<T>().await.unwrap();
+    let socket = dht.get_socket();
     dht.start().await;
 
-    tracing::info!("start bootstrap");
-    dht.bootstrap().await;
-
-    while !dht.is_bootstrapped().await {
-        tokio::time::sleep(Duration::from_secs(1)).await;
-    }
-
-    tracing::info!("finished bootstrapping");
-
-    dht
+    socket
 }
