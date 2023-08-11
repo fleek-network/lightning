@@ -205,6 +205,7 @@ where
             && self.consensus.is_running()
             && self.delivery_acknowledgment_aggregator.is_running()
             && self.handshake.is_running()
+            && self.dht.is_running()
     }
 
     async fn start(&self) {
@@ -215,6 +216,7 @@ where
         self.delivery_acknowledgment_aggregator.start().await;
         self.handshake.start().await;
         self.rpc.start().await;
+        self.dht.start().await;
     }
 
     async fn shutdown(&self) {
@@ -224,6 +226,7 @@ where
         self.delivery_acknowledgment_aggregator.shutdown().await;
         self.handshake.shutdown().await;
         self.rpc.shutdown().await;
+        self.dht.shutdown().await;
     }
 }
 

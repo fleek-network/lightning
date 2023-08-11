@@ -1,16 +1,11 @@
 use std::{net::SocketAddr, time::Duration};
 
 use clap::{Parser, Subcommand};
-use fleek_crypto::NodeNetworkingPublicKey;
+use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSecretKey, SecretKey};
 use lightning_application::query_runner::QueryRunner;
 use lightning_dht::dht::{Builder, Dht};
-use lightning_interfaces::{Blake3Hash, TopologyInterface};
+use lightning_interfaces::{Blake3Hash, TopologyInterface, WithStartAndShutdown};
 use lightning_topology::Topology;
-
-const BOOTSTRAP_KEY: Blake3Hash = [
-    240, 76, 40, 117, 207, 118, 89, 141, 116, 76, 54, 143, 23, 169, 217, 135, 248, 10, 42, 172, 64,
-    171, 193, 85, 186, 234, 102, 129, 48, 240, 126, 33,
-];
 
 #[derive(Parser)]
 struct Cli {
@@ -39,13 +34,17 @@ async fn main() {
 
     let cli = Cli::parse();
 
+    let bootstrap_key_pem = include_str!("../../test-utils/keys/test_network.pem");
+    let bootstrap_secret_key = NodeNetworkingSecretKey::decode_pem(bootstrap_key_pem).unwrap();
+    let bootstrap_key = bootstrap_secret_key.to_pk();
+
     match cli.command {
         Commands::Get { key } => {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
-            let public_key = NodeNetworkingPublicKey(rand::random());
-            tracing::info!("public key: {public_key:?}");
+            let secret_key = NodeNetworkingSecretKey::generate();
+            tracing::info!("public key: {:?}", secret_key.to_pk());
             let dht =
-                start_node::<Topology<QueryRunner>>(public_key, Some((address, BOOTSTRAP_KEY)))
+                start_node::<Topology<QueryRunner>>(secret_key, Some((address, bootstrap_key)))
                     .await;
 
             tracing::info!("GET {key:?}");
@@ -57,10 +56,10 @@ async fn main() {
         },
         Commands::Put => {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
-            let public_key = NodeNetworkingPublicKey(rand::random());
-            tracing::info!("public key: {public_key:?}");
+            let secret_key = NodeNetworkingSecretKey::generate();
+            tracing::info!("public key: {:?}", secret_key.to_pk());
             let dht =
-                start_node::<Topology<QueryRunner>>(public_key, Some((address, BOOTSTRAP_KEY)))
+                start_node::<Topology<QueryRunner>>(secret_key, Some((address, bootstrap_key)))
                     .await;
 
             // Todo: get actual hash.
@@ -79,18 +78,16 @@ async fn main() {
         },
         Commands::Join => {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
-            let public_key = NodeNetworkingPublicKey(rand::random());
-            tracing::info!("public key: {public_key:?}");
-            let _ = start_node::<Topology<QueryRunner>>(public_key, Some((address, BOOTSTRAP_KEY)))
+            let secret_key = NodeNetworkingSecretKey::generate();
+            tracing::info!("public key: {:?}", secret_key.to_pk());
+            let _ = start_node::<Topology<QueryRunner>>(secret_key, Some((address, bootstrap_key)))
                 .await;
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
         },
         Commands::Bootstrapper => {
-            let _ =
-                start_node::<Topology<QueryRunner>>(NodeNetworkingPublicKey(BOOTSTRAP_KEY), None)
-                    .await;
+            let _ = start_node::<Topology<QueryRunner>>(bootstrap_secret_key, None).await;
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
@@ -101,18 +98,18 @@ async fn main() {
 }
 
 async fn start_node<T: TopologyInterface>(
-    public_key: NodeNetworkingPublicKey,
-    bootstrapper: Option<(SocketAddr, Blake3Hash)>,
+    secret_key: NodeNetworkingSecretKey,
+    bootstrapper: Option<(SocketAddr, NodeNetworkingPublicKey)>,
 ) -> Dht<T> {
-    let mut builder = Builder::new();
-    builder.set_node_key(public_key);
+    let mut builder = Builder::new(secret_key);
 
     if let Some((address, key)) = bootstrapper {
         tracing::info!("bootstrapping to {address:?} {key:?}");
-        builder.add_node(NodeNetworkingPublicKey(key), address);
+        builder.add_node(key, address);
     }
 
     let dht = builder.build().await.unwrap();
+    dht.start().await;
 
     tracing::info!("start bootstrap");
     dht.bootstrap().await;
