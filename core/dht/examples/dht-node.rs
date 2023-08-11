@@ -2,8 +2,10 @@ use std::{net::SocketAddr, time::Duration};
 
 use clap::{Parser, Subcommand};
 use fleek_crypto::NodeNetworkingPublicKey;
+use lightning_application::query_runner::QueryRunner;
 use lightning_dht::dht::{Builder, Dht};
-use lightning_interfaces::Blake3Hash;
+use lightning_interfaces::{Blake3Hash, TopologyInterface};
+use lightning_topology::Topology;
 
 const BOOTSTRAP_KEY: Blake3Hash = [
     240, 76, 40, 117, 207, 118, 89, 141, 116, 76, 54, 143, 23, 169, 217, 135, 248, 10, 42, 172, 64,
@@ -42,7 +44,9 @@ async fn main() {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
             let public_key = NodeNetworkingPublicKey(rand::random());
             tracing::info!("public key: {public_key:?}");
-            let dht = start_node(public_key, Some((address, BOOTSTRAP_KEY))).await;
+            let dht =
+                start_node::<Topology<QueryRunner>>(public_key, Some((address, BOOTSTRAP_KEY)))
+                    .await;
 
             tracing::info!("GET {key:?}");
 
@@ -55,7 +59,9 @@ async fn main() {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
             let public_key = NodeNetworkingPublicKey(rand::random());
             tracing::info!("public key: {public_key:?}");
-            let dht = start_node(public_key, Some((address, BOOTSTRAP_KEY))).await;
+            let dht =
+                start_node::<Topology<QueryRunner>>(public_key, Some((address, BOOTSTRAP_KEY)))
+                    .await;
 
             // Todo: get actual hash.
             let key: Blake3Hash = rand::random();
@@ -75,13 +81,16 @@ async fn main() {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
             let public_key = NodeNetworkingPublicKey(rand::random());
             tracing::info!("public key: {public_key:?}");
-            let _ = start_node(public_key, Some((address, BOOTSTRAP_KEY))).await;
+            let _ = start_node::<Topology<QueryRunner>>(public_key, Some((address, BOOTSTRAP_KEY)))
+                .await;
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
         },
         Commands::Bootstrapper => {
-            let _ = start_node(NodeNetworkingPublicKey(BOOTSTRAP_KEY), None).await;
+            let _ =
+                start_node::<Topology<QueryRunner>>(NodeNetworkingPublicKey(BOOTSTRAP_KEY), None)
+                    .await;
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
@@ -91,10 +100,10 @@ async fn main() {
     tracing::info!("shutting down dht-node");
 }
 
-async fn start_node(
+async fn start_node<T: TopologyInterface>(
     public_key: NodeNetworkingPublicKey,
     bootstrapper: Option<(SocketAddr, Blake3Hash)>,
-) -> Dht {
+) -> Dht<T> {
     let mut builder = Builder::new();
     builder.set_node_key(public_key);
 

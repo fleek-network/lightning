@@ -1,14 +1,12 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{marker::PhantomData, net::SocketAddr, sync::Arc};
 
 use anyhow::Result;
 use async_trait::async_trait;
 use fleek_crypto::NodeNetworkingPublicKey;
-use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::{
     dht::{DhtInterface, KeyPrefix, TableEntry},
-    SignerInterface, WithStartAndShutdown,
+    SignerInterface, TopologyInterface, WithStartAndShutdown,
 };
-use lightning_topology::Topology;
 use tokio::{
     net::UdpSocket,
     sync::{mpsc, oneshot},
@@ -55,7 +53,7 @@ impl Builder {
     }
 
     /// Build and initiates the DHT.
-    pub async fn build(self) -> Result<Dht> {
+    pub async fn build<T: TopologyInterface>(self) -> Result<Dht<T>> {
         let buffer_size = self.buffer_size.unwrap_or(10_000);
 
         let node_key = self.node_key.unwrap_or_else(|| {
@@ -93,17 +91,19 @@ impl Builder {
         Ok(Dht {
             handler_tx,
             bootstrap_tx,
+            topology: PhantomData,
         })
     }
 }
 
 /// Maintains the DHT.
-pub struct Dht {
+pub struct Dht<T: TopologyInterface> {
     handler_tx: mpsc::Sender<HandlerRequest>,
     bootstrap_tx: mpsc::Sender<BootstrapRequest>,
+    topology: PhantomData<T>,
 }
 
-impl Dht {
+impl<T: TopologyInterface> Dht<T> {
     /// Return one value associated with the given key.
     pub async fn get(&self, key: &[u8]) -> Option<TableEntry> {
         let (tx, rx) = oneshot::channel();
@@ -171,7 +171,7 @@ impl Dht {
 }
 
 #[async_trait]
-impl WithStartAndShutdown for Dht {
+impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
     fn is_running(&self) -> bool {
         !self.handler_tx.is_closed() && !self.bootstrap_tx.is_closed()
     }
@@ -194,8 +194,8 @@ impl WithStartAndShutdown for Dht {
 }
 
 #[async_trait]
-impl DhtInterface for Dht {
-    type Topology = Topology<QueryRunner>;
+impl<T: TopologyInterface> DhtInterface for Dht<T> {
+    type Topology = T;
 
     async fn init<S: SignerInterface>(_: &S, _: Arc<Self::Topology>) -> Result<Self> {
         Builder::new().build().await

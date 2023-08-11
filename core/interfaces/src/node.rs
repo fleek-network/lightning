@@ -5,10 +5,10 @@ use async_trait::async_trait;
 use crate::{
     application::ApplicationInterface, blockstore::BlockStoreInterface,
     common::WithStartAndShutdown, config::ConfigProviderInterface, consensus::ConsensusInterface,
-    handshake::HandshakeInterface, notifier::NotifierInterface, origin::OriginProviderSocket,
-    pod::DeliveryAcknowledgmentAggregatorInterface, reputation::ReputationAggregatorInterface,
-    rpc::RpcInterface, signer::SignerInterface, BroadcastInterface, ConnectionPoolInterface,
-    ServiceScope, TopologyInterface,
+    dht::DhtInterface, handshake::HandshakeInterface, notifier::NotifierInterface,
+    origin::OriginProviderSocket, pod::DeliveryAcknowledgmentAggregatorInterface,
+    reputation::ReputationAggregatorInterface, rpc::RpcInterface, signer::SignerInterface,
+    BroadcastInterface, ConnectionPoolInterface, ServiceScope, TopologyInterface,
 };
 
 pub trait LightningTypes: Send + Sync {
@@ -45,6 +45,7 @@ pub trait LightningTypes: Send + Sync {
         QueryRunner = <Self::Application as ApplicationInterface>::SyncExecutor,
         Signer = Self::Signer,
     >;
+    type Dht: DhtInterface<Topology = Self::Topology>;
 }
 
 pub struct Node<T: LightningTypes> {
@@ -61,6 +62,7 @@ pub struct Node<T: LightningTypes> {
     pub handshake: T::Handshake,
     pub topology: Arc<T::Topology>,
     pub broadcast: T::Broadcast,
+    pub dht: T::Dht,
     pub notifier: PhantomData<T::Notifier>,
 }
 
@@ -79,6 +81,8 @@ impl<T: LightningTypes> Node<T> {
             )
             .await?,
         );
+
+        let dht = T::Dht::init(&signer, topology.clone()).await?;
 
         let notifier = T::Notifier::init(application.sync_query());
 
@@ -152,6 +156,7 @@ impl<T: LightningTypes> Node<T> {
             handshake,
             topology,
             broadcast,
+            dht,
             notifier: PhantomData,
         })
     }
@@ -257,5 +262,6 @@ pub mod transformers {
         type Topology = T::Topology;
         type Broadcast = T::Broadcast;
         type ConnectionPool = T::ConnectionPool;
+        type Dht = T::Dht;
     }
 }

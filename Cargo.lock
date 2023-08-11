@@ -3465,6 +3465,7 @@ dependencies = [
  "lightning-application",
  "lightning-blockstore",
  "lightning-consensus",
+ "lightning-dht",
  "lightning-handshake",
  "lightning-interfaces",
  "lightning-notifier",

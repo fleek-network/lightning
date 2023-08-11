@@ -1,6 +1,7 @@
 use lightning_application::{app::Application, query_runner::QueryRunner};
 use lightning_blockstore::memory::MemoryBlockStore;
 use lightning_consensus::consensus::{Consensus, PubSubMsg};
+use lightning_dht::dht::Dht;
 use lightning_handshake::server::TcpHandshakeServer;
 use lightning_interfaces::{BroadcastInterface, LightningTypes};
 use lightning_notifier::Notifier;
@@ -35,4 +36,5 @@ impl LightningTypes for FinalTypes {
     type Topology = Topology<QueryRunner>;
     type Broadcast = Broadcast<QueryRunner, Signer, Topology<QueryRunner>, Notifier>;
     type ConnectionPool = ConnectionPool<QueryRunner, Signer>;
+    type Dht = Dht<Topology<QueryRunner>>;
 }
