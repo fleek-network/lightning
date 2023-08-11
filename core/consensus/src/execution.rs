@@ -75,11 +75,11 @@ impl<P: PubSub<PubSubMsg>> ExecutionState for Execution<P> {
             // If node is on committee they should broadcast this certificate and batches through
             // gossip
             if self.is_committee.load(Ordering::Relaxed) {
-                self.pub_sub.send(&certificate.into());
+                self.pub_sub.send(&certificate.into()).await;
 
                 for batch in &batches {
                     // todo(dalton): Find a way to not clone batches here
-                    self.pub_sub.send(&batch.clone().into());
+                    self.pub_sub.send(&batch.clone().into()).await;
                 }
             }
 

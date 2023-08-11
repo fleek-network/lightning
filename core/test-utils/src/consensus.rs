@@ -27,7 +27,7 @@ pub struct MockPubSub {}
 #[async_trait]
 impl PubSub<()> for MockPubSub {
     /// Publish a message.
-    fn send(&self, _msg: &()) {}
+    async fn send(&self, _msg: &()) {}
 
     /// Await the next message in the topic, should only return `None` if there are
     /// no longer any new messages coming. (indicating that the gossip instance is

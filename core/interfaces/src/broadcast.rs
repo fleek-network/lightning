@@ -16,11 +16,14 @@ use crate::{
 #[derive(
     Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Serialize, Deserialize, IsVariant,
 )]
+#[repr(u8)]
 pub enum Topic {
     /// The gossip topic for
-    Consensus,
+    Consensus = 0x00,
     /// The gossip topic for Fleek Network's indexer DHT.
-    DistributedHashTable,
+    DistributedHashTable = 0x01,
+    /// The debug topic for tests
+    Debug = 0xFF,
 }
 
 impl ink_quill::TranscriptBuilderInput for Topic {
@@ -74,7 +77,7 @@ pub trait BroadcastInterface: WithStartAndShutdown + ConfigConsumer + Sized + Se
 #[async_trait]
 pub trait PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
     /// Publish a message.
-    fn send(&self, msg: &T);
+    async fn send(&self, msg: &T);
 
     /// Await the next message in the topic, should only return `None` if there are
     /// no longer any new messages coming. (indicating that the gossip instance is

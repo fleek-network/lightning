@@ -103,7 +103,7 @@ impl<T> PubSub<T> for MockPubSub<T>
 where
     T: Clone + LightningMessage,
 {
-    fn send(&self, _msg: &T) {}
+    async fn send(&self, _msg: &T) {}
     async fn recv(&mut self) -> Option<T> {
         None
     }
