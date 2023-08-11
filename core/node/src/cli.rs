@@ -181,7 +181,7 @@ where
             let network_secret_key = NodeNetworkingSecretKey::decode_pem(&network_secret_key)
                 .with_context(|| "Failed to decode network pem file")?;
             println!(
-                "Networking Public Key: {}",
+                "Network Public Key: {}",
                 network_secret_key.to_pk().to_base64()
             );
         } else {

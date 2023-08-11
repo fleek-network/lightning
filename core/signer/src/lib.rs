@@ -262,7 +262,7 @@ impl SignerInner {
                 .expect("Failed to decode network pem file")
         } else {
             return Err(anyhow!(
-                "Networking secret key does not exist. Use the CLI to generate keys."
+                "Network secret key does not exist. Use the CLI to generate keys."
             ));
         };
 
@@ -361,13 +361,13 @@ impl SignerInner {
             };
         if *base_nonce == application_nonce && *next_nonce > *base_nonce + 1 {
             // Application nonce has not been incremented even though we sent out
-            // transaction
+            // a transaction
             if let Some(base_timestamp_) = base_timestamp {
                 if base_timestamp_.elapsed().unwrap() >= TIMEOUT {
                     // At this point we assume that the transaction with nonce `base_nonce` will
                     // never arrive at the mempool
                     *base_timestamp = None;
-                    // Reset `next_nonce` to application nonce.
+                    // Reset `next_nonce` to the nonce the application is expecting.
                     *next_nonce = *base_nonce + 1;
                     // Resend all transactions with nonce >= base_nonce.
                     for pending_tx in pending_transactions.iter_mut() {
