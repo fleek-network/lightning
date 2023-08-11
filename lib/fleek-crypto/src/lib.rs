@@ -364,12 +364,12 @@ impl SecretKey for NodeNetworkingSecretKey {
 
 /// A node's ed25519 networking signature
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct NodeNetworkingSignature([u8; 32]);
+pub struct NodeNetworkingSignature(#[serde(with = "BigArray")] [u8; 64]);
 
 impl From<Ed25519Signature> for NodeNetworkingSignature {
     fn from(value: Ed25519Signature) -> Self {
         let bytes = value.as_ref();
-        NodeNetworkingSignature(*array_ref!(bytes, 0, 32))
+        NodeNetworkingSignature(*array_ref!(bytes, 0, 64))
     }
 }
 
