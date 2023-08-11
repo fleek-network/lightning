@@ -4,3 +4,24 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+serde.workspace = true
+anyhow.workspace = true
+arrayref = "0.3.7"
+async-trait.workspace = true
+bytes = "1.4.0"
+tokio.workspace = true
+fleek-crypto = { path = "../../lib/fleek-crypto" }
+ink-quill = { path = "../../lib/ink-quill" }
+lightning-interfaces = { path = "../interfaces" }
+dashmap = "5.5.0"
+
+#temp
+flexbuffers = "2.0.0"
+
+
+[dev-dependencies]
+lightning-application = { path = "../application" }
+lightning-signer = { path = "../signer" }
+lightning-topology = { path = "../topology" }
+lightning-notifier = { path = "../notifier" }
+mock = { path = "../mock" }
