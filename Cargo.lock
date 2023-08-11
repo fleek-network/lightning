@@ -3084,6 +3084,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "infusion"
+version = "0.1.0"
+
+[[package]]
 name = "ink-quill"
 version = "0.1.0"
 dependencies = [
