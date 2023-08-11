@@ -68,9 +68,7 @@ macro_rules! infu {
     [
         $name:ident ;
 
-        dep = [$($dep:tt),*];
-
-        fn init($init_param:ident) $init:block
+        fn init($($dep_name:ident: $dep_ty:tt),*) $init:block
     ] => {
         type Collection: Collection<$name = Self>;
 
@@ -78,13 +76,17 @@ macro_rules! infu {
         fn infu_dependencies(collector: &mut DependencyCollector) {
             $(
                 collector.depend::<
-                    <Self::Collection as Collection>::$dep
+                    <Self::Collection as Collection>::$dep_ty
                 >();
              );*
         }
 
         #[doc(hidden)]
-        fn infu_initialize($init_param: &Container<Self::Collection>) -> Result<Self, ()> {
+        fn infu_initialize(container: &Container<Self::Collection>) -> Result<Self, ()> {
+            $(
+                let $dep_name = container.get::<<Self::Collection as Collection>::$dep_ty>();
+             );*
+
             $init
         }
     };
@@ -93,9 +95,7 @@ macro_rules! infu {
 pub trait ConsensusInterface: Sized {
     infu![
         ConsensusInterface;
-        dep = [AppInterface];
-        fn init(container) {
-            let app = container.get_app();
+        fn init(app: AppInterface) {
             let sqr = app.get_sync_query_runner();
             Self::init(sqr)
         }
@@ -129,8 +129,8 @@ pub trait ConsensusInterface: Sized {
 // all this should be generated from the above macro.
 
 pub trait Collection {
-    type AppInterface: AppInterface<Collection = Self> + 'static;
-    type ConsensusInterface: ConsensusInterface<Collection = Self> + 'static;
+    type AppInterface: AppInterface<Collection = Self> + Sized + 'static;
+    type ConsensusInterface: ConsensusInterface<Collection = Self> + Sized + 'static;
 }
 
 pub struct Container<C: Collection> {
@@ -163,6 +163,10 @@ impl<C: Collection> Container<C> {
 
     pub fn initialize(self) {
         // based on the topo order
+        todo!()
+    }
+
+    pub fn get<T: Sized + 'static>(&self) -> &T {
         todo!()
     }
 
