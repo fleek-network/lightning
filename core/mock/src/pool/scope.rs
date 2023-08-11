@@ -41,9 +41,10 @@ impl<S: SignerInterface + 'static, Q: SyncQueryRunnerInterface, T: LightningMess
 
     /// Returns [`None`] if a connection for this scope already exists, or cannot be made.
     async fn handle(&mut self, key: Self::Request) -> Self::Response {
-        // TODO: check if we have an existing outgoing channel
+        // check if we have an existing outgoing channel
         if self.receivers.contains_key(&(key, self.scope)) || self.senders.contains_key(&key) {
-            // TODO: should we error here?
+            // TODO: should we error here, is there a need for there to be multiple connections per
+            // scope?
             return None;
         }
 

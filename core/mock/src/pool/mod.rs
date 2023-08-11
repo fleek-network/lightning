@@ -292,7 +292,7 @@ mod tests {
         let mut pool_a = ConnectionPool::init(Config {}, &signer_a, query_runner.clone());
         pool_a.with_transport(global_transport.clone());
         pool_a.start().await;
-        let (mut listener_a, _) = pool_a.bind::<TestFrame>(ServiceScope::Broadcast);
+        let (mut listener_a, _) = pool_a.bind::<TestFrame>(ServiceScope::Debug);
 
         let task = tokio::spawn(async move {
             // listen for a connection
@@ -326,7 +326,7 @@ mod tests {
         let mut pool_b = ConnectionPool::init(Config {}, &signer_b, query_runner);
         pool_b.with_transport(global_transport.clone());
         pool_b.start().await;
-        let (_, connector_b) = pool_b.bind::<TestFrame>(ServiceScope::Broadcast);
+        let (_, connector_b) = pool_b.bind::<TestFrame>(ServiceScope::Debug);
         let (sender, mut receiver) = connector_b
             .connect(&signer_a.get_bls_pk())
             .await
