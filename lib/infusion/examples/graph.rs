@@ -54,5 +54,5 @@ impl Collection for Binding {
 
 fn main() {
     let graph = Binding::build_graph();
-    println!("{:#?}", graph);
+    println!("{graph:#?}");
 }
