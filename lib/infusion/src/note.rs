@@ -63,3 +63,6 @@
 //! ```
 //!
 //! This trick allows us to provide a unique identifier for the different types per trait.
+//!
+//! The [vtable](crate::vtable) module provides the implementation of building blocks of this
+//! strategy.

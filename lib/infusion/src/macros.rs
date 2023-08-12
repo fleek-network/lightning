@@ -20,21 +20,20 @@
 /// trait Collection {
 ///     type A: A<Collection = Self>;
 ///     type B: B<Collection = Self>;
-/// }
 ///
-/// impl<T> infusion::CollectionBase for T where T: Collection {
-///     // ...
+///     fn build_graph() -> infusion::DependencyGraph {
+///         // ...
+///     }
 /// }
 /// ```
 ///
-/// This way we can have the `Collection: CollectionBase` and use it with a container, the container
-/// has the type `struct Container<C: CollectionBase>`. The container is where the instances of `A`
-/// and `B` will be stored.
+/// This way we can have the auto-implemented method `build_graph` that can always return the
+/// dependency graph of the concrete types.
 ///
 /// We can use this macro in this way to generate it:
 ///
 /// ```ignore
-/// infu!(@ [
+/// infu!(@Collection [
 ///     A,
 ///     B
 /// ]);
@@ -157,49 +156,41 @@
 #[macro_export]
 macro_rules! infu {
     // Case 1: Handle creation of the collection.
-    (@ [$($service:tt),*]) => {
-        trait Collection {
+    (@Collection [$($service:tt),*]) => {
+        pub trait Collection {
         $(
-            type $service: $service<Collection = Self>;
+            type $service: $service<Collection = Self> + 'static;
          )*
-        }
 
-        #[derive(Copy, Clone)]
-        #[repr(usize)]
-        enum InfuCollectionTypeTag {
-        $(
-            $service
-         ),*
-        }
+            fn build_graph() -> infusion::DependencyGraph {
+                let mut vtables = Vec::<infusion::vtable::VTable>::new();
 
-        impl InfuCollectionTypeTag {
-            fn tag(&self) -> usize {
-                *self as usize
-            }
-        }
-
-        impl<T> infusion::CollectionBase for T where T: Collection {
-            fn gather_dependencies(collector: &mut infusion::DependencyCollector) {
             $(
-                {
-                    collector.set_current_type::<T::$service>();
-                    <T::$service as $service>::infu_dependencies(collector);
-                }
-             )*
-            }
+                vtables.push({
+                    fn init<T: $service + 'static>(
+                        container: &infusion::Container
+                    ) -> Result<infusion::vtable::Object, Box<dyn std::error::Error>> {
+                        T::infu_initialize(container).map(infusion::vtable::Object::new)
+                    }
 
-            fn init_from_type_id(
-                id: TypeId,
-                container: &Container<T>
-            ) -> Result<Box<dyn std::any::Any>, Box<dyn std::error::Error>> {
-            $(
-                if id == TypeId::of::<T::$service>() {
-                    let tmp = <T::$service as $service>::infu_initialize(container)?;
-                    return Ok(Box::new(tmp));
-                }
+                    fn post<T: $service + 'static>(
+                        obj: &mut infusion::vtable::Object,
+                        container: &infusion::Container
+                    ) {
+                        let obj = obj.downcast_mut::<T>();
+                        obj.infu_post_initialize(container);
+                    }
+
+                    infusion::vtable::VTable::new::<Self::$service>(
+                        stringify!($service),
+                        <Self::$service as $service>::infu_dependencies,
+                        init::<Self::$service>,
+                        post::<Self::$service>,
+                    )
+                });
              )*
 
-                unreachable!("Type does not belong to the collection.")
+                infusion::DependencyGraph::new(vtables)
             }
         }
     };
@@ -230,26 +221,24 @@ macro_rules! infu {
     //
     // A use case for such an interface is the `ConfigProvider`.
     ($trait_name:tt @ Input) => {
-        infu!($trait_name, {
-            type Collection: Collection<$trait_name = Self>;
+        type Collection: Collection<$trait_name = Self>;
 
-            #[doc(hidden)]
-            fn infu_dependencies(collector: &mut infusion::DependencyCollector) {
-                collector.mark_input();
-            }
+        #[doc(hidden)]
+        fn infu_dependencies(visitor: &mut infusion::container::DependencyGraphVisitor) {
+            visitor.mark_input();
+        }
 
-            #[doc(hidden)]
-            fn infu_initialize(
-                container: &Container<Self::Collection>
-            ) -> Result<Self, Box<dyn std::error::Error>> {
-                unreachable!("This interface is marked as an input.")
-            }
+        #[doc(hidden)]
+        fn infu_initialize(
+            container: &infusion::Container
+        ) -> Result<Self, Box<dyn std::error::Error>> {
+            unreachable!("This trait is marked as an input.")
+        }
 
-            #[doc(hidden)]
-            fn infu_post_initialize(&mut self, container: &Container<Self::Collection>) {
-                // empty
-            }
-        })
+        #[doc(hidden)]
+        fn infu_post_initialize(&mut self, container: &infusion::Container) {
+            // empty
+        }
     };
 
     // Case 4: Implement the method.
@@ -261,23 +250,32 @@ macro_rules! infu {
         fn init($($init_dep_name:ident: $init_dep_ty:tt),*) $init:block
     }) => {
         #[doc(hidden)]
-        fn infu_dependencies(collector: &mut infusion::DependencyCollector) {
-            $(
-                collector.depend::<
-                    <Self::Collection as Collection>::$init_dep_ty
-                >();
-             );*
+        fn infu_dependencies(visitor: &mut infusion::container::DependencyGraphVisitor) {
+        $(
+            visitor.add_dependency(infusion::vtable::Tag::new::<
+                <Self::Collection as Collection>::$init_dep_ty,
+            >(
+                stringify!($init_dep_ty),
+                <<Self::Collection as Collection>::$init_dep_ty as $init_dep_ty>::infu_dependencies,
+            ));
+         )*
         }
 
         #[doc(hidden)]
         fn infu_initialize(
-            container: &infusion::Container<Self::Collection>
+            container: &infusion::Container
         ) -> Result<Self, Box<dyn std::error::Error>> {
         $(
-            let $init_dep_name = container.get::<<Self::Collection as Collection>::$init_dep_ty>();
+            let $init_dep_name = container.get::<<Self::Collection as Collection>::$init_dep_ty>(
+                infusion::vtable::Tag::new::<<Self::Collection as Collection>::$init_dep_ty>(
+                    stringify!($init_dep_ty),
+                    <<Self::Collection as Collection>::$init_dep_ty as $init_dep_ty>
+                        ::infu_dependencies,
+                )
+            );
          )*
 
-            let tmp = {
+            let tmp: Result<Self, _> = {
                 $init
             };
 
@@ -290,9 +288,15 @@ macro_rules! infu {
         fn post($($post_dep_name:ident: $post_dep_ty:tt),*) $post:block
     }) => {
         #[doc(hidden)]
-        fn infu_post_initialize(&mut self, container: &Container<Self::Collection>) {
+        fn infu_post_initialize(&mut self, container: &infusion::Container) {
         $(
-            let $post_dep_name = container.get::<<Self::Collection as Collection>::$post_dep_ty>();
+            let $post_dep_name = container.get::<<Self::Collection as Collection>::$post_dep_ty>(
+                infusion::vtable::Tag::new::<<Self::Collection as Collection>::$post_dep_ty>(
+                    stringify!($post_dep_ty),
+                    <<Self::Collection as Collection>::$post_dep_ty as $post_dep_ty>
+                        ::infu_dependencies,
+                )
+            );
          )*
 
             $post
@@ -315,7 +319,7 @@ macro_rules! infu {
             fn init($($init_dep_name: $init_dep_ty),*) $init
 
             fn post($($post_dep_name: $post_dep_ty),*) $post
-        })
+        });
     };
 
     // Handle the case when `post` is not provided by providing an empty version.
@@ -326,7 +330,7 @@ macro_rules! infu {
             fn init($($init_dep_name: $init_dep_ty),*) $init
 
             fn post() {}
-        })
+        });
     };
 
     // The `infu!(TraitName @ Default)` is a shorthand that will use the default function
@@ -338,7 +342,7 @@ macro_rules! infu {
             }
 
             fn post() {}
-        })
+        });
     };
 
     // Handle a single block for both `init` and `post`.
