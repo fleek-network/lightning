@@ -77,7 +77,7 @@ impl<Q: SyncQueryRunnerInterface> Topology<Q> {
 impl<Q: SyncQueryRunnerInterface> TopologyInterface for Topology<Q> {
     type SyncQuery = Q;
 
-    async fn init(
+    fn init(
         config: Self::Config,
         our_public_key: NodePublicKey,
         query_runner: Self::SyncQuery,

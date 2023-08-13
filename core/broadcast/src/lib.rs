@@ -150,7 +150,7 @@ where
     type PubSub<M: LightningMessage + Clone> = PubSubTopic<M>;
     type Message = BroadcastFrame;
 
-    async fn init(
+    fn init(
         _config: Self::Config,
         (listener, connector): ListenerConnector<P, Self::Message>,
         topology: Arc<Self::Topology>,

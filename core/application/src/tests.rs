@@ -77,14 +77,14 @@ fn get_genesis_committee(
 
 // Init the app and return the execution engine socket that would go to narwhal and the query socket
 // that could go to anyone
-async fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
+fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
     let config = config.or_else(|| Some(Config::default()));
-    let app = Application::init(config.unwrap()).await.unwrap();
+    let app = Application::init(config.unwrap()).unwrap();
 
     (app.transaction_executor(), app.sync_query())
 }
 
-async fn init_app_with_params(
+fn init_app_with_params(
     params: Params,
     committee: Option<Vec<GenesisCommittee>>,
 ) -> (ExecutionEngineSocket, QueryRunner) {
@@ -130,7 +130,7 @@ async fn init_app_with_params(
         mode: Mode::Test,
     };
 
-    init_app(Some(config)).await
+    init_app(Some(config))
 }
 
 async fn simple_epoch_change(
@@ -302,7 +302,7 @@ async fn stake(
 #[test]
 async fn test_genesis() {
     // Init application + get the query and update socket
-    let (_, query_runner) = init_app(None).await;
+    let (_, query_runner) = init_app(None);
     // Get the genesis paramaters plus the initial committee
     let (genesis, genesis_committee) = get_genesis();
     // For every member of the genesis committee they should have an initial stake of the min stake
@@ -322,8 +322,7 @@ async fn test_epoch_change() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
-    }))
-    .await;
+    }));
 
     let required_signals = 2 * committee_size / 3 + 1;
 
@@ -358,7 +357,7 @@ async fn test_epoch_change() {
 
 #[test]
 async fn test_stake() {
-    let (update_socket, query_runner) = init_app(None).await;
+    let (update_socket, query_runner) = init_app(None);
     let (genesis, _) = get_genesis();
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -524,7 +523,7 @@ async fn test_stake() {
 
 #[test]
 async fn test_stake_lock() {
-    let (update_socket, query_runner) = init_app(None).await;
+    let (update_socket, query_runner) = init_app(None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_secret_key = NodeSecretKey::generate();
@@ -606,8 +605,7 @@ async fn test_pod_without_proof() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
-    }))
-    .await;
+    }));
 
     let bandwidth_pod = pod_request(keystore[0].node_secret_key, 1000, 0, 1);
     let compute_pod = pod_request(keystore[0].node_secret_key, 2000, 1, 2);
@@ -654,8 +652,7 @@ async fn test_distribute_rewards() {
             supply_at_genesis: Some(supply_at_genesis),
         },
         Some(committee),
-    )
-    .await;
+    );
 
     // get params for emission calculations
     let percentage_divisor: HpUfixed<18> = 100_u16.into();
@@ -806,8 +803,7 @@ async fn test_submit_rep_measurements() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
-    }))
-    .await;
+    }));
 
     let mut map = BTreeMap::new();
     let mut rng = random::get_seedable_rng();
@@ -855,8 +851,7 @@ async fn test_rep_scores() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
-    }))
-    .await;
+    }));
     let required_signals = 2 * committee_len / 3 + 1;
 
     let mut rng = random::get_seedable_rng();
@@ -937,8 +932,7 @@ async fn test_supply_across_epoch() {
             supply_at_genesis: Some(supply_at_genesis),
         },
         Some(committee),
-    )
-    .await;
+    );
 
     // get params for emission calculations
     let percentage_divisor: HpUfixed<18> = 100_u16.into();
@@ -1010,8 +1004,7 @@ async fn test_validate_txn() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
-    }))
-    .await;
+    }));
 
     // Submit a ChangeEpoch transaction that will revert (EpochHasNotStarted) and ensure that the
     // `validate_txn` method of the query runner returns the same response as the update runner.
@@ -1048,7 +1041,7 @@ async fn test_validate_txn() {
 
 #[test]
 async fn test_is_valid_node() {
-    let (update_socket, query_runner) = init_app(None).await;
+    let (update_socket, query_runner) = init_app(None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_secret_key = NodeSecretKey::generate();
@@ -1108,8 +1101,7 @@ async fn test_get_node_registry() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
-    }))
-    .await;
+    }));
 
     let owner_secret_key1 = AccountOwnerSecretKey::generate();
     let node_secret_key1 = NodeSecretKey::generate();
@@ -1209,8 +1201,7 @@ async fn test_change_protocol_params() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
-    }))
-    .await;
+    }));
 
     let update_method = UpdateMethod::ChangeProtocolParam {
         param: ProtocolParams::LockTime,

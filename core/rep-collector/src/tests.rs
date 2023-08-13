@@ -96,15 +96,12 @@ async fn test_query() {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     app.start().await;
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer = Signer::init(signer_config, query_runner.clone())
-        .await
-        .unwrap();
+    let mut signer = Signer::init(signer_config, query_runner.clone()).unwrap();
 
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
@@ -120,7 +117,6 @@ async fn test_query() {
         query_runner.clone(),
         MockPubSub {},
     )
-    .await
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
@@ -132,9 +128,7 @@ async fn test_query() {
     let config = Config {
         reporter_buffer_size: 1,
     };
-    let rep_aggregator = ReputationAggregator::init(config, signer.get_socket(), notifier)
-        .await
-        .unwrap();
+    let rep_aggregator = ReputationAggregator::init(config, signer.get_socket(), notifier).unwrap();
 
     let rep_reporter = rep_aggregator.get_reporter();
     let rep_query = rep_aggregator.get_query();
@@ -208,15 +202,12 @@ async fn test_submit_measurements() {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     app.start().await;
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer = Signer::init(signer_config, query_runner.clone())
-        .await
-        .unwrap();
+    let mut signer = Signer::init(signer_config, query_runner.clone()).unwrap();
 
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
@@ -232,7 +223,6 @@ async fn test_submit_measurements() {
         query_runner.clone(),
         MockPubSub {},
     )
-    .await
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
@@ -244,9 +234,7 @@ async fn test_submit_measurements() {
     let config = Config {
         reporter_buffer_size: 1,
     };
-    let rep_aggregator = ReputationAggregator::init(config, signer.get_socket(), notifier)
-        .await
-        .unwrap();
+    let rep_aggregator = ReputationAggregator::init(config, signer.get_socket(), notifier).unwrap();
 
     let rep_reporter = rep_aggregator.get_reporter();
     let mut aggregator_handle = tokio::spawn(async move {
@@ -363,18 +351,13 @@ async fn test_reputation_calculation_and_query() {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     app.start().await;
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer1 = Signer::init(signer_config1, query_runner.clone())
-        .await
-        .unwrap();
-    let mut signer2 = Signer::init(signer_config2, query_runner.clone())
-        .await
-        .unwrap();
+    let mut signer1 = Signer::init(signer_config1, query_runner.clone()).unwrap();
+    let mut signer2 = Signer::init(signer_config2, query_runner.clone()).unwrap();
 
     let mock_gossip = MockPubSub {};
     let consensus_config = ConsensusConfig {
@@ -391,7 +374,6 @@ async fn test_reputation_calculation_and_query() {
         query_runner.clone(),
         mock_gossip.clone(),
     )
-    .await
     .unwrap();
     let consensus2 = MockConsensus::init(
         consensus_config,
@@ -400,7 +382,6 @@ async fn test_reputation_calculation_and_query() {
         query_runner.clone(),
         mock_gossip.clone(),
     )
-    .await
     .unwrap();
 
     signer1.provide_mempool(consensus1.mempool());
@@ -418,12 +399,9 @@ async fn test_reputation_calculation_and_query() {
         reporter_buffer_size: 1,
     };
     let rep_aggregator1 =
-        ReputationAggregator::init(config.clone(), signer1.get_socket(), notifier1)
-            .await
-            .unwrap();
-    let rep_aggregator2 = ReputationAggregator::init(config, signer2.get_socket(), notifier2)
-        .await
-        .unwrap();
+        ReputationAggregator::init(config.clone(), signer1.get_socket(), notifier1).unwrap();
+    let rep_aggregator2 =
+        ReputationAggregator::init(config, signer2.get_socket(), notifier2).unwrap();
 
     let rep_reporter1 = rep_aggregator1.get_reporter();
     let rep_reporter2 = rep_aggregator2.get_reporter();

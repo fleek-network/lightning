@@ -28,7 +28,7 @@ pub trait TopologyInterface: ConfigConsumer + Sized + Send + Sync {
     /// Due to that reason instead we just pass the public key here. For consistency and
     /// correctness of the implementation it is required that this public key to be our
     /// actual public key which is obtained from [get_bls_pk](crate::SignerInterface::get_bls_pk).
-    async fn init(
+    fn init(
         config: Self::Config,
         our_public_key: NodePublicKey,
         query_runner: Self::SyncQuery,

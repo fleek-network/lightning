@@ -15,7 +15,7 @@ pub trait OriginProviderInterface<Stream: UntrustedStream>:
     ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
 {
     /// Initialize the origin service.
-    async fn init(config: Self::Config) -> anyhow::Result<Self>;
+    fn init(config: Self::Config) -> anyhow::Result<Self>;
 
     /// Returns a socket for submitting a fetch request to an origin.
     fn get_socket(&self) -> OriginProviderSocket<Stream>;

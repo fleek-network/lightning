@@ -90,7 +90,7 @@ pub struct HandshakeServer<L: StreamProvider> {
     listener: Arc<L>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct HandshakeServerInner {
     lanes: Arc<DashMap<ClientPublicKey, [LaneState; 24]>>,
 }
@@ -151,20 +151,21 @@ impl<
 {
     type Connection = RawLaneConnection<L::Reader, L::Writer>;
 
-    async fn init(config: Self::Config) -> anyhow::Result<Self> {
+    fn init(config: Self::Config) -> anyhow::Result<Self> {
+        // TODO: Do not consume resources on initialization.
+        let listener = futures::executor::block_on(L::new(config.listen_addr))?.into();
+
         Ok(Self {
-            listener: L::new(config.listen_addr).await?.into(),
-            inner: Arc::new(HandshakeServerInner::new().await),
+            listener,
+            inner: Arc::new(HandshakeServerInner::new()),
             shutdown_channel: Mutex::new(None).into(),
         })
     }
 }
 
 impl HandshakeServerInner {
-    pub async fn new() -> HandshakeServerInner {
-        Self {
-            lanes: DashMap::new().into(),
-        }
+    pub fn new() -> HandshakeServerInner {
+        Self::default()
     }
 
     pub async fn handle<

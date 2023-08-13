@@ -101,7 +101,7 @@ impl SignerInterface for Signer {
     type SyncQuery = QueryRunner;
 
     /// Initialize the signature service.
-    async fn init(config: Config, query_runner: Self::SyncQuery) -> anyhow::Result<Self> {
+    fn init(config: Config, query_runner: Self::SyncQuery) -> anyhow::Result<Self> {
         let inner = SignerInner::init(config)?;
         let (socket, rx) = Socket::raw_bounded(2048);
         Ok(Self {

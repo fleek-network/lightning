@@ -23,7 +23,7 @@ pub trait ResolverInterface: Sized + ConfigConsumer + WithStartAndShutdown {
     type OriginFinder: OriginFinderAsyncIter;
 
     /// Initialize and return the resolver service.
-    async fn init(
+    fn init(
         config: Self::Config,
         dht: Arc<Self::Dht>,
         signer: &Self::Signer,

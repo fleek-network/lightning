@@ -68,7 +68,7 @@ mod tests {
 
     const EPSILON: f64 = 0.1;
 
-    async fn init_app(epoch_time: u64) -> (ExecutionEngineSocket, QueryRunner) {
+    fn init_app(epoch_time: u64) -> (ExecutionEngineSocket, QueryRunner) {
         let mut genesis = Genesis::load().expect("Failed to load genesis from file.");
         let epoch_start = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -81,14 +81,14 @@ mod tests {
             mode: Mode::Test,
         };
 
-        let app = Application::init(config).await.unwrap();
+        let app = Application::init(config).unwrap();
 
         (app.transaction_executor(), app.sync_query())
     }
 
     #[tokio::test]
     async fn test_on_new_epoch() {
-        let (_, query_runner) = init_app(2000).await;
+        let (_, query_runner) = init_app(2000);
 
         let notifier = Notifier::init(query_runner);
 
@@ -107,7 +107,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_before_epoch_change() {
-        let (_, query_runner) = init_app(3000).await;
+        let (_, query_runner) = init_app(3000);
 
         let notifier = Notifier::init(query_runner);
 

@@ -24,7 +24,7 @@ impl BlockStoreInterface for MemoryBlockStore {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
     type Put = IncrementalPut<Self>;
 
-    async fn init(_: Self::Config) -> anyhow::Result<Self> {
+    fn init(_: Self::Config) -> anyhow::Result<Self> {
         Ok(Self {
             inner: Default::default(),
         })

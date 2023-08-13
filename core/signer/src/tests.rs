@@ -47,15 +47,12 @@ async fn test_send_two_txs_in_a_row() {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     app.start().await;
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer = Signer::init(signer_config, query_runner.clone())
-        .await
-        .unwrap();
+    let mut signer = Signer::init(signer_config, query_runner.clone()).unwrap();
     let signer_socket = signer.get_socket();
 
     let consensus_config = ConsensusConfig {
@@ -72,7 +69,6 @@ async fn test_send_two_txs_in_a_row() {
         query_runner.clone(),
         MockPubSub {},
     )
-    .await
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
@@ -127,13 +123,12 @@ async fn test_retry_send() {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     app.start().await;
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer = Signer::init(signer_config, app.sync_query()).await.unwrap();
+    let mut signer = Signer::init(signer_config, app.sync_query()).unwrap();
 
     let signer_socket = signer.get_socket();
 
@@ -151,7 +146,6 @@ async fn test_retry_send() {
         query_runner.clone(),
         MockPubSub {},
     )
-    .await
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
@@ -189,11 +183,9 @@ async fn test_retry_send() {
 
 #[tokio::test]
 async fn test_shutdown() {
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-    let mut signer = Signer::init(Config::test(), query_runner.clone())
-        .await
-        .unwrap();
+    let mut signer = Signer::init(Config::test(), query_runner.clone()).unwrap();
     let consensus = MockConsensus::init(
         ConsensusConfig::default(),
         &signer,
@@ -201,7 +193,6 @@ async fn test_shutdown() {
         query_runner.clone(),
         MockPubSub {},
     )
-    .await
     .unwrap();
     signer.provide_mempool(consensus.mempool());
     signer.provide_new_block_notify(consensus.new_block_notifier());
@@ -215,11 +206,9 @@ async fn test_shutdown() {
 
 #[tokio::test]
 async fn test_sign_raw_digest() {
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-    let mut signer = Signer::init(Config::test(), query_runner.clone())
-        .await
-        .unwrap();
+    let mut signer = Signer::init(Config::test(), query_runner.clone()).unwrap();
     let consensus = MockConsensus::init(
         ConsensusConfig::default(),
         &signer,
@@ -227,7 +216,6 @@ async fn test_sign_raw_digest() {
         query_runner.clone(),
         MockPubSub {},
     )
-    .await
     .unwrap();
     signer.provide_mempool(consensus.mempool());
     signer.provide_new_block_notify(consensus.new_block_notifier());
@@ -258,9 +246,9 @@ async fn test_load_keys() {
         network_key_path: network_key_path.try_into().expect("Failed to resolve path"),
     };
 
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).unwrap();
     let (_, query_runner) = (app.transaction_executor(), app.sync_query());
-    let signer = Signer::init(config, query_runner).await.unwrap();
+    let signer = Signer::init(config, query_runner).unwrap();
 
     // Make sure that the signer loaded the keys from the provided paths.
     let (network_secret_key_loaded, node_secret_key_loaded) = signer.get_sk();
@@ -289,9 +277,9 @@ async fn test_fail_to_encode_keys() {
 
     let result = std::panic::catch_unwind(|| {
         futures::executor::block_on(async move {
-            let app = Application::init(AppConfig::default()).await.unwrap();
+            let app = Application::init(AppConfig::default()).unwrap();
             let (_, query_runner) = (app.transaction_executor(), app.sync_query());
-            Signer::init(config, query_runner).await.unwrap();
+            Signer::init(config, query_runner).unwrap();
         })
     });
 
@@ -316,19 +304,13 @@ async fn test_no_keys_exist() {
     let network_key_path = path.join("network.pem");
 
     let config = Config {
-        node_key_path: node_key_path
-            .clone()
-            .try_into()
-            .expect("Failed to resolve path"),
-        network_key_path: network_key_path
-            .clone()
-            .try_into()
-            .expect("Failed to resolve path"),
+        node_key_path: node_key_path.try_into().expect("Failed to resolve path"),
+        network_key_path: network_key_path.try_into().expect("Failed to resolve path"),
     };
 
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).unwrap();
     let (_, query_runner) = (app.transaction_executor(), app.sync_query());
-    let signer = Signer::init(config, query_runner).await;
+    let signer = Signer::init(config, query_runner);
 
     // Initiating the signer should return an error if no keys exist.
     assert!(signer.is_err());

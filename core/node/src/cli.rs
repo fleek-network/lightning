@@ -92,7 +92,7 @@ where
         shutdown_controller.install_ctrl_c_handler();
 
         let config = Arc::new(Self::load_or_write_config(config_path).await?);
-        let node = Node::<T>::init(config).await?;
+        let node = Node::<T>::init(config)?;
 
         node.start().await;
 

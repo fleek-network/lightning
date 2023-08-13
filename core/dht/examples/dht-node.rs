@@ -128,7 +128,7 @@ async fn start_node<T: TopologyInterface>(
         builder.add_node(key, address);
     }
 
-    let dht = builder.build::<T>().await.unwrap();
+    let dht = builder.build::<T>().unwrap();
     let socket = dht.get_socket();
     dht.start().await;
 

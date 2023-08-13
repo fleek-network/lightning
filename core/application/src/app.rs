@@ -47,7 +47,7 @@ impl ApplicationInterface for Application {
     type SyncExecutor = QueryRunner;
 
     /// Create a new instance of the application layer using the provided configuration.
-    async fn init(config: Self::Config) -> Result<Self> {
+    fn init(config: Self::Config) -> Result<Self> {
         let mut env = Env::new();
         env.genesis(config);
         Ok(Self {

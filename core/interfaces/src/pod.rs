@@ -15,7 +15,7 @@ pub trait DeliveryAcknowledgmentAggregatorInterface:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
     /// Initialize a new delivery acknowledgment aggregator.
-    async fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self>;
+    fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self>;
 
     /// Returns the socket that can be used to submit delivery acknowledgments to be aggregated.
     fn socket(&self) -> DeliveryAcknowledgmentSocket;

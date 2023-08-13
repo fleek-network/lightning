@@ -61,7 +61,7 @@ impl<Q: SyncQueryRunnerInterface> ConsensusInterface for MockConsensus<Q> {
     type PubSub = MockPubSub;
 
     /// Create a new consensus service with the provided config and executor.
-    async fn init<S: SignerInterface>(
+    fn init<S: SignerInterface>(
         config: Config,
         _signer: &S,
         executor: ExecutionEngineSocket,

@@ -27,7 +27,7 @@ impl WithStartAndShutdown for DeliveryAcknowledgmentAggregator {
 #[async_trait]
 impl DeliveryAcknowledgmentAggregatorInterface for DeliveryAcknowledgmentAggregator {
     /// Initialize a new delivery acknowledgment aggregator.
-    async fn init(_config: Self::Config, _submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
+    fn init(_config: Self::Config, _submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
         Ok(Self {})
     }
 

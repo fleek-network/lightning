@@ -12,9 +12,5 @@ pub trait RpcInterface<Q: SyncQueryRunnerInterface>:
     Sized + Send + Sync + ConfigConsumer + WithStartAndShutdown
 {
     /// Initialize the *RPC* server, with the given parameters.
-    async fn init(
-        config: Self::Config,
-        mempool: MempoolSocket,
-        query_runner: Q,
-    ) -> anyhow::Result<Self>;
+    fn init(config: Self::Config, mempool: MempoolSocket, query_runner: Q) -> anyhow::Result<Self>;
 }

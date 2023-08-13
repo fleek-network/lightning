@@ -151,7 +151,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<()>> ConsensusInterface for MockCons
     type Certificate = ();
     type PubSub = P;
 
-    async fn init<S: SignerInterface>(
+    fn init<S: SignerInterface>(
         config: Self::Config,
         _signer: &S,
         executor: ExecutionEngineSocket,

@@ -80,23 +80,19 @@ async fn pubsub_send_recv() -> Result<()> {
         lightning_application::app::Application::init(lightning_application::config::Config {
             mode: Mode::Test,
             genesis: Some(genesis),
-        })
-        .await?;
+        })?;
     let query_runner = application.sync_query();
 
     // setup signers
-    let signer_a = Signer::init(signer_config_a, query_runner.clone()).await?;
-    let signer_b = Signer::init(signer_config_b, query_runner.clone()).await?;
+    let signer_a = Signer::init(signer_config_a, query_runner.clone())?;
+    let signer_b = Signer::init(signer_config_b, query_runner.clone())?;
 
-    let topology = Arc::new(
-        Topology::init(
-            lightning_topology::config::Config::default(),
-            // use a dummy key to force topology to always return all nodes
-            NodePublicKey([0u8; 96]),
-            query_runner.clone(),
-        )
-        .await?,
-    );
+    let topology = Arc::new(Topology::init(
+        lightning_topology::config::Config::default(),
+        // use a dummy key to force topology to always return all nodes
+        NodePublicKey([0u8; 96]),
+        query_runner.clone(),
+    )?);
 
     // Node A
     let mut pool_a = ConnectionPool::init(Config {}, &signer_a, query_runner.clone());
@@ -110,8 +106,7 @@ async fn pubsub_send_recv() -> Result<()> {
         topology.clone(),
         &signer_a,
         notifier,
-    )
-    .await?;
+    )?;
     let pubsub_a = broadcast_a.get_pubsub::<DebugMessage>(Topic::Debug);
 
     // Node B
@@ -126,8 +121,7 @@ async fn pubsub_send_recv() -> Result<()> {
         topology.clone(),
         &signer_b,
         notifier,
-    )
-    .await?;
+    )?;
     let mut pubsub_b = broadcast_b.get_pubsub::<DebugMessage>(Topic::Debug);
 
     broadcast_a.start().await;

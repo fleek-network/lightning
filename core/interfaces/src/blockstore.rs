@@ -98,7 +98,7 @@ pub trait BlockStoreInterface: Clone + Send + Sync + ConfigConsumer {
     type Put: IncrementalPutInterface;
 
     /// Create a new block store from the given configuration values.
-    async fn init(config: Self::Config) -> anyhow::Result<Self>;
+    fn init(config: Self::Config) -> anyhow::Result<Self>;
 
     /// Returns the Blake3 tree associated with the given CID. Returns [`None`] if the content
     /// is not present in our block store.

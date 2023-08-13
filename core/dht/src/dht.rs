@@ -59,7 +59,7 @@ impl Builder {
     }
 
     /// Build and initiates the DHT.
-    pub async fn build<T: TopologyInterface>(self) -> Result<Dht<T>> {
+    pub fn build<T: TopologyInterface>(self) -> Result<Dht<T>> {
         let buffer_size = self.buffer_size.unwrap_or(10_000);
         let address = self.address.unwrap_or_else(|| "0.0.0.0:0".parse().unwrap());
 
@@ -256,9 +256,9 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
 impl<T: TopologyInterface> DhtInterface for Dht<T> {
     type Topology = T;
 
-    async fn init<S: SignerInterface>(signer: &S, _: Arc<Self::Topology>) -> Result<Self> {
+    fn init<S: SignerInterface>(signer: &S, _: Arc<Self::Topology>) -> Result<Self> {
         let (network_secret_key, _) = signer.get_sk();
-        Builder::new(network_secret_key).build().await
+        Builder::new(network_secret_key).build()
     }
 
     fn get_socket(&self) -> DhtSocket {

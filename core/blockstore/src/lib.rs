@@ -71,7 +71,7 @@ mod tests {
         // Given: some content.
         let content = create_content();
         // Given: a block store.
-        let blockstore = MemoryBlockStore::init(Config {}).await.unwrap();
+        let blockstore = MemoryBlockStore::init(Config {}).unwrap();
         // When: we create a putter and write some content.
         let mut putter = blockstore.put(None);
         putter
@@ -88,7 +88,7 @@ mod tests {
         // Given: some content.
         let content = create_content();
         // Given: a block store.
-        let blockstore = MemoryBlockStore::init(Config {}).await.unwrap();
+        let blockstore = MemoryBlockStore::init(Config {}).unwrap();
         // Given: we put the content in the block store.
         let mut putter = blockstore.put(None);
         putter
@@ -116,7 +116,7 @@ mod tests {
         // Given: some content.
         let mut content = create_content();
         // Given: a block store.
-        let blockstore = MemoryBlockStore::init(Config {}).await.unwrap();
+        let blockstore = MemoryBlockStore::init(Config {}).unwrap();
         // Given: we put the content in the block store and feed the proof to verify it.
         let mut putter = blockstore.put(None);
         putter
@@ -142,7 +142,7 @@ mod tests {
         // Given: some content.
         let content = create_content();
         // Given: a block store.
-        let blockstore = MemoryBlockStore::init(Config {}).await.unwrap();
+        let blockstore = MemoryBlockStore::init(Config {}).unwrap();
         // Given: we put the content in the block store.
         let mut putter = blockstore.put(None);
         putter
@@ -179,7 +179,7 @@ mod tests {
         // Given: some content.
         let content = [0; BLAKE3_CHUNK_SIZE];
         // Given: a block store.
-        let blockstore = MemoryBlockStore::init(Config {}).await.unwrap();
+        let blockstore = MemoryBlockStore::init(Config {}).unwrap();
         // Given: we put the content in the block store.
         let mut putter = blockstore.put(None);
         putter
@@ -205,7 +205,7 @@ mod tests {
         // Given: some content.
         let content = [0; 256];
         // Given: a block store.
-        let blockstore = MemoryBlockStore::init(Config {}).await.unwrap();
+        let blockstore = MemoryBlockStore::init(Config {}).unwrap();
         // Given: we put the content in the block store.
         let mut putter = blockstore.put(None);
         putter
@@ -234,7 +234,7 @@ mod tests {
             .flatten()
             .collect::<Vec<_>>();
         // Given: a block store.
-        let blockstore = MemoryBlockStore::init(Config {}).await.unwrap();
+        let blockstore = MemoryBlockStore::init(Config {}).unwrap();
         // Given: we put the content in the block store.
         let mut putter = blockstore.put(None);
         putter

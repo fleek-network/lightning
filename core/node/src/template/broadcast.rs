@@ -67,7 +67,7 @@ impl<
     type Message = ();
 
     /// Initialize the gossip system with the config and the topology object..
-    async fn init(
+    fn init(
         _config: Self::Config,
         _listener_connector: ListenerConnector<Self::ConnectionPool, Self::Message>,
         _topology: Arc<Self::Topology>,

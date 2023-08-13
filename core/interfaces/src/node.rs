@@ -67,22 +67,19 @@ pub struct Node<T: LightningTypes> {
 }
 
 impl<T: LightningTypes> Node<T> {
-    pub async fn init(configuration: Arc<T::ConfigProvider>) -> anyhow::Result<Self> {
-        let application = T::Application::init(configuration.get::<T::Application>()).await?;
+    pub fn init(configuration: Arc<T::ConfigProvider>) -> anyhow::Result<Self> {
+        let application = T::Application::init(configuration.get::<T::Application>())?;
 
         let mut signer =
-            T::Signer::init(configuration.get::<T::Signer>(), application.sync_query()).await?;
+            T::Signer::init(configuration.get::<T::Signer>(), application.sync_query())?;
 
-        let topology = Arc::new(
-            T::Topology::init(
-                configuration.get::<T::Topology>(),
-                signer.get_bls_pk(),
-                application.sync_query(),
-            )
-            .await?,
-        );
+        let topology = Arc::new(T::Topology::init(
+            configuration.get::<T::Topology>(),
+            signer.get_bls_pk(),
+            application.sync_query(),
+        )?);
 
-        let dht = T::Dht::init(&signer, topology.clone()).await?;
+        let dht = T::Dht::init(&signer, topology.clone())?;
 
         let notifier = T::Notifier::init(application.sync_query());
 
@@ -99,8 +96,7 @@ impl<T: LightningTypes> Node<T> {
             topology.clone(),
             &signer,
             notifier,
-        )
-        .await?;
+        )?;
         let consensus_pubsub = broadcast.get_pubsub(crate::Topic::Consensus);
 
         let consensus = T::Consensus::init(
@@ -109,20 +105,18 @@ impl<T: LightningTypes> Node<T> {
             application.transaction_executor(),
             application.sync_query(),
             consensus_pubsub,
-        )
-        .await?;
+        )?;
 
         // Provide the mempool socket to the signer so it can use it to send messages to consensus.
         signer.provide_mempool(consensus.mempool());
         signer.provide_new_block_notify(consensus.new_block_notifier());
 
-        let store = T::BlockStore::init(configuration.get::<T::BlockStore>()).await?;
+        let store = T::BlockStore::init(configuration.get::<T::BlockStore>())?;
 
         let delivery_acknowledgment_aggregator = T::DeliveryAcknowledgmentAggregator::init(
             configuration.get::<T::DeliveryAcknowledgmentAggregator>(),
             signer.get_socket(),
-        )
-        .await?;
+        )?;
 
         let notifier = T::Notifier::init(application.sync_query());
 
@@ -130,17 +124,15 @@ impl<T: LightningTypes> Node<T> {
             configuration.get::<T::ReputationAggregator>(),
             signer.get_socket(),
             notifier,
-        )
-        .await?;
+        )?;
 
         let rpc = T::Rpc::init(
             configuration.get::<T::Rpc>(),
             consensus.mempool(),
             application.sync_query(),
-        )
-        .await?;
+        )?;
 
-        let handshake = T::Handshake::init(configuration.get::<T::Handshake>()).await?;
+        let handshake = T::Handshake::init(configuration.get::<T::Handshake>())?;
 
         Ok(Self {
             configuration,

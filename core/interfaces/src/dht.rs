@@ -20,10 +20,7 @@ pub trait DhtInterface: WithStartAndShutdown + Sized + Send + Sync {
     // -- BOUNDED TYPES
     // empty
 
-    async fn init<S: SignerInterface>(
-        signer: &S,
-        topology: Arc<Self::Topology>,
-    ) -> anyhow::Result<Self>;
+    fn init<S: SignerInterface>(signer: &S, topology: Arc<Self::Topology>) -> anyhow::Result<Self>;
 
     fn get_socket(&self) -> DhtSocket;
 }

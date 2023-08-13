@@ -40,7 +40,7 @@ impl Container {
                 .expect("Failed to build tokio runtime for node container.");
 
             runtime.block_on(async move {
-                let node = Node::<FinalTypes>::init(config).await.unwrap();
+                let node = Node::<FinalTypes>::init(config).unwrap();
                 node.start().await;
 
                 shutdown_notify_rx.notified().await;

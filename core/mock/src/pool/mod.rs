@@ -271,8 +271,7 @@ mod tests {
             lightning_application::app::Application::init(lightning_application::config::Config {
                 mode: Mode::Test,
                 genesis: None,
-            })
-            .await?;
+            })?;
         let query_runner = application.sync_query();
 
         // create pool a
@@ -287,7 +286,6 @@ mod tests {
             },
             query_runner.clone(),
         )
-        .await
         .map_err(|e| anyhow!("{e:?}"))?;
         let mut pool_a = ConnectionPool::init(Config {}, &signer_a, query_runner.clone());
         pool_a.with_transport(global_transport.clone());
@@ -321,8 +319,7 @@ mod tests {
                     .expect("Failed to resolve path"),
             },
             query_runner.clone(),
-        )
-        .await?;
+        )?;
         let mut pool_b = ConnectionPool::init(Config {}, &signer_b, query_runner);
         pool_b.with_transport(global_transport.clone());
         pool_b.start().await;

@@ -14,7 +14,7 @@ pub struct Topology<Q: SyncQueryRunnerInterface> {
 impl<Q: SyncQueryRunnerInterface> TopologyInterface for Topology<Q> {
     type SyncQuery = Q;
 
-    async fn init(
+    fn init(
         _config: Self::Config,
         _our_public_key: NodePublicKey,
         _query_runner: Self::SyncQuery,

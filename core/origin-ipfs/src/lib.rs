@@ -40,7 +40,7 @@ pub struct IPFSOrigin {
 
 #[async_trait]
 impl OriginProviderInterface<IPFSStream> for IPFSOrigin {
-    async fn init(config: Config) -> anyhow::Result<Self> {
+    fn init(config: Config) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
         let inner = IPFSOriginInner {
             gateways: config.gateways,

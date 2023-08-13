@@ -33,7 +33,7 @@ pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Se
     type Certificate: LightningMessage + Clone;
 
     /// Create a new consensus service with the provided config and executor.
-    async fn init<S: SignerInterface>(
+    fn init<S: SignerInterface>(
         config: Self::Config,
         signer: &S,
         executor: ExecutionEngineSocket,

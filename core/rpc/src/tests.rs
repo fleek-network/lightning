@@ -52,15 +52,14 @@ impl Worker for MockWorker {
     fn handle(&mut self, _req: Self::Request) -> Self::Response {}
 }
 
-async fn init_rpc_without_consensus() -> Result<Rpc<QueryRunner>> {
-    let app = Application::init(AppConfig::default()).await.unwrap();
+fn init_rpc_without_consensus() -> Result<Rpc<QueryRunner>> {
+    let app = Application::init(AppConfig::default()).unwrap();
 
     let rpc = Rpc::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         app.sync_query(),
-    )
-    .await?;
+    )?;
 
     Ok(rpc)
 }
@@ -107,7 +106,7 @@ async fn make_request(port: u16, req: String) -> Result<Response> {
 #[test]
 async fn test_rpc_ping() -> Result<()> {
     let port = 30000;
-    let mut rpc = init_rpc_without_consensus().await.unwrap();
+    let mut rpc = init_rpc_without_consensus().unwrap();
     rpc.config.port = port;
     task::spawn(async move {
         rpc.start().await;
@@ -154,7 +153,6 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
@@ -165,8 +163,7 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -212,7 +209,6 @@ async fn test_rpc_get_reputation() -> Result<()> {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
@@ -223,8 +219,7 @@ async fn test_rpc_get_reputation() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -298,7 +293,6 @@ async fn test_rpc_get_staked() -> Result<()> {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
@@ -309,8 +303,7 @@ async fn test_rpc_get_staked() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
     task::spawn(async move {
         rpc.start().await;
@@ -360,7 +353,6 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
@@ -371,8 +363,7 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -446,7 +437,6 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
@@ -457,8 +447,7 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -532,7 +521,6 @@ async fn test_rpc_get_locked_time() -> Result<()> {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
@@ -543,8 +531,7 @@ async fn test_rpc_get_locked_time() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -618,7 +605,6 @@ async fn test_rpc_get_locked() -> Result<()> {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
@@ -629,8 +615,7 @@ async fn test_rpc_get_locked() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -682,7 +667,6 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
@@ -693,8 +677,7 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -768,7 +751,6 @@ async fn test_rpc_get_node_info() -> Result<()> {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
@@ -779,8 +761,7 @@ async fn test_rpc_get_node_info() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -815,7 +796,7 @@ async fn test_rpc_get_node_info() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_staking_amount() -> Result<()> {
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -825,8 +806,7 @@ async fn test_rpc_get_staking_amount() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -861,7 +841,7 @@ async fn test_rpc_get_staking_amount() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_committee_members() -> Result<()> {
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -871,8 +851,7 @@ async fn test_rpc_get_committee_members() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -911,7 +890,7 @@ async fn test_rpc_get_committee_members() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_epoch() -> Result<()> {
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -921,8 +900,7 @@ async fn test_rpc_get_epoch() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -957,7 +935,7 @@ async fn test_rpc_get_epoch() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_epoch_info() -> Result<()> {
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -967,8 +945,7 @@ async fn test_rpc_get_epoch_info() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -1003,7 +980,7 @@ async fn test_rpc_get_epoch_info() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_total_supply() -> Result<()> {
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -1013,8 +990,7 @@ async fn test_rpc_get_total_supply() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -1049,7 +1025,7 @@ async fn test_rpc_get_total_supply() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_year_start_supply() -> Result<()> {
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -1059,8 +1035,7 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -1098,7 +1073,7 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_protocol_fund_address() -> Result<()> {
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -1108,8 +1083,7 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -1147,7 +1121,7 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_protocol_params() -> Result<()> {
-    let app = Application::init(AppConfig::default()).await.unwrap();
+    let app = Application::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -1157,8 +1131,7 @@ async fn test_rpc_get_protocol_params() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -1211,7 +1184,6 @@ async fn test_rpc_get_total_served() -> Result<()> {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
@@ -1222,8 +1194,7 @@ async fn test_rpc_get_total_served() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -1274,7 +1245,6 @@ async fn test_rpc_get_node_served() -> Result<()> {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
@@ -1285,8 +1255,7 @@ async fn test_rpc_get_node_served() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -1360,7 +1329,6 @@ async fn test_rpc_is_valid_node() -> Result<()> {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
@@ -1371,8 +1339,7 @@ async fn test_rpc_is_valid_node() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {
@@ -1448,7 +1415,6 @@ async fn test_rpc_get_node_registry() -> Result<()> {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
-    .await
     .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
@@ -1459,8 +1425,7 @@ async fn test_rpc_get_node_registry() -> Result<()> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
-    )
-    .await?;
+    )?;
     rpc.config.port = port;
 
     task::spawn(async move {

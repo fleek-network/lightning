@@ -23,7 +23,7 @@ async fn test_origin() {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30100".to_string(),
         });
-        let ipfs_origin = IPFSOrigin::init(config).await.unwrap();
+        let ipfs_origin = IPFSOrigin::init(config).unwrap();
         ipfs_origin.start().await;
 
         let socket = ipfs_origin.get_socket();
@@ -62,7 +62,7 @@ async fn test_origin() {
 
 #[tokio::test]
 async fn test_shutdown() {
-    let ipfs_origin = IPFSOrigin::init(Config::default()).await.unwrap();
+    let ipfs_origin = IPFSOrigin::init(Config::default()).unwrap();
     assert!(!ipfs_origin.is_running());
     ipfs_origin.start().await;
     assert!(ipfs_origin.is_running());

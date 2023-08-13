@@ -24,7 +24,7 @@ pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
     type ReputationQuery: ReputationQueryInteface;
 
     /// Create a new reputation
-    async fn init(
+    fn init(
         config: Self::Config,
         submit_tx: SubmitTxSocket,
         notifier: Self::Notifier,

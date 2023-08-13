@@ -13,5 +13,5 @@ pub trait HandshakeInterface: ConfigConsumer + WithStartAndShutdown + Sized + Se
     type Connection: ConnectionInterface;
 
     /// Initialize a new delivery acknowledgment aggregator.
-    async fn init(config: Self::Config) -> anyhow::Result<Self>;
+    fn init(config: Self::Config) -> anyhow::Result<Self>;
 }

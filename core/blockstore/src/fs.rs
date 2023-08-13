@@ -37,7 +37,7 @@ impl BlockStoreInterface for FsStore {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
     type Put = IncrementalPut<Self>;
 
-    async fn init(config: Self::Config) -> anyhow::Result<Self> {
+    fn init(config: Self::Config) -> anyhow::Result<Self> {
         Ok(Self {
             store_dir_path: config.store_dir_path,
             tmp_dir: TempDir::new(TMP_DIR_PREFIX).map(Arc::new)?,

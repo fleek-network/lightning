@@ -29,7 +29,7 @@ pub trait SignerInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send 
     // empty
 
     /// Initialize the signature service.
-    async fn init(config: Self::Config, query_runner: Self::SyncQuery) -> anyhow::Result<Self>;
+    fn init(config: Self::Config, query_runner: Self::SyncQuery) -> anyhow::Result<Self>;
 
     /// Provide the signer service with the mempool socket after initialization, this function
     /// should only be called once.

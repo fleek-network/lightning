@@ -62,7 +62,7 @@ pub trait BroadcastInterface: WithStartAndShutdown + ConfigConsumer + Sized + Se
     type PubSub<T: LightningMessage + Clone>: PubSub<T>;
 
     /// Initialize the gossip system with the config and the topology object..
-    async fn init(
+    fn init(
         config: Self::Config,
         listener_connector: ListenerConnector<Self::ConnectionPool, Self::Message>,
         topology: Arc<Self::Topology>,

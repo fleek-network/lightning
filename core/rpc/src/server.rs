@@ -85,11 +85,7 @@ impl<Q: SyncQueryRunnerInterface + 'static> WithStartAndShutdown for Rpc<Q> {
 #[async_trait]
 impl<Q: SyncQueryRunnerInterface + Send + Sync + 'static> RpcInterface<Q> for Rpc<Q> {
     /// Initialize the *RPC* server, with the given parameters.
-    async fn init(
-        config: Self::Config,
-        mempool: MempoolSocket,
-        query_runner: Q,
-    ) -> anyhow::Result<Self> {
+    fn init(config: Self::Config, mempool: MempoolSocket, query_runner: Q) -> anyhow::Result<Self> {
         Ok(Self {
             data: Arc::new(RpcData {
                 mempool_socket: mempool,

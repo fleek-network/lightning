@@ -39,7 +39,7 @@ pub trait ApplicationInterface:
     type SyncExecutor: SyncQueryRunnerInterface;
 
     /// Create a new instance of the application layer using the provided configuration.
-    async fn init(config: Self::Config) -> anyhow::Result<Self>;
+    fn init(config: Self::Config) -> anyhow::Result<Self>;
 
     /// Returns a socket that should be used to submit transactions to be executed
     /// by the application layer.
