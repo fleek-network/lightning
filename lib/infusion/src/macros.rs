@@ -156,7 +156,7 @@
 #[macro_export]
 macro_rules! infu {
     // Case 1: Handle creation of the collection.
-    (@Collection [$($service:tt),*]) => {
+    (@Collection [$($service:tt),* $(,)?]) => {
         pub trait Collection {
         $(
             type $service: $service<Collection = Self> + 'static;
@@ -199,9 +199,9 @@ macro_rules! infu {
 
     // Case 2: Inside the trait.
     ($trait_name:tt, {
-        fn init($($init_dep_name:ident: $init_dep_ty:tt),*) $init:block
+        fn init($($init_dep_name:ident: $init_dep_ty:tt),* $(,)?) $init:block
 
-        fn post($($post_dep_name:ident: $post_dep_ty:tt),*) $post:block
+        fn post($($post_dep_name:ident: $post_dep_ty:tt),* $(,)?) $post:block
     }) => {
         /// The [`infusion`] collection that contains this trait.
         type Collection: Collection<$trait_name = Self>;
@@ -223,7 +223,7 @@ macro_rules! infu {
     //
     // A use case for such an interface is the `ConfigProvider`.
     //
-    // The return type for `infu_initialize` is set to 
+    // The return type for `infu_initialize` is set to
     ($trait_name:tt @ Input) => {
         type Collection: Collection<$trait_name = Self>;
 
@@ -252,7 +252,7 @@ macro_rules! infu {
 
     // Handle overwriting `init` in the implementation.
     (impl {
-        fn init($($init_dep_name:ident: $init_dep_ty:tt),*) $init:block
+        fn init($($init_dep_name:ident: $init_dep_ty:tt),* $(,)?) $init:block
     }) => {
         #[doc(hidden)]
         fn infu_dependencies(visitor: &mut $crate::graph::DependencyGraphVisitor) {
@@ -286,7 +286,7 @@ macro_rules! infu {
 
     // Handle overwriting `post` in the implementation.
     (impl {
-        fn post($($post_dep_name:ident: $post_dep_ty:tt),*) $post:block
+        fn post($($post_dep_name:ident: $post_dep_ty:tt),* $(,)?) $post:block
     }) => {
         #[doc(hidden)]
         fn infu_post_initialize(&mut self, __container: &$crate::Container) {
@@ -308,9 +308,9 @@ macro_rules! infu {
     // Handle the case when `post` appears before `init` by rearranging them and doing a recursive
     // expansion.
     ($trait_name:tt, {
-        fn post($($post_dep_name:ident: $post_dep_ty:tt),*) $post:block
+        fn post($($post_dep_name:ident: $post_dep_ty:tt),* $(,)?) $post:block
 
-        fn init($($init_dep_name:ident: $init_dep_ty:tt),*) $init:block
+        fn init($($init_dep_name:ident: $init_dep_ty:tt),* $(,)?) $init:block
     }) => {
         infu!($trait_name, {
             fn init($($init_dep_name: $init_dep_ty),*) $init
@@ -321,7 +321,7 @@ macro_rules! infu {
 
     // Handle the case when `post` is not provided by providing an empty version.
     ($trait_name:tt, {
-        fn init($($init_dep_name:ident: $init_dep_ty:tt),*) $init:block
+        fn init($($init_dep_name:ident: $init_dep_ty:tt),* $(,)?) $init:block
     }) => {
         infu!($trait_name, {
             fn init($($init_dep_name: $init_dep_ty),*) $init
@@ -344,9 +344,9 @@ macro_rules! infu {
 
     // Handle a single block for both `init` and `post`.
     (impl {
-        fn init($($init_dep_name:ident: $init_dep_ty:tt),*) $init:block
+        fn init($($init_dep_name:ident: $init_dep_ty:tt),* $(,)?) $init:block
 
-        fn post($($post_dep_name:ident: $post_dep_ty:tt),*) $post:block
+        fn post($($post_dep_name:ident: $post_dep_ty:tt),* $(,)?) $post:block
     }) => {
         infu!(impl {
             fn init($($init_dep_name: $init_dep_ty),*) $init
@@ -359,9 +359,9 @@ macro_rules! infu {
 
     // Previous case but `post` comes before `init`.
     (impl {
-        fn post($($post_dep_name:ident: $post_dep_ty:tt),*) $post:block
+        fn post($($post_dep_name:ident: $post_dep_ty:tt),* $(,)?) $post:block
 
-        fn init($($init_dep_name:ident: $init_dep_ty:tt),*) $init:block
+        fn init($($init_dep_name:ident: $init_dep_ty:tt),* $(,)?) $init:block
     }) => {
         infu!(impl {
             fn init($($init_dep_name: $init_dep_ty),*) $init
@@ -399,8 +399,16 @@ macro_rules! p {
         <Self::Collection as Collection>::$name
     };
 
+    [:: $name:tt < $($g:ty),* >] => {
+        <Self::Collection as Collection>::$name<$($g),*>
+    };
+
     [:: $name:tt :: $sub:ident] => {
         <<Self::Collection as Collection>::$name as $name>::$sub
+    };
+
+    [:: $name:tt :: $sub:ident < $($g:ty),* >] => {
+        <<Self::Collection as Collection>::$name as $name>::$sub<$($g),*>
     };
 }
 
