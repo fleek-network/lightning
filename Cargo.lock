@@ -3465,6 +3465,7 @@ dependencies = [
  "bytes",
  "fleek-crypto",
  "hp-fixed",
+ "infusion",
  "ink-quill",
  "lightning-schema",
  "lightning-types",

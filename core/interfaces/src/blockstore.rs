@@ -1,11 +1,14 @@
 use std::{fmt::Debug, ops::Deref};
 
 use async_trait::async_trait;
+use infusion::infu;
 use thiserror::Error;
 
 use crate::{
     config::ConfigConsumer,
+    infu_collection::Collection,
     types::{CompressionAlgoSet, CompressionAlgorithm},
+    ConfigProviderInterface,
 };
 
 pub type Blake3Hash = [u8; 32];
@@ -84,10 +87,12 @@ pub struct ContentChunk {
 /// we chunk first, and compress each chunk later for obvious technical reasons.
 #[async_trait]
 pub trait BlockStoreInterface: Clone + Send + Sync + ConfigConsumer {
-    // -- DYNAMIC TYPES
-    // empty
-
-    // -- BOUNDED TYPES
+    infu!(BlockStoreInterface, {
+        fn init(config: ConfigProviderInterface) {
+            let config = config.get::<Self>();
+            Self::init(config)
+        }
+    });
 
     /// The block store has the ability to use a smart pointer to avoid duplicating
     /// the same content multiple times in memory, this can be used for when multiple

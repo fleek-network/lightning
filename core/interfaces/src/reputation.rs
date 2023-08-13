@@ -2,14 +2,17 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
+use infusion::infu;
 
 use crate::{
-    application::SyncQueryRunnerInterface, config::ConfigConsumer, notifier::NotifierInterface,
-    signer::SubmitTxSocket,
+    application::SyncQueryRunnerInterface, config::ConfigConsumer, infu_collection::Collection,
+    notifier::NotifierInterface, signer::SubmitTxSocket,
 };
 
 #[async_trait]
 pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
+    infu!(ReputationAggregatorInterface @ Input);
+
     // -- DYNAMIC TYPES
 
     /// The notifier can be used to receive notifications on and before epoch changes.

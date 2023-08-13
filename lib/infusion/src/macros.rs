@@ -222,6 +222,8 @@ macro_rules! infu {
     // using the `.with` function before initialize is called.
     //
     // A use case for such an interface is the `ConfigProvider`.
+    //
+    // The return type for `infu_initialize` is set to 
     ($trait_name:tt @ Input) => {
         type Collection: Collection<$trait_name = Self>;
 
@@ -233,7 +235,8 @@ macro_rules! infu {
         #[doc(hidden)]
         fn infu_initialize(
             _container: &$crate::Container
-        ) -> ::std::result::Result<Self, ::std::boxed::Box<dyn std::error::Error>> {
+        ) -> ::std::result::Result<
+            Self, ::std::boxed::Box<dyn std::error::Error>> where Self: Sized {
             unreachable!("This trait is marked as an input.")
         }
 
@@ -277,7 +280,7 @@ macro_rules! infu {
                 $init
             };
 
-            tmp.map_err(|e| ::std::boxed::Box::new(e).into())
+            tmp.map_err(|e| e.into())
         }
     };
 

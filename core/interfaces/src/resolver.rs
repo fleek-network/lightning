@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use infusion::infu;
 
 use crate::{
     dht::DhtInterface,
+    infu_collection::Collection,
     types::{ImmutablePointer, ResolvedImmutablePointerRecord},
     Blake3Hash, ConfigConsumer, SignerInterface, WithStartAndShutdown,
 };
@@ -12,6 +14,8 @@ use crate::{
 /// into a Blake3 hash of the content.
 #[async_trait]
 pub trait ResolverInterface: Sized + ConfigConsumer + WithStartAndShutdown {
+    infu!(ResolverInterface @ Input);
+
     // -- DYNAMIC TYPES
 
     type Dht: DhtInterface;

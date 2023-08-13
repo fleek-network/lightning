@@ -5,11 +5,12 @@ use async_trait::async_trait;
 use fleek_crypto::{
     ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
+use infusion::infu;
 use tokio::sync::Notify;
 
 use crate::{
     application::SyncQueryRunnerInterface, config::ConfigConsumer, consensus::MempoolSocket,
-    types::UpdateMethod, WithStartAndShutdown,
+    infu_collection::Collection, types::UpdateMethod, WithStartAndShutdown,
 };
 
 /// A socket that is responsible to submit a transaction to the consensus from our node,
@@ -21,6 +22,8 @@ pub type SubmitTxSocket = Socket<UpdateMethod, u64>;
 /// the node.
 #[async_trait]
 pub trait SignerInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
+    infu!(SignerInterface @ Input);
+
     // -- DYNAMIC TYPES
 
     type SyncQuery: SyncQueryRunnerInterface;

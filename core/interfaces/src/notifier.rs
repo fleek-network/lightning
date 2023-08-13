@@ -1,9 +1,10 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
+use infusion::infu;
 use tokio::sync::mpsc;
 
-use crate::application::SyncQueryRunnerInterface;
+use crate::{application::SyncQueryRunnerInterface, infu_collection::Collection};
 
 #[derive(Debug)]
 pub enum Notification {
@@ -13,6 +14,8 @@ pub enum Notification {
 
 #[async_trait]
 pub trait NotifierInterface {
+    infu!(NotifierInterface @ Input);
+
     // -- DYNAMIC TYPES
     type SyncQuery: SyncQueryRunnerInterface;
 

@@ -1,6 +1,13 @@
-use crate::{types::ServiceId, ConfigConsumer, ConnectionInterface, WithStartAndShutdown};
+use infusion::infu;
+
+use crate::{
+    infu_collection::Collection, types::ServiceId, ConfigConsumer, ConnectionInterface,
+    WithStartAndShutdown,
+};
 
 pub trait ServiceExecutorInterface: WithStartAndShutdown + ConfigConsumer + Send + Sync {
+    infu!(ServiceExecutorInterface @ Input);
+
     // -- DYNAMIC TYPES
     // empty
 

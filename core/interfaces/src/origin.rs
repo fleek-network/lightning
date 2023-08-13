@@ -1,8 +1,9 @@
 use affair::Socket;
 use anyhow;
 use async_trait::async_trait;
+use infusion::infu;
 
-use crate::{ConfigConsumer, WithStartAndShutdown};
+use crate::{infu_collection::Collection, ConfigConsumer, WithStartAndShutdown};
 
 /// A socket for submitting a fetch request to an origin.
 pub type OriginProviderSocket<Stream> = Socket<Vec<u8>, anyhow::Result<Stream>>;
@@ -11,14 +12,18 @@ pub type OriginProviderSocket<Stream> = Socket<Vec<u8>, anyhow::Result<Stream>>;
 /// a modular way, and [`OriginProvider`] can be something like a provider for resolving
 /// *IPFS* files.
 #[async_trait]
-pub trait OriginProviderInterface<Stream: UntrustedStream>:
+pub trait OriginProviderInterface:
     ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
 {
+    infu!(OriginProviderInterface @ Input);
+
+    type Stream: UntrustedStream;
+
     /// Initialize the origin service.
     fn init(config: Self::Config) -> anyhow::Result<Self>;
 
     /// Returns a socket for submitting a fetch request to an origin.
-    fn get_socket(&self) -> OriginProviderSocket<Stream>;
+    fn get_socket(&self) -> OriginProviderSocket<Self::Stream>;
 }
 
 /// An untrusted stream to an origin, this allows the origin provider to start the

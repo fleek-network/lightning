@@ -1,9 +1,13 @@
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
+use infusion::infu;
 use lightning_schema::LightningMessage;
 use lightning_types::ServiceScope;
 
-use crate::{ConfigConsumer, SignerInterface, SyncQueryRunnerInterface, WithStartAndShutdown};
+use crate::{
+    infu_collection::Collection, ConfigConsumer, SignerInterface, SyncQueryRunnerInterface,
+    WithStartAndShutdown,
+};
 
 /// Type alias for the return type of accept and connect.
 pub type SenderReceiver<C, T> = (
@@ -26,6 +30,8 @@ pub type ListenerConnector<C, T> = (
 pub trait ConnectionPoolInterface:
     ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
 {
+    infu!(ConnectionPoolInterface @ Input);
+
     // -- DYNAMIC TYPES
 
     /// The query runner on the application to provide the information about a node

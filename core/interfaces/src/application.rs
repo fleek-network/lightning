@@ -4,15 +4,18 @@ use affair::Socket;
 use async_trait::async_trait;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
+use infusion::infu;
 
 use crate::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
+    infu_collection::Collection,
     types::{
         Block, BlockExecutionResponse, Epoch, EpochInfo, NodeInfo, NodeServed, ProtocolParams,
         ReportedReputationMeasurements, Service, ServiceId, TotalServed, TransactionResponse,
         UpdateRequest,
     },
+    ConfigProviderInterface,
 };
 
 /// The socket that is handled by the application layer and fed by consensus (or other
@@ -30,10 +33,12 @@ pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
 pub trait ApplicationInterface:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
-    // -- DYNAMIC TYPES
-    // empty: Application layer does not need any generic.
-
-    // -- BOUNDED TYPES
+    infu!(ApplicationInterface, {
+        fn init(config: ConfigProviderInterface) {
+            let config = config.get::<Self>();
+            Self::init(config)
+        }
+    });
 
     /// The type for the sync query executor.
     type SyncExecutor: SyncQueryRunnerInterface;

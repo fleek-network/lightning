@@ -1,8 +1,13 @@
+use infusion::infu;
 use serde::{de::DeserializeOwned, Serialize};
+
+use crate::infu_collection::Collection;
 
 /// An implementer of this trait should handle providing the configurations from
 /// the loaded configuration file.
 pub trait ConfigProviderInterface: Send + Sync {
+    infu!(ConfigProviderInterface @ Input);
+
     /// Returns the configuration for the given object. If the key is not present
     /// in the loaded file we should return the default object.
     fn get<S: ConfigConsumer>(&self) -> S::Config;

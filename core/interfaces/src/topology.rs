@@ -2,15 +2,18 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
+use infusion::infu;
 
-use crate::{ConfigConsumer, SyncQueryRunnerInterface};
+use crate::{infu_collection::Collection, ConfigConsumer, SyncQueryRunnerInterface};
 
 /// The algorithm used for clustering our network and dynamically creating a network topology.
 /// This clustering is later used in other parts of the codebase when connection to other nodes
 /// is required. The gossip layer is an example of a component that can feed the data this
 /// algorithm generates.
 #[async_trait]
-pub trait TopologyInterface: ConfigConsumer + Sized + Send + Sync {
+pub trait TopologyInterface: ConfigConsumer + Sized + Send + Sync + Clone {
+    infu!(TopologyInterface @ Input);
+
     // -- DYNAMIC TYPES
 
     /// Topology requires the query runner in order to access reputation data as well as the

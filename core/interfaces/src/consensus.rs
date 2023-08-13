@@ -2,12 +2,14 @@ use std::sync::Arc;
 
 use affair::Socket;
 use async_trait::async_trait;
+use infusion::infu;
 use lightning_schema::LightningMessage;
 use tokio::sync::Notify;
 
 use crate::{
     application::ExecutionEngineSocket, common::WithStartAndShutdown, config::ConfigConsumer,
-    signer::SignerInterface, types::UpdateRequest, PubSub, SyncQueryRunnerInterface,
+    infu_collection::Collection, signer::SignerInterface, types::UpdateRequest, PubSub,
+    SyncQueryRunnerInterface,
 };
 
 /// A socket that gives services and other sub-systems the required functionality to
@@ -22,6 +24,8 @@ pub type MempoolSocket = Socket<UpdateRequest, ()>;
 
 #[async_trait]
 pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
+    infu!(ConsensusInterface @ Input);
+
     // -- DYNAMIC TYPES
 
     type QueryRunner: SyncQueryRunnerInterface;
