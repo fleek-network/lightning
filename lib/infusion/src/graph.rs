@@ -147,10 +147,12 @@ impl DependencyGraph {
 
             for v in self.dependency_graph.get(&u).unwrap().iter() {
                 if let Some(ref_mut) = in_degree.get_mut(v) {
+                    assert_ne!(*ref_mut, 0);
+
                     *ref_mut -= 1;
 
                     if *ref_mut == 0 {
-                        queue.push_back(u);
+                        queue.push_back(*v);
                     }
                 }
             }
