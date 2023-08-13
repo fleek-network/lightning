@@ -9,9 +9,9 @@
 ///
 /// # 1. Collections and Containers
 ///
-/// Two core concepts in this library are `Collection` and [`crate::Container`]. Container is
-/// exported by infusion as an struct. However `Collection` is project depended. And should be
-/// generated using this macro.
+/// Two core concepts in this library are `Collection` and [`Container`](crate::Container).
+/// Container is exported by infusion as an struct. However `Collection` is project depended.
+/// And should be generated using this macro.
 ///
 /// There is no magic, a collection is simply a trait with a series of generics that have the same
 /// name as the type name.
@@ -120,7 +120,7 @@
 /// We refer to these objects as inputs, other traits can accept these inputs as dependency.
 ///
 /// An input must be provided during the construction of the collection using the
-/// [`crate::Container::with`] method.
+/// [`Container::with`](crate::Container::with) method.
 ///
 /// ```ignore
 /// trait MyConfiguration: Sized {

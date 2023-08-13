@@ -1,16 +1,22 @@
 //! This module contains the implementation of our virtual call tables and dynamic objects,
-//! the [`VTable`] a collection member, and contains the callback to the implemented functions
+//! the [VTable] a collection member, and contains the callback to the implemented functions
 //! that we care about.
 //!
-//! Both [`VTable`] and [`Tag`] are labeled for humans, they have the trait name and the type
-//! name. The type name is generated using the [`type_name`] method from the standard library.
+//! Both [VTable] and [Tag] are labeled for humans, they have the trait name and the type
+//! name. The type name is generated using the [type_name](std::any::type_name) method from
+//! the standard library.
 //!
 //! But due to limitations, we explicitly pass the name of a trait as `&'static str`, this makes
 //! this module not really portable for other use cases and is very tuned for this library.
 //!
-//! However, the [`Object`] type is quite general purpose and is a very simple implementation of
+//! However, the [Object] type is quite general purpose and is a very simple implementation of
 //! a dynamic object (without dynamic dispatch). An object is only labeled with the named of the
 //! concrete type and not the trait name.
+//!
+//!
+//! [VTable]: ./struct.VTable.html
+//! [Tag]: ./struct.Tag.html
+//! [Object]: ./struct.Object.html
 
 use std::{
     any::{type_name, TypeId},
@@ -50,7 +56,7 @@ pub struct Object {
     tid: TypeId,
 }
 
-/// The interned id of an object.
+/// The interned id of an object that is trait aware.
 #[derive(Copy, Clone)]
 pub struct Tag {
     /// The unique identifier for the object, which is the pointer to the `dependencies` function
@@ -136,6 +142,9 @@ impl VTable {
 
 impl Tag {
     /// Create a new object identifier from a dependency visitor callback.
+    ///
+    /// You can also use the [`tag`](crate::tag) macro in order to generate
+    /// a tag.
     pub fn new<T: 'static>(trait_name: &'static str, cb: fn(&mut DependencyGraphVisitor)) -> Self {
         let id = (cb as *const u8) as usize;
         let type_id = TypeId::of::<T>();
