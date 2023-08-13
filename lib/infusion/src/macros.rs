@@ -252,12 +252,9 @@ macro_rules! infu {
         #[doc(hidden)]
         fn infu_dependencies(visitor: &mut infusion::container::DependencyGraphVisitor) {
         $(
-            visitor.add_dependency(infusion::vtable::Tag::new::<
-                <Self::Collection as Collection>::$init_dep_ty,
-            >(
-                stringify!($init_dep_ty),
-                <<Self::Collection as Collection>::$init_dep_ty as $init_dep_ty>::infu_dependencies,
-            ));
+            visitor.add_dependency(
+                tag!(<Self::Collection as Collection>::$init_dep_ty as $init_dep_ty)
+            );
          )*
         }
 
@@ -267,11 +264,7 @@ macro_rules! infu {
         ) -> Result<Self, Box<dyn std::error::Error>> {
         $(
             let $init_dep_name = container.get::<<Self::Collection as Collection>::$init_dep_ty>(
-                infusion::vtable::Tag::new::<<Self::Collection as Collection>::$init_dep_ty>(
-                    stringify!($init_dep_ty),
-                    <<Self::Collection as Collection>::$init_dep_ty as $init_dep_ty>
-                        ::infu_dependencies,
-                )
+                tag!(<Self::Collection as Collection>::$init_dep_ty as $init_dep_ty)
             );
          )*
 
@@ -291,11 +284,7 @@ macro_rules! infu {
         fn infu_post_initialize(&mut self, container: &infusion::Container) {
         $(
             let $post_dep_name = container.get::<<Self::Collection as Collection>::$post_dep_ty>(
-                infusion::vtable::Tag::new::<<Self::Collection as Collection>::$post_dep_ty>(
-                    stringify!($post_dep_ty),
-                    <<Self::Collection as Collection>::$post_dep_ty as $post_dep_ty>
-                        ::infu_dependencies,
-                )
+                tag!(<Self::Collection as Collection>::$post_dep_ty as $post_dep_ty)
             );
          )*
 
