@@ -162,26 +162,28 @@ macro_rules! infu {
             type $service: $service<Collection = Self> + 'static;
          )*
 
-            fn build_graph() -> infusion::DependencyGraph {
-                let mut vtables = Vec::<infusion::vtable::VTable>::new();
+            fn build_graph() -> $crate::DependencyGraph {
+                let mut vtables = Vec::<$crate::vtable::VTable>::new();
 
             $(
                 vtables.push({
                     fn init<T: $service + 'static>(
-                        container: &infusion::Container
-                    ) -> Result<infusion::vtable::Object, Box<dyn std::error::Error>> {
-                        T::infu_initialize(container).map(infusion::vtable::Object::new)
+                        container: &$crate::Container
+                    ) -> ::std::result::Result<
+                        $crate::vtable::Object, ::std::boxed::Box<dyn std::error::Error>
+                    > {
+                        T::infu_initialize(container).map($crate::vtable::Object::new)
                     }
 
                     fn post<T: $service + 'static>(
-                        obj: &mut infusion::vtable::Object,
-                        container: &infusion::Container
+                        obj: &mut $crate::vtable::Object,
+                        container: &$crate::Container
                     ) {
                         let obj = obj.downcast_mut::<T>();
                         obj.infu_post_initialize(container);
                     }
 
-                    infusion::vtable::VTable::new::<Self::$service>(
+                    $crate::vtable::VTable::new::<Self::$service>(
                         stringify!($service),
                         <Self::$service as $service>::infu_dependencies,
                         init::<Self::$service>,
@@ -190,7 +192,7 @@ macro_rules! infu {
                 });
              )*
 
-                infusion::DependencyGraph::new(vtables)
+                $crate::DependencyGraph::new(vtables)
             }
         }
     };
@@ -224,19 +226,19 @@ macro_rules! infu {
         type Collection: Collection<$trait_name = Self>;
 
         #[doc(hidden)]
-        fn infu_dependencies(visitor: &mut infusion::container::DependencyGraphVisitor) {
+        fn infu_dependencies(visitor: &mut $crate::container::DependencyGraphVisitor) {
             visitor.mark_input();
         }
 
         #[doc(hidden)]
         fn infu_initialize(
-            container: &infusion::Container
-        ) -> Result<Self, Box<dyn std::error::Error>> {
+            _container: &$crate::Container
+        ) -> ::std::result::Result<Self, ::std::boxed::Box<dyn std::error::Error>> {
             unreachable!("This trait is marked as an input.")
         }
 
         #[doc(hidden)]
-        fn infu_post_initialize(&mut self, container: &infusion::Container) {
+        fn infu_post_initialize(&mut self, container: &$crate::Container) {
             // empty
         }
     };
@@ -250,29 +252,32 @@ macro_rules! infu {
         fn init($($init_dep_name:ident: $init_dep_ty:tt),*) $init:block
     }) => {
         #[doc(hidden)]
-        fn infu_dependencies(visitor: &mut infusion::container::DependencyGraphVisitor) {
+        fn infu_dependencies(visitor: &mut $crate::container::DependencyGraphVisitor) {
         $(
             visitor.add_dependency(
-                tag!(<Self::Collection as Collection>::$init_dep_ty as $init_dep_ty)
+                $crate::tag!(<Self::Collection as Collection>::$init_dep_ty as $init_dep_ty)
             );
          )*
         }
 
         #[doc(hidden)]
         fn infu_initialize(
-            container: &infusion::Container
-        ) -> Result<Self, Box<dyn std::error::Error>> {
+            __container: &$crate::Container
+        ) -> ::std::result::Result<Self, ::std::boxed::Box<dyn std::error::Error>> {
         $(
-            let $init_dep_name = container.get::<<Self::Collection as Collection>::$init_dep_ty>(
-                tag!(<Self::Collection as Collection>::$init_dep_ty as $init_dep_ty)
+            let $init_dep_name = __container.get::<<Self::Collection as Collection>::$init_dep_ty>(
+                $crate::tag!(<Self::Collection as Collection>::$init_dep_ty as $init_dep_ty)
             );
          )*
 
-            let tmp: Result<Self, _> = {
+            // Make the container inaccessible to the block.
+            let __container = ();
+
+            let tmp: ::std::result::Result<Self, _> = {
                 $init
             };
 
-            tmp.map_err(|e| Box::new(e).into())
+            tmp.map_err(|e| ::std::boxed::Box::new(e).into())
         }
     };
 
@@ -281,14 +286,14 @@ macro_rules! infu {
         fn post($($post_dep_name:ident: $post_dep_ty:tt),*) $post:block
     }) => {
         #[doc(hidden)]
-        fn infu_post_initialize(&mut self, container: &infusion::Container) {
+        fn infu_post_initialize(&mut self, __container: &$crate::Container) {
         $(
-            let $post_dep_name = container.get::<<Self::Collection as Collection>::$post_dep_ty>(
-                tag!(<Self::Collection as Collection>::$post_dep_ty as $post_dep_ty)
+            let $post_dep_name = __container.get::<<Self::Collection as Collection>::$post_dep_ty>(
+                $crate::tag!(<Self::Collection as Collection>::$post_dep_ty as $post_dep_ty)
             );
          )*
 
-            $post
+            { $post };
         }
     };
 
@@ -327,7 +332,7 @@ macro_rules! infu {
     ($trait_name:tt @ Default) => {
         infu!($trait_name, {
             fn init() {
-                Result::<Self, std::convert::Infallible>::Ok(Self::default())
+                $crate::ok!(Self::default())
             }
 
             fn post() {}
@@ -400,9 +405,19 @@ macro_rules! p {
 #[macro_export]
 macro_rules! tag {
     ($type:ty as $trait_name:tt) => {
-        infusion::vtable::Tag::new::<$type>(
+        $crate::vtable::Tag::new::<$type>(
             stringify!($trait_name),
             <$type as $trait_name>::infu_dependencies,
         )
+    };
+}
+
+/// Use this macro to generate the return type from an infallible init
+/// function. This is when you never return an error and the type for
+/// error is not available.
+#[macro_export]
+macro_rules! ok {
+    ($e:expr) => {
+        ::std::result::Result::<_, $crate::error::Infallible>::Ok($e)
     };
 }

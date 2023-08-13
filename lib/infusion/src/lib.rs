@@ -8,7 +8,6 @@
 //!
 //! There are 3 main parts that you should read about.
 //!
-//!
 //! | NAME     | Description |
 //! | -------- | ----------- |
 //! | [`infu`] | The main macro to generate a collection and service traits. |
@@ -17,12 +16,13 @@
 //!
 //! ## Utility macros
 //!
-//! There are also two utility macros:
+//! There are also some utility macros:
 //!
 //! | NAME     | Description |
 //! | -------- | ----------- |
 //! | [`p`]    | This can be used to help with accessing the type on a collection. |
 //! | [`tag`]  | This can be used to help generate a [`Tag`](vtable::Tag). |
+//! | [`ok`]  | Can be used to create an infallible `Ok`. |
 //!
 //! # Example
 //!

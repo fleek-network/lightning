@@ -4,10 +4,13 @@ use std::fmt::{Debug, Display};
 
 use crate::vtable::Tag;
 
-/// A cycle was found. Contains two path one from `u -> v` and another
-/// from `v -> u`.
+/// A cycle is reported as a path starting from a node `v` and ending with `v`.
+pub type Cycle = Vec<Tag>;
+
+/// One or more cycle was found. There is always at least one element in this
+/// vec.
 #[derive(Debug)]
-pub struct CycleFound(pub Vec<Tag>, pub Vec<Tag>);
+pub struct CycleFound(pub Vec<Cycle>);
 
 /// The error returned from the initialization of a container.
 #[derive(Debug)]
@@ -23,7 +26,7 @@ pub enum InitializationError {
 
 impl Display for CycleFound {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // TODO: Print the two path.
+        // TODO: Print the cycles.
         write!(f, "Found a cycle in the dependency graph.")
     }
 }
