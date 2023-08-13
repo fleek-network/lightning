@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
-use infusion::infu;
+use infusion::{infu, ok, p};
 use lightning_schema::LightningMessage;
 use lightning_types::ServiceScope;
 
 use crate::{
-    infu_collection::Collection, ConfigConsumer, SignerInterface, SyncQueryRunnerInterface,
-    WithStartAndShutdown,
+    infu_collection::Collection, ApplicationInterface, ConfigConsumer, ConfigProviderInterface,
+    SignerInterface, WithStartAndShutdown,
 };
 
 /// Type alias for the return type of accept and connect.
@@ -30,17 +30,16 @@ pub type ListenerConnector<C, T> = (
 pub trait ConnectionPoolInterface:
     ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
 {
-    infu!(ConnectionPoolInterface @ Input);
+    infu!(ConnectionPoolInterface, {
+        fn init(
+            config: ConfigProviderInterface,
+            signer: SignerInterface,
+            app: ApplicationInterface,
+        ) {
+            ok!(Self::init(config.get::<Self>(), signer, app.sync_query()))
+        }
+    });
 
-    // -- DYNAMIC TYPES
-
-    /// The query runner on the application to provide the information about a node
-    /// to this connection pool. Should be a generic on this implementation.
-    type QueryRunner: SyncQueryRunnerInterface;
-
-    type Signer: SignerInterface;
-
-    // -- BOUNDED TYPES
     // The existence of Sender/Receiver at this layer and the link back to this connection
     // pool from listener and connector is to force the listener and connector to use the
     // same type for the sender/receiver.
@@ -58,7 +57,11 @@ pub trait ConnectionPoolInterface:
     type Receiver<T: LightningMessage>: ReceiverInterface<T>;
 
     /// Initialize the pool with the given configuration.
-    fn init(config: Self::Config, signer: &Self::Signer, query_runner: Self::QueryRunner) -> Self;
+    fn init(
+        config: Self::Config,
+        signer: &p!(::SignerInterface),
+        query_runner: p!(::ApplicationInterface::SyncExecutor),
+    ) -> Self;
 
     /// Provide ownership to an scope in the connection pool.
     ///

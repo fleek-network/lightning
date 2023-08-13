@@ -2,9 +2,12 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
-use infusion::infu;
+use infusion::{infu, p};
 
-use crate::{infu_collection::Collection, ConfigConsumer, SyncQueryRunnerInterface};
+use crate::{
+    infu_collection::Collection, ApplicationInterface, ConfigConsumer, ConfigProviderInterface,
+    SignerInterface,
+};
 
 /// The algorithm used for clustering our network and dynamically creating a network topology.
 /// This clustering is later used in other parts of the codebase when connection to other nodes
@@ -12,16 +15,15 @@ use crate::{infu_collection::Collection, ConfigConsumer, SyncQueryRunnerInterfac
 /// algorithm generates.
 #[async_trait]
 pub trait TopologyInterface: ConfigConsumer + Sized + Send + Sync + Clone {
-    infu!(TopologyInterface @ Input);
-
-    // -- DYNAMIC TYPES
-
-    /// Topology requires the query runner in order to access reputation data as well as the
-    /// node registry in order to create the connection graph for the epoch.
-    type SyncQuery: SyncQueryRunnerInterface;
-
-    // -- BOUNDED TYPES
-    // empty
+    infu!(TopologyInterface, {
+        fn init(
+            config: ConfigProviderInterface,
+            signer: SignerInterface,
+            app: ApplicationInterface,
+        ) {
+            Self::init(config.get::<Self>(), signer.get_bls_pk(), app.sync_query())
+        }
+    });
 
     /// Create an instance of the structure from the provided configuration and public key.
     /// The public key is supposed to be the public key of our own node. This can be obtained
@@ -34,7 +36,7 @@ pub trait TopologyInterface: ConfigConsumer + Sized + Send + Sync + Clone {
     fn init(
         config: Self::Config,
         our_public_key: NodePublicKey,
-        query_runner: Self::SyncQuery,
+        query_runner: p!(::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self>;
 
     /// Suggest a list of connections that our current node must connect to. This should be

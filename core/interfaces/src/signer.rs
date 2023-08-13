@@ -5,12 +5,12 @@ use async_trait::async_trait;
 use fleek_crypto::{
     ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
-use infusion::infu;
+use infusion::{infu, p};
 use tokio::sync::Notify;
 
 use crate::{
-    application::SyncQueryRunnerInterface, config::ConfigConsumer, consensus::MempoolSocket,
-    infu_collection::Collection, types::UpdateMethod, WithStartAndShutdown,
+    config::ConfigConsumer, consensus::MempoolSocket, infu_collection::Collection,
+    types::UpdateMethod, ApplicationInterface, ConfigProviderInterface, WithStartAndShutdown,
 };
 
 /// A socket that is responsible to submit a transaction to the consensus from our node,
@@ -22,17 +22,17 @@ pub type SubmitTxSocket = Socket<UpdateMethod, u64>;
 /// the node.
 #[async_trait]
 pub trait SignerInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
-    infu!(SignerInterface @ Input);
-
-    // -- DYNAMIC TYPES
-
-    type SyncQuery: SyncQueryRunnerInterface;
-
-    // -- BOUNDED TYPES
-    // empty
+    infu!(SignerInterface, {
+        fn init(config: ConfigProviderInterface, app: ApplicationInterface) {
+            Self::init(config.get::<Self>(), app.sync_query())
+        }
+    });
 
     /// Initialize the signature service.
-    fn init(config: Self::Config, query_runner: Self::SyncQuery) -> anyhow::Result<Self>;
+    fn init(
+        config: Self::Config,
+        query_runner: p!(::ApplicationInterface::SyncExecutor),
+    ) -> anyhow::Result<Self>;
 
     /// Provide the signer service with the mempool socket after initialization, this function
     /// should only be called once.

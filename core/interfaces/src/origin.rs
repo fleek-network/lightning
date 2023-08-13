@@ -3,7 +3,9 @@ use anyhow;
 use async_trait::async_trait;
 use infusion::infu;
 
-use crate::{infu_collection::Collection, ConfigConsumer, WithStartAndShutdown};
+use crate::{
+    infu_collection::Collection, ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown,
+};
 
 /// A socket for submitting a fetch request to an origin.
 pub type OriginProviderSocket<Stream> = Socket<Vec<u8>, anyhow::Result<Stream>>;
@@ -15,7 +17,11 @@ pub type OriginProviderSocket<Stream> = Socket<Vec<u8>, anyhow::Result<Stream>>;
 pub trait OriginProviderInterface:
     ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
 {
-    infu!(OriginProviderInterface @ Input);
+    infu!(OriginProviderInterface, {
+        fn init(config: ConfigProviderInterface) {
+            Self::init(config.get::<Self>())
+        }
+    });
 
     type Stream: UntrustedStream;
 

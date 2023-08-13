@@ -3,12 +3,16 @@ use infusion::infu;
 
 use crate::{
     common::WithStartAndShutdown, config::ConfigConsumer, infu_collection::Collection,
-    ConnectionInterface,
+    ConfigProviderInterface, ConnectionInterface,
 };
 
 #[async_trait]
 pub trait HandshakeInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
-    infu!(HandshakeInterface @ Input);
+    infu!(HandshakeInterface, {
+        fn init(config: ConfigProviderInterface) {
+            Self::init(config.get::<Self>())
+        }
+    });
 
     /// The connection type that this handshake implementation offers.
     type Connection: ConnectionInterface;

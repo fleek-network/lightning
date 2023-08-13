@@ -1,36 +1,31 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
-use infusion::infu;
+use infusion::{infu, p};
 
 use crate::{
     dht::DhtInterface,
     infu_collection::Collection,
     types::{ImmutablePointer, ResolvedImmutablePointerRecord},
-    Blake3Hash, ConfigConsumer, SignerInterface, WithStartAndShutdown,
+    Blake3Hash, ConfigConsumer, ConfigProviderInterface, DhtSocket, SignerInterface,
+    WithStartAndShutdown,
 };
 
 /// The resolver is responsible to resolve an FNIP (Fleek Network Immutable Pointer),
 /// into a Blake3 hash of the content.
 #[async_trait]
 pub trait ResolverInterface: Sized + ConfigConsumer + WithStartAndShutdown {
-    infu!(ResolverInterface @ Input);
-
-    // -- DYNAMIC TYPES
-
-    type Dht: DhtInterface;
-
-    type Signer: SignerInterface;
-
-    // -- BOUNDED TYPES
+    infu!(ResolverInterface, {
+        fn init(config: ConfigProviderInterface, dht: DhtInterface, signer: SignerInterface) {
+            Self::init(config.get::<Self>(), dht.get_socket(), signer)
+        }
+    });
 
     type OriginFinder: OriginFinderAsyncIter;
 
     /// Initialize and return the resolver service.
     fn init(
         config: Self::Config,
-        dht: Arc<Self::Dht>,
-        signer: &Self::Signer,
+        dht: DhtSocket,
+        signer: &p!(::SignerInterface),
     ) -> anyhow::Result<Self>;
 
     /// Publish new records into the resolver global hash table about us witnessing

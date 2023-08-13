@@ -4,7 +4,8 @@ use infusion::infu;
 
 use crate::{
     common::WithStartAndShutdown, config::ConfigConsumer, infu_collection::Collection,
-    signer::SubmitTxSocket, types::DeliveryAcknowledgment,
+    signer::SubmitTxSocket, types::DeliveryAcknowledgment, ConfigProviderInterface,
+    SignerInterface,
 };
 
 /// The socket which upon receiving a delivery acknowledgment can add it to the aggregator
@@ -15,7 +16,11 @@ pub type DeliveryAcknowledgmentSocket = Socket<DeliveryAcknowledgment, ()>;
 pub trait DeliveryAcknowledgmentAggregatorInterface:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
-    infu!(DeliveryAcknowledgmentAggregatorInterface @ Input);
+    infu!(DeliveryAcknowledgmentAggregatorInterface, {
+        fn init(config: ConfigProviderInterface, signer: SignerInterface) {
+            Self::init(config.get::<Self>(), signer.get_socket())
+        }
+    });
 
     /// Initialize a new delivery acknowledgment aggregator.
     fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self>;

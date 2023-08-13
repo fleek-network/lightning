@@ -2,23 +2,31 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
-use infusion::infu;
+use infusion::{infu, p};
 
 use crate::{
     application::SyncQueryRunnerInterface, config::ConfigConsumer, infu_collection::Collection,
-    notifier::NotifierInterface, signer::SubmitTxSocket,
+    notifier::NotifierInterface, signer::SubmitTxSocket, ApplicationInterface,
+    ConfigProviderInterface, SignerInterface,
 };
 
 #[async_trait]
 pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
-    infu!(ReputationAggregatorInterface @ Input);
-
-    // -- DYNAMIC TYPES
-
-    /// The notifier can be used to receive notifications on and before epoch changes.
-    type Notifier: NotifierInterface;
-
-    // -- BOUNDED TYPES
+    infu!(ReputationAggregatorInterface, {
+        fn init(
+            config: ConfigProviderInterface,
+            signer: SignerInterface,
+            notifier: NotifierInterface,
+            app: ApplicationInterface
+        ) {
+            Self::init(
+                config.get::<Self>(),
+                signer.get_socket(),
+                notifier.clone(),
+                app.sync_query()
+            )
+        }
+    });
 
     /// The reputation reporter can be used by our system to report the reputation of other
     type ReputationReporter: ReputationReporterInterface;
@@ -33,7 +41,7 @@ pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
     fn init(
         config: Self::Config,
         submit_tx: SubmitTxSocket,
-        notifier: Self::Notifier,
+        notifier: p!(::NotifierInterface),
         query_runner: Self::SyncQuery,
     ) -> anyhow::Result<Self>;
 

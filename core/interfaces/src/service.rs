@@ -1,20 +1,23 @@
 use infusion::infu;
 
 use crate::{
-    infu_collection::Collection, types::ServiceId, ConfigConsumer, ConnectionInterface,
-    WithStartAndShutdown,
+    infu_collection::Collection, types::ServiceId, ConfigConsumer, ConfigProviderInterface,
+    ConnectionInterface, WithStartAndShutdown,
 };
 
-pub trait ServiceExecutorInterface: WithStartAndShutdown + ConfigConsumer + Send + Sync {
-    infu!(ServiceExecutorInterface @ Input);
-
-    // -- DYNAMIC TYPES
-    // empty
-
-    // -- BOUNDED TYPES
+pub trait ServiceExecutorInterface:
+    WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
+{
+    infu!(ServiceExecutorInterface, {
+        fn init(config: ConfigProviderInterface) {
+            Self::init(config.get::<Self>())
+        }
+    });
 
     /// The connector object that this service executor provides.
     type Connector: ServiceConnectorInterface;
+
+    fn init(config: Self::Config) -> anyhow::Result<Self>;
 
     /// Return the connector for this service executor.
     fn get_connector(&self) -> Self::Connector;
