@@ -7,7 +7,7 @@ use std::{
 use crate::{
     error::CycleFound,
     vtable::{self, Object, Tag, VTable},
-    ContainerError,
+    InitializationError,
 };
 
 /// The container contains an instance of every `<Type as Trait>`s.
@@ -37,23 +37,23 @@ impl Container {
     }
 
     /// Initialize the container based on the provided dependency graph.
-    pub fn initialize(mut self, graph: DependencyGraph) -> Result<Self, ContainerError> {
+    pub fn initialize(mut self, graph: DependencyGraph) -> Result<Self, InitializationError> {
         // Step 1: Ensure that every input type has been provided.
         for tag in graph.get_inputs() {
             if !self.objects.contains_key(tag) {
-                return Err(ContainerError::InputNotProvided(*tag));
+                return Err(InitializationError::InputNotProvided(*tag));
             }
         }
 
         // Step 2: Order the objects we need to initialize by topologically ordering the dependency
         // graph.
-        let sorted = graph.sort().map_err(ContainerError::CycleFound)?;
+        let sorted = graph.sort().map_err(InitializationError::CycleFound)?;
 
         for tag in &sorted {
             let vtable = graph.vtables.get(tag).unwrap();
             let object = vtable
                 .init(&self)
-                .map_err(|e| ContainerError::InitializationFailed(*tag, e))?;
+                .map_err(|e| InitializationError::InitializationFailed(*tag, e))?;
             self.objects.insert(*tag, object);
         }
 

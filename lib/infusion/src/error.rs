@@ -1,3 +1,5 @@
+/// Re-export infallible since we want to use in the macros.
+pub use std::convert::Infallible;
 use std::fmt::{Debug, Display};
 
 use crate::vtable::Tag;
@@ -9,7 +11,7 @@ pub struct CycleFound(pub Vec<Tag>, pub Vec<Tag>);
 
 /// The error returned from the initialization of a container.
 #[derive(Debug)]
-pub enum ContainerError {
+pub enum InitializationError {
     CycleFound(CycleFound),
 
     /// Attempt to initialize a member failed and an error was returned.
@@ -26,17 +28,17 @@ impl Display for CycleFound {
     }
 }
 
-impl Display for ContainerError {
+impl Display for InitializationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ContainerError::CycleFound(_) => {
+            InitializationError::CycleFound(_) => {
                 write!(f, "Cycle Found")
             },
-            ContainerError::InitializationFailed(tag, _) => {
+            InitializationError::InitializationFailed(tag, _) => {
                 // No need to print the error because we implement `source`.
                 write!(f, "Initialization of '{tag:?}' failed.")
             },
-            ContainerError::InputNotProvided(tag) => {
+            InitializationError::InputNotProvided(tag) => {
                 write!(f, "Required value for '{tag:?}' was not provided.")
             },
         }
@@ -45,12 +47,12 @@ impl Display for ContainerError {
 
 impl std::error::Error for CycleFound {}
 
-impl std::error::Error for ContainerError {
+impl std::error::Error for InitializationError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            ContainerError::CycleFound(err) => Some(err),
-            ContainerError::InitializationFailed(_, err) => Some(err.as_ref()),
-            ContainerError::InputNotProvided(_) => None,
+            InitializationError::CycleFound(err) => Some(err),
+            InitializationError::InitializationFailed(_, err) => Some(err.as_ref()),
+            InitializationError::InputNotProvided(_) => None,
         }
     }
 }
