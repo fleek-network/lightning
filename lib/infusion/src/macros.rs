@@ -406,3 +406,14 @@ macro_rules! p {
         <<Self::Collection as Collection>::$name as $name>::$sub
     };
 }
+
+/// Use this macro to generate a tag for a type.
+#[macro_export]
+macro_rules! tag {
+    ($type:ty as $trait_name:tt) => {
+        infusion::vtable::Tag::new::<$type>(
+            stringify!($trait_name),
+            <$type as $trait_name>::infu_dependencies,
+        )
+    };
+}

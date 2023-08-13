@@ -1,11 +1,12 @@
 use std::{
+    any::TypeId,
     collections::{HashMap, HashSet, VecDeque},
     fmt::Debug,
 };
 
 use crate::{
     error::CycleFound,
-    vtable::{Object, Tag, VTable},
+    vtable::{self, Object, Tag, VTable},
     ContainerError,
 };
 
@@ -15,12 +16,67 @@ pub struct Container {
 }
 
 impl Container {
-    pub fn build(graph: DependencyGraph) -> Result<Self, ContainerError> {
-        todo!()
+    /// Provide the given value to the container. Should be used for
+    /// for input traits.
+    pub fn with<T: 'static>(mut self, tag: Tag, value: T) -> Self {
+        let type_id = TypeId::of::<T>();
+        assert_eq!(tag.type_id(), type_id, "Type mismatch.");
+        self.objects.insert(tag, Object::new(value));
+        self
     }
 
+    /// Returns a reference to the given value from the tag.
     pub fn get<T: 'static>(&self, tag: Tag) -> &T {
-        todo!()
+        self.objects
+            .get(&tag)
+            .expect("{tag:?} not initialized in the container.")
+            .downcast::<T>()
+    }
+
+    /// Initialize the container based on the provided dependency graph.
+    pub fn initialize(mut self, graph: DependencyGraph) -> Result<Self, ContainerError> {
+        // Step 1: Ensure that every input type has been provided.
+        for tag in graph.get_inputs() {
+            if !self.objects.contains_key(tag) {
+                return Err(ContainerError::InputNotProvided(*tag));
+            }
+        }
+
+        // Step 2: Order the objects we need to initialize by topologically ordering the dependency
+        // graph.
+        let sorted = graph.sort().map_err(ContainerError::CycleFound)?;
+
+        for tag in &sorted {
+            let vtable = graph.vtables.get(tag).unwrap();
+            let object = vtable
+                .init(&self)
+                .map_err(|e| ContainerError::InitializationFailed(*tag, e))?;
+            self.objects.insert(*tag, object);
+        }
+
+        for tag in sorted {
+            let vtable = graph.vtables.get(&tag).unwrap();
+            // We can not hold a mutable reference to self and pass &self to the
+            // `post` function. Since `post` is not supposed to get reference to
+            // self anyway, we can simply remove it from the map at this step and
+            // put it back later.
+            //
+            // The edge case is that a trait would get `self` as a post dependency,
+            // which is dumb enough for us to not care about supporting.
+            let mut object = self.objects.remove(&tag).unwrap();
+            vtable.post(&mut object, &self);
+            self.objects.insert(tag, object);
+        }
+
+        // Run the `post_initialization` for the input types.
+        for tag in graph.get_inputs() {
+            let vtable = graph.vtables.get(tag).unwrap();
+            let mut object = self.objects.remove(tag).unwrap();
+            vtable.post(&mut object, &self);
+            self.objects.insert(*tag, object);
+        }
+
+        Ok(self)
     }
 }
 
@@ -126,11 +182,12 @@ impl DependencyGraph {
             in_degree.remove(&u);
 
             for v in self.dependency_graph.get(&u).unwrap().iter() {
-                let ref_mut = in_degree.get_mut(v).unwrap();
-                *ref_mut -= 1;
+                if let Some(ref_mut) = in_degree.get_mut(v) {
+                    *ref_mut -= 1;
 
-                if *ref_mut == 0 {
-                    queue.push_back(u);
+                    if *ref_mut == 0 {
+                        queue.push_back(u);
+                    }
                 }
             }
         }
@@ -180,7 +237,7 @@ impl DependencyGraphVisitor {
     /// # Panics
     ///
     /// If the current node has already specified dependencies through a prior call to the
-    /// [add_dependency](DependencyGraphBuilder::add_dependency) method.
+    /// [add_dependency](DependencyGraphVisitor::add_dependency) method.
     pub fn mark_input(&mut self) {
         let current = self.current.unwrap();
         if self.inputs.insert(current) {
@@ -193,7 +250,7 @@ impl DependencyGraphVisitor {
     /// # Panics
     ///
     /// If the current node has already been specified as an input node via a prior call to the
-    /// [mark_input](DependencyGraphBuilder::mark_input) method.
+    /// [mark_input](Self::mark_input) method.
     pub fn add_dependency(&mut self, tag: Tag) {
         let current = self.current.unwrap();
         self.dependency_graph

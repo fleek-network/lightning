@@ -2,7 +2,7 @@
 
 use std::{convert::Infallible, marker::PhantomData};
 
-use infusion::{infu, p};
+use infusion::{infu, p, tag};
 
 pub trait A: Sized {
     infu!(A, {
@@ -33,8 +33,14 @@ where
 {
     type Collection = C;
 
+    infu!(impl {
+        fn post() {
+            println!("Running post initialization for A");
+        }
+    });
+
     fn init(_b: &p![::B]) -> Self {
-        todo!()
+        I(PhantomData)
     }
 }
 
@@ -43,6 +49,12 @@ where
     C: Collection<B = Self>,
 {
     type Collection = C;
+
+    infu!(impl {
+        fn post() {
+            println!("Running post initialization for B");
+        }
+    });
 }
 
 struct Binding;
@@ -55,4 +67,9 @@ impl Collection for Binding {
 fn main() {
     let graph = Binding::build_graph();
     println!("{graph:#?}");
+
+    let _container = infusion::Container::default()
+        .with(tag!(I<Binding> as B), I::<Binding>(PhantomData))
+        .initialize(graph)
+        .unwrap();
 }

@@ -1,3 +1,6 @@
+//! Infusion is a dependency injection library to help with top-down approach to
+//! software development by leveraging traits and generics.
+
 #![allow(clippy::all, unused)]
 
 /// The implementation of macros.

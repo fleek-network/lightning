@@ -56,6 +56,8 @@ pub struct Tag {
     /// The unique identifier for the object, which is the pointer to the `dependencies` function
     /// casted to a usize.
     id: usize,
+    /// The rust type id.
+    type_id: TypeId,
     /// Name of the trait. Used as a debug label. Does not effect on equality checks and the hash.
     trait_name: &'static str,
     /// Name of the type implementing this trait. Same as above, only for human labeling.
@@ -89,6 +91,7 @@ impl VTable {
 
         Tag {
             id,
+            type_id: self.tid,
             trait_name: self.trait_name,
             type_name: self.type_name,
         }
@@ -135,13 +138,20 @@ impl Tag {
     /// Create a new object identifier from a dependency visitor callback.
     pub fn new<T: 'static>(trait_name: &'static str, cb: fn(&mut DependencyGraphVisitor)) -> Self {
         let id = (cb as *const u8) as usize;
+        let type_id = TypeId::of::<T>();
         let type_name = type_name::<T>();
 
         Self {
             id,
+            type_id,
             trait_name,
             type_name,
         }
+    }
+
+    /// Returns the [`TypeId`] of this tag.
+    pub fn type_id(&self) -> TypeId {
+        self.type_id
     }
 }
 

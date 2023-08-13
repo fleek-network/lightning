@@ -14,6 +14,9 @@ pub enum ContainerError {
 
     /// Attempt to initialize a member failed and an error was returned.
     InitializationFailed(Tag, Box<dyn std::error::Error>),
+
+    /// The required input was not provided.
+    InputNotProvided(Tag),
 }
 
 impl Display for CycleFound {
@@ -31,7 +34,10 @@ impl Display for ContainerError {
             },
             ContainerError::InitializationFailed(tag, _) => {
                 // No need to print the error because we implement `source`.
-                write!(f, "Initialization of '{:?}' failed.", tag)
+                write!(f, "Initialization of '{tag:?}' failed.")
+            },
+            ContainerError::InputNotProvided(tag) => {
+                write!(f, "Required value for '{tag:?}' was not provided.")
             },
         }
     }
@@ -44,6 +50,7 @@ impl std::error::Error for ContainerError {
         match self {
             ContainerError::CycleFound(err) => Some(err),
             ContainerError::InitializationFailed(_, err) => Some(err.as_ref()),
+            ContainerError::InputNotProvided(_) => None,
         }
     }
 }
