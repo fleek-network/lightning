@@ -5,11 +5,6 @@ use crate::types::CompressionAlgoSet;
 
 /// The connection type that is offered by the (HandshakeInterface)[crate::HandshakeInterface].
 pub trait ConnectionInterface: Send + Sync {
-    // -- DYNAMIC TYPES
-    // empty
-
-    // -- BOUNDED TYPES
-
     /// The writer half of this connection.
     type Writer: AsyncWrite + Unpin + Send + Sync;
 
