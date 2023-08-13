@@ -47,6 +47,9 @@ pub mod vtable;
 /// The implementation of the container.
 pub mod container;
 
-pub use container::{Container, DependencyGraph};
-/// Error generated when performing the initialization.
+/// Project graph.
+pub mod graph;
+
+pub use container::Container;
 pub use error::InitializationError;
+pub use graph::DependencyGraph;

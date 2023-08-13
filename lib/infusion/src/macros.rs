@@ -226,7 +226,7 @@ macro_rules! infu {
         type Collection: Collection<$trait_name = Self>;
 
         #[doc(hidden)]
-        fn infu_dependencies(visitor: &mut $crate::container::DependencyGraphVisitor) {
+        fn infu_dependencies(visitor: &mut $crate::graph::DependencyGraphVisitor) {
             visitor.mark_input();
         }
 
@@ -252,7 +252,7 @@ macro_rules! infu {
         fn init($($init_dep_name:ident: $init_dep_ty:tt),*) $init:block
     }) => {
         #[doc(hidden)]
-        fn infu_dependencies(visitor: &mut $crate::container::DependencyGraphVisitor) {
+        fn infu_dependencies(visitor: &mut $crate::graph::DependencyGraphVisitor) {
         $(
             visitor.add_dependency(
                 $crate::tag!(<Self::Collection as Collection>::$init_dep_ty as $init_dep_ty)

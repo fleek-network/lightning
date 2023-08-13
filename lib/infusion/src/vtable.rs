@@ -25,7 +25,7 @@ use std::{
     mem::transmute,
 };
 
-use crate::container::{Container, DependencyGraphVisitor};
+use crate::{container::Container, graph::DependencyGraphVisitor};
 
 /// The description of a dependency node.
 pub struct VTable {
