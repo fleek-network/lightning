@@ -278,7 +278,6 @@ impl Env<UpdatePerm> {
 
             // add node info
             for (_, node_info) in genesis.node_info {
-                
                 let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
                     Some(Value::NextNodeIndex(index)) => index,
                     _ => 0,
