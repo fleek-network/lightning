@@ -12,8 +12,7 @@ use tokio::{
 
 use crate::{
     bucket::MAX_BUCKETS,
-    handler::HandlerRequest,
-    query::NodeInfo,
+    query::{HandlerRequest, NodeInfo},
     table::{TableKey, TableRequest},
 };
 

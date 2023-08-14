@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSecretKey, SecretKey};
 use lightning_interfaces::{
     dht::{DhtInterface, DhtSocket},
-    types::{DhtRequest, DhtResponse, TableEntry},
+    types::{DhtResponse, TableEntry},
     ConfigConsumer, SignerInterface, TopologyInterface, WithStartAndShutdown,
 };
 use tokio::{
@@ -20,8 +20,13 @@ use tokio::{
 };
 
 use crate::{
-    bootstrap, bootstrap::BootstrapRequest, config::Config, handler, handler::HandlerRequest,
-    query::NodeInfo, store, table,
+    api,
+    api::DhtRequest,
+    bootstrap,
+    bootstrap::BootstrapRequest,
+    config::Config,
+    query::{HandlerRequest, NodeInfo},
+    store, table,
 };
 
 /// Builds the DHT.
@@ -67,19 +72,16 @@ impl Builder {
 
         let (socket, rx) = Socket::raw_bounded(2048);
         let (handler_tx, handler_rx) = mpsc::channel(buffer_size);
-        let (bootstrap_tx, bootstrap_rx) = mpsc::channel(buffer_size);
 
         Ok(Dht {
             socket,
-            socket_rx: Arc::new(Mutex::new(Some(rx))),
             nodes: Arc::new(Mutex::new(Some(self.nodes))),
             buffer_size,
             address: self.config.address,
             network_secret_key: self.network_secret_key,
             handler_tx,
-            bootstrap_tx,
             handler_rx: Arc::new(Mutex::new(Some(handler_rx))),
-            bootstrap_rx: Arc::new(Mutex::new(Some(bootstrap_rx))),
+            bootstrap_notify: Arc::new(Notify::new()),
             is_running: Arc::new(Mutex::new(false)),
             shutdown_notify: Arc::new(Notify::new()),
             topology: PhantomData,
@@ -91,14 +93,12 @@ impl Builder {
 #[allow(clippy::type_complexity)]
 pub struct Dht<T: TopologyInterface> {
     socket: DhtSocket,
-    socket_rx: Arc<Mutex<Option<mpsc::Receiver<Task<DhtRequest, DhtResponse>>>>>,
     buffer_size: usize,
     address: SocketAddr,
     network_secret_key: NodeNetworkingSecretKey,
-    handler_tx: mpsc::Sender<HandlerRequest>,
-    bootstrap_tx: mpsc::Sender<BootstrapRequest>,
-    handler_rx: Arc<Mutex<Option<mpsc::Receiver<HandlerRequest>>>>,
-    bootstrap_rx: Arc<Mutex<Option<mpsc::Receiver<BootstrapRequest>>>>,
+    handler_tx: mpsc::Sender<DhtRequest>,
+    handler_rx: Arc<Mutex<Option<mpsc::Receiver<DhtRequest>>>>,
+    bootstrap_notify: Arc<Notify>,
     nodes: Arc<Mutex<Option<Vec<NodeInfo>>>>,
     is_running: Arc<Mutex<bool>>,
     shutdown_notify: Arc<Notify>,
@@ -145,28 +145,7 @@ impl<T: TopologyInterface> Dht<T> {
     /// Start bootstrap task.
     /// If bootstrapping is in process, this request will be ignored.
     pub async fn bootstrap(&self) {
-        if self
-            .bootstrap_tx
-            .send(BootstrapRequest::Start)
-            .await
-            .is_err()
-        {
-            tracing::error!("failed to send to bootstrap request");
-        }
-    }
-
-    /// Returns true if the node is bootstrapped and false otherwise.
-    pub async fn is_bootstrapped(&self) -> bool {
-        let (tx, rx) = oneshot::channel();
-        if self
-            .bootstrap_tx
-            .send(BootstrapRequest::DoneBootstrapping { tx })
-            .await
-            .is_err()
-        {
-            tracing::error!("failed to send to bootstrap request");
-        }
-        rx.await.unwrap_or(false)
+        self.bootstrap_notify.notify_waiters();
     }
 }
 
@@ -195,57 +174,18 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
             .expect("Binding to socket failed");
         tracing::info!("UDP socket bound to {:?}", socket.local_addr().unwrap());
 
-        let (newtask_tx, _) = mpsc::channel(self.buffer_size);
-        tokio::spawn(handler::start_worker(
-            newtask_tx,
+        let (task_tx, _) = mpsc::channel(self.buffer_size);
+        tokio::spawn(api::start_worker(
             self.handler_rx.lock().unwrap().take().unwrap(),
-            table_tx.clone(),
-            worker_tx,
-            socket,
-            self.network_secret_key.to_pk(),
+            task_tx,
+            self.bootstrap_notify.clone(),
             self.shutdown_notify.clone(),
-        ));
-        tokio::spawn(bootstrap::start_worker(
-            self.bootstrap_rx.lock().unwrap().take().unwrap(),
-            table_tx,
-            self.handler_tx.clone(),
             self.network_secret_key.to_pk(),
-            self.nodes.lock().unwrap().take().unwrap(),
+            socket,
         ));
 
+        // Todo: Check that it is done bootstrapping.
         self.bootstrap().await;
-        while !self.is_bootstrapped().await {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
-
-        // TODO: this will be refactored soon
-        let mut socket_rx = self.socket_rx.lock().unwrap().take().unwrap();
-        let shutdown_notify = self.shutdown_notify.clone();
-        let handler_tx = self.handler_tx.clone();
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    task = socket_rx.recv() => {
-                        if let Some(task) = task {
-                            match task.request.clone() {
-                                DhtRequest::Get { prefix: _, key } => {
-                                    let entry = Dht::<T>::get(handler_tx.clone(), &key).await;
-                                    task.respond(DhtResponse::Get(entry));
-                                }
-                                DhtRequest::Put { prefix: _, key, value } => {
-                                    Dht::<T>::put(handler_tx.clone(), &key, &value);
-                                    task.respond(DhtResponse::Put(()));
-                                }
-                            }
-                        }
-
-                    }
-                    _ = shutdown_notify.notified() => {
-                        break;
-                    }
-                }
-            }
-        });
 
         *self.is_running.lock().unwrap() = true;
     }

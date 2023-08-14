@@ -13,23 +13,13 @@ use tokio::{
 };
 
 use crate::{
-    handler::NO_REPLY_CHANNEL_ID,
     query::{Message, MessageType, Query},
     socket,
     table::TableKey,
     task::Task,
 };
 
-pub enum DhtRequest {
-    Get {
-        key: Vec<u8>,
-        tx: oneshot::Sender<Result<Option<TableEntry>>>,
-    },
-    Put {
-        key: Vec<u8>,
-        value: Vec<u8>,
-    },
-}
+pub const NO_REPLY_CHANNEL_ID: u64 = 0;
 
 pub async fn start_worker(
     mut rx: Receiver<DhtRequest>,
@@ -80,6 +70,17 @@ pub async fn start_worker(
             }
         }
     }
+}
+
+pub enum DhtRequest {
+    Get {
+        key: Vec<u8>,
+        tx: oneshot::Sender<Result<Option<TableEntry>>>,
+    },
+    Put {
+        key: Vec<u8>,
+        value: Vec<u8>,
+    },
 }
 
 #[derive(Clone)]
