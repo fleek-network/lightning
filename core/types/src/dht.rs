@@ -1,8 +1,6 @@
 use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSignature, PublicKey};
-use ink_quill::TranscriptBuilder;
+use ink_quill::{ToDigest, TranscriptBuilder};
 use serde::{Deserialize, Serialize};
-
-use crate::ToDigest;
 
 const FN_DHT_ENTRY_DOMAIN: &str = "FLEEK_NETWORK_DHT_ENTRY";
 

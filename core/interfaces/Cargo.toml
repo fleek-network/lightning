@@ -19,18 +19,18 @@ multiaddr = "0.17.1"
 num-bigint = { workspace = true, features=["serde"]}
 num-traits.workspace = true
 num-derive.workspace = true
-blake3-tree = { path = "../../lib/blake3-tree"}
 derive_more = "0.99"
 
 
 # Our libraries
+lightning-schema = { path = "../schema/" }
+lightning-types.workspace = true
 affair.workspace = true
 atomo.workspace = true
 fleek-crypto.workspace = true
 hp-fixed.workspace = true
 ink-quill.workspace = true
-lightning-schema = { path = "../schema/" }
-
+blake3-tree = { path = "../../lib/blake3-tree"}
 
 [features]
 e2e-test = []

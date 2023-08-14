@@ -3464,6 +3464,7 @@ dependencies = [
  "hp-fixed",
  "ink-quill",
  "lightning-schema",
+ "lightning-types",
  "multiaddr",
  "num-bigint",
  "num-derive",
@@ -3628,6 +3629,7 @@ dependencies = [
  "fleek-crypto",
  "flexbuffers",
  "ink-quill",
+ "lightning-types",
  "serde",
 ]
 
@@ -3694,6 +3696,21 @@ dependencies = [
  "serde_json",
  "simulon",
  "tokio",
+]
+
+[[package]]
+name = "lightning-types"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "fleek-crypto",
+ "hp-fixed",
+ "ink-quill",
+ "multiaddr",
+ "num-bigint",
+ "num-derive",
+ "num-traits",
+ "serde",
 ]
 
 [[package]]

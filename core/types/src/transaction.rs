@@ -5,7 +5,7 @@ use fleek_crypto::{
     TransactionSignature,
 };
 use hp_fixed::unsigned::HpUfixed;
-use ink_quill::{TranscriptBuilder, TranscriptBuilderInput};
+use ink_quill::{ToDigest, TranscriptBuilder, TranscriptBuilderInput};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +13,6 @@ use super::{
     DeliveryAcknowledgment, Epoch, ProofOfConsensus, ProofOfMisbehavior, ProtocolParams,
     ReputationMeasurements, Service, ServiceId, Tokens,
 };
-use crate::ToDigest;
 
 // TODO: Change this to capital and non-abrv version.
 const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";

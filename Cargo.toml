@@ -40,6 +40,7 @@ log = "0.4"
 lazy_static = "1.4.0"
 
 # Our libraries
+lightning-types = { path = "core/types" }
 affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
 fleek-crypto = { path = "lib/fleek-crypto" }

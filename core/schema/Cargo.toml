@@ -10,5 +10,6 @@ serde.workspace = true
 anyhow.workspace = true
 fleek-crypto.workspace = true
 ink-quill.workspace = true
+lightning-types.workspace = true
 
 flexbuffers = "2.0"
