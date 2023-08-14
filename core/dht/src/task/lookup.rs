@@ -204,10 +204,6 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
     }
 }
 
-#[derive(Debug, Error)]
-#[error("lookup procedure failed: {0}")]
-pub struct LookUpError(String);
-
 pub struct LookupTask {
     // Task identifier.
     id: u64,
@@ -320,11 +316,6 @@ enum Status {
 pub struct LookupNode {
     inner: NodeInfo,
     status: Status,
-}
-
-pub enum LookupResult {
-    Nodes(Vec<NodeInfo>),
-    Value(Option<Vec<u8>>),
 }
 
 #[derive(Debug)]

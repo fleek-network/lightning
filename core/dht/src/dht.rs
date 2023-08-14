@@ -195,7 +195,9 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
             .expect("Binding to socket failed");
         tracing::info!("UDP socket bound to {:?}", socket.local_addr().unwrap());
 
+        let (newtask_tx, _) = mpsc::channel(self.buffer_size);
         tokio::spawn(handler::start_worker(
+            newtask_tx,
             self.handler_rx.lock().unwrap().take().unwrap(),
             table_tx.clone(),
             worker_tx,

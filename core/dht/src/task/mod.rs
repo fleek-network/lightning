@@ -21,7 +21,7 @@ use crate::{
     task::lookup::LookupTask,
 };
 
-async fn start_worker(
+pub async fn start_worker(
     mut rx: Receiver<Task>,
     mut network_event: Receiver<ResponseEvent>,
     socket: Arc<UdpSocket>,
@@ -51,11 +51,11 @@ async fn start_worker(
     }
 }
 
-enum Task {
+pub enum Task {
     Bootstrap,
     Lookup {
         target: TableKey,
-        tx: oneshot::Sender<Option<Vec<NodeInfo>>>,
+        tx: oneshot::Sender<TaskResponse>,
     },
     Ping {
         target: TableKey,
@@ -68,6 +68,7 @@ pub struct TaskResponse {
     pub nodes: Vec<NodeInfo>,
     pub value: Option<Vec<u8>>,
     pub rtt: Option<usize>,
+    pub source: Option<NodeNetworkingPublicKey>,
 }
 
 struct TaskManager {
@@ -133,7 +134,7 @@ struct OngoingTask {
     /// Send network event to task.
     tx: Sender<ResponseEvent>,
     /// Send back response to client.
-    response_tx: oneshot::Sender<Option<Vec<NodeInfo>>>,
+    response_tx: oneshot::Sender<TaskResponse>,
 }
 
 #[derive(Debug)]
