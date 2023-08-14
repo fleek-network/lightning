@@ -79,7 +79,7 @@ impl<S: SerdeBackend> Atomo<QueryPerm, S> {
     /// Run a query on the database.
     pub fn run<F, R>(&self, query: F) -> R
     where
-        F: Fn(&mut TableSelector<S>) -> R,
+        F: FnOnce(&mut TableSelector<S>) -> R,
     {
         let mut selector = TableSelector::new(self.inner.clone());
         query(&mut selector)
@@ -90,7 +90,7 @@ impl<S: SerdeBackend> Atomo<UpdatePerm, S> {
     /// Run an update on the database.
     pub fn run<F, R>(&mut self, mutation: F) -> R
     where
-        F: Fn(&mut TableSelector<S>) -> R,
+        F: FnOnce(&mut TableSelector<S>) -> R,
     {
         let mut selector = TableSelector::new(self.inner.clone());
         let response = mutation(&mut selector);

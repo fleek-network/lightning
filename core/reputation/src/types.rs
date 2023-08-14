@@ -3,9 +3,8 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use fleek_crypto::NodePublicKey;
 use hp_fixed::signed::HpFixed;
-use lightning_interfaces::types::ReputationMeasurements;
+use lightning_interfaces::types::{NodeIndex, ReputationMeasurements};
 
 use crate::{statistics, PRECISION};
 
@@ -301,8 +300,8 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
     }
 }
 
-impl From<&HashMap<NodePublicKey, NormalizedMeasurements>> for MinMaxValues {
-    fn from(normalized_measurements: &HashMap<NodePublicKey, NormalizedMeasurements>) -> Self {
+impl From<&HashMap<NodeIndex, NormalizedMeasurements>> for MinMaxValues {
+    fn from(normalized_measurements: &HashMap<NodeIndex, NormalizedMeasurements>) -> Self {
         let min_values = Values {
             latency: HpFixed::<PRECISION>::from(f64::MAX),
             interactions: HpFixed::<PRECISION>::from(f64::MAX),

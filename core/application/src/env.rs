@@ -2,12 +2,15 @@ use std::time::{Duration, SystemTime};
 
 use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
-use fleek_crypto::{AccountOwnerPublicKey, ClientPublicKey, EthAddress, NodePublicKey, PublicKey};
+use fleek_crypto::{
+    AccountOwnerPublicKey, ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodePublicKey,
+    PublicKey,
+};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
     AccountInfo, Block, BlockExecutionResponse, Committee, CommodityTypes, Epoch, ExecutionData,
-    Metadata, NodeInfo, NodeServed, ProtocolParams, ReportedReputationMeasurements, Service,
-    ServiceId, ServiceRevenue, TotalServed, TransactionResponse, Value,
+    Metadata, NodeIndex, NodeInfo, NodeServed, ProtocolParams, ReportedReputationMeasurements,
+    Service, ServiceId, ServiceRevenue, TotalServed, TransactionResponse, Value,
 };
 
 use crate::{
@@ -28,17 +31,17 @@ impl Env<UpdatePerm> {
             .with_table::<Metadata, Value>("metadata")
             .with_table::<EthAddress, AccountInfo>("account")
             .with_table::<ClientPublicKey, EthAddress>("client_keys")
-            .with_table::<NodePublicKey, NodeInfo>("node")
-            .with_table::<NodePublicKey, u32>("pubkey_to_index")
-            .with_table::<u32, NodePublicKey>("index_to_pubkey")
-            .with_table::<(u32, u32), Duration>("latencies")
+            .with_table::<NodeIndex, NodeInfo>("node")
+            .with_table::<NodePublicKey, u32>("bls_to_index")
+            .with_table::<NodeNetworkingPublicKey, u32>("networking_to_index")
+            .with_table::<(NodeIndex, NodeIndex), Duration>("latencies")
             .with_table::<Epoch, Committee>("committee")
             .with_table::<ServiceId, Service>("service")
             .with_table::<ProtocolParams, u128>("parameter")
-            .with_table::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements")
-            .with_table::<NodePublicKey, u8>("rep_scores")
-            .with_table::<NodePublicKey, NodeServed>("current_epoch_served")
-            .with_table::<NodePublicKey, NodeServed>("last_epoch_served")
+            .with_table::<NodeIndex, Vec<ReportedReputationMeasurements>>("rep_measurements")
+            .with_table::<NodeIndex, u8>("rep_scores")
+            .with_table::<NodeIndex, NodeServed>("current_epoch_served")
+            .with_table::<NodeIndex, NodeServed>("last_epoch_served")
             .with_table::<Epoch, TotalServed>("total_served")
             .with_table::<CommodityTypes, HpUfixed<6>>("commodity_prices")
             .with_table::<ServiceId, ServiceRevenue>("service_revenue")
@@ -52,8 +55,8 @@ impl Env<UpdatePerm> {
         #[cfg(debug_assertions)]
         {
             atomo = atomo
-                .enable_iter("pubkey_to_index")
-                .enable_iter("index_to_pubkey");
+                .enable_iter("bls_to_index")
+                .enable_iter("networking_to_index");
         }
 
         Self {
@@ -130,7 +133,7 @@ impl Env<UpdatePerm> {
                 Mode::Prod => (),
             }
 
-            let mut node_table = ctx.get_table::<NodePublicKey, NodeInfo>("node");
+            let mut node_table = ctx.get_table::<NodeIndex, NodeInfo>("node");
             let mut account_table = ctx.get_table::<EthAddress, AccountInfo>("account");
             let mut service_table = ctx.get_table::<ServiceId, Service>("service");
             let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
@@ -138,14 +141,14 @@ impl Env<UpdatePerm> {
             let mut metadata_table = ctx.get_table::<Metadata, Value>("metadata");
             let mut commodity_prices_table =
                 ctx.get_table::<CommodityTypes, HpUfixed<6>>("commodity_prices");
-            let mut rep_scores_table = ctx.get_table::<NodePublicKey, u8>("rep_scores");
+            let mut rep_scores_table = ctx.get_table::<NodeIndex, u8>("rep_scores");
             let mut total_served_table = ctx.get_table::<Epoch, TotalServed>("total_served");
             let mut current_epoch_served_table =
-                ctx.get_table::<NodePublicKey, NodeServed>("current_epoch_served");
+                ctx.get_table::<NodeIndex, NodeServed>("current_epoch_served");
             let mut latencies_table =
-                ctx.get_table::<(u32, u32), Duration>("latencies");
-            let mut pubkey_to_index_table = ctx.get_table::<NodePublicKey, u32>("pubkey_to_index");
-            let mut index_to_pubkey_table = ctx.get_table::<u32, NodePublicKey>("index_to_pubkey");
+                ctx.get_table::<(NodeIndex, NodeIndex), Duration>("latencies");
+            let mut bls_to_index_table = ctx.get_table::<NodePublicKey, u32>("bls_to_index");
+            let mut networking_to_index_table = ctx.get_table::<NodeNetworkingPublicKey, u32>("networking_to_index");
 
             let protocol_fund_address =
                 AccountOwnerPublicKey::from_base64(&genesis.protocol_fund_address).unwrap();
@@ -206,15 +209,16 @@ impl Env<UpdatePerm> {
             for node in &genesis.committee {
                 let mut node_info: NodeInfo = node.into();
                 node_info.stake.staked = HpUfixed::<18>::from(genesis.min_stake);
-                committee_members.push(node_info.public_key);
 
                 let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
                     Some(Value::NextNodeIndex(index)) => index,
                     _ => 0,
                 };
-                pubkey_to_index_table.insert(node_info.public_key, node_index);
-                index_to_pubkey_table.insert(node_index, node_info.public_key);
-                node_table.insert(node_info.public_key, node_info);
+                committee_members.push(node_index);
+
+                bls_to_index_table.insert(node_info.public_key, node_index);
+                networking_to_index_table.insert(node_info.network_key, node_index);
+                node_table.insert(node_index, node_info);
                 metadata_table.insert(
                     Metadata::NextNodeIndex,
                     Value::NextNodeIndex(node_index + 1),
@@ -261,20 +265,32 @@ impl Env<UpdatePerm> {
 
             // add reputation scores
             for (node_public_key_b64, rep_score) in genesis.rep_scores {
+                // Todo(dalton): We should rework this to use NodeIndex instead of nodePublic key
                 let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
                     .expect("Failed to parse node public key from genesis.");
                 assert!(
                     (0..=100).contains(&rep_score),
                     "Reputation scores must be in range [0, 100]."
                 );
-                rep_scores_table.insert(node_public_key, rep_score);
+                let index = bls_to_index_table.get(node_public_key).unwrap();
+                rep_scores_table.insert(index, rep_score);
             }
 
             // add node info
-            for (node_public_key_b64, node_info) in genesis.node_info {
-                let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
-                    .expect("Failed to parse node public key from genesis.");
-                node_table.insert(node_public_key, node_info);
+            for (_, node_info) in genesis.node_info {
+                // let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
+                //     .expect("Failed to parse node public key from genesis.");
+                let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
+                    Some(Value::NextNodeIndex(index)) => index,
+                    _ => 0,
+                };
+                bls_to_index_table.insert(node_info.public_key, node_index);
+                networking_to_index_table.insert(node_info.network_key, node_index);
+                node_table.insert(node_index, node_info);
+                metadata_table.insert(
+                    Metadata::NextNodeIndex,
+                    Value::NextNodeIndex(node_index + 1),
+                );
             }
 
             // add total served
@@ -286,7 +302,8 @@ impl Env<UpdatePerm> {
             for (node_public_key_b64, commodity_served) in genesis.current_epoch_served {
                 let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
                     .expect("Failed to parse node public key from genesis.");
-                current_epoch_served_table.insert(node_public_key, commodity_served);
+                let index = bls_to_index_table.get(node_public_key).expect("Node added to genesis epoch served without node info");
+                current_epoch_served_table.insert(index, commodity_served);
             }
 
             // add latencies
@@ -298,9 +315,9 @@ impl Env<UpdatePerm> {
                         .expect("Failed to parse node public key from genesis.");
                     assert!(node_public_key_lhs < node_public_key_rhs,
                         "Invalid latency entry, node_public_key_lhs must be smaller than node_public_key_rhs");
-                    let index_lhs = pubkey_to_index_table.get(node_public_key_lhs)
+                    let index_lhs = bls_to_index_table.get(node_public_key_lhs)
                         .expect("Invalid latency entry, node doesn't have an index.");
-                    let index_rhs = pubkey_to_index_table.get(node_public_key_rhs)
+                    let index_rhs = bls_to_index_table.get(node_public_key_rhs)
                         .expect("Invalid latency entry, node doesn't have an index.");
                     latencies_table.insert(
                         (index_lhs, index_rhs),

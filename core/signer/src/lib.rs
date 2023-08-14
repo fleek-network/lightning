@@ -305,7 +305,7 @@ impl SignerInner {
                     let digest = update_payload.to_digest();
                     let signature = self.node_secret_key.sign(&digest);
                     let update_request = UpdateRequest {
-                        sender:  TransactionSender::Node(self.node_public_key),
+                        sender:  TransactionSender::NodeBLS(self.node_public_key),
                         signature: signature.into(),
                         payload: update_payload,
                     };

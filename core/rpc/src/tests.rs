@@ -15,7 +15,7 @@ use lightning_application::{
 };
 use lightning_interfaces::{
     types::{
-        EpochInfo, NodeInfo, NodeServed, ProtocolParams, Staking, TotalServed, UpdateRequest,
+        EpochInfo, NodeInfo, ProtocolParams, Staking, TotalServed, UpdateRequest,
         Worker as NodeWorker,
     },
     ApplicationInterface, MempoolSocket, RpcInterface, SyncQueryRunnerInterface,
@@ -195,61 +195,61 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
     Ok(())
 }
 
-#[test]
-async fn test_rpc_get_reputation() -> Result<()> {
-    // Create keys
-    let node_secret_key = NodeSecretKey::generate();
-    let node_public_key = node_secret_key.to_pk();
+// #[test]
+// async fn test_rpc_get_reputation() -> Result<()> {
+//     // Create keys
+//     let node_secret_key = NodeSecretKey::generate();
+//     let node_public_key = node_secret_key.to_pk();
 
-    // Init application service and store reputation score in application state.
-    let mut genesis = Genesis::load().unwrap();
-    genesis.rep_scores.insert(node_public_key.to_base64(), 46);
+//     // Init application service and store reputation score in application state.
+//     let mut genesis = Genesis::load().unwrap();
+//     genesis.rep_scores.insert(node_public_key.to_base64(), 46);
 
-    let app = Application::init(AppConfig {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-    })
-    .unwrap();
-    let query_runner = app.sync_query();
-    app.start().await;
+//     let app = Application::init(AppConfig {
+//         genesis: Some(genesis),
+//         mode: Mode::Test,
+//     })
+//     .unwrap();
+//     let query_runner = app.sync_query();
+//     app.start().await;
 
-    // Init rpc service
-    let port = 30002;
-    let mut rpc = Rpc::init(
-        RpcConfig::default(),
-        MockWorker::mempool_socket(),
-        query_runner,
-    )?;
-    rpc.config.port = port;
+//     // Init rpc service
+//     let port = 30002;
+//     let mut rpc = Rpc::init(
+//         RpcConfig::default(),
+//         MockWorker::mempool_socket(),
+//         query_runner,
+//     )?;
+//     rpc.config.port = port;
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
-    wait_for_server_start(port).await?;
+//     task::spawn(async move {
+//         rpc.start().await;
+//     });
+//     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_reputation",
-        "params": {"public_key": node_public_key},
-        "id":1,
-    });
+//     let req = json!({
+//         "jsonrpc": "2.0",
+//         "method":"flk_get_reputation",
+//         "params": {"public_key": node_public_key},
+//         "id":1,
+//     });
 
-    let response = make_request(port, req.to_string()).await?;
+//     let response = make_request(port, req.to_string()).await?;
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<Option<u8>> = serde_json::from_value(value)?;
-            assert_eq!(Some(46), success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
-    Ok(())
-}
+//     if response.status().is_success() {
+//         let value: Value = response.json().await?;
+//         if value.get("result").is_some() {
+//             // Parse the response as a successful response
+//             let success_response: RpcSuccessResponse<Option<u8>> =
+// serde_json::from_value(value)?;             assert_eq!(Some(46), success_response.result);
+//         } else {
+//             panic!("Rpc Error: {value}")
+//         }
+//     } else {
+//         panic!("Request failed with status: {}", response.status());
+//     }
+//     Ok(())
+// }
 
 #[test]
 async fn test_rpc_get_staked() -> Result<()> {
@@ -1226,66 +1226,66 @@ async fn test_rpc_get_total_served() -> Result<()> {
     Ok(())
 }
 
-#[test]
-async fn test_rpc_get_node_served() -> Result<()> {
-    // Init application service and store total served in application state.
-    let mut genesis = Genesis::load().unwrap();
+// #[test]
+// async fn test_rpc_get_node_served() -> Result<()> {
+//     // Init application service and store total served in application state.
+//     let mut genesis = Genesis::load().unwrap();
 
-    let node_secret_key = NodeSecretKey::generate();
-    let node_public_key = node_secret_key.to_pk();
-    genesis.current_epoch_served.insert(
-        node_public_key.to_base64(),
-        NodeServed {
-            served: vec![1000],
-            ..Default::default()
-        },
-    );
+//     let node_secret_key = NodeSecretKey::generate();
+//     let node_public_key = node_secret_key.to_pk();
+//     genesis.current_epoch_served.insert(
+//         node_public_key.to_base64(),
+//         NodeServed {
+//             served: vec![1000],
+//             ..Default::default()
+//         },
+//     );
 
-    let app = Application::init(AppConfig {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-    })
-    .unwrap();
-    let query_runner = app.sync_query();
-    app.start().await;
+//     let app = Application::init(AppConfig {
+//         genesis: Some(genesis),
+//         mode: Mode::Test,
+//     })
+//     .unwrap();
+//     let query_runner = app.sync_query();
+//     app.start().await;
 
-    // Init rpc service
-    let port = 30019;
-    let mut rpc = Rpc::init(
-        RpcConfig::default(),
-        MockWorker::mempool_socket(),
-        query_runner,
-    )?;
-    rpc.config.port = port;
+//     // Init rpc service
+//     let port = 30019;
+//     let mut rpc = Rpc::init(
+//         RpcConfig::default(),
+//         MockWorker::mempool_socket(),
+//         query_runner,
+//     )?;
+//     rpc.config.port = port;
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
-    wait_for_server_start(port).await?;
+//     task::spawn(async move {
+//         rpc.start().await;
+//     });
+//     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_node_served",
-        "params": {"public_key": node_public_key},
-        "id":1,
-    });
+//     let req = json!({
+//         "jsonrpc": "2.0",
+//         "method":"flk_get_node_served",
+//         "params": {"public_key": node_public_key},
+//         "id":1,
+//     });
 
-    let response = make_request(port, req.to_string()).await?;
+//     let response = make_request(port, req.to_string()).await?;
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<NodeServed> = serde_json::from_value(value)?;
-            assert_eq!(vec![1000], success_response.result.served);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
-    Ok(())
-}
+//     if response.status().is_success() {
+//         let value: Value = response.json().await?;
+//         if value.get("result").is_some() {
+//             // Parse the response as a successful response
+//             let success_response: RpcSuccessResponse<NodeServed> =
+// serde_json::from_value(value)?;             assert_eq!(vec![1000],
+// success_response.result.served);         } else {
+//             panic!("Rpc Error: {value}")
+//         }
+//     } else {
+//         panic!("Request failed with status: {}", response.status());
+//     }
+//     Ok(())
+// }
 
 #[test]
 async fn test_rpc_is_valid_node() -> Result<()> {

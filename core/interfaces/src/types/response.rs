@@ -53,4 +53,5 @@ pub enum ExecutionError {
     LockedTokensUnstakeForbidden,
     EpochAlreadyChanged,
     EpochHasNotStarted,
+    NetworkingKeyAlreadyIndexed,
 }

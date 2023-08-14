@@ -6,9 +6,9 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::{
     application::SyncQueryRunnerInterface,
     types::{
-        AccountInfo, Committee, CommodityTypes, Epoch, EpochInfo, Metadata, NodeInfo, NodeServed,
-        ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, ServiceRevenue,
-        TotalServed, TransactionResponse, UpdateRequest, Value,
+        AccountInfo, Committee, CommodityTypes, Epoch, EpochInfo, Metadata, NodeIndex, NodeInfo,
+        NodeServed, ProtocolParams, ReportedReputationMeasurements, Service, ServiceId,
+        ServiceRevenue, TotalServed, TransactionResponse, UpdateRequest, Value,
     },
 };
 
@@ -20,17 +20,16 @@ pub struct QueryRunner {
     metadata_table: ResolvedTableReference<Metadata, Value>,
     account_table: ResolvedTableReference<EthAddress, AccountInfo>,
     client_table: ResolvedTableReference<ClientPublicKey, EthAddress>,
-    node_table: ResolvedTableReference<NodePublicKey, NodeInfo>,
-    pubkey_to_index: ResolvedTableReference<NodePublicKey, u32>,
-    index_to_pubkey: ResolvedTableReference<u32, NodePublicKey>,
+    node_table: ResolvedTableReference<NodeIndex, NodeInfo>,
+    bls_to_index: ResolvedTableReference<NodePublicKey, u32>,
     committee_table: ResolvedTableReference<Epoch, Committee>,
     services_table: ResolvedTableReference<ServiceId, Service>,
     param_table: ResolvedTableReference<ProtocolParams, u128>,
-    current_epoch_served: ResolvedTableReference<NodePublicKey, NodeServed>,
-    rep_measurements: ResolvedTableReference<NodePublicKey, Vec<ReportedReputationMeasurements>>,
-    latencies: ResolvedTableReference<(u32, u32), Duration>,
-    rep_scores: ResolvedTableReference<NodePublicKey, u8>,
-    _last_epoch_served: ResolvedTableReference<NodePublicKey, NodeServed>,
+    current_epoch_served: ResolvedTableReference<NodeIndex, NodeServed>,
+    rep_measurements: ResolvedTableReference<NodeIndex, Vec<ReportedReputationMeasurements>>,
+    latencies: ResolvedTableReference<(NodeIndex, NodeIndex), Duration>,
+    rep_scores: ResolvedTableReference<NodeIndex, u8>,
+    _last_epoch_served: ResolvedTableReference<NodeIndex, NodeServed>,
     total_served_table: ResolvedTableReference<Epoch, TotalServed>,
     _service_revenue: ResolvedTableReference<ServiceId, ServiceRevenue>,
     _commodity_price: ResolvedTableReference<CommodityTypes, HpUfixed<6>>,
@@ -42,24 +41,36 @@ impl QueryRunner {
             metadata_table: atomo.resolve::<Metadata, Value>("metadata"),
             account_table: atomo.resolve::<EthAddress, AccountInfo>("account"),
             client_table: atomo.resolve::<ClientPublicKey, EthAddress>("client_keys"),
-            node_table: atomo.resolve::<NodePublicKey, NodeInfo>("node"),
-            pubkey_to_index: atomo.resolve::<NodePublicKey, u32>("pubkey_to_index"),
-            index_to_pubkey: atomo.resolve::<u32, NodePublicKey>("index_to_pubkey"),
+            node_table: atomo.resolve::<NodeIndex, NodeInfo>("node"),
+            bls_to_index: atomo.resolve::<NodePublicKey, u32>("bls_to_index"),
             committee_table: atomo.resolve::<Epoch, Committee>("committee"),
             services_table: atomo.resolve::<ServiceId, Service>("service"),
             param_table: atomo.resolve::<ProtocolParams, u128>("parameter"),
-            current_epoch_served: atomo
-                .resolve::<NodePublicKey, NodeServed>("current_epoch_served"),
+            current_epoch_served: atomo.resolve::<NodeIndex, NodeServed>("current_epoch_served"),
             rep_measurements: atomo
-                .resolve::<NodePublicKey, Vec<ReportedReputationMeasurements>>("rep_measurements"),
-            latencies: atomo.resolve::<(u32, u32), Duration>("latencies"),
-            rep_scores: atomo.resolve::<NodePublicKey, u8>("rep_scores"),
-            _last_epoch_served: atomo.resolve::<NodePublicKey, NodeServed>("last_epoch_served"),
+                .resolve::<NodeIndex, Vec<ReportedReputationMeasurements>>("rep_measurements"),
+            latencies: atomo.resolve::<(NodeIndex, NodeIndex), Duration>("latencies"),
+            rep_scores: atomo.resolve::<NodeIndex, u8>("rep_scores"),
+            _last_epoch_served: atomo.resolve::<NodeIndex, NodeServed>("last_epoch_served"),
             total_served_table: atomo.resolve::<Epoch, TotalServed>("total_served"),
             _commodity_price: atomo.resolve::<CommodityTypes, HpUfixed<6>>("commodity_prices"),
             _service_revenue: atomo.resolve::<ServiceId, ServiceRevenue>("service_revenue"),
             inner: atomo,
         }
+    }
+
+    fn get_node_info_with_bls<F: FnOnce(NodeInfo) -> T, T>(
+        &self,
+        public_key: &NodePublicKey,
+        f: F,
+    ) -> Option<T> {
+        self.inner.run(|ctx| {
+            self.bls_to_index
+                .get(ctx)
+                .get(public_key)
+                .map(|index| self.node_table.get(ctx).get(index).map(f))
+                .unwrap_or(None)
+        })
     }
 }
 
@@ -108,52 +119,42 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     fn get_staked(&self, node: &NodePublicKey) -> HpUfixed<18> {
-        self.inner.run(|ctx| {
-            self.node_table
-                .get(ctx)
-                .get(node)
-                .map(|node| node.stake.staked)
-                .unwrap_or(HpUfixed::zero())
-        })
+        self.get_node_info_with_bls(node, |node_info| node_info.stake.staked)
+            .unwrap_or(HpUfixed::zero())
     }
 
     fn get_locked(&self, node: &NodePublicKey) -> HpUfixed<18> {
-        self.inner.run(|ctx| {
-            self.node_table
-                .get(ctx)
-                .get(node)
-                .map(|node| node.stake.locked)
-                .unwrap_or(HpUfixed::zero())
-        })
+        self.get_node_info_with_bls(node, |node_info| node_info.stake.locked)
+            .unwrap_or(HpUfixed::zero())
     }
 
     fn get_stake_locked_until(&self, node: &NodePublicKey) -> Epoch {
-        self.inner.run(|ctx| {
-            self.node_table
-                .get(ctx)
-                .get(node)
-                .map(|node| node.stake.stake_locked_until)
-                .unwrap_or(0)
-        })
+        self.get_node_info_with_bls(node, |node_info| node_info.stake.stake_locked_until)
+            .unwrap_or(0)
     }
 
     fn get_locked_time(&self, node: &NodePublicKey) -> Epoch {
-        self.inner.run(|ctx| {
-            self.node_table
-                .get(ctx)
-                .get(node)
-                .map(|node| node.stake.locked_until)
-                .unwrap_or(0)
-        })
+        self.get_node_info_with_bls(node, |node_info| node_info.stake.locked_until)
+            .unwrap_or(0)
     }
 
     fn get_rep_measurements(&self, node: NodePublicKey) -> Vec<ReportedReputationMeasurements> {
-        self.inner
-            .run(|ctx| self.rep_measurements.get(ctx).get(node).unwrap_or(vec![]))
+        self.inner.run(|ctx| {
+            self.bls_to_index
+                .get(ctx)
+                .get(node)
+                .map(|index| self.rep_measurements.get(ctx).get(index).unwrap_or(vec![]))
+                .unwrap_or(vec![])
+        })
     }
 
     fn get_reputation(&self, node: &NodePublicKey) -> Option<u8> {
-        self.inner.run(|ctx| self.rep_scores.get(ctx).get(node))
+        self.inner.run(|ctx| {
+            self.bls_to_index
+                .get(ctx)
+                .get(node)
+                .and_then(|index| self.rep_scores.get(ctx).get(index))
+        })
     }
 
     fn get_relative_score(&self, _n1: &NodePublicKey, _n2: &NodePublicKey) -> u128 {
@@ -161,19 +162,19 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     fn get_node_info(&self, id: &NodePublicKey) -> Option<NodeInfo> {
-        self.inner.run(|ctx| self.node_table.get(ctx).get(id))
+        self.get_node_info_with_bls(id, |node_info| node_info)
     }
 
     fn get_node_registry(&self) -> Vec<NodeInfo> {
-        let public_keys: Vec<NodePublicKey> = self
-            .inner
-            .run(|ctx| self.node_table.get(ctx).keys())
-            .collect();
-        public_keys
-            .into_iter()
-            .filter(|node| self.is_valid_node(node))
-            .filter_map(|node| self.inner.run(|ctx| self.node_table.get(ctx).get(node)))
-            .collect()
+        let staking_amount: HpUfixed<18> = self.get_staking_amount().into();
+        self.inner.run(|ctx| {
+            let node_table = self.node_table.get(ctx);
+            node_table
+                .keys()
+                .map(|index| node_table.get(index).unwrap())
+                .filter(|node| node.stake.staked >= staking_amount)
+                .collect()
+        })
     }
 
     fn is_valid_node(&self, id: &NodePublicKey) -> bool {
@@ -212,6 +213,14 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 .get(epoch)
                 .map(|c| c.members)
                 .unwrap_or_default()
+                .into_iter()
+                .filter_map(|index| {
+                    self.node_table
+                        .get(ctx)
+                        .get(index)
+                        .map(|node| node.public_key)
+                })
+                .collect()
         })
     }
 
@@ -260,9 +269,15 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     fn get_node_served(&self, node: &NodePublicKey) -> NodeServed {
         self.inner.run(|ctx| {
-            self.current_epoch_served
+            self.bls_to_index
                 .get(ctx)
                 .get(node)
+                .map(|index| {
+                    self.current_epoch_served
+                        .get(ctx)
+                        .get(index)
+                        .unwrap_or_default()
+                })
                 .unwrap_or_default()
         })
     }
@@ -349,12 +364,15 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     fn pubkey_to_index(&self, node: NodePublicKey) -> Option<u32> {
-        self.inner
-            .run(|ctx| self.pubkey_to_index.get(ctx).get(node))
+        self.inner.run(|ctx| self.bls_to_index.get(ctx).get(node))
     }
 
     fn index_to_pubkey(&self, node_index: u32) -> Option<NodePublicKey> {
-        self.inner
-            .run(|ctx| self.index_to_pubkey.get(ctx).get(node_index))
+        self.inner.run(|ctx| {
+            self.node_table
+                .get(ctx)
+                .get(node_index)
+                .map(|info| info.public_key)
+        })
     }
 }

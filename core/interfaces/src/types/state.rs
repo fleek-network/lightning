@@ -15,6 +15,9 @@ pub type ServiceId = u32;
 /// Application epoch number
 pub type Epoch = u64;
 
+/// A nodes index
+pub type NodeIndex = u32;
+
 #[derive(Serialize, Deserialize, Hash, Debug, Clone)]
 pub enum Tokens {
     USDC,
@@ -50,8 +53,7 @@ pub enum CommodityTypes {
 
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
 pub struct ReportedReputationMeasurements {
-    // TODO: Use NodeIndex instead.
-    pub reporting_node: NodePublicKey,
+    pub reporting_node: NodeIndex,
     pub measurements: ReputationMeasurements,
 }
 
@@ -164,8 +166,8 @@ pub struct Service {
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
 pub struct Committee {
-    pub members: Vec<NodePublicKey>,
-    pub ready_to_change: Vec<NodePublicKey>,
+    pub members: Vec<NodeIndex>,
+    pub ready_to_change: Vec<NodeIndex>,
     pub epoch_end_timestamp: u64,
 }
 

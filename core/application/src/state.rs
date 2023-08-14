@@ -5,18 +5,17 @@ use std::{
 };
 
 use fleek_crypto::{
-    ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodePublicKey, PublicKey,
-    TransactionSender, TransactionSignature,
+    ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodePublicKey, TransactionSender,
 };
 use hp_fixed::unsigned::HpUfixed;
 use lazy_static::lazy_static;
 use lightning_interfaces::{
     types::{
         AccountInfo, Committee, CommodityTypes, DeliveryAcknowledgment, Epoch, ExecutionData,
-        ExecutionError, Metadata, NodeInfo, NodeServed, ProofOfConsensus, ProofOfMisbehavior,
-        ProtocolParams, ReportedReputationMeasurements, ReputationMeasurements, Service, ServiceId,
-        ServiceRevenue, Staking, Tokens, TotalServed, TransactionResponse, UpdateMethod,
-        UpdateRequest, Value, Worker,
+        ExecutionError, Metadata, NodeIndex, NodeInfo, NodeServed, ProofOfConsensus,
+        ProofOfMisbehavior, ProtocolParams, ReportedReputationMeasurements, ReputationMeasurements,
+        Service, ServiceId, ServiceRevenue, Staking, Tokens, TotalServed, TransactionResponse,
+        UpdateMethod, UpdateRequest, Value, Worker,
     },
     ToDigest,
 };
@@ -57,17 +56,17 @@ pub struct State<B: Backend> {
     pub metadata: B::Ref<Metadata, Value>,
     pub account_info: B::Ref<EthAddress, AccountInfo>,
     pub client_keys: B::Ref<ClientPublicKey, EthAddress>,
-    pub node_info: B::Ref<NodePublicKey, NodeInfo>,
-    pub pubkey_to_index: B::Ref<NodePublicKey, u32>,
-    pub index_to_pubkey: B::Ref<u32, NodePublicKey>,
-    pub latencies: B::Ref<(u32, u32), Duration>,
+    pub node_info: B::Ref<NodeIndex, NodeInfo>,
+    pub bls_to_index: B::Ref<NodePublicKey, NodeIndex>,
+    pub networking_to_index: B::Ref<NodeNetworkingPublicKey, NodeIndex>,
+    pub latencies: B::Ref<(NodeIndex, NodeIndex), Duration>,
     pub committee_info: B::Ref<Epoch, Committee>,
     pub services: B::Ref<ServiceId, Service>,
     pub parameters: B::Ref<ProtocolParams, u128>,
-    pub rep_measurements: B::Ref<NodePublicKey, Vec<ReportedReputationMeasurements>>,
-    pub rep_scores: B::Ref<NodePublicKey, u8>,
-    pub current_epoch_served: B::Ref<NodePublicKey, NodeServed>,
-    pub last_epoch_served: B::Ref<NodePublicKey, NodeServed>,
+    pub rep_measurements: B::Ref<NodeIndex, Vec<ReportedReputationMeasurements>>,
+    pub rep_scores: B::Ref<NodeIndex, u8>,
+    pub current_epoch_served: B::Ref<NodeIndex, NodeServed>,
+    pub last_epoch_served: B::Ref<NodeIndex, NodeServed>,
     pub total_served: B::Ref<Epoch, TotalServed>,
     pub service_revenue: B::Ref<ServiceId, ServiceRevenue>,
     pub commodity_prices: B::Ref<CommodityTypes, HpUfixed<6>>,
@@ -81,8 +80,8 @@ impl<B: Backend> State<B> {
             account_info: backend.get_table_reference("account"),
             client_keys: backend.get_table_reference("client_keys"),
             node_info: backend.get_table_reference("node"),
-            index_to_pubkey: backend.get_table_reference("index_to_pubkey"),
-            pubkey_to_index: backend.get_table_reference("pubkey_to_index"),
+            bls_to_index: backend.get_table_reference("bls_to_index"),
+            networking_to_index: backend.get_table_reference("networking_to_index"),
             committee_info: backend.get_table_reference("committee"),
             services: backend.get_table_reference("service"),
             parameters: backend.get_table_reference("parameter"),
@@ -177,11 +176,11 @@ impl<B: Backend> State<B> {
         #[cfg(debug_assertions)]
         {
             let node_info_len = self.node_info.keys().count();
-            let index_to_pubkey_len = self.index_to_pubkey.keys().count();
-            let pubkey_to_index_len = self.pubkey_to_index.keys().count();
-            assert_eq!(node_info_len, index_to_pubkey_len);
-            assert_eq!(node_info_len, pubkey_to_index_len);
-            assert_eq!(index_to_pubkey_len, pubkey_to_index_len);
+            let bls_to_index_len = self.bls_to_index.keys().count();
+            let networking_to_index_len = self.networking_to_index.keys().count();
+            assert_eq!(node_info_len, bls_to_index_len);
+            assert_eq!(node_info_len, networking_to_index_len);
+            assert_eq!(networking_to_index_len, bls_to_index_len);
         }
 
         // Increment nonce of the sender
@@ -201,8 +200,8 @@ impl<B: Backend> State<B> {
         _acknowledgments: Vec<DeliveryAcknowledgment>,
     ) -> TransactionResponse {
         // Todo: function not done
-        let sender: NodePublicKey = match self.only_node(sender) {
-            Ok(node) => node,
+        let sender: NodeIndex = match self.only_node(sender) {
+            Ok(index) => index,
             Err(e) => return e,
         };
         let account_owner = match self.node_info.get(&sender) {
@@ -371,15 +370,25 @@ impl<B: Backend> State<B> {
             None => None,
         };
 
-        match self.node_info.get(&node_public_key) {
-            Some(mut node) => {
+        let node_bls_index = self.bls_to_index.get(&node_public_key);
+        // Make sure the networking index and bls are the same
+        if let Some(networking_key) = node_network_key {
+            // If the networking key is indexed make sure it is the same as the indexed bls, if its
+            // none indexed and the bls is, that is fine
+            if self.networking_to_index.get(&networking_key) != node_bls_index {
+                return TransactionResponse::Revert(ExecutionError::NetworkingKeyAlreadyIndexed);
+            }
+        }
+
+        match node_bls_index {
+            Some(index) => {
+                let mut node = match self.node_info.get(&index) {
+                    Some(node) => node,
+                    // This should be impossible to hit
+                    None => return TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
+                };
                 // Todo(dalton): should we stop people from staking on a node they do not own??
 
-                // If any of the nodes fields were provided with this transaction update them on the
-                // nodes state
-                if let Some(network_key) = node_network_key {
-                    node.network_key = network_key;
-                }
                 if let Some(primary_domain) = node_domain {
                     node.domain = primary_domain;
                 }
@@ -395,7 +404,7 @@ impl<B: Backend> State<B> {
 
                 // Increase the nodes stake by the amount being staked
                 node.stake.staked += amount.clone();
-                self.node_info.set(node_public_key, node);
+                self.node_info.set(node_bls_index.unwrap(), node);
             },
             None => {
                 // If the node doesnt Exist, create it. But check if they provided all the required
@@ -459,7 +468,7 @@ impl<B: Backend> State<B> {
             Err(e) => return e,
         };
 
-        let mut node = match self.node_info.get(&node_public_key) {
+        let (index, mut node) = match self.get_node_info(node_public_key.into()) {
             Some(node) => node,
             None => return TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
         };
@@ -492,7 +501,7 @@ impl<B: Backend> State<B> {
         node.stake.stake_locked_until += locked_for;
 
         // Save the changed node state and return success
-        self.node_info.set(node_public_key, node);
+        self.node_info.set(index, node);
         TransactionResponse::Success(ExecutionData::None)
     }
 
@@ -509,7 +518,7 @@ impl<B: Backend> State<B> {
             Err(e) => return e,
         };
 
-        let mut node = match self.node_info.get(&node_public_key) {
+        let (index, mut node) = match self.get_node_info(node_public_key.into()) {
             Some(node) => node,
             None => return TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
         };
@@ -544,7 +553,7 @@ impl<B: Backend> State<B> {
         node.stake.locked_until = current_epoch + lock_time as u64;
 
         // Save the changed node state and return success
-        self.node_info.set(node_public_key, node);
+        self.node_info.set(index, node);
         TransactionResponse::Success(ExecutionData::None)
     }
 
@@ -561,7 +570,7 @@ impl<B: Backend> State<B> {
             Err(e) => return e,
         };
 
-        let mut node = match self.node_info.get(&node_public_key) {
+        let (index, mut node) = match self.get_node_info(node_public_key.into()) {
             Some(node) => node,
             None => return TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
         };
@@ -598,13 +607,13 @@ impl<B: Backend> State<B> {
 
         // Save state changes and return response
         self.account_info.set(recipient, reciever);
-        self.node_info.set(node_public_key, node);
+        self.node_info.set(index, node);
         TransactionResponse::Success(ExecutionData::None)
     }
 
     fn change_epoch(&self, sender: TransactionSender, epoch: Epoch) -> TransactionResponse {
         // Only Nodes can call this function
-        let sender = match self.only_node(sender) {
+        let index = match self.only_node(sender) {
             Ok(account) => account,
             Err(e) => return e,
         };
@@ -626,12 +635,12 @@ impl<B: Backend> State<B> {
         let mut current_committee = self.committee_info.get(&current_epoch).unwrap_or_default();
 
         // If sender is not on the current committee revert early, or if they have already signaled;
-        if !current_committee.members.contains(&sender) {
+        if !current_committee.members.contains(&index) {
             return TransactionResponse::Revert(ExecutionError::NotCommitteeMember);
-        } else if current_committee.ready_to_change.contains(&sender) {
+        } else if current_committee.ready_to_change.contains(&index) {
             return TransactionResponse::Revert(ExecutionError::AlreadySignaled);
         }
-        current_committee.ready_to_change.push(sender);
+        current_committee.ready_to_change.push(index);
 
         // If more than 2/3rds of the committee have signaled, start the epoch change process
         if current_committee.ready_to_change.len() > (2 * current_committee.members.len() / 3) {
@@ -736,9 +745,7 @@ impl<B: Backend> State<B> {
         // Remove latency measurements from invalid nodes.
         let node_registry = self.get_node_registry();
         for (index_lhs, index_rhs) in self.latencies.keys() {
-            let node_lhs = self.index_to_pubkey.get(&index_lhs).unwrap();
-            let node_rhs = self.index_to_pubkey.get(&index_rhs).unwrap();
-            if !node_registry.contains_key(&node_lhs) || !node_registry.contains_key(&node_rhs) {
+            if !node_registry.contains_key(&index_lhs) || !node_registry.contains_key(&index_rhs) {
                 self.latencies.remove(&(index_lhs, index_rhs));
             }
         }
@@ -769,10 +776,11 @@ impl<B: Backend> State<B> {
 
         // Store the latencies that were reported in this epoch.
         // This will potentially overwrite latency measurements from previous epochs.
-        for ((node_lhs, node_rhs), latency) in latency_map {
-            let index_lhs = self.pubkey_to_index.get(&node_lhs);
-            let index_rhs = self.pubkey_to_index.get(&node_rhs);
-            if let (Some(index_lhs), Some(index_rhs)) = (index_lhs, index_rhs) {
+        for ((index_lhs, index_rhs), latency) in latency_map {
+            // Todo (dalton): Check if this check is needed, it may be done before being added to
+            // latancy map
+            if self.node_info.get(&index_lhs).is_some() && self.node_info.get(&index_rhs).is_some()
+            {
                 self.latencies.set((index_lhs, index_rhs), latency);
             }
         }
@@ -803,7 +811,7 @@ impl<B: Backend> State<B> {
         TransactionResponse::Success(ExecutionData::None)
     }
 
-    fn get_node_registry(&self) -> HashMap<NodePublicKey, NodeInfo> {
+    fn get_node_registry(&self) -> HashMap<NodeIndex, NodeInfo> {
         let minimum_stake = self
             .parameters
             .get(&ProtocolParams::MinimumNodeStake)
@@ -848,19 +856,23 @@ impl<B: Backend> State<B> {
         measurements: BTreeMap<NodePublicKey, ReputationMeasurements>,
     ) -> TransactionResponse {
         let reporting_node = match self.only_node(sender) {
-            Ok(account) => account,
+            Ok(index) => index,
             Err(e) => return e,
         };
         measurements.into_iter().for_each(|(peer, measurements)| {
-            let mut node_measurements = match self.rep_measurements.get(&peer) {
-                Some(node_measurements) => node_measurements,
-                None => Vec::new(),
-            };
-            node_measurements.push(ReportedReputationMeasurements {
-                reporting_node,
-                measurements,
-            });
-            self.rep_measurements.set(peer, node_measurements);
+            // Todo(dalton): Check with matthias we can probably change the params to be
+            // NodeIndex=>RepMeasurements to avoid having to look up index here
+            if let Some(peer_index) = self.bls_to_index.get(&peer) {
+                let mut node_measurements = match self.rep_measurements.get(&peer_index) {
+                    Some(node_measurements) => node_measurements,
+                    None => Vec::new(),
+                };
+                node_measurements.push(ReportedReputationMeasurements {
+                    reporting_node,
+                    measurements,
+                });
+                self.rep_measurements.set(peer_index, node_measurements);
+            }
         });
         TransactionResponse::Success(ExecutionData::None)
     }
@@ -902,6 +914,7 @@ impl<B: Backend> State<B> {
         if reward_pool == HpUfixed::zero() {
             return;
         }
+
         let node_percentage: HpUfixed<18> = self
             .parameters
             .get(&ProtocolParams::NodeShare)
@@ -912,8 +925,8 @@ impl<B: Backend> State<B> {
         let emissions_for_node = &emissions * &node_share;
 
         let mut total_reward_share: HpUfixed<18> = HpUfixed::from(0_u64);
-        let mut local_shares_map: HashMap<NodePublicKey, HpUfixed<18>> = HashMap::new();
-        let mut node_info_map: HashMap<NodePublicKey, NodeInfo> = HashMap::new();
+        let mut local_shares_map: HashMap<NodeIndex, HpUfixed<18>> = HashMap::new();
+        let mut node_info_map: HashMap<NodeIndex, NodeInfo> = HashMap::new();
 
         for node in self.current_epoch_served.keys() {
             // safe to unwrap since all the nodes in current_epoch_served table are in node info
@@ -1088,7 +1101,7 @@ impl<B: Backend> State<B> {
         HpUfixed::<3>::min(&max_boost, &boost).to_owned()
     }
 
-    fn choose_new_committee(&self) -> Vec<NodePublicKey> {
+    fn choose_new_committee(&self) -> Vec<NodeIndex> {
         // Todo: function not done
         // we need true randomness here, for now we will return the same committee as before to be
         // able to run tests
@@ -1105,13 +1118,28 @@ impl<B: Backend> State<B> {
     pub fn verify_transaction(&self, txn: &UpdateRequest) -> Result<(), ExecutionError> {
         // Check nonce
         match txn.sender {
-            TransactionSender::Node(node) => match self.node_info.get(&node) {
-                Some(node_info) => {
-                    if txn.payload.nonce != node_info.nonce + 1 {
-                        return Err(ExecutionError::InvalidNonce);
+            // Todo Sunday(dalton): Clean up this match nesting
+            TransactionSender::NodeBLS(node) => {
+                if let Some(index) = self.bls_to_index.get(&node) {
+                    if let Some(info) = self.node_info.get(&index) {
+                        if txn.payload.nonce != info.nonce + 1 {
+                            return Err(ExecutionError::InvalidNonce);
+                        }
+                    } else {
+                        return Err(ExecutionError::NodeDoesNotExist);
                     }
-                },
-                None => return Err(ExecutionError::NodeDoesNotExist),
+                }
+            },
+            TransactionSender::NodeNetwork(node) => {
+                if let Some(index) = self.networking_to_index.get(&node) {
+                    if let Some(info) = self.node_info.get(&index) {
+                        if txn.payload.nonce != info.nonce + 1 {
+                            return Err(ExecutionError::InvalidNonce);
+                        }
+                    }
+                } else {
+                    return Err(ExecutionError::NodeDoesNotExist);
+                }
             },
             TransactionSender::AccountOwner(account) => {
                 let account_info = self.account_info.get(&account).unwrap_or_default();
@@ -1124,35 +1152,18 @@ impl<B: Backend> State<B> {
         // Check signature
         let payload = txn.payload.clone();
         let digest = payload.to_digest();
-        match txn.sender {
-            TransactionSender::Node(public_key) => match txn.signature {
-                TransactionSignature::Node(signature) => {
-                    if public_key.verify(&signature, &digest) {
-                        Ok(())
-                    } else {
-                        Err(ExecutionError::InvalidSignature)
-                    }
-                },
-                TransactionSignature::AccountOwner(_) => Err(ExecutionError::InvalidSignature),
-            },
-            TransactionSender::AccountOwner(eth_address) => match txn.signature {
-                TransactionSignature::AccountOwner(signature) => {
-                    if eth_address.verify(&signature, &digest) {
-                        Ok(())
-                    } else {
-                        Err(ExecutionError::InvalidSignature)
-                    }
-                },
-                TransactionSignature::Node(_) => Err(ExecutionError::InvalidSignature),
-            },
+
+        if !txn.sender.verify(txn.signature, &digest) {
+            return Err(ExecutionError::InvalidSignature);
         }
+        Ok(())
     }
 
     /// Takes in a zk Proof Of Delivery and returns true if valid
     fn verify_proof_of_delivery(
         &self,
         _client: &EthAddress,
-        _provider: &NodePublicKey,
+        _provider: &NodeIndex,
         _commodity: &u128,
         _service_id: &u32,
         _proof: (),
@@ -1167,16 +1178,20 @@ impl<B: Backend> State<B> {
 
     /// Creates a new node. A new node should only be created through this function.
     fn create_node(&self, node: NodeInfo) -> bool {
-        if self.node_info.get(&node.public_key).is_some() {
+        // If this public key or network key is already indexed to no create it
+        if self.bls_to_index.get(&node.public_key).is_some()
+            || self.networking_to_index.get(&node.network_key).is_some()
+        {
             return false;
         }
         let node_index = match self.metadata.get(&Metadata::NextNodeIndex) {
             Some(Value::NextNodeIndex(index)) => index,
             _ => 0,
         };
-        self.pubkey_to_index.set(node.public_key, node_index);
-        self.index_to_pubkey.set(node_index, node.public_key);
-        self.node_info.set(node.public_key, node);
+        self.bls_to_index.set(node.public_key, node_index);
+        self.networking_to_index.set(node.network_key, node_index);
+        // todo sunday(dalton): Do we need this^^ if so we need one for networking key as well
+        self.node_info.set(node_index, node);
         self.metadata.set(
             Metadata::NextNodeIndex,
             Value::NextNodeIndex(node_index + 1),
@@ -1187,13 +1202,12 @@ impl<B: Backend> State<B> {
     /// Remove a node. A node should only be removed through this function.
     #[allow(unused)]
     fn remove_node(&self, node: NodePublicKey) -> bool {
-        if self.node_info.get(&node).is_none() {
-            return false;
-        }
-        if let Some(node_index) = self.pubkey_to_index.get(&node) {
-            self.node_info.remove(&node);
-            self.pubkey_to_index.remove(&node);
-            self.index_to_pubkey.remove(&node_index);
+        if let Some(index) = self.bls_to_index.get(&node) {
+            if let Some(info) = self.node_info.get(&index) {
+                self.networking_to_index.remove(&info.network_key)
+            }
+            self.node_info.remove(&index);
+            self.bls_to_index.remove(&node);
             true
         } else {
             false
@@ -1206,10 +1220,17 @@ impl<B: Backend> State<B> {
     /// calling this function
     fn increment_nonce(&self, sender: TransactionSender) {
         match sender {
-            TransactionSender::Node(node) => {
-                let mut node_info = self.node_info.get(&node).unwrap();
+            TransactionSender::NodeBLS(node) => {
+                let index = self.bls_to_index.get(&node).unwrap();
+                let mut node_info = self.node_info.get(&index).unwrap();
                 node_info.nonce += 1;
-                self.node_info.set(node, node_info);
+                self.node_info.set(index, node_info);
+            },
+            TransactionSender::NodeNetwork(node) => {
+                let index = self.networking_to_index.get(&node).unwrap();
+                let mut node_info = self.node_info.get(&index).unwrap();
+                node_info.nonce += 1;
+                self.node_info.set(index, node_info);
             },
             TransactionSender::AccountOwner(account) => {
                 let mut account_info = self.account_info.get(&account).unwrap();
@@ -1233,10 +1254,38 @@ impl<B: Backend> State<B> {
     }
     // Useful for transaction that nodes can call but an account owner cant
     // Does not panic
-    fn only_node(&self, sender: TransactionSender) -> Result<NodePublicKey, TransactionResponse> {
+    fn only_node(&self, sender: TransactionSender) -> Result<NodeIndex, TransactionResponse> {
         match sender {
-            TransactionSender::Node(node) => Ok(node),
+            TransactionSender::NodeBLS(public_key) => {
+                self.bls_to_index
+                    .get(&public_key)
+                    .ok_or(TransactionResponse::Revert(
+                        ExecutionError::NodeDoesNotExist,
+                    ))
+            },
+            TransactionSender::NodeNetwork(public_key) => self
+                .networking_to_index
+                .get(&public_key)
+                .ok_or(TransactionResponse::Revert(
+                    ExecutionError::NodeDoesNotExist,
+                )),
             _ => Err(TransactionResponse::Revert(ExecutionError::OnlyNode)),
+        }
+    }
+
+    fn get_node_info(&self, sender: TransactionSender) -> Option<(NodeIndex, NodeInfo)> {
+        match sender {
+            TransactionSender::NodeBLS(public_key) => match self.bls_to_index.get(&public_key) {
+                Some(index) => self.node_info.get(&index).map(|info| (index, info)),
+                None => None,
+            },
+            TransactionSender::NodeNetwork(public_key) => {
+                match self.networking_to_index.get(&public_key) {
+                    Some(index) => self.node_info.get(&index).map(|info| (index, info)),
+                    None => None,
+                }
+            },
+            TransactionSender::AccountOwner(_) => None,
         }
     }
 }

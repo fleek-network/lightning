@@ -687,19 +687,45 @@ impl From<&AccountOwnerSignature> for Secp256k1RecoverableSignature {
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum TransactionSender {
-    Node(NodePublicKey),
+    NodeBLS(NodePublicKey),
+    NodeNetwork(NodeNetworkingPublicKey),
     AccountOwner(EthAddress),
 }
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum TransactionSignature {
-    Node(NodeSignature),
+    NodeBLS(NodeSignature),
+    NodeNetwork(NodeNetworkingSignature),
     AccountOwner(AccountOwnerSignature),
 }
 
+impl TransactionSender {
+    pub fn verify(&self, signature: TransactionSignature, digest: &[u8; 32]) -> bool {
+        match self {
+            TransactionSender::NodeBLS(public_key) => match signature {
+                TransactionSignature::NodeBLS(sig) => public_key.verify(&sig, digest),
+                _ => false,
+            },
+            TransactionSender::NodeNetwork(public_key) => match signature {
+                TransactionSignature::NodeNetwork(sig) => public_key.verify(&sig, digest),
+                _ => false,
+            },
+            TransactionSender::AccountOwner(public_key) => match signature {
+                TransactionSignature::AccountOwner(sig) => public_key.verify(&sig, digest),
+                _ => false,
+            },
+        }
+    }
+}
 impl From<NodeSignature> for TransactionSignature {
     fn from(value: NodeSignature) -> Self {
-        TransactionSignature::Node(value)
+        TransactionSignature::NodeBLS(value)
+    }
+}
+
+impl From<NodeNetworkingSignature> for TransactionSignature {
+    fn from(value: NodeNetworkingSignature) -> Self {
+        TransactionSignature::NodeNetwork(value)
     }
 }
 
@@ -711,7 +737,13 @@ impl From<AccountOwnerSignature> for TransactionSignature {
 
 impl From<NodePublicKey> for TransactionSender {
     fn from(value: NodePublicKey) -> Self {
-        TransactionSender::Node(value)
+        TransactionSender::NodeBLS(value)
+    }
+}
+
+impl From<NodeNetworkingPublicKey> for TransactionSender {
+    fn from(value: NodeNetworkingPublicKey) -> Self {
+        TransactionSender::NodeNetwork(value)
     }
 }
 

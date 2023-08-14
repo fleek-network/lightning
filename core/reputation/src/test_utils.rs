@@ -8,6 +8,7 @@ use crate::{NormalizedMeasurements, WeightedReputationMeasurements};
 
 const PROB_MEASUREMENT_PRESENT: f64 = 0.1;
 
+#[allow(unused)]
 pub(crate) fn generate_weighted_measurements_map(
     map_size: usize,
     rng: Option<StdRng>,
