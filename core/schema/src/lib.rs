@@ -55,6 +55,7 @@ impl<T: AutoImplSerde + 'static> LightningMessage for T {
 }
 
 impl AutoImplSerde for () {}
+impl<T> AutoImplSerde for infusion::Blank<T> {}
 
 #[cfg(test)]
 mod test {

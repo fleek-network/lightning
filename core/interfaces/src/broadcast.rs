@@ -11,7 +11,7 @@ use crate::{
 
 /// The gossip system in Fleek Network implements the functionality of broadcasting
 /// messages to the rest of the nodes in the network.
-#[async_trait]
+#[infusion::blank]
 pub trait BroadcastInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
     infu!(BroadcastInterface, {
         fn init(
@@ -35,7 +35,7 @@ pub trait BroadcastInterface: WithStartAndShutdown + ConfigConsumer + Sized + Se
     type Message: LightningMessage;
 
     /// Pubsub topic for sending and receiving messages on a topic
-    type PubSub<T: LightningMessage + Clone>: PubSub<T>;
+    type PubSub<T: LightningMessage + Clone>: PubSub<T> = infusion::Blank<T>;
 
     /// Initialize the gossip system with the config and the topology object..
     fn init(
@@ -51,6 +51,7 @@ pub trait BroadcastInterface: WithStartAndShutdown + ConfigConsumer + Sized + Se
 }
 
 #[async_trait]
+#[infusion::blank(object = true)]
 pub trait PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
     /// Publish a message.
     async fn send(&self, msg: &T);

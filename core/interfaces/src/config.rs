@@ -5,6 +5,7 @@ use crate::infu_collection::Collection;
 
 /// An implementer of this trait should handle providing the configurations from
 /// the loaded configuration file.
+#[infusion::blank]
 pub trait ConfigProviderInterface: Send + Sync {
     infu!(ConfigProviderInterface @ Input);
 
@@ -25,4 +26,9 @@ pub trait ConfigConsumer {
 
     /// The type which is expected for this configuration object.
     type Config: Serialize + DeserializeOwned + Default;
+}
+
+impl<T> ConfigConsumer for infusion::Blank<T> {
+    const KEY: &'static str = "BLANK";
+    type Config = ();
 }

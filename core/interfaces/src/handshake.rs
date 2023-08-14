@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use infusion::infu;
 
 use crate::{
@@ -6,7 +5,7 @@ use crate::{
     ConfigProviderInterface, ConnectionInterface,
 };
 
-#[async_trait]
+#[infusion::blank]
 pub trait HandshakeInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
     infu!(HandshakeInterface, {
         fn init(config: ConfigProviderInterface) {

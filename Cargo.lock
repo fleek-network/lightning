@@ -3087,6 +3087,21 @@ dependencies = [
 [[package]]
 name = "infusion"
 version = "0.1.0"
+dependencies = [
+ "infusion-blank",
+ "serde",
+]
+
+[[package]]
+name = "infusion-blank"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2 1.0.66",
+ "quote 1.0.31",
+ "serde",
+ "serde_tokenstream",
+ "syn 2.0.26",
+]
 
 [[package]]
 name = "ink-quill"
@@ -3628,6 +3643,7 @@ dependencies = [
  "anyhow",
  "fleek-crypto",
  "flexbuffers",
+ "infusion",
  "ink-quill",
  "lightning-types",
  "serde",

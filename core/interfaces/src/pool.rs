@@ -11,8 +11,8 @@ use crate::{
 
 /// Type alias for the return type of accept and connect.
 pub type SenderReceiver<C, T> = (
-    <C as ConnectionPoolInterface>::Sender<T>,
-    <C as ConnectionPoolInterface>::Receiver<T>,
+    <<C as ConnectionPoolInterface>::Listener<T> as ListenerInterface<T>>::Sender,
+    <<C as ConnectionPoolInterface>::Listener<T> as ListenerInterface<T>>::Receiver,
 );
 
 /// Type alias for the return type of bind.
@@ -27,6 +27,7 @@ pub type ListenerConnector<C, T> = (
 /// parameter. However the [`ListenerConnector`] is a valid input. In other terms each interface
 /// that is in need of connections should get a listener/connector for the scope that it
 /// cares about during the node bootstrap life cycle.
+#[infusion::blank]
 pub trait ConnectionPoolInterface:
     ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
 {
@@ -40,21 +41,16 @@ pub trait ConnectionPoolInterface:
         }
     });
 
-    // The existence of Sender/Receiver at this layer and the link back to this connection
-    // pool from listener and connector is to force the listener and connector to use the
-    // same type for the sender/receiver.
-
-    /// Listener object implemented by this connection pool.
-    type Listener<T: LightningMessage>: ListenerInterface<T, ConnectionPool = Self>;
+    /// Listener object implemented by this connection pool. The bounds here ensure
+    /// that both listener and connector produce the same type.
+    type Listener<T: LightningMessage>: ListenerInterface<
+        T,
+        Sender = <Self::Connector<T> as ConnectorInterface<T>>::Sender,
+        Receiver = <Self::Connector<T> as ConnectorInterface<T>>::Receiver,
+    > = infusion::Blank<T>;
 
     /// Connector object implemented by this connection pool.
-    type Connector<T: LightningMessage>: ConnectorInterface<T, ConnectionPool = Self>;
-
-    /// The sender struct used across the sender and connector.
-    type Sender<T: LightningMessage>: SenderInterface<T>;
-
-    /// The receiver struct used across the sender and connector.
-    type Receiver<T: LightningMessage>: ReceiverInterface<T>;
+    type Connector<T: LightningMessage>: ConnectorInterface<T> = infusion::Blank<T>;
 
     /// Initialize the pool with the given configuration.
     fn init(
@@ -75,16 +71,17 @@ pub trait ConnectionPoolInterface:
 
 /// The connector can be used to connect to other peers under the scope.
 #[async_trait]
+#[infusion::blank(object = true)]
 pub trait ConnectorInterface<T>: Send + Sync + Sized + Clone
 where
     T: LightningMessage,
 {
-    /// Link to the actual connection pool.
-    type ConnectionPool: ConnectionPoolInterface;
+    type Sender: SenderInterface<T> = infusion::Blank<T>;
+    type Receiver: ReceiverInterface<T> = infusion::Blank<T>;
 
     /// Create a new connection to the peer with the provided public key. Should return [`None`]
     /// if the connection pool is shutting down.
-    async fn connect(&self, to: &NodePublicKey) -> Option<SenderReceiver<Self::ConnectionPool, T>>;
+    async fn connect(&self, to: &NodePublicKey) -> Option<(Self::Sender, Self::Receiver)>;
 }
 
 /// The listener object
@@ -94,15 +91,16 @@ where
 /// The implementation of this struct has to provide a custom [`Drop`] implementation
 /// in order to free the scope. So that successive calls to `bind` can succeed.
 #[async_trait]
+#[infusion::blank(object = true)]
 pub trait ListenerInterface<T>: Send
 where
     T: LightningMessage,
 {
-    /// Link to the actual connection pool.
-    type ConnectionPool: ConnectionPoolInterface;
+    type Sender: SenderInterface<T> = infusion::Blank<T>;
+    type Receiver: ReceiverInterface<T> = infusion::Blank<T>;
 
     /// Accept a new connection from a peer. Returns [`None`] if we are shutting down.
-    async fn accept(&mut self) -> Option<SenderReceiver<Self::ConnectionPool, T>>;
+    async fn accept(&mut self) -> Option<(Self::Sender, Self::Receiver)>;
 }
 
 /// An scoped sender allows the holder to send messages to other nodes through this connection.
@@ -114,6 +112,7 @@ where
 /// Drop implementation must perform graceful disconnection if there is no sender and receiver
 /// object anymore.
 #[async_trait]
+#[infusion::blank(object = true)]
 pub trait SenderInterface<T>: Send + Sync
 where
     T: LightningMessage,
@@ -138,6 +137,7 @@ where
 /// Drop implementation must perform graceful disconnection if there is no sender and receiver
 /// object anymore.
 #[async_trait]
+#[infusion::blank(object = true)]
 pub trait ReceiverInterface<T>: Send + Sync
 where
     T: LightningMessage,

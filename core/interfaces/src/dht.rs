@@ -1,5 +1,4 @@
 use affair::Socket;
-use async_trait::async_trait;
 use infusion::{infu, p};
 
 use crate::{
@@ -12,7 +11,7 @@ use crate::{
 pub type DhtSocket = Socket<DhtRequest, DhtResponse>;
 
 /// The distributed hash table for Fleek Network.
-#[async_trait]
+#[infusion::blank]
 pub trait DhtInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
     infu!(DhtInterface, {
         fn init(signer: SignerInterface, topology: TopologyInterface, config: ConfigProviderInterface) {

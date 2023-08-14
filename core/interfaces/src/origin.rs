@@ -1,6 +1,5 @@
 use affair::Socket;
 use anyhow;
-use async_trait::async_trait;
 use infusion::infu;
 
 use crate::{
@@ -13,7 +12,7 @@ pub type OriginProviderSocket<Stream> = Socket<Vec<u8>, anyhow::Result<Stream>>;
 /// The abstraction layer for different origins and how we handle them in the codebase in
 /// a modular way, and [`OriginProvider`] can be something like a provider for resolving
 /// *IPFS* files.
-#[async_trait]
+#[infusion::blank]
 pub trait OriginProviderInterface:
     ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
 {
@@ -23,7 +22,7 @@ pub trait OriginProviderInterface:
         }
     });
 
-    type Stream: UntrustedStream;
+    type Stream: UntrustedStream = BlankUntrustedStream;
 
     /// Initialize the origin service.
     fn init(config: Self::Config) -> anyhow::Result<Self>;
@@ -45,4 +44,23 @@ pub trait UntrustedStream:
     /// of the stream. If this method is called before the end of the stream, it will return
     /// `None`.
     fn was_content_valid(&self) -> Option<bool>;
+}
+
+pub struct BlankUntrustedStream;
+
+impl tokio_stream::Stream for BlankUntrustedStream {
+    type Item = Result<bytes::Bytes, std::io::Error>;
+
+    fn poll_next(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        todo!()
+    }
+}
+
+impl UntrustedStream for BlankUntrustedStream {
+    fn was_content_valid(&self) -> Option<bool> {
+        todo!()
+    }
 }

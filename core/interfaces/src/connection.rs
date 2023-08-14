@@ -1,15 +1,19 @@
 use fleek_crypto::ClientPublicKey;
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::tcp::{OwnedReadHalf, OwnedWriteHalf},
+};
 
 use crate::types::CompressionAlgoSet;
 
 /// The connection type that is offered by the (HandshakeInterface)[crate::HandshakeInterface].
+#[infusion::blank(object = true)]
 pub trait ConnectionInterface: Send + Sync {
     /// The writer half of this connection.
-    type Writer: AsyncWrite + Unpin + Send + Sync;
+    type Writer: AsyncWrite + Unpin + Send + Sync = OwnedWriteHalf;
 
     /// The reader half of this connection.
-    type Reader: AsyncRead + Unpin + Send + Sync;
+    type Reader: AsyncRead + Unpin + Send + Sync = OwnedReadHalf;
 
     /// Split the connection to the `writer` and `reader` half and returns a mutable reference to
     /// both sides.

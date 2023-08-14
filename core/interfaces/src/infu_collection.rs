@@ -3,7 +3,7 @@ use infusion::infu;
 use super::*;
 
 // Define the collection of every top-level trait in the system.
-infu!(@Collection [
+infu!(@Collection+Blank [
       ConfigProviderInterface,
       ApplicationInterface,
       BlockStoreInterface,

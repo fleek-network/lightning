@@ -1,7 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
 use affair::Socket;
-use async_trait::async_trait;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use infusion::infu;
@@ -29,7 +28,7 @@ use crate::{
 /// it is created.
 pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
 
-#[async_trait]
+#[infusion::blank]
 pub trait ApplicationInterface:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
@@ -62,6 +61,7 @@ pub trait ApplicationInterface:
     fn sync_query(&self) -> Self::SyncExecutor;
 }
 
+#[infusion::blank(object = true)]
 pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Returns the latest bandwidth balance associated with the given account public key.
     fn get_account_balance(&self, account: &EthAddress) -> u128;

@@ -1,7 +1,6 @@
 use std::{path::Path, sync::Arc};
 
 use affair::Socket;
-use async_trait::async_trait;
 use fleek_crypto::{
     ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
@@ -20,7 +19,7 @@ pub type SubmitTxSocket = Socket<UpdateMethod, u64>;
 
 /// The signature provider is responsible for signing messages using the private key of
 /// the node.
-#[async_trait]
+#[infusion::blank]
 pub trait SignerInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
     infu!(SignerInterface, {
         fn init(config: ConfigProviderInterface, app: ApplicationInterface) {

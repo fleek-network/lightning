@@ -5,6 +5,7 @@ use crate::{
     ConnectionInterface, WithStartAndShutdown,
 };
 
+#[infusion::blank]
 pub trait ServiceExecutorInterface:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
@@ -26,6 +27,7 @@ pub trait ServiceExecutorInterface:
     fn register_core_service(&self, service_id: ServiceId);
 }
 
+#[infusion::blank(object = true)]
 pub trait ServiceConnectorInterface: Clone {
     /// The connection specified.
     type Connection: ConnectionInterface;

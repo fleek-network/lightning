@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use affair::Socket;
-use async_trait::async_trait;
 use infusion::{infu, p};
 use lightning_schema::LightningMessage;
 use tokio::sync::Notify;
@@ -22,7 +21,7 @@ use crate::{
 /// this as if the current node was only an external client to the network.
 pub type MempoolSocket = Socket<UpdateRequest, ()>;
 
-#[async_trait]
+#[infusion::blank]
 pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
     infu!(ConsensusInterface, {
         fn init(

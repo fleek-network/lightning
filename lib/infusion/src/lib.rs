@@ -50,6 +50,30 @@ pub mod container;
 /// Project graph.
 pub mod graph;
 
+use std::marker::PhantomData;
+
 pub use container::Container;
 pub use error::InitializationError;
 pub use graph::DependencyGraph;
+pub use infusion_blank::blank;
+use serde::{Deserialize, Serialize};
+
+/// The object that is meant to be the placeholder nullified implementer
+/// of every generic trait.
+#[derive(Copy, Serialize, Deserialize)]
+pub struct Blank<C>(PhantomData<C>);
+
+unsafe impl<C> Send for Blank<C> {}
+unsafe impl<C> Sync for Blank<C> {}
+
+impl<T> Default for Blank<T> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<T> Clone for Blank<T> {
+    fn clone(&self) -> Self {
+        Self(PhantomData)
+    }
+}

@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
 use infusion::{infu, p};
 
@@ -10,7 +9,7 @@ use crate::{
     ConfigProviderInterface, SignerInterface,
 };
 
-#[async_trait]
+#[infusion::blank]
 pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
     infu!(ReputationAggregatorInterface, {
         fn init(
@@ -62,6 +61,7 @@ pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
 /// Used to answer queries about the (local) reputation of other nodes, this queries should
 /// be as real-time as possible, meaning that the most recent data captured by the reporter
 /// should be taken into account at this layer.
+#[infusion::blank(object = true)]
 pub trait ReputationQueryInteface: Clone {
     /// The application layer's synchronize query runner.
     type SyncQuery: SyncQueryRunnerInterface;
@@ -74,6 +74,7 @@ pub trait ReputationQueryInteface: Clone {
 /// that we have with another peer, this interface allows a reputation aggregator to spawn many
 /// reporters which can use any method to report the data they capture to their aggregator so
 /// that it can send it to the application layer.
+#[infusion::blank(object = true)]
 pub trait ReputationReporterInterface: Clone {
     /// Report a satisfactory (happy) interaction with the given peer. Used for up time.
     fn report_sat(&self, peer: &NodePublicKey, weight: Weight);

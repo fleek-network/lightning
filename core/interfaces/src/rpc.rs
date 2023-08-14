@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use infusion::{infu, p};
 
 use crate::{
@@ -8,7 +7,7 @@ use crate::{
 
 /// The interface for the *RPC* server. Which is supposed to be opening a public
 /// port (possibly an HTTP server) and accepts queries or updates from the user.
-#[async_trait]
+#[infusion::blank]
 pub trait RpcInterface: Sized + Send + Sync + ConfigConsumer + WithStartAndShutdown {
     infu!(RpcInterface, {
         fn init(

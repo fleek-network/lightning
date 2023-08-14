@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
 use infusion::{infu, p};
 
@@ -13,7 +12,7 @@ use crate::{
 /// This clustering is later used in other parts of the codebase when connection to other nodes
 /// is required. The gossip layer is an example of a component that can feed the data this
 /// algorithm generates.
-#[async_trait]
+#[infusion::blank]
 pub trait TopologyInterface: ConfigConsumer + Sized + Send + Sync + Clone {
     infu!(TopologyInterface, {
         fn init(

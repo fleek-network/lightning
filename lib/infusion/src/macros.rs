@@ -197,6 +197,23 @@ macro_rules! infu {
         }
     };
 
+    // Create a BlankBinding struct
+    (@Blank [$($service:tt),* $(,)?]) => {
+        pub struct BlankBinding;
+
+        impl Collection for BlankBinding {
+        $(
+            type $service = $crate::Blank<Self>;
+         )*
+        }
+    };
+
+    (@Collection+Blank [$($service:tt),* $(,)?]) => {
+        infu!(@Collection [$($service),*]);
+
+        infu!(@Blank [$($service),*]);
+    };
+
     // Case 2: Inside the trait.
     ($trait_name:tt, {
         fn init($($init_dep_name:ident: $init_dep_ty:tt),* $(,)?) $init:block
@@ -266,7 +283,8 @@ macro_rules! infu {
         #[doc(hidden)]
         fn infu_initialize(
             __container: &$crate::Container
-        ) -> ::std::result::Result<Self, ::std::boxed::Box<dyn std::error::Error>> {
+        ) -> ::std::result::Result<
+            Self, ::std::boxed::Box<dyn std::error::Error>> where Self: Sized {
         $(
             let $init_dep_name = __container.get::<<Self::Collection as Collection>::$init_dep_ty>(
                 $crate::tag!(<Self::Collection as Collection>::$init_dep_ty as $init_dep_ty)

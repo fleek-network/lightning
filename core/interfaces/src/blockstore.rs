@@ -1,4 +1,4 @@
-use std::{fmt::Debug, ops::Deref};
+use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 use async_trait::async_trait;
 use infusion::infu;
@@ -86,6 +86,7 @@ pub struct ContentChunk {
 /// we use it at the chunk level, we don't compress the entire file and then perform the chunking,
 /// we chunk first, and compress each chunk later for obvious technical reasons.
 #[async_trait]
+#[infusion::blank]
 pub trait BlockStoreInterface: Clone + Send + Sync + ConfigConsumer {
     infu!(BlockStoreInterface, {
         fn init(config: ConfigProviderInterface) {
@@ -97,7 +98,7 @@ pub trait BlockStoreInterface: Clone + Send + Sync + ConfigConsumer {
     /// The block store has the ability to use a smart pointer to avoid duplicating
     /// the same content multiple times in memory, this can be used for when multiple
     /// services want access to the same buffer of data.
-    type SharedPointer<T: ?Sized + Send + Sync>: Deref<Target = T> + Clone + Send + Sync;
+    type SharedPointer<T: ?Sized + Send + Sync>: Deref<Target = T> + Clone + Send + Sync = Arc<T>;
 
     /// The incremental putter which can be used to write a file to block store.
     type Put: IncrementalPutInterface;
@@ -131,6 +132,7 @@ pub trait BlockStoreInterface: Clone + Send + Sync + ConfigConsumer {
 
 /// The interface for the writer to a [`BlockStoreInterface`].
 #[async_trait]
+#[infusion::blank(object = true)]
 pub trait IncrementalPutInterface {
     /// Write the proof for the buffer.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError>;

@@ -1,5 +1,4 @@
 use affair::Socket;
-use async_trait::async_trait;
 use infusion::infu;
 
 use crate::{
@@ -12,7 +11,7 @@ use crate::{
 /// queue which will later roll up a batch of delivery acknowledgments to the consensus.
 pub type DeliveryAcknowledgmentSocket = Socket<DeliveryAcknowledgment, ()>;
 
-#[async_trait]
+#[infusion::blank]
 pub trait DeliveryAcknowledgmentAggregatorInterface:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {

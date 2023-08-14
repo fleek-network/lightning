@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use async_trait::async_trait;
 use infusion::{infu, ok, p};
 use tokio::sync::mpsc;
 
@@ -12,7 +11,7 @@ pub enum Notification {
     BeforeEpochChange,
 }
 
-#[async_trait]
+#[infusion::blank]
 pub trait NotifierInterface: Clone {
     infu!(NotifierInterface, {
         fn init(app: ApplicationInterface) {
