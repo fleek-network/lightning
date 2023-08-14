@@ -25,8 +25,9 @@ use crate::{
     bootstrap,
     bootstrap::BootstrapRequest,
     config::Config,
+    query,
     query::{HandlerRequest, NodeInfo},
-    store, table,
+    store, table, task,
 };
 
 /// Builds the DHT.
@@ -165,8 +166,8 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
             self.shutdown_notify.clone(),
         ));
 
-        let (worker_tx, worker_rx) = mpsc::channel(self.buffer_size);
-        tokio::spawn(store::start_worker(worker_rx, self.shutdown_notify.clone()));
+        let (store_tx, store_rx) = mpsc::channel(self.buffer_size);
+        tokio::spawn(store::start_worker(store_rx, self.shutdown_notify.clone()));
 
         let socket = UdpSocket::bind(self.address)
             .await
@@ -174,14 +175,31 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
             .expect("Binding to socket failed");
         tracing::info!("UDP socket bound to {:?}", socket.local_addr().unwrap());
 
-        let (task_tx, _) = mpsc::channel(self.buffer_size);
+        let (task_tx, task_rx) = mpsc::channel(self.buffer_size);
         tokio::spawn(api::start_worker(
             self.handler_rx.lock().unwrap().take().unwrap(),
             task_tx,
             self.bootstrap_notify.clone(),
             self.shutdown_notify.clone(),
             self.network_secret_key.to_pk(),
+            socket.clone(),
+        ));
+
+        let (event_queue_tx, event_queue_rx) = mpsc::channel(self.buffer_size);
+        tokio::spawn(task::start_worker(
+            task_rx,
+            event_queue_rx,
+            table_tx.clone(),
+            socket.clone(),
+        ));
+
+        tokio::spawn(query::start_worker(
+            event_queue_tx,
+            table_tx,
+            store_tx,
             socket,
+            public_key,
+            self.shutdown_notify.clone(),
         ));
 
         // Todo: Check that it is done bootstrapping.

@@ -24,8 +24,8 @@ use crate::{
 pub async fn start_worker(
     mut rx: Receiver<Task>,
     mut network_event: Receiver<ResponseEvent>,
-    socket: Arc<UdpSocket>,
     table_tx: Sender<TableRequest>,
+    socket: Arc<UdpSocket>,
 ) {
     let mut task_set = TaskManager {
         inflight: HashMap::new(),
