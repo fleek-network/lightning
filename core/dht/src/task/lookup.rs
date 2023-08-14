@@ -6,7 +6,6 @@ use std::{
 
 use anyhow::Result;
 use fleek_crypto::NodeNetworkingPublicKey;
-use thiserror::Error;
 use tokio::{
     net::UdpSocket,
     select,

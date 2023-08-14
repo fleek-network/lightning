@@ -2,7 +2,6 @@ use std::{
     marker::PhantomData,
     net::SocketAddr,
     sync::{Arc, Mutex},
-    time::Duration,
 };
 
 use affair::{Socket, Task};
@@ -11,7 +10,7 @@ use async_trait::async_trait;
 use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSecretKey, SecretKey};
 use lightning_interfaces::{
     dht::{DhtInterface, DhtSocket},
-    types::{DhtResponse, TableEntry},
+    types::{DhtRequest, DhtResponse, TableEntry},
     ConfigConsumer, SignerInterface, TopologyInterface, WithStartAndShutdown,
 };
 use tokio::{
@@ -21,9 +20,6 @@ use tokio::{
 
 use crate::{
     api,
-    api::DhtRequest,
-    bootstrap,
-    bootstrap::BootstrapRequest,
     config::Config,
     query,
     query::{HandlerRequest, NodeInfo},
@@ -72,16 +68,14 @@ impl Builder {
         let buffer_size = self.buffer_size.unwrap_or(10_000);
 
         let (socket, rx) = Socket::raw_bounded(2048);
-        let (handler_tx, handler_rx) = mpsc::channel(buffer_size);
 
         Ok(Dht {
             socket,
+            socket_rx: Arc::new(Mutex::new(Some(rx))),
             nodes: Arc::new(Mutex::new(Some(self.nodes))),
             buffer_size,
             address: self.config.address,
             network_secret_key: self.network_secret_key,
-            handler_tx,
-            handler_rx: Arc::new(Mutex::new(Some(handler_rx))),
             bootstrap_notify: Arc::new(Notify::new()),
             is_running: Arc::new(Mutex::new(false)),
             shutdown_notify: Arc::new(Notify::new()),
@@ -94,11 +88,10 @@ impl Builder {
 #[allow(clippy::type_complexity)]
 pub struct Dht<T: TopologyInterface> {
     socket: DhtSocket,
+    socket_rx: Arc<Mutex<Option<mpsc::Receiver<Task<DhtRequest, DhtResponse>>>>>,
     buffer_size: usize,
     address: SocketAddr,
     network_secret_key: NodeNetworkingSecretKey,
-    handler_tx: mpsc::Sender<DhtRequest>,
-    handler_rx: Arc<Mutex<Option<mpsc::Receiver<DhtRequest>>>>,
     bootstrap_notify: Arc<Notify>,
     nodes: Arc<Mutex<Option<Vec<NodeInfo>>>>,
     is_running: Arc<Mutex<bool>>,
@@ -177,7 +170,7 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
 
         let (task_tx, task_rx) = mpsc::channel(self.buffer_size);
         tokio::spawn(api::start_worker(
-            self.handler_rx.lock().unwrap().take().unwrap(),
+            self.socket_rx.lock().unwrap().take().unwrap(),
             task_tx,
             self.bootstrap_notify.clone(),
             self.shutdown_notify.clone(),

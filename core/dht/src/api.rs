@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use fleek_crypto::NodeNetworkingPublicKey;
-use lightning_interfaces::types::{KeyPrefix, TableEntry};
+use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
 use tokio::{
     net::UdpSocket,
     select,
@@ -22,36 +22,38 @@ use crate::{
 pub const NO_REPLY_CHANNEL_ID: u64 = 0;
 
 pub async fn start_worker(
-    mut rx: Receiver<DhtRequest>,
+    mut rx: Receiver<affair::Task<DhtRequest, DhtResponse>>,
     task_tx: Sender<Task>,
     bootstrap_notify: Arc<Notify>,
     shutdown_notify: Arc<Notify>,
     local_key: NodeNetworkingPublicKey,
     socket: Arc<UdpSocket>,
 ) {
-    let handler = ApiHandler {
+    let handler = Handler {
         task_tx,
         local_key,
         socket,
     };
     loop {
         select! {
-            request = rx.recv() => {
-                let request = request.unwrap();
-                match request {
-                    DhtRequest::Get { key, tx } => {
+            task = rx.recv() => {
+                let task = task.unwrap();
+                match task.request.clone() {
+                    DhtRequest::Get { key, .. } => {
                         let get_handler = handler.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = get_handler.handle_get(key, tx).await {
-                                tracing::error!("failed to handle GET");
+                            match get_handler.handle_get(key).await {
+                                Ok(value) => task.respond(DhtResponse::Get(value)),
+                                Err(e) => tracing::error!("failed to handle GET: {e:?}"),
                             }
                         });
                     }
-                    DhtRequest::Put { key, value } => {
+                    DhtRequest::Put { key, value, .. } => {
                         let put_handler = handler.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = put_handler.handle_put(key, value).await {
-                                tracing::error!("failed to handle GET");
+                            match put_handler.handle_put(key, value).await {
+                                Ok(_) => task.respond(DhtResponse::Put(())),
+                                Err(e) => tracing::error!("failed to handle PUT: {e:?}"),
                             }
                         });
                     }
@@ -59,11 +61,7 @@ pub async fn start_worker(
             }
             _ = bootstrap_notify.notified() => {
                 let bootstrap_handler = handler.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = bootstrap_handler.bootstrap().await {
-                        tracing::error!("failed to start bootstrap task");
-                    }
-                });
+                tokio::spawn(async move {bootstrap_handler.bootstrap().await;});
             }
             _ = shutdown_notify.notified() => {
                 break;
@@ -72,30 +70,15 @@ pub async fn start_worker(
     }
 }
 
-pub enum DhtRequest {
-    Get {
-        key: Vec<u8>,
-        tx: oneshot::Sender<Result<Option<TableEntry>>>,
-    },
-    Put {
-        key: Vec<u8>,
-        value: Vec<u8>,
-    },
-}
-
 #[derive(Clone)]
-pub struct ApiHandler {
+pub struct Handler {
     task_tx: Sender<Task>,
     local_key: NodeNetworkingPublicKey,
     socket: Arc<UdpSocket>,
 }
 
-impl ApiHandler {
-    async fn handle_get(
-        &self,
-        key: Vec<u8>,
-        response_tx: oneshot::Sender<Result<Option<TableEntry>>>,
-    ) -> Result<()> {
+impl Handler {
+    async fn handle_get(&self, key: Vec<u8>) -> Result<Option<TableEntry>> {
         let (tx, rx) = oneshot::channel();
         let target = TableKey::try_from(key.as_slice())?;
         let task = Task::Lookup { target, tx };
@@ -103,11 +86,9 @@ impl ApiHandler {
         let response = rx.await?;
 
         if response.value.is_none() {
-            if response_tx.send(Ok(None)).is_err() {
-                tracing::error!("client dropped the channel")
-            }
+            Ok(None)
         } else {
-            let entry = TableEntry {
+            Ok(Some(TableEntry {
                 prefix: KeyPrefix::ContentRegistry,
                 key,
                 value: response.value.unwrap_or_default(),
@@ -116,12 +97,8 @@ impl ApiHandler {
                     .source
                     .unwrap_or(NodeNetworkingPublicKey(rand::random())),
                 signature: None,
-            };
-            if response_tx.send(Ok(Some(entry))).is_err() {
-                tracing::error!("client dropped the channel")
-            }
+            }))
         }
-        Ok(())
     }
 
     async fn handle_put(&self, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
@@ -150,8 +127,9 @@ impl ApiHandler {
         Ok(())
     }
 
-    async fn bootstrap(&self) -> Result<()> {
-        self.task_tx.send(Task::Bootstrap).await?;
-        Ok(())
+    async fn bootstrap(&self) {
+        if self.task_tx.send(Task::Bootstrap).await.is_err() {
+            tracing::error!("failed to send bootstrap task");
+        }
     }
 }
