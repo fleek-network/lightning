@@ -2,7 +2,7 @@ use std::{
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, Mutex,
     },
 };
 
@@ -11,6 +11,8 @@ use axum::{
     routing::{get, post},
     Extension, Router,
 };
+#[cfg(feature = "e2e-test")]
+use lightning_interfaces::dht::DhtSocket;
 use lightning_interfaces::{
     common::WithStartAndShutdown, config::ConfigConsumer, MempoolSocket, RpcInterface,
     SyncQueryRunnerInterface,
@@ -31,6 +33,8 @@ pub struct Rpc<Q: SyncQueryRunnerInterface> {
 pub struct RpcData<Q: SyncQueryRunnerInterface> {
     pub query_runner: Q,
     pub mempool_socket: MempoolSocket,
+    #[cfg(feature = "e2e-test")]
+    pub dht_socket: Arc<Mutex<Option<DhtSocket>>>,
 }
 
 #[async_trait]
@@ -86,7 +90,8 @@ impl<Q: SyncQueryRunnerInterface + 'static> WithStartAndShutdown for Rpc<Q> {
 impl<Q: SyncQueryRunnerInterface + Send + Sync + 'static> RpcInterface<Q> for Rpc<Q> {
     /// Initialize the *RPC* server, with the given parameters.
     fn init(config: Self::Config, mempool: MempoolSocket, query_runner: Q) -> anyhow::Result<Self> {
-        Ok(Self {
+        #[cfg(not(feature = "e2e-test"))]
+        let rpc = Ok(Self {
             data: Arc::new(RpcData {
                 mempool_socket: mempool,
                 query_runner,
@@ -94,7 +99,24 @@ impl<Q: SyncQueryRunnerInterface + Send + Sync + 'static> RpcInterface<Q> for Rp
             config,
             is_running: Arc::new(AtomicBool::new(false)),
             shutdown_notify: Arc::new(Notify::new()),
-        })
+        });
+        #[cfg(feature = "e2e-test")]
+        let rpc = Ok(Self {
+            data: Arc::new(RpcData {
+                mempool_socket: mempool,
+                query_runner,
+                dht_socket: Arc::new(Mutex::new(None)),
+            }),
+            config,
+            is_running: Arc::new(AtomicBool::new(false)),
+            shutdown_notify: Arc::new(Notify::new()),
+        });
+        rpc
+    }
+
+    #[cfg(feature = "e2e-test")]
+    fn provide_dht_socket(&self, dht_socket: DhtSocket) {
+        *self.data.dht_socket.lock().unwrap() = Some(dht_socket);
     }
 }
 

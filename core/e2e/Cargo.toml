@@ -6,15 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lightning-interfaces = { path = "../interfaces" }
+lightning-interfaces = { path = "../interfaces", features = ["e2e-test"] }
 lightning-node = { path = "../node" }
-lightning-rpc = { path = "../rpc" }
+lightning-rpc = { path = "../rpc", features = ["e2e-test"] }
 lightning-application = { path = "../application" }
 lightning-consensus = { path = "../consensus" }
 lightning-notifier = { path = "../notifier" }
 lightning-handshake = { path = "../handshake" }
 lightning-topology = { path = "../topology" }
 lightning-signer = { path = "../signer" }
+lightning-dht = { path = "../dht" }
 mock = { path = "../mock" }
 tokio.workspace = true
 anyhow.workspace = true
@@ -24,6 +25,7 @@ fleek-crypto.workspace = true
 resolved-pathbuf.workspace = true
 reqwest = { workspace = true, features = ["json"] }
 serde.workspace = true
+rand.workspace = true
 
 toml = "0.7"
 resolve-path = "0.1.0"

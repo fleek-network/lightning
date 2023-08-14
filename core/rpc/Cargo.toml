@@ -24,3 +24,7 @@ hp-fixed.workspace = true
 reqwest = { workspace = true, features = ["json"] }
 lightning-application = { path = "../application" }
 #lightning-consensus = {path="../consensus"}
+
+
+[features]
+e2e-test = []

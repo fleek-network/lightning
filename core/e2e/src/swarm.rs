@@ -18,6 +18,10 @@ use lightning_consensus::{
     config::Config as ConsensusConfig,
     consensus::{Consensus, PubSubMsg},
 };
+use lightning_dht::{
+    config::{Bootstrapper, Config as DhtConfig},
+    dht::Dht,
+};
 use lightning_handshake::server::{HandshakeServer, HandshakeServerConfig, TcpProvider};
 use lightning_interfaces::{BroadcastInterface, ConfigConsumer};
 use lightning_node::{config::TomlConfigProvider, template::broadcast::Broadcast};
@@ -71,6 +75,8 @@ pub struct SwarmBuilder {
     num_nodes: Option<usize>,
     epoch_start: Option<u64>,
     epoch_time: Option<u64>,
+    port_assigner: Option<PortAssigner>,
+    bootstrappers: Option<Vec<Bootstrapper>>,
 }
 
 impl SwarmBuilder {
@@ -94,6 +100,16 @@ impl SwarmBuilder {
         self
     }
 
+    pub fn with_port_assigner(mut self, port_assigner: PortAssigner) -> Self {
+        self.port_assigner = Some(port_assigner);
+        self
+    }
+
+    pub fn with_bootstrappers(mut self, bootstrappers: Vec<Bootstrapper>) -> Self {
+        self.bootstrappers = Some(bootstrappers);
+        self
+    }
+
     pub fn build(self) -> Swarm {
         let num_nodes = self.num_nodes.expect("Number of nodes must be provided.");
         let directory = self.directory.expect("Directory must be provided.");
@@ -110,7 +126,12 @@ impl SwarmBuilder {
 
         fs::create_dir_all(&directory).expect("Failed to create swarm directory");
 
-        let mut port_assigner = PortAssigner::default();
+        let mut port_assigner = match self.port_assigner {
+            Some(port_assigner) => port_assigner,
+            None => PortAssigner::default(),
+        };
+
+        let bootstrappers = self.bootstrappers.unwrap_or(Vec::new());
 
         let min_stake = genesis.min_stake;
         genesis.committee = Vec::new();
@@ -124,6 +145,9 @@ impl SwarmBuilder {
             let mempool_addr_port = port_assigner
                 .get_port(8000, 40000, Transport::Tcp)
                 .expect("Failed to get available port.");
+            let dht_port = port_assigner
+                .get_port(8000, 40000, Transport::Udp)
+                .expect("Failed to get available port.");
 
             let node_directory = directory.join(format!("swarm/nodes/{i}"));
             fs::create_dir_all(&directory).expect("Failed to create node directory");
@@ -135,6 +159,15 @@ impl SwarmBuilder {
             config.table.lock().expect("Failed to aqcuire lock").insert(
                 Rpc::<QueryRunner>::KEY.into(),
                 Value::try_from(&rpc_config).unwrap(),
+            );
+
+            let dht_config = DhtConfig {
+                address: format!("0.0.0.0:{dht_port}").parse().unwrap(),
+                bootstrappers: bootstrappers.clone(),
+            };
+            config.table.lock().expect("Failed to aqcuire lock").insert(
+                Dht::<Topology<QueryRunner>>::KEY.into(),
+                Value::try_from(&dht_config).unwrap(),
             );
 
             let consensus_config = ConsensusConfig {

@@ -15,3 +15,14 @@ pub struct NodeKeyParam {
 pub struct ClientKeyParam {
     pub public_key: ClientPublicKey,
 }
+
+#[derive(Deserialize)]
+pub struct DhtPutParam {
+    pub key: Vec<u8>,
+    pub value: Vec<u8>,
+}
+
+#[derive(Deserialize)]
+pub struct DhtGetParam {
+    pub key: Vec<u8>,
+}

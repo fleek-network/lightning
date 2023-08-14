@@ -13,4 +13,7 @@ pub trait RpcInterface<Q: SyncQueryRunnerInterface>:
 {
     /// Initialize the *RPC* server, with the given parameters.
     fn init(config: Self::Config, mempool: MempoolSocket, query_runner: Q) -> anyhow::Result<Self>;
+
+    #[cfg(feature = "e2e-test")]
+    fn provide_dht_socket(&self, dht_socket: crate::dht::DhtSocket);
 }

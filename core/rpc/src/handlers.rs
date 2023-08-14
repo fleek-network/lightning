@@ -4,11 +4,15 @@ use axum::{Extension, Json};
 use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use jsonrpc_v2::{Data, Error, MapRouter, Params, RequestObject, ResponseObjects, Server};
+#[cfg(feature = "e2e-test")]
+use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
 use lightning_interfaces::{
     types::{EpochInfo, NodeInfo, NodeServed, ProtocolParams, TotalServed, UpdateRequest},
     SyncQueryRunnerInterface,
 };
 
+#[cfg(feature = "e2e-test")]
+use crate::types::{DhtGetParam, DhtPutParam};
 use crate::{
     server::RpcData,
     types::{NodeKeyParam, PublicKeyParam},
@@ -33,7 +37,7 @@ impl RpcServer {
     where
         Q: SyncQueryRunnerInterface + 'static,
     {
-        let server = Server::new()
+        let mut server = Server::new()
             .with_data(Data::new(interface))
             .with_method("rpc.discover", discovery_handler::<Q>)
             .with_method("flk_ping", ping_handler::<Q>)
@@ -74,6 +78,11 @@ impl RpcServer {
             .with_method("flk_get_node_registry", get_node_registry_handler::<Q>)
             .with_method("flk_get_reputation", get_reputation_handler::<Q>)
             .with_method("flk_send_txn", send_txn::<Q>);
+
+        if cfg!(feature = "e2e-test") {
+            server = server.with_method("flk_dht_put", dht_put::<Q>);
+            server = server.with_method("flk_dht_get", dht_get::<Q>);
+        }
 
         RpcServer(server.finish())
     }
@@ -243,4 +252,53 @@ pub async fn send_txn<Q: SyncQueryRunnerInterface>(
 
     // println!("{:?}", param);
     //Ok(())
+}
+
+#[cfg(feature = "e2e-test")]
+pub async fn dht_put<Q: SyncQueryRunnerInterface>(
+    data: Data<Arc<RpcData<Q>>>,
+    Params(param): Params<DhtPutParam>,
+) -> Result<()> {
+    let dht_socket = match data.0.dht_socket.lock().unwrap().clone() {
+        Some(dht_socket) => dht_socket,
+        None => panic!("Dht socket not provided"),
+    };
+
+    let res = dht_socket
+        .run(DhtRequest::Put {
+            prefix: KeyPrefix::ContentRegistry,
+            key: param.key,
+            value: param.value,
+        })
+        .await
+        .expect("sending put request failed.");
+    if let DhtResponse::Put(()) = res {
+        Ok(())
+    } else {
+        Err(Error::INTERNAL_ERROR)
+    }
+}
+
+#[cfg(feature = "e2e-test")]
+pub async fn dht_get<Q: SyncQueryRunnerInterface>(
+    data: Data<Arc<RpcData<Q>>>,
+    Params(param): Params<DhtGetParam>,
+) -> Result<Option<TableEntry>> {
+    let dht_socket = match data.0.dht_socket.lock().unwrap().clone() {
+        Some(dht_socket) => dht_socket,
+        None => panic!("Dht socket not provided"),
+    };
+
+    let res = dht_socket
+        .run(DhtRequest::Get {
+            prefix: KeyPrefix::ContentRegistry,
+            key: param.key,
+        })
+        .await
+        .expect("sending get request failed.");
+    if let DhtResponse::Get(value) = res {
+        Ok(value)
+    } else {
+        Err(Error::INTERNAL_ERROR)
+    }
 }

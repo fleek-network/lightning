@@ -132,6 +132,9 @@ impl<T: LightningTypes> Node<T> {
             application.sync_query(),
         )?;
 
+        #[cfg(feature = "e2e-test")]
+        rpc.provide_dht_socket(dht.get_socket());
+
         let handshake = T::Handshake::init(configuration.get::<T::Handshake>())?;
 
         Ok(Self {

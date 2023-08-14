@@ -14,7 +14,7 @@ lightning-interfaces = { path = "../interfaces" }
 lightning-rep-collector = { path = "../rep-collector" }
 lightning-consensus = { path = "../consensus" }
 lightning-notifier = { path = "../notifier" }
-lightning-rpc = { path = "../rpc" }
+lightning-rpc = { path = "../rpc"}
 lightning-signer = { path = "../signer" }
 lightning-dht = { path = "../dht" }
 lightning-test-utils = { path = "../test-utils" }

@@ -30,3 +30,7 @@ fleek-crypto.workspace = true
 hp-fixed.workspace = true
 ink-quill.workspace = true
 lightning-schema = { path = "../schema/" }
+
+
+[features]
+e2e-test = []

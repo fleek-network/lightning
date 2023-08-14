@@ -35,9 +35,17 @@ pub struct Builder {
 impl Builder {
     /// Returns a new [`Builder`].
     pub fn new(network_secret_key: NodeNetworkingSecretKey, config: Config) -> Self {
+        let nodes: Vec<NodeInfo> = config
+            .bootstrappers
+            .iter()
+            .map(|b| NodeInfo {
+                key: b.network_public_key,
+                address: b.address,
+            })
+            .collect();
         Self {
             config,
-            nodes: vec![],
+            nodes,
             network_secret_key,
             buffer_size: None,
         }
