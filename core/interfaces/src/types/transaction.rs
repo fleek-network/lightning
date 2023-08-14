@@ -160,7 +160,7 @@ impl ToDigest for UpdatePayload {
     /// This function must take all of the data into account, including the
     /// nonce, the name of all of the update method names along with the value
     /// for all of the parameters.
-    fn to_digest(&self) -> [u8; 32] {
+    fn transcript(&self) -> TranscriptBuilder {
         let mut transcript_builder =
             TranscriptBuilder::empty(FN_TXN_PAYLOAD_DOMAIN).with("nonce", &self.nonce);
 
@@ -314,7 +314,7 @@ impl ToDigest for UpdatePayload {
             },
         }
 
-        transcript_builder.hash()
+        transcript_builder
     }
 }
 

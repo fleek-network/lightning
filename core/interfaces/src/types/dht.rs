@@ -1,4 +1,3 @@
-use blake3_tree::blake3::derive_key;
 use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSignature, PublicKey};
 use ink_quill::TranscriptBuilder;
 use serde::{Deserialize, Serialize};
@@ -48,13 +47,12 @@ pub struct TableEntry {
 }
 
 impl ToDigest for TableEntry {
-    fn to_digest(&self) -> [u8; 32] {
-        let tb = TranscriptBuilder::empty(FN_DHT_ENTRY_DOMAIN)
+    fn transcript(&self) -> TranscriptBuilder {
+        TranscriptBuilder::empty(FN_DHT_ENTRY_DOMAIN)
             .with("prefix", &(self.prefix as u8))
             .with("key", &self.key)
             .with("value", &self.value)
-            .with("source", &self.source.0);
-        derive_key(tb.get_domain(), &tb.compile())
+            .with("source", &self.source.0)
     }
 }
 

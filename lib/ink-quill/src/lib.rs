@@ -1,5 +1,41 @@
 // inspired by https://gist.github.com/qti3e/ed5b1e06514957f7032d3b41ff362c34
 
+/// Generic trait for implementing digest functionality for an object using a [`TranscriptBuilder`].
+///
+/// # Example
+///
+/// ```
+/// use ink_quill::{ToDigest, TranscriptBuilder};
+///
+/// struct ExampleMessage {
+///     foo: u64,
+///     bar: String,
+/// }
+///
+/// impl ToDigest for ExampleMessage {
+///     fn transcript(&self) -> TranscriptBuilder {
+///         TranscriptBuilder::empty("example domain")
+///             .with("FOO", &self.foo)
+///             .with("BAR", &self.bar)
+///     }
+/// }
+///
+/// let message = ExampleMessage {
+///     foo: 0,
+///     bar: "blah".into(),
+/// };
+/// let digest = message.to_digest();
+/// ```
+pub trait ToDigest {
+    /// Returns the underlying transcript
+    fn transcript(&self) -> TranscriptBuilder;
+
+    /// Returns the digest of the object.
+    fn to_digest(&self) -> [u8; 32] {
+        self.transcript().hash()
+    }
+}
+
 /// The `TranscriptBuilder` struct is responsible for constructing a transcript of input data.
 /// It contains a `domain` for unique identification, a `data` vector to hold the input data,
 /// and an optional `prefix` for new labels.

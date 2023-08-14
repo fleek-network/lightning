@@ -3625,7 +3625,9 @@ name = "lightning-schema"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "fleek-crypto",
  "flexbuffers",
+ "ink-quill",
  "serde",
 ]
 

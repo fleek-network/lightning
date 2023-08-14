@@ -1,4 +1,5 @@
 use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSignature};
+use ink_quill::TranscriptBuilder;
 use lightning_interfaces::{schema::AutoImplSerde, Blake3Hash, ToDigest, Topic};
 use serde::{Deserialize, Serialize};
 
@@ -10,12 +11,11 @@ pub struct BroadcastMessage {
 }
 
 impl ToDigest for BroadcastMessage {
-    fn to_digest(&self) -> [u8; 32] {
-        ink_quill::TranscriptBuilder::empty("lightning-broadcast")
+    fn transcript(&self) -> TranscriptBuilder {
+        TranscriptBuilder::empty("lightning-broadcast")
             .with("TOPIC", &self.topic)
             .with("PUBKEY", &self.originator.0)
             .with("PAYLOAD", &self.payload)
-            .hash()
     }
 }
 
