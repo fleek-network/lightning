@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::types::NodeIndex;
 use lightning_test_utils::{random, reputation};
 use rand::{rngs::StdRng, Rng};
 
@@ -12,7 +13,7 @@ const PROB_MEASUREMENT_PRESENT: f64 = 0.1;
 pub(crate) fn generate_weighted_measurements_map(
     map_size: usize,
     rng: Option<StdRng>,
-) -> HashMap<NodePublicKey, Vec<WeightedReputationMeasurements>> {
+) -> HashMap<NodeIndex, Vec<WeightedReputationMeasurements>> {
     let mut rng = if let Some(rng) = rng {
         rng
     } else {
@@ -21,11 +22,10 @@ pub(crate) fn generate_weighted_measurements_map(
     let mut map = HashMap::with_capacity(map_size);
     for _ in 0..map_size {
         let mut array = [0; 96];
-        (0..96).for_each(|i| array[i] = rng.gen_range(0..=255));
-        let node = NodePublicKey(array);
+        let node_index = rng.gen_range(0..=NodeIndex::MAX);
         let num_measurements = rng.gen_range(1..20);
         map.insert(
-            node,
+            node_index,
             generate_weighted_measurements(num_measurements, Some(rng.clone())),
         );
     }
