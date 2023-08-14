@@ -1,9 +1,9 @@
-use std::sync::Arc;
+use std::{sync::Arc, marker::PhantomData};
 
 use async_trait::async_trait;
 use lightning_interfaces::{
     types::{CompressionAlgoSet, CompressionAlgorithm},
-    Blake3Hash, Blake3Tree, BlockStoreInterface, ConfigConsumer, ContentChunk,
+    Blake3Hash, Blake3Tree, BlockStoreInterface, ConfigConsumer, ContentChunk, infu_collection::Collection,
 };
 use serde::{Deserialize, Serialize};
 use tempdir::TempDir;
@@ -22,18 +22,20 @@ pub struct FsStoreConfig {
 }
 
 #[derive(Clone)]
-pub struct FsStore {
+pub struct FsStore<C: Collection> {
     store_dir_path: String,
     tmp_dir: Arc<TempDir>,
+    collection: PhantomData<C>
 }
 
-impl ConfigConsumer for FsStore {
+impl<C> ConfigConsumer for FsStore<C> where C: Collection {
     const KEY: &'static str = "fsstore";
     type Config = FsStoreConfig;
 }
 
 #[async_trait]
-impl BlockStoreInterface for FsStore {
+impl<C> BlockStoreInterface for FsStore<C> where C: Collection<BlockStoreInterface = Self> {
+    type Collection = C;
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
     type Put = IncrementalPut<Self>;
 
@@ -41,6 +43,7 @@ impl BlockStoreInterface for FsStore {
         Ok(Self {
             store_dir_path: config.store_dir_path,
             tmp_dir: TempDir::new(TMP_DIR_PREFIX).map(Arc::new)?,
+            collection: PhantomData
         })
     }
 
@@ -86,7 +89,7 @@ impl BlockStoreInterface for FsStore {
 
 // TODO: Add logging.
 #[async_trait]
-impl Store for FsStore {
+impl<C> Store for FsStore<C> where C: Collection {
     async fn fetch(&self, key: &Key) -> Option<Block> {
         let path = format!("{}/{:?}", self.store_dir_path, key.0);
         fs::read(path).await.ok()
