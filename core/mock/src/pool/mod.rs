@@ -18,7 +18,7 @@ use connection::{Receiver, Sender};
 use dashmap::DashMap;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::{
-    schema::LightningMessage, ConfigConsumer, ConnectionPoolInterface, ServiceScope,
+    schema::LightningMessage, types::ServiceScope, ConfigConsumer, ConnectionPoolInterface,
     SignerInterface, SyncQueryRunnerInterface, WithStartAndShutdown,
 };
 use scope::{Connector, Listener};
@@ -201,10 +201,7 @@ impl<S: SignerInterface + 'static, Q: SyncQueryRunnerInterface + 'static> Connec
         }
     }
 
-    fn bind<T>(
-        &self,
-        scope: lightning_interfaces::ServiceScope,
-    ) -> (Self::Listener<T>, Self::Connector<T>)
+    fn bind<T>(&self, scope: ServiceScope) -> (Self::Listener<T>, Self::Connector<T>)
     where
         T: LightningMessage + 'static,
     {
@@ -246,8 +243,9 @@ mod tests {
     use anyhow::anyhow;
     use lightning_application::config::Mode;
     use lightning_interfaces::{
-        ApplicationInterface, ConnectionPoolInterface, ConnectorInterface, ListenerInterface,
-        ReceiverInterface, SenderInterface, ServiceScope, SignerInterface, WithStartAndShutdown,
+        types::ServiceScope, ApplicationInterface, ConnectionPoolInterface, ConnectorInterface,
+        ListenerInterface, ReceiverInterface, SenderInterface, SignerInterface,
+        WithStartAndShutdown,
     };
     use lightning_schema::AutoImplSerde;
     use lightning_signer::Signer;

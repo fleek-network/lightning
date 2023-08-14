@@ -14,9 +14,9 @@ use config::Config;
 use dashmap::DashMap;
 use inner::BroadcastInner;
 use lightning_interfaces::{
-    broadcast::BroadcastInterface, schema::LightningMessage, ConfigConsumer,
+    broadcast::BroadcastInterface, schema::LightningMessage, types::Topic, ConfigConsumer,
     ConnectionPoolInterface, ListenerConnector, ListenerInterface, NotifierInterface,
-    SignerInterface, Topic, TopologyInterface, WithStartAndShutdown,
+    SignerInterface, TopologyInterface, WithStartAndShutdown,
 };
 use pubsub::PubSubTopic;
 use schema::BroadcastFrame;

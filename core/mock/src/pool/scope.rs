@@ -5,8 +5,8 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::{
-    schema::LightningMessage, ConnectorInterface, ListenerInterface, SenderReceiver, ServiceScope,
-    SignerInterface, SyncQueryRunnerInterface,
+    schema::LightningMessage, types::ServiceScope, ConnectorInterface, ListenerInterface,
+    SenderReceiver, SignerInterface, SyncQueryRunnerInterface,
 };
 use tokio::sync::mpsc::{channel, Receiver};
 

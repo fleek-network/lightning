@@ -1,4 +1,4 @@
-use lightning_interfaces::ServiceScope;
+use lightning_interfaces::types::ServiceScope;
 use lightning_schema::AutoImplSerde;
 use serde::{Deserialize, Serialize};
 

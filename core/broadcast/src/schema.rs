@@ -1,6 +1,6 @@
 use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSignature};
 use ink_quill::TranscriptBuilder;
-use lightning_interfaces::{schema::AutoImplSerde, Blake3Hash, ToDigest, Topic};
+use lightning_interfaces::{schema::AutoImplSerde, types::Topic, Blake3Hash, ToDigest};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

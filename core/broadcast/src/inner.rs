@@ -8,8 +8,8 @@ use fleek_crypto::{
     NodeNetworkingSecretKey, NodeNetworkingSignature, NodePublicKey, PublicKey, SecretKey,
 };
 use lightning_interfaces::{
-    Blake3Hash, ConnectionPoolInterface, ConnectorInterface, ReceiverInterface, SenderInterface,
-    SignerInterface, ToDigest, Topic, TopologyInterface,
+    types::Topic, Blake3Hash, ConnectionPoolInterface, ConnectorInterface, ReceiverInterface,
+    SenderInterface, SignerInterface, ToDigest, TopologyInterface,
 };
 
 use crate::schema::{BroadcastFrame, BroadcastMessage};

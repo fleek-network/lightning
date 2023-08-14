@@ -3,8 +3,8 @@ use std::{marker::PhantomData, sync::Arc};
 use anyhow::Result;
 use async_trait::async_trait;
 use lightning_interfaces::{
-    schema::LightningMessage, signer::SignerInterface, BroadcastInterface, ConfigConsumer,
-    ListenerConnector, NotifierInterface, PubSub, SyncQueryRunnerInterface, Topic,
+    schema::LightningMessage, signer::SignerInterface, types::Topic, BroadcastInterface,
+    ConfigConsumer, ListenerConnector, NotifierInterface, PubSub, SyncQueryRunnerInterface,
     TopologyInterface, WithStartAndShutdown,
 };
 

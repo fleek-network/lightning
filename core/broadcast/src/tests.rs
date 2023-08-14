@@ -8,9 +8,10 @@ use lightning_application::{
     query_runner::QueryRunner,
 };
 use lightning_interfaces::{
-    schema::AutoImplSerde, ApplicationInterface, BroadcastInterface, ConnectionPoolInterface,
-    NotifierInterface, PubSub, ServiceScope, SignerInterface, Topic, TopologyInterface,
-    WithStartAndShutdown,
+    schema::AutoImplSerde,
+    types::{ServiceScope, Topic},
+    ApplicationInterface, BroadcastInterface, ConnectionPoolInterface, NotifierInterface, PubSub,
+    SignerInterface, TopologyInterface, WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;

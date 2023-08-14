@@ -2,7 +2,7 @@ use std::{marker::PhantomData, sync::Arc};
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use lightning_interfaces::{schema::LightningMessage, PubSub, Topic};
+use lightning_interfaces::{schema::LightningMessage, types::Topic, PubSub};
 
 pub struct PubSubTopic<M: LightningMessage> {
     _m: PhantomData<M>,

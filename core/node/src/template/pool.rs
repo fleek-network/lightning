@@ -2,9 +2,9 @@ use std::marker::PhantomData;
 
 use async_trait::async_trait;
 use lightning_interfaces::{
-    schema::LightningMessage, ConfigConsumer, ConnectionPoolInterface, ConnectorInterface,
-    ListenerInterface, ReceiverInterface, SenderInterface, SenderReceiver, SignerInterface,
-    SyncQueryRunnerInterface, WithStartAndShutdown,
+    schema::LightningMessage, types::ServiceScope, ConfigConsumer, ConnectionPoolInterface,
+    ConnectorInterface, ListenerInterface, ReceiverInterface, SenderInterface, SenderReceiver,
+    SignerInterface, SyncQueryRunnerInterface, WithStartAndShutdown,
 };
 
 use super::config::Config;
@@ -65,10 +65,7 @@ impl<Q: SyncQueryRunnerInterface, S: SignerInterface> ConnectionPoolInterface
         Self { _q: PhantomData }
     }
 
-    fn bind<T>(
-        &self,
-        _scope: lightning_interfaces::ServiceScope,
-    ) -> (Self::Listener<T>, Self::Connector<T>)
+    fn bind<T>(&self, _scope: ServiceScope) -> (Self::Listener<T>, Self::Connector<T>)
     where
         T: LightningMessage,
     {

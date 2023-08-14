@@ -2,11 +2,13 @@ use serde::{Deserialize, Serialize};
 
 mod application;
 mod bridge;
+mod broadcast;
 mod compression;
 mod content;
 mod dht;
 mod misbehavior;
 mod pod;
+mod pool;
 mod reputation;
 mod response;
 mod state;
@@ -14,11 +16,13 @@ mod transaction;
 
 pub use application::*;
 pub use bridge::*;
+pub use broadcast::*;
 pub use compression::*;
 pub use content::*;
 pub use dht::*;
 pub use misbehavior::*;
 pub use pod::*;
+pub use pool::*;
 pub use reputation::*;
 pub use response::*;
 pub use state::*;

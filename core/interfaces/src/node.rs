@@ -3,12 +3,21 @@ use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 use async_trait::async_trait;
 
 use crate::{
-    application::ApplicationInterface, blockstore::BlockStoreInterface,
-    common::WithStartAndShutdown, config::ConfigProviderInterface, consensus::ConsensusInterface,
-    dht::DhtInterface, handshake::HandshakeInterface, notifier::NotifierInterface,
-    origin::OriginProviderSocket, pod::DeliveryAcknowledgmentAggregatorInterface,
-    reputation::ReputationAggregatorInterface, rpc::RpcInterface, signer::SignerInterface,
-    BroadcastInterface, ConnectionPoolInterface, ServiceScope, TopologyInterface,
+    application::ApplicationInterface,
+    blockstore::BlockStoreInterface,
+    common::WithStartAndShutdown,
+    config::ConfigProviderInterface,
+    consensus::ConsensusInterface,
+    dht::DhtInterface,
+    handshake::HandshakeInterface,
+    notifier::NotifierInterface,
+    origin::OriginProviderSocket,
+    pod::DeliveryAcknowledgmentAggregatorInterface,
+    reputation::ReputationAggregatorInterface,
+    rpc::RpcInterface,
+    signer::SignerInterface,
+    types::{ServiceScope, Topic},
+    BroadcastInterface, ConnectionPoolInterface, TopologyInterface,
 };
 
 pub trait LightningTypes: Send + Sync {
@@ -97,7 +106,7 @@ impl<T: LightningTypes> Node<T> {
             &signer,
             notifier,
         )?;
-        let consensus_pubsub = broadcast.get_pubsub(crate::Topic::Consensus);
+        let consensus_pubsub = broadcast.get_pubsub(Topic::Consensus);
 
         let consensus = T::Consensus::init(
             configuration.get::<T::Consensus>(),

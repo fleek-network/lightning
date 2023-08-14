@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::{
-    schema::LightningMessage, ReceiverInterface, SenderInterface, ServiceScope,
+    schema::LightningMessage, types::ServiceScope, ReceiverInterface, SenderInterface,
 };
 
 use super::schema::ScopedFrame;
