@@ -280,7 +280,7 @@ fn pod_request(
         UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
             commodity,  // units of data served
             service_id, // service 0 serving bandwidth
-            proofs: vec![DeliveryAcknowledgment::default()],
+            proofs: vec![DeliveryAcknowledgment],
             metadata: None,
         },
         secret_key,

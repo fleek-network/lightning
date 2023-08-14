@@ -56,7 +56,7 @@ pub struct MockWorker;
 
 impl MockWorker {
     fn mempool_socket() -> MempoolSocket {
-        TokioSpawn::spawn(MockWorker::default())
+        TokioSpawn::spawn(MockWorker)
     }
 }
 
