@@ -38,8 +38,6 @@ pub trait AutoImplSerde: Serialize + for<'a> Deserialize<'a> + Send + Sync + Siz
 // have a faster development. However an schema based approach should be preferred in
 // the future.
 
-impl AutoImplSerde for () {}
-
 impl<T: AutoImplSerde + 'static> LightningMessage for T {
     #[inline]
     fn decode(buffer: &[u8]) -> anyhow::Result<Self> {
@@ -55,6 +53,8 @@ impl<T: AutoImplSerde + 'static> LightningMessage for T {
         writer.write(ser.view())
     }
 }
+
+impl AutoImplSerde for () {}
 
 #[cfg(test)]
 mod test {
