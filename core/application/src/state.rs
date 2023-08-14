@@ -1190,7 +1190,7 @@ impl<B: Backend> State<B> {
         };
         self.bls_to_index.set(node.public_key, node_index);
         self.networking_to_index.set(node.network_key, node_index);
-        // todo sunday(dalton): Do we need this^^ if so we need one for networking key as well
+
         self.node_info.set(node_index, node);
         self.metadata.set(
             Metadata::NextNodeIndex,

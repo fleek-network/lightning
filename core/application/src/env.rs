@@ -278,8 +278,7 @@ impl Env<UpdatePerm> {
 
             // add node info
             for (_, node_info) in genesis.node_info {
-                // let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
-                //     .expect("Failed to parse node public key from genesis.");
+                
                 let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
                     Some(Value::NextNodeIndex(index)) => index,
                     _ => 0,
