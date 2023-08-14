@@ -3,7 +3,7 @@ use std::{net::SocketAddr, time::Duration};
 use clap::{Parser, Subcommand};
 use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSecretKey, SecretKey};
 use lightning_application::query_runner::QueryRunner;
-use lightning_dht::dht::Builder;
+use lightning_dht::{config::Config, dht::Builder};
 use lightning_interfaces::{
     dht::{DhtInterface, DhtSocket},
     types::{DhtRequest, DhtResponse, KeyPrefix},
@@ -121,7 +121,7 @@ async fn start_node<T: TopologyInterface>(
     secret_key: NodeNetworkingSecretKey,
     bootstrapper: Option<(SocketAddr, NodeNetworkingPublicKey)>,
 ) -> DhtSocket {
-    let mut builder = Builder::new(secret_key);
+    let mut builder = Builder::new(secret_key, Config::default());
 
     if let Some((address, key)) = bootstrapper {
         tracing::info!("bootstrapping to {address:?} {key:?}");

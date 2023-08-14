@@ -12,7 +12,7 @@ use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSecretKey, SecretKey};
 use lightning_interfaces::{
     dht::{DhtInterface, DhtSocket},
     types::{DhtRequest, DhtResponse, TableEntry},
-    SignerInterface, TopologyInterface, WithStartAndShutdown,
+    ConfigConsumer, SignerInterface, TopologyInterface, WithStartAndShutdown,
 };
 use tokio::{
     net::UdpSocket,
@@ -20,25 +20,25 @@ use tokio::{
 };
 
 use crate::{
-    bootstrap, bootstrap::BootstrapRequest, handler, handler::HandlerRequest, query::NodeInfo,
-    store, table,
+    bootstrap, bootstrap::BootstrapRequest, config::Config, handler, handler::HandlerRequest,
+    query::NodeInfo, store, table,
 };
 
 /// Builds the DHT.
 pub struct Builder {
+    config: Config,
     nodes: Vec<NodeInfo>,
     network_secret_key: NodeNetworkingSecretKey,
-    address: Option<SocketAddr>,
     buffer_size: Option<usize>,
 }
 
 impl Builder {
     /// Returns a new [`Builder`].
-    pub fn new(network_secret_key: NodeNetworkingSecretKey) -> Self {
+    pub fn new(network_secret_key: NodeNetworkingSecretKey, config: Config) -> Self {
         Self {
+            config,
             nodes: vec![],
             network_secret_key,
-            address: None,
             buffer_size: None,
         }
     }
@@ -46,11 +46,6 @@ impl Builder {
     /// Add node which will be added to routing table.
     pub fn add_node(&mut self, key: NodeNetworkingPublicKey, address: SocketAddr) {
         self.nodes.push(NodeInfo { key, address });
-    }
-
-    /// Set address to bind the node's socket to.
-    pub fn set_address(&mut self, address: SocketAddr) {
-        self.address = Some(address);
     }
 
     /// Set buffer size for tasks.
@@ -61,7 +56,6 @@ impl Builder {
     /// Build and initiates the DHT.
     pub fn build<T: TopologyInterface>(self) -> Result<Dht<T>> {
         let buffer_size = self.buffer_size.unwrap_or(10_000);
-        let address = self.address.unwrap_or_else(|| "0.0.0.0:0".parse().unwrap());
 
         let (socket, rx) = Socket::raw_bounded(2048);
         let (handler_tx, handler_rx) = mpsc::channel(buffer_size);
@@ -72,7 +66,7 @@ impl Builder {
             socket_rx: Arc::new(Mutex::new(Some(rx))),
             nodes: Arc::new(Mutex::new(Some(self.nodes))),
             buffer_size,
-            address,
+            address: self.config.address,
             network_secret_key: self.network_secret_key,
             handler_tx,
             bootstrap_tx,
@@ -256,12 +250,22 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
 impl<T: TopologyInterface> DhtInterface for Dht<T> {
     type Topology = T;
 
-    fn init<S: SignerInterface>(signer: &S, _: Arc<Self::Topology>) -> Result<Self> {
+    fn init<S: SignerInterface>(
+        signer: &S,
+        _: Arc<Self::Topology>,
+        config: Self::Config,
+    ) -> Result<Self> {
         let (network_secret_key, _) = signer.get_sk();
-        Builder::new(network_secret_key).build()
+        Builder::new(network_secret_key, config).build()
     }
 
     fn get_socket(&self) -> DhtSocket {
         self.socket.clone()
     }
+}
+
+impl<T: TopologyInterface> ConfigConsumer for Dht<T> {
+    const KEY: &'static str = "dht";
+
+    type Config = Config;
 }

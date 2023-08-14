@@ -8,4 +8,5 @@ mod socket;
 mod store;
 mod table;
 
+pub mod config;
 pub mod dht;

@@ -79,7 +79,7 @@ impl<T: LightningTypes> Node<T> {
             application.sync_query(),
         )?);
 
-        let dht = T::Dht::init(&signer, topology.clone())?;
+        let dht = T::Dht::init(&signer, topology.clone(), configuration.get::<T::Dht>())?;
 
         let notifier = T::Notifier::init(application.sync_query());
 
@@ -182,6 +182,7 @@ impl<T: LightningTypes> Node<T> {
         configuration.get::<T::ReputationAggregator>();
         configuration.get::<T::Rpc>();
         configuration.get::<T::Handshake>();
+        configuration.get::<T::Dht>();
     }
 }
 
