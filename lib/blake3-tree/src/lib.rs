@@ -24,11 +24,10 @@ pub struct IncrementalVerifier {
     ///
     /// # Guarantees
     ///
-    /// 1. The cursor is never null in any valid execution path of the
-    ///    public methods.
+    /// 1. The cursor is never null in any valid execution path of the public methods.
     ///
-    /// 2. The children of the cursor are always null. i.e we're always
-    ///    pointing to a leaf/non-internal node.
+    /// 2. The children of the cursor are always null. i.e we're always pointing to a
+    ///    leaf/non-internal node.
     cursor: *mut IncrementalVerifierTreeNode,
     /// The index of the block we're verifying now, starting from zero.
     block_counter: usize,
@@ -323,8 +322,8 @@ impl IncrementalVerifier {
 
         // SAFETY:
         // 1. Dereferencing the `self.cursor` is safe since we don't set it to null.
-        // 2. `self.merge_stack` guarantees that the new node in the stack which we
-        //     popped has both children set.
+        // 2. `self.merge_stack` guarantees that the new node in the stack which we popped has both
+        //    children set.
         unsafe {
             if &(*node).hash != self.current_hash() {
                 // This is an error and we need to return the error, we should also

@@ -69,8 +69,8 @@ impl<S: SerdeBackend> AtomoInner<S> {
     /// This method panics if:
     ///
     /// 1. The table with the given name does not exists.
-    /// 2. The generic types passed for the key-value pair mismatch from the type that was used
-    ///    when constructing atomo.
+    /// 2. The generic types passed for the key-value pair mismatch from the type that was used when
+    ///    constructing atomo.
     #[inline]
     pub fn resolve<K, V>(&self, name: impl AsRef<str>) -> ResolvedTableReference<K, V>
     where

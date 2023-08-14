@@ -258,6 +258,5 @@ impl<T, U> Drop for SnapshotList<T, U> {
 #[cfg(tests)]
 mod tests {
     // TODO(qti3e): test this data structure. test ideas:
-    // 1. `find` method should work in the single-thread mode.
-    //      1.1. Should return `None`
+    // 1. `find` method should work in the single-thread mode. 1.1. Should return `None`
 }

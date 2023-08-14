@@ -48,10 +48,10 @@ pub trait ConnectionPoolInterface<C: Collection>:
     /// Listener object implemented by this connection pool. The bounds here ensure
     /// that both listener and connector produce the same type.
     type Listener<T: LightningMessage>: ListenerInterface<
-        T,
-        Sender = <Self::Connector<T> as ConnectorInterface<T>>::Sender,
-        Receiver = <Self::Connector<T> as ConnectorInterface<T>>::Receiver,
-    > = infusion::Blank<T>;
+            T,
+            Sender = <Self::Connector<T> as ConnectorInterface<T>>::Sender,
+            Receiver = <Self::Connector<T> as ConnectorInterface<T>>::Receiver,
+        > = infusion::Blank<T>;
 
     /// Connector object implemented by this connection pool.
     type Connector<T: LightningMessage>: ConnectorInterface<T> = infusion::Blank<T>;

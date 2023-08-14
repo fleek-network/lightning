@@ -347,9 +347,8 @@ impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> Co
 //
 //     async fn hello_world_server(
 //         port: u16,
-//     ) -> Result<(
-//         TcpHandshakeServer<Sdk<OwnedReadHalf, OwnedWriteHalf>>,
-//         Sdk<OwnedReadHalf, OwnedWriteHalf>,
+//     ) -> Result<( TcpHandshakeServer<Sdk<OwnedReadHalf, OwnedWriteHalf>>, Sdk<OwnedReadHalf,
+//       OwnedWriteHalf>,
 //     )> {
 //         let signer = TokioSpawn::spawn(Signer {});
 //         let app = Application::init(Config::default()).await?;
