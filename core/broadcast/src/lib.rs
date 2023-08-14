@@ -69,18 +69,27 @@ where
             return;
         }
 
+        // initiate connections
         self.inner.apply_topology().await;
+
+        // setup notifier
         let notifier = self.notifier.clone();
         let (epoch_tx, mut epoch_rx) = tokio::sync::mpsc::channel(1);
         notifier.notify_on_new_epoch(epoch_tx.clone());
+
+        // setup shutdown channel
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel();
+        *self
+            .shutdown_signal
+            .write()
+            .expect("failed to aquire shutdown lock") = Some(shutdown_tx);
 
         let inner = self.inner.clone();
         let listener = self.listener.clone();
         let outgoing = self.receiver.clone();
 
+        // Spawn the main loop
         tokio::spawn(async move {
-            // main loop, receives new connections, or terminate on the signal
             let mut listener = listener.lock().await;
             let mut outgoing = outgoing.lock().await;
             loop {
@@ -88,6 +97,7 @@ where
                     // Incoming connection
                     res = listener.accept() => {
                         let Some(conn) = res else {
+                            // The listener should only return none here if it shuts down
                             break
                         };
                         if let Err(e) = inner.handle_connection(conn.1, conn.0).await {
@@ -111,11 +121,6 @@ where
                 }
             }
         });
-
-        *self
-            .shutdown_signal
-            .write()
-            .expect("failed to aquire shutdown lock") = Some(shutdown_tx);
     }
 
     async fn shutdown(&self) {
@@ -173,13 +178,14 @@ where
     }
 
     fn get_pubsub<M: LightningMessage + Clone>(&self, topic: Topic) -> Self::PubSub<M> {
-        let receiver = self
-            .channels
-            .entry(topic)
-            .or_insert_with(|| tokio::sync::broadcast::channel(256).0)
-            .subscribe();
-        let sender = self.sender.clone();
-
-        PubSubTopic::new(topic, sender, receiver, self.channels.clone())
+        PubSubTopic::new(
+            topic,
+            self.sender.clone(),
+            self.channels
+                .entry(topic)
+                .or_insert_with(|| tokio::sync::broadcast::channel(256).0)
+                .subscribe(),
+            self.channels.clone(),
+        )
     }
 }

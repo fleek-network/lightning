@@ -5,7 +5,7 @@ use dashmap::DashMap;
 use lightning_interfaces::{schema::LightningMessage, PubSub, Topic};
 
 pub struct PubSubTopic<M: LightningMessage> {
-    _x: PhantomData<M>,
+    _m: PhantomData<M>,
     topic: Topic,
     /// sender for outgoing messages
     sender: tokio::sync::mpsc::Sender<(Topic, Vec<u8>)>,
@@ -23,7 +23,7 @@ impl<M: LightningMessage> PubSubTopic<M> {
         channels: Arc<DashMap<Topic, tokio::sync::broadcast::Sender<Vec<u8>>>>,
     ) -> Self {
         Self {
-            _x: PhantomData,
+            _m: PhantomData,
             topic,
             sender,
             receiver,
@@ -35,7 +35,7 @@ impl<M: LightningMessage> PubSubTopic<M> {
 impl<M: LightningMessage> Clone for PubSubTopic<M> {
     fn clone(&self) -> Self {
         Self {
-            _x: self._x,
+            _m: self._m,
             topic: self.topic,
             sender: self.sender.clone(),
             receiver: self
