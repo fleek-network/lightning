@@ -1,7 +1,7 @@
 pub mod bootstrap;
 mod lookup;
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use anyhow::{Error, Result};
 use fleek_crypto::NodeNetworkingPublicKey;
@@ -18,7 +18,8 @@ use tokio::{
 use tokio_util::time::DelayQueue;
 
 use crate::{
-    query::{NodeInfo, Response},
+    query::{Message, MessageType, NodeInfo, Query, Response},
+    socket,
     table::{TableKey, TableRequest},
     task::{bootstrap::Bootstrapper, lookup::LookupTask},
 };
@@ -91,7 +92,8 @@ pub enum Task {
     },
     Ping {
         target: TableKey,
-        rx: oneshot::Sender<()>,
+        address: SocketAddr,
+        tx: oneshot::Sender<()>,
     },
 }
 
@@ -195,7 +197,65 @@ impl TaskManager {
                     self.bootstrap_task = self.bootstrap_task.restart();
                 }
             },
-            Task::Ping { .. } => todo!(),
+            Task::Ping {
+                target,
+                tx,
+                address,
+            } => {
+                let id = rand::random();
+                let socket = self.socket.clone();
+                let sender_key = self.local_key;
+                let (task_tx, mut task_rx) = mpsc::channel(3);
+                self.ongoing.insert(id, OngoingTask { tx: task_tx });
+                self.set.spawn(async move {
+                    let payload = match bincode::serialize(&Query::Ping) {
+                        Ok(bytes) => bytes,
+                        Err(e) => {
+                            return TaskResult::Failed {
+                                id,
+                                error: e.into(),
+                            };
+                        },
+                    };
+
+                    let message = Message {
+                        ty: MessageType::Query,
+                        id,
+                        token: rand::random(),
+                        sender_key,
+                        payload: vec![],
+                    };
+
+                    let bytes = match bincode::serialize(&message) {
+                        Ok(bytes) => bytes,
+                        Err(e) => {
+                            return TaskResult::Failed {
+                                id,
+                                error: e.into(),
+                            };
+                        },
+                    };
+
+                    if let Err(e) = socket::send_to(&socket, &bytes, address).await {
+                        return TaskResult::Failed {
+                            id,
+                            error: e.into(),
+                        };
+                    }
+
+                    if tx.send(()).is_err() {
+                        tracing::error!("failed to send PING response")
+                    }
+
+                    match task_rx.recv().await {
+                        None => TaskResult::Failed {
+                            id,
+                            error: anyhow::anyhow!("sender handle was dropped"),
+                        },
+                        Some(_) => TaskResult::Success(id),
+                    }
+                });
+            },
         }
     }
 
