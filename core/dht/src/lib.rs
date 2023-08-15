@@ -1,5 +1,4 @@
 mod api;
-mod bootstrap;
 mod bucket;
 mod distance;
 mod query;
