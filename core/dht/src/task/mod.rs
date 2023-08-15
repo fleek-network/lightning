@@ -79,7 +79,6 @@ pub async fn start_worker(
                     }
                 };
 
-                tracing::trace!("removing task {id:?}");
                 task_set.remove_ongoing(id);
             }
         }
@@ -127,7 +126,7 @@ impl TaskManager {
             Some(ongoing) => {
                 if ongoing.tx.is_closed() {
                     // The task is done so this request is not expected.
-                    tracing::warn!("received unexpected response");
+                    tracing::warn!("received unexpected responseee");
                     return;
                 }
                 let task_tx = ongoing.tx.clone();
@@ -138,6 +137,7 @@ impl TaskManager {
                 });
             },
             None => {
+                tracing::trace!("event id {:?}", event.id);
                 tracing::warn!("received unexpected response");
             },
         }
@@ -276,6 +276,7 @@ struct OngoingTask {
 #[derive(Debug)]
 pub struct ResponseEvent {
     pub id: u64,
+    pub token: u64,
     pub sender_key: NodePublicKey,
     pub response: Response,
 }

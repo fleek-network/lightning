@@ -68,7 +68,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
                 .closest_nodes
                 .pickout(MAX_BUCKET_SIZE, 3, |node| node.status == Status::Initial)
             {
-                let id = rand::random();
+                let token = rand::random();
                 let payload = bincode::serialize(&Query::Find {
                     find_value: lookup.find_value_lookup,
                     target: lookup.target,
@@ -76,7 +76,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
                 .expect("query to be valid");
                 let message = Message {
                     ty: MessageType::Query,
-                    token: id,
+                    token,
                     id: lookup.id,
                     sender_key: lookup.local_key,
                     payload,
@@ -87,7 +87,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
                     node.inner.key,
                     PendingResponse {
                         node: node.inner,
-                        id,
+                        token,
                     },
                 );
             }
@@ -118,19 +118,19 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
             message = lookup.main_rx.recv() => {
                 let response_event = message.expect("handler worker not to drop the channel");
                 let sender_key = response_event.sender_key;
-                let response_id = response_event.id;
+                let response_token = response_event.token;
                 let response = response_event.response;
                 if pending.contains_key(&sender_key) || late.contains_key(&sender_key) {
                     // Validate id in response.
-                    let expected_id = match pending.get(&sender_key) {
-                        Some(pending) => pending.id,
+                    let expected_token = match pending.get(&sender_key) {
+                        Some(pending) => pending.token,
                         // It's fine to use unwrap here because of the of condition.
-                        None => late.get(&sender_key).unwrap().id,
+                        None => late.get(&sender_key).unwrap().token,
                     };
 
                     // If the id does not match, we ignore this response.
-                    if expected_id != response_id {
-                        tracing::trace!("expected id {expected_id} but received instead {response_id}");
+                    if expected_token != response_token {
+                        tracing::trace!("expected id {expected_token} but received instead {response_token}");
                         continue;
                     }
 
@@ -143,7 +143,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
                         .nodes
                         .into_iter()
                         .filter(|node| {
-                            !pending.contains_key(&node.key) && !late.contains_key(&node.key)
+                            !pending.contains_key(&node.key) && !late.contains_key(&node.key) && node.key != lookup.local_key
                         })
                         .map(|node| {
                             (
@@ -320,5 +320,5 @@ pub struct LookupNode {
 #[derive(Debug)]
 struct PendingResponse {
     node: NodeInfo,
-    id: u64,
+    token: u64,
 }

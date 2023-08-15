@@ -227,7 +227,8 @@ impl Handler {
                 tokio::spawn(async move {
                     if event_tx
                         .send(ResponseEvent {
-                            id: message.token,
+                            id: message.id,
+                            token: message.token,
                             sender_key: message.sender_key,
                             response,
                         })

@@ -172,10 +172,7 @@ impl Bootstrapper {
     pub async fn start(self, response_tx: oneshot::Sender<Result<()>>) -> TaskResult {
         match bootstrap(self.task_tx, self.table_tx, self.local_key, self.nodes).await {
             Ok(_) => {
-                if response_tx
-                    .send(Ok(()))
-                    .is_err()
-                {
+                if response_tx.send(Ok(())).is_err() {
                     tracing::error!("failed to send bootstrap result");
                 }
                 Ok(BOOTSTRAP_TASK_ID)

@@ -59,12 +59,11 @@ pub async fn start_worker(
                     }
                 }
             }
-            bootstrap_task = bootstrap_rx.recv() => {
-                let task = bootstrap_task.unwrap();
+            Some(bootstrap_task) = bootstrap_rx.recv() => {
                 let bootstrap_handler = handler.clone();
                 tokio::spawn(async move {
                     let result = bootstrap_handler.bootstrap().await;
-                    task.respond(result);
+                    bootstrap_task.respond(result);
                 });
             }
             _ = shutdown_notify.notified() => {
