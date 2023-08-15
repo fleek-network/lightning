@@ -24,6 +24,7 @@ use crate::{
     query,
     query::{HandlerRequest, NodeInfo},
     store, table, task,
+    task::bootstrap::Bootstrapper,
 };
 
 /// Builds the DHT.
@@ -179,14 +180,19 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
         ));
 
         let (event_queue_tx, event_queue_rx) = mpsc::channel(self.buffer_size);
-        tokio::spawn(task::start_worker(
+        let bootstrapper = Bootstrapper::new(
             task_tx,
+            table_tx.clone(),
+            public_key.0,
+            self.nodes.lock().unwrap().take().unwrap_or_default(),
+        );
+        tokio::spawn(task::start_worker(
             task_rx,
             event_queue_rx,
             table_tx.clone(),
             socket.clone(),
-            self.nodes.lock().unwrap().take().unwrap_or_default(),
             public_key,
+            bootstrapper,
         ));
 
         tokio::spawn(query::start_worker(

@@ -13,7 +13,7 @@ use crate::{
     task::Task,
 };
 
-pub struct Bootstrap {
+pub struct Bootstrapper {
     state: State,
     task_tx: Sender<Task>,
     table_tx: Sender<TableRequest>,
@@ -28,7 +28,7 @@ pub enum State {
     Complete,
 }
 
-impl Bootstrap {
+impl Bootstrapper {
     pub fn new(
         task_tx: Sender<Task>,
         table_tx: Sender<TableRequest>,

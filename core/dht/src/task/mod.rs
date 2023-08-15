@@ -1,4 +1,4 @@
-mod bootstrap;
+pub mod bootstrap;
 mod lookup;
 
 use std::{collections::HashMap, sync::Arc};
@@ -20,17 +20,16 @@ use tokio_util::time::DelayQueue;
 use crate::{
     query::{NodeInfo, Response},
     table::{TableKey, TableRequest},
-    task::{bootstrap::Bootstrap, lookup::LookupTask},
+    task::{bootstrap::Bootstrapper, lookup::LookupTask},
 };
 
 pub async fn start_worker(
-    task_tx: Sender<Task>,
     mut rx: Receiver<Task>,
     mut network_event: Receiver<ResponseEvent>,
     table_tx: Sender<TableRequest>,
     socket: Arc<UdpSocket>,
-    bootstrap_nodes: Vec<NodeInfo>,
     local_key: NodeNetworkingPublicKey,
+    bootstrap_task: Bootstrapper,
 ) {
     let mut task_set = TaskManager {
         task_queue: DelayQueue::new(),
@@ -39,7 +38,7 @@ pub async fn start_worker(
         local_key,
         table_tx: table_tx.clone(),
         socket,
-        bootstrap_task: Bootstrap::new(task_tx, table_tx, local_key.0, bootstrap_nodes.clone()),
+        bootstrap_task,
     };
     loop {
         select! {
@@ -92,7 +91,7 @@ struct TaskManager {
     local_key: NodeNetworkingPublicKey,
     table_tx: Sender<TableRequest>,
     socket: Arc<UdpSocket>,
-    bootstrap_task: Bootstrap,
+    bootstrap_task: Bootstrapper,
 }
 
 impl TaskManager {
