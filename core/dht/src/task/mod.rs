@@ -3,7 +3,7 @@ mod lookup;
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-use anyhow::{Error, Result};
+use anyhow::Error;
 use fleek_crypto::NodeNetworkingPublicKey;
 use tokio::{
     net::UdpSocket,
@@ -197,11 +197,7 @@ impl TaskManager {
                     self.bootstrap_task = self.bootstrap_task.restart();
                 }
             },
-            Task::Ping {
-                target,
-                tx,
-                address,
-            } => {
+            Task::Ping { tx, address, .. } => {
                 let id = rand::random();
                 let socket = self.socket.clone();
                 let sender_key = self.local_key;
@@ -223,7 +219,7 @@ impl TaskManager {
                         id,
                         token: rand::random(),
                         sender_key,
-                        payload: vec![],
+                        payload,
                     };
 
                     let bytes = match bincode::serialize(&message) {
