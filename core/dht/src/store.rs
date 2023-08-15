@@ -24,8 +24,9 @@ pub async fn start_worker(mut rx: Receiver<StoreRequest>, shutdown_notify: Arc<N
                     match request {
                         StoreRequest::Get { key, tx } => {
                             let value = storage.get(&key).cloned();
+                            tracing::trace!("received GET {key:?}:{value:?}");
                             if tx.send(value).is_err() {
-                                tracing::warn!("[Store]: client dropped channel")
+                                tracing::warn!("client dropped channel")
                             }
                         },
                         StoreRequest::Put { key, value } => {

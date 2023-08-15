@@ -143,7 +143,9 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
                         .nodes
                         .into_iter()
                         .filter(|node| {
-                            !pending.contains_key(&node.key) && !late.contains_key(&node.key) && node.key != lookup.local_key
+                            !pending.contains_key(&node.key)
+                                && !late.contains_key(&node.key)
+                                && node.key != lookup.local_key
                         })
                         .map(|node| {
                             (

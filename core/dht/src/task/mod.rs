@@ -2,6 +2,7 @@ pub mod bootstrap;
 mod lookup;
 
 use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc};
+use std::collections::hash_map::Entry;
 
 use anyhow::Error;
 use fleek_crypto::NodePublicKey;
@@ -93,6 +94,7 @@ pub enum Task {
     Lookup {
         target: TableKey,
         refresh_bucket: bool,
+        is_value: bool,
         tx: Option<oneshot::Sender<TaskResponse>>,
     },
     Ping {
@@ -150,12 +152,13 @@ impl TaskManager {
                 target,
                 refresh_bucket,
                 tx,
+                is_value,
             } => {
                 let (task_tx, task_rx) = mpsc::channel(20);
                 self.ongoing.insert(id, OngoingTask { tx: task_tx });
                 let lookup = LookupTask::new(
                     id,
-                    false,
+                    is_value,
                     self.local_key,
                     target,
                     self.table_tx.clone(),
@@ -196,11 +199,10 @@ impl TaskManager {
                 });
             },
             Task::Bootstrap { tx } => {
-                if !self.ongoing.contains_key(&BOOTSTRAP_TASK_ID) {
+                if let Entry::Vacant(entry) = self.ongoing.entry(BOOTSTRAP_TASK_ID) {
                     // Bootstrap task actually doesn't need events from the network.
                     let (event_tx, _) = mpsc::channel(1);
-                    self.ongoing
-                        .insert(BOOTSTRAP_TASK_ID, OngoingTask { tx: event_tx });
+                    entry.insert(OngoingTask { tx: event_tx });
                     let bootstrapper = self.bootstrapper.clone();
                     self.task_results.spawn(bootstrapper.start(tx));
                 }

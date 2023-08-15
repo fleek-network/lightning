@@ -88,6 +88,7 @@ impl Handler {
             target,
             tx: Some(tx),
             refresh_bucket: false,
+            is_value: true,
         };
         self.task_tx.send(task).await?;
         let response = rx.await?;
@@ -113,6 +114,7 @@ impl Handler {
             target,
             tx: Some(tx),
             refresh_bucket: false,
+            is_value: false,
         };
         self.task_tx.send(task).await?;
         let response = rx.await?;

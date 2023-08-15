@@ -51,6 +51,7 @@ async fn bootstrap(
                                 target,
                                 tx: Some(tx),
                                 refresh_bucket: true,
+                                is_value: false,
                             })
                             .await
                             .expect("handler worker not to drop channel");
@@ -104,6 +105,7 @@ pub async fn self_lookup(
             target: local_key,
             tx: Some(tx),
             refresh_bucket: true,
+            is_value: false,
         })
         .await
         .expect("handler worker not to drop channel");
