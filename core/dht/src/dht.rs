@@ -171,7 +171,7 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
         let (task_tx, task_rx) = mpsc::channel(self.buffer_size);
         tokio::spawn(api::start_worker(
             self.socket_rx.lock().unwrap().take().unwrap(),
-            task_tx,
+            task_tx.clone(),
             self.bootstrap_notify.clone(),
             self.shutdown_notify.clone(),
             self.network_secret_key.to_pk(),
@@ -180,10 +180,13 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
 
         let (event_queue_tx, event_queue_rx) = mpsc::channel(self.buffer_size);
         tokio::spawn(task::start_worker(
+            task_tx,
             task_rx,
             event_queue_rx,
             table_tx.clone(),
             socket.clone(),
+            self.nodes.lock().unwrap().take().unwrap_or_default(),
+            public_key,
         ));
 
         tokio::spawn(query::start_worker(

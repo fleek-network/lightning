@@ -3389,6 +3389,7 @@ dependencies = [
  "clap 4.3.17",
  "env_logger 0.10.0",
  "fleek-crypto",
+ "futures",
  "hex",
  "lightning-application",
  "lightning-interfaces",

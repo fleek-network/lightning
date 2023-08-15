@@ -81,7 +81,11 @@ impl Handler {
     async fn handle_get(&self, key: Vec<u8>) -> Result<Option<TableEntry>> {
         let (tx, rx) = oneshot::channel();
         let target = TableKey::try_from(key.as_slice())?;
-        let task = Task::Lookup { target, tx };
+        let task = Task::Lookup {
+            target,
+            tx: Some(tx),
+            refresh_bucket: false,
+        };
         self.task_tx.send(task).await?;
         let response = rx.await?;
 
@@ -104,7 +108,11 @@ impl Handler {
     async fn handle_put(&self, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         let target = TableKey::try_from(key.as_slice())?;
-        let task = Task::Lookup { target, tx };
+        let task = Task::Lookup {
+            target,
+            tx: Some(tx),
+            refresh_bucket: false,
+        };
         self.task_tx.send(task).await?;
         let response = rx.await?;
 

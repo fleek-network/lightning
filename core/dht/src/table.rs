@@ -5,7 +5,6 @@ use std::{
 
 use anyhow::Result;
 use fleek_crypto::NodeNetworkingPublicKey;
-use lightning_interfaces::Blake3Hash;
 use thiserror::Error;
 use tokio::sync::{mpsc::Receiver, oneshot, Notify};
 
@@ -15,7 +14,7 @@ use crate::{
     query::NodeInfo,
 };
 
-pub type TableKey = Blake3Hash;
+pub type TableKey = [u8; 32];
 
 pub async fn start_worker(
     mut rx: Receiver<TableRequest>,
