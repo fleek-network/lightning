@@ -1,8 +1,11 @@
 pub mod bootstrap;
 mod lookup;
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use std::collections::hash_map::Entry;
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    net::SocketAddr,
+    sync::Arc,
+};
 
 use anyhow::Error;
 use fleek_crypto::NodePublicKey;
