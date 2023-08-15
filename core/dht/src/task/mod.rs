@@ -1,7 +1,7 @@
 pub mod bootstrap;
 mod lookup;
 
-use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use std::collections::hash_map::Entry;
 
 use anyhow::Error;
@@ -15,7 +15,7 @@ use tokio::{
         mpsc::{Receiver, Sender},
         oneshot,
     },
-    task::{JoinHandle, JoinSet},
+    task::JoinSet,
 };
 use tokio_util::time::DelayQueue;
 
@@ -37,7 +37,6 @@ pub async fn start_worker(
     local_key: NodePublicKey,
     bootstrapper: Bootstrapper,
 ) {
-    use futures::FutureExt;
     let mut task_set = TaskManager {
         task_queue: DelayQueue::new(),
         ongoing: HashMap::new(),
