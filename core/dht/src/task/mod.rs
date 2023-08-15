@@ -3,7 +3,7 @@ mod lookup;
 
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Error, Result};
 use fleek_crypto::NodeNetworkingPublicKey;
 use tokio::{
     net::UdpSocket,
@@ -33,7 +33,7 @@ pub async fn start_worker(
 ) {
     let mut task_set = TaskManager {
         task_queue: DelayQueue::new(),
-        inflight: HashMap::new(),
+        ongoing: HashMap::new(),
         set: JoinSet::new(),
         local_key,
         table_tx: table_tx.clone(),
@@ -56,8 +56,27 @@ pub async fn start_worker(
             bootstrap_result = task_set.bootstrap_task.advance() => {
                 todo!()
             }
-            response = task_set.set.join_next() => {
-                todo!()
+            Some(response) = task_set.set.join_next() => {
+                let id = match response {
+                    Ok(TaskResult::Success(id)) => {
+                        id
+                    }
+                    Ok(TaskResult::Failed { id, error }) => {
+                        tracing::error!("task failed: {error:?}");
+                        id
+                    }
+                    Err(e) => {
+                        // JoinError may leave ongoing tasks that
+                        // will not get cleaned up.
+                        // We should use tokio::Task ids when the
+                        // featuer is stable.
+                        tracing::error!("internal error: {:?}", e);
+                        tracing::warn!("unable to remove task from pending task list");
+                        continue;
+                    }
+                };
+
+                task_set.remove_ongoing(id);
             }
         }
     }
@@ -86,8 +105,8 @@ pub struct TaskResponse {
 
 struct TaskManager {
     task_queue: DelayQueue<Task>,
-    inflight: HashMap<u64, OngoingTask>,
-    set: JoinSet<Result<()>>,
+    ongoing: HashMap<u64, OngoingTask>,
+    set: JoinSet<TaskResult>,
     local_key: NodeNetworkingPublicKey,
     table_tx: Sender<TableRequest>,
     socket: Arc<UdpSocket>,
@@ -96,7 +115,7 @@ struct TaskManager {
 
 impl TaskManager {
     fn handle_response(&mut self, event: ResponseEvent) {
-        match self.inflight.get(&event.id) {
+        match self.ongoing.get(&event.id) {
             Some(ongoing) => {
                 if ongoing.tx.is_closed() {
                     // The task is done so this request is not expected.
@@ -125,7 +144,7 @@ impl TaskManager {
                 tx,
             } => {
                 let (task_tx, task_rx) = mpsc::channel(20);
-                self.inflight.insert(id, OngoingTask { tx: task_tx });
+                self.ongoing.insert(id, OngoingTask { tx: task_tx });
                 let lookup = LookupTask::new(
                     id,
                     false,
@@ -137,7 +156,15 @@ impl TaskManager {
                 );
                 let table_tx = self.table_tx.clone();
                 self.set.spawn(async move {
-                    let response = lookup::lookup(lookup).await?;
+                    let response = match lookup::lookup(lookup).await {
+                        Ok(response) => response,
+                        Err(error) => {
+                            return TaskResult::Failed {
+                                id,
+                                error: error.into(),
+                            };
+                        },
+                    };
 
                     if refresh_bucket {
                         for node in &response.nodes {
@@ -160,7 +187,7 @@ impl TaskManager {
                             tracing::error!("failed to send task response");
                         }
                     }
-                    Ok(())
+                    TaskResult::Success(id)
                 });
             },
             Task::Bootstrap => {
@@ -170,6 +197,10 @@ impl TaskManager {
             },
             Task::Ping { .. } => todo!(),
         }
+    }
+
+    pub fn remove_ongoing(&mut self, id: u64) {
+        self.ongoing.remove(&id);
     }
 }
 
@@ -183,4 +214,9 @@ pub struct ResponseEvent {
     pub id: u64,
     pub sender_key: NodeNetworkingPublicKey,
     pub response: Response,
+}
+
+enum TaskResult {
+    Success(u64),
+    Failed { id: u64, error: Error },
 }
