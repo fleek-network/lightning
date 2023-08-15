@@ -1,7 +1,6 @@
 pub mod config;
 pub(crate) mod inner;
 pub mod pubsub;
-pub mod schema;
 
 #[cfg(test)]
 mod tests;
