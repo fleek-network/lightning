@@ -70,6 +70,8 @@ impl Builder {
 
         let (socket, rx) = Socket::raw_bounded(2048);
 
+        let (bootstrap_socket, bootstrap_rx) = Socket::raw_bounded(2048);
+
         Ok(Dht {
             socket,
             socket_rx: Arc::new(Mutex::new(Some(rx))),
@@ -77,7 +79,8 @@ impl Builder {
             buffer_size,
             address: self.config.address,
             network_secret_key: self.network_secret_key,
-            bootstrap_notify: Arc::new(Notify::new()),
+            bootstrap_socket,
+            bootstrap_rx: Arc::new(Mutex::new(Some(bootstrap_rx))),
             is_running: Arc::new(Mutex::new(false)),
             shutdown_notify: Arc::new(Notify::new()),
             topology: PhantomData,
@@ -93,7 +96,8 @@ pub struct Dht<T: TopologyInterface> {
     buffer_size: usize,
     address: SocketAddr,
     network_secret_key: NodeSecretKey,
-    bootstrap_notify: Arc<Notify>,
+    bootstrap_socket: Socket<(), Result<()>>,
+    bootstrap_rx: Arc<Mutex<Option<mpsc::Receiver<Task<(), Result<()>>>>>>,
     nodes: Arc<Mutex<Option<Vec<NodeInfo>>>>,
     is_running: Arc<Mutex<bool>>,
     shutdown_notify: Arc<Notify>,
@@ -139,8 +143,11 @@ impl<T: TopologyInterface> Dht<T> {
 
     /// Start bootstrap task.
     /// If bootstrapping is in process, this request will be ignored.
-    pub async fn bootstrap(&self) {
-        self.bootstrap_notify.notify_waiters();
+    pub async fn bootstrap(&self) -> Result<()> {
+        self.bootstrap_socket
+            .run(())
+            .await
+            .map_err(|e| anyhow::anyhow!("unexpected run error {e:?}"))?
     }
 }
 
@@ -173,7 +180,7 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
         tokio::spawn(api::start_worker(
             self.socket_rx.lock().unwrap().take().unwrap(),
             task_tx.clone(),
-            self.bootstrap_notify.clone(),
+            self.bootstrap_rx.lock().unwrap().take().unwrap(),
             self.shutdown_notify.clone(),
             self.network_secret_key.to_pk(),
             socket.clone(),
@@ -204,8 +211,9 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
             self.shutdown_notify.clone(),
         ));
 
-        // Todo: Check that it is done bootstrapping.
-        self.bootstrap().await;
+        if let Err(e) = self.bootstrap().await {
+            tracing::error!("DHT failed to bootstrap: {e:?}");
+        }
 
         *self.is_running.lock().unwrap() = true;
     }

@@ -1,10 +1,11 @@
 pub mod bootstrap;
 mod lookup;
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc};
 
 use anyhow::Error;
 use fleek_crypto::NodePublicKey;
+use futures::{future::Fuse, FutureExt};
 use tokio::{
     net::UdpSocket,
     select,
@@ -13,7 +14,7 @@ use tokio::{
         mpsc::{Receiver, Sender},
         oneshot,
     },
-    task::JoinSet,
+    task::{JoinHandle, JoinSet},
 };
 use tokio_util::time::DelayQueue;
 
@@ -21,7 +22,10 @@ use crate::{
     query::{Message, MessageType, NodeInfo, Query, Response},
     socket,
     table::{TableKey, TableRequest},
-    task::{bootstrap::Bootstrapper, lookup::LookupTask},
+    task::{
+        bootstrap::{Bootstrapper, BOOTSTRAP_TASK_ID},
+        lookup::LookupTask,
+    },
 };
 
 pub async fn start_worker(
@@ -30,8 +34,9 @@ pub async fn start_worker(
     table_tx: Sender<TableRequest>,
     socket: Arc<UdpSocket>,
     local_key: NodePublicKey,
-    bootstrap_task: Bootstrapper,
+    bootstrapper: Bootstrapper,
 ) {
+    use futures::FutureExt;
     let mut task_set = TaskManager {
         task_queue: DelayQueue::new(),
         ongoing: HashMap::new(),
@@ -39,7 +44,7 @@ pub async fn start_worker(
         local_key,
         table_tx: table_tx.clone(),
         socket,
-        bootstrap_task,
+        bootstrapper,
     };
     loop {
         select! {
@@ -47,25 +52,19 @@ pub async fn start_worker(
                 let task = task.expect("all channels to not drop");
                 task_set.execute(task);
             }
-            Some(task) = std::future::poll_fn(|cx| task_set.task_queue.poll_expired(cx)) => {
-                task_set.execute(task.into_inner());
-            }
             event = network_event.recv() => {
                 let event = event.expect("all channels to not drop");
                 task_set.handle_response(event);
             }
-            bootstrap_result = task_set.bootstrap_task.advance() => {
-                if let Err(e) = bootstrap_result {
-                    tracing::error!("unexpected error while bootstrapping: {e:?}");
-                    task_set.reset_bootstrapper();
-                }
+            Some(task) = std::future::poll_fn(|cx| task_set.task_queue.poll_expired(cx)) => {
+                task_set.execute(task.into_inner());
             }
             Some(response) = task_set.task_results.join_next() => {
                 let id = match response {
-                    Ok(TaskResult::Success(id)) => {
+                    Ok(Ok(id)) => {
                         id
                     }
-                    Ok(TaskResult::Failed { id, error }) => {
+                    Ok(Err(TaskFailed { id, error })) => {
                         tracing::error!("task failed: {error:?}");
                         id
                     }
@@ -80,6 +79,7 @@ pub async fn start_worker(
                     }
                 };
 
+                tracing::trace!("removing task {id:?}");
                 task_set.remove_ongoing(id);
             }
         }
@@ -88,7 +88,9 @@ pub async fn start_worker(
 
 #[allow(dead_code)]
 pub enum Task {
-    Bootstrap,
+    Bootstrap {
+        tx: oneshot::Sender<anyhow::Result<()>>,
+    },
     Lookup {
         target: TableKey,
         refresh_bucket: bool,
@@ -116,7 +118,7 @@ struct TaskManager {
     local_key: NodePublicKey,
     table_tx: Sender<TableRequest>,
     socket: Arc<UdpSocket>,
-    bootstrap_task: Bootstrapper,
+    bootstrapper: Bootstrapper,
 }
 
 impl TaskManager {
@@ -165,7 +167,7 @@ impl TaskManager {
                     let response = match lookup::lookup(lookup).await {
                         Ok(response) => response,
                         Err(error) => {
-                            return TaskResult::Failed { id, error };
+                            return Err(TaskFailed { id, error });
                         },
                     };
 
@@ -190,12 +192,17 @@ impl TaskManager {
                             tracing::error!("failed to send task response");
                         }
                     }
-                    TaskResult::Success(id)
+                    Ok(id)
                 });
             },
-            Task::Bootstrap => {
-                if self.bootstrap_task.is_idle() || self.bootstrap_task.is_complete() {
-                    self.bootstrap_task = self.bootstrap_task.restart();
+            Task::Bootstrap { tx } => {
+                if !self.ongoing.contains_key(&BOOTSTRAP_TASK_ID) {
+                    // Bootstrap task actually doesn't need events from the network.
+                    let (event_tx, _) = mpsc::channel(1);
+                    self.ongoing
+                        .insert(BOOTSTRAP_TASK_ID, OngoingTask { tx: event_tx });
+                    let bootstrapper = self.bootstrapper.clone();
+                    self.task_results.spawn(bootstrapper.start(tx));
                 }
             },
             Task::Ping { tx, address, .. } => {
@@ -208,10 +215,10 @@ impl TaskManager {
                     let payload = match bincode::serialize(&Query::Ping) {
                         Ok(bytes) => bytes,
                         Err(e) => {
-                            return TaskResult::Failed {
+                            return Err(TaskFailed {
                                 id,
                                 error: e.into(),
-                            };
+                            });
                         },
                     };
 
@@ -226,18 +233,18 @@ impl TaskManager {
                     let bytes = match bincode::serialize(&message) {
                         Ok(bytes) => bytes,
                         Err(e) => {
-                            return TaskResult::Failed {
+                            return Err(TaskFailed {
                                 id,
                                 error: e.into(),
-                            };
+                            });
                         },
                     };
 
                     if let Err(e) = socket::send_to(&socket, &bytes, address).await {
-                        return TaskResult::Failed {
+                        return Err(TaskFailed {
                             id,
                             error: e.into(),
-                        };
+                        });
                     }
 
                     if tx.send(()).is_err() {
@@ -245,11 +252,11 @@ impl TaskManager {
                     }
 
                     match task_rx.recv().await {
-                        None => TaskResult::Failed {
+                        None => Err(TaskFailed {
                             id,
                             error: anyhow::anyhow!("sender handle was dropped"),
-                        },
-                        Some(_) => TaskResult::Success(id),
+                        }),
+                        Some(_) => Ok(id),
                     }
                 });
             },
@@ -258,10 +265,6 @@ impl TaskManager {
 
     pub fn remove_ongoing(&mut self, id: u64) {
         self.ongoing.remove(&id);
-    }
-
-    pub fn reset_bootstrapper(&mut self) {
-        self.bootstrap_task = self.bootstrap_task.restart();
     }
 }
 
@@ -277,7 +280,9 @@ pub struct ResponseEvent {
     pub response: Response,
 }
 
-enum TaskResult {
-    Success(u64),
-    Failed { id: u64, error: Error },
+pub struct TaskFailed {
+    id: u64,
+    error: Error,
 }
+
+type TaskResult = Result<u64, TaskFailed>;

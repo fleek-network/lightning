@@ -24,7 +24,7 @@ pub const NO_REPLY_CHANNEL_ID: u64 = 0;
 pub async fn start_worker(
     mut rx: Receiver<affair::Task<DhtRequest, DhtResponse>>,
     task_tx: Sender<Task>,
-    bootstrap_notify: Arc<Notify>,
+    mut bootstrap_rx: Receiver<affair::Task<(), Result<()>>>,
     shutdown_notify: Arc<Notify>,
     local_key: NodePublicKey,
     socket: Arc<UdpSocket>,
@@ -59,9 +59,13 @@ pub async fn start_worker(
                     }
                 }
             }
-            _ = bootstrap_notify.notified() => {
+            bootstrap_task = bootstrap_rx.recv() => {
+                let task = bootstrap_task.unwrap();
                 let bootstrap_handler = handler.clone();
-                tokio::spawn(async move {bootstrap_handler.bootstrap().await;});
+                tokio::spawn(async move {
+                    let result = bootstrap_handler.bootstrap().await;
+                    task.respond(result);
+                });
             }
             _ = shutdown_notify.notified() => {
                 break;
@@ -133,9 +137,11 @@ impl Handler {
         Ok(())
     }
 
-    async fn bootstrap(&self) {
-        if self.task_tx.send(Task::Bootstrap).await.is_err() {
+    async fn bootstrap(&self) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        if self.task_tx.send(Task::Bootstrap { tx }).await.is_err() {
             tracing::error!("failed to send bootstrap task");
         }
+        rx.await.expect("task manager not to drop the channel")
     }
 }

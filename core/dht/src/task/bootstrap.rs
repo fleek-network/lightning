@@ -10,57 +10,40 @@ use crate::{
     bucket::MAX_BUCKETS,
     query::NodeInfo,
     table::{TableKey, TableRequest},
-    task::Task,
+    task::{Task, TaskFailed, TaskResult},
 };
 
-pub struct Bootstrapper {
-    state: State,
+pub const BOOTSTRAP_TASK_ID: u64 = 0;
+
+async fn bootstrap(
     task_tx: Sender<Task>,
     table_tx: Sender<TableRequest>,
     local_key: TableKey,
     nodes: Vec<NodeInfo>,
-}
-
-pub enum State {
-    Idle,
-    Initial(JoinHandle<Result<HashSet<TableKey>>>),
-    Lookups(JoinSet<Result<()>>),
-    Complete,
-}
-
-impl Bootstrapper {
-    pub fn new(
-        task_tx: Sender<Task>,
-        table_tx: Sender<TableRequest>,
-        local_key: TableKey,
-        nodes: Vec<NodeInfo>,
-    ) -> Self {
-        Self {
-            state: State::Idle,
-            task_tx,
-            table_tx,
-            local_key,
-            nodes,
-        }
+) -> Result<()> {
+    if nodes.is_empty() {
+        tracing::trace!("bootstrap complete");
+        return Ok(());
     }
 
-    pub async fn advance(&mut self) -> Result<()> {
-        match &mut self.state {
+    let mut state = State::Idle;
+    loop {
+        match &mut state {
             State::Idle => {
-                let task_tx = self.task_tx.clone();
-                let table_tx = self.table_tx.clone();
-                let nodes = self.nodes.clone();
-                let local_key = self.local_key;
+                let task_tx = task_tx.clone();
+                let table_tx = table_tx.clone();
+                let nodes = nodes.clone();
+                let local_key = local_key;
                 let task = tokio::spawn(async move {
                     self_lookup(task_tx.clone(), table_tx.clone(), &nodes, local_key).await
                 });
-                self.state = State::Initial(task);
+                state = State::Initial(task);
             },
             State::Initial(handle) => {
                 let indexes = handle.await??;
                 let mut set = JoinSet::new();
                 for target in indexes {
-                    let task_tx = self.task_tx.clone();
+                    let task_tx = task_tx.clone();
                     set.spawn(async move {
                         let (tx, rx) = oneshot::channel();
                         task_tx
@@ -76,7 +59,7 @@ impl Bootstrapper {
                     });
                 }
 
-                self.state = State::Lookups(set);
+                state = State::Lookups(set);
             },
             State::Lookups(set) => match set.join_next().await {
                 Some(result) => {
@@ -85,30 +68,14 @@ impl Bootstrapper {
                     }
                 },
                 None => {
-                    self.state = State::Complete;
+                    state = State::Complete;
                 },
             },
-            State::Complete => {},
+            State::Complete => break,
         }
-        Ok(())
     }
 
-    pub fn is_complete(&self) -> bool {
-        matches!(self.state, State::Complete)
-    }
-
-    pub fn is_idle(&self) -> bool {
-        matches!(self.state, State::Idle)
-    }
-
-    pub fn restart(&self) -> Self {
-        Self::new(
-            self.task_tx.clone(),
-            self.table_tx.clone(),
-            self.local_key,
-            self.nodes.clone(),
-        )
-    }
+    Ok(())
 }
 
 pub async fn self_lookup(
@@ -171,4 +138,60 @@ pub fn random_key_in_bucket(mut index: usize) -> TableKey {
         index -= 8;
     }
     key
+}
+
+pub enum State {
+    Idle,
+    Initial(JoinHandle<Result<HashSet<TableKey>>>),
+    Lookups(JoinSet<Result<()>>),
+    Complete,
+}
+
+#[derive(Clone)]
+pub struct Bootstrapper {
+    task_tx: Sender<Task>,
+    table_tx: Sender<TableRequest>,
+    local_key: TableKey,
+    nodes: Vec<NodeInfo>,
+}
+
+impl Bootstrapper {
+    pub fn new(
+        task_tx: Sender<Task>,
+        table_tx: Sender<TableRequest>,
+        local_key: TableKey,
+        nodes: Vec<NodeInfo>,
+    ) -> Self {
+        Self {
+            task_tx,
+            table_tx,
+            local_key,
+            nodes,
+        }
+    }
+    pub async fn start(self, response_tx: oneshot::Sender<Result<()>>) -> TaskResult {
+        match bootstrap(self.task_tx, self.table_tx, self.local_key, self.nodes).await {
+            Ok(_) => {
+                if response_tx
+                    .send(Ok(()))
+                    .is_err()
+                {
+                    tracing::error!("failed to send bootstrap result");
+                }
+                Ok(BOOTSTRAP_TASK_ID)
+            },
+            Err(error) => {
+                if response_tx
+                    .send(Err(anyhow::anyhow!("failed to bootstrap: {error:?}")))
+                    .is_err()
+                {
+                    tracing::error!("failed to send bootstrap result");
+                }
+                Err(TaskFailed {
+                    id: BOOTSTRAP_TASK_ID,
+                    error,
+                })
+            },
+        }
+    }
 }
