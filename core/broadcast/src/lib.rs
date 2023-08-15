@@ -14,12 +14,13 @@ use config::Config;
 use dashmap::DashMap;
 use inner::BroadcastInner;
 use lightning_interfaces::{
-    broadcast::BroadcastInterface, schema::LightningMessage, types::Topic, ConfigConsumer,
-    ConnectionPoolInterface, ListenerConnector, ListenerInterface, NotifierInterface,
-    SignerInterface, TopologyInterface, WithStartAndShutdown,
+    broadcast::BroadcastInterface,
+    schema::{broadcast::BroadcastFrame, LightningMessage},
+    types::Topic,
+    ConfigConsumer, ConnectionPoolInterface, ListenerConnector, ListenerInterface,
+    NotifierInterface, SignerInterface, TopologyInterface, WithStartAndShutdown,
 };
 use pubsub::PubSubTopic;
-use schema::BroadcastFrame;
 use tokio::select;
 
 #[allow(clippy::type_complexity)]
@@ -50,11 +51,11 @@ where
     T: TopologyInterface + 'static,
     N: NotifierInterface + Send + Sync + 'static,
     S: SignerInterface,
-    <P as lightning_interfaces::ConnectionPoolInterface>::Listener<schema::BroadcastFrame>:
+    <P as lightning_interfaces::ConnectionPoolInterface>::Listener<BroadcastFrame>:
         std::marker::Send + 'static,
     <P as ConnectionPoolInterface>::Connector<BroadcastFrame>: 'static,
-    <P as lightning_interfaces::ConnectionPoolInterface>::Receiver<schema::BroadcastFrame>: 'static,
-    <P as lightning_interfaces::ConnectionPoolInterface>::Sender<schema::BroadcastFrame>: 'static,
+    <P as lightning_interfaces::ConnectionPoolInterface>::Receiver<BroadcastFrame>: 'static,
+    <P as lightning_interfaces::ConnectionPoolInterface>::Sender<BroadcastFrame>: 'static,
 {
     fn is_running(&self) -> bool {
         self.shutdown_signal
@@ -142,11 +143,11 @@ where
     T: TopologyInterface + 'static,
     N: NotifierInterface + Send + Sync + 'static,
     S: SignerInterface,
-    <P as lightning_interfaces::ConnectionPoolInterface>::Listener<schema::BroadcastFrame>:
+    <P as lightning_interfaces::ConnectionPoolInterface>::Listener<BroadcastFrame>:
         std::marker::Send + 'static,
     <P as ConnectionPoolInterface>::Connector<BroadcastFrame>: 'static,
-    <P as lightning_interfaces::ConnectionPoolInterface>::Receiver<schema::BroadcastFrame>: 'static,
-    <P as lightning_interfaces::ConnectionPoolInterface>::Sender<schema::BroadcastFrame>: 'static,
+    <P as lightning_interfaces::ConnectionPoolInterface>::Receiver<BroadcastFrame>: 'static,
+    <P as lightning_interfaces::ConnectionPoolInterface>::Sender<BroadcastFrame>: 'static,
 {
     type Topology = T;
     type Notifier = N;

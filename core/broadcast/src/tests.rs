@@ -8,7 +8,7 @@ use lightning_application::{
     query_runner::QueryRunner,
 };
 use lightning_interfaces::{
-    schema::AutoImplSerde,
+    schema::{broadcast::BroadcastFrame, AutoImplSerde},
     types::{ServiceScope, Topic},
     ApplicationInterface, BroadcastInterface, ConnectionPoolInterface, NotifierInterface, PubSub,
     SignerInterface, TopologyInterface, WithStartAndShutdown,
@@ -19,7 +19,7 @@ use lightning_topology::Topology;
 use mock::pool::{transport::GlobalMemoryTransport, Config, ConnectionPool};
 use serde::{Deserialize, Serialize};
 
-use crate::{schema::BroadcastFrame, Broadcast};
+use crate::Broadcast;
 
 /// Mock pubsub topic message
 #[derive(Clone, Serialize, Deserialize)]
