@@ -124,11 +124,12 @@ async fn test_query() {
     signer.start().await;
     consensus.start().await;
 
-    let notifier = Notifier::init(query_runner);
+    let notifier = Notifier::init(query_runner.clone());
     let config = Config {
         reporter_buffer_size: 1,
     };
-    let rep_aggregator = ReputationAggregator::init(config, signer.get_socket(), notifier).unwrap();
+    let rep_aggregator =
+        ReputationAggregator::init(config, signer.get_socket(), notifier, query_runner).unwrap();
 
     let rep_reporter = rep_aggregator.get_reporter();
     let rep_query = rep_aggregator.get_query();
@@ -403,10 +404,20 @@ async fn test_reputation_calculation_and_query() {
     let config = Config {
         reporter_buffer_size: 1,
     };
-    let rep_aggregator1 =
-        ReputationAggregator::init(config.clone(), signer1.get_socket(), notifier1).unwrap();
-    let rep_aggregator2 =
-        ReputationAggregator::init(config, signer2.get_socket(), notifier2).unwrap();
+    let rep_aggregator1 = ReputationAggregator::init(
+        config.clone(),
+        signer1.get_socket(),
+        notifier1,
+        query_runner.clone(),
+    )
+    .unwrap();
+    let rep_aggregator2 = ReputationAggregator::init(
+        config,
+        signer2.get_socket(),
+        notifier2,
+        query_runner.clone(),
+    )
+    .unwrap();
 
     let rep_reporter1 = rep_aggregator1.get_reporter();
     let rep_reporter2 = rep_aggregator2.get_reporter();

@@ -30,6 +30,7 @@ pub struct ReputationAggregator {
     notifier: Notifier,
     notify_rx: mpsc::Receiver<Notification>,
     notify_tx: mpsc::Sender<Notification>,
+    _query_runner: <Notifier as NotifierInterface>::SyncQuery,
     _config: Config,
 }
 
@@ -103,11 +104,15 @@ impl ReputationAggregatorInterface for ReputationAggregator {
     /// The notifier can be used to receive notifications on and before epoch changes.
     type Notifier = Notifier;
 
+    /// The application query runner can be used to query the application state.
+    type SyncQuery = QueryRunner;
+
     /// Create a new reputation
     fn init(
         config: Self::Config,
         submit_tx: SubmitTxSocket,
         notifier: Self::Notifier,
+        query_runner: Self::SyncQuery,
     ) -> anyhow::Result<Self> {
         let (report_tx, report_rx) =
             buffered_mpsc::buffered_channel(config.reporter_buffer_size, 2048);
@@ -123,6 +128,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
             notifier,
             notify_rx,
             notify_tx,
+            _query_runner: query_runner,
             _config: config,
         })
     }

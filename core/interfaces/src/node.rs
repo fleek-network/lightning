@@ -38,7 +38,10 @@ pub trait LightningTypes: Send + Sync {
     type Notifier: NotifierInterface<
         SyncQuery = <Self::Application as ApplicationInterface>::SyncExecutor,
     >;
-    type ReputationAggregator: ReputationAggregatorInterface<Notifier = Self::Notifier>;
+    type ReputationAggregator: ReputationAggregatorInterface<
+        SyncQuery = <Self::Application as ApplicationInterface>::SyncExecutor,
+        Notifier = Self::Notifier,
+    >;
     type Rpc: RpcInterface<<Self::Application as ApplicationInterface>::SyncExecutor>;
     type Handshake: HandshakeInterface;
     type Topology: TopologyInterface<
@@ -133,6 +136,7 @@ impl<T: LightningTypes> Node<T> {
             configuration.get::<T::ReputationAggregator>(),
             signer.get_socket(),
             notifier,
+            application.sync_query(),
         )?;
 
         let rpc = T::Rpc::init(

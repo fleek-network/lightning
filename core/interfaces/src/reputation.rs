@@ -23,11 +23,15 @@ pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
     /// The query runner can be used to query the local reputation of other nodes.
     type ReputationQuery: ReputationQueryInteface;
 
+    /// The application query runner can be used to query the application state.
+    type SyncQuery: SyncQueryRunnerInterface;
+
     /// Create a new reputation
     fn init(
         config: Self::Config,
         submit_tx: SubmitTxSocket,
         notifier: Self::Notifier,
+        query_runner: Self::SyncQuery,
     ) -> anyhow::Result<Self>;
 
     /// Called by the scheduler to notify that it is time to submit the aggregation, to do
