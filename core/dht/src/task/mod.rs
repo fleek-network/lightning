@@ -86,6 +86,7 @@ pub async fn start_worker(
     }
 }
 
+#[allow(dead_code)]
 pub enum Task {
     Bootstrap,
     Lookup {
@@ -164,10 +165,7 @@ impl TaskManager {
                     let response = match lookup::lookup(lookup).await {
                         Ok(response) => response,
                         Err(error) => {
-                            return TaskResult::Failed {
-                                id,
-                                error: error.into(),
-                            };
+                            return TaskResult::Failed { id, error };
                         },
                     };
 

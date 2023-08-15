@@ -105,7 +105,7 @@ impl Bootstrapper {
         Self::new(
             self.task_tx.clone(),
             self.table_tx.clone(),
-            self.local_key.clone(),
+            self.local_key,
             self.nodes.clone(),
         )
     }
