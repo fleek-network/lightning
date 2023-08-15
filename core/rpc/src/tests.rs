@@ -10,7 +10,7 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
-    genesis::{Genesis, GenesisAccount},
+    genesis::{Genesis, GenesisAccount, GenesisCommittee},
     query_runner::QueryRunner,
 };
 use lightning_interfaces::{
@@ -195,61 +195,76 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
     Ok(())
 }
 
-// #[test]
-// async fn test_rpc_get_reputation() -> Result<()> {
-//     // Create keys
-//     let node_secret_key = NodeSecretKey::generate();
-//     let node_public_key = node_secret_key.to_pk();
+#[test]
+async fn test_rpc_get_reputation() -> Result<()> {
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner_public_key = owner_secret_key.to_pk();
+    let node_secret_key = NodeSecretKey::generate();
+    let node_public_key = node_secret_key.to_pk();
+    let network_secret_key = NodeNetworkingSecretKey::generate();
+    let network_public_key = network_secret_key.to_pk();
 
-//     // Init application service and store reputation score in application state.
-//     let mut genesis = Genesis::load().unwrap();
-//     genesis.rep_scores.insert(node_public_key.to_base64(), 46);
+    let mut genesis = Genesis::load().unwrap();
 
-//     let app = Application::init(AppConfig {
-//         genesis: Some(genesis),
-//         mode: Mode::Test,
-//     })
-//     .unwrap();
-//     let query_runner = app.sync_query();
-//     app.start().await;
+    genesis.committee.push(GenesisCommittee::new(
+        owner_public_key.to_base64(),
+        node_public_key.to_base64(),
+        "/ip4/127.0.0.1/udp/48000".to_owned(),
+        network_public_key.to_base64(),
+        "/ip4/127.0.0.1/udp/48101/http".to_owned(),
+        network_public_key.to_base64(),
+        "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
+        None,
+    ));
 
-//     // Init rpc service
-//     let port = 30002;
-//     let mut rpc = Rpc::init(
-//         RpcConfig::default(),
-//         MockWorker::mempool_socket(),
-//         query_runner,
-//     )?;
-//     rpc.config.port = port;
+    // Init application service and store reputation score in application state.
+    genesis.rep_scores.insert(node_public_key.to_base64(), 46);
 
-//     task::spawn(async move {
-//         rpc.start().await;
-//     });
-//     wait_for_server_start(port).await?;
+    let app = Application::init(AppConfig {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+    })
+    .unwrap();
+    let query_runner = app.sync_query();
+    app.start().await;
 
-//     let req = json!({
-//         "jsonrpc": "2.0",
-//         "method":"flk_get_reputation",
-//         "params": {"public_key": node_public_key},
-//         "id":1,
-//     });
+    // Init rpc service
+    let port = 30002;
+    let mut rpc = Rpc::init(
+        RpcConfig::default(),
+        MockWorker::mempool_socket(),
+        query_runner,
+    )?;
+    rpc.config.port = port;
 
-//     let response = make_request(port, req.to_string()).await?;
+    task::spawn(async move {
+        rpc.start().await;
+    });
+    wait_for_server_start(port).await?;
 
-//     if response.status().is_success() {
-//         let value: Value = response.json().await?;
-//         if value.get("result").is_some() {
-//             // Parse the response as a successful response
-//             let success_response: RpcSuccessResponse<Option<u8>> =
-// serde_json::from_value(value)?;             assert_eq!(Some(46), success_response.result);
-//         } else {
-//             panic!("Rpc Error: {value}")
-//         }
-//     } else {
-//         panic!("Request failed with status: {}", response.status());
-//     }
-//     Ok(())
-// }
+    let req = json!({
+        "jsonrpc": "2.0",
+        "method":"flk_get_reputation",
+        "params": {"public_key": node_public_key},
+        "id":1,
+    });
+
+    let response = make_request(port, req.to_string()).await?;
+
+    if response.status().is_success() {
+        let value: Value = response.json().await?;
+        if value.get("result").is_some() {
+            // Parse the response as a successful response
+            let success_response: RpcSuccessResponse<Option<u8>> = serde_json::from_value(value)?;
+            assert_eq!(Some(46), success_response.result);
+        } else {
+            panic!("Rpc Error: {value}")
+        }
+    } else {
+        panic!("Request failed with status: {}", response.status());
+    }
+    Ok(())
+}
 
 #[test]
 async fn test_rpc_get_staked() -> Result<()> {

@@ -1,8 +1,10 @@
+#[cfg(feature = "e2e-test")]
+use std::sync::Mutex;
 use std::{
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
+        Arc,
     },
 };
 
