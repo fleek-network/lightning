@@ -6,7 +6,6 @@ use std::collections::hash_map::Entry;
 
 use anyhow::Error;
 use fleek_crypto::NodePublicKey;
-use futures::{future::Fuse, FutureExt};
 use tokio::{
     net::UdpSocket,
     select,
