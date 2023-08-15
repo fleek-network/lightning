@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 use fleek_crypto::PublicKey;
 use lightning_e2e::{swarm::Swarm, utils::shutdown};
-use resolve_path::PathResolveExt;
+use resolved_pathbuf::ResolvedPathBuf;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -27,8 +27,9 @@ async fn main() -> Result<()> {
         .unwrap()
         .as_millis() as u64;
 
+    let path = ResolvedPathBuf::try_from("~/.fleek-test/e2e/spawn-swarm").unwrap();
     let swarm = Swarm::builder()
-        .with_directory("~/.fleek-test/e2e/spawn-swarm".resolve().into())
+        .with_directory(path)
         .with_num_nodes(args.num_nodes)
         .with_epoch_time(args.epoch_time)
         .with_epoch_start(epoch_start)

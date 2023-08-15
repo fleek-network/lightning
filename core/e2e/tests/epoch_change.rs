@@ -2,22 +2,20 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
 use lightning_e2e::{swarm::Swarm, utils::rpc};
-use resolve_path::PathResolveExt;
+use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
 
-// TODO(matthias): some of the RPC helpers are copied over from the rpc tests.
-// We should probably make that code reusable.
-
-#[tokio::main]
-async fn main() -> Result<()> {
+#[tokio::test]
+async fn e2e_epoch_change() -> Result<()> {
     // Start epoch now and let it end in 20 seconds.
     let epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
         .as_millis() as u64;
 
+    let path = ResolvedPathBuf::try_from("~/.fleek-test/e2e/epoch-change").unwrap();
     let swarm = Swarm::builder()
-        .with_directory("~/.fleek-test/e2e/epoch-change".resolve().into())
+        .with_directory(path)
         .with_num_nodes(4)
         .with_epoch_time(20000)
         .with_epoch_start(epoch_start)
@@ -64,7 +62,5 @@ async fn main() -> Result<()> {
             .expect("Failed to parse response.");
         assert_eq!(epoch, 1);
     }
-
-    println!("Epoch change: test passed");
     Ok(())
 }

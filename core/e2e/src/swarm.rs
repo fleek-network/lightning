@@ -1,7 +1,4 @@
-use std::{
-    borrow::BorrowMut, collections::HashMap, fs, net::SocketAddr, path::PathBuf, str::FromStr,
-    sync::Arc,
-};
+use std::{borrow::BorrowMut, collections::HashMap, fs, net::SocketAddr, str::FromStr, sync::Arc};
 
 use fleek_crypto::{
     AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
@@ -80,8 +77,8 @@ pub struct SwarmBuilder {
 }
 
 impl SwarmBuilder {
-    pub fn with_directory(mut self, directory: PathBuf) -> Self {
-        self.directory = Some(directory.try_into().expect("Failed to resolve path"));
+    pub fn with_directory(mut self, directory: ResolvedPathBuf) -> Self {
+        self.directory = Some(directory);
         self
     }
 
