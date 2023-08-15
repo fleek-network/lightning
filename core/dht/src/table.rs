@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
-use fleek_crypto::NodeNetworkingPublicKey;
+use fleek_crypto::NodePublicKey;
 use thiserror::Error;
 use tokio::sync::{mpsc::Receiver, oneshot, Notify};
 
@@ -18,7 +18,7 @@ pub type TableKey = [u8; 32];
 
 pub async fn start_worker(
     mut rx: Receiver<TableRequest>,
-    local_key: NodeNetworkingPublicKey,
+    local_key: NodePublicKey,
     shutdown_notify: Arc<Notify>,
 ) {
     let mut table = Table::new(local_key);
@@ -90,12 +90,12 @@ pub enum TableRequest {
 }
 
 pub struct Table {
-    local_node_key: NodeNetworkingPublicKey,
+    local_node_key: NodePublicKey,
     buckets: Vec<Bucket>,
 }
 
 impl Table {
-    pub fn new(local_node_key: NodeNetworkingPublicKey) -> Self {
+    pub fn new(local_node_key: NodePublicKey) -> Self {
         Self {
             local_node_key,
             buckets: vec![Bucket::new()],

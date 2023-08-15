@@ -4,8 +4,7 @@ use std::{
 };
 
 use fleek_crypto::{
-    AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
-    SecretKey,
+    AccountOwnerSecretKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, PublicKey, SecretKey,
 };
 use lightning_application::{
     app::Application,
@@ -34,8 +33,8 @@ use crate::{aggregator::ReputationAggregator, config::Config, measurement_manage
 struct GenesisCommitteeKeystore {
     _owner_secret_key: AccountOwnerSecretKey,
     node_secret_key: NodeSecretKey,
-    _network_secret_key: NodeNetworkingSecretKey,
-    _worker_secret_key: NodeNetworkingSecretKey,
+    _consensus_secret_key: ConsensusSecretKey,
+    _worker_secret_key: NodeSecretKey,
 }
 
 fn get_genesis_committee(
@@ -46,25 +45,25 @@ fn get_genesis_committee(
     (0..num_members).for_each(|i| {
         let node_secret_key = NodeSecretKey::generate();
         let node_public_key = node_secret_key.to_pk();
-        let network_secret_key = NodeNetworkingSecretKey::generate();
-        let network_public_key = network_secret_key.to_pk();
+        let consensus_secret_key = ConsensusSecretKey::generate();
+        let consensus_public_key = consensus_secret_key.to_pk();
         let owner_secret_key = AccountOwnerSecretKey::generate();
         let owner_public_key = owner_secret_key.to_pk();
         committee.push(GenesisCommittee::new(
             owner_public_key.to_base64(),
             node_public_key.to_base64(),
             format!("/ip4/127.0.0.1/udp/800{i}"),
-            network_public_key.to_base64(),
+            consensus_public_key.to_base64(),
             format!("/ip4/127.0.0.1/udp/810{i}/http"),
-            network_public_key.to_base64(),
+            node_public_key.to_base64(),
             format!("/ip4/127.0.0.1/tcp/810{i}/http"),
             None,
         ));
         keystore.push(GenesisCommitteeKeystore {
             _owner_secret_key: owner_secret_key,
             node_secret_key,
-            _network_secret_key: network_secret_key,
-            _worker_secret_key: network_secret_key,
+            _consensus_secret_key: consensus_secret_key,
+            _worker_secret_key: node_secret_key,
         });
     });
     (committee, keystore)
@@ -73,9 +72,9 @@ fn get_genesis_committee(
 #[tokio::test]
 async fn test_query() {
     let signer_config = SignerConfig::test();
-    let (secret_key, network_secret_key) = signer_config.load_test_keys();
-    let public_key = secret_key.to_pk();
-    let network_public_key = network_secret_key.to_pk();
+    let (consensus_secret_key, node_secret_key) = signer_config.load_test_keys();
+    let node_public_key = node_secret_key.to_pk();
+    let consensus_public_key = consensus_secret_key.to_pk();
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
@@ -83,11 +82,11 @@ async fn test_query() {
 
     genesis.committee.push(GenesisCommittee::new(
         owner_public_key.to_base64(),
-        public_key.to_base64(),
+        node_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/48000".to_owned(),
-        network_public_key.to_base64(),
+        consensus_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        network_public_key.to_base64(),
+        node_public_key.to_base64(),
         "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
         None,
     ));
@@ -137,8 +136,8 @@ async fn test_query() {
         rep_aggregator.start().await.unwrap();
     });
     // Report some measurements for alice and bob.
-    let alice = NodePublicKey([1; 96]);
-    let bob = NodePublicKey([2; 96]);
+    let alice = NodePublicKey([1; 32]);
+    let bob = NodePublicKey([2; 32]);
     rep_reporter.report_sat(&alice, Weight::Strong);
     rep_reporter.report_sat(&alice, Weight::VeryStrong);
     rep_reporter.report_sat(&bob, Weight::Weak);
@@ -173,27 +172,27 @@ async fn test_query() {
 #[tokio::test]
 async fn test_submit_measurements() {
     let signer_config = SignerConfig::test();
-    let (secret_key, network_secret_key) = signer_config.load_test_keys();
-    let public_key = secret_key.to_pk();
-    let network_public_key = network_secret_key.to_pk();
+    let (consensus_secret_key, node_secret_key) = signer_config.load_test_keys();
+    let node_public_key = node_secret_key.to_pk();
+    let consensus_public_key = consensus_secret_key.to_pk();
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
     let peer_owner_public_key = AccountOwnerSecretKey::generate();
     let peer_secret_key = NodeSecretKey::generate();
     let peer_public_key = peer_secret_key.to_pk();
-    let peer_network_secret_key = NodeNetworkingSecretKey::generate();
-    let peer_network_public_key = peer_network_secret_key.to_pk();
+    let peer_consensus_secret_key = ConsensusSecretKey::generate();
+    let peer_consensus_public_key = peer_consensus_secret_key.to_pk();
 
     let mut genesis = Genesis::load().unwrap();
 
     genesis.committee.push(GenesisCommittee::new(
         owner_public_key.to_base64(),
-        public_key.to_base64(),
+        node_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/48000".to_owned(),
-        network_public_key.to_base64(),
+        consensus_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        network_public_key.to_base64(),
+        node_public_key.to_base64(),
         "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
         None,
     ));
@@ -202,9 +201,9 @@ async fn test_submit_measurements() {
         peer_owner_public_key.to_pk().to_base64(),
         peer_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/38000".to_owned(),
-        peer_network_public_key.to_base64(),
+        peer_consensus_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/38101/http".to_owned(),
-        peer_network_public_key.to_base64(),
+        peer_public_key.to_base64(),
         "/ip4/127.0.0.1/tcp/38102/http".to_owned(),
         None,
     ));
@@ -270,7 +269,7 @@ async fn test_submit_measurements() {
     rep_reporter.report_bytes_received(&peer_public_key, 20_000, Some(Duration::from_millis(100)));
     rep_reporter.report_hops(&peer_public_key, 4);
 
-    let reporting_node_index = query_runner.pubkey_to_index(public_key).unwrap();
+    let reporting_node_index = query_runner.pubkey_to_index(node_public_key).unwrap();
 
     let mut interval = tokio::time::interval(Duration::from_millis(100));
     loop {
@@ -310,55 +309,55 @@ async fn test_reputation_calculation_and_query() {
     // service.
     let signer_config1 = SignerConfig::test();
     let signer_config2 = SignerConfig::test2();
-    let (secret_key1, network_secret_key1) = signer_config1.load_test_keys();
-    let (secret_key2, network_secret_key2) = signer_config2.load_test_keys();
+    let (consensus_secret_key1, node_secret_key1) = signer_config1.load_test_keys();
+    let (consensus_secret_key2, node_secret_key2) = signer_config2.load_test_keys();
 
     let (committee, mut keystore) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
     genesis.committee = committee;
 
-    let public_key1 = secret_key1.to_pk();
-    let network_public_key1 = network_secret_key1.to_pk();
+    let node_public_key1 = node_secret_key1.to_pk();
+    let consensus_public_key1 = consensus_secret_key1.to_pk();
     let owner_secret_key1 = AccountOwnerSecretKey::generate();
     let owner_public_key1 = owner_secret_key1.to_pk();
 
     genesis.committee.push(GenesisCommittee::new(
         owner_public_key1.to_base64(),
-        public_key1.to_base64(),
+        node_public_key1.to_base64(),
         "/ip4/127.0.0.1/udp/48000".to_owned(),
-        network_public_key1.to_base64(),
+        consensus_public_key1.to_base64(),
         "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        network_public_key1.to_base64(),
+        node_public_key1.to_base64(),
         "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
         None,
     ));
     keystore.push(GenesisCommitteeKeystore {
         _owner_secret_key: owner_secret_key1,
-        node_secret_key: secret_key1,
-        _network_secret_key: network_secret_key1,
-        _worker_secret_key: network_secret_key1,
+        node_secret_key: node_secret_key1,
+        _consensus_secret_key: consensus_secret_key1,
+        _worker_secret_key: node_secret_key1,
     });
 
-    let public_key2 = secret_key2.to_pk();
-    let network_public_key2 = network_secret_key2.to_pk();
+    let node_public_key2 = node_secret_key2.to_pk();
+    let consensus_public_key2 = consensus_secret_key2.to_pk();
     let owner_secret_key2 = AccountOwnerSecretKey::generate();
     let owner_public_key2 = owner_secret_key2.to_pk();
 
     genesis.committee.push(GenesisCommittee::new(
         owner_public_key2.to_base64(),
-        public_key2.to_base64(),
+        node_public_key2.to_base64(),
         "/ip4/127.0.0.1/udp/48001".to_owned(),
-        network_public_key2.to_base64(),
+        consensus_public_key2.to_base64(),
         "/ip4/127.0.0.1/udp/48102/http".to_owned(),
-        network_public_key2.to_base64(),
+        node_public_key2.to_base64(),
         "/ip4/127.0.0.1/tcp/48103/http".to_owned(),
         None,
     ));
     keystore.push(GenesisCommitteeKeystore {
         _owner_secret_key: owner_secret_key2,
-        node_secret_key: secret_key2,
-        _network_secret_key: network_secret_key2,
-        _worker_secret_key: network_secret_key2,
+        node_secret_key: node_secret_key2,
+        _consensus_secret_key: consensus_secret_key2,
+        _worker_secret_key: node_secret_key2,
     });
 
     let epoch_start = SystemTime::now()
@@ -450,8 +449,8 @@ async fn test_reputation_calculation_and_query() {
     // Both nodes report measurements for two peers (alice and bob).
     // note(dalton): Refactored to not include measurements for non white listed nodes so have to
     // switch Alice and bob to the keys we added to the committee
-    let alice = public_key1;
-    let bob = public_key2;
+    let alice = node_public_key1;
+    let bob = node_public_key2;
     rep_reporter1.report_sat(&alice, Weight::Strong);
     rep_reporter1.report_latency(&alice, Duration::from_millis(100));
     rep_reporter1.report_bytes_sent(&alice, 10_000, Some(Duration::from_millis(100)));
@@ -494,7 +493,9 @@ async fn test_reputation_calculation_and_query() {
         let method = UpdateMethod::ChangeEpoch { epoch: 0 };
         // If the committee member is either one of the nodes from this test, we have to increment
         // the nonce, since the nodes already send a transaction containing the measurements.
-        let nonce = if node.node_secret_key == secret_key1 || node.node_secret_key == secret_key2 {
+        let nonce = if node.node_secret_key == node_secret_key1
+            || node.node_secret_key == node_secret_key2
+        {
             2
         } else {
             1

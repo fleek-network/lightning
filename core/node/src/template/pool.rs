@@ -133,7 +133,7 @@ impl<Q: SyncQueryRunnerInterface, S: SignerInterface, T: LightningMessage> Liste
 #[async_trait]
 impl<T: LightningMessage> SenderInterface<T> for Sender<T> {
     fn pk(&self) -> &fleek_crypto::NodePublicKey {
-        &fleek_crypto::NodePublicKey([0; 96])
+        &fleek_crypto::NodePublicKey([0; 32])
     }
 
     async fn send(&self, _msg: T) -> bool {
@@ -144,7 +144,7 @@ impl<T: LightningMessage> SenderInterface<T> for Sender<T> {
 #[async_trait]
 impl<T: LightningMessage> ReceiverInterface<T> for Receiver<T> {
     fn pk(&self) -> &fleek_crypto::NodePublicKey {
-        &fleek_crypto::NodePublicKey([0; 96])
+        &fleek_crypto::NodePublicKey([0; 32])
     }
 
     async fn recv(&mut self) -> Option<T> {

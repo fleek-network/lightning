@@ -189,7 +189,7 @@ impl<S: SignerInterface + 'static, Q: SyncQueryRunnerInterface + 'static> Connec
         signer: &Self::Signer,
         _query_runner: Self::QueryRunner,
     ) -> Self {
-        let pubkey = signer.get_bls_pk();
+        let pubkey = signer.get_ed25519_pk();
         Self {
             pubkey,
             _q: PhantomData,
@@ -278,7 +278,7 @@ mod tests {
                 node_key_path: PathBuf::from("../test-utils/keys/test_node.pem")
                     .try_into()
                     .expect("Failed to resolve path"),
-                network_key_path: PathBuf::from("../test-utils/keys/test_network.pem")
+                consensus_key_path: PathBuf::from("../test-utils/keys/test_consensus.pem")
                     .try_into()
                     .expect("Failed to resolve path"),
             },
@@ -312,7 +312,7 @@ mod tests {
                 node_key_path: PathBuf::from("../test-utils/keys/test_node2.pem")
                     .try_into()
                     .expect("Failed to resolve path"),
-                network_key_path: PathBuf::from("../test-utils/keys/test_network2.pem")
+                consensus_key_path: PathBuf::from("../test-utils/keys/test_consensus2.pem")
                     .try_into()
                     .expect("Failed to resolve path"),
             },
@@ -323,7 +323,7 @@ mod tests {
         pool_b.start().await;
         let (_, connector_b) = pool_b.bind::<TestFrame>(ServiceScope::Debug);
         let (sender, mut receiver) = connector_b
-            .connect(&signer_a.get_bls_pk())
+            .connect(&signer_a.get_ed25519_pk())
             .await
             .expect("failed to connect to node a");
 

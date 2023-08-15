@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::Result;
-use fleek_crypto::NodeNetworkingPublicKey;
+use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::TableEntry;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -22,7 +22,7 @@ pub async fn start_worker(
     table_tx: Sender<TableRequest>,
     store_tx: Sender<StoreRequest>,
     socket: Arc<UdpSocket>,
-    local_key: NodeNetworkingPublicKey,
+    local_key: NodePublicKey,
     shutdown_notify: Arc<Notify>,
 ) {
     let mut handler = Handler {
@@ -58,7 +58,7 @@ async fn handle_query(
     table_tx: Sender<TableRequest>,
     store_tx: Sender<StoreRequest>,
     socket: Arc<UdpSocket>,
-    local_key: NodeNetworkingPublicKey,
+    local_key: NodePublicKey,
     message: Message,
     address: SocketAddr,
 ) -> Result<()> {
@@ -140,7 +140,7 @@ async fn handle_query(
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NodeInfo {
     pub address: SocketAddr,
-    pub key: NodeNetworkingPublicKey,
+    pub key: NodePublicKey,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -168,7 +168,7 @@ pub struct Message {
     // Random value used that must be returned in response.
     pub token: u64,
     // Sender's public key.
-    pub sender_key: NodeNetworkingPublicKey,
+    pub sender_key: NodePublicKey,
     // Payload of message.
     pub payload: Vec<u8>,
 }
@@ -192,7 +192,7 @@ pub enum HandlerRequest {
         value: Vec<u8>,
     },
     FindNode {
-        target: NodeNetworkingPublicKey,
+        target: NodePublicKey,
         tx: oneshot::Sender<Result<Vec<NodeInfo>>>,
     },
     Shutdown,
@@ -200,7 +200,7 @@ pub enum HandlerRequest {
 
 struct Handler {
     response_queue_tx: Sender<ResponseEvent>,
-    local_key: NodeNetworkingPublicKey,
+    local_key: NodePublicKey,
     table_tx: Sender<TableRequest>,
     store_tx: Sender<StoreRequest>,
     socket: Arc<UdpSocket>,

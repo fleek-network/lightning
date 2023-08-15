@@ -39,22 +39,21 @@ fn test_verify_false_eth_address() {
 }
 
 mod pem {
-    use crate::{AccountOwnerSecretKey, NodeNetworkingSecretKey, NodeSecretKey, SecretKey};
+    use crate::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 
     #[test]
     fn node_key_encode_decode() {
-        let key = NodeSecretKey::generate();
+        let key = ConsensusSecretKey::generate();
         let pem = key.encode_pem();
-        let decoded = NodeSecretKey::decode_pem(&pem).expect("failed to decode bls12-381 pem");
+        let decoded = ConsensusSecretKey::decode_pem(&pem).expect("failed to decode bls12-381 pem");
         assert_eq!(key, decoded);
     }
 
     #[test]
     fn node_networking_key_encode_decode() {
-        let key = NodeNetworkingSecretKey::generate();
+        let key = NodeSecretKey::generate();
         let pem = key.encode_pem();
-        let decoded =
-            NodeNetworkingSecretKey::decode_pem(&pem).expect("failed to decode ed25519 pem");
+        let decoded = NodeSecretKey::decode_pem(&pem).expect("failed to decode ed25519 pem");
         assert_eq!(key, decoded);
     }
 

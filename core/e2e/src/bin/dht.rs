@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
-use fleek_crypto::{NodeNetworkingSecretKey, SecretKey};
+use fleek_crypto::{NodeSecretKey, SecretKey};
 use lightning_application::query_runner::QueryRunner;
 use lightning_dht::{
     config::{Bootstrapper, Config as DhtConfig},
@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
     };
 
     // Start bootstrapper
-    let bootstrap_secret_key = NodeNetworkingSecretKey::generate();
+    let bootstrap_secret_key = NodeSecretKey::generate();
     let bootstrap_shutdown_notify = Arc::new(Notify::new());
     let bootstrap_ready = Arc::new(Notify::new());
     let bootstrap_ready_rx = bootstrap_ready.clone();

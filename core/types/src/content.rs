@@ -1,5 +1,5 @@
 use derive_more::IsVariant;
-use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSignature};
+use fleek_crypto::{NodePublicKey, NodeSignature};
 use serde::{Deserialize, Serialize};
 
 /// An immutable pointer is used as a general address to a content living off Fleek Network.
@@ -36,7 +36,7 @@ pub struct ResolvedImmutablePointerRecord {
     pub hash: [u8; 32],
     /// The public key of the node which fetched and attested to this content.
     // TODO: Replace with node id later.
-    pub originator: NodeNetworkingPublicKey,
+    pub originator: NodePublicKey,
     /// The signature of the node.
-    pub signature: NodeNetworkingSignature,
+    pub signature: NodeSignature,
 }

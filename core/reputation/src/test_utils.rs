@@ -21,7 +21,6 @@ pub(crate) fn generate_weighted_measurements_map(
     };
     let mut map = HashMap::with_capacity(map_size);
     for _ in 0..map_size {
-        let mut array = [0; 96];
         let node_index = rng.gen_range(0..=NodeIndex::MAX);
         let num_measurements = rng.gen_range(1..20);
         map.insert(
@@ -101,8 +100,8 @@ pub(crate) fn generate_normalized_measurements_map(
             bytes_received,
             bytes_sent,
         };
-        let mut array = [0; 96];
-        (0..96).for_each(|i| array[i] = rng.gen_range(0..=255));
+        let mut array = [0; 32];
+        (0..32).for_each(|i| array[i] = rng.gen_range(0..=255));
         let node = NodePublicKey(array);
         map.insert(node, normalized_measurements);
     }

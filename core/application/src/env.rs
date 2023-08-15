@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use fleek_crypto::{
-    AccountOwnerPublicKey, ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodePublicKey,
+    AccountOwnerPublicKey, ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey,
     PublicKey,
 };
 use hp_fixed::unsigned::HpUfixed;
@@ -32,8 +32,8 @@ impl Env<UpdatePerm> {
             .with_table::<EthAddress, AccountInfo>("account")
             .with_table::<ClientPublicKey, EthAddress>("client_keys")
             .with_table::<NodeIndex, NodeInfo>("node")
-            .with_table::<NodePublicKey, u32>("bls_to_index")
-            .with_table::<NodeNetworkingPublicKey, u32>("networking_to_index")
+            .with_table::<ConsensusPublicKey, NodeIndex>("consensus_key_to_index")
+            .with_table::<NodePublicKey, NodeIndex>("pub_key_to_index")
             .with_table::<(NodeIndex, NodeIndex), Duration>("latencies")
             .with_table::<Epoch, Committee>("committee")
             .with_table::<ServiceId, Service>("service")
@@ -55,8 +55,8 @@ impl Env<UpdatePerm> {
         #[cfg(debug_assertions)]
         {
             atomo = atomo
-                .enable_iter("bls_to_index")
-                .enable_iter("networking_to_index");
+                .enable_iter("consensus_key_to_index")
+                .enable_iter("pub_key_to_index");
         }
 
         Self {
@@ -147,8 +147,8 @@ impl Env<UpdatePerm> {
                 ctx.get_table::<NodeIndex, NodeServed>("current_epoch_served");
             let mut latencies_table =
                 ctx.get_table::<(NodeIndex, NodeIndex), Duration>("latencies");
-            let mut bls_to_index_table = ctx.get_table::<NodePublicKey, u32>("bls_to_index");
-            let mut networking_to_index_table = ctx.get_table::<NodeNetworkingPublicKey, u32>("networking_to_index");
+            let mut consensus_key_to_index_table = ctx.get_table::<ConsensusPublicKey, NodeIndex>("consensus_key_to_index");
+            let mut pub_key_to_index_table = ctx.get_table::<NodePublicKey, NodeIndex>("pub_key_to_index");
 
             let protocol_fund_address =
                 AccountOwnerPublicKey::from_base64(&genesis.protocol_fund_address).unwrap();
@@ -216,8 +216,8 @@ impl Env<UpdatePerm> {
                 };
                 committee_members.push(node_index);
 
-                bls_to_index_table.insert(node_info.public_key, node_index);
-                networking_to_index_table.insert(node_info.network_key, node_index);
+                consensus_key_to_index_table.insert(node_info.consensus_key, node_index);
+                pub_key_to_index_table.insert(node_info.public_key, node_index);
                 node_table.insert(node_index, node_info);
                 metadata_table.insert(
                     Metadata::NextNodeIndex,
@@ -272,7 +272,7 @@ impl Env<UpdatePerm> {
                     (0..=100).contains(&rep_score),
                     "Reputation scores must be in range [0, 100]."
                 );
-                let index = bls_to_index_table.get(node_public_key).unwrap();
+                let index = pub_key_to_index_table.get(node_public_key).unwrap();
                 rep_scores_table.insert(index, rep_score);
             }
 
@@ -282,8 +282,8 @@ impl Env<UpdatePerm> {
                     Some(Value::NextNodeIndex(index)) => index,
                     _ => 0,
                 };
-                bls_to_index_table.insert(node_info.public_key, node_index);
-                networking_to_index_table.insert(node_info.network_key, node_index);
+                consensus_key_to_index_table.insert(node_info.consensus_key, node_index);
+                pub_key_to_index_table.insert(node_info.public_key, node_index);
                 node_table.insert(node_index, node_info);
                 metadata_table.insert(
                     Metadata::NextNodeIndex,
@@ -300,7 +300,7 @@ impl Env<UpdatePerm> {
             for (node_public_key_b64, commodity_served) in genesis.current_epoch_served {
                 let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
                     .expect("Failed to parse node public key from genesis.");
-                let index = bls_to_index_table.get(node_public_key).expect("Node added to genesis epoch served without node info");
+                let index = pub_key_to_index_table.get(node_public_key).expect("Node added to genesis epoch served without node info");
                 current_epoch_served_table.insert(index, commodity_served);
             }
 
@@ -313,9 +313,9 @@ impl Env<UpdatePerm> {
                         .expect("Failed to parse node public key from genesis.");
                     assert!(node_public_key_lhs < node_public_key_rhs,
                         "Invalid latency entry, node_public_key_lhs must be smaller than node_public_key_rhs");
-                    let index_lhs = bls_to_index_table.get(node_public_key_lhs)
+                    let index_lhs = pub_key_to_index_table.get(node_public_key_lhs)
                         .expect("Invalid latency entry, node doesn't have an index.");
-                    let index_rhs = bls_to_index_table.get(node_public_key_rhs)
+                    let index_rhs = pub_key_to_index_table.get(node_public_key_rhs)
                         .expect("Invalid latency entry, node doesn't have an index.");
                     latencies_table.insert(
                         (index_lhs, index_rhs),

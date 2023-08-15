@@ -4,7 +4,7 @@ mod lookup;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use anyhow::Error;
-use fleek_crypto::NodeNetworkingPublicKey;
+use fleek_crypto::NodePublicKey;
 use tokio::{
     net::UdpSocket,
     select,
@@ -29,7 +29,7 @@ pub async fn start_worker(
     mut network_event: Receiver<ResponseEvent>,
     table_tx: Sender<TableRequest>,
     socket: Arc<UdpSocket>,
-    local_key: NodeNetworkingPublicKey,
+    local_key: NodePublicKey,
     bootstrap_task: Bootstrapper,
 ) {
     let mut task_set = TaskManager {
@@ -106,14 +106,14 @@ pub struct TaskResponse {
     pub nodes: Vec<NodeInfo>,
     pub value: Option<Vec<u8>>,
     pub rtt: Option<usize>,
-    pub source: Option<NodeNetworkingPublicKey>,
+    pub source: Option<NodePublicKey>,
 }
 
 struct TaskManager {
     task_queue: DelayQueue<Task>,
     ongoing: HashMap<u64, OngoingTask>,
     task_results: JoinSet<TaskResult>,
-    local_key: NodeNetworkingPublicKey,
+    local_key: NodePublicKey,
     table_tx: Sender<TableRequest>,
     socket: Arc<UdpSocket>,
     bootstrap_task: Bootstrapper,
@@ -273,7 +273,7 @@ struct OngoingTask {
 #[derive(Debug)]
 pub struct ResponseEvent {
     pub id: u64,
-    pub sender_key: NodeNetworkingPublicKey,
+    pub sender_key: NodePublicKey,
     pub response: Response,
 }
 

@@ -12,7 +12,7 @@ use affair::AsyncWorker;
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use fastcrypto::bls12381::min_sig::BLS12381PublicKey;
-use fleek_crypto::NodePublicKey;
+use fleek_crypto::ConsensusPublicKey;
 use lightning_interfaces::{
     types::{Epoch, EpochInfo, NodeInfo, UpdateRequest},
     SyncQueryRunnerInterface,
@@ -28,7 +28,7 @@ pub struct Forwarder<Q: SyncQueryRunnerInterface> {
     /// Query runner used to read application state
     query_runner: Q,
     /// The public key of this node
-    primary_name: NodePublicKey,
+    primary_name: ConsensusPublicKey,
     /// Current Epoch
     epoch: Epoch,
     /// List of the committee members
@@ -118,7 +118,10 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
 
         // If our node is on the committee, return a vec with just our node. Or return a vec of all
         // the committee members
-        if let Some(item) = committee.iter().find(|x| x.public_key == self.primary_name) {
+        if let Some(item) = committee
+            .iter()
+            .find(|x| x.consensus_key == self.primary_name)
+        {
             self.committee = vec![item.clone()];
         } else {
             // shuffle the order with thread_range so nodes accross the network are not all

@@ -5,7 +5,7 @@ use std::{
 };
 
 use fleek_crypto::{
-    AccountOwnerSecretKey, NodeNetworkingSecretKey, NodeSecretKey, PublicKey, SecretKey,
+    AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey,
 };
 use lightning_application::{
     app::Application,
@@ -24,21 +24,21 @@ use crate::{config::Config, utils, Signer};
 #[tokio::test]
 async fn test_send_two_txs_in_a_row() {
     let signer_config = Config::test();
-    let (secret_key, network_secret_key) = signer_config.load_test_keys();
+    let (consensus_secret_key, node_secret_key) = signer_config.load_test_keys();
 
     let mut genesis = Genesis::load().unwrap();
-    let public_key = secret_key.to_pk();
-    let network_public_key = network_secret_key.to_pk();
+    let node_public_key = node_secret_key.to_pk();
+    let consensus_public_key = consensus_secret_key.to_pk();
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
     genesis.committee.push(GenesisCommittee::new(
         owner_public_key.to_base64(),
-        public_key.to_base64(),
+        node_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/48000".to_owned(),
-        network_public_key.to_base64(),
+        consensus_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        network_public_key.to_base64(),
+        node_public_key.to_base64(),
         "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
         None,
     ));
@@ -90,7 +90,7 @@ async fn test_send_two_txs_in_a_row() {
     // Therefore, after 5 seconds, the nonce should be 2.
     tokio::time::sleep(Duration::from_secs(5)).await;
     let new_nonce = query_runner
-        .get_node_info(&signer.get_bls_pk())
+        .get_node_info(&signer.get_ed25519_pk())
         .unwrap()
         .nonce;
     assert_eq!(new_nonce, 2);
@@ -99,22 +99,21 @@ async fn test_send_two_txs_in_a_row() {
 #[tokio::test]
 async fn test_retry_send() {
     let signer_config = Config::test();
-    let (secret_key, network_secret_key) = signer_config.load_test_keys();
-    println!("{:}", secret_key.to_pk());
-    let mut genesis = Genesis::load().unwrap();
+    let (consensus_secret_key, node_secret_key) = signer_config.load_test_keys();
 
-    let public_key = secret_key.to_pk();
-    let network_public_key = network_secret_key.to_pk();
+    let mut genesis = Genesis::load().unwrap();
+    let node_public_key = node_secret_key.to_pk();
+    let consensus_public_key = consensus_secret_key.to_pk();
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
     genesis.committee.push(GenesisCommittee::new(
         owner_public_key.to_base64(),
-        public_key.to_base64(),
+        node_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/48000".to_owned(),
-        network_public_key.to_base64(),
+        consensus_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        network_public_key.to_base64(),
+        node_public_key.to_base64(),
         "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
         None,
     ));
@@ -175,7 +174,7 @@ async fn test_retry_send() {
     // Hence, the application nonce should be 3 after some time.
     tokio::time::sleep(Duration::from_secs(15)).await;
     let new_nonce = query_runner
-        .get_node_info(&signer.get_bls_pk())
+        .get_node_info(&signer.get_ed25519_pk())
         .unwrap()
         .nonce;
     assert_eq!(new_nonce, 3);
@@ -223,7 +222,7 @@ async fn test_sign_raw_digest() {
 
     let digest = [0; 32];
     let signature = signer.sign_raw_digest(&digest);
-    let public_key = signer.get_bls_pk();
+    let public_key = signer.get_ed25519_pk();
     assert!(public_key.verify(&signature, &digest));
 }
 
@@ -235,15 +234,18 @@ async fn test_load_keys() {
     // Generate keys and pass the paths to the signer.
     fs::create_dir_all(&path).expect("Failed to create swarm directory");
     let node_secret_key = NodeSecretKey::generate();
-    let network_secret_key = NodeNetworkingSecretKey::generate();
+    let consensus_secret_key = ConsensusSecretKey::generate();
     let node_key_path = path.join("node.pem");
-    let network_key_path = path.join("network.pem");
+    let consensus_key_path = path.join("consensus.pem");
     utils::save(&node_key_path, node_secret_key.encode_pem()).expect("Failed to save key");
-    utils::save(&network_key_path, network_secret_key.encode_pem()).expect("Failed to save key");
+    utils::save(&consensus_key_path, consensus_secret_key.encode_pem())
+        .expect("Failed to save key");
 
     let config = Config {
         node_key_path: node_key_path.try_into().expect("Failed to resolve path"),
-        network_key_path: network_key_path.try_into().expect("Failed to resolve path"),
+        consensus_key_path: consensus_key_path
+            .try_into()
+            .expect("Failed to resolve path"),
     };
 
     let app = Application::init(AppConfig::default()).unwrap();
@@ -251,9 +253,9 @@ async fn test_load_keys() {
     let signer = Signer::init(config, query_runner).unwrap();
 
     // Make sure that the signer loaded the keys from the provided paths.
-    let (network_secret_key_loaded, node_secret_key_loaded) = signer.get_sk();
+    let (consensus_secret_key_loaded, node_secret_key_loaded) = signer.get_sk();
     assert_eq!(node_secret_key, node_secret_key_loaded);
-    assert_eq!(network_secret_key, network_secret_key_loaded);
+    assert_eq!(consensus_secret_key, consensus_secret_key_loaded);
 
     fs::remove_dir_all(&path).expect("Failed to clean up signer test directory.");
 }
@@ -266,13 +268,16 @@ async fn test_fail_to_encode_keys() {
     // Save broken keys to disk and pass the paths to the signer.
     fs::create_dir_all(&path).expect("Failed to create swarm directory");
     let node_key_path = path.join("node.pem");
-    let network_key_path = path.join("network.pem");
+    let consensus_key_path = path.join("consensus.pem");
     utils::save(&node_key_path, "I am a broken node secret key").expect("Failed to save key");
-    utils::save(&network_key_path, "I am a broken network secret key").expect("Failed to save key");
+    utils::save(&consensus_key_path, "I am a broken consensus secret key")
+        .expect("Failed to save key");
 
     let config = Config {
         node_key_path: node_key_path.try_into().expect("Failed to resolve path"),
-        network_key_path: network_key_path.try_into().expect("Failed to resolve path"),
+        consensus_key_path: consensus_key_path
+            .try_into()
+            .expect("Failed to resolve path"),
     };
 
     let result = std::panic::catch_unwind(|| {
@@ -301,11 +306,13 @@ async fn test_no_keys_exist() {
 
     // Pass the paths to the signer. No keys are in the directory.
     let node_key_path = path.join("node.pem");
-    let network_key_path = path.join("network.pem");
+    let consensus_key_path = path.join("consensus.pem");
 
     let config = Config {
         node_key_path: node_key_path.try_into().expect("Failed to resolve path"),
-        network_key_path: network_key_path.try_into().expect("Failed to resolve path"),
+        consensus_key_path: consensus_key_path
+            .try_into()
+            .expect("Failed to resolve path"),
     };
 
     let app = Application::init(AppConfig::default()).unwrap();
@@ -337,7 +344,7 @@ async fn test_generate_node_key() {
 }
 
 #[tokio::test]
-async fn test_generate_network_key() {
+async fn test_generate_consensus_key() {
     let path =
         ResolvedPathBuf::try_from("~/.fleek-signer-test-5/keys").expect("Failed to resolve path");
 
@@ -346,14 +353,14 @@ async fn test_generate_network_key() {
         fs::remove_dir_all(&path).expect("Failed to clean up signer test directory.");
     }
 
-    let network_key_path = path.join("network.pem");
-    Signer::generate_network_key(&network_key_path).unwrap();
+    let network_key_path = path.join("consensus.pem");
+    Signer::generate_consensus_key(&network_key_path).unwrap();
 
     // Make sure that a valid key was created.
     let network_secret_key =
-        fs::read_to_string(&network_key_path).expect("Failed to read network pem file");
-    let _ = NodeNetworkingSecretKey::decode_pem(&network_secret_key)
-        .expect("Failed to decode network pem file");
+        fs::read_to_string(&network_key_path).expect("Failed to read consensus pem file");
+    let _ = ConsensusSecretKey::decode_pem(&network_secret_key)
+        .expect("Failed to decode consensus pem file");
 
     fs::remove_dir_all(&path).expect("Failed to clean up signer test directory.");
 }

@@ -167,13 +167,13 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         for node in &committee {
             // TODO(dalton) This check should be done at application before adding it to state. So
             // it should never not be Ok so even an unwrap should be safe here
-            if let (Ok(address), Ok(protocol_key), Ok(network_key)) = (
+            if let (Ok(address), Ok(consensus_key), Ok(public_key)) = (
                 Multiaddr::try_from(node.domain.to_string()),
-                PublicKey::from_bytes(&node.public_key.0),
-                NetworkPublicKey::from_bytes(&node.network_key.0),
+                PublicKey::from_bytes(&node.consensus_key.0),
+                NetworkPublicKey::from_bytes(&node.public_key.0),
             ) {
                 committee_builder =
-                    committee_builder.add_authority(protocol_key, 1, address, network_key);
+                    committee_builder.add_authority(consensus_key, 1, address, public_key);
             }
         }
         let narwhal_committee = committee_builder.build();
@@ -183,7 +183,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             workers: committee
                 .iter()
                 .filter_map(|node| {
-                    if let Ok(public_key) = PublicKey::from_bytes(&node.public_key.0) {
+                    if let Ok(public_key) = PublicKey::from_bytes(&node.consensus_key.0) {
                         let mut worker_index = BTreeMap::new();
                         node.workers
                             .iter()
@@ -368,11 +368,11 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> ConsensusInterface for C
         // Init the metrics for narwhal
         DBMetrics::init(&registry);
 
-        let (networking_sk, primary_sk) = signer.get_sk();
+        let (consensus_sk, primary_sk) = signer.get_sk();
         let reconfigure_notify = Arc::new(Notify::new());
         let new_block_notify = Arc::new(Notify::new());
-        let networking_keypair = NetworkKeyPair::from(networking_sk);
-        let primary_keypair = KeyPair::from(primary_sk);
+        let networking_keypair = NetworkKeyPair::from(primary_sk);
+        let primary_keypair = KeyPair::from(consensus_sk);
         let forwarder = Forwarder::new(query_runner.clone(), primary_keypair.public().clone());
         let narwhal_args = NarwhalArgs {
             primary_keypair,

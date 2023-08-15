@@ -2,7 +2,7 @@ use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result};
 use clap::{arg, ArgAction, Parser, Subcommand};
-use fleek_crypto::{NodeNetworkingSecretKey, NodeSecretKey, PublicKey, SecretKey};
+use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_interfaces::{
     ConfigProviderInterface, LightningTypes, Node, SignerInterface, WithStartAndShutdown,
 };
@@ -146,17 +146,17 @@ where
                 Err(err) => eprintln!("Failed to create node secret key: {err:?}"),
             };
         }
-        if signer_config.network_key_path.exists() {
+        if signer_config.consensus_key_path.exists() {
             eprintln!(
-                "Network secret key already exists at specified path. Not generating a new key."
+                "Consensus secret key already exists at specified path. Not generating a new key."
             );
         } else {
-            match Signer::generate_network_key(&signer_config.network_key_path) {
+            match Signer::generate_consensus_key(&signer_config.consensus_key_path) {
                 Ok(_) => println!(
-                    "Successfully created network secret key at: {:?}",
-                    signer_config.network_key_path
+                    "Successfully created consensus secret key at: {:?}",
+                    signer_config.consensus_key_path
                 ),
-                Err(err) => eprintln!("Failed to create network secret key: {err:?}"),
+                Err(err) => eprintln!("Failed to create consensus secret key: {err:?}"),
             };
         }
         Ok(())
@@ -175,17 +175,17 @@ where
             eprintln!("Node Public Key: does not exist");
         }
 
-        if signer_config.network_key_path.exists() {
-            let network_secret_key = fs::read_to_string(&signer_config.network_key_path)
-                .with_context(|| "Failed to read network pem file")?;
-            let network_secret_key = NodeNetworkingSecretKey::decode_pem(&network_secret_key)
-                .with_context(|| "Failed to decode network pem file")?;
+        if signer_config.consensus_key_path.exists() {
+            let consensus_secret_key = fs::read_to_string(&signer_config.consensus_key_path)
+                .with_context(|| "Failed to read consensus pem file")?;
+            let consensus_secret_key = ConsensusSecretKey::decode_pem(&consensus_secret_key)
+                .with_context(|| "Failed to decode consensus pem file")?;
             println!(
-                "Network Public Key: {}",
-                network_secret_key.to_pk().to_base64()
+                "Consensus Public Key: {}",
+                consensus_secret_key.to_pk().to_base64()
             );
         } else {
-            eprintln!("Network Public Key: does not exist");
+            eprintln!("Consensus Public Key: does not exist");
         }
         Ok(())
     }

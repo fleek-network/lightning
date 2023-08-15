@@ -5,7 +5,7 @@ use std::{
 };
 
 use fleek_crypto::{
-    ClientPublicKey, EthAddress, NodeNetworkingPublicKey, NodePublicKey, TransactionSender,
+    ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey, TransactionSender,
 };
 use hp_fixed::unsigned::HpUfixed;
 use lazy_static::lazy_static;
@@ -57,8 +57,8 @@ pub struct State<B: Backend> {
     pub account_info: B::Ref<EthAddress, AccountInfo>,
     pub client_keys: B::Ref<ClientPublicKey, EthAddress>,
     pub node_info: B::Ref<NodeIndex, NodeInfo>,
-    pub bls_to_index: B::Ref<NodePublicKey, NodeIndex>,
-    pub networking_to_index: B::Ref<NodeNetworkingPublicKey, NodeIndex>,
+    pub consensus_key_to_index: B::Ref<ConsensusPublicKey, NodeIndex>,
+    pub pub_key_to_index: B::Ref<NodePublicKey, NodeIndex>,
     pub latencies: B::Ref<(NodeIndex, NodeIndex), Duration>,
     pub committee_info: B::Ref<Epoch, Committee>,
     pub services: B::Ref<ServiceId, Service>,
@@ -80,8 +80,8 @@ impl<B: Backend> State<B> {
             account_info: backend.get_table_reference("account"),
             client_keys: backend.get_table_reference("client_keys"),
             node_info: backend.get_table_reference("node"),
-            bls_to_index: backend.get_table_reference("bls_to_index"),
-            networking_to_index: backend.get_table_reference("networking_to_index"),
+            consensus_key_to_index: backend.get_table_reference("consensus_key_to_index"),
+            pub_key_to_index: backend.get_table_reference("pub_key_to_index"),
             committee_info: backend.get_table_reference("committee"),
             services: backend.get_table_reference("service"),
             parameters: backend.get_table_reference("parameter"),
@@ -123,7 +123,7 @@ impl<B: Backend> State<B> {
             UpdateMethod::Stake {
                 amount,
                 node_public_key,
-                node_network_key,
+                consensus_key,
                 node_domain,
                 worker_public_key,
                 worker_domain,
@@ -132,7 +132,7 @@ impl<B: Backend> State<B> {
                 txn.sender,
                 amount,
                 node_public_key,
-                node_network_key,
+                consensus_key,
                 node_domain,
                 worker_public_key,
                 worker_domain,
@@ -176,11 +176,11 @@ impl<B: Backend> State<B> {
         #[cfg(debug_assertions)]
         {
             let node_info_len = self.node_info.keys().count();
-            let bls_to_index_len = self.bls_to_index.keys().count();
-            let networking_to_index_len = self.networking_to_index.keys().count();
-            assert_eq!(node_info_len, bls_to_index_len);
-            assert_eq!(node_info_len, networking_to_index_len);
-            assert_eq!(networking_to_index_len, bls_to_index_len);
+            let consensus_key_to_index_len = self.consensus_key_to_index.keys().count();
+            let pub_key_to_index_len = self.pub_key_to_index.keys().count();
+            assert_eq!(node_info_len, consensus_key_to_index_len);
+            assert_eq!(node_info_len, pub_key_to_index_len);
+            assert_eq!(pub_key_to_index_len, consensus_key_to_index_len);
         }
 
         // Increment nonce of the sender
@@ -312,9 +312,9 @@ impl<B: Backend> State<B> {
         sender: TransactionSender,
         amount: HpUfixed<18>,
         node_public_key: NodePublicKey,
-        node_network_key: Option<NodeNetworkingPublicKey>,
+        node_consensus_key: Option<ConsensusPublicKey>,
         node_domain: Option<String>,
-        worker_public_key: Option<NodeNetworkingPublicKey>,
+        worker_public_key: Option<NodePublicKey>,
         worker_domain: Option<String>,
         worker_mempool_address: Option<String>,
     ) -> TransactionResponse {
@@ -370,17 +370,17 @@ impl<B: Backend> State<B> {
             None => None,
         };
 
-        let node_bls_index = self.bls_to_index.get(&node_public_key);
+        let node_index = self.pub_key_to_index.get(&node_public_key);
         // Make sure the networking index and bls are the same
-        if let Some(networking_key) = node_network_key {
-            // If the networking key is indexed make sure it is the same as the indexed bls, if its
-            // none indexed and the bls is, that is fine
-            if self.networking_to_index.get(&networking_key) != node_bls_index {
-                return TransactionResponse::Revert(ExecutionError::NetworkingKeyAlreadyIndexed);
+        if let Some(consensus_key) = node_consensus_key {
+            // If the consensus key is indexed make sure it is the same as the indexed node public
+            // key, if its none indexed and the node key is, that is fine
+            if self.consensus_key_to_index.get(&consensus_key) != node_index {
+                return TransactionResponse::Revert(ExecutionError::ConsensusKeyAlreadyIndexed);
             }
         }
 
-        match node_bls_index {
+        match node_index {
             Some(index) => {
                 let mut node = match self.node_info.get(&index) {
                     Some(node) => node,
@@ -404,19 +404,19 @@ impl<B: Backend> State<B> {
 
                 // Increase the nodes stake by the amount being staked
                 node.stake.staked += amount.clone();
-                self.node_info.set(node_bls_index.unwrap(), node);
+                self.node_info.set(index, node);
             },
             None => {
                 // If the node doesnt Exist, create it. But check if they provided all the required
                 // options for a new node
                 if let (
-                    Some(network_key),
+                    Some(consensus_key),
                     Some(primary_domain),
                     Some(worker_key),
                     Some(worker_domain),
                     Some(mempool_domain),
                 ) = (
-                    node_network_key,
+                    node_consensus_key,
                     node_domain,
                     worker_public_key,
                     worker_domain,
@@ -425,7 +425,7 @@ impl<B: Backend> State<B> {
                     let node = NodeInfo {
                         owner: sender,
                         public_key: node_public_key,
-                        network_key,
+                        consensus_key,
                         staked_since: current_epoch,
                         stake: Staking {
                             staked: amount.clone(),
@@ -1120,8 +1120,8 @@ impl<B: Backend> State<B> {
         // Check nonce
         match txn.sender {
             // Todo Sunday(dalton): Clean up this match nesting
-            TransactionSender::NodeBLS(node) => {
-                if let Some(index) = self.bls_to_index.get(&node) {
+            TransactionSender::NodeMain(node) => {
+                if let Some(index) = self.pub_key_to_index.get(&node) {
                     if let Some(info) = self.node_info.get(&index) {
                         if txn.payload.nonce != info.nonce + 1 {
                             return Err(ExecutionError::InvalidNonce);
@@ -1131,8 +1131,8 @@ impl<B: Backend> State<B> {
                     }
                 }
             },
-            TransactionSender::NodeNetwork(node) => {
-                if let Some(index) = self.networking_to_index.get(&node) {
+            TransactionSender::NodeConsensus(node) => {
+                if let Some(index) = self.consensus_key_to_index.get(&node) {
                     if let Some(info) = self.node_info.get(&index) {
                         if txn.payload.nonce != info.nonce + 1 {
                             return Err(ExecutionError::InvalidNonce);
@@ -1180,8 +1180,11 @@ impl<B: Backend> State<B> {
     /// Creates a new node. A new node should only be created through this function.
     fn create_node(&self, node: NodeInfo) -> bool {
         // If this public key or network key is already indexed to no create it
-        if self.bls_to_index.get(&node.public_key).is_some()
-            || self.networking_to_index.get(&node.network_key).is_some()
+        if self.pub_key_to_index.get(&node.public_key).is_some()
+            || self
+                .consensus_key_to_index
+                .get(&node.consensus_key)
+                .is_some()
         {
             return false;
         }
@@ -1189,8 +1192,9 @@ impl<B: Backend> State<B> {
             Some(Value::NextNodeIndex(index)) => index,
             _ => 0,
         };
-        self.bls_to_index.set(node.public_key, node_index);
-        self.networking_to_index.set(node.network_key, node_index);
+        self.pub_key_to_index.set(node.public_key, node_index);
+        self.consensus_key_to_index
+            .set(node.consensus_key, node_index);
 
         self.node_info.set(node_index, node);
         self.metadata.set(
@@ -1203,12 +1207,12 @@ impl<B: Backend> State<B> {
     /// Remove a node. A node should only be removed through this function.
     #[allow(unused)]
     fn remove_node(&self, node: NodePublicKey) -> bool {
-        if let Some(index) = self.bls_to_index.get(&node) {
+        if let Some(index) = self.pub_key_to_index.get(&node) {
             if let Some(info) = self.node_info.get(&index) {
-                self.networking_to_index.remove(&info.network_key)
+                self.consensus_key_to_index.remove(&info.consensus_key)
             }
             self.node_info.remove(&index);
-            self.bls_to_index.remove(&node);
+            self.pub_key_to_index.remove(&node);
             true
         } else {
             false
@@ -1221,14 +1225,14 @@ impl<B: Backend> State<B> {
     /// calling this function
     fn increment_nonce(&self, sender: TransactionSender) {
         match sender {
-            TransactionSender::NodeBLS(node) => {
-                let index = self.bls_to_index.get(&node).unwrap();
+            TransactionSender::NodeMain(node) => {
+                let index = self.pub_key_to_index.get(&node).unwrap();
                 let mut node_info = self.node_info.get(&index).unwrap();
                 node_info.nonce += 1;
                 self.node_info.set(index, node_info);
             },
-            TransactionSender::NodeNetwork(node) => {
-                let index = self.networking_to_index.get(&node).unwrap();
+            TransactionSender::NodeConsensus(node) => {
+                let index = self.consensus_key_to_index.get(&node).unwrap();
                 let mut node_info = self.node_info.get(&index).unwrap();
                 node_info.nonce += 1;
                 self.node_info.set(index, node_info);
@@ -1257,15 +1261,14 @@ impl<B: Backend> State<B> {
     // Does not panic
     fn only_node(&self, sender: TransactionSender) -> Result<NodeIndex, TransactionResponse> {
         match sender {
-            TransactionSender::NodeBLS(public_key) => {
-                self.bls_to_index
-                    .get(&public_key)
-                    .ok_or(TransactionResponse::Revert(
-                        ExecutionError::NodeDoesNotExist,
-                    ))
-            },
-            TransactionSender::NodeNetwork(public_key) => self
-                .networking_to_index
+            TransactionSender::NodeMain(public_key) => self
+                .pub_key_to_index
+                .get(&public_key)
+                .ok_or(TransactionResponse::Revert(
+                    ExecutionError::NodeDoesNotExist,
+                )),
+            TransactionSender::NodeConsensus(public_key) => self
+                .consensus_key_to_index
                 .get(&public_key)
                 .ok_or(TransactionResponse::Revert(
                     ExecutionError::NodeDoesNotExist,
@@ -1276,12 +1279,13 @@ impl<B: Backend> State<B> {
 
     fn get_node_info(&self, sender: TransactionSender) -> Option<(NodeIndex, NodeInfo)> {
         match sender {
-            TransactionSender::NodeBLS(public_key) => match self.bls_to_index.get(&public_key) {
+            TransactionSender::NodeMain(public_key) => match self.pub_key_to_index.get(&public_key)
+            {
                 Some(index) => self.node_info.get(&index).map(|info| (index, info)),
                 None => None,
             },
-            TransactionSender::NodeNetwork(public_key) => {
-                match self.networking_to_index.get(&public_key) {
+            TransactionSender::NodeConsensus(public_key) => {
+                match self.consensus_key_to_index.get(&public_key) {
                     Some(index) => self.node_info.get(&index).map(|info| (index, info)),
                     None => None,
                 }

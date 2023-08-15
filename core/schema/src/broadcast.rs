@@ -1,4 +1,4 @@
-use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSignature};
+use fleek_crypto::{NodePublicKey, NodeSignature};
 use ink_quill::{ToDigest, TranscriptBuilder};
 use lightning_types::Topic;
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,7 @@ use crate::AutoImplSerde;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BroadcastMessage {
     pub topic: Topic,
-    pub originator: NodeNetworkingPublicKey,
+    pub originator: NodePublicKey,
     pub payload: Vec<u8>,
 }
 
@@ -31,7 +31,7 @@ pub enum BroadcastFrame {
     },
     Message {
         message: BroadcastMessage,
-        signature: NodeNetworkingSignature,
+        signature: NodeSignature,
     },
 }
 impl AutoImplSerde for BroadcastFrame {}

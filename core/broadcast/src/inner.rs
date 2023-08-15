@@ -4,9 +4,7 @@ use std::{collections::HashSet, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use dashmap::{mapref::entry::Entry, DashMap};
-use fleek_crypto::{
-    NodeNetworkingSecretKey, NodeNetworkingSignature, NodePublicKey, PublicKey, SecretKey,
-};
+use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
 use lightning_interfaces::{
     schema::broadcast::{BroadcastFrame, BroadcastMessage},
     types::Topic,
@@ -38,8 +36,7 @@ impl<S: SenderInterface<BroadcastFrame>> BroadcastSender<S> {
 
 pub struct BroadcastInner<T, P: ConnectionPoolInterface> {
     topology: Arc<T>,
-    public_key: Arc<NodePublicKey>,
-    networking_key: Arc<NodeNetworkingSecretKey>,
+    node_secret_key: Arc<NodeSecretKey>,
     // Current topology peers
     peers: Arc<tokio::sync::RwLock<Arc<Vec<Vec<NodePublicKey>>>>>,
     connector: Arc<<P as ConnectionPoolInterface>::Connector<BroadcastFrame>>,
@@ -53,7 +50,7 @@ pub struct BroadcastInner<T, P: ConnectionPoolInterface> {
     // received messages + signatures
     /// PERF: This should be a cache. Maybe TTL = 24hrs, a simple LRU cache, or even prune this at
     /// each epoch
-    messages: Arc<DashMap<Blake3Hash, Option<(BroadcastMessage, NodeNetworkingSignature)>>>,
+    messages: Arc<DashMap<Blake3Hash, Option<(BroadcastMessage, NodeSignature)>>>,
     // incoming channels for pubsub messages
     channels: Arc<DashMap<Topic, tokio::sync::broadcast::Sender<Vec<u8>>>>,
 }
@@ -62,8 +59,7 @@ impl<T, P: ConnectionPoolInterface> Clone for BroadcastInner<T, P> {
     fn clone(&self) -> Self {
         Self {
             topology: self.topology.clone(),
-            public_key: self.public_key.clone(),
-            networking_key: self.networking_key.clone(),
+            node_secret_key: self.node_secret_key.clone(),
             peers: self.peers.clone(),
             connector: self.connector.clone(),
             connections: self.connections.clone(),
@@ -85,13 +81,12 @@ where
         channels: Arc<DashMap<Topic, tokio::sync::broadcast::Sender<Vec<u8>>>>,
     ) -> Self {
         let peers = tokio::sync::RwLock::new(topology.suggest_connections()).into();
-        let (networking_key, node_key) = signer.get_sk();
+        let (_, node_key) = signer.get_sk();
         Self {
             topology,
             peers,
             channels,
-            public_key: node_key.to_pk().into(),
-            networking_key: networking_key.into(),
+            node_secret_key: node_key.into(),
             connector: connector.into(),
             connections: DashMap::new().into(),
             messages: DashMap::new().into(),
@@ -115,7 +110,7 @@ where
 
         // connect to any new peers without an existing connection
         for peer in new_set {
-            if !self.connections.contains_key(&peer) && *self.public_key != peer {
+            if !self.connections.contains_key(&peer) && self.node_secret_key.to_pk() != peer {
                 if let Some((sender, receiver)) = self.connector.connect(&peer).await {
                     let inner = self.clone();
                     tokio::spawn(async move { inner.handle_connection(receiver, sender).await });
@@ -135,12 +130,12 @@ where
         let message = BroadcastMessage {
             topic,
             payload,
-            originator: self.networking_key.to_pk(),
+            originator: self.node_secret_key.to_pk(),
         };
 
         // compute the digest and sign it with the networking key
         let digest = message.to_digest();
-        let signature = self.networking_key.sign(&digest);
+        let signature = self.node_secret_key.sign(&digest);
 
         // insert the message into the map
         self.messages.insert(digest, Some((message, signature)));
@@ -236,7 +231,7 @@ where
         &self,
         pubkey: &NodePublicKey,
         message: BroadcastMessage,
-        signature: NodeNetworkingSignature,
+        signature: NodeSignature,
     ) -> anyhow::Result<()> {
         // compute message digest
         let digest = message.to_digest();

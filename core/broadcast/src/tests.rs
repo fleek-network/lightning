@@ -31,16 +31,16 @@ async fn pubsub_send_recv() -> Result<()> {
     let global_transport = GlobalMemoryTransport::default();
 
     let signer_config_a = lightning_signer::Config::test();
-    let (key_a, networking_key_a) = signer_config_a.load_test_keys();
-    let (key_a, networking_key_a) = (
-        key_a.to_pk().to_base64(),
-        networking_key_a.to_pk().to_base64(),
+    let (consensus_key_a, node_key_a) = signer_config_a.load_test_keys();
+    let (consensus_key_a, node_key_a) = (
+        consensus_key_a.to_pk().to_base64(),
+        node_key_a.to_pk().to_base64(),
     );
     let signer_config_b = lightning_signer::Config::test2();
-    let (key_b, networking_key_b) = signer_config_b.load_test_keys();
-    let (key_b, networking_key_b) = (
-        key_b.to_pk().to_base64(),
-        networking_key_b.to_pk().to_base64(),
+    let (consensus_key_b, node_key_b) = signer_config_b.load_test_keys();
+    let (consensus_key_b, node_key_b) = (
+        consensus_key_b.to_pk().to_base64(),
+        node_key_b.to_pk().to_base64(),
     );
 
     // Setup genesis
@@ -48,28 +48,28 @@ async fn pubsub_send_recv() -> Result<()> {
     genesis.committee = vec![
         GenesisCommittee::new(
             AccountOwnerSecretKey::generate().to_pk().to_base64(),
-            key_a.clone(),
+            node_key_a.clone(),
             "/ip4/127.0.0.1/udp/48100".to_owned(),
-            networking_key_a.clone(),
+            consensus_key_a.clone(),
             "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-            networking_key_a,
+            node_key_a.clone(),
             "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
             Some(10000),
         ),
         GenesisCommittee::new(
             AccountOwnerSecretKey::generate().to_pk().to_base64(),
-            key_b.clone(),
+            node_key_b.clone(),
             "/ip4/127.0.0.1/udp/48100".to_owned(),
-            networking_key_b.clone(),
+            consensus_key_b.clone(),
             "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-            networking_key_b,
+            node_key_b.clone(),
             "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
             Some(10000),
         ),
     ];
     genesis.latencies = Some(vec![GenesisLatency {
-        node_public_key_lhs: key_a,
-        node_public_key_rhs: key_b,
+        node_public_key_lhs: node_key_a,
+        node_public_key_rhs: node_key_b,
         latency_in_microseconds: 42000,
     }]);
     genesis.epoch_start = SystemTime::now()
@@ -91,7 +91,7 @@ async fn pubsub_send_recv() -> Result<()> {
     let topology = Arc::new(Topology::init(
         lightning_topology::config::Config::default(),
         // use a dummy key to force topology to always return all nodes
-        NodePublicKey([0u8; 96]),
+        NodePublicKey([0u8; 32]),
         query_runner.clone(),
     )?);
 

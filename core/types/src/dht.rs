@@ -1,4 +1,4 @@
-use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSignature, PublicKey};
+use fleek_crypto::{NodePublicKey, NodeSignature, PublicKey};
 use ink_quill::{ToDigest, TranscriptBuilder};
 use serde::{Deserialize, Serialize};
 
@@ -39,9 +39,9 @@ pub struct TableEntry {
     /// The raw value.
     pub value: Vec<u8>,
     /// The originator of this key-value relation.
-    pub source: NodeNetworkingPublicKey,
+    pub source: NodePublicKey,
     /// The signature from the source committing to this key-value.
-    pub signature: Option<NodeNetworkingSignature>,
+    pub signature: Option<NodeSignature>,
 }
 
 impl ToDigest for TableEntry {

@@ -1,8 +1,7 @@
 use std::{borrow::BorrowMut, collections::HashMap, fs, net::SocketAddr, str::FromStr, sync::Arc};
 
 use fleek_crypto::{
-    AccountOwnerSecretKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, PublicKey,
-    SecretKey,
+    AccountOwnerSecretKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, PublicKey, SecretKey,
 };
 use futures::future::try_join_all;
 use lightning_application::{
@@ -209,15 +208,18 @@ impl SwarmBuilder {
             let node_secret_key_path = keys_path.join("node.pem");
             utils::save(&node_secret_key_path, node_secret_key.encode_pem())
                 .expect("Failed to save node secret key.");
-            let node_net_secret_key = NodeNetworkingSecretKey::generate();
-            let node_net_secret_key_path = keys_path.join("network.pem");
-            utils::save(&node_net_secret_key_path, node_net_secret_key.encode_pem())
-                .expect("Failed to save node secret key.");
+            let node_consensus_secret_key = ConsensusSecretKey::generate();
+            let node_consensus_secret_key_path = keys_path.join("consensus.pem");
+            utils::save(
+                &node_consensus_secret_key_path,
+                node_consensus_secret_key.encode_pem(),
+            )
+            .expect("Failed to save node secret key.");
             let signer_config = SignerConfig {
                 node_key_path: node_secret_key_path
                     .try_into()
                     .expect("Failed to resolve path"),
-                network_key_path: node_net_secret_key_path
+                consensus_key_path: node_consensus_secret_key_path
                     .try_into()
                     .expect("Failed to resolve path"),
             };
@@ -237,9 +239,9 @@ impl SwarmBuilder {
                 owner_secret_key.to_pk().to_base64(),
                 node_secret_key.to_pk().to_base64(),
                 format!("/ip4/127.0.0.1/udp/{primary_addr_port}"),
-                node_net_secret_key.to_pk().to_base64(),
+                node_consensus_secret_key.to_pk().to_base64(),
                 format!("/ip4/127.0.0.1/udp/{worker_addr_port}/http"),
-                node_net_secret_key.to_pk().to_base64(),
+                node_secret_key.to_pk().to_base64(),
                 format!("/ip4/127.0.0.1/tcp/{mempool_addr_port}/http"),
                 Some(min_stake),
             ));

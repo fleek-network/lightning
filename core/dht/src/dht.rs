@@ -7,7 +7,7 @@ use std::{
 use affair::{Socket, Task};
 use anyhow::Result;
 use async_trait::async_trait;
-use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSecretKey, SecretKey};
+use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
 use lightning_interfaces::{
     dht::{DhtInterface, DhtSocket},
     types::{DhtRequest, DhtResponse, TableEntry},
@@ -31,13 +31,13 @@ use crate::{
 pub struct Builder {
     config: Config,
     nodes: Vec<NodeInfo>,
-    network_secret_key: NodeNetworkingSecretKey,
+    network_secret_key: NodeSecretKey,
     buffer_size: Option<usize>,
 }
 
 impl Builder {
     /// Returns a new [`Builder`].
-    pub fn new(network_secret_key: NodeNetworkingSecretKey, config: Config) -> Self {
+    pub fn new(network_secret_key: NodeSecretKey, config: Config) -> Self {
         let nodes: Vec<NodeInfo> = config
             .bootstrappers
             .iter()
@@ -55,7 +55,7 @@ impl Builder {
     }
 
     /// Add node which will be added to routing table.
-    pub fn add_node(&mut self, key: NodeNetworkingPublicKey, address: SocketAddr) {
+    pub fn add_node(&mut self, key: NodePublicKey, address: SocketAddr) {
         self.nodes.push(NodeInfo { key, address });
     }
 
@@ -92,7 +92,7 @@ pub struct Dht<T: TopologyInterface> {
     socket_rx: Arc<Mutex<Option<mpsc::Receiver<Task<DhtRequest, DhtResponse>>>>>,
     buffer_size: usize,
     address: SocketAddr,
-    network_secret_key: NodeNetworkingSecretKey,
+    network_secret_key: NodeSecretKey,
     bootstrap_notify: Arc<Notify>,
     nodes: Arc<Mutex<Option<Vec<NodeInfo>>>>,
     is_running: Arc<Mutex<bool>>,
@@ -225,8 +225,8 @@ impl<T: TopologyInterface> DhtInterface for Dht<T> {
         _: Arc<Self::Topology>,
         config: Self::Config,
     ) -> Result<Self> {
-        let (network_secret_key, _) = signer.get_sk();
-        Builder::new(network_secret_key, config).build()
+        let (_, node_public_key) = signer.get_sk();
+        Builder::new(node_public_key, config).build()
     }
 
     fn get_socket(&self) -> DhtSocket {

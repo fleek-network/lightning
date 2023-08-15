@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use fleek_crypto::NodeNetworkingPublicKey;
+use fleek_crypto::NodePublicKey;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -12,7 +12,7 @@ pub struct Config {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Bootstrapper {
     pub address: SocketAddr,
-    pub network_public_key: NodeNetworkingPublicKey,
+    pub network_public_key: NodePublicKey,
 }
 
 impl Default for Config {

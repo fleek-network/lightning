@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result};
-use fleek_crypto::{AccountOwnerPublicKey, NodeNetworkingPublicKey, NodePublicKey, PublicKey};
+use fleek_crypto::{AccountOwnerPublicKey, ConsensusPublicKey, NodePublicKey, PublicKey};
 use lightning_interfaces::types::{
     CommodityTypes, Epoch, NodeInfo, NodeServed, Staking, TotalServed, Worker,
 };
@@ -57,7 +57,7 @@ pub struct GenesisCommittee {
     owner: String,
     primary_public_key: String,
     primary_address: String,
-    network_key: String,
+    consensus_public_key: String,
     worker_address: String,
     worker_public_key: String,
     worker_mempool: String,
@@ -94,12 +94,12 @@ impl From<&GenesisCommittee> for NodeInfo {
     fn from(value: &GenesisCommittee) -> Self {
         let owner = AccountOwnerPublicKey::from_base64(&value.owner).unwrap();
         let public_key = NodePublicKey::from_base64(&value.primary_public_key).unwrap();
-        let network_key = NodeNetworkingPublicKey::from_base64(&value.network_key).unwrap();
+        let consensus_key = ConsensusPublicKey::from_base64(&value.consensus_public_key).unwrap();
 
         let domain: Multiaddr = value.primary_address.parse().unwrap();
 
         let worker = Worker {
-            public_key: NodeNetworkingPublicKey::from_base64(&value.worker_public_key).unwrap(),
+            public_key: NodePublicKey::from_base64(&value.worker_public_key).unwrap(),
             address: value.worker_address.parse().unwrap(),
             mempool: value.worker_mempool.parse().unwrap(),
         };
@@ -107,7 +107,7 @@ impl From<&GenesisCommittee> for NodeInfo {
         NodeInfo {
             owner: owner.into(),
             public_key,
-            network_key,
+            consensus_key,
             domain,
             workers: [worker].to_vec(),
             staked_since: 0,
@@ -123,7 +123,7 @@ impl GenesisCommittee {
         owner: String,
         primary_public_key: String,
         primary_address: String,
-        network_key: String,
+        consensus_public_key: String,
         worker_address: String,
         worker_public_key: String,
         worker_mempool: String,
@@ -133,7 +133,7 @@ impl GenesisCommittee {
             owner,
             primary_public_key,
             primary_address,
-            network_key,
+            consensus_public_key,
             worker_address,
             worker_public_key,
             worker_mempool,

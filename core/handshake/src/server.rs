@@ -192,7 +192,7 @@ impl HandshakeServerInner {
                         if *state == LaneState::Disconnected {
                             // 2. send response w last info
                             conn.write_frame(HandshakeFrame::HandshakeResponseUnlock {
-                                pubkey: NodePublicKey([0u8; 96]),
+                                pubkey: NodePublicKey([0u8; 32]),
                                 nonce: 1000,
                                 lane,
                                 // TODO: When exiting, services should return if the session was
@@ -224,7 +224,7 @@ impl HandshakeServerInner {
                             .map(|l| l as u8)
                         {
                             conn.write_frame(HandshakeFrame::HandshakeResponse {
-                                pubkey: NodePublicKey([0u8; 96]),
+                                pubkey: NodePublicKey([0u8; 32]),
                                 nonce: 1000,
                                 lane,
                             })

@@ -87,7 +87,7 @@ impl<T: LightningTypes> Node<T> {
 
         let topology = Arc::new(T::Topology::init(
             configuration.get::<T::Topology>(),
-            signer.get_bls_pk(),
+            signer.get_ed25519_pk(),
             application.sync_query(),
         )?);
 

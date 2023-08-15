@@ -15,8 +15,8 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 pub use config::Config;
 use fleek_crypto::{
-    NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
-    SecretKey, TransactionSender,
+    ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, NodeSignature, SecretKey,
+    TransactionSender,
 };
 use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::{
@@ -130,13 +130,13 @@ impl SignerInterface for Signer {
     }
 
     /// Returns the `BLS` public key of the current node.
-    fn get_bls_pk(&self) -> NodePublicKey {
-        self.inner.node_public_key
+    fn get_bls_pk(&self) -> ConsensusPublicKey {
+        self.inner.consensus_public_key
     }
 
     /// Returns the `Ed25519` (network) public key of the current node.
-    fn get_ed25519_pk(&self) -> NodeNetworkingPublicKey {
-        self.inner.network_public_key
+    fn get_ed25519_pk(&self) -> NodePublicKey {
+        self.inner.node_public_key
     }
 
     /// Returns the loaded secret key material.
@@ -145,8 +145,8 @@ impl SignerInterface for Signer {
     ///
     /// Just like any other function which deals with secret material this function should
     /// be used with the greatest caution.
-    fn get_sk(&self) -> (NodeNetworkingSecretKey, NodeSecretKey) {
-        (self.inner.network_secret_key, self.inner.node_secret_key)
+    fn get_sk(&self) -> (ConsensusSecretKey, NodeSecretKey) {
+        (self.inner.consensus_secret_key, self.inner.node_secret_key)
     }
 
     /// Returns a socket that can be used to submit transactions to the mempool, these
@@ -191,12 +191,12 @@ impl SignerInterface for Signer {
     /// # Safety
     ///
     /// This function will return an error if the key already exists.
-    fn generate_network_key(path: &Path) -> anyhow::Result<()> {
+    fn generate_consensus_key(path: &Path) -> anyhow::Result<()> {
         if path.exists() {
-            return Err(anyhow!("Networking secret key already exists"));
+            return Err(anyhow!("Consensus secret key already exists"));
         } else {
-            let network_secret_key = NodeNetworkingSecretKey::generate();
-            utils::save(path, network_secret_key.encode_pem())?;
+            let consensus_secret_key = ConsensusSecretKey::generate();
+            utils::save(path, consensus_secret_key.encode_pem())?;
         }
         Ok(())
     }
@@ -231,8 +231,8 @@ impl Signer {
 struct SignerInner {
     node_secret_key: NodeSecretKey,
     node_public_key: NodePublicKey,
-    network_secret_key: NodeNetworkingSecretKey,
-    network_public_key: NodeNetworkingPublicKey,
+    consensus_secret_key: ConsensusSecretKey,
+    consensus_public_key: ConsensusPublicKey,
 }
 
 impl SignerInner {
@@ -251,29 +251,27 @@ impl SignerInner {
             ));
         };
 
-        let network_secret_key = if config.network_key_path.exists() {
+        let consensus_secret_key = if config.consensus_key_path.exists() {
             // read pem file, if we cant read the pem file we should panic
-            let encoded =
-                read_to_string(&config.network_key_path).expect("Failed to read network pem file");
+            let encoded = read_to_string(&config.consensus_key_path)
+                .expect("Failed to read consensus pem file");
             // todo(dalton): We should panic if we cannot decode pem file. But we should try to
             // identify the encoding and try a few different ways first. Also we should
             // support passworded pems
-            NodeNetworkingSecretKey::decode_pem(&encoded)
-                .expect("Failed to decode network pem file")
+            ConsensusSecretKey::decode_pem(&encoded).expect("Failed to decode consensus pem file")
         } else {
             return Err(anyhow!(
-                "Network secret key does not exist. Use the CLI to generate keys."
+                "Consensus secret key does not exist. Use the CLI to generate keys."
             ));
         };
 
         let node_public_key = node_secret_key.to_pk();
-
-        let network_public_key = network_secret_key.to_pk();
+        let consensus_public_key = consensus_secret_key.to_pk();
         Ok(Self {
             node_secret_key,
             node_public_key,
-            network_secret_key,
-            network_public_key,
+            consensus_secret_key,
+            consensus_public_key,
         })
     }
 
@@ -305,7 +303,7 @@ impl SignerInner {
                     let digest = update_payload.to_digest();
                     let signature = self.node_secret_key.sign(&digest);
                     let update_request = UpdateRequest {
-                        sender:  TransactionSender::NodeBLS(self.node_public_key),
+                        sender:  TransactionSender::NodeMain(self.node_public_key),
                         signature: signature.into(),
                         payload: update_payload,
                     };

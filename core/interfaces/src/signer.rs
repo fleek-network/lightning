@@ -3,7 +3,7 @@ use std::{path::Path, sync::Arc};
 use affair::Socket;
 use async_trait::async_trait;
 use fleek_crypto::{
-    NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
+    ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
 use tokio::sync::Notify;
 
@@ -40,10 +40,10 @@ pub trait SignerInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send 
     fn provide_new_block_notify(&self, block_notify: Arc<Notify>);
 
     /// Returns the `BLS` public key of the current node.
-    fn get_bls_pk(&self) -> NodePublicKey;
+    fn get_bls_pk(&self) -> ConsensusPublicKey;
 
     /// Returns the `Ed25519` (network) public key of the current node.
-    fn get_ed25519_pk(&self) -> NodeNetworkingPublicKey;
+    fn get_ed25519_pk(&self) -> NodePublicKey;
 
     /// Returns the loaded secret key material.
     ///
@@ -51,7 +51,7 @@ pub trait SignerInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send 
     ///
     /// Just like any other function which deals with secret material this function should
     /// be used with the greatest caution.
-    fn get_sk(&self) -> (NodeNetworkingSecretKey, NodeSecretKey);
+    fn get_sk(&self) -> (ConsensusSecretKey, NodeSecretKey);
 
     /// Returns a socket that can be used to submit transactions to the mempool, these
     /// transactions are signed by the node and a proper nonce is assigned by the
@@ -78,10 +78,10 @@ pub trait SignerInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send 
     /// This function will return an error if the key already exists.
     fn generate_node_key(path: &Path) -> anyhow::Result<()>;
 
-    /// Generates the network secret keys.
+    /// Generates the consensus secret keys.
     ///
     /// # Safety
     ///
     /// This function will return an error if the key already exists.
-    fn generate_network_key(path: &Path) -> anyhow::Result<()>;
+    fn generate_consensus_key(path: &Path) -> anyhow::Result<()>;
 }

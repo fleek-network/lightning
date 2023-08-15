@@ -51,29 +51,29 @@ const BLS12_381_PEM_LABEL: &str = "LIGHTNING BLS12_381 PRIVATE KEY";
 
 /// A node's BLS 12-381 public key
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy)]
-pub struct NodePublicKey(pub [u8; 96]);
+pub struct ConsensusPublicKey(pub [u8; 96]);
 
-impl From<[u8; 96]> for NodePublicKey {
+impl From<[u8; 96]> for ConsensusPublicKey {
     fn from(value: [u8; 96]) -> Self {
         Self(value)
     }
 }
 
-impl From<BLS12381PublicKey> for NodePublicKey {
+impl From<BLS12381PublicKey> for ConsensusPublicKey {
     fn from(value: BLS12381PublicKey) -> Self {
         let bytes = value.as_ref();
-        NodePublicKey(*array_ref!(bytes, 0, 96))
+        ConsensusPublicKey(*array_ref!(bytes, 0, 96))
     }
 }
 
-impl From<&NodePublicKey> for BLS12381PublicKey {
-    fn from(value: &NodePublicKey) -> Self {
+impl From<&ConsensusPublicKey> for BLS12381PublicKey {
+    fn from(value: &ConsensusPublicKey) -> Self {
         BLS12381PublicKey::from_bytes(&value.0).unwrap()
     }
 }
 
-impl PublicKey for NodePublicKey {
-    type Signature = NodeSignature;
+impl PublicKey for ConsensusPublicKey {
+    type Signature = ConsensusSignature;
 
     fn verify(&self, signature: &Self::Signature, digest: &[u8; 32]) -> bool {
         let pubkey: BLS12381PublicKey = self.into();
@@ -88,6 +88,165 @@ impl PublicKey for NodePublicKey {
     fn from_base64(encoded: &str) -> Option<Self> {
         let bytes = Base64::decode(encoded).ok()?;
         (bytes.len() == 96).then(|| Self(*array_ref!(bytes, 0, 96)))
+    }
+}
+
+impl Display for ConsensusPublicKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
+    }
+}
+
+impl Serialize for ConsensusPublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl FromStr for ConsensusPublicKey {
+    type Err = std::io::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let bytes = hex::decode(s)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
+
+        if bytes.len() != 96 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Expected 96 bytes",
+            ));
+        }
+
+        let mut address = [0u8; 96];
+        address.copy_from_slice(&bytes);
+        Ok(ConsensusPublicKey(address))
+    }
+}
+
+impl<'de> Deserialize<'de> for ConsensusPublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse::<ConsensusPublicKey>()
+            .map_err(serde::de::Error::custom)
+    }
+}
+
+/// A node's BLS 12-381 secret key
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
+pub struct ConsensusSecretKey(#[serde(with = "BigArray")] pub [u8; 32]);
+
+impl From<BLS12381PrivateKey> for ConsensusSecretKey {
+    fn from(value: BLS12381PrivateKey) -> Self {
+        let bytes = value.as_ref();
+        ConsensusSecretKey(*array_ref!(bytes, 0, 32))
+    }
+}
+
+impl From<&ConsensusSecretKey> for BLS12381PrivateKey {
+    fn from(value: &ConsensusSecretKey) -> Self {
+        BLS12381PrivateKey::from_bytes(&value.0).unwrap()
+    }
+}
+
+impl From<ConsensusSecretKey> for BLS12381KeyPair {
+    fn from(value: ConsensusSecretKey) -> Self {
+        BLS12381PrivateKey::from(&value).into()
+    }
+}
+
+impl SecretKey for ConsensusSecretKey {
+    type PublicKey = ConsensusPublicKey;
+
+    fn generate() -> Self {
+        let pair = BLS12381KeyPair::generate(&mut ThreadRng::default());
+        pair.private().into()
+    }
+
+    /// Decode a BLS12-381 secret key from a custom protobuf pem file
+    fn decode_pem(encoded: &str) -> Option<ConsensusSecretKey> {
+        let (label, bytes) = sec1::pem::decode_vec(encoded.as_bytes()).ok()?;
+        // todo: verify ec point
+        (label == BLS12_381_PEM_LABEL && bytes.len() == 32)
+            .then(|| ConsensusSecretKey(*array_ref!(bytes, 0, 32)))
+    }
+
+    /// Encode the BLS12-381 secret key to a custom protobuf pem file
+    fn encode_pem(&self) -> String {
+        sec1::pem::encode_string(BLS12_381_PEM_LABEL, sec1::LineEnding::LF, &self.0).unwrap()
+    }
+
+    fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
+        let secret: BLS12381PrivateKey = self.into();
+        secret.sign(digest).into()
+    }
+
+    fn to_pk(&self) -> Self::PublicKey {
+        let secret: BLS12381PrivateKey = self.into();
+        Into::<BLS12381PublicKey>::into(&secret).into()
+    }
+}
+
+/// A node's BLS 12-381 signature
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
+pub struct ConsensusSignature(#[serde(with = "BigArray")] pub [u8; 48]);
+
+impl From<BLS12381Signature> for ConsensusSignature {
+    fn from(value: BLS12381Signature) -> Self {
+        let bytes = value.as_ref();
+        ConsensusSignature(*array_ref!(bytes, 0, 48))
+    }
+}
+
+impl From<&ConsensusSignature> for BLS12381Signature {
+    fn from(value: &ConsensusSignature) -> Self {
+        BLS12381Signature::from_bytes(&value.0).unwrap()
+    }
+}
+
+/// A node's ed25519 main public key
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy)]
+pub struct NodePublicKey(pub [u8; 32]);
+
+impl From<[u8; 32]> for NodePublicKey {
+    fn from(value: [u8; 32]) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Ed25519PublicKey> for NodePublicKey {
+    fn from(value: Ed25519PublicKey) -> Self {
+        let bytes = value.as_ref();
+        NodePublicKey(*array_ref!(bytes, 0, 32))
+    }
+}
+
+impl From<&NodePublicKey> for Ed25519PublicKey {
+    fn from(value: &NodePublicKey) -> Self {
+        Ed25519PublicKey::from_bytes(&value.0).unwrap()
+    }
+}
+
+impl PublicKey for NodePublicKey {
+    type Signature = NodeSignature;
+
+    fn verify(&self, signature: &Self::Signature, digest: &[u8; 32]) -> bool {
+        let pubkey: Ed25519PublicKey = self.into();
+        let signature: Ed25519Signature = signature.into();
+        pubkey.verify(digest, &signature).is_ok()
+    }
+
+    fn to_base64(&self) -> String {
+        Base64::encode(self.0)
+    }
+
+    fn from_base64(encoded: &str) -> Option<Self> {
+        let bytes = Base64::decode(encoded).ok()?;
+        (bytes.len() == 32).then(|| Self(*array_ref!(bytes, 0, 32)))
     }
 }
 
@@ -112,14 +271,14 @@ impl FromStr for NodePublicKey {
         let bytes = hex::decode(s)
             .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
 
-        if bytes.len() != 96 {
+        if bytes.len() != 32 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                "Expected 96 bytes",
+                "Expected 32 bytes",
             ));
         }
 
-        let mut address = [0u8; 96];
+        let mut address = [0u8; 32];
         address.copy_from_slice(&bytes);
         Ok(NodePublicKey(address))
     }
@@ -135,191 +294,32 @@ impl<'de> Deserialize<'de> for NodePublicKey {
     }
 }
 
-/// A node's BLS 12-381 secret key
+/// A node's ed25519 main secret key
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct NodeSecretKey(#[serde(with = "BigArray")] pub [u8; 32]);
+pub struct NodeSecretKey([u8; 32]);
 
-impl From<BLS12381PrivateKey> for NodeSecretKey {
-    fn from(value: BLS12381PrivateKey) -> Self {
+impl From<Ed25519PrivateKey> for NodeSecretKey {
+    fn from(value: Ed25519PrivateKey) -> Self {
         let bytes = value.as_ref();
         NodeSecretKey(*array_ref!(bytes, 0, 32))
     }
 }
 
-impl From<&NodeSecretKey> for BLS12381PrivateKey {
+impl From<&NodeSecretKey> for Ed25519PrivateKey {
     fn from(value: &NodeSecretKey) -> Self {
-        BLS12381PrivateKey::from_bytes(&value.0).unwrap()
-    }
-}
-
-impl From<NodeSecretKey> for BLS12381KeyPair {
-    fn from(value: NodeSecretKey) -> Self {
-        BLS12381PrivateKey::from(&value).into()
-    }
-}
-
-impl SecretKey for NodeSecretKey {
-    type PublicKey = NodePublicKey;
-
-    fn generate() -> Self {
-        let pair = BLS12381KeyPair::generate(&mut ThreadRng::default());
-        pair.private().into()
-    }
-
-    /// Decode a BLS12-381 secret key from a custom protobuf pem file
-    fn decode_pem(encoded: &str) -> Option<NodeSecretKey> {
-        let (label, bytes) = sec1::pem::decode_vec(encoded.as_bytes()).ok()?;
-        // todo: verify ec point
-        (label == BLS12_381_PEM_LABEL && bytes.len() == 32)
-            .then(|| NodeSecretKey(*array_ref!(bytes, 0, 32)))
-    }
-
-    /// Encode the BLS12-381 secret key to a custom protobuf pem file
-    fn encode_pem(&self) -> String {
-        sec1::pem::encode_string(BLS12_381_PEM_LABEL, sec1::LineEnding::LF, &self.0).unwrap()
-    }
-
-    fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
-        let secret: BLS12381PrivateKey = self.into();
-        secret.sign(digest).into()
-    }
-
-    fn to_pk(&self) -> Self::PublicKey {
-        let secret: BLS12381PrivateKey = self.into();
-        Into::<BLS12381PublicKey>::into(&secret).into()
-    }
-}
-
-/// A node's BLS 12-381 signature
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct NodeSignature(#[serde(with = "BigArray")] pub [u8; 48]);
-
-impl From<BLS12381Signature> for NodeSignature {
-    fn from(value: BLS12381Signature) -> Self {
-        let bytes = value.as_ref();
-        NodeSignature(*array_ref!(bytes, 0, 48))
-    }
-}
-
-impl From<&NodeSignature> for BLS12381Signature {
-    fn from(value: &NodeSignature) -> Self {
-        BLS12381Signature::from_bytes(&value.0).unwrap()
-    }
-}
-
-/// A node's ed25519 networking public key
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy)]
-pub struct NodeNetworkingPublicKey(pub [u8; 32]);
-
-impl From<[u8; 32]> for NodeNetworkingPublicKey {
-    fn from(value: [u8; 32]) -> Self {
-        Self(value)
-    }
-}
-
-impl From<Ed25519PublicKey> for NodeNetworkingPublicKey {
-    fn from(value: Ed25519PublicKey) -> Self {
-        let bytes = value.as_ref();
-        NodeNetworkingPublicKey(*array_ref!(bytes, 0, 32))
-    }
-}
-
-impl From<&NodeNetworkingPublicKey> for Ed25519PublicKey {
-    fn from(value: &NodeNetworkingPublicKey) -> Self {
-        Ed25519PublicKey::from_bytes(&value.0).unwrap()
-    }
-}
-
-impl PublicKey for NodeNetworkingPublicKey {
-    type Signature = NodeNetworkingSignature;
-
-    fn verify(&self, signature: &Self::Signature, digest: &[u8; 32]) -> bool {
-        let pubkey: Ed25519PublicKey = self.into();
-        let signature: Ed25519Signature = signature.into();
-        pubkey.verify(digest, &signature).is_ok()
-    }
-
-    fn to_base64(&self) -> String {
-        Base64::encode(self.0)
-    }
-
-    fn from_base64(encoded: &str) -> Option<Self> {
-        let bytes = Base64::decode(encoded).ok()?;
-        (bytes.len() == 32).then(|| Self(*array_ref!(bytes, 0, 32)))
-    }
-}
-
-impl Display for NodeNetworkingPublicKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", hex::encode(self.0))
-    }
-}
-
-impl Serialize for NodeNetworkingPublicKey {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl FromStr for NodeNetworkingPublicKey {
-    type Err = std::io::Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let bytes = hex::decode(s)
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
-
-        if bytes.len() != 32 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Expected 32 bytes",
-            ));
-        }
-
-        let mut address = [0u8; 32];
-        address.copy_from_slice(&bytes);
-        Ok(NodeNetworkingPublicKey(address))
-    }
-}
-
-impl<'de> Deserialize<'de> for NodeNetworkingPublicKey {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        s.parse::<NodeNetworkingPublicKey>()
-            .map_err(serde::de::Error::custom)
-    }
-}
-
-/// A node's ed25519 networking secret key
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct NodeNetworkingSecretKey([u8; 32]);
-
-impl From<Ed25519PrivateKey> for NodeNetworkingSecretKey {
-    fn from(value: Ed25519PrivateKey) -> Self {
-        let bytes = value.as_ref();
-        NodeNetworkingSecretKey(*array_ref!(bytes, 0, 32))
-    }
-}
-
-impl From<&NodeNetworkingSecretKey> for Ed25519PrivateKey {
-    fn from(value: &NodeNetworkingSecretKey) -> Self {
         Ed25519PrivateKey::from_bytes(&value.0).unwrap()
     }
 }
 
-impl From<NodeNetworkingSecretKey> for Ed25519KeyPair {
-    fn from(value: NodeNetworkingSecretKey) -> Self {
+impl From<NodeSecretKey> for Ed25519KeyPair {
+    fn from(value: NodeSecretKey) -> Self {
         let secret: Ed25519PrivateKey = (&value).into();
         secret.into()
     }
 }
 
-impl SecretKey for NodeNetworkingSecretKey {
-    type PublicKey = NodeNetworkingPublicKey;
+impl SecretKey for NodeSecretKey {
+    type PublicKey = NodePublicKey;
 
     fn generate() -> Self {
         let pair = Ed25519KeyPair::generate(&mut ThreadRng::default());
@@ -362,19 +362,19 @@ impl SecretKey for NodeNetworkingSecretKey {
     }
 }
 
-/// A node's ed25519 networking signature
+/// A node's ed25519 main signature
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct NodeNetworkingSignature(#[serde(with = "BigArray")] [u8; 64]);
+pub struct NodeSignature(#[serde(with = "BigArray")] [u8; 64]);
 
-impl From<Ed25519Signature> for NodeNetworkingSignature {
+impl From<Ed25519Signature> for NodeSignature {
     fn from(value: Ed25519Signature) -> Self {
         let bytes = value.as_ref();
-        NodeNetworkingSignature(*array_ref!(bytes, 0, 64))
+        NodeSignature(*array_ref!(bytes, 0, 64))
     }
 }
 
-impl From<&NodeNetworkingSignature> for Ed25519Signature {
-    fn from(value: &NodeNetworkingSignature) -> Self {
+impl From<&NodeSignature> for Ed25519Signature {
+    fn from(value: &NodeSignature) -> Self {
         Ed25519Signature::from_bytes(&value.0).unwrap()
     }
 }
@@ -687,27 +687,27 @@ impl From<&AccountOwnerSignature> for Secp256k1RecoverableSignature {
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum TransactionSender {
-    NodeBLS(NodePublicKey),
-    NodeNetwork(NodeNetworkingPublicKey),
+    NodeConsensus(ConsensusPublicKey),
+    NodeMain(NodePublicKey),
     AccountOwner(EthAddress),
 }
 
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum TransactionSignature {
-    NodeBLS(NodeSignature),
-    NodeNetwork(NodeNetworkingSignature),
+    NodeConsensus(ConsensusSignature),
+    NodeMain(NodeSignature),
     AccountOwner(AccountOwnerSignature),
 }
 
 impl TransactionSender {
     pub fn verify(&self, signature: TransactionSignature, digest: &[u8; 32]) -> bool {
         match self {
-            TransactionSender::NodeBLS(public_key) => match signature {
-                TransactionSignature::NodeBLS(sig) => public_key.verify(&sig, digest),
+            TransactionSender::NodeConsensus(public_key) => match signature {
+                TransactionSignature::NodeConsensus(sig) => public_key.verify(&sig, digest),
                 _ => false,
             },
-            TransactionSender::NodeNetwork(public_key) => match signature {
-                TransactionSignature::NodeNetwork(sig) => public_key.verify(&sig, digest),
+            TransactionSender::NodeMain(public_key) => match signature {
+                TransactionSignature::NodeMain(sig) => public_key.verify(&sig, digest),
                 _ => false,
             },
             TransactionSender::AccountOwner(public_key) => match signature {
@@ -717,15 +717,15 @@ impl TransactionSender {
         }
     }
 }
-impl From<NodeSignature> for TransactionSignature {
-    fn from(value: NodeSignature) -> Self {
-        TransactionSignature::NodeBLS(value)
+impl From<ConsensusSignature> for TransactionSignature {
+    fn from(value: ConsensusSignature) -> Self {
+        TransactionSignature::NodeConsensus(value)
     }
 }
 
-impl From<NodeNetworkingSignature> for TransactionSignature {
-    fn from(value: NodeNetworkingSignature) -> Self {
-        TransactionSignature::NodeNetwork(value)
+impl From<NodeSignature> for TransactionSignature {
+    fn from(value: NodeSignature) -> Self {
+        TransactionSignature::NodeMain(value)
     }
 }
 
@@ -735,15 +735,15 @@ impl From<AccountOwnerSignature> for TransactionSignature {
     }
 }
 
-impl From<NodePublicKey> for TransactionSender {
-    fn from(value: NodePublicKey) -> Self {
-        TransactionSender::NodeBLS(value)
+impl From<ConsensusPublicKey> for TransactionSender {
+    fn from(value: ConsensusPublicKey) -> Self {
+        TransactionSender::NodeConsensus(value)
     }
 }
 
-impl From<NodeNetworkingPublicKey> for TransactionSender {
-    fn from(value: NodeNetworkingPublicKey) -> Self {
-        TransactionSender::NodeNetwork(value)
+impl From<NodePublicKey> for TransactionSender {
+    fn from(value: NodePublicKey) -> Self {
+        TransactionSender::NodeMain(value)
     }
 }
 

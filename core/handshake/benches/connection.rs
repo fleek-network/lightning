@@ -118,14 +118,14 @@ fn bench_codec_group(c: &mut Criterion) {
     bench_frame(&mut g, frame, "handshake_request");
 
     let frame = HandshakeFrame::HandshakeResponse {
-        pubkey: NodePublicKey([3u8; 96]),
+        pubkey: NodePublicKey([3u8; 32]),
         nonce: 65535,
         lane: 0,
     };
     bench_frame(&mut g, frame, "handshake_response");
 
     let frame = HandshakeFrame::HandshakeResponseUnlock {
-        pubkey: NodePublicKey([3u8; 96]),
+        pubkey: NodePublicKey([3u8; 32]),
         nonce: 65535,
         lane: 0,
         last_bytes: 420,

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use fleek_crypto::NodeNetworkingPublicKey;
+use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
 use tokio::{
     net::UdpSocket,
@@ -26,7 +26,7 @@ pub async fn start_worker(
     task_tx: Sender<Task>,
     bootstrap_notify: Arc<Notify>,
     shutdown_notify: Arc<Notify>,
-    local_key: NodeNetworkingPublicKey,
+    local_key: NodePublicKey,
     socket: Arc<UdpSocket>,
 ) {
     let handler = Handler {
@@ -73,7 +73,7 @@ pub async fn start_worker(
 #[derive(Clone)]
 pub struct Handler {
     task_tx: Sender<Task>,
-    local_key: NodeNetworkingPublicKey,
+    local_key: NodePublicKey,
     socket: Arc<UdpSocket>,
 }
 
@@ -97,9 +97,7 @@ impl Handler {
                 key,
                 value: response.value.unwrap_or_default(),
                 // Todo: Refactor when source is implemented.
-                source: response
-                    .source
-                    .unwrap_or(NodeNetworkingPublicKey(rand::random())),
+                source: response.source.unwrap_or(NodePublicKey(rand::random())),
                 signature: None,
             }))
         }

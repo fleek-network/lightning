@@ -3,8 +3,8 @@ use std::{thread, time::Duration};
 use affair::{Executor, TokioSpawn, Worker};
 use anyhow::Result;
 use fleek_crypto::{
-    AccountOwnerSecretKey, EthAddress, NodeNetworkingSecretKey, NodePublicKey, NodeSecretKey,
-    PublicKey, SecretKey,
+    AccountOwnerSecretKey, ConsensusSecretKey, EthAddress, NodePublicKey, NodeSecretKey, PublicKey,
+    SecretKey,
 };
 use hp_fixed::unsigned::HpUfixed;
 use lightning_application::{
@@ -201,8 +201,8 @@ async fn test_rpc_get_reputation() -> Result<()> {
     let owner_public_key = owner_secret_key.to_pk();
     let node_secret_key = NodeSecretKey::generate();
     let node_public_key = node_secret_key.to_pk();
-    let network_secret_key = NodeNetworkingSecretKey::generate();
-    let network_public_key = network_secret_key.to_pk();
+    let consensus_secret_key = ConsensusSecretKey::generate();
+    let consensus_public_key = consensus_secret_key.to_pk();
 
     let mut genesis = Genesis::load().unwrap();
 
@@ -210,9 +210,9 @@ async fn test_rpc_get_reputation() -> Result<()> {
         owner_public_key.to_base64(),
         node_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/48000".to_owned(),
-        network_public_key.to_base64(),
+        consensus_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        network_public_key.to_base64(),
+        node_public_key.to_base64(),
         "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
         None,
     ));
@@ -274,8 +274,8 @@ async fn test_rpc_get_staked() -> Result<()> {
     let eth_address = owner_public_key.into();
     let node_secret_key = NodeSecretKey::generate();
     let node_public_key = node_secret_key.to_pk();
-    let network_secret_key = NodeNetworkingSecretKey::generate();
-    let network_public_key = network_secret_key.to_pk();
+    let consensus_secret_key = ConsensusSecretKey::generate();
+    let consensus_public_key = consensus_secret_key.to_pk();
 
     // Init application service and store node info in application state.
     let mut genesis = Genesis::load().unwrap();
@@ -288,12 +288,12 @@ async fn test_rpc_get_staked() -> Result<()> {
     let node_info = NodeInfo {
         owner: eth_address,
         public_key: node_public_key,
-        network_key: network_public_key,
+        consensus_key: consensus_public_key,
         staked_since: 1,
         stake: staking,
         domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
         workers: vec![NodeWorker {
-            public_key: network_public_key,
+            public_key: node_public_key,
             address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
             mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
         }],
@@ -418,8 +418,8 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
     let eth_address = owner_public_key.into();
     let node_secret_key = NodeSecretKey::generate();
     let node_public_key = node_secret_key.to_pk();
-    let network_secret_key = NodeNetworkingSecretKey::generate();
-    let network_public_key = network_secret_key.to_pk();
+    let consensus_secret_key = ConsensusSecretKey::generate();
+    let consensus_public_key = consensus_secret_key.to_pk();
 
     // Init application service and store node info in application state.
     let mut genesis = Genesis::load().unwrap();
@@ -432,12 +432,12 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
     let node_info = NodeInfo {
         owner: eth_address,
         public_key: node_public_key,
-        network_key: network_public_key,
+        consensus_key: consensus_public_key,
         staked_since: 1,
         stake: staking,
         domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
         workers: vec![NodeWorker {
-            public_key: network_public_key,
+            public_key: node_public_key,
             address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
             mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
         }],
@@ -502,8 +502,8 @@ async fn test_rpc_get_locked_time() -> Result<()> {
     let eth_address = owner_public_key.into();
     let node_secret_key = NodeSecretKey::generate();
     let node_public_key = node_secret_key.to_pk();
-    let network_secret_key = NodeNetworkingSecretKey::generate();
-    let network_public_key = network_secret_key.to_pk();
+    let consensus_secret_key = ConsensusSecretKey::generate();
+    let consensus_public_key = consensus_secret_key.to_pk();
 
     // Init application service and store node info in application state.
     let mut genesis = Genesis::load().unwrap();
@@ -516,12 +516,12 @@ async fn test_rpc_get_locked_time() -> Result<()> {
     let node_info = NodeInfo {
         owner: eth_address,
         public_key: node_public_key,
-        network_key: network_public_key,
+        consensus_key: consensus_public_key,
         staked_since: 1,
         stake: staking,
         domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
         workers: vec![NodeWorker {
-            public_key: network_public_key,
+            public_key: node_public_key,
             address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
             mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
         }],
@@ -586,8 +586,8 @@ async fn test_rpc_get_locked() -> Result<()> {
     let eth_address = owner_public_key.into();
     let node_secret_key = NodeSecretKey::generate();
     let node_public_key = node_secret_key.to_pk();
-    let network_secret_key = NodeNetworkingSecretKey::generate();
-    let network_public_key = network_secret_key.to_pk();
+    let consensus_secret_key = ConsensusSecretKey::generate();
+    let consensus_public_key = consensus_secret_key.to_pk();
 
     // Init application service and store node info in application state.
     let mut genesis = Genesis::load().unwrap();
@@ -600,12 +600,12 @@ async fn test_rpc_get_locked() -> Result<()> {
     let node_info = NodeInfo {
         owner: eth_address,
         public_key: node_public_key,
-        network_key: network_public_key,
+        consensus_key: consensus_public_key,
         staked_since: 1,
         stake: staking,
         domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
         workers: vec![NodeWorker {
-            public_key: network_public_key,
+            public_key: node_public_key,
             address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
             mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
         }],
@@ -732,8 +732,8 @@ async fn test_rpc_get_node_info() -> Result<()> {
     let eth_address = owner_public_key.into();
     let node_secret_key = NodeSecretKey::generate();
     let node_public_key = node_secret_key.to_pk();
-    let network_secret_key = NodeNetworkingSecretKey::generate();
-    let network_public_key = network_secret_key.to_pk();
+    let consensus_secret_key = ConsensusSecretKey::generate();
+    let consensus_public_key = consensus_secret_key.to_pk();
 
     // Init application service and store node info in application state.
     let mut genesis = Genesis::load().unwrap();
@@ -746,12 +746,12 @@ async fn test_rpc_get_node_info() -> Result<()> {
     let node_info = NodeInfo {
         owner: eth_address,
         public_key: node_public_key,
-        network_key: network_public_key,
+        consensus_key: consensus_public_key,
         staked_since: 1,
         stake: staking,
         domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
         workers: vec![NodeWorker {
-            public_key: network_public_key,
+            public_key: node_public_key,
             address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
             mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
         }],
@@ -1247,8 +1247,8 @@ async fn test_rpc_get_node_served() -> Result<()> {
     let owner_public_key = owner_secret_key.to_pk();
     let node_secret_key = NodeSecretKey::generate();
     let node_public_key = node_secret_key.to_pk();
-    let network_secret_key = NodeNetworkingSecretKey::generate();
-    let network_public_key = network_secret_key.to_pk();
+    let consensus_secret_key = ConsensusSecretKey::generate();
+    let consensus_public_key = consensus_secret_key.to_pk();
 
     // Init application service and store total served in application state.
     let mut genesis = Genesis::load().unwrap();
@@ -1256,9 +1256,9 @@ async fn test_rpc_get_node_served() -> Result<()> {
         owner_public_key.to_base64(),
         node_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/48000".to_owned(),
-        network_public_key.to_base64(),
+        consensus_public_key.to_base64(),
         "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        network_public_key.to_base64(),
+        node_public_key.to_base64(),
         "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
         None,
     ));
@@ -1325,8 +1325,8 @@ async fn test_rpc_is_valid_node() -> Result<()> {
     let eth_address = owner_public_key.into();
     let node_secret_key = NodeSecretKey::generate();
     let node_public_key = node_secret_key.to_pk();
-    let network_secret_key = NodeNetworkingSecretKey::generate();
-    let network_public_key = network_secret_key.to_pk();
+    let consensus_secret_key = ConsensusSecretKey::generate();
+    let consensus_public_key = consensus_secret_key.to_pk();
 
     // Init application service and store node info in application state.
     let mut genesis = Genesis::load().unwrap();
@@ -1339,12 +1339,12 @@ async fn test_rpc_is_valid_node() -> Result<()> {
     let node_info = NodeInfo {
         owner: eth_address,
         public_key: node_public_key,
-        network_key: network_public_key,
+        consensus_key: consensus_public_key,
         staked_since: 1,
         stake: staking,
         domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
         workers: vec![NodeWorker {
-            public_key: network_public_key,
+            public_key: node_public_key,
             address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
             mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
         }],
@@ -1409,8 +1409,8 @@ async fn test_rpc_get_node_registry() -> Result<()> {
     let eth_address = owner_public_key.into();
     let node_secret_key = NodeSecretKey::generate();
     let node_public_key = node_secret_key.to_pk();
-    let network_secret_key = NodeNetworkingSecretKey::generate();
-    let network_public_key = network_secret_key.to_pk();
+    let consensus_secret_key = ConsensusSecretKey::generate();
+    let consensus_public_key = consensus_secret_key.to_pk();
 
     // Init application service and store node info in application state.
     let mut genesis = Genesis::load().unwrap();
@@ -1423,12 +1423,12 @@ async fn test_rpc_get_node_registry() -> Result<()> {
     let node_info = NodeInfo {
         owner: eth_address,
         public_key: node_public_key,
-        network_key: network_public_key,
+        consensus_key: consensus_public_key,
         staked_since: 1,
         stake: staking,
         domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
         workers: vec![NodeWorker {
-            public_key: network_public_key,
+            public_key: node_public_key,
             address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
             mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
         }],

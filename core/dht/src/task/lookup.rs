@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
-use fleek_crypto::NodeNetworkingPublicKey;
+use fleek_crypto::NodePublicKey;
 use tokio::{
     net::UdpSocket,
     select,
@@ -211,7 +211,7 @@ pub struct LookupTask {
     // Closest nodes.
     closest_nodes: LookupMap<LookupNode>,
     // Our node's local key.
-    local_key: NodeNetworkingPublicKey,
+    local_key: NodePublicKey,
     // Target that we're looking for.
     target: TableKey,
     // Send queries to table server.
@@ -226,7 +226,7 @@ impl LookupTask {
     pub fn new(
         task_id: u64,
         find_value_lookup: bool,
-        local_key: NodeNetworkingPublicKey,
+        local_key: NodePublicKey,
         target: TableKey,
         table_tx: Sender<TableRequest>,
         main_rx: Receiver<ResponseEvent>,

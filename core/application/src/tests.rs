@@ -3,8 +3,8 @@ use std::{collections::BTreeMap, time::SystemTime, vec};
 use affair::Socket;
 use anyhow::{anyhow, Result};
 use fleek_crypto::{
-    AccountOwnerSecretKey, NodeNetworkingPublicKey, NodeNetworkingSecretKey, NodePublicKey,
-    NodeSecretKey, PublicKey, SecretKey,
+    AccountOwnerSecretKey, ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey,
+    PublicKey, SecretKey,
 };
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::{
@@ -39,8 +39,8 @@ pub struct Params {
 struct GenesisCommitteeKeystore {
     _owner_secret_key: AccountOwnerSecretKey,
     node_secret_key: NodeSecretKey,
-    _network_secret_key: NodeNetworkingSecretKey,
-    _worker_secret_key: NodeNetworkingSecretKey,
+    _consensus_secret_key: ConsensusSecretKey,
+    _worker_secret_key: NodeSecretKey,
 }
 
 fn get_genesis_committee(
@@ -51,25 +51,25 @@ fn get_genesis_committee(
     (0..num_members).for_each(|i| {
         let node_secret_key = NodeSecretKey::generate();
         let node_public_key = node_secret_key.to_pk();
-        let network_secret_key = NodeNetworkingSecretKey::generate();
-        let network_public_key = network_secret_key.to_pk();
+        let consensus_secret_key = ConsensusSecretKey::generate();
+        let consensus_public_key = consensus_secret_key.to_pk();
         let owner_secret_key = AccountOwnerSecretKey::generate();
         let owner_public_key = owner_secret_key.to_pk();
         committee.push(GenesisCommittee::new(
             owner_public_key.to_base64(),
             node_public_key.to_base64(),
             format!("/ip4/127.0.0.1/udp/800{i}"),
-            network_public_key.to_base64(),
+            consensus_public_key.to_base64(),
             format!("/ip4/127.0.0.1/udp/810{i}/http"),
-            network_public_key.to_base64(),
+            node_public_key.to_base64(),
             format!("/ip4/127.0.0.1/tcp/810{i}/http"),
             None,
         ));
         keystore.push(GenesisCommitteeKeystore {
             _owner_secret_key: owner_secret_key,
             node_secret_key,
-            _network_secret_key: network_secret_key,
-            _worker_secret_key: network_secret_key,
+            _consensus_secret_key: consensus_secret_key,
+            _worker_secret_key: node_secret_key,
         });
     });
     (committee, keystore)
@@ -272,7 +272,7 @@ async fn stake_lock(
 async fn stake(
     amount: HpUfixed<18>,
     node_public_key: NodePublicKey,
-    node_networking_key: NodeNetworkingPublicKey,
+    consensus_key: ConsensusPublicKey,
     secret_key: AccountOwnerSecretKey,
     update_socket: &Socket<Block, BlockExecutionResponse>,
     nonce: u64,
@@ -281,7 +281,7 @@ async fn stake(
         UpdateMethod::Stake {
             amount,
             node_public_key,
-            node_network_key: Some(node_networking_key),
+            consensus_key: Some(consensus_key),
             node_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
             worker_public_key: Some([0; 32].into()),
             worker_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
@@ -401,7 +401,7 @@ async fn test_stake() {
         UpdateMethod::Stake {
             amount: 1_000_u64.into(),
             node_public_key: node_secret_key.to_pk(),
-            node_network_key: None,
+            consensus_key: None,
             node_domain: None,
             worker_public_key: None,
             worker_domain: None,
@@ -422,7 +422,7 @@ async fn test_stake() {
         UpdateMethod::Stake {
             amount: 1_000_u64.into(),
             node_public_key: node_secret_key.to_pk(),
-            node_network_key: Some([0; 32].into()),
+            consensus_key: Some([0; 96].into()),
             node_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
             worker_public_key: Some([0; 32].into()),
             worker_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
@@ -452,7 +452,7 @@ async fn test_stake() {
         UpdateMethod::Stake {
             amount: 1_000_u64.into(),
             node_public_key: node_secret_key.to_pk(),
-            node_network_key: None,
+            consensus_key: None,
             node_domain: None,
             worker_public_key: None,
             worker_domain: None,
@@ -544,7 +544,7 @@ async fn test_stake_lock() {
     stake(
         1_000_u64.into(),
         node_secret_key.to_pk(),
-        [0; 32].into(),
+        [0; 96].into(),
         owner_secret_key,
         &update_socket,
         2,
@@ -680,7 +680,7 @@ async fn test_distribute_rewards() {
     stake(
         10_000_u64.into(),
         node_secret_key1.to_pk(),
-        [0; 32].into(),
+        [0; 96].into(),
         owner_secret_key1,
         &update_socket,
         2,
@@ -697,7 +697,7 @@ async fn test_distribute_rewards() {
     stake(
         10_000_u64.into(),
         node_secret_key2.to_pk(),
-        [1; 32].into(),
+        [1; 96].into(),
         owner_secret_key2,
         &update_socket,
         2,
@@ -958,7 +958,7 @@ async fn test_supply_across_epoch() {
     stake(
         10_000_u64.into(),
         node_secret_key.to_pk(),
-        [0; 32].into(),
+        [0; 96].into(),
         owner_secret_key,
         &update_socket,
         2,
@@ -1061,7 +1061,7 @@ async fn test_is_valid_node() {
     stake(
         minimum_stake_amount.into(),
         node_secret_key.to_pk(),
-        [0; 32].into(),
+        [0; 96].into(),
         owner_secret_key,
         &update_socket,
         2,
@@ -1087,7 +1087,7 @@ async fn test_is_valid_node() {
     stake(
         less_than_minimum_skate_amount.into(),
         node_secret_key.to_pk(),
-        [1; 32].into(),
+        [1; 96].into(),
         owner_secret_key,
         &update_socket,
         2,
@@ -1123,7 +1123,7 @@ async fn test_get_node_registry() {
     stake(
         minimum_stake_amount.into(),
         node_secret_key1.to_pk(),
-        [0; 32].into(),
+        [0; 96].into(),
         owner_secret_key1,
         &update_socket,
         2,
@@ -1147,7 +1147,7 @@ async fn test_get_node_registry() {
     stake(
         less_than_minimum_skate_amount.into(),
         node_secret_key2.to_pk(),
-        [1; 32].into(),
+        [1; 96].into(),
         owner_secret_key2,
         &update_socket,
         2,
@@ -1170,7 +1170,7 @@ async fn test_get_node_registry() {
     stake(
         minimum_stake_amount.into(),
         node_secret_key3.to_pk(),
-        [3; 32].into(),
+        [3; 96].into(),
         owner_secret_key3,
         &update_socket,
         2,

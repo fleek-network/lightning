@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use fleek_crypto::{
-    EthAddress, NodeNetworkingPublicKey, NodePublicKey, TransactionSender, TransactionSignature,
+    ConsensusPublicKey, EthAddress, NodePublicKey, TransactionSender, TransactionSignature,
 };
 use hp_fixed::unsigned::HpUfixed;
 use ink_quill::{ToDigest, TranscriptBuilder, TranscriptBuilderInput};
@@ -88,12 +88,12 @@ pub enum UpdateMethod {
         amount: HpUfixed<18>,
         /// Node Public Key
         node_public_key: NodePublicKey,
-        /// Node networking key for narwhal
-        node_network_key: Option<NodeNetworkingPublicKey>,
+        /// Consensus Public Key
+        consensus_key: Option<ConsensusPublicKey>,
         /// Nodes primary internet address
         node_domain: Option<String>,
         /// Worker public Key
-        worker_public_key: Option<NodeNetworkingPublicKey>,
+        worker_public_key: Option<NodePublicKey>,
         /// internet address for the worker
         worker_domain: Option<String>,
         /// internet address for workers mempool
@@ -210,7 +210,7 @@ impl ToDigest for UpdatePayload {
             UpdateMethod::Stake {
                 amount,
                 node_public_key,
-                node_network_key,
+                consensus_key,
                 node_domain,
                 worker_public_key,
                 worker_domain,
@@ -223,7 +223,7 @@ impl ToDigest for UpdatePayload {
                     .with("node_public_key", &node_public_key.0)
                     .with(
                         "node_network_key",
-                        &node_network_key.map_or([0u8; 32], |key| key.0),
+                        &consensus_key.map_or([0u8; 96], |key| key.0),
                     )
                     .with("node_domain", node_domain)
                     .with(

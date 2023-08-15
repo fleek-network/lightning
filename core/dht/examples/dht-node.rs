@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, time::Duration};
 
 use clap::{Parser, Subcommand};
-use fleek_crypto::{NodeNetworkingPublicKey, NodeNetworkingSecretKey, SecretKey};
+use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
 use lightning_application::query_runner::QueryRunner;
 use lightning_dht::{config::Config, dht::Builder};
 use lightning_interfaces::{
@@ -38,14 +38,14 @@ async fn main() {
 
     let cli = Cli::parse();
 
-    let bootstrap_key_pem = include_str!("../../test-utils/keys/test_network.pem");
-    let bootstrap_secret_key = NodeNetworkingSecretKey::decode_pem(bootstrap_key_pem).unwrap();
+    let bootstrap_key_pem = include_str!("../../test-utils/keys/test_node.pem");
+    let bootstrap_secret_key = NodeSecretKey::decode_pem(bootstrap_key_pem).unwrap();
     let bootstrap_key = bootstrap_secret_key.to_pk();
 
     match cli.command {
         Commands::Get { key } => {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
-            let secret_key = NodeNetworkingSecretKey::generate();
+            let secret_key = NodeSecretKey::generate();
             tracing::info!("public key: {:?}", secret_key.to_pk());
             let dht_socket =
                 start_node::<Topology<QueryRunner>>(secret_key, Some((address, bootstrap_key)))
@@ -69,7 +69,7 @@ async fn main() {
         },
         Commands::Put => {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
-            let secret_key = NodeNetworkingSecretKey::generate();
+            let secret_key = NodeSecretKey::generate();
             tracing::info!("public key: {:?}", secret_key.to_pk());
             let dht_socket =
                 start_node::<Topology<QueryRunner>>(secret_key, Some((address, bootstrap_key)))
@@ -98,7 +98,7 @@ async fn main() {
         },
         Commands::Join => {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
-            let secret_key = NodeNetworkingSecretKey::generate();
+            let secret_key = NodeSecretKey::generate();
             tracing::info!("public key: {:?}", secret_key.to_pk());
             let _ = start_node::<Topology<QueryRunner>>(secret_key, Some((address, bootstrap_key)))
                 .await;
@@ -118,8 +118,8 @@ async fn main() {
 }
 
 async fn start_node<T: TopologyInterface>(
-    secret_key: NodeNetworkingSecretKey,
-    bootstrapper: Option<(SocketAddr, NodeNetworkingPublicKey)>,
+    secret_key: NodeSecretKey,
+    bootstrapper: Option<(SocketAddr, NodePublicKey)>,
 ) -> DhtSocket {
     let mut builder = Builder::new(secret_key, Config::default());
 

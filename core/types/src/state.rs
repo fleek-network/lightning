@@ -1,6 +1,6 @@
 //! The data types used in the application state.
 
-use fleek_crypto::{EthAddress, NodeNetworkingPublicKey, NodePublicKey};
+use fleek_crypto::{ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use ink_quill::TranscriptBuilderInput;
 use multiaddr::Multiaddr;
@@ -110,11 +110,11 @@ pub enum ProtocolParams {
 pub struct NodeInfo {
     /// The owner of this node
     pub owner: EthAddress,
+    /// Public key that is used for fast communication signatures for this node.
+    pub public_key: NodePublicKey,
     /// The BLS public key of the node which is used for our BFT DAG consensus
     /// multi signatures.
-    pub public_key: NodePublicKey,
-    /// Public key that is used for fast communication signatures for this node.
-    pub network_key: NodeNetworkingPublicKey,
+    pub consensus_key: ConsensusPublicKey,
     /// The epoch that this node has been staked since,
     pub staked_since: Epoch,
     /// The amount of stake by the node.
@@ -144,7 +144,7 @@ pub struct Staking {
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
 pub struct Worker {
     /// The public key of the worker
-    pub public_key: NodeNetworkingPublicKey,
+    pub public_key: NodePublicKey,
     /// The workers internet address
     pub address: Multiaddr,
     /// The address to the workers mempool
