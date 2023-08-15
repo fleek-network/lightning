@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
@@ -8,8 +8,8 @@ use lightning_interfaces::{
     notifier::{Notification, NotifierInterface},
     reputation::ReputationAggregatorInterface,
     signer::SubmitTxSocket,
-    types::UpdateMethod,
-    ReputationQueryInteface, ReputationReporterInterface, Weight,
+    types::{NodeIndex, ReputationMeasurements, UpdateMethod},
+    ReputationQueryInteface, ReputationReporterInterface, SyncQueryRunnerInterface, Weight,
 };
 use lightning_notifier::Notifier;
 use tokio::sync::mpsc;
@@ -137,7 +137,16 @@ impl ReputationAggregatorInterface for ReputationAggregator {
     /// so one should use the [`SubmitTxSocket`] that is passed during the initialization
     /// to submit a transaction to the consensus.
     fn submit_aggregation(&self) {
-        let measurements = self.measurement_manager.get_measurements();
+        let measurements: BTreeMap<NodeIndex, ReputationMeasurements> = self
+            .measurement_manager
+            .get_measurements()
+            .into_iter()
+            .filter_map(|(key, m)| {
+                self._query_runner
+                    .pubkey_to_index(key)
+                    .map(|index| (index, m))
+            })
+            .collect();
         if !measurements.is_empty() {
             let submit_tx = self.submit_tx.clone();
             tokio::spawn(async move {

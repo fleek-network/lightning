@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 
 use fleek_crypto::{
-    EthAddress, NodeNetworkingPublicKey, NodePublicKey, PublicKey, TransactionSender,
-    TransactionSignature,
+    EthAddress, NodeNetworkingPublicKey, NodePublicKey, TransactionSender, TransactionSignature,
 };
 use hp_fixed::unsigned::HpUfixed;
 use ink_quill::{ToDigest, TranscriptBuilder, TranscriptBuilderInput};
@@ -13,6 +12,7 @@ use super::{
     DeliveryAcknowledgment, Epoch, ProofOfConsensus, ProofOfMisbehavior, ProtocolParams,
     ReputationMeasurements, Service, ServiceId, Tokens,
 };
+use crate::NodeIndex;
 
 // TODO: Change this to capital and non-abrv version.
 const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";
@@ -142,7 +142,7 @@ pub enum UpdateMethod {
         proof_of_misbehavior: ProofOfMisbehavior,
     },
     SubmitReputationMeasurements {
-        measurements: BTreeMap<NodePublicKey, ReputationMeasurements>,
+        measurements: BTreeMap<NodeIndex, ReputationMeasurements>,
     },
     ChangeProtocolParam {
         param: ProtocolParams,
@@ -294,7 +294,7 @@ impl ToDigest for UpdatePayload {
                     transcript_builder.with("transaction_name", &"submit_reputation_measurements");
                 for (key, value) in measurements {
                     transcript_builder = transcript_builder
-                        .with_prefix(key.to_base64())
+                        .with_prefix(key.to_string())
                         .with("latency", &value.latency.map_or(0, |l| l.as_nanos()))
                         .with("interactions", &value.interactions)
                         .with("inbound_bandwidth", &value.inbound_bandwidth)

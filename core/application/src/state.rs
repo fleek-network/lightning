@@ -853,27 +853,28 @@ impl<B: Backend> State<B> {
     fn submit_reputation_measurements(
         &self,
         sender: TransactionSender,
-        measurements: BTreeMap<NodePublicKey, ReputationMeasurements>,
+        measurements: BTreeMap<NodeIndex, ReputationMeasurements>,
     ) -> TransactionResponse {
         let reporting_node = match self.only_node(sender) {
             Ok(index) => index,
             Err(e) => return e,
         };
-        measurements.into_iter().for_each(|(peer, measurements)| {
-            // Todo(dalton): Check with matthias we can probably change the params to be
-            // NodeIndex=>RepMeasurements to avoid having to look up index here
-            if let Some(peer_index) = self.bls_to_index.get(&peer) {
-                let mut node_measurements = match self.rep_measurements.get(&peer_index) {
-                    Some(node_measurements) => node_measurements,
-                    None => Vec::new(),
-                };
-                node_measurements.push(ReportedReputationMeasurements {
-                    reporting_node,
-                    measurements,
-                });
-                self.rep_measurements.set(peer_index, node_measurements);
-            }
-        });
+        measurements
+            .into_iter()
+            .for_each(|(peer_index, measurements)| {
+                // TODO(matthias): check if node has minimum stake?
+                if self.node_info.get(&peer_index).is_some() {
+                    let mut node_measurements = match self.rep_measurements.get(&peer_index) {
+                        Some(node_measurements) => node_measurements,
+                        None => Vec::new(),
+                    };
+                    node_measurements.push(ReportedReputationMeasurements {
+                        reporting_node,
+                        measurements,
+                    });
+                    self.rep_measurements.set(peer_index, node_measurements);
+                }
+            });
         TransactionResponse::Success(ExecutionData::None)
     }
 
