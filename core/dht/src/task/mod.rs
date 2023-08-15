@@ -35,7 +35,7 @@ pub async fn start_worker(
     let mut task_set = TaskManager {
         task_queue: DelayQueue::new(),
         ongoing: HashMap::new(),
-        set: JoinSet::new(),
+        task_results: JoinSet::new(),
         local_key,
         table_tx: table_tx.clone(),
         socket,
@@ -60,7 +60,7 @@ pub async fn start_worker(
                     task_set.reset_bootstrapper();
                 }
             }
-            Some(response) = task_set.set.join_next() => {
+            Some(response) = task_set.task_results.join_next() => {
                 let id = match response {
                     Ok(TaskResult::Success(id)) => {
                         id
@@ -111,7 +111,7 @@ pub struct TaskResponse {
 struct TaskManager {
     task_queue: DelayQueue<Task>,
     ongoing: HashMap<u64, OngoingTask>,
-    set: JoinSet<TaskResult>,
+    task_results: JoinSet<TaskResult>,
     local_key: NodeNetworkingPublicKey,
     table_tx: Sender<TableRequest>,
     socket: Arc<UdpSocket>,
@@ -160,7 +160,7 @@ impl TaskManager {
                     self.socket.clone(),
                 );
                 let table_tx = self.table_tx.clone();
-                self.set.spawn(async move {
+                self.task_results.spawn(async move {
                     let response = match lookup::lookup(lookup).await {
                         Ok(response) => response,
                         Err(error) => {
@@ -206,7 +206,7 @@ impl TaskManager {
                 let sender_key = self.local_key;
                 let (task_tx, mut task_rx) = mpsc::channel(3);
                 self.ongoing.insert(id, OngoingTask { tx: task_tx });
-                self.set.spawn(async move {
+                self.task_results.spawn(async move {
                     let payload = match bincode::serialize(&Query::Ping) {
                         Ok(bytes) => bytes,
                         Err(e) => {
