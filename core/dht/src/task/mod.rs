@@ -55,7 +55,10 @@ pub async fn start_worker(
                 task_set.handle_response(event);
             }
             bootstrap_result = task_set.bootstrap_task.advance() => {
-                todo!()
+                if let Err(e) = bootstrap_result {
+                    tracing::error!("unexpected error while bootstrapping: {e:?}");
+                    task_set.reset_bootstrapper();
+                }
             }
             Some(response) = task_set.set.join_next() => {
                 let id = match response {
@@ -257,6 +260,10 @@ impl TaskManager {
 
     pub fn remove_ongoing(&mut self, id: u64) {
         self.ongoing.remove(&id);
+    }
+
+    pub fn reset_bootstrapper(&mut self) {
+        self.bootstrap_task = self.bootstrap_task.restart();
     }
 }
 
