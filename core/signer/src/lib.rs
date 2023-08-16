@@ -146,7 +146,10 @@ impl SignerInterface for Signer {
     /// Just like any other function which deals with secret material this function should
     /// be used with the greatest caution.
     fn get_sk(&self) -> (ConsensusSecretKey, NodeSecretKey) {
-        (self.inner.consensus_secret_key, self.inner.node_secret_key)
+        (
+            self.inner.consensus_secret_key.clone(),
+            self.inner.node_secret_key.clone(),
+        )
     }
 
     /// Returns a socket that can be used to submit transactions to the mempool, these
