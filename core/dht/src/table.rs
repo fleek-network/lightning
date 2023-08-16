@@ -6,13 +6,13 @@ use std::{
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
 use thiserror::Error;
-use tokio::sync::{mpsc::Receiver, Notify, oneshot};
+use tokio::sync::{mpsc::Receiver, oneshot, Notify};
 
 use crate::{
-    bucket::{Bucket, MAX_BUCKET_SIZE, MAX_BUCKETS},
+    bucket::{Bucket, MAX_BUCKETS, MAX_BUCKET_SIZE},
     distance,
+    node::NodeInfo,
 };
-use crate::node::NodeInfo;
 
 pub type TableKey = [u8; 32];
 

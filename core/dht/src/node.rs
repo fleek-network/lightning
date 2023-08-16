@@ -1,6 +1,7 @@
-use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+
 use fleek_crypto::NodePublicKey;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NodeInfo {

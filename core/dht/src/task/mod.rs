@@ -22,15 +22,15 @@ use tokio::{
 use tokio_util::time::DelayQueue;
 
 use crate::{
-    network::{Message, MessageType, Query, Response},
+    network::{Message, MessageType, Request, Response},
+    node::NodeInfo,
     socket,
     table::{TableKey, TableRequest},
     task::{
-        bootstrap::{BOOTSTRAP_TASK_ID, Bootstrapper},
+        bootstrap::{Bootstrapper, BOOTSTRAP_TASK_ID},
         lookup::LookupTask,
     },
 };
-use crate::node::NodeInfo;
 
 pub async fn start_worker(
     mut rx: Receiver<Task>,
@@ -216,7 +216,7 @@ impl TaskManager {
                 let (task_tx, mut task_rx) = mpsc::channel(3);
                 self.ongoing.insert(id, OngoingTask { tx: task_tx });
                 self.task_results.spawn(async move {
-                    let payload = match bincode::serialize(&Query::Ping) {
+                    let payload = match bincode::serialize(&Request::Ping) {
                         Ok(bytes) => bytes,
                         Err(e) => {
                             return Err(TaskFailed {

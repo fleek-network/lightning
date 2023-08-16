@@ -13,7 +13,7 @@ use tokio::{
 };
 
 use crate::{
-    network::{Message, MessageType, Query},
+    network::{Message, MessageType, Request},
     socket,
     table::TableKey,
     task::Task,
@@ -120,7 +120,7 @@ impl Handler {
         let response = rx.await?;
 
         let payload =
-            bincode::serialize(&Query::Store { key: target, value }).expect("query to be valid");
+            bincode::serialize(&Request::Store { key: target, value }).expect("query to be valid");
         let message = Message {
             ty: MessageType::Query,
             id: NO_REPLY_CHANNEL_ID,

@@ -19,12 +19,12 @@ use tokio::{
 use crate::{
     bucket::MAX_BUCKET_SIZE,
     distance::{self, Distance},
-    network::{Message, MessageType, Query},
+    network::{Message, MessageType, Request},
+    node::NodeInfo,
     socket,
     table::{TableKey, TableRequest},
     task::{ResponseEvent, TaskResponse},
 };
-use crate::node::NodeInfo;
 
 /// Kademlia's lookup procedure.
 pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
@@ -70,7 +70,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
                 .pickout(MAX_BUCKET_SIZE, 3, |node| node.status == Status::Initial)
             {
                 let token = rand::random();
-                let payload = bincode::serialize(&Query::Find {
+                let payload = bincode::serialize(&Request::Find {
                     find_value: lookup.find_value_lookup,
                     target: lookup.target,
                 })

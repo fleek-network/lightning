@@ -8,10 +8,10 @@ use tokio::{
 
 use crate::{
     bucket::MAX_BUCKETS,
+    node::NodeInfo,
     table::{TableKey, TableRequest},
     task::{Task, TaskFailed, TaskResult},
 };
-use crate::node::NodeInfo;
 
 pub const BOOTSTRAP_TASK_ID: u64 = 0;
 

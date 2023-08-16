@@ -6,16 +6,16 @@ use serde::{Deserialize, Serialize};
 use tokio::{
     net::UdpSocket,
     select,
-    sync::{mpsc::Sender, Notify, oneshot},
+    sync::{mpsc::Sender, oneshot, Notify},
 };
 
 use crate::{
+    node::NodeInfo,
     socket,
     store::StoreRequest,
     table::{TableKey, TableRequest},
     task::ResponseEvent,
 };
-use crate::node::NodeInfo;
 
 pub async fn start_worker(
     response_queue_tx: Sender<ResponseEvent>,
@@ -62,9 +62,9 @@ async fn handle_query(
     message: Message,
     address: SocketAddr,
 ) -> Result<()> {
-    let query: Query = bincode::deserialize(&message.payload)?;
+    let query: Request = bincode::deserialize(&message.payload)?;
     match query {
-        Query::Find { find_value, target } => {
+        Request::Find { find_value, target } => {
             let (tx, rx) = oneshot::channel();
             table_tx
                 .send(TableRequest::ClosestNodes {
@@ -115,13 +115,13 @@ async fn handle_query(
                 .await
                 .expect("table worker to not drop the channel");
         },
-        Query::Store { key, value } => {
+        Request::Store { key, value } => {
             store_tx
                 .send(StoreRequest::Put { key, value })
                 .await
                 .expect("store worker not to drop channel");
         },
-        Query::Ping => {
+        Request::Ping => {
             let payload = bincode::serialize(&Response {
                 nodes: Vec::new(),
                 value: None,
@@ -141,7 +141,7 @@ async fn handle_query(
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub enum Query {
+pub enum Request {
     Find { find_value: bool, target: TableKey },
     // Todo: This may not fit on a datagram
     // but we will delegate this task to an
