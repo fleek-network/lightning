@@ -80,7 +80,7 @@ async fn handle_query(
                     store_tx
                         .send(StoreRequest::Get {
                             key: target,
-                            tx: get_tx,
+                            respond: get_tx,
                         })
                         .await
                         .expect("store worker not to drop channel");

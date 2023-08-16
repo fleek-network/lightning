@@ -7,7 +7,7 @@ use crate::table::TableKey;
 pub enum StoreRequest {
     Get {
         key: TableKey,
-        tx: oneshot::Sender<Option<Vec<u8>>>,
+        respond: oneshot::Sender<Option<Vec<u8>>>,
     },
     Put {
         key: TableKey,
@@ -22,10 +22,10 @@ pub async fn start_worker(mut rx: Receiver<StoreRequest>, shutdown_notify: Arc<N
             request = rx.recv() => {
                 if let Some(request) = request {
                     match request {
-                        StoreRequest::Get { key, tx } => {
+                        StoreRequest::Get { key, respond } => {
+                            tracing::trace!("received GET {key:?}");
                             let value = storage.get(&key).cloned();
-                            tracing::trace!("received GET {key:?}:{value:?}");
-                            if tx.send(value).is_err() {
+                            if respond.send(value).is_err() {
                                 tracing::warn!("client dropped channel")
                             }
                         },
