@@ -2,3 +2,8 @@
 name = "lightning-pool"
 version = "0.0.0"
 edition = "2021"
+
+[dependencies]
+async-trait.workspace = true
+fleek-crypto = { path = "../../lib/fleek-crypto" }
+lightning-interfaces = { path = "../interfaces" }

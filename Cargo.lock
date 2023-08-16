@@ -3642,6 +3642,11 @@ dependencies = [
 [[package]]
 name = "lightning-pool"
 version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "fleek-crypto",
+ "lightning-interfaces",
+]
 
 [[package]]
 name = "lightning-rep-collector"
