@@ -1,28 +1,47 @@
-#[infusion_proc::input]
-trait A<C: Collection, W> {}
+use std::convert::Infallible;
 
-trait Collection {}
+#[infusion_proc::service]
+trait A<C: Collection> {
+    const X: u8 = 121;
 
-#[infusion_proc::input]
-trait B<C: Collection> {}
+    fn _init(a: ::A, b: ::B) {
+        let x = b.xxx();
+        Result::<Self, Infallible>::Ok(todo!())
+    }
 
-#[infusion_proc::input]
-trait C {}
+    fn p(b: &<C as Collection>::B) {
+        let x = b.xxx();
+    }
 
-pub mod infusion {
-    use std::marker::PhantomData;
+    fn t(&self);
+}
 
-    pub struct Blank<C>(PhantomData<C>);
+#[infusion_proc::service]
+trait B<C: Collection> {
+    fn xxx(&self) {}
 
-    pub struct Container;
+    fn _post(&mut self) {
+        self.xxx();
+    }
 
-    pub mod graph {
-        pub struct DependencyGraphVisitor;
-
-        impl DependencyGraphVisitor {
-            pub fn mark_input(&mut self) {}
-        }
+    fn x(&mut self) {
+        let _x = self.xxx();
     }
 }
 
-fn main() {}
+trait Collection: Sized + 'static {
+    type A: A<Self> + 'static;
+    type B: B<Self> + 'static;
+}
+
+struct C {}
+impl Collection for C {
+    type A = infusion::Blank<Self>;
+    type B = infusion::Blank<Self>;
+}
+
+
+fn main() {
+    let x = <infusion::Blank<C> as A<C>>::X;
+    println!("x = {x}");
+}

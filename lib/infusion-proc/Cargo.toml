@@ -17,3 +17,6 @@ darling = "0.20.3"
 version = "2.0"
 default-features = false
 features = ["clone-impls", "full", "parsing", "printing", "proc-macro"]
+
+[dev-dependencies]
+infusion = { path = "../infusion/" }
