@@ -32,6 +32,9 @@ use crate::{
     },
 };
 
+type TaskResult = Result<u64, TaskFailed>;
+
+/// Task worker executes tasks.
 pub async fn start_worker(
     mut rx: Receiver<Task>,
     mut network_event: Receiver<ResponseEvent>,
@@ -64,24 +67,35 @@ pub async fn start_worker(
     }
 }
 
+/// Kademlia tasks.
 #[allow(dead_code)]
 pub enum Task {
+    /// Task that starts a long running bootstrap task.
     Bootstrap {
         respond: oneshot::Sender<anyhow::Result<()>>,
     },
+    /// Lookup task for nodes or values.
     Lookup {
+        /// Target key for the task.
         target: TableKey,
+        /// This flag will tell the task manager to try to store
+        /// the nodes found in this lookup.
         refresh_bucket: bool,
+        /// Indicate if lookup task should look for a value.
         is_value: bool,
         respond: Option<oneshot::Sender<TaskResponse>>,
     },
+    /// Ping task.
     Ping {
+        /// Key of peer.
         target: TableKey,
+        /// Address of peer.
         address: SocketAddr,
         respond: oneshot::Sender<()>,
     },
 }
 
+/// Responses from tasks.
 #[derive(Default)]
 pub struct TaskResponse {
     pub nodes: Vec<NodeInfo>,
@@ -90,6 +104,7 @@ pub struct TaskResponse {
     pub source: Option<NodePublicKey>,
 }
 
+/// Manages tasks.
 struct TaskManager {
     task_queue: DelayQueue<Task>,
     ongoing: HashMap<u64, OngoingTask>,
@@ -101,6 +116,7 @@ struct TaskManager {
 }
 
 impl TaskManager {
+    /// Routes responses received from the network to running tasks.
     fn handle_response(&mut self, event: ResponseEvent) {
         match self.ongoing.get(&event.id) {
             Some(ongoing) => {
@@ -123,6 +139,7 @@ impl TaskManager {
         }
     }
 
+    /// Executes task.
     fn execute(&mut self, task: Task) {
         let id: u64 = rand::random();
         match task {
@@ -259,6 +276,7 @@ impl TaskManager {
         }
     }
 
+    /// Advances tasks that are enqueued and ongoing.
     pub async fn advance_tasks(&mut self) {
         tokio::select! {
             Some(task) = std::future::poll_fn(|cx| self.task_queue.poll_expired(cx)) => {
@@ -288,16 +306,19 @@ impl TaskManager {
         }
     }
 
+    /// Remove ongoing tasks from list.
     pub fn remove_ongoing(&mut self, id: u64) {
         self.ongoing.remove(&id);
     }
 }
 
+/// A handle to send response events to running task.
 struct OngoingTask {
     /// Send network event to task.
     network_event_tx: Sender<ResponseEvent>,
 }
 
+/// Response event trigger by a response received from the network.
 #[derive(Debug)]
 pub struct ResponseEvent {
     pub id: u64,
@@ -306,9 +327,8 @@ pub struct ResponseEvent {
     pub response: Response,
 }
 
+/// Error sent by tasks on failure.
 pub struct TaskFailed {
     id: u64,
     error: Error,
 }
-
-type TaskResult = Result<u64, TaskFailed>;
