@@ -1,6 +1,6 @@
 use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::{arg, ArgAction, Parser, Subcommand};
 use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_interfaces::{
@@ -134,31 +134,31 @@ where
         let config = Arc::new(Self::load_or_write_config(config_path).await?);
         let signer_config = config.get::<Signer>();
         if signer_config.node_key_path.exists() {
-            eprintln!(
-                "Node secret key already exists at specified path. Not generating a new key."
-            );
-        } else {
-            match Signer::generate_node_key(&signer_config.node_key_path) {
-                Ok(_) => println!(
-                    "Successfully created node secret key at: {:?}",
-                    signer_config.node_key_path
-                ),
-                Err(err) => eprintln!("Failed to create node secret key: {err:?}"),
-            };
+            return Err(anyhow!(
+                "Node secret key exists at specified path. Not generating keys."
+            ));
         }
         if signer_config.consensus_key_path.exists() {
-            eprintln!(
-                "Consensus secret key already exists at specified path. Not generating a new key."
-            );
-        } else {
-            match Signer::generate_consensus_key(&signer_config.consensus_key_path) {
-                Ok(_) => println!(
-                    "Successfully created consensus secret key at: {:?}",
-                    signer_config.consensus_key_path
-                ),
-                Err(err) => eprintln!("Failed to create consensus secret key: {err:?}"),
-            };
+            return Err(anyhow!(
+                "Consensus secret key exists at specified path. Not generating keys."
+            ));
         }
+        // TODO(matthias): we should probably create the keys in a temp dir and then copy them over
+        // if both are created successfully.
+        match Signer::generate_node_key(&signer_config.node_key_path) {
+            Ok(_) => println!(
+                "Successfully created node secret key at: {:?}",
+                signer_config.node_key_path
+            ),
+            Err(err) => eprintln!("Failed to create node secret key: {err:?}"),
+        };
+        match Signer::generate_consensus_key(&signer_config.consensus_key_path) {
+            Ok(_) => println!(
+                "Successfully created consensus secret key at: {:?}",
+                signer_config.consensus_key_path
+            ),
+            Err(err) => eprintln!("Failed to create consensus secret key: {err:?}"),
+        };
         Ok(())
     }
 
