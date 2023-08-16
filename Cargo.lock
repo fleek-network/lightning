@@ -3285,6 +3285,7 @@ dependencies = [
  "async-trait",
  "atomo",
  "bincode",
+ "fleek-blake3",
  "fleek-crypto",
  "hp-fixed",
  "lazy_static",

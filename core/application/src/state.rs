@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use fleek_blake3::Hasher;
 use fleek_crypto::{
     ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey, TransactionSender,
 };
@@ -21,6 +22,7 @@ use lightning_interfaces::{
 };
 use lightning_reputation::{statistics, types::WeightedReputationMeasurements};
 use multiaddr::Multiaddr;
+use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
 use crate::table::{Backend, TableRef};
 
@@ -1103,14 +1105,49 @@ impl<B: Backend> State<B> {
     }
 
     fn choose_new_committee(&self) -> Vec<NodeIndex> {
-        // Todo: function not done
-        // we need true randomness here, for now we will return the same committee as before to be
-        // able to run tests
         let epoch = match self.metadata.get(&Metadata::Epoch) {
             Some(Value::Epoch(epoch)) => epoch,
             _ => 0,
         };
-        self.committee_info.get(&epoch).unwrap_or_default().members
+        let num_of_nodes = match self.metadata.get(&Metadata::NextNodeIndex) {
+            Some(Value::NextNodeIndex(index)) => index,
+            _ => 0,
+        };
+        let committee_size = self.parameters.get(&ProtocolParams::CommitteeSize).unwrap();
+        // if total number of nodes are less than committee size, all nodes are part of committee
+        if committee_size >= num_of_nodes.into() {
+            return (0..num_of_nodes).collect();
+        }
+
+        let committee = self.committee_info.get(&epoch).unwrap();
+        let epoch_end = committee.epoch_end_timestamp;
+        let public_key = {
+            if !committee.members.is_empty() {
+                let mid_index = committee.members.len() / 2;
+                self.node_info
+                    .get(&committee.members[mid_index])
+                    .unwrap()
+                    .network_key
+            } else {
+                NodeNetworkingPublicKey([1u8; 32])
+            }
+        };
+
+        let mut hasher = Hasher::new();
+        hasher.update(&public_key.0);
+        hasher.update(&epoch_end.to_be_bytes());
+        let result = hasher.finalize();
+        let mut seed = [0u8; 32];
+        seed.copy_from_slice(&result.as_bytes()[0..32]);
+
+        let mut rng: StdRng = SeedableRng::from_seed(seed);
+        let mut members = committee.members;
+        members.shuffle(&mut rng);
+
+        members
+            .into_iter()
+            .take(committee_size.try_into().unwrap())
+            .collect()
     }
 
     /// This function takes in the Transaction and verifies the Signature matches the Sender. It

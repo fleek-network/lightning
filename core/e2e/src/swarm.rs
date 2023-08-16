@@ -73,6 +73,7 @@ pub struct SwarmBuilder {
     epoch_time: Option<u64>,
     port_assigner: Option<PortAssigner>,
     bootstrappers: Option<Vec<Bootstrapper>>,
+    committee_size: Option<u64>,
 }
 
 impl SwarmBuilder {
@@ -106,6 +107,11 @@ impl SwarmBuilder {
         self
     }
 
+    pub fn with_committee_size(mut self, committee_size: u64) -> Self {
+        self.committee_size = Some(committee_size);
+        self
+    }
+
     pub fn build(self) -> Swarm {
         let num_nodes = self.num_nodes.expect("Number of nodes must be provided.");
         let directory = self.directory.expect("Directory must be provided.");
@@ -116,6 +122,9 @@ impl SwarmBuilder {
         }
         if let Some(epoch_time) = self.epoch_time {
             genesis.epoch_time = epoch_time;
+        }
+        if let Some(committee_size) = self.committee_size {
+            genesis.committee_size = committee_size;
         }
 
         let mut nodes = HashMap::with_capacity(num_nodes);

@@ -55,7 +55,7 @@ pub struct GenesisService {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenesisCommittee {
     owner: String,
-    primary_public_key: String,
+    pub primary_public_key: String,
     primary_address: String,
     consensus_public_key: String,
     worker_address: String,

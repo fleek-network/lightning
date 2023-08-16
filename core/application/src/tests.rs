@@ -36,6 +36,7 @@ pub struct Params {
     supply_at_genesis: Option<u64>,
 }
 
+#[derive(Clone)]
 struct GenesisCommitteeKeystore {
     _owner_secret_key: AccountOwnerSecretKey,
     node_secret_key: NodeSecretKey,
@@ -50,29 +51,73 @@ fn get_genesis_committee(
     let mut committee = Vec::new();
     (0..num_members).for_each(|i| {
         let node_secret_key = NodeSecretKey::generate();
-        let node_public_key = node_secret_key.to_pk();
-        let consensus_secret_key = ConsensusSecretKey::generate();
-        let consensus_public_key = consensus_secret_key.to_pk();
+        let network_secret_key = NodeNetworkingSecretKey::generate();
         let owner_secret_key = AccountOwnerSecretKey::generate();
-        let owner_public_key = owner_secret_key.to_pk();
-        committee.push(GenesisCommittee::new(
-            owner_public_key.to_base64(),
-            node_public_key.to_base64(),
-            format!("/ip4/127.0.0.1/udp/800{i}"),
-            consensus_public_key.to_base64(),
-            format!("/ip4/127.0.0.1/udp/810{i}/http"),
-            node_public_key.to_base64(),
-            format!("/ip4/127.0.0.1/tcp/810{i}/http"),
-            None,
-        ));
-        keystore.push(GenesisCommitteeKeystore {
-            _owner_secret_key: owner_secret_key,
+        add_to_committee(
+            &mut committee,
+            &mut keystore,
             node_secret_key,
-            _consensus_secret_key: consensus_secret_key,
-            _worker_secret_key: node_secret_key,
-        });
+            network_secret_key,
+            owner_secret_key,
+            i as u32,
+        )
     });
     (committee, keystore)
+}
+
+fn add_to_committee(
+    committee: &mut Vec<GenesisCommittee>,
+    keystore: &mut Vec<GenesisCommitteeKeystore>,
+    node_secret_key: NodeSecretKey,
+    consensus_secret_key: ConsensusSecretKey,
+    owner_secret_key: AccountOwnerSecretKey,
+    index: u32,
+) {
+    let node_public_key = node_secret_key.to_pk();
+    let consensus_public_key = consensus_secret_key.to_pk();
+    let owner_public_key = owner_secret_key.to_pk();
+    committee.push(GenesisCommittee::new(
+        owner_public_key.to_base64(),
+        node_public_key.to_base64(),
+        format!("/ip4/127.0.0.1/udp/800{i}"),
+        consensus_public_key.to_base64(),
+        format!("/ip4/127.0.0.1/udp/810{i}/http"),
+        node_public_key.to_base64(),
+        format!("/ip4/127.0.0.1/tcp/810{i}/http"),
+        None,
+    ));
+    keystore.push(GenesisCommitteeKeystore {
+        _owner_secret_key: owner_secret_key,
+        node_secret_key,
+        _consensus_secret_key: consensus_secret_key,
+        _worker_secret_key: node_secret_key,
+    });
+}
+
+fn get_new_committee(
+    query_runner: &QueryRunner,
+    committee: &[GenesisCommittee],
+    keystore: &[GenesisCommitteeKeystore],
+) -> (Vec<GenesisCommittee>, Vec<GenesisCommitteeKeystore>) {
+    let mut new_committee = Vec::new();
+    let mut new_keystore = Vec::new();
+    let committee_members = query_runner.get_committee_members();
+    for node in committee_members {
+        let index = committee
+            .iter()
+            .enumerate()
+            .find_map(|(index, c)| {
+                if c.primary_public_key == node.to_base64() {
+                    Some(index)
+                } else {
+                    None
+                }
+            })
+            .expect("Committe member was not found in genesis Committee");
+        new_committee.push(committee[index].clone());
+        new_keystore.push(keystore[index].clone());
+    }
+    (new_committee, new_keystore)
 }
 
 // Init the app and return the execution engine socket that would go to narwhal and the query socket
@@ -137,11 +182,16 @@ async fn simple_epoch_change(
     epoch: Epoch,
     committee_keystore: &Vec<GenesisCommitteeKeystore>,
     update_socket: &Socket<Block, BlockExecutionResponse>,
-    nonce: u64,
+    query_runner: &QueryRunner,
 ) -> Result<()> {
     let required_signals = 2 * committee_keystore.len() / 3 + 1;
     // make call epoch change for 2/3rd committe members
     for (index, node) in committee_keystore.iter().enumerate().take(required_signals) {
+        let nonce = query_runner
+            .get_node_info(&node.node_secret_key.to_pk())
+            .unwrap()
+            .nonce
+            + 1;
         let req = get_update_request_node(
             UpdateMethod::ChangeEpoch { epoch },
             node.node_secret_key,
@@ -149,7 +199,6 @@ async fn simple_epoch_change(
         );
         let res = run_transaction(vec![req], update_socket).await?;
         // check epoch change
-
         if index == required_signals - 1 {
             assert!(res.change_epoch);
         }
@@ -735,7 +784,7 @@ async fn test_distribute_rewards() {
     }
 
     // call epoch change that will trigger distribute rewards
-    if let Err(err) = simple_epoch_change(0, &keystore, &update_socket, 1).await {
+    if let Err(err) = simple_epoch_change(0, &keystore, &update_socket, &query_runner).await {
         panic!("error while changing epoch, {err}");
     }
 
@@ -913,7 +962,7 @@ async fn test_rep_scores() {
 
 #[test]
 async fn test_supply_across_epoch() {
-    let (committee, keystore) = get_genesis_committee(4);
+    let (mut committee, mut keystore) = get_genesis_committee(4);
 
     let epoch_time = 100;
     let max_inflation = 10;
@@ -932,7 +981,7 @@ async fn test_supply_across_epoch() {
             max_boost: Some(boost),
             supply_at_genesis: Some(supply_at_genesis),
         },
-        Some(committee),
+        Some(committee.clone()),
     );
 
     // get params for emission calculations
@@ -945,6 +994,7 @@ async fn test_supply_across_epoch() {
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_secret_key = NodeSecretKey::generate();
+    let network_secret_key = NodeNetworkingSecretKey::generate();
 
     // deposit FLK tokens and stake it
     deposit(
@@ -958,14 +1008,22 @@ async fn test_supply_across_epoch() {
     stake(
         10_000_u64.into(),
         node_secret_key.to_pk(),
-        [0; 96].into(),
+        network_secret_key.to_pk(),
         owner_secret_key,
         &update_socket,
         2,
     )
     .await;
-
-    //every epoch supply increase similar for simplicity of the test
+    // the index should be increment of whatever the size of genesis committee is, 5 in this case
+    add_to_committee(
+        &mut committee,
+        &mut keystore,
+        node_secret_key,
+        network_secret_key,
+        owner_secret_key,
+        5,
+    );
+    // every epoch supply increase similar for simplicity of the test
     let _node_1_usd = 0.1 * 10000_f64;
 
     // calculate emissions per unit
@@ -975,12 +1033,20 @@ async fn test_supply_across_epoch() {
 
     // 365 epoch changes to see if the current supply and year start suppply are ok
     for i in 0..365 {
+        // add at least one transaction per epoch, so reward pool is not zero
         let pod_10 = pod_request(node_secret_key, 10000, 0, i + 1);
         // run the delivery ack transaction
-        if let Err(e) = run_transaction(vec![pod_10], &update_socket).await {
-            panic!("{e}");
+        if let TransactionResponse::Revert(error) = run_transaction(vec![pod_10], &update_socket)
+            .await
+            .unwrap()
+            .txn_receipts[0]
+            .clone()
+        {
+            panic!("{error:?}");
         }
-        if let Err(err) = simple_epoch_change(i, &keystore, &update_socket, i + 1).await {
+        let (_, new_keystore) = get_new_committee(&query_runner, &committee, &keystore);
+        if let Err(err) = simple_epoch_change(i, &new_keystore, &update_socket, &query_runner).await
+        {
             panic!("error while changing epoch, {err}");
         }
 
@@ -988,11 +1054,11 @@ async fn test_supply_across_epoch() {
             + &emissions_per_epoch * &protocol_share
             + &emissions_per_epoch * &service_share;
         let total_supply = query_runner.get_total_supply();
-        let supply_year_start = query_runner.get_year_start_supply();
         supply += supply_increase;
         assert_eq!(total_supply, supply);
         if i == 364 {
             // the supply_year_start should update
+            let supply_year_start = query_runner.get_year_start_supply();
             assert_eq!(total_supply, supply_year_start);
         }
     }
