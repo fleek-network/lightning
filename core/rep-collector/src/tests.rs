@@ -61,9 +61,9 @@ fn get_genesis_committee(
         ));
         keystore.push(GenesisCommitteeKeystore {
             _owner_secret_key: owner_secret_key,
+            _worker_secret_key: node_secret_key.clone(),
             node_secret_key,
             _consensus_secret_key: consensus_secret_key,
-            _worker_secret_key: node_secret_key,
         });
     });
     (committee, keystore)
@@ -333,9 +333,9 @@ async fn test_reputation_calculation_and_query() {
     ));
     keystore.push(GenesisCommitteeKeystore {
         _owner_secret_key: owner_secret_key1,
-        node_secret_key: node_secret_key1,
+        node_secret_key: node_secret_key1.clone(),
         _consensus_secret_key: consensus_secret_key1,
-        _worker_secret_key: node_secret_key1,
+        _worker_secret_key: node_secret_key1.clone(),
     });
 
     let node_public_key2 = node_secret_key2.to_pk();
@@ -355,9 +355,9 @@ async fn test_reputation_calculation_and_query() {
     ));
     keystore.push(GenesisCommitteeKeystore {
         _owner_secret_key: owner_secret_key2,
-        node_secret_key: node_secret_key2,
+        node_secret_key: node_secret_key2.clone(),
         _consensus_secret_key: consensus_secret_key2,
-        _worker_secret_key: node_secret_key2,
+        _worker_secret_key: node_secret_key2.clone(),
     });
 
     let epoch_start = SystemTime::now()
