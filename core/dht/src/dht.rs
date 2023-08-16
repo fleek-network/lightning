@@ -10,21 +10,16 @@ use async_trait::async_trait;
 use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
 use lightning_interfaces::{
     dht::{DhtInterface, DhtSocket},
-    types::{DhtRequest, DhtResponse, TableEntry},
+    types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry},
     ConfigConsumer, SignerInterface, TopologyInterface, WithStartAndShutdown,
 };
 use tokio::{
     net::UdpSocket,
-    sync::{mpsc, oneshot, Notify},
+    sync::{mpsc, Notify},
 };
 
 use crate::{
-    api,
-    config::Config,
-    query,
-    query::{HandlerRequest, NodeInfo},
-    store, table, task,
-    task::bootstrap::Bootstrapper,
+    api, config::Config, query, query::NodeInfo, store, table, task, task::bootstrap::Bootstrapper,
 };
 
 /// Builds the DHT.
@@ -106,37 +101,32 @@ pub struct Dht<T: TopologyInterface> {
 
 impl<T: TopologyInterface> Dht<T> {
     /// Return one value associated with the given key.
-    pub async fn get(handler_tx: mpsc::Sender<HandlerRequest>, key: &[u8]) -> Option<TableEntry> {
-        let (tx, rx) = oneshot::channel();
-        if handler_tx
-            .send(HandlerRequest::Get {
+    pub async fn get(&self, prefix: KeyPrefix, key: &[u8]) -> Option<TableEntry> {
+        match self
+            .socket
+            .run(DhtRequest::Get {
+                prefix,
                 key: key.to_vec(),
-                tx,
             })
             .await
-            .is_err()
         {
-            tracing::error!("failed to send to handler request");
-        }
-        rx.await
-            .expect("handler worker to not drop the channel")
-            .unwrap_or_else(|e| {
-                tracing::trace!("unexpected error when attempting to get {key:?}: {e:?}");
+            Ok(DhtResponse::Get(value)) => value,
+            Err(e) => {
+                tracing::error!("failed to get entry for key {key:?}: {e:?}");
                 None
-            })
+            },
+            Ok(_) => unreachable!(),
+        }
     }
 
     /// Put a key-value pair into the DHT.
-    pub fn put(handler_tx: mpsc::Sender<HandlerRequest>, key: &[u8], value: &[u8]) {
+    pub fn put(&self, prefix: KeyPrefix, key: &[u8], value: &[u8]) {
+        let socket = self.socket.clone();
         let key = key.to_vec();
         let value = value.to_vec();
         tokio::spawn(async move {
-            if handler_tx
-                .send(HandlerRequest::Put { key, value })
-                .await
-                .is_err()
-            {
-                tracing::error!("failed to send to handler request");
+            if let Err(e) = socket.enqueue(DhtRequest::Put { prefix, key, value }).await {
+                tracing::error!("failed to put entry: {e:?}");
             }
         });
     }

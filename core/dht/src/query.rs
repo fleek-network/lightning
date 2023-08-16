@@ -2,7 +2,6 @@ use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::types::TableEntry;
 use serde::{Deserialize, Serialize};
 use tokio::{
     net::UdpSocket,
@@ -25,7 +24,7 @@ pub async fn start_worker(
     local_key: NodePublicKey,
     shutdown_notify: Arc<Notify>,
 ) {
-    let mut handler = Handler {
+    let mut handler = NetworkReceiver {
         response_queue_tx,
         local_key,
         table_tx,
@@ -184,24 +183,7 @@ pub struct Response {
     pub value: Option<Vec<u8>>,
 }
 
-#[derive(Debug)]
-pub enum HandlerRequest {
-    Get {
-        key: Vec<u8>,
-        tx: oneshot::Sender<Result<Option<TableEntry>>>,
-    },
-    Put {
-        key: Vec<u8>,
-        value: Vec<u8>,
-    },
-    FindNode {
-        target: NodePublicKey,
-        tx: oneshot::Sender<Result<Vec<NodeInfo>>>,
-    },
-    Shutdown,
-}
-
-struct Handler {
+struct NetworkReceiver {
     response_queue_tx: Sender<ResponseEvent>,
     local_key: NodePublicKey,
     table_tx: Sender<TableRequest>,
@@ -209,7 +191,7 @@ struct Handler {
     socket: Arc<UdpSocket>,
 }
 
-impl Handler {
+impl NetworkReceiver {
     fn handle_incoming(&mut self, datagram: Vec<u8>, address: SocketAddr) -> Result<()> {
         let message: Message = bincode::deserialize(datagram.as_slice())?;
         match message.ty {
