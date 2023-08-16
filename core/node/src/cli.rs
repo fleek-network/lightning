@@ -143,8 +143,6 @@ where
                 "Consensus secret key exists at specified path. Not generating keys."
             ));
         }
-        // TODO(matthias): we should probably create the keys in a temp dir and then copy them over
-        // if both are created successfully.
         match Signer::generate_node_key(&signer_config.node_key_path) {
             Ok(_) => println!(
                 "Successfully created node secret key at: {:?}",
@@ -157,7 +155,10 @@ where
                 "Successfully created consensus secret key at: {:?}",
                 signer_config.consensus_key_path
             ),
-            Err(err) => eprintln!("Failed to create consensus secret key: {err:?}"),
+            Err(err) => {
+                fs::remove_file(signer_config.node_key_path)?;
+                eprintln!("Failed to create consensus secret key: {err:?}");
+            },
         };
         Ok(())
     }
