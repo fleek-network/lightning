@@ -19,11 +19,12 @@ use tokio::{
 use crate::{
     bucket::MAX_BUCKET_SIZE,
     distance::{self, Distance},
-    query::{Message, MessageType, NodeInfo, Query},
+    network::{Message, MessageType, Query},
     socket,
     table::{TableKey, TableRequest},
     task::{ResponseEvent, TaskResponse},
 };
+use crate::node::NodeInfo;
 
 /// Kademlia's lookup procedure.
 pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {

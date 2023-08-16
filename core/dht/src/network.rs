@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tokio::{
     net::UdpSocket,
     select,
-    sync::{mpsc::Sender, oneshot, Notify},
+    sync::{mpsc::Sender, Notify, oneshot},
 };
 
 use crate::{
@@ -15,6 +15,7 @@ use crate::{
     table::{TableKey, TableRequest},
     task::ResponseEvent,
 };
+use crate::node::NodeInfo;
 
 pub async fn start_worker(
     response_queue_tx: Sender<ResponseEvent>,
@@ -137,12 +138,6 @@ async fn handle_query(
         },
     }
     Ok(())
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct NodeInfo {
-    pub address: SocketAddr,
-    pub key: NodePublicKey,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

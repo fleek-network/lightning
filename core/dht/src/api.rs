@@ -13,7 +13,7 @@ use tokio::{
 };
 
 use crate::{
-    query::{Message, MessageType, Query},
+    network::{Message, MessageType, Query},
     socket,
     table::TableKey,
     task::Task,

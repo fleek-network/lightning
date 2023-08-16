@@ -1,4 +1,4 @@
-use crate::query::NodeInfo;
+use crate::node::NodeInfo;
 
 pub const MAX_BUCKET_SIZE: usize = 6;
 pub const MAX_BUCKETS: usize = HASH_LEN * 8;

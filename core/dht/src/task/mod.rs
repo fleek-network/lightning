@@ -22,14 +22,15 @@ use tokio::{
 use tokio_util::time::DelayQueue;
 
 use crate::{
-    query::{Message, MessageType, NodeInfo, Query, Response},
+    network::{Message, MessageType, Query, Response},
     socket,
     table::{TableKey, TableRequest},
     task::{
-        bootstrap::{Bootstrapper, BOOTSTRAP_TASK_ID},
+        bootstrap::{BOOTSTRAP_TASK_ID, Bootstrapper},
         lookup::LookupTask,
     },
 };
+use crate::node::NodeInfo;
 
 pub async fn start_worker(
     mut rx: Receiver<Task>,

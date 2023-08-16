@@ -9,9 +9,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
 use lightning_interfaces::{
+    ConfigConsumer,
     dht::{DhtInterface, DhtSocket},
-    types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry},
-    ConfigConsumer, SignerInterface, TopologyInterface, WithStartAndShutdown,
+    SignerInterface, TopologyInterface, types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry}, WithStartAndShutdown,
 };
 use tokio::{
     net::UdpSocket,
@@ -19,8 +19,9 @@ use tokio::{
 };
 
 use crate::{
-    api, config::Config, query, query::NodeInfo, store, table, task, task::bootstrap::Bootstrapper,
+    api, config::Config, network, store, table, task, task::bootstrap::Bootstrapper,
 };
+use crate::node::NodeInfo;
 
 /// Builds the DHT.
 pub struct Builder {
@@ -192,7 +193,7 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
             bootstrapper,
         ));
 
-        tokio::spawn(query::start_worker(
+        tokio::spawn(network::start_worker(
             event_queue_tx,
             table_tx,
             store_tx,
