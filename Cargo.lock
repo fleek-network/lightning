@@ -3640,6 +3640,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-pool"
+version = "0.0.0"
+
+[[package]]
 name = "lightning-rep-collector"
 version = "0.0.0"
 dependencies = [

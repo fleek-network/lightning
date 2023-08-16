@@ -1,0 +1,4 @@
+[package]
+name = "lightning-pool"
+version = "0.0.0"
+edition = "2021"
