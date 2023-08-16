@@ -67,7 +67,10 @@ async fn handle_query(
         Query::Find { find_value, target } => {
             let (tx, rx) = oneshot::channel();
             table_tx
-                .send(TableRequest::ClosestNodes { target, tx })
+                .send(TableRequest::ClosestNodes {
+                    target,
+                    respond: tx,
+                })
                 .await
                 .expect("table worker to not drop the channel");
             let nodes = rx.await.expect("table worker to not drop the channel")?;
@@ -107,7 +110,7 @@ async fn handle_query(
                         address,
                         key: message.sender_key,
                     },
-                    tx: None,
+                    respond: None,
                 })
                 .await
                 .expect("table worker to not drop the channel");

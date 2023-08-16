@@ -31,7 +31,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
     let (tx, rx) = oneshot::channel();
     let table_query = TableRequest::ClosestNodes {
         target: lookup.target,
-        tx,
+        respond: tx,
     };
     lookup
         .table_tx

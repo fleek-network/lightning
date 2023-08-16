@@ -181,7 +181,7 @@ impl TaskManager {
                             table_tx
                                 .send(TableRequest::AddNode {
                                     node: node.clone(),
-                                    tx: Some(tx),
+                                    respond: Some(tx),
                                 })
                                 .await
                                 .expect("table worker not to drop channel");

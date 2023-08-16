@@ -27,21 +27,21 @@ pub async fn start_worker(
             request = rx.recv() => {
                 if let Some(request) = request {
                     match request {
-                        TableRequest::ClosestNodes { target: key, tx } => {
+                        TableRequest::ClosestNodes { target: key, respond } => {
                             let nodes = table.closest_nodes(&key);
-                            tx.send(Ok(nodes))
+                            respond.send(Ok(nodes))
                                 .expect("internal table client not to drop the channel");
                         },
-                        TableRequest::AddNode { node, tx } => {
+                        TableRequest::AddNode { node, respond } => {
                             let result = table
                                 .add_node(node)
                                 .map_err(|e| QueryError(e.to_string()));
-                            if let Some(tx) = tx {
-                                tx.send(result)
+                            if let Some(respond) = respond {
+                                respond.send(result)
                                     .expect("internal table client not to drop the channel");
                             }
                         },
-                        TableRequest::FirstNonEmptyBucket { tx } => {
+                        TableRequest::NearestNeighborsBucket { respond } => {
                             let local_key = table.local_node_key;
                             let closest = table.closest_nodes(&local_key.0);
                             match &closest.first() {
@@ -50,11 +50,11 @@ pub async fn start_worker(
                                         &node.key.0,
                                         &local_key.0
                                     );
-                                    tx.send(Some(index))
+                                    respond.send(Some(index))
                                         .expect("internal table client not to drop the channel");
                                 },
                                 None => {
-                                    tx.send(None)
+                                    respond.send(None)
                                         .expect("internal table client not to drop the channel");
                                 },
                             }
@@ -77,15 +77,15 @@ pub struct QueryError(String);
 pub enum TableRequest {
     ClosestNodes {
         target: TableKey,
-        tx: oneshot::Sender<Result<Vec<NodeInfo>, QueryError>>,
+        respond: oneshot::Sender<Result<Vec<NodeInfo>, QueryError>>,
     },
     AddNode {
         node: NodeInfo,
-        tx: Option<oneshot::Sender<Result<(), QueryError>>>,
+        respond: Option<oneshot::Sender<Result<(), QueryError>>>,
     },
-    // Returns index for non-empty bucket containing closest nodes. Used for bootstrapping.
-    FirstNonEmptyBucket {
-        tx: oneshot::Sender<Option<usize>>,
+    // Returns index for non-empty bucket containing closest neighbors. Used for bootstrapping.
+    NearestNeighborsBucket {
+        respond: oneshot::Sender<Option<usize>>,
     },
 }
 

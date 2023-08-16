@@ -90,7 +90,7 @@ pub async fn self_lookup(
         table_tx
             .send(TableRequest::AddNode {
                 node: node.clone(),
-                tx: Some(tx),
+                respond: Some(tx),
             })
             .await
             .expect("table worker not to drop channel");
@@ -113,7 +113,7 @@ pub async fn self_lookup(
 
     let (tx, rx) = oneshot::channel();
     table_tx
-        .send(TableRequest::FirstNonEmptyBucket { tx })
+        .send(TableRequest::NearestNeighborsBucket { respond: tx })
         .await
         .expect("table worker not to drop channel");
     let index = rx
