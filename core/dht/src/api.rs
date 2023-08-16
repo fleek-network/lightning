@@ -35,7 +35,10 @@ pub async fn start_worker(
     loop {
         select! {
             task = rx.recv() => {
-                let task = task.unwrap();
+                let task = match task {
+                    Some(task) => task,
+                    None => break,
+                };
                 match task.request.clone() {
                     DhtRequest::Get { key, .. } => {
                         let get_handler = handler.clone();
@@ -65,6 +68,7 @@ pub async fn start_worker(
                 });
             }
             _ = shutdown_notify.notified() => {
+                tracing::info!("shutting down API handler worker");
                 break;
             }
         }

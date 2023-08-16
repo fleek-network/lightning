@@ -167,6 +167,7 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
         tracing::info!("UDP socket bound to {:?}", socket.local_addr().unwrap());
 
         let (task_tx, task_rx) = mpsc::channel(self.buffer_size);
+
         tokio::spawn(api::start_worker(
             self.socket_rx.lock().unwrap().take().unwrap(),
             task_tx.clone(),
@@ -176,29 +177,32 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
             socket.clone(),
         ));
 
-        let (event_queue_tx, event_queue_rx) = mpsc::channel(self.buffer_size);
         let bootstrapper = Bootstrapper::new(
             task_tx,
             table_tx.clone(),
             public_key.0,
             self.nodes.lock().unwrap().take().unwrap_or_default(),
         );
+
+        let (network_event_tx, network_event_rx) = mpsc::channel(self.buffer_size);
+
+        tokio::spawn(network::start_worker(
+            network_event_tx,
+            table_tx.clone(),
+            store_tx.clone(),
+            socket.clone(),
+            public_key,
+            self.shutdown_notify.clone(),
+        ));
+
         tokio::spawn(task::start_worker(
             task_rx,
-            event_queue_rx,
+            network_event_rx,
             table_tx.clone(),
+            self.shutdown_notify.clone(),
             socket.clone(),
             public_key,
             bootstrapper,
-        ));
-
-        tokio::spawn(network::start_worker(
-            event_queue_tx,
-            table_tx,
-            store_tx,
-            socket,
-            public_key,
-            self.shutdown_notify.clone(),
         ));
 
         if let Err(e) = self.bootstrap().await {

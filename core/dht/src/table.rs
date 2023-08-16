@@ -63,7 +63,7 @@ pub async fn start_worker(
                 }
             }
             _ = shutdown_notify.notified() => {
-                tracing::info!("shutting down handler");
+                tracing::info!("shutting down table worker");
                 break;
             }
         }

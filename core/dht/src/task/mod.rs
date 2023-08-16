@@ -15,7 +15,7 @@ use tokio::{
     sync::{
         mpsc,
         mpsc::{Receiver, Sender},
-        oneshot,
+        oneshot, Notify,
     },
     task::JoinSet,
 };
@@ -36,9 +36,10 @@ type TaskResult = Result<u64, TaskFailed>;
 
 /// Task worker executes tasks.
 pub async fn start_worker(
-    mut rx: Receiver<Task>,
-    mut network_event: Receiver<ResponseEvent>,
+    mut task_rx: Receiver<Task>,
+    mut network_event_rx: Receiver<ResponseEvent>,
     table_tx: Sender<TableRequest>,
+    shutdown_notify: Arc<Notify>,
     socket: Arc<UdpSocket>,
     local_key: NodePublicKey,
     bootstrapper: Bootstrapper,
@@ -54,15 +55,25 @@ pub async fn start_worker(
     };
     loop {
         tokio::select! {
-            task = rx.recv() => {
-                let task = task.expect("all channels to not drop");
+            task = task_rx.recv() => {
+                let task = match task {
+                    Some(task) => task,
+                    None => break,
+                };
                 task_set.execute(task);
             }
-            event = network_event.recv() => {
-                let event = event.expect("all channels to not drop");
+            event = network_event_rx.recv() => {
+                let event = match event {
+                    Some(event) => event,
+                    None => break,
+                };
                 task_set.handle_response(event);
             }
             _ = task_set.advance_tasks() => {}
+            _ = shutdown_notify.notified() => {
+                tracing::trace!("shutting down task manager worker");
+                break
+            },
         }
     }
 }
@@ -303,6 +314,7 @@ impl TaskManager {
                 };
                 self.remove_ongoing(id);
             }
+            else => {}
         }
     }
 

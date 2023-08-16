@@ -37,7 +37,7 @@ pub async fn start_worker(mut rx: Receiver<StoreRequest>, shutdown_notify: Arc<N
                 }
             }
             _ = shutdown_notify.notified() => {
-                tracing::info!("shutting down handler");
+                tracing::info!("shutting down Store worker");
                 break;
             }
         }
