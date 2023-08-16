@@ -25,6 +25,7 @@ use sec1::{
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_big_array::BigArray;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[cfg(test)]
 mod tests;
@@ -37,7 +38,7 @@ pub trait PublicKey: Sized {
     fn from_base64(encoded: &str) -> Option<Self>;
 }
 
-pub trait SecretKey: Sized {
+pub trait SecretKey: Sized + ZeroizeOnDrop {
     type PublicKey: PublicKey;
 
     fn generate() -> Self;
@@ -137,8 +138,16 @@ impl<'de> Deserialize<'de> for ConsensusPublicKey {
 }
 
 /// A node's BLS 12-381 secret key
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct ConsensusSecretKey(#[serde(with = "BigArray")] pub [u8; 32]);
+#[derive(Clone, PartialEq, Zeroize, ZeroizeOnDrop)]
+pub struct ConsensusSecretKey([u8; 32]);
+
+impl std::fmt::Debug for ConsensusSecretKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ConsensusSecretKeyOf")
+            .field(&self.to_pk())
+            .finish()
+    }
+}
 
 impl From<BLS12381PrivateKey> for ConsensusSecretKey {
     fn from(value: BLS12381PrivateKey) -> Self {
@@ -295,8 +304,16 @@ impl<'de> Deserialize<'de> for NodePublicKey {
 }
 
 /// A node's ed25519 main secret key
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Zeroize, ZeroizeOnDrop)]
 pub struct NodeSecretKey([u8; 32]);
+
+impl std::fmt::Debug for NodeSecretKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("NodeSecretKeyOf")
+            .field(&self.to_pk())
+            .finish()
+    }
+}
 
 impl From<Ed25519PrivateKey> for NodeSecretKey {
     fn from(value: Ed25519PrivateKey) -> Self {
@@ -444,8 +461,16 @@ impl<'de> Deserialize<'de> for ClientPublicKey {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Zeroize, ZeroizeOnDrop)]
 pub struct ClientSecretKey([u8; 32]);
+
+impl std::fmt::Debug for ClientSecretKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ClientSecretKeyOf")
+            .field(&self.to_pk())
+            .finish()
+    }
+}
 
 impl SecretKey for ClientSecretKey {
     type PublicKey = ClientPublicKey;
@@ -610,8 +635,16 @@ impl EthAddress {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct AccountOwnerSecretKey(#[serde(with = "BigArray")] pub [u8; 32]);
+#[derive(Clone, PartialEq, Zeroize, ZeroizeOnDrop)]
+pub struct AccountOwnerSecretKey([u8; 32]);
+
+impl std::fmt::Debug for AccountOwnerSecretKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("AccountOwnerSecretKeyOf")
+            .field(&self.to_pk())
+            .finish()
+    }
+}
 
 impl From<Secp256k1PrivateKey> for AccountOwnerSecretKey {
     fn from(value: Secp256k1PrivateKey) -> Self {
