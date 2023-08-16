@@ -312,5 +312,3 @@ pub struct TaskFailed {
 }
 
 type TaskResult = Result<u64, TaskFailed>;
-
-pub const NO_REPLY_CHANNEL_ID: u64 = 0;

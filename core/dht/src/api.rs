@@ -16,7 +16,7 @@ use crate::{
     network::{Message, MessageType, Request},
     socket,
     table::TableKey,
-    task::{Task, NO_REPLY_CHANNEL_ID},
+    task::Task,
 };
 
 pub async fn start_worker(
@@ -121,7 +121,7 @@ impl Handler {
             bincode::serialize(&Request::Store { key: target, value }).expect("query to be valid");
         let message = Message {
             ty: MessageType::Query,
-            id: NO_REPLY_CHANNEL_ID,
+            id: rand::random(),
             token: rand::random(),
             sender_key: self.local_key,
             payload,
