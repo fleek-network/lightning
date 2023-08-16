@@ -1,5 +1,6 @@
-pub mod bootstrap;
 mod lookup;
+
+pub mod bootstrap;
 
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -11,7 +12,6 @@ use anyhow::Error;
 use fleek_crypto::NodePublicKey;
 use tokio::{
     net::UdpSocket,
-    select,
     sync::{
         mpsc,
         mpsc::{Receiver, Sender},
@@ -50,7 +50,7 @@ pub async fn start_worker(
         bootstrapper,
     };
     loop {
-        select! {
+        tokio::select! {
             task = rx.recv() => {
                 let task = task.expect("all channels to not drop");
                 task_set.execute(task);
@@ -59,31 +59,7 @@ pub async fn start_worker(
                 let event = event.expect("all channels to not drop");
                 task_set.handle_response(event);
             }
-            Some(task) = std::future::poll_fn(|cx| task_set.task_queue.poll_expired(cx)) => {
-                task_set.execute(task.into_inner());
-            }
-            Some(response) = task_set.task_results.join_next() => {
-                let id = match response {
-                    Ok(Ok(id)) => {
-                        id
-                    }
-                    Ok(Err(TaskFailed { id, error })) => {
-                        tracing::error!("task failed: {error:?}");
-                        id
-                    }
-                    Err(e) => {
-                        // JoinError may leave ongoing tasks that
-                        // will not get cleaned up.
-                        // We should use tokio::Task ids when the
-                        // featuer is stable.
-                        tracing::error!("internal error: {:?}", e);
-                        tracing::warn!("unable to remove task from pending task list");
-                        continue;
-                    }
-                };
-
-                task_set.remove_ongoing(id);
-            }
+            _ = task_set.advance_tasks() => {}
         }
     }
 }
@@ -91,18 +67,18 @@ pub async fn start_worker(
 #[allow(dead_code)]
 pub enum Task {
     Bootstrap {
-        tx: oneshot::Sender<anyhow::Result<()>>,
+        respond: oneshot::Sender<anyhow::Result<()>>,
     },
     Lookup {
         target: TableKey,
         refresh_bucket: bool,
         is_value: bool,
-        tx: Option<oneshot::Sender<TaskResponse>>,
+        respond: Option<oneshot::Sender<TaskResponse>>,
     },
     Ping {
         target: TableKey,
         address: SocketAddr,
-        tx: oneshot::Sender<()>,
+        respond: oneshot::Sender<()>,
     },
 }
 
@@ -128,12 +104,12 @@ impl TaskManager {
     fn handle_response(&mut self, event: ResponseEvent) {
         match self.ongoing.get(&event.id) {
             Some(ongoing) => {
-                if ongoing.tx.is_closed() {
+                if ongoing.network_event_tx.is_closed() {
                     // The task is done so this request is not expected.
                     tracing::warn!("received unexpected responseee");
                     return;
                 }
-                let task_tx = ongoing.tx.clone();
+                let task_tx = ongoing.network_event_tx.clone();
                 tokio::spawn(async move {
                     if task_tx.send(event).await.is_err() {
                         tracing::error!("tasked dropped ")
@@ -153,11 +129,16 @@ impl TaskManager {
             Task::Lookup {
                 target,
                 refresh_bucket,
-                tx,
+                respond: tx,
                 is_value,
             } => {
                 let (task_tx, task_rx) = mpsc::channel(20);
-                self.ongoing.insert(id, OngoingTask { tx: task_tx });
+                self.ongoing.insert(
+                    id,
+                    OngoingTask {
+                        network_event_tx: task_tx,
+                    },
+                );
                 let lookup = LookupTask::new(
                     id,
                     is_value,
@@ -200,21 +181,32 @@ impl TaskManager {
                     Ok(id)
                 });
             },
-            Task::Bootstrap { tx } => {
+            Task::Bootstrap { respond: tx } => {
                 if let Entry::Vacant(entry) = self.ongoing.entry(BOOTSTRAP_TASK_ID) {
                     // Bootstrap task actually doesn't need events from the network.
                     let (event_tx, _) = mpsc::channel(1);
-                    entry.insert(OngoingTask { tx: event_tx });
+                    entry.insert(OngoingTask {
+                        network_event_tx: event_tx,
+                    });
                     let bootstrapper = self.bootstrapper.clone();
                     self.task_results.spawn(bootstrapper.start(tx));
                 }
             },
-            Task::Ping { tx, address, .. } => {
+            Task::Ping {
+                respond: tx,
+                address,
+                ..
+            } => {
                 let id = rand::random();
                 let socket = self.socket.clone();
                 let sender_key = self.local_key;
                 let (task_tx, mut task_rx) = mpsc::channel(3);
-                self.ongoing.insert(id, OngoingTask { tx: task_tx });
+                self.ongoing.insert(
+                    id,
+                    OngoingTask {
+                        network_event_tx: task_tx,
+                    },
+                );
                 self.task_results.spawn(async move {
                     let payload = match bincode::serialize(&Request::Ping) {
                         Ok(bytes) => bytes,
@@ -267,6 +259,35 @@ impl TaskManager {
         }
     }
 
+    pub async fn advance_tasks(&mut self) {
+        tokio::select! {
+            Some(task) = std::future::poll_fn(|cx| self.task_queue.poll_expired(cx)) => {
+                self.execute(task.into_inner());
+            }
+            Some(response) = self.task_results.join_next() => {
+                let id = match response {
+                    Ok(Ok(id)) => {
+                        id
+                    }
+                    Ok(Err(TaskFailed { id, error })) => {
+                        tracing::error!("task failed: {error:?}");
+                        id
+                    }
+                    Err(e) => {
+                        // JoinError may leave ongoing tasks that
+                        // will not get cleaned up.
+                        // We should use tokio::Task ids when the
+                        // featuer is stable.
+                        tracing::error!("internal error: {:?}", e);
+                        tracing::warn!("unable to remove task from pending task list");
+                        return;
+                    }
+                };
+                self.remove_ongoing(id);
+            }
+        }
+    }
+
     pub fn remove_ongoing(&mut self, id: u64) {
         self.ongoing.remove(&id);
     }
@@ -274,7 +295,7 @@ impl TaskManager {
 
 struct OngoingTask {
     /// Send network event to task.
-    tx: Sender<ResponseEvent>,
+    network_event_tx: Sender<ResponseEvent>,
 }
 
 #[derive(Debug)]
@@ -291,3 +312,5 @@ pub struct TaskFailed {
 }
 
 type TaskResult = Result<u64, TaskFailed>;
+
+pub const NO_REPLY_CHANNEL_ID: u64 = 0;

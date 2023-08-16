@@ -16,10 +16,8 @@ use crate::{
     network::{Message, MessageType, Request},
     socket,
     table::TableKey,
-    task::Task,
+    task::{Task, NO_REPLY_CHANNEL_ID},
 };
-
-pub const NO_REPLY_CHANNEL_ID: u64 = 0;
 
 pub async fn start_worker(
     mut rx: Receiver<affair::Task<DhtRequest, DhtResponse>>,
@@ -86,7 +84,7 @@ impl Handler {
         let target = TableKey::try_from(key.as_slice())?;
         let task = Task::Lookup {
             target,
-            tx: Some(tx),
+            respond: Some(tx),
             refresh_bucket: false,
             is_value: true,
         };
@@ -112,7 +110,7 @@ impl Handler {
         let target = TableKey::try_from(key.as_slice())?;
         let task = Task::Lookup {
             target,
-            tx: Some(tx),
+            respond: Some(tx),
             refresh_bucket: false,
             is_value: false,
         };
@@ -140,7 +138,12 @@ impl Handler {
 
     async fn bootstrap(&self) -> Result<()> {
         let (tx, rx) = oneshot::channel();
-        if self.task_tx.send(Task::Bootstrap { tx }).await.is_err() {
+        if self
+            .task_tx
+            .send(Task::Bootstrap { respond: tx })
+            .await
+            .is_err()
+        {
             tracing::error!("failed to send bootstrap task");
         }
         rx.await.expect("task manager not to drop the channel")

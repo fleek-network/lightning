@@ -49,7 +49,7 @@ async fn bootstrap(
                         task_tx
                             .send(Task::Lookup {
                                 target,
-                                tx: Some(tx),
+                                respond: Some(tx),
                                 refresh_bucket: true,
                                 is_value: false,
                             })
@@ -103,7 +103,7 @@ pub async fn self_lookup(
     handler_tx
         .send(Task::Lookup {
             target: local_key,
-            tx: Some(tx),
+            respond: Some(tx),
             refresh_bucket: true,
             is_value: false,
         })
