@@ -1127,9 +1127,9 @@ impl<B: Backend> State<B> {
                 self.node_info
                     .get(&committee.members[mid_index])
                     .unwrap()
-                    .network_key
+                    .public_key
             } else {
-                NodeNetworkingPublicKey([1u8; 32])
+                NodePublicKey([1u8; 32])
             }
         };
 

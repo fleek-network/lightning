@@ -51,13 +51,13 @@ fn get_genesis_committee(
     let mut committee = Vec::new();
     (0..num_members).for_each(|i| {
         let node_secret_key = NodeSecretKey::generate();
-        let network_secret_key = NodeNetworkingSecretKey::generate();
+        let consensus_secret_key = ConsensusSecretKey::generate();
         let owner_secret_key = AccountOwnerSecretKey::generate();
         add_to_committee(
             &mut committee,
             &mut keystore,
             node_secret_key,
-            network_secret_key,
+            consensus_secret_key,
             owner_secret_key,
             i as u32,
         )
@@ -79,11 +79,11 @@ fn add_to_committee(
     committee.push(GenesisCommittee::new(
         owner_public_key.to_base64(),
         node_public_key.to_base64(),
-        format!("/ip4/127.0.0.1/udp/800{i}"),
+        format!("/ip4/127.0.0.1/udp/800{index}"),
         consensus_public_key.to_base64(),
-        format!("/ip4/127.0.0.1/udp/810{i}/http"),
+        format!("/ip4/127.0.0.1/udp/810{index}/http"),
         node_public_key.to_base64(),
-        format!("/ip4/127.0.0.1/tcp/810{i}/http"),
+        format!("/ip4/127.0.0.1/tcp/810{index}/http"),
         None,
     ));
     keystore.push(GenesisCommitteeKeystore {
@@ -994,7 +994,7 @@ async fn test_supply_across_epoch() {
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_secret_key = NodeSecretKey::generate();
-    let network_secret_key = NodeNetworkingSecretKey::generate();
+    let consensus_secret_key = ConsensusSecretKey::generate();
 
     // deposit FLK tokens and stake it
     deposit(
@@ -1008,7 +1008,7 @@ async fn test_supply_across_epoch() {
     stake(
         10_000_u64.into(),
         node_secret_key.to_pk(),
-        network_secret_key.to_pk(),
+        consensus_secret_key.to_pk(),
         owner_secret_key,
         &update_socket,
         2,
@@ -1019,7 +1019,7 @@ async fn test_supply_across_epoch() {
         &mut committee,
         &mut keystore,
         node_secret_key,
-        network_secret_key,
+        consensus_secret_key,
         owner_secret_key,
         5,
     );
