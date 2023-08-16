@@ -1,9 +1,11 @@
 use std::{borrow::BorrowMut, collections::HashMap, fs, net::SocketAddr, str::FromStr, sync::Arc};
 
 use fleek_crypto::{
-    AccountOwnerSecretKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, PublicKey, SecretKey,
+    AccountOwnerSecretKey, ConsensusSecretKey, EthAddress, NodePublicKey, NodeSecretKey, PublicKey,
+    SecretKey,
 };
 use futures::future::try_join_all;
+use hp_fixed::unsigned::HpUfixed;
 use lightning_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
@@ -19,7 +21,10 @@ use lightning_dht::{
     dht::Dht,
 };
 use lightning_handshake::server::{HandshakeServer, HandshakeServerConfig, TcpProvider};
-use lightning_interfaces::{BroadcastInterface, ConfigConsumer};
+use lightning_interfaces::{
+    types::{NodeInfo, Staking, Worker},
+    BroadcastInterface, ConfigConsumer,
+};
 use lightning_node::{config::TomlConfigProvider, template::broadcast::Broadcast};
 use lightning_notifier::Notifier;
 use lightning_rpc::{config::Config as RpcConfig, server::Rpc};
@@ -140,6 +145,7 @@ impl SwarmBuilder {
 
         let min_stake = genesis.min_stake;
         genesis.committee = Vec::new();
+        genesis.node_info = HashMap::new();
         for i in 0..num_nodes {
             let primary_addr_port = port_assigner
                 .get_port(8000, 40000, Transport::Udp)
@@ -244,20 +250,50 @@ impl SwarmBuilder {
                 Value::try_from(&handshake_config).unwrap(),
             );
 
-            genesis.borrow_mut().committee.push(GenesisCommittee::new(
-                owner_secret_key.to_pk().to_base64(),
-                node_secret_key.to_pk().to_base64(),
-                format!("/ip4/127.0.0.1/udp/{primary_addr_port}"),
-                node_consensus_secret_key.to_pk().to_base64(),
-                format!("/ip4/127.0.0.1/udp/{worker_addr_port}/http"),
-                node_secret_key.to_pk().to_base64(),
-                format!("/ip4/127.0.0.1/tcp/{mempool_addr_port}/http"),
-                Some(min_stake),
-            ));
+            if i < genesis.committee_size as usize {
+                genesis.borrow_mut().committee.push(GenesisCommittee::new(
+                    owner_secret_key.to_pk().to_base64(),
+                    node_secret_key.to_pk().to_base64(),
+                    format!("/ip4/127.0.0.1/udp/{primary_addr_port}"),
+                    node_consensus_secret_key.to_pk().to_base64(),
+                    format!("/ip4/127.0.0.1/udp/{worker_addr_port}/http"),
+                    node_secret_key.to_pk().to_base64(),
+                    format!("/ip4/127.0.0.1/tcp/{mempool_addr_port}/http"),
+                    Some(min_stake),
+                ));
+            } else {
+                let owner: EthAddress = owner_secret_key.to_pk().into();
+                let worker = Worker {
+                    public_key: node_secret_key.to_pk(),
+                    address: format!("/ip4/127.0.0.1/udp/{worker_addr_port}/http")
+                        .parse()
+                        .unwrap(),
+                    mempool: format!("/ip4/127.0.0.1/tcp/{mempool_addr_port}/http")
+                        .parse()
+                        .unwrap(),
+                };
+                let mut node_info = NodeInfo {
+                    owner,
+                    public_key: node_secret_key.to_pk(),
+                    consensus_key: node_consensus_secret_key.to_pk(),
+                    staked_since: 0,
+                    stake: Staking::default(),
+                    domain: format!("/ip4/127.0.0.1/udp/{primary_addr_port}")
+                        .parse()
+                        .unwrap(),
+                    workers: vec![worker],
+                    nonce: 0,
+                };
+                node_info.stake.staked = HpUfixed::<18>::from(genesis.min_stake);
+                genesis
+                    .node_info
+                    .insert(node_secret_key.to_pk().to_base64(), node_info);
+            }
 
             nodes.insert(node_secret_key.to_pk(), (config, owner_secret_key, i));
         }
 
+        println!("GENESIS LEN: {}", genesis.committee.len());
         let nodes = nodes
             .into_iter()
             .map(|(node_pub_key, (config, owner_secret_key, index))| {

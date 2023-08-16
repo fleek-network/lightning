@@ -72,7 +72,7 @@ async fn main() -> Result<()> {
     // Wait for bootstrapper to start
     bootstrap_ready.notified().await;
 
-    let path = ResolvedPathBuf::try_from("~/.fleek-test/e2e/dht").unwrap();
+    let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/dht").unwrap();
     let swarm = Swarm::builder()
         .with_directory(path)
         .with_num_nodes(4)

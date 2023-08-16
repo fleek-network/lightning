@@ -3411,6 +3411,7 @@ dependencies = [
  "clap 4.3.17",
  "fleek-crypto",
  "futures",
+ "hp-fixed",
  "lightning-application",
  "lightning-consensus",
  "lightning-dht",

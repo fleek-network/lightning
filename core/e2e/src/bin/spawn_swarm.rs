@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
         .unwrap()
         .as_millis() as u64;
 
-    let path = ResolvedPathBuf::try_from("~/.fleek-test/e2e/spawn-swarm").unwrap();
+    let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/spawn-swarm").unwrap();
     let swarm = Swarm::builder()
         .with_directory(path)
         .with_num_nodes(args.num_nodes)
