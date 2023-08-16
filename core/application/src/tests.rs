@@ -88,9 +88,9 @@ fn add_to_committee(
     ));
     keystore.push(GenesisCommitteeKeystore {
         _owner_secret_key: owner_secret_key,
+        _worker_secret_key: node_secret_key.clone(),
         node_secret_key,
         _consensus_secret_key: consensus_secret_key,
-        _worker_secret_key: node_secret_key,
     });
 }
 
@@ -194,7 +194,7 @@ async fn simple_epoch_change(
             + 1;
         let req = get_update_request_node(
             UpdateMethod::ChangeEpoch { epoch },
-            node.node_secret_key,
+            &node.node_secret_key,
             nonce,
         );
         let res = run_transaction(vec![req], update_socket).await?;
@@ -211,7 +211,7 @@ async fn simple_epoch_change(
 // testing.
 fn get_update_request_node(
     method: UpdateMethod,
-    secret_key: NodeSecretKey,
+    secret_key: &NodeSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
     let payload = UpdatePayload { nonce, method };
@@ -227,7 +227,7 @@ fn get_update_request_node(
 // testing.
 fn get_update_request_account(
     method: UpdateMethod,
-    secret_key: AccountOwnerSecretKey,
+    secret_key: &AccountOwnerSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
     let payload = UpdatePayload { nonce, method };
@@ -252,7 +252,7 @@ fn get_genesis() -> (Genesis, Vec<NodeInfo>) {
 // Passing the private key around like this should only be done for
 // testing.
 fn pod_request(
-    secret_key: NodeSecretKey,
+    secret_key: &NodeSecretKey,
     commodity: u128,
     service_id: u32,
     nonce: u64,
@@ -285,7 +285,7 @@ async fn run_transaction(
 async fn deposit(
     amount: HpUfixed<18>,
     token: Tokens,
-    secret_key: AccountOwnerSecretKey,
+    secret_key: &AccountOwnerSecretKey,
     update_socket: &Socket<Block, BlockExecutionResponse>,
     nonce: u64,
 ) {
@@ -305,7 +305,7 @@ async fn deposit(
 async fn stake_lock(
     locked_for: u64,
     node: NodePublicKey,
-    secret_key: AccountOwnerSecretKey,
+    secret_key: &AccountOwnerSecretKey,
     update_socket: &Socket<Block, BlockExecutionResponse>,
     nonce: u64,
 ) {
@@ -322,7 +322,7 @@ async fn stake(
     amount: HpUfixed<18>,
     node_public_key: NodePublicKey,
     consensus_key: ConsensusPublicKey,
-    secret_key: AccountOwnerSecretKey,
+    secret_key: &AccountOwnerSecretKey,
     update_socket: &Socket<Block, BlockExecutionResponse>,
     nonce: u64,
 ) {
@@ -381,7 +381,7 @@ async fn test_epoch_change() {
     for node in keystore.iter().take(required_signals - 1) {
         let req = get_update_request_node(
             UpdateMethod::ChangeEpoch { epoch: 0 },
-            node.node_secret_key,
+            &node.node_secret_key,
             1,
         );
 
@@ -395,7 +395,7 @@ async fn test_epoch_change() {
     // Have the last needed committee member signal the epoch change and make sure it changes
     let req = get_update_request_node(
         UpdateMethod::ChangeEpoch { epoch: 0 },
-        keystore[required_signals].node_secret_key,
+        &keystore[required_signals].node_secret_key,
         1,
     );
     let res = run_transaction(vec![req], &update_socket).await.unwrap();
@@ -420,7 +420,7 @@ async fn test_stake() {
             token: Tokens::FLK,
             amount: 1_000_u64.into(),
         },
-        owner_secret_key,
+        &owner_secret_key,
         1,
     );
     let update2 = get_update_request_account(
@@ -429,7 +429,7 @@ async fn test_stake() {
             token: Tokens::FLK,
             amount: 1_000_u64.into(),
         },
-        owner_secret_key,
+        &owner_secret_key,
         2,
     );
     // Put 2 of the transaction in the block just to also test block exucution a bit
@@ -456,7 +456,7 @@ async fn test_stake() {
             worker_domain: None,
             worker_mempool_address: None,
         },
-        owner_secret_key,
+        &owner_secret_key,
         3,
     );
     let res = run_transaction(vec![update], &update_socket).await.unwrap();
@@ -477,7 +477,7 @@ async fn test_stake() {
             worker_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
             worker_mempool_address: Some("/ip4/127.0.0.1/udp/38000".to_string()),
         },
-        owner_secret_key,
+        &owner_secret_key,
         4,
     );
     if let TransactionResponse::Revert(error) = run_transaction(vec![update], &update_socket)
@@ -507,7 +507,7 @@ async fn test_stake() {
             worker_domain: None,
             worker_mempool_address: None,
         },
-        owner_secret_key,
+        &owner_secret_key,
         5,
     );
     if let TransactionResponse::Revert(error) = run_transaction(vec![update], &update_socket)
@@ -531,7 +531,7 @@ async fn test_stake() {
             amount: 1_000_u64.into(),
             node: node_secret_key.to_pk(),
         },
-        owner_secret_key,
+        &owner_secret_key,
         6,
     );
     run_transaction(vec![update], &update_socket).await.unwrap();
@@ -557,7 +557,7 @@ async fn test_stake() {
             node: node_secret_key.to_pk(),
             recipient: None,
         },
-        owner_secret_key,
+        &owner_secret_key,
         7,
     );
     let res = run_transaction(vec![update], &update_socket)
@@ -580,7 +580,7 @@ async fn test_stake_lock() {
     deposit(
         1_000_u64.into(),
         Tokens::FLK,
-        owner_secret_key,
+        &owner_secret_key,
         &update_socket,
         1,
     )
@@ -594,7 +594,7 @@ async fn test_stake_lock() {
         1_000_u64.into(),
         node_secret_key.to_pk(),
         [0; 96].into(),
-        owner_secret_key,
+        &owner_secret_key,
         &update_socket,
         2,
     )
@@ -609,7 +609,7 @@ async fn test_stake_lock() {
             node: node_secret_key.to_pk(),
             locked_for: 365,
         },
-        owner_secret_key,
+        &owner_secret_key,
         3,
     );
 
@@ -632,7 +632,7 @@ async fn test_stake_lock() {
             amount: 1_000_u64.into(),
             node: node_secret_key.to_pk(),
         },
-        owner_secret_key,
+        &owner_secret_key,
         4,
     );
     let res = run_transaction(vec![unstake_req], &update_socket)
@@ -657,8 +657,8 @@ async fn test_pod_without_proof() {
         mode: Mode::Test,
     }));
 
-    let bandwidth_pod = pod_request(keystore[0].node_secret_key, 1000, 0, 1);
-    let compute_pod = pod_request(keystore[0].node_secret_key, 2000, 1, 2);
+    let bandwidth_pod = pod_request(&keystore[0].node_secret_key, 1000, 0, 1);
+    let compute_pod = pod_request(&keystore[0].node_secret_key, 2000, 1, 2);
 
     // run the delivery ack transaction
     if let Err(e) = run_transaction(vec![bandwidth_pod, compute_pod], &update_socket).await {
@@ -721,7 +721,7 @@ async fn test_distribute_rewards() {
     deposit(
         10_000_u64.into(),
         Tokens::FLK,
-        owner_secret_key1,
+        &owner_secret_key1,
         &update_socket,
         1,
     )
@@ -730,7 +730,7 @@ async fn test_distribute_rewards() {
         10_000_u64.into(),
         node_secret_key1.to_pk(),
         [0; 96].into(),
-        owner_secret_key1,
+        &owner_secret_key1,
         &update_socket,
         2,
     )
@@ -738,7 +738,7 @@ async fn test_distribute_rewards() {
     deposit(
         10_000_u64.into(),
         Tokens::FLK,
-        owner_secret_key2,
+        &owner_secret_key2,
         &update_socket,
         1,
     )
@@ -747,7 +747,7 @@ async fn test_distribute_rewards() {
         10_000_u64.into(),
         node_secret_key2.to_pk(),
         [1; 96].into(),
-        owner_secret_key2,
+        &owner_secret_key2,
         &update_socket,
         2,
     )
@@ -756,16 +756,16 @@ async fn test_distribute_rewards() {
     stake_lock(
         1460,
         node_secret_key2.to_pk(),
-        owner_secret_key2,
+        &owner_secret_key2,
         &update_socket,
         3,
     )
     .await;
 
     // submit pods for usage
-    let pod_10 = pod_request(node_secret_key1, 12_800, 0, 1);
-    let pod11 = pod_request(node_secret_key1, 3_600, 1, 2);
-    let pod_21 = pod_request(node_secret_key2, 5000, 1, 1);
+    let pod_10 = pod_request(&node_secret_key1, 12_800, 0, 1);
+    let pod11 = pod_request(&node_secret_key1, 3_600, 1, 2);
+    let pod_21 = pod_request(&node_secret_key2, 5000, 1, 1);
 
     let node_1_usd = 0.1 * 12_800_f64 + 0.2 * 3_600_f64; // 2_000 in revenue
     let node_2_usd = 0.2 * 5_000_f64; // 1_000 in revenue
@@ -874,7 +874,7 @@ async fn test_submit_rep_measurements() {
     let reporting_node_index = query_runner.pubkey_to_index(reporting_node_key).unwrap();
     let req = get_update_request_node(
         UpdateMethod::SubmitReputationMeasurements { measurements: map },
-        keystore[0].node_secret_key,
+        &keystore[0].node_secret_key,
         1,
     );
     if let Err(e) = run_transaction(vec![req], &update_socket).await {
@@ -919,7 +919,7 @@ async fn test_rep_scores() {
 
     let req = get_update_request_node(
         UpdateMethod::SubmitReputationMeasurements { measurements: map },
-        keystore[0].node_secret_key,
+        &keystore[0].node_secret_key,
         1,
     );
 
@@ -936,7 +936,7 @@ async fn test_rep_scores() {
 
     let req = get_update_request_node(
         UpdateMethod::SubmitReputationMeasurements { measurements: map },
-        keystore[1].node_secret_key,
+        &keystore[1].node_secret_key,
         1,
     );
 
@@ -950,7 +950,7 @@ async fn test_rep_scores() {
         let nonce = if i == 0 || i == 1 { 2 } else { 1 };
         let req = get_update_request_node(
             UpdateMethod::ChangeEpoch { epoch: 0 },
-            node.node_secret_key,
+            &node.node_secret_key,
             nonce,
         );
         run_transaction(vec![req], &update_socket).await.unwrap();
@@ -1000,7 +1000,7 @@ async fn test_supply_across_epoch() {
     deposit(
         10_000_u64.into(),
         Tokens::FLK,
-        owner_secret_key,
+        &owner_secret_key,
         &update_socket,
         1,
     )
@@ -1009,7 +1009,7 @@ async fn test_supply_across_epoch() {
         10_000_u64.into(),
         node_secret_key.to_pk(),
         consensus_secret_key.to_pk(),
-        owner_secret_key,
+        &owner_secret_key,
         &update_socket,
         2,
     )
@@ -1018,9 +1018,9 @@ async fn test_supply_across_epoch() {
     add_to_committee(
         &mut committee,
         &mut keystore,
-        node_secret_key,
-        consensus_secret_key,
-        owner_secret_key,
+        node_secret_key.clone(),
+        consensus_secret_key.clone(),
+        owner_secret_key.clone(),
         5,
     );
     // every epoch supply increase similar for simplicity of the test
@@ -1034,7 +1034,7 @@ async fn test_supply_across_epoch() {
     // 365 epoch changes to see if the current supply and year start suppply are ok
     for i in 0..365 {
         // add at least one transaction per epoch, so reward pool is not zero
-        let pod_10 = pod_request(node_secret_key, 10000, 0, i + 1);
+        let pod_10 = pod_request(&node_secret_key, 10000, 0, i + 1);
         // run the delivery ack transaction
         if let TransactionResponse::Revert(error) = run_transaction(vec![pod_10], &update_socket)
             .await
@@ -1078,7 +1078,7 @@ async fn test_validate_txn() {
     // `validate_txn` method of the query runner returns the same response as the update runner.
     let req = get_update_request_node(
         UpdateMethod::ChangeEpoch { epoch: 1 },
-        keystore[0].node_secret_key,
+        &keystore[0].node_secret_key,
         1,
     );
     let res = run_transaction(vec![req.clone()], &update_socket)
@@ -1086,7 +1086,7 @@ async fn test_validate_txn() {
         .unwrap();
     let req = get_update_request_node(
         UpdateMethod::ChangeEpoch { epoch: 1 },
-        keystore[0].node_secret_key,
+        &keystore[0].node_secret_key,
         2,
     );
     assert_eq!(res.txn_receipts[0], query_runner.validate_txn(req));
@@ -1095,13 +1095,13 @@ async fn test_validate_txn() {
     // `validate_txn` method of the query runner returns the same response as the update runner.
     let req = get_update_request_node(
         UpdateMethod::ChangeEpoch { epoch: 0 },
-        keystore[0].node_secret_key,
+        &keystore[0].node_secret_key,
         2,
     );
     let res = run_transaction(vec![req], &update_socket).await.unwrap();
     let req = get_update_request_node(
         UpdateMethod::ChangeEpoch { epoch: 0 },
-        keystore[1].node_secret_key,
+        &keystore[1].node_secret_key,
         1,
     );
     assert_eq!(res.txn_receipts[0], query_runner.validate_txn(req));
@@ -1119,7 +1119,7 @@ async fn test_is_valid_node() {
     deposit(
         minimum_stake_amount.into(),
         Tokens::FLK,
-        owner_secret_key,
+        &owner_secret_key,
         &update_socket,
         1,
     )
@@ -1128,7 +1128,7 @@ async fn test_is_valid_node() {
         minimum_stake_amount.into(),
         node_secret_key.to_pk(),
         [0; 96].into(),
-        owner_secret_key,
+        &owner_secret_key,
         &update_socket,
         2,
     )
@@ -1145,7 +1145,7 @@ async fn test_is_valid_node() {
     deposit(
         less_than_minimum_skate_amount.into(),
         Tokens::FLK,
-        owner_secret_key,
+        &owner_secret_key,
         &update_socket,
         1,
     )
@@ -1154,7 +1154,7 @@ async fn test_is_valid_node() {
         less_than_minimum_skate_amount.into(),
         node_secret_key.to_pk(),
         [1; 96].into(),
-        owner_secret_key,
+        &owner_secret_key,
         &update_socket,
         2,
     )
@@ -1181,7 +1181,7 @@ async fn test_get_node_registry() {
     deposit(
         minimum_stake_amount.into(),
         Tokens::FLK,
-        owner_secret_key1,
+        &owner_secret_key1,
         &update_socket,
         1,
     )
@@ -1190,7 +1190,7 @@ async fn test_get_node_registry() {
         minimum_stake_amount.into(),
         node_secret_key1.to_pk(),
         [0; 96].into(),
-        owner_secret_key1,
+        &owner_secret_key1,
         &update_socket,
         2,
     )
@@ -1205,7 +1205,7 @@ async fn test_get_node_registry() {
     deposit(
         less_than_minimum_skate_amount.into(),
         Tokens::FLK,
-        owner_secret_key2,
+        &owner_secret_key2,
         &update_socket,
         1,
     )
@@ -1214,7 +1214,7 @@ async fn test_get_node_registry() {
         less_than_minimum_skate_amount.into(),
         node_secret_key2.to_pk(),
         [1; 96].into(),
-        owner_secret_key2,
+        &owner_secret_key2,
         &update_socket,
         2,
     )
@@ -1228,7 +1228,7 @@ async fn test_get_node_registry() {
     deposit(
         minimum_stake_amount.into(),
         Tokens::FLK,
-        owner_secret_key3,
+        &owner_secret_key3,
         &update_socket,
         1,
     )
@@ -1237,7 +1237,7 @@ async fn test_get_node_registry() {
         minimum_stake_amount.into(),
         node_secret_key3.to_pk(),
         [3; 96].into(),
-        owner_secret_key3,
+        &owner_secret_key3,
         &update_socket,
         2,
     )
@@ -1280,7 +1280,7 @@ async fn test_change_protocol_params() {
         param: ProtocolParams::LockTime,
         value: 5,
     };
-    let update_request = get_update_request_account(update_method, governance_secret_key, 1);
+    let update_request = get_update_request_account(update_method, &governance_secret_key, 1);
     run_transaction(vec![update_request], &update_socket)
         .await
         .unwrap();
@@ -1292,7 +1292,7 @@ async fn test_change_protocol_params() {
         param: ProtocolParams::LockTime,
         value: 8,
     };
-    let update_request = get_update_request_account(update_method, governance_secret_key, 2);
+    let update_request = get_update_request_account(update_method, &governance_secret_key, 2);
     run_transaction(vec![update_request], &update_socket)
         .await
         .unwrap();
@@ -1307,7 +1307,7 @@ async fn test_change_protocol_params() {
     deposit(
         minimum_stake_amount.into(),
         Tokens::FLK,
-        some_secret_key,
+        &some_secret_key,
         &update_socket,
         1,
     )
@@ -1317,7 +1317,7 @@ async fn test_change_protocol_params() {
         param: ProtocolParams::LockTime,
         value: 1,
     };
-    let update_request = get_update_request_account(update_method, some_secret_key, 2);
+    let update_request = get_update_request_account(update_method, &some_secret_key, 2);
     let response = run_transaction(vec![update_request], &update_socket)
         .await
         .unwrap();
