@@ -52,7 +52,7 @@ impl ContainerizedNode {
     }
 
     pub fn get_owner_secret_key(&self) -> AccountOwnerSecretKey {
-        self.owner_secret_key
+        self.owner_secret_key.clone()
     }
 
     pub fn get_index(&self) -> usize {

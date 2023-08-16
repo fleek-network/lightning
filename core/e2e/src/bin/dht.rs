@@ -51,6 +51,7 @@ async fn main() -> Result<()> {
     let bootstrap_ready_rx = bootstrap_ready.clone();
     let bootstrap_shutdown_notify_rx = bootstrap_shutdown_notify.clone();
 
+    let key_cloned = bootstrap_secret_key.clone();
     let _bootstrap_handle = thread::spawn(move || {
         let mut builder = tokio::runtime::Builder::new_multi_thread();
         let runtime = builder
@@ -59,7 +60,7 @@ async fn main() -> Result<()> {
             .expect("Failed to build tokio runtime for node container.");
 
         runtime.block_on(async move {
-            let builder = DhtBuilder::new(bootstrap_secret_key, bootstrapper_config);
+            let builder = DhtBuilder::new(key_cloned, bootstrapper_config);
             let dht = builder.build::<Topology<QueryRunner>>().unwrap();
             dht.start().await;
             bootstrap_ready_rx.notify_one();
