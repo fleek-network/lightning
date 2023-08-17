@@ -24,8 +24,8 @@ use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
 use tokio::sync::Notify;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+#[tokio::test]
+async fn e2e_dht() -> Result<()> {
     // Start epoch now and let it end in 20 seconds.
     let epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
 
     let mut port_assigner = PortAssigner::default();
     let bootstrapper_port = port_assigner
-        .get_port(8000, 40000, Transport::Udp)
+        .get_port(11001, 12000, Transport::Udp)
         .expect("Failed to assign port");
 
     let bootstrapper_address = format!("0.0.0.0:{bootstrapper_port}").parse().unwrap();
@@ -76,6 +76,8 @@ async fn main() -> Result<()> {
     let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/dht").unwrap();
     let swarm = Swarm::builder()
         .with_directory(path)
+        .with_min_port(11001)
+        .with_max_port(12000)
         .with_num_nodes(4)
         .with_epoch_start(epoch_start)
         .with_bootstrappers(vec![Bootstrapper {
@@ -129,8 +131,6 @@ async fn main() -> Result<()> {
         // Make sure the retrieved value equals the value we stored
         assert_eq!(value.to_vec(), entry.value);
     }
-
-    println!("DHT: test passed");
     bootstrap_shutdown_notify.notify_one();
     Ok(())
 }
