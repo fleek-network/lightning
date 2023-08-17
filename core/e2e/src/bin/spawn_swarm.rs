@@ -97,9 +97,18 @@ async fn main() -> Result<()> {
     swarm.launch().await.unwrap();
 
     let mut s = String::from("#####################################\n\n");
+    s.push_str(&format!(
+        "DHT Bootstrapper Address: {bootstrapper_address}\n"
+    ));
+    s.push_str(&format!(
+        "DHT Bootstrapper Public Key: {}\n\n",
+        bootstrap_secret_key.to_pk().to_base64()
+    ));
+
+    s.push_str("#####################################\n\n");
     for (pub_key, rpc_address) in swarm.get_rpc_addresses() {
         s.push_str(&format!(
-            "BLS Public Key: {}\nRPC Address: {}\n\n",
+            "Public Key: {}\nRPC Address: {}\n\n",
             pub_key.to_base64(),
             rpc_address
         ));
