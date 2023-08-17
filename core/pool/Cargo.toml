@@ -4,6 +4,10 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
+affair.workspace = true
 async-trait.workspace = true
+quinn.workspace = true
 fleek-crypto = { path = "../../lib/fleek-crypto" }
 lightning-interfaces = { path = "../interfaces" }
+rustls = { version = "0.21", default-features = false, features = ["dangerous_configuration"] }
+rcgen = "0.11.1"
