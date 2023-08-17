@@ -93,7 +93,7 @@ jobs:
       - name: Fix paths
         working-directory: ./docs/rpc/docs/gatsby
         # fix: 🐛 support gatsby path prefix https://github.com/open-rpc/generator/pull/708
-        run: find . -type f -path 'public/**/*.html' -exec sed -ie 's/href="\/api-documentation"/href="\/lightning\/api-documentation"/g' {} \;
+        run: find ./public -type f -name '*.html' -exec sed -ie 's/href="\/api-documentation"/href="\/lightning\/api-documentation"/g' {} \;
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
