@@ -148,7 +148,7 @@ where
                 "Successfully created node secret key at: {:?}",
                 signer_config.node_key_path
             ),
-            Err(err) => eprintln!("Failed to create node secret key: {err:?}"),
+            Err(err) => return Err(anyhow!("Failed to create node secret key: {err:?}")),
         };
         match Signer::generate_consensus_key(&signer_config.consensus_key_path) {
             Ok(_) => println!(
@@ -157,7 +157,7 @@ where
             ),
             Err(err) => {
                 fs::remove_file(signer_config.node_key_path)?;
-                eprintln!("Failed to create consensus secret key: {err:?}");
+                return Err(anyhow!("Failed to create consensus secret key: {err:?}"));
             },
         };
         Ok(())
