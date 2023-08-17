@@ -136,7 +136,7 @@ macro_rules! infu {
 macro_rules! collection {
     // Case 1: Handle creation of the collection.
     ([$($service:tt),* $(,)?]) => {
-        pub trait Collection: Send + Sync + Sized + 'static {
+        pub trait Collection: Clone + Send + Sync + Sized + 'static {
         $(
             type $service: $service<Self> + 'static;
          )*
@@ -178,6 +178,7 @@ macro_rules! collection {
         #[macro_export]
         macro_rules! partial {
             ($$struct:ident { $$($$name:ident = $$ty:ty;)* }) => {
+                #[derive(Clone)]
                 struct $$struct;
                 impl Collection for $$struct {
                     $$(type $$name = $$ty;)*
@@ -186,6 +187,7 @@ macro_rules! collection {
             };
         }
 
+        #[derive(Clone)]
         pub struct BlankBinding;
 
         impl Collection for BlankBinding {
