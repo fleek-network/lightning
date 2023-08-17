@@ -174,7 +174,7 @@ impl Table {
         // This is because the closest nodes to us will be
         // in the buckets further up in the list.
         // In addition, bucket size decrements.
-        if index != MAX_BUCKETS - 1 || index != self.buckets.len() - 1 {
+        if index == MAX_BUCKETS - 1 || index != self.buckets.len() - 1 {
             return false;
         }
 
@@ -194,5 +194,79 @@ fn calculate_bucket_index(bucket_count: usize, possible_index: usize) -> usize {
         bucket_count - 1
     } else {
         possible_index
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::Rng;
+
+    use super::*;
+
+    fn get_random_key() -> TableKey {
+        let mut rng = rand::thread_rng();
+        let mut array = [0; 32];
+        #[allow(clippy::needless_range_loop)]
+        for i in 0..array.len() {
+            array[i] = rng.gen_range(0..255);
+        }
+        array
+    }
+
+    #[test]
+    fn test_build_table() {
+        let my_key = [0; 32];
+        let mut table = Table::new(NodePublicKey(my_key));
+        let num_nodes = 20;
+
+        let mut set = HashSet::new();
+        for i in 0..num_nodes {
+            let k = num_nodes - i;
+            let mut leading_zeros = 0;
+            let mut and_mask = Vec::new();
+            let mut or_mask = Vec::new();
+            while leading_zeros < k {
+                if leading_zeros + 8 <= k {
+                    and_mask.push(0u8);
+                    or_mask.push(0u8);
+                    leading_zeros += 8;
+                } else {
+                    let x = -1_i8;
+                    let byte = (x as u8) >> (k - leading_zeros);
+                    and_mask.push(byte);
+                    let byte = 128_u8 >> (k - leading_zeros);
+                    or_mask.push(byte);
+                    leading_zeros += k - leading_zeros;
+                }
+            }
+            while and_mask.len() < 32 {
+                and_mask.push(-1i8 as u8);
+                or_mask.push(0_u8);
+            }
+
+            let key = loop {
+                let mut key = get_random_key();
+                for j in 0..key.len() {
+                    key[j] &= and_mask[j];
+                    key[j] |= or_mask[j];
+                }
+                if !set.contains(&key) {
+                    break key;
+                }
+            };
+            set.insert(key);
+
+            let node = NodeInfo {
+                address: "0.0.0.0:0".parse().unwrap(),
+                key: key.into(),
+            };
+            table.add_node(node).unwrap();
+        }
+
+        let mut actual_count = 0;
+        for bucket in table.buckets.iter() {
+            actual_count += bucket.nodes().count();
+        }
+        assert_eq!(actual_count, num_nodes);
     }
 }
