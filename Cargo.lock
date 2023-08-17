@@ -2995,10 +2995,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
-name = "identset"
-version = "0.1.0"
-
-[[package]]
 name = "idna"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3092,19 +3088,8 @@ dependencies = [
 name = "infusion"
 version = "0.1.0"
 dependencies = [
- "infusion-blank",
+ "infusion-proc",
  "serde",
-]
-
-[[package]]
-name = "infusion-blank"
-version = "0.1.0"
-dependencies = [
- "proc-macro2 1.0.66",
- "quote 1.0.31",
- "serde",
- "serde_tokenstream",
- "syn 2.0.26",
 ]
 
 [[package]]
@@ -3112,7 +3097,6 @@ name = "infusion-proc"
 version = "0.1.0"
 dependencies = [
  "darling 0.20.3",
- "infusion",
  "proc-macro2 1.0.66",
  "quote 1.0.31",
  "syn 2.0.26",

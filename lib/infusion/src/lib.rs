@@ -1,3 +1,5 @@
+#![feature(macro_metavar_expr)]
+
 //! Infusion is a dependency injection library to help with top-down approach to
 //! software development by leveraging traits and generics.
 //!
@@ -55,7 +57,7 @@ use std::marker::PhantomData;
 pub use container::Container;
 pub use error::InitializationError;
 pub use graph::DependencyGraph;
-pub use infusion_blank::blank;
+pub use infusion_proc::{blank, service};
 use serde::{Deserialize, Serialize};
 
 /// The object that is meant to be the placeholder nullified implementer

@@ -90,7 +90,7 @@ pub fn verify_fn_signature(kind: InfuFnKind, sig: &syn::Signature) -> Result<(Ve
         },
         (InfuFnKind::Post, None) => {
             return Err(Error::new(
-                sig.inputs.span(),
+                sig.ident.span(),
                 "infu::post method must take self.",
             ));
         },

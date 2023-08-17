@@ -157,9 +157,9 @@
 macro_rules! infu {
     // Case 1: Handle creation of the collection.
     (@Collection [$($service:tt),* $(,)?]) => {
-        pub trait Collection {
+        pub trait Collection: Sized + 'static {
         $(
-            type $service: $service<Collection = Self> + 'static;
+            type $service: $service<Self> + 'static;
          )*
 
             fn build_graph() -> $crate::DependencyGraph {
@@ -167,7 +167,7 @@ macro_rules! infu {
 
             $(
                 vtables.push({
-                    fn init<T: $service + 'static>(
+                    fn init<C: Collection, T: $service<C> + 'static>(
                         container: &$crate::Container
                     ) -> ::std::result::Result<
                         $crate::vtable::Object, ::std::boxed::Box<dyn std::error::Error>
@@ -175,7 +175,7 @@ macro_rules! infu {
                         T::infu_initialize(container).map($crate::vtable::Object::new)
                     }
 
-                    fn post<T: $service + 'static>(
+                    fn post<C: Collection, T: $service<C> + 'static>(
                         obj: &mut $crate::vtable::Object,
                         container: &$crate::Container
                     ) {
@@ -185,9 +185,9 @@ macro_rules! infu {
 
                     $crate::vtable::VTable::new::<Self::$service>(
                         stringify!($service),
-                        <Self::$service as $service>::infu_dependencies,
-                        init::<Self::$service>,
-                        post::<Self::$service>,
+                        <Self::$service as $service<Self>>::infu_dependencies,
+                        init::<Self, Self::$service>,
+                        post::<Self, Self::$service>,
                     )
                 });
              )*
@@ -195,6 +195,18 @@ macro_rules! infu {
                 $crate::DependencyGraph::new(vtables)
             }
         }
+
+        #[macro_export]
+        macro_rules! partial {
+            ($$struct:ident { $$($$name:ident = $$ty:ty;)* }) => {
+                struct $$struct;
+                impl Collection for $$struct {
+                    $$(type $$name = $$ty;)*
+                    infusion_proc::x!({$($service),*}, {$$($$name),*});
+                }
+            };
+        }
+
     };
 
     // Create a BlankBinding struct

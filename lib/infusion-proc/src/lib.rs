@@ -8,6 +8,7 @@ mod on_trait;
 mod parse;
 mod sig;
 mod utils;
+mod sub;
 
 #[proc_macro_attribute]
 pub fn blank(
@@ -30,4 +31,10 @@ pub fn service(
         _ => todo!(),
     };
     token.into()
+}
+
+#[proc_macro]
+pub fn x(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let pair = parse_macro_input!(input as sub::IdentSetPair);
+    sub::generate_partial_blank(pair).into()
 }

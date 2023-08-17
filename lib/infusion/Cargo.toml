@@ -6,5 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-infusion-blank = { path = "../infusion-blank/" }
-serde = "1.0"
+infusion-proc = { path = "../infusion-proc/" }
+serde = { version = "1.0", features=["derive"]}

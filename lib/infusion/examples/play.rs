@@ -17,7 +17,10 @@ trait Collection: 'static + Sized {
 
 struct I<C: Collection, T>(PhantomData<T>, <C::B as B>::Output);
 
-impl<C, T> A<C> for I<C, T> where C: Collection<A = Self> {
+impl<C, T> A<C> for I<C, T>
+where
+    C: Collection<A = Self>,
+{
     fn x(&self, o: <C::B as B>::Output) {}
 }
 
@@ -25,5 +28,4 @@ fn main() {
     println!("BLANK");
 
     println!("");
-
 }
