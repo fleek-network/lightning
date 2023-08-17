@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, time::Duration};
 
 use clap::{Parser, Subcommand};
-use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
+use fleek_crypto::{NodePublicKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_application::query_runner::QueryRunner;
 use lightning_dht::{config::Config, dht::Builder};
 use lightning_interfaces::{
@@ -15,6 +15,9 @@ use lightning_topology::Topology;
 struct Cli {
     #[arg(short, long, group = "bootstrap_address")]
     bootstrapper: Option<String>,
+
+    #[arg(long, group = "bootstrap_key")]
+    bootstrapper_key: Option<String>,
 
     #[command(subcommand)]
     command: Commands,
@@ -40,7 +43,12 @@ async fn main() {
 
     let bootstrap_key_pem = include_str!("../../test-utils/keys/test_node.pem");
     let bootstrap_secret_key = NodeSecretKey::decode_pem(bootstrap_key_pem).unwrap();
-    let bootstrap_key = bootstrap_secret_key.to_pk();
+
+    let bootstrap_key = match cli.bootstrapper_key {
+        Some(bootstrapper_key) => NodePublicKey::from_base64(&bootstrapper_key)
+            .expect("Failed to parse bootstrap public key"),
+        None => bootstrap_secret_key.to_pk(),
+    };
 
     match cli.command {
         Commands::Get { key } => {
