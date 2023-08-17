@@ -4,7 +4,6 @@ use affair::Socket;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 
-
 use crate::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,

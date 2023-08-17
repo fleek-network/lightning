@@ -1,7 +1,6 @@
 use affair::Socket;
 use anyhow;
 
-
 use crate::{
     infu_collection::Collection, ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown,
 };

@@ -4,15 +4,21 @@ use infusion::c;
 use crate::{
     infu_collection::Collection,
     types::{DhtRequest, DhtResponse},
-    ConfigProviderInterface, ConfigConsumer, SignerInterface, TopologyInterface,
+    ConfigConsumer, ConfigProviderInterface, SignerInterface, TopologyInterface,
     WithStartAndShutdown,
 };
 
 pub type DhtSocket = Socket<DhtRequest, DhtResponse>;
 
 #[infusion::service]
-pub trait DhtInterface<C: Collection>: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
-    fn _init(signer: ::SignerInterface, topology: ::TopologyInterface, config: ::ConfigProviderInterface) {
+pub trait DhtInterface<C: Collection>:
+    ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
+{
+    fn _init(
+        signer: ::SignerInterface,
+        topology: ::TopologyInterface,
+        config: ::ConfigProviderInterface,
+    ) {
         Self::init(signer, topology.clone(), config.get::<Self>())
     }
 

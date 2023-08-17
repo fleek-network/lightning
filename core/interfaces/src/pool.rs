@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
-use infusion::{ok, c};
+use infusion::{c, ok};
 use lightning_schema::LightningMessage;
 use lightning_types::ServiceScope;
 

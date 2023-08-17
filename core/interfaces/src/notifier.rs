@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use infusion::{ok, c};
+use infusion::{c, ok};
 use tokio::sync::mpsc;
 
 use crate::{infu_collection::Collection, ApplicationInterface};

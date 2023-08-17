@@ -5,14 +5,16 @@ use lightning_schema::LightningMessage;
 
 use crate::{
     infu_collection::Collection, signer::SignerInterface, topology::TopologyInterface,
-    types::Topic, ConfigConsumer, ConnectionPoolInterface, ConfigProviderInterface,
+    types::Topic, ConfigConsumer, ConfigProviderInterface, ConnectionPoolInterface,
     ListenerConnector, NotifierInterface, WithStartAndShutdown,
 };
 
 /// The gossip system in Fleek Network implements the functionality of broadcasting
 /// messages to the rest of the nodes in the network.
 #[infusion::service]
-pub trait BroadcastInterface<C: Collection>: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
+pub trait BroadcastInterface<C: Collection>:
+    WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
+{
     fn _init(
         config: ::ConfigProviderInterface,
         pool: ::ConnectionPoolInterface,
@@ -22,7 +24,7 @@ pub trait BroadcastInterface<C: Collection>: WithStartAndShutdown + ConfigConsum
     ) {
         Self::init(
             config.get::<Self>(),
-            pool.bind(crate::ServiceScope::Broadcast),
+            pool.bind(crate::types::ServiceScope::Broadcast),
             topology.clone(),
             signer,
             notifier.clone(),

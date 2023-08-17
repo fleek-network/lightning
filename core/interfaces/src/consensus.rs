@@ -22,7 +22,9 @@ use crate::{
 pub type MempoolSocket = Socket<UpdateRequest, ()>;
 
 #[infusion::service]
-pub trait ConsensusInterface<C: Collection>: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
+pub trait ConsensusInterface<C: Collection>:
+    WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
+{
     fn _init(
         config: ::ConfigProviderInterface,
         signer: ::SignerInterface,
@@ -31,7 +33,7 @@ pub trait ConsensusInterface<C: Collection>: WithStartAndShutdown + ConfigConsum
     ) {
         let executor = app.transaction_executor();
         let sqr = app.sync_query();
-        let pubsub = broadcast.get_pubsub(crate::Topic::Consensus);
+        let pubsub = broadcast.get_pubsub(crate::types::Topic::Consensus);
         Self::init(config.get::<Self>(), signer, executor, sqr, pubsub)
     }
 

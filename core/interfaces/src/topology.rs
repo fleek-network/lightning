@@ -19,7 +19,11 @@ pub trait TopologyInterface<C: Collection>: ConfigConsumer + Sized + Send + Sync
         signer: ::SignerInterface,
         app: ::ApplicationInterface,
     ) {
-        Self::init(config.get::<Self>(), signer.get_bls_pk(), app.sync_query())
+        Self::init(
+            config.get::<Self>(),
+            signer.get_ed25519_pk(),
+            app.sync_query(),
+        )
     }
 
     /// Create an instance of the structure from the provided configuration and public key.

@@ -15,13 +15,13 @@ pub trait ReputationAggregatorInterface<C: Collection>: ConfigConsumer + Sized {
         config: ::ConfigProviderInterface,
         signer: ::SignerInterface,
         notifier: ::NotifierInterface,
-        app: ::ApplicationInterface
+        app: ::ApplicationInterface,
     ) {
         Self::init(
             config.get::<Self>(),
             signer.get_socket(),
             notifier.clone(),
-            app.sync_query()
+            app.sync_query(),
         )
     }
 

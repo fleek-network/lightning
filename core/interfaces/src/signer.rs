@@ -20,7 +20,9 @@ pub type SubmitTxSocket = Socket<UpdateMethod, u64>;
 /// The signature provider is responsible for signing messages using the private key of
 /// the node.
 #[infusion::service]
-pub trait SignerInterface<C: Collection>: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
+pub trait SignerInterface<C: Collection>:
+    ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
+{
     fn _init(config: ::ConfigProviderInterface, app: ::ApplicationInterface) {
         Self::init(config.get::<Self>(), app.sync_query())
     }

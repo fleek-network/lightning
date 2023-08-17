@@ -1,6 +1,5 @@
 use affair::Socket;
 
-
 use crate::{
     common::WithStartAndShutdown, config::ConfigConsumer, infu_collection::Collection,
     signer::SubmitTxSocket, types::DeliveryAcknowledgment, ConfigProviderInterface,

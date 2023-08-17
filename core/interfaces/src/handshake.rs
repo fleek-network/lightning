@@ -4,7 +4,9 @@ use crate::{
 };
 
 #[infusion::service]
-pub trait HandshakeInterface<C: Collection>: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
+pub trait HandshakeInterface<C: Collection>:
+    ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
+{
     fn _init(config: ::ConfigProviderInterface) {
         Self::init(config.get::<Self>())
     }
