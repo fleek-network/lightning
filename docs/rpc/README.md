@@ -41,6 +41,10 @@ cd ./docs/gatsby
 npm install
 ```
 
+## Static site
+
+The static site is published in GitHub Pages URL [https://fleek-network.github.io/lightning/](https://fleek-network.github.io/lightning/)
+
 ## Common issues
 
 ### libvips binaries are not yet available
