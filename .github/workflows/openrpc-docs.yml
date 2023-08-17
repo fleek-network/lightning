@@ -91,8 +91,9 @@ jobs:
           npx gatsby build --prefix-paths
 
       - name: Fix paths
-        run: |
-          sed -i '' 's|href="/api-documentation"|href="api-documentation"|g' public/**/*.html
+        working-directory: ./docs/rpc/docs/gatsby
+        # fix: 🐛 support gatsby path prefix https://github.com/open-rpc/generator/pull/708
+        run: sed -i '' 's|href="/api-documentation"|href="api-documentation"|g' public/**/*.html
   
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
