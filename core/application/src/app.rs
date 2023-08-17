@@ -23,7 +23,7 @@ pub struct Application<C: Collection> {
 }
 
 #[async_trait]
-impl<C> WithStartAndShutdown for Application<C> where C: Collection<ApplicationInterface = Self> {
+impl<C: Collection> WithStartAndShutdown for Application<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         true
@@ -39,16 +39,14 @@ impl<C> WithStartAndShutdown for Application<C> where C: Collection<ApplicationI
     async fn shutdown(&self) {}
 }
 
-impl<C> ConfigConsumer for Application<C> where C: Collection<ApplicationInterface = Self> {
+impl<C: Collection> ConfigConsumer for Application<C> {
     const KEY: &'static str = "application";
 
     type Config = Config;
 }
 
 #[async_trait]
-impl<C> ApplicationInterface for Application<C> where C: Collection<ApplicationInterface = Self> {
-    type Collection = C;
-
+impl<C: Collection> ApplicationInterface<C> for Application<C> {
     /// The type for the sync query executor.
     type SyncExecutor = QueryRunner;
 

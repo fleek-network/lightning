@@ -136,7 +136,7 @@ macro_rules! infu {
 macro_rules! collection {
     // Case 1: Handle creation of the collection.
     ([$($service:tt),* $(,)?]) => {
-        pub trait Collection: Sized + 'static {
+        pub trait Collection: Send + Sync + Sized + 'static {
         $(
             type $service: $service<Self> + 'static;
          )*
