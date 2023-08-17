@@ -73,6 +73,8 @@ impl Swarm {
 #[derive(Default)]
 pub struct SwarmBuilder {
     directory: Option<ResolvedPathBuf>,
+    min_port: Option<u16>,
+    max_port: Option<u16>,
     num_nodes: Option<usize>,
     epoch_start: Option<u64>,
     epoch_time: Option<u64>,
@@ -117,9 +119,21 @@ impl SwarmBuilder {
         self
     }
 
+    pub fn with_min_port(mut self, port: u16) -> Self {
+        self.min_port = Some(port);
+        self
+    }
+
+    pub fn with_max_port(mut self, port: u16) -> Self {
+        self.max_port = Some(port);
+        self
+    }
+
     pub fn build(self) -> Swarm {
         let num_nodes = self.num_nodes.expect("Number of nodes must be provided.");
         let directory = self.directory.expect("Directory must be provided.");
+        let min_port = self.min_port.expect("Minimum port must be provided.");
+        let max_port = self.max_port.expect("Maximum port must be provided.");
 
         let mut genesis = Genesis::load().unwrap();
         if let Some(epoch_start) = self.epoch_start {
@@ -148,16 +162,16 @@ impl SwarmBuilder {
         genesis.node_info = HashMap::new();
         for i in 0..num_nodes {
             let primary_addr_port = port_assigner
-                .get_port(8000, 40000, Transport::Udp)
+                .get_port(min_port, max_port, Transport::Udp)
                 .expect("Failed to get available port.");
             let worker_addr_port = port_assigner
-                .get_port(8000, 40000, Transport::Udp)
+                .get_port(min_port, max_port, Transport::Udp)
                 .expect("Failed to get available port.");
             let mempool_addr_port = port_assigner
-                .get_port(8000, 40000, Transport::Tcp)
+                .get_port(min_port, max_port, Transport::Tcp)
                 .expect("Failed to get available port.");
             let dht_port = port_assigner
-                .get_port(8000, 40000, Transport::Udp)
+                .get_port(min_port, max_port, Transport::Udp)
                 .expect("Failed to get available port.");
 
             let node_directory = directory.join(format!("swarm/nodes/{i}"));
@@ -207,7 +221,7 @@ impl SwarmBuilder {
             );
 
             let handshake_addr_port = port_assigner
-                .get_port(6969, 40000, Transport::Tcp)
+                .get_port(min_port, max_port, Transport::Tcp)
                 .expect("Failed to get available port.");
             let handshake_config = HandshakeServerConfig {
                 listen_addr: SocketAddr::from_str(&format!("0.0.0.0:{handshake_addr_port}"))

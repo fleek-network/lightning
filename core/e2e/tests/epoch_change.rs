@@ -16,6 +16,8 @@ async fn e2e_epoch_change() -> Result<()> {
     let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/epoch-change").unwrap();
     let swarm = Swarm::builder()
         .with_directory(path)
+        .with_min_port(10000)
+        .with_max_port(11000)
         .with_num_nodes(4)
         .with_epoch_time(20000)
         .with_epoch_start(epoch_start)
