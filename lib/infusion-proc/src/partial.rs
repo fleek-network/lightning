@@ -45,7 +45,7 @@ pub fn generate_partial_blank(pair: IdentSetPair) -> TokenStream {
         string_to_ident.remove(&ident.to_string());
     }
 
-    let result = string_to_ident.values().map(|x| *x);
+    let result = string_to_ident.values();
 
     quote! {
         #(type #result = infusion::Blank<Self>;)*

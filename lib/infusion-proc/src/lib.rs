@@ -8,7 +8,7 @@ mod on_trait;
 mod parse;
 mod sig;
 mod utils;
-mod sub;
+mod partial;
 
 #[proc_macro_attribute]
 pub fn blank(
@@ -28,13 +28,15 @@ pub fn service(
     let item = parse_macro_input!(input as Item);
     let token = match item {
         Item::Trait(item) => on_trait::process_trait(utils::Mode::WithCollection, item),
-        _ => todo!(),
+        Item::Impl(item) => syn::Error::new_spanned(item, "Infusion over impl not supported yet.").to_compile_error(),
     };
     token.into()
 }
 
+// Given a set of identifiers as `__blank_helper!({A, B}, {A})` generate the `type % = Blank<Self>`
+// for each item in the first set that is not in the second set.
 #[proc_macro]
-pub fn x(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let pair = parse_macro_input!(input as sub::IdentSetPair);
-    sub::generate_partial_blank(pair).into()
+pub fn __blank_helper(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let pair = parse_macro_input!(input as partial::IdentSetPair);
+    partial::generate_partial_blank(pair).into()
 }

@@ -35,7 +35,7 @@
 #![allow(clippy::all, unused)]
 
 /// The implementation of macros.
-mod macros;
+mod macros2;
 
 /// The error types.
 pub mod error;
@@ -58,6 +58,10 @@ pub use container::Container;
 pub use error::InitializationError;
 pub use graph::DependencyGraph;
 pub use infusion_proc::{blank, service};
+
+#[doc(hidden)]
+pub use infusion_proc::__blank_helper;
+
 use serde::{Deserialize, Serialize};
 
 /// The object that is meant to be the placeholder nullified implementer

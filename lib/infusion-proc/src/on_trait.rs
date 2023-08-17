@@ -102,7 +102,11 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
         }
     }
 
+    let mut is_input = false;
+
     if !has_init && mode == utils::Mode::WithCollection {
+        is_input = true;
+
         trait_body.push(parse_quote! {
             #[doc(hidden)]
             fn infu_dependencies(visitor: &mut infusion::graph::DependencyGraphVisitor) {
@@ -137,6 +141,7 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
 
     let blank = {
         let generics = &trait_.generics;
+        let where_clause = &generics.where_clause;
 
         let params = if names.is_empty() {
             quote!()
@@ -146,9 +151,20 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
 
         let blank = utils::generics_to_blank(generics);
 
+        let dep_rewrite = if is_input {
+            // Don't mark the blank as input.
+            quote! {
+                fn infu_dependencies(_visitor: &mut infusion::graph::DependencyGraphVisitor) {}
+            }
+        } else {
+            quote!()
+        };
+
         let maybe_init = if mode == utils::Mode::WithCollection {
             // overwrite the initialization.
             quote! {
+                #dep_rewrite
+
                 fn infu_initialize(
                     _container: &infusion::Container
                 ) -> ::std::result::Result<
@@ -163,7 +179,7 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
         };
 
         quote! {
-            impl #generics #name #params for #blank {
+            impl #generics #name #params for #blank #where_clause {
                 #maybe_init
 
                 #(#blank_body)*

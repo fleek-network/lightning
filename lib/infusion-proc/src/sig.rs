@@ -61,9 +61,9 @@ pub fn verify_fn_signature(kind: InfuFnKind, sig: &syn::Signature) -> Result<(Ve
                 receiver = Some(arg);
             },
             syn::FnArg::Typed(pat) => {
-                let name = get_infu_param_name(&pat)?;
+                let name = get_infu_param_name(pat)?;
                 params.push(name);
-                let arg = get_infu_collection_member_from_arg(&pat)?;
+                let arg = get_infu_collection_member_from_arg(pat)?;
                 args.push(arg);
             },
         }
