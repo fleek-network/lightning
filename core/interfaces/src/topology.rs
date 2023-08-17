@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use fleek_crypto::NodePublicKey;
-use infusion::{infu, p};
+use infusion::c;
 
 use crate::{
     infu_collection::Collection, ApplicationInterface, ConfigConsumer, ConfigProviderInterface,
@@ -12,17 +12,15 @@ use crate::{
 /// This clustering is later used in other parts of the codebase when connection to other nodes
 /// is required. The gossip layer is an example of a component that can feed the data this
 /// algorithm generates.
-#[infusion::blank]
-pub trait TopologyInterface: ConfigConsumer + Sized + Send + Sync + Clone {
-    infu!(TopologyInterface, {
-        fn init(
-            config: ConfigProviderInterface,
-            signer: SignerInterface,
-            app: ApplicationInterface,
-        ) {
-            Self::init(config.get::<Self>(), signer.get_bls_pk(), app.sync_query())
-        }
-    });
+#[infusion::service]
+pub trait TopologyInterface<C: Collection>: ConfigConsumer + Sized + Send + Sync + Clone {
+    fn _init(
+        config: ::ConfigProviderInterface,
+        signer: ::SignerInterface,
+        app: ::ApplicationInterface,
+    ) {
+        Self::init(config.get::<Self>(), signer.get_bls_pk(), app.sync_query())
+    }
 
     /// Create an instance of the structure from the provided configuration and public key.
     /// The public key is supposed to be the public key of our own node. This can be obtained
@@ -35,7 +33,7 @@ pub trait TopologyInterface: ConfigConsumer + Sized + Send + Sync + Clone {
     fn init(
         config: Self::Config,
         our_public_key: NodePublicKey,
-        query_runner: p!(::ApplicationInterface::SyncExecutor),
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self>;
 
     /// Suggest a list of connections that our current node must connect to. This should be

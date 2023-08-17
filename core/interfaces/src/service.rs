@@ -1,19 +1,15 @@
-use infusion::infu;
-
 use crate::{
     infu_collection::Collection, types::ServiceId, ConfigConsumer, ConfigProviderInterface,
     ConnectionInterface, WithStartAndShutdown,
 };
 
-#[infusion::blank]
-pub trait ServiceExecutorInterface:
+#[infusion::service]
+pub trait ServiceExecutorInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
-    infu!(ServiceExecutorInterface, {
-        fn init(config: ConfigProviderInterface) {
-            Self::init(config.get::<Self>())
-        }
-    });
+    fn _init(config: ::ConfigProviderInterface) {
+        Self::init(config.get::<Self>())
+    }
 
     /// The connector object that this service executor provides.
     type Connector: ServiceConnectorInterface;
@@ -27,7 +23,7 @@ pub trait ServiceExecutorInterface:
     fn register_core_service(&self, service_id: ServiceId);
 }
 
-#[infusion::blank(object = true)]
+#[infusion::blank]
 pub trait ServiceConnectorInterface: Clone {
     /// The connection specified.
     type Connection: ConnectionInterface;

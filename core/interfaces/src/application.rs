@@ -3,7 +3,7 @@ use std::{collections::HashMap, time::Duration};
 use affair::Socket;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use infusion::infu;
+
 
 use crate::{
     common::WithStartAndShutdown,
@@ -28,16 +28,14 @@ use crate::{
 /// it is created.
 pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
 
-#[infusion::blank]
-pub trait ApplicationInterface:
+#[infusion::service]
+pub trait ApplicationInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
-    infu!(ApplicationInterface, {
-        fn init(config: ConfigProviderInterface) {
-            let config = config.get::<Self>();
-            Self::init(config)
-        }
-    });
+    fn _init(config: ::ConfigProviderInterface) {
+        let config = config.get::<Self>();
+        Self::init(config)
+    }
 
     /// The type for the sync query executor.
     type SyncExecutor: SyncQueryRunnerInterface;
@@ -61,7 +59,7 @@ pub trait ApplicationInterface:
     fn sync_query(&self) -> Self::SyncExecutor;
 }
 
-#[infusion::blank(object = true)]
+#[infusion::blank]
 pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Returns the latest bandwidth balance associated with the given account public key.
     fn get_account_balance(&self, account: &EthAddress) -> u128;

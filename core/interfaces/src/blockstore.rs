@@ -1,7 +1,6 @@
-use std::{fmt::Debug, ops::Deref, sync::Arc};
+use std::{ops::Deref, sync::Arc};
 
 use async_trait::async_trait;
-use infusion::infu;
 use thiserror::Error;
 
 use crate::{
@@ -86,14 +85,12 @@ pub struct ContentChunk {
 /// we use it at the chunk level, we don't compress the entire file and then perform the chunking,
 /// we chunk first, and compress each chunk later for obvious technical reasons.
 #[async_trait]
-#[infusion::blank]
-pub trait BlockStoreInterface: Clone + Send + Sync + ConfigConsumer {
-    infu!(BlockStoreInterface, {
-        fn init(config: ConfigProviderInterface) {
-            let config = config.get::<Self>();
-            Self::init(config)
-        }
-    });
+#[infusion::service]
+pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsumer {
+    fn _init(config: ::ConfigProviderInterface) {
+        let config = config.get::<Self>();
+        Self::init(config)
+    }
 
     /// The block store has the ability to use a smart pointer to avoid duplicating
     /// the same content multiple times in memory, this can be used for when multiple
@@ -132,7 +129,7 @@ pub trait BlockStoreInterface: Clone + Send + Sync + ConfigConsumer {
 
 /// The interface for the writer to a [`BlockStoreInterface`].
 #[async_trait]
-#[infusion::blank(object = true)]
+#[infusion::blank]
 pub trait IncrementalPutInterface {
     /// Write the proof for the buffer.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError>;

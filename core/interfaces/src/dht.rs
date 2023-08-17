@@ -1,5 +1,5 @@
 use affair::Socket;
-use infusion::{infu, p};
+use infusion::c;
 
 use crate::{
     infu_collection::Collection,
@@ -10,18 +10,15 @@ use crate::{
 
 pub type DhtSocket = Socket<DhtRequest, DhtResponse>;
 
-/// The distributed hash table for Fleek Network.
-#[infusion::blank]
-pub trait DhtInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
-    infu!(DhtInterface, {
-        fn init(signer: SignerInterface, topology: TopologyInterface, config: ConfigProviderInterface) {
-            Self::init(signer, topology.clone(), config.get::<Self>())
-        }
-    });
+#[infusion::service]
+pub trait DhtInterface<C: Collection>: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
+    fn _init(signer: ::SignerInterface, topology: ::TopologyInterface, config: ::ConfigProviderInterface) {
+        Self::init(signer, topology.clone(), config.get::<Self>())
+    }
 
     fn init(
-        signer: &p!(::SignerInterface),
-        topology: p!(::TopologyInterface),
+        signer: &c!(C::SignerInterface),
+        topology: c!(C::TopologyInterface),
         config: Self::Config,
     ) -> anyhow::Result<Self>;
 

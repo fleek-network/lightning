@@ -1,3 +1,5 @@
+#![feature(macro_metavar_expr)]
+
 pub mod application;
 pub mod blockstore;
 pub mod broadcast;

@@ -1,6 +1,6 @@
 use affair::Socket;
 use anyhow;
-use infusion::infu;
+
 
 use crate::{
     infu_collection::Collection, ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown,
@@ -12,15 +12,13 @@ pub type OriginProviderSocket<Stream> = Socket<Vec<u8>, anyhow::Result<Stream>>;
 /// The abstraction layer for different origins and how we handle them in the codebase in
 /// a modular way, and [`OriginProvider`] can be something like a provider for resolving
 /// *IPFS* files.
-#[infusion::blank]
-pub trait OriginProviderInterface:
+#[infusion::service]
+pub trait OriginProviderInterface<C: Collection>:
     ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
 {
-    infu!(OriginProviderInterface, {
-        fn init(config: ConfigProviderInterface) {
-            Self::init(config.get::<Self>())
-        }
-    });
+    fn _init(config: ::ConfigProviderInterface) {
+        Self::init(config.get::<Self>())
+    }
 
     type Stream: UntrustedStream = BlankUntrustedStream;
 

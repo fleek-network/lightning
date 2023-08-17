@@ -7,7 +7,7 @@ use tokio::{
 use crate::types::CompressionAlgoSet;
 
 /// The connection type that is offered by the (HandshakeInterface)[crate::HandshakeInterface].
-#[infusion::blank(object = true)]
+#[infusion::blank]
 pub trait ConnectionInterface: Send + Sync {
     /// The writer half of this connection.
     type Writer: AsyncWrite + Unpin + Send + Sync = OwnedWriteHalf;

@@ -1,17 +1,13 @@
-use infusion::infu;
-
 use crate::{
     common::WithStartAndShutdown, config::ConfigConsumer, infu_collection::Collection,
     ConfigProviderInterface, ConnectionInterface,
 };
 
-#[infusion::blank]
-pub trait HandshakeInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
-    infu!(HandshakeInterface, {
-        fn init(config: ConfigProviderInterface) {
-            Self::init(config.get::<Self>())
-        }
-    });
+#[infusion::service]
+pub trait HandshakeInterface<C: Collection>: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
+    fn _init(config: ::ConfigProviderInterface) {
+        Self::init(config.get::<Self>())
+    }
 
     /// The connection type that this handshake implementation offers.
     type Connection: ConnectionInterface;

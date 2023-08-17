@@ -1,5 +1,5 @@
 use affair::Socket;
-use infusion::infu;
+
 
 use crate::{
     common::WithStartAndShutdown, config::ConfigConsumer, infu_collection::Collection,
@@ -11,15 +11,13 @@ use crate::{
 /// queue which will later roll up a batch of delivery acknowledgments to the consensus.
 pub type DeliveryAcknowledgmentSocket = Socket<DeliveryAcknowledgment, ()>;
 
-#[infusion::blank]
-pub trait DeliveryAcknowledgmentAggregatorInterface:
+#[infusion::service]
+pub trait DeliveryAcknowledgmentAggregatorInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
-    infu!(DeliveryAcknowledgmentAggregatorInterface, {
-        fn init(config: ConfigProviderInterface, signer: SignerInterface) {
-            Self::init(config.get::<Self>(), signer.get_socket())
-        }
-    });
+    fn _init(config: ::ConfigProviderInterface, signer: ::SignerInterface) {
+        Self::init(config.get::<Self>(), signer.get_socket())
+    }
 
     /// Initialize a new delivery acknowledgment aggregator.
     fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self>;

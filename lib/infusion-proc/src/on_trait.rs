@@ -140,16 +140,34 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
     trait_.items = trait_body;
 
     let blank = {
-        let generics = &trait_.generics;
-        let where_clause = &generics.where_clause;
-
         let params = if names.is_empty() {
             quote!()
         } else {
             quote! { <#(#names),*> }
         };
 
-        let blank = utils::generics_to_blank(generics);
+        let (generics, blank) = if trait_.generics.params.is_empty() {
+            (quote!(<T>), quote!(infusion::Blank<T>))
+        } else {
+            let g = &trait_.generics;
+            (quote!(#g), utils::generics_to_blank(g))
+        };
+
+        let supertraits = &trait_.supertraits;
+        let where_clause = match (&trait_.generics.where_clause, supertraits.is_empty()) {
+            (Some(clause), true) => {
+                quote!(#clause)
+            },
+            (Some(syn::WhereClause { where_token, predicates }), false) => {
+                quote!(#where_token #blank: #supertraits, #predicates)
+            },
+            (None, true) => {
+                quote!()
+            },
+            (None, false) => {
+                quote!(where #blank : #supertraits)
+            },
+        };
 
         let dep_rewrite = if is_input {
             // Don't mark the blank as input.
@@ -179,6 +197,7 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
         };
 
         quote! {
+            #[allow(unused)]
             impl #generics #name #params for #blank #where_clause {
                 #maybe_init
 

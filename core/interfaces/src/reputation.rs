@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use fleek_crypto::NodePublicKey;
-use infusion::{infu, p};
+use infusion::c;
 
 use crate::{
     application::SyncQueryRunnerInterface, config::ConfigConsumer, infu_collection::Collection,
@@ -9,23 +9,21 @@ use crate::{
     ConfigProviderInterface, SignerInterface,
 };
 
-#[infusion::blank]
-pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
-    infu!(ReputationAggregatorInterface, {
-        fn init(
-            config: ConfigProviderInterface,
-            signer: SignerInterface,
-            notifier: NotifierInterface,
-            app: ApplicationInterface
-        ) {
-            Self::init(
-                config.get::<Self>(),
-                signer.get_socket(),
-                notifier.clone(),
-                app.sync_query()
-            )
-        }
-    });
+#[infusion::service]
+pub trait ReputationAggregatorInterface<C: Collection>: ConfigConsumer + Sized {
+    fn _init(
+        config: ::ConfigProviderInterface,
+        signer: ::SignerInterface,
+        notifier: ::NotifierInterface,
+        app: ::ApplicationInterface
+    ) {
+        Self::init(
+            config.get::<Self>(),
+            signer.get_socket(),
+            notifier.clone(),
+            app.sync_query()
+        )
+    }
 
     /// The reputation reporter can be used by our system to report the reputation of other
     type ReputationReporter: ReputationReporterInterface;
@@ -33,15 +31,12 @@ pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
     /// The query runner can be used to query the local reputation of other nodes.
     type ReputationQuery: ReputationQueryInteface;
 
-    /// The application query runner can be used to query the application state.
-    type SyncQuery: SyncQueryRunnerInterface;
-
     /// Create a new reputation
     fn init(
         config: Self::Config,
         submit_tx: SubmitTxSocket,
-        notifier: p!(::NotifierInterface),
-        query_runner: Self::SyncQuery,
+        notifier: c!(C::NotifierInterface),
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self>;
 
     /// Called by the scheduler to notify that it is time to submit the aggregation, to do
@@ -61,7 +56,7 @@ pub trait ReputationAggregatorInterface: ConfigConsumer + Sized {
 /// Used to answer queries about the (local) reputation of other nodes, this queries should
 /// be as real-time as possible, meaning that the most recent data captured by the reporter
 /// should be taken into account at this layer.
-#[infusion::blank(object = true)]
+#[infusion::blank]
 pub trait ReputationQueryInteface: Clone {
     /// The application layer's synchronize query runner.
     type SyncQuery: SyncQueryRunnerInterface;
@@ -74,7 +69,7 @@ pub trait ReputationQueryInteface: Clone {
 /// that we have with another peer, this interface allows a reputation aggregator to spawn many
 /// reporters which can use any method to report the data they capture to their aggregator so
 /// that it can send it to the application layer.
-#[infusion::blank(object = true)]
+#[infusion::blank]
 pub trait ReputationReporterInterface: Clone {
     /// Report a satisfactory (happy) interaction with the given peer. Used for up time.
     fn report_sat(&self, peer: &NodePublicKey, weight: Weight);

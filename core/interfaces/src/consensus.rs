@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use affair::Socket;
-use infusion::{infu, p};
+use infusion::c;
 use lightning_schema::LightningMessage;
 use tokio::sync::Notify;
 
@@ -21,31 +21,29 @@ use crate::{
 /// this as if the current node was only an external client to the network.
 pub type MempoolSocket = Socket<UpdateRequest, ()>;
 
-#[infusion::blank]
-pub trait ConsensusInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
-    infu!(ConsensusInterface, {
-        fn init(
-            config: ConfigProviderInterface,
-            signer: SignerInterface,
-            app: ApplicationInterface,
-            broadcast: BroadcastInterface,
-        ) {
-            let executor = app.transaction_executor();
-            let sqr = app.sync_query();
-            let pubsub = broadcast.get_pubsub(crate::Topic::Consensus);
-            Self::init(config.get::<Self>(), signer, executor, sqr, pubsub)
-        }
-    });
+#[infusion::service]
+pub trait ConsensusInterface<C: Collection>: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
+    fn _init(
+        config: ::ConfigProviderInterface,
+        signer: ::SignerInterface,
+        app: ::ApplicationInterface,
+        broadcast: ::BroadcastInterface,
+    ) {
+        let executor = app.transaction_executor();
+        let sqr = app.sync_query();
+        let pubsub = broadcast.get_pubsub(crate::Topic::Consensus);
+        Self::init(config.get::<Self>(), signer, executor, sqr, pubsub)
+    }
 
     type Certificate: LightningMessage + Clone;
 
     /// Create a new consensus service with the provided config and executor.
-    fn init<S: SignerInterface>(
+    fn init<S: SignerInterface<C>>(
         config: Self::Config,
         signer: &S,
         executor: ExecutionEngineSocket,
-        query_runner: p!(::ApplicationInterface::SyncExecutor),
-        pubsub: p!(::BroadcastInterface::PubSub<Self::Certificate>),
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
     ) -> anyhow::Result<Self>;
 
     /// Returns a socket that can be used to submit transactions to the consensus,

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use infusion::{infu, p};
+use infusion::{c};
 
 use crate::{
     dht::DhtInterface,
@@ -12,13 +12,11 @@ use crate::{
 /// The resolver is responsible to resolve an FNIP (Fleek Network Immutable Pointer),
 /// into a Blake3 hash of the content.
 #[async_trait]
-#[infusion::blank]
-pub trait ResolverInterface: Sized + ConfigConsumer + WithStartAndShutdown {
-    infu!(ResolverInterface, {
-        fn init(config: ConfigProviderInterface, dht: DhtInterface, signer: SignerInterface) {
-            Self::init(config.get::<Self>(), dht.get_socket(), signer)
-        }
-    });
+#[infusion::service]
+pub trait ResolverInterface<C: Collection>: Sized + ConfigConsumer + WithStartAndShutdown {
+    fn _init(config: ::ConfigProviderInterface, dht: ::DhtInterface, signer: ::SignerInterface) {
+        Self::init(config.get::<Self>(), dht.get_socket(), signer)
+    }
 
     type OriginFinder: OriginFinderAsyncIter;
 
@@ -26,7 +24,7 @@ pub trait ResolverInterface: Sized + ConfigConsumer + WithStartAndShutdown {
     fn init(
         config: Self::Config,
         dht: DhtSocket,
-        signer: &p!(::SignerInterface),
+        signer: &c!(C::SignerInterface),
     ) -> anyhow::Result<Self>;
 
     /// Publish new records into the resolver global hash table about us witnessing
@@ -56,7 +54,7 @@ pub trait ResolverInterface: Sized + ConfigConsumer + WithStartAndShutdown {
 
 /// An `async-iterator`-like interface that tries to find the immutable pointers of
 #[async_trait]
-#[infusion::blank(object = true)]
+#[infusion::blank]
 pub trait OriginFinderAsyncIter: Sized + Send + Sync {
     /// Returns the hash of requested content.
     fn hash(&self) -> &Blake3Hash;

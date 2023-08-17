@@ -4,7 +4,7 @@ use affair::Socket;
 use fleek_crypto::{
     ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
-use infusion::{infu, p};
+use infusion::c;
 use tokio::sync::Notify;
 
 use crate::{
@@ -19,18 +19,16 @@ pub type SubmitTxSocket = Socket<UpdateMethod, u64>;
 
 /// The signature provider is responsible for signing messages using the private key of
 /// the node.
-#[infusion::blank]
-pub trait SignerInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
-    infu!(SignerInterface, {
-        fn init(config: ConfigProviderInterface, app: ApplicationInterface) {
-            Self::init(config.get::<Self>(), app.sync_query())
-        }
-    });
+#[infusion::service]
+pub trait SignerInterface<C: Collection>: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
+    fn _init(config: ::ConfigProviderInterface, app: ::ApplicationInterface) {
+        Self::init(config.get::<Self>(), app.sync_query())
+    }
 
     /// Initialize the signature service.
     fn init(
         config: Self::Config,
-        query_runner: p!(::ApplicationInterface::SyncExecutor),
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self>;
 
     /// Provide the signer service with the mempool socket after initialization, this function
