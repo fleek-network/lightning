@@ -84,6 +84,7 @@ async fn e2e_dht() -> Result<()> {
             address: bootstrapper_address,
             network_public_key: bootstrap_secret_key.to_pk(),
         }])
+        .with_port_assigner(port_assigner)
         .build();
     swarm.launch().await.unwrap();
 

@@ -306,8 +306,6 @@ impl SwarmBuilder {
 
             nodes.insert(node_secret_key.to_pk(), (config, owner_secret_key, i));
         }
-
-        println!("GENESIS LEN: {}", genesis.committee.len());
         let nodes = nodes
             .into_iter()
             .map(|(node_pub_key, (config, owner_secret_key, index))| {
