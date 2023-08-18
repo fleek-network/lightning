@@ -24,7 +24,7 @@ impl Collection for FinalTypes {
     type ConnectionPoolInterface = infusion::Blank<Self>;
     type TopologyInterface = Topology<Self>;
     type ConsensusInterface = Consensus<Self>;
-    type HandshakeInterface = infusion::Blank<Self>;
+    type HandshakeInterface = TcpHandshakeServer<Self>;
     type NotifierInterface = Notifier<Self>;
     type OriginProviderInterface = infusion::Blank<Self>;
     type DeliveryAcknowledgmentAggregatorInterface = infusion::Blank<Self>;
