@@ -115,7 +115,7 @@ async fn test_build_latency_matrix() {
     app.start().await;
 
     let topology = Topology::init(Config::default(), our_public_key, query_runner).unwrap();
-    let (matrix, index_to_pubkey, our_index) = topology.build_latency_matrix();
+    let (matrix, index_to_pubkey, our_index) = topology.inner.build_latency_matrix();
     let pubkey_to_index: HashMap<NodePublicKey, usize> = index_to_pubkey
         .iter()
         .map(|(index, pubkey)| (*pubkey, *index))

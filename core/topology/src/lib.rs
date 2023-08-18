@@ -16,11 +16,26 @@ use async_trait::async_trait;
 pub use config::Config;
 use divisive::DivisiveHierarchy;
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::{ConfigConsumer, SyncQueryRunnerInterface, TopologyInterface};
+use lightning_interfaces::{
+    infu_collection::{c, Collection},
+    ApplicationInterface, ConfigConsumer, SyncQueryRunnerInterface, TopologyInterface,
+};
 use ndarray::{Array, Array2};
 use rand::SeedableRng;
 
-pub struct Topology<Q: SyncQueryRunnerInterface> {
+pub struct Topology<C: Collection> {
+    inner: Arc<TopologyInner<c![C::ApplicationInterface::SyncExecutor]>>,
+}
+
+impl<C: Collection> Clone for Topology<C> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+struct TopologyInner<Q: SyncQueryRunnerInterface + 'static> {
     query: Q,
     our_public_key: NodePublicKey,
     current_peers: Mutex<Arc<Vec<Vec<NodePublicKey>>>>,
@@ -29,7 +44,7 @@ pub struct Topology<Q: SyncQueryRunnerInterface> {
     min_nodes: usize,
 }
 
-impl<Q: SyncQueryRunnerInterface> Topology<Q> {
+impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
     fn build_latency_matrix(&self) -> (Array2<i32>, HashMap<usize, NodePublicKey>, Option<usize>) {
         let latencies = self.query.get_latencies();
         let valid_pubkeys: BTreeSet<NodePublicKey> = self
@@ -71,26 +86,6 @@ impl<Q: SyncQueryRunnerInterface> Topology<Q> {
 
         (matrix, index_to_pubkey, our_index)
     }
-}
-
-#[async_trait]
-impl<Q: SyncQueryRunnerInterface> TopologyInterface for Topology<Q> {
-    type SyncQuery = Q;
-
-    fn init(
-        config: Self::Config,
-        our_public_key: NodePublicKey,
-        query_runner: Self::SyncQuery,
-    ) -> anyhow::Result<Self> {
-        Ok(Self {
-            target_k: config.testing_target_k,
-            min_nodes: config.testing_min_nodes,
-            query: query_runner,
-            current_epoch: Mutex::new(u64::MAX),
-            current_peers: Mutex::new(Arc::new(Vec::new())),
-            our_public_key,
-        })
-    }
 
     fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>> {
         let epoch = self.query.get_epoch();
@@ -128,7 +123,32 @@ impl<Q: SyncQueryRunnerInterface> TopologyInterface for Topology<Q> {
     }
 }
 
-impl<Q: SyncQueryRunnerInterface> ConfigConsumer for Topology<Q> {
+#[async_trait]
+impl<C: Collection> TopologyInterface<C> for Topology<C> {
+    fn init(
+        config: Self::Config,
+        our_public_key: NodePublicKey,
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    ) -> anyhow::Result<Self> {
+        let inner = TopologyInner {
+            target_k: config.testing_target_k,
+            min_nodes: config.testing_min_nodes,
+            query: query_runner,
+            current_epoch: Mutex::new(u64::MAX),
+            current_peers: Mutex::new(Arc::new(Vec::new())),
+            our_public_key,
+        };
+        Ok(Self {
+            inner: Arc::new(inner),
+        })
+    }
+
+    fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>> {
+        self.inner.suggest_connections()
+    }
+}
+
+impl<C: Collection> ConfigConsumer for Topology<C> {
     type Config = Config;
 
     const KEY: &'static str = "topology";
