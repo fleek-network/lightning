@@ -3658,7 +3658,6 @@ dependencies = [
  "fleek-crypto",
  "futures",
  "hp-fixed",
- "lightning-application",
  "lightning-interfaces",
  "lightning-test-utils",
  "log",

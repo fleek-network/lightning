@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
-lightning-application = { path = "../application" }
 anyhow.workspace = true
 async-trait.workspace = true
 log.workspace = true
