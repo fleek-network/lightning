@@ -206,9 +206,8 @@ mod tests {
     fn get_random_key() -> TableKey {
         let mut rng = rand::thread_rng();
         let mut array = [0; 32];
-        #[allow(clippy::needless_range_loop)]
-        for i in 0..array.len() {
-            array[i] = rng.gen_range(0..255);
+        for byte in array.iter_mut() {
+            *byte = rng.gen_range(0..255);
         }
         array
     }
@@ -231,8 +230,7 @@ mod tests {
                     or_mask.push(0u8);
                     leading_zeros += 8;
                 } else {
-                    let x = -1_i8;
-                    let byte = (x as u8) >> (k - leading_zeros);
+                    let byte = 255_u8 >> (k - leading_zeros);
                     and_mask.push(byte);
                     let byte = 128_u8 >> (k - leading_zeros);
                     or_mask.push(byte);
@@ -240,7 +238,7 @@ mod tests {
                 }
             }
             while and_mask.len() < 32 {
-                and_mask.push(-1i8 as u8);
+                and_mask.push(255_u8);
                 or_mask.push(0_u8);
             }
 
