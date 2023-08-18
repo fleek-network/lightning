@@ -14,6 +14,7 @@ use lightning_topology::Topology;
 use crate::config::TomlConfigProvider;
 
 /// Finalized type bindings for Lightning.
+#[derive(Clone)]
 pub struct FinalTypes;
 
 impl Collection for FinalTypes {

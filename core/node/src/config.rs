@@ -14,7 +14,7 @@ pub struct TomlConfigProvider<C: Collection> {
     collection: PhantomData<C>,
 }
 
-impl TomlConfigProvider {
+impl<C: Collection> TomlConfigProvider<C> {
     pub fn open<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let path = path.as_ref();
 
