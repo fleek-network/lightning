@@ -9,7 +9,8 @@ use tokio::sync::Notify;
 
 use crate::{
     config::ConfigConsumer, consensus::MempoolSocket, infu_collection::Collection,
-    types::UpdateMethod, ApplicationInterface, ConfigProviderInterface, WithStartAndShutdown,
+    types::UpdateMethod, ApplicationInterface, ConfigProviderInterface, ConsensusInterface,
+    WithStartAndShutdown,
 };
 
 /// A socket that is responsible to submit a transaction to the consensus from our node,
@@ -25,6 +26,11 @@ pub trait SignerInterface<C: Collection>:
 {
     fn _init(config: ::ConfigProviderInterface, app: ::ApplicationInterface) {
         Self::init(config.get::<Self>(), app.sync_query())
+    }
+
+    fn _post(&mut self, c: ::ConsensusInterface) {
+        self.provide_mempool(c.mempool());
+        self.provide_new_block_notify(c.new_block_notifier());
     }
 
     /// Initialize the signature service.
