@@ -1,18 +1,27 @@
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
-use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::{
     application::SyncQueryRunnerInterface,
+    infu_collection::{c, Collection},
     notifier::{Notification, NotifierInterface},
+    ApplicationInterface,
 };
 use tokio::{sync::mpsc, time::sleep};
 
-pub struct Notifier {
-    query_runner: <Notifier as NotifierInterface>::SyncQuery,
+pub struct Notifier<C: Collection> {
+    query_runner: c![C::ApplicationInterface::SyncExecutor],
 }
 
-impl Notifier {
+impl<C: Collection> Clone for Notifier<C> {
+    fn clone(&self) -> Self {
+        Self {
+            query_runner: self.query_runner.clone(),
+        }
+    }
+}
+
+impl<C: Collection> Notifier<C> {
     fn get_until_epoch_end(&self) -> Duration {
         let epoch_info = self.query_runner.get_epoch_info();
         let now = SystemTime::now()
@@ -28,10 +37,8 @@ impl Notifier {
 }
 
 #[async_trait]
-impl NotifierInterface for Notifier {
-    type SyncQuery = QueryRunner;
-
-    fn init(query_runner: Self::SyncQuery) -> Self {
+impl<C: Collection> NotifierInterface<C> for Notifier<C> {
+    fn init(query_runner: c![C::ApplicationInterface::SyncExecutor]) -> Self {
         Self { query_runner }
     }
 
