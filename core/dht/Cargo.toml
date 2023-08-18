@@ -8,9 +8,7 @@ edition = "2021"
 anyhow.workspace = true
 async-trait.workspace = true
 bincode.workspace = true
-lightning-application = { path="../application" }
 lightning-interfaces = { path="../interfaces" }
-lightning-topology = { path="../topology" }
 fleek-crypto.workspace = true
 futures.workspace = true
 serde.workspace = true
@@ -25,3 +23,5 @@ tracing = "0.1"
 clap = { version = "4.2", features = ["derive"] }
 env_logger = "0.10"
 hex = "0.4"
+lightning-application = { path="../application" }
+lightning-topology = { path="../topology" }
