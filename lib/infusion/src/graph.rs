@@ -1,7 +1,7 @@
 use std::{
     any::TypeId,
     collections::{HashMap, HashSet, VecDeque},
-    fmt::Debug,
+    fmt::{Debug, Display},
 };
 
 use crate::{
@@ -95,6 +95,25 @@ impl DependencyGraph {
     /// Returns the dependency graph.
     pub fn get_graph(&self) -> &HashMap<Tag, HashSet<Tag>> {
         &self.dependency_graph
+    }
+
+    /// Return the dependency graph as a mermaid diagram.
+    pub fn mermaid(&self, title: impl Display) -> String {
+        use std::fmt::Write;
+        let mut b = String::with_capacity(1024);
+
+        writeln!(&mut b, "---");
+        writeln!(&mut b, "title: {title}");
+        writeln!(&mut b, "---");
+        writeln!(&mut b, "stateDiagram-v2");
+        writeln!(&mut b, "  direction LR");
+        for (v, tmp) in &self.dependency_graph {
+            for u in tmp {
+                writeln!(&mut b, "  {} --> {}", u.trait_name(), v.trait_name());
+            }
+        }
+
+        b
     }
 
     /// Returns `true` if the provided tag is marked as an input.
