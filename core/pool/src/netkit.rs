@@ -1,5 +1,6 @@
-use rustls::{ClientConfig, ServerConfig};
 use std::sync::Arc;
+
+use rustls::{ClientConfig, ServerConfig};
 
 pub static CIPHER_SUITES: &[rustls::SupportedCipherSuite] = &[
     rustls::cipher_suite::TLS13_AES_128_GCM_SHA256,
@@ -33,8 +34,7 @@ pub fn server_config() -> ServerConfig {
         .unwrap()
         .with_no_client_auth()
         .with_single_cert(cert, key)
-        .expect("Building server config to suceed")
-        ;
+        .expect("Building server config to suceed");
     config.alpn_protocols = vec![b"gemini".to_vec()];
     config
 }

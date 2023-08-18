@@ -1,12 +1,12 @@
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
-use quinn::{Connection, ConnectionError, Endpoint};
-use tokio::sync::mpsc::{Receiver, Sender};
 use lightning_interfaces::{
     schema::LightningMessage, ListenerInterface, SenderReceiver, SignerInterface,
     SyncQueryRunnerInterface,
 };
+use quinn::{Connection, ConnectionError, Endpoint};
+use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::pool::ConnectionPool;
 

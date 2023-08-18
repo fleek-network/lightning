@@ -1,14 +1,12 @@
-use std::marker::PhantomData;
-use std::net::SocketAddr;
-use std::sync::Arc;
+use std::{marker::PhantomData, net::SocketAddr, sync::Arc};
 
 use affair::Worker;
 use async_trait::async_trait;
-use quinn::{Endpoint, ServerConfig};
 use lightning_interfaces::{
     schema::LightningMessage, types::ServiceScope, ConfigConsumer, ConnectionPoolInterface,
     SignerInterface, SyncQueryRunnerInterface, WithStartAndShutdown,
 };
+use quinn::{Endpoint, ServerConfig};
 
 use crate::{connector::Connector, listener::Listener, netkit, receiver::Receiver, sender::Sender};
 
