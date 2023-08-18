@@ -17,16 +17,16 @@ use axum::{
 use lightning_interfaces::dht::DhtSocket;
 use lightning_interfaces::{
     common::WithStartAndShutdown, config::ConfigConsumer, MempoolSocket, RpcInterface,
-    SyncQueryRunnerInterface,
+    SyncQueryRunnerInterface, infu_collection::{Collection, c}, ApplicationInterface,
 };
 use tokio::{sync::Notify, task};
 
 use super::config::Config;
 use crate::handlers::{rpc_handler, RpcServer};
 
-pub struct Rpc<Q: SyncQueryRunnerInterface> {
+pub struct Rpc<C: Collection> {
     /// Data available to the rpc handler during a request
-    data: Arc<RpcData<Q>>,
+    data: Arc<RpcData<c![C::ApplicationInterface::SyncExecutor]>>,
     is_running: Arc<AtomicBool>,
     pub config: Config,
     shutdown_notify: Arc<Notify>,
@@ -40,7 +40,7 @@ pub struct RpcData<Q: SyncQueryRunnerInterface> {
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface + 'static> WithStartAndShutdown for Rpc<Q> {
+impl<C: Collection> WithStartAndShutdown for Rpc<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         self.is_running.load(Ordering::Relaxed)
@@ -89,9 +89,13 @@ impl<Q: SyncQueryRunnerInterface + 'static> WithStartAndShutdown for Rpc<Q> {
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface + Send + Sync + 'static> RpcInterface<Q> for Rpc<Q> {
+impl<C: Collection> RpcInterface<C> for Rpc<C> {
     /// Initialize the *RPC* server, with the given parameters.
-    fn init(config: Self::Config, mempool: MempoolSocket, query_runner: Q) -> anyhow::Result<Self> {
+    fn init(
+        config: Self::Config,
+        mempool: MempoolSocket,
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    ) -> anyhow::Result<Self> {
         #[cfg(not(feature = "e2e-test"))]
         let rpc = Ok(Self {
             data: Arc::new(RpcData {
@@ -122,7 +126,7 @@ impl<Q: SyncQueryRunnerInterface + Send + Sync + 'static> RpcInterface<Q> for Rp
     }
 }
 
-impl<Q: SyncQueryRunnerInterface> ConfigConsumer for Rpc<Q> {
+impl<C: Collection> ConfigConsumer for Rpc<C> {
     const KEY: &'static str = "rpc";
 
     type Config = Config;
