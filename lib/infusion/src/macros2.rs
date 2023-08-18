@@ -20,11 +20,6 @@ macro_rules! infu {
             Self, ::std::boxed::Box<dyn std::error::Error>> where Self: Sized {
             unreachable!("This trait is marked as an input.")
         }
-
-        #[doc(hidden)]
-        fn infu_post_initialize(&mut self, container: &$crate::Container) {
-            // empty
-        }
     };
 
     // The `infu!(@ Default)` specifies that the current implementation should be using the default
@@ -39,11 +34,6 @@ macro_rules! infu {
         ) -> ::std::result::Result<
             Self, ::std::boxed::Box<dyn std::error::Error>> where Self: Sized {
             $crate::ok!(Self::default())
-        }
-
-        #[doc(hidden)]
-        fn infu_post_initialize(&mut self, container: &$crate::Container) {
-            // empty
         }
     };
 
