@@ -1,6 +1,9 @@
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
+use quinn::Connection;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::oneshot;
 use lightning_interfaces::{
     schema::LightningMessage, ConnectorInterface, SenderReceiver, SignerInterface,
     SyncQueryRunnerInterface,
@@ -8,7 +11,14 @@ use lightning_interfaces::{
 
 use crate::pool::ConnectionPool;
 
+/// ConnectionCommand
+pub struct NewConnectionCommand {
+    peer: fleek_crypto::NodePublicKey,
+    respond: oneshot::Sender<Option<Connection>>,
+}
+
 pub struct Connector<Q, S, T> {
+    pool_request_tx: Sender<NewConnectionCommand>,
     _marker: PhantomData<(Q, S, T)>,
 }
 
