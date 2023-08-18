@@ -8,6 +8,7 @@ default-run = "lightning-node"
 
 [dependencies]
 lightning-application = { path = "../application" }
+lightning-broadcast = { path = "../broadcast" }
 lightning-blockstore = { path = "../blockstore" }
 lightning-handshake = { path = "../handshake" }
 lightning-interfaces = { path = "../interfaces" }

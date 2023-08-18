@@ -1,5 +1,6 @@
 use lightning_application::{app::Application, query_runner::QueryRunner};
 use lightning_blockstore::memory::MemoryBlockStore;
+use lightning_broadcast::Broadcast;
 use lightning_consensus::consensus::{Consensus, PubSubMsg};
 use lightning_dht::dht::Dht;
 use lightning_handshake::server::TcpHandshakeServer;
@@ -19,7 +20,7 @@ impl Collection for FinalTypes {
     type ConfigProviderInterface = TomlConfigProvider<Self>;
     type ApplicationInterface = Application<Self>;
     type BlockStoreInterface = MemoryBlockStore<Self>;
-    type BroadcastInterface = infusion::Blank<Self>;
+    type BroadcastInterface = Broadcast<Self>;
     type ConnectionPoolInterface = infusion::Blank<Self>;
     type TopologyInterface = Topology<Self>;
     type ConsensusInterface = Consensus<Self>;

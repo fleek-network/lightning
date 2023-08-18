@@ -3505,6 +3505,7 @@ dependencies = [
  "infusion",
  "lightning-application",
  "lightning-blockstore",
+ "lightning-broadcast",
  "lightning-consensus",
  "lightning-dht",
  "lightning-handshake",

@@ -10,16 +10,18 @@ use crate::{
 };
 
 /// Type alias for the return type of accept and connect.
-pub type SenderReceiver<C, P, T> = (
-    <<P as ConnectionPoolInterface<C>>::Listener<T> as ListenerInterface<T>>::Sender,
-    <<P as ConnectionPoolInterface<C>>::Listener<T> as ListenerInterface<T>>::Receiver,
-);
+pub type SenderReceiver<C, P, T> = (PoolSender<C, P, T>, PoolReceiver<C, P, T>);
 
 /// Type alias for the return type of bind.
 pub type ListenerConnector<C, P, T> = (
     <P as ConnectionPoolInterface<C>>::Listener<T>,
     <P as ConnectionPoolInterface<C>>::Connector<T>,
 );
+
+pub type PoolSender<C, P, T> =
+    <<P as ConnectionPoolInterface<C>>::Listener<T> as ListenerInterface<T>>::Sender;
+pub type PoolReceiver<C, P, T> =
+    <<P as ConnectionPoolInterface<C>>::Listener<T> as ListenerInterface<T>>::Receiver;
 
 /// The connection pool provides the basic functionality for a node to node communication.
 ///
