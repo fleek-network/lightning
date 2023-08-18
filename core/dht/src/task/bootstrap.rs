@@ -122,19 +122,26 @@ pub async fn self_lookup(
         .ok_or_else(|| anyhow!("failed to find next bucket"))?;
 
     let search_list = (index..MAX_BUCKETS)
-        .map(random_key_in_bucket)
+        .map(|index| random_key_in_bucket(index, &local_key))
         .collect::<HashSet<_>>();
 
     Ok(search_list)
 }
 
-pub fn random_key_in_bucket(mut index: usize) -> TableKey {
+pub fn random_key_in_bucket(mut index: usize, local_key: &TableKey) -> TableKey {
     let mut key: TableKey = rand::random();
-    for byte in key.iter_mut() {
+    for (byte, local_key_byte) in key.iter_mut().zip(local_key.iter()) {
         if index > 7 {
-            *byte = 0;
+            *byte = *local_key_byte;
         } else {
-            *byte = (*byte | 128u8) >> index as u8;
+            // The first index bits of the random key byte
+            // have to match the byte of the local_key.
+            let mask = 255_u8 >> index;
+            *byte = (*byte & mask) | (*local_key_byte & !mask);
+            // The index + 1 bit (from the left) of the random key byte
+            // has to be different than the local key bit at that position.
+            let mask = 128_u8 >> index;
+            *byte = (*byte & !mask) | ((*local_key_byte ^ 255_u8) & mask);
             break;
         }
         index -= 8;
@@ -191,6 +198,26 @@ impl Bootstrapper {
                     error,
                 })
             },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::Rng;
+
+    use super::*;
+    use crate::{bucket::MAX_BUCKETS, distance};
+
+    #[test]
+    fn test_random_key_in_bucket() {
+        let local_key: TableKey = rand::random();
+        let mut rng = rand::thread_rng();
+        for _ in 0..10000 {
+            let index = rng.gen_range(0..MAX_BUCKETS);
+            let random_key = random_key_in_bucket(index, &local_key);
+            let calc_index = distance::leading_zero_bits(&local_key, &random_key);
+            assert_eq!(index, calc_index);
         }
     }
 }
