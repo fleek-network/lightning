@@ -7,6 +7,5 @@ edition = "2021"
 
 [dependencies]
 lightning-interfaces = {path="../interfaces"}
-lightning-application = {path="../application"}
 tokio.workspace = true
 async-trait = "0.1"
