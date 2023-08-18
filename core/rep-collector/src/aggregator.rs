@@ -4,11 +4,13 @@ use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::{
     config::ConfigConsumer,
+    infu_collection::{c, Collection},
     notifier::{Notification, NotifierInterface},
     reputation::ReputationAggregatorInterface,
     signer::SubmitTxSocket,
     types::{NodeIndex, ReputationMeasurements, UpdateMethod},
-    ReputationQueryInteface, ReputationReporterInterface, SyncQueryRunnerInterface, Weight, infu_collection::{Collection, c}, ApplicationInterface,
+    ApplicationInterface, ReputationQueryInteface, ReputationReporterInterface,
+    SyncQueryRunnerInterface, Weight,
 };
 use tokio::sync::mpsc;
 

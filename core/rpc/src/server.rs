@@ -16,8 +16,10 @@ use axum::{
 #[cfg(feature = "e2e-test")]
 use lightning_interfaces::dht::DhtSocket;
 use lightning_interfaces::{
-    common::WithStartAndShutdown, config::ConfigConsumer, MempoolSocket, RpcInterface,
-    SyncQueryRunnerInterface, infu_collection::{Collection, c}, ApplicationInterface,
+    common::WithStartAndShutdown,
+    config::ConfigConsumer,
+    infu_collection::{c, Collection},
+    ApplicationInterface, MempoolSocket, RpcInterface, SyncQueryRunnerInterface,
 };
 use tokio::{sync::Notify, task};
 

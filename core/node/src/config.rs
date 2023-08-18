@@ -1,4 +1,4 @@
-use std::{fs, path::Path, sync::Mutex, marker::PhantomData};
+use std::{fs, marker::PhantomData, path::Path, sync::Mutex};
 
 use anyhow::Context;
 use lightning_interfaces::{config::ConfigProviderInterface, infu_collection::Collection};
@@ -11,7 +11,7 @@ pub struct TomlConfigProvider<C: Collection> {
     /// format of the document, except that we need a `[key: string]->any`
     /// mapping. The [`Table`] is that map.
     pub table: Mutex<Table>,
-    collection: PhantomData<C>
+    collection: PhantomData<C>,
 }
 
 impl TomlConfigProvider {
@@ -38,7 +38,10 @@ impl TomlConfigProvider {
         }
         .into();
 
-        Ok(Self { table, collection: PhantomData })
+        Ok(Self {
+            table,
+            collection: PhantomData,
+        })
     }
 }
 

@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use clap::{arg, ArgAction, Parser, Subcommand};
 use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_interfaces::{
-    ConfigProviderInterface, LightningTypes, Node, SignerInterface, WithStartAndShutdown,
+    infu_collection::Collection, ConfigProviderInterface, SignerInterface, WithStartAndShutdown,
 };
 use lightning_signer::Signer;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -58,18 +58,15 @@ pub enum Keys {
 }
 
 /// Create a new command line application.
-pub struct Cli<T: LightningTypes>(CliArgs, PhantomData<T>);
+pub struct Cli<C: Collection>(CliArgs, PhantomData<C>);
 
-impl<T: LightningTypes> Cli<T> {
+impl<C: Collection> Cli<C> {
     pub fn new(args: CliArgs) -> Self {
         Self(args, PhantomData)
     }
 }
 
-impl<T: LightningTypes<ConfigProvider = TomlConfigProvider>> Cli<T>
-where
-    Node<T>: Send + Sync,
-{
+impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>> Cli<C> {
     /// Execute the application based on the provided command.
     pub async fn exec(self) -> Result<()> {
         let args = self.0;
@@ -189,5 +186,20 @@ where
             eprintln!("Consensus Public Key: does not exist");
         }
         Ok(())
+    }
+}
+
+mod tmp {
+    use infusion::Container;
+    use lightning_interfaces::infu_collection::Collection;
+
+    pub struct Node<C: Collection> {
+        container: Container,
+    }
+
+    impl<C: Collection> Node<C> {
+        pub fn new() -> Self {
+            todo!()
+        }
     }
 }

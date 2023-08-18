@@ -4,9 +4,8 @@ use fleek_crypto::NodePublicKey;
 use infusion::c;
 
 use crate::{
-    config::ConfigConsumer, infu_collection::Collection,
-    notifier::NotifierInterface, signer::SubmitTxSocket, ApplicationInterface,
-    ConfigProviderInterface, SignerInterface,
+    config::ConfigConsumer, infu_collection::Collection, notifier::NotifierInterface,
+    signer::SubmitTxSocket, ApplicationInterface, ConfigProviderInterface, SignerInterface,
 };
 
 #[infusion::service]

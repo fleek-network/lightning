@@ -9,9 +9,7 @@ use anyhow::Result;
 use chrono::Local;
 use clap::Parser;
 use cli::Cli;
-use lightning_interfaces::{
-    ApplicationInterface, BroadcastInterface, LightningTypes,
-};
+use lightning_interfaces::{ApplicationInterface, BroadcastInterface, LightningTypes};
 use log::LevelFilter;
 use mock::consensus::MockConsensus;
 use simplelog::{
@@ -72,9 +70,9 @@ async fn main() -> Result<()> {
         // type Node = transformers::WithConsensus<
         //     FinalTypes,
         //     MockConsensus<
-        //         <<FinalTypes as LightningTypes>::Application as ApplicationInterface>::SyncExecutor,
-        //         <<FinalTypes as LightningTypes>::Broadcast as BroadcastInterface>::PubSub<()>,
-        //     >,
+        //         <<FinalTypes as LightningTypes>::Application as
+        // ApplicationInterface>::SyncExecutor,         <<FinalTypes as
+        // LightningTypes>::Broadcast as BroadcastInterface>::PubSub<()>,     >,
         // >;
         // Cli::<Node>::new(args).exec().await
         todo!("partial! should work for reassignment.")

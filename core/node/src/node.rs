@@ -3,38 +3,34 @@ use lightning_blockstore::memory::MemoryBlockStore;
 use lightning_consensus::consensus::{Consensus, PubSubMsg};
 use lightning_dht::dht::Dht;
 use lightning_handshake::server::TcpHandshakeServer;
-use lightning_interfaces::{BroadcastInterface, LightningTypes};
+use lightning_interfaces::{infu_collection::Collection, BroadcastInterface, TopologyInterface};
 use lightning_notifier::Notifier;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_rpc::server::Rpc;
 use lightning_signer::Signer;
+use lightning_topology::Topology;
 
-use crate::{
-    config::TomlConfigProvider,
-    template::{
-        broadcast::Broadcast, origin::MyStream, pod::DeliveryAcknowledgmentAggregator,
-        pool::ConnectionPool, topology::Topology,
-    },
-};
+use crate::config::TomlConfigProvider;
 
 /// Finalized type bindings for Lightning.
 pub struct FinalTypes;
 
-impl LightningTypes for FinalTypes {
-    type ConfigProvider = TomlConfigProvider;
-    type Consensus =
-        Consensus<QueryRunner, <Self::Broadcast as BroadcastInterface>::PubSub<PubSubMsg>>;
-    type Application = Application;
-    type BlockStore = MemoryBlockStore;
-    type Signer = Signer;
-    type Stream = MyStream;
-    type DeliveryAcknowledgmentAggregator = DeliveryAcknowledgmentAggregator;
-    type Notifier = Notifier;
-    type ReputationAggregator = ReputationAggregator;
-    type Rpc = Rpc<QueryRunner>;
-    type Handshake = TcpHandshakeServer;
-    type Topology = Topology<QueryRunner>;
-    type Broadcast = Broadcast<QueryRunner, Signer, Topology<QueryRunner>, Notifier>;
-    type ConnectionPool = ConnectionPool<QueryRunner, Signer>;
-    type Dht = Dht<Topology<QueryRunner>>;
+impl Collection for FinalTypes {
+    type ConfigProviderInterface = TomlConfigProvider<Self>;
+    type ApplicationInterface = Application<Self>;
+    type BlockStoreInterface = MemoryBlockStore<Self>;
+    type BroadcastInterface = infusion::Blank<Self>;
+    type ConnectionPoolInterface = infusion::Blank<Self>;
+    type TopologyInterface = Topology<Self>;
+    type ConsensusInterface = Consensus<Self>;
+    type HandshakeInterface = infusion::Blank<Self>;
+    type NotifierInterface = Notifier<Self>;
+    type OriginProviderInterface = infusion::Blank<Self>;
+    type DeliveryAcknowledgmentAggregatorInterface = infusion::Blank<Self>;
+    type ReputationAggregatorInterface = ReputationAggregator<Self>;
+    type ResolverInterface = infusion::Blank<Self>;
+    type RpcInterface = Rpc<Self>;
+    type DhtInterface = Dht<Self>;
+    type ServiceExecutorInterface = infusion::Blank<Self>;
+    type SignerInterface = Signer<Self>;
 }
