@@ -2,7 +2,6 @@ mod cli;
 mod config;
 mod node;
 mod shutdown;
-mod template;
 
 use std::fs::File;
 
@@ -11,7 +10,7 @@ use chrono::Local;
 use clap::Parser;
 use cli::Cli;
 use lightning_interfaces::{
-    transformers, ApplicationInterface, BroadcastInterface, LightningTypes,
+    ApplicationInterface, BroadcastInterface, LightningTypes,
 };
 use log::LevelFilter;
 use mock::consensus::MockConsensus;
@@ -70,15 +69,15 @@ async fn main() -> Result<()> {
     if args.with_mock_consensus {
         log::info!("Using MockConsensus");
 
-        type Node = transformers::WithConsensus<
-            FinalTypes,
-            MockConsensus<
-                <<FinalTypes as LightningTypes>::Application as ApplicationInterface>::SyncExecutor,
-                <<FinalTypes as LightningTypes>::Broadcast as BroadcastInterface>::PubSub<()>,
-            >,
-        >;
-
-        Cli::<Node>::new(args).exec().await
+        // type Node = transformers::WithConsensus<
+        //     FinalTypes,
+        //     MockConsensus<
+        //         <<FinalTypes as LightningTypes>::Application as ApplicationInterface>::SyncExecutor,
+        //         <<FinalTypes as LightningTypes>::Broadcast as BroadcastInterface>::PubSub<()>,
+        //     >,
+        // >;
+        // Cli::<Node>::new(args).exec().await
+        todo!("partial! should work for reassignment.")
     } else {
         Cli::<FinalTypes>::new(args).exec().await
     }
