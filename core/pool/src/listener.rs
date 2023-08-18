@@ -1,21 +1,18 @@
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
+use fleek_crypto::NodePublicKey;
 use lightning_interfaces::{
     schema::LightningMessage, ListenerInterface, SenderReceiver, SignerInterface,
     SyncQueryRunnerInterface,
 };
-use quinn::{Connection, ConnectionError, Endpoint};
+use quinn::{Connection, ConnectionError, Endpoint, RecvStream, SendStream};
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::pool::ConnectionPool;
-
-pub struct ConnectionEvent {
-    connection: Connection,
-}
+use crate::{connection::RegisterEvent, pool::ConnectionPool};
 
 pub struct Listener<Q, S, T> {
-    connection_event_rx: Receiver<Option<ConnectionEvent>>,
+    connection_event_rx: Receiver<Option<(SendStream, RecvStream)>>,
     _marker: PhantomData<(Q, S, T)>,
 }
 

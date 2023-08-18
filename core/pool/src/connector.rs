@@ -10,14 +10,7 @@ use tokio::sync::{mpsc::Sender, oneshot};
 
 use crate::pool::ConnectionPool;
 
-/// ConnectionCommand
-pub struct NewConnectionCommand {
-    peer: fleek_crypto::NodePublicKey,
-    respond: oneshot::Sender<Option<Connection>>,
-}
-
 pub struct Connector<Q, S, T> {
-    pool_request_tx: Sender<NewConnectionCommand>,
     _marker: PhantomData<(Q, S, T)>,
 }
 
