@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use proc_macro2::TokenStream;
-use syn::{Token, parse::Parse};
 use quote::quote;
+use syn::{parse::Parse, Token};
 
 pub struct IdentSetPair {
     pub left: IdentSet,
     pub comma: Token![,],
-    pub right: IdentSet
+    pub right: IdentSet,
 }
 
 pub struct IdentSet {
@@ -30,9 +30,8 @@ impl Parse for IdentSet {
         let content;
         Ok(Self {
             brace_token: syn::braced!(content in input),
-            ident: content.parse_terminated(syn::Ident::parse, Token![,])?
+            ident: content.parse_terminated(syn::Ident::parse, Token![,])?,
         })
-
     }
 }
 
@@ -51,5 +50,3 @@ pub fn generate_partial_blank(pair: IdentSetPair) -> TokenStream {
         #(type #result = infusion::Blank<Self>;)*
     }
 }
-
-

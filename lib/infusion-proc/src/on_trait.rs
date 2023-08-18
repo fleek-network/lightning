@@ -158,7 +158,13 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
             (Some(clause), true) => {
                 quote!(#clause)
             },
-            (Some(syn::WhereClause { where_token, predicates }), false) => {
+            (
+                Some(syn::WhereClause {
+                    where_token,
+                    predicates,
+                }),
+                false,
+            ) => {
                 quote!(#where_token #blank: #supertraits, #predicates)
             },
             (None, true) => {
@@ -285,4 +291,3 @@ fn default_blank_block() -> syn::Block {
         }
     }
 }
-

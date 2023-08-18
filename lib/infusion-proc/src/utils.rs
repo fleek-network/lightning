@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Error, Result, parse_quote};
+use syn::{parse_quote, Error, Result};
 
 #[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Copy)]
 pub enum Mode {
@@ -102,4 +102,3 @@ pub fn tag(base: &syn::Ident, type_name: &syn::Ident) -> syn::Expr {
          )
     }
 }
-

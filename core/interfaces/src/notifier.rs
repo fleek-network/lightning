@@ -12,7 +12,7 @@ pub enum Notification {
 }
 
 #[infusion::service]
-pub trait NotifierInterface<C: Collection>: Clone {
+pub trait NotifierInterface<C: Collection>: Sync + Send + Clone {
     fn _init(app: ::ApplicationInterface) {
         ok!(Self::init(app.sync_query()))
     }

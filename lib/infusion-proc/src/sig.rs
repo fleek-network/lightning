@@ -22,7 +22,10 @@ impl Display for InfuFnKind {
 /// name of the method.
 ///
 /// Returns a list of dependencies that should be provided to the method.
-pub fn verify_fn_signature(kind: InfuFnKind, sig: &syn::Signature) -> Result<(Vec<&syn::Ident>, Vec<&syn::Ident>)> {
+pub fn verify_fn_signature(
+    kind: InfuFnKind,
+    sig: &syn::Signature,
+) -> Result<(Vec<&syn::Ident>, Vec<&syn::Ident>)> {
     if !sig.generics.params.is_empty() {
         return Err(Error::new(
             sig.generics.params.span(),
@@ -103,31 +106,40 @@ pub fn verify_fn_signature(kind: InfuFnKind, sig: &syn::Signature) -> Result<(Ve
 fn get_infu_param_name(pat: &syn::PatType) -> Result<&syn::Ident> {
     match pat.pat.as_ref() {
         syn::Pat::Ident(path) => Ok(&path.ident),
-        ty => Err(Error::new(ty.span(), "Invalid parameter name."))
+        ty => Err(Error::new(ty.span(), "Invalid parameter name.")),
     }
 }
 
 fn get_infu_collection_member_from_arg(pat: &syn::PatType) -> Result<&syn::Ident> {
     match pat.ty.as_ref() {
         syn::Type::Path(syn::TypePath { qself: None, path }) => match path {
-            ty @ syn::Path { leading_colon: None, .. } => {
-                Err(Error::new(ty.span(), "Missing leading double colon."))
-            },
-            syn::Path { leading_colon: Some(_), segments } if segments.len() != 1 => {
-                Err(Error::new(segments.last().unwrap().span(), "Expected a single identifier."))
-            },
-            syn::Path { leading_colon: Some(_), segments } => {
+            ty @ syn::Path {
+                leading_colon: None,
+                ..
+            } => Err(Error::new(ty.span(), "Missing leading double colon.")),
+            syn::Path {
+                leading_colon: Some(_),
+                segments,
+            } if segments.len() != 1 => Err(Error::new(
+                segments.last().unwrap().span(),
+                "Expected a single identifier.",
+            )),
+            syn::Path {
+                leading_colon: Some(_),
+                segments,
+            } => {
                 let seg = segments.first().unwrap();
 
                 if !seg.arguments.is_empty() {
-                    Err(Error::new(segments.last().unwrap().span(), "Did not expect arguments."))
+                    Err(Error::new(
+                        segments.last().unwrap().span(),
+                        "Did not expect arguments.",
+                    ))
                 } else {
                     Ok(&seg.ident)
                 }
-            }
+            },
         },
-        ty => {
-            Err(Error::new(ty.span(), "Invalid type for infu method."))
-        }
+        ty => Err(Error::new(ty.span(), "Invalid type for infu method.")),
     }
 }

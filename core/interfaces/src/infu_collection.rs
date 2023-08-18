@@ -1,3 +1,4 @@
+pub use infusion::c;
 use infusion::collection;
 
 use super::*;

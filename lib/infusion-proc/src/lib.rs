@@ -6,9 +6,9 @@ use crate::parse::Item;
 
 mod on_trait;
 mod parse;
+mod partial;
 mod sig;
 mod utils;
-mod partial;
 
 #[proc_macro_attribute]
 pub fn blank(
@@ -28,7 +28,8 @@ pub fn service(
     let item = parse_macro_input!(input as Item);
     let token = match item {
         Item::Trait(item) => on_trait::process_trait(utils::Mode::WithCollection, item),
-        Item::Impl(item) => syn::Error::new_spanned(item, "Infusion over impl not supported yet.").to_compile_error(),
+        Item::Impl(item) => syn::Error::new_spanned(item, "Infusion over impl not supported yet.")
+            .to_compile_error(),
     };
     token.into()
 }

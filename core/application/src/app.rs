@@ -4,10 +4,10 @@ use affair::{Executor, TokioSpawn};
 use anyhow::Result;
 use async_trait::async_trait;
 use lightning_interfaces::{
-    infu_collection::Collection,
     application::{ApplicationInterface, ExecutionEngineSocket},
     common::WithStartAndShutdown,
     config::ConfigConsumer,
+    infu_collection::Collection,
 };
 
 use crate::{
@@ -19,7 +19,7 @@ use crate::{
 pub struct Application<C: Collection> {
     update_socket: ExecutionEngineSocket,
     query_runner: QueryRunner,
-    collection: PhantomData<C>
+    collection: PhantomData<C>,
 }
 
 #[async_trait]
@@ -57,7 +57,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
         Ok(Self {
             query_runner: env.query_runner(),
             update_socket: TokioSpawn::spawn(UpdateWorker::new(env)),
-            collection: PhantomData
+            collection: PhantomData,
         })
     }
 
