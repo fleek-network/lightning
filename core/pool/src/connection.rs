@@ -9,6 +9,8 @@ use lightning_interfaces::types::ServiceScope;
 use quinn::{Connection, Endpoint, RecvStream, SendStream};
 use tokio::sync::{mpsc::Sender, oneshot};
 
+use crate::connector::ConnectEvent;
+
 /// Driver for driving the connection events from the transport connection.
 pub struct ListenerDriver {
     /// Current active connections.
@@ -25,6 +27,8 @@ pub struct ConnectorDriver {
     active_scopes: HashSet<(ServiceScope, NodePublicKey)>,
     /// Listens for scoped service registration.
     register_rx: Receiver<RegisterEvent>,
+    /// Listens for scoped service registration.
+    connect_rx: Receiver<ConnectEvent>,
     /// QUIC connection pool.
     pool: HashMap<(NodePublicKey, SocketAddr), Connection>,
     /// QUIC endpoint.

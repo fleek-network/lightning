@@ -3,12 +3,23 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::{schema::LightningMessage, ReceiverInterface};
-use quinn::Connection;
+use quinn::{Connection, RecvStream};
 
 pub struct Receiver<T> {
-    connection: Connection,
-    pk: NodePublicKey,
+    receive: RecvStream,
     _marker: PhantomData<T>,
+}
+
+impl<T> Receiver<T>
+where
+    T: LightningMessage,
+{
+    pub fn new(receive: RecvStream) -> Self {
+        Self {
+            receive,
+            _marker: PhantomData::default(),
+        }
+    }
 }
 
 #[async_trait]

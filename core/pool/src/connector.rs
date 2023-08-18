@@ -1,16 +1,24 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, net::SocketAddr};
 
 use async_trait::async_trait;
+use fleek_crypto::NodePublicKey;
 use lightning_interfaces::{
     schema::LightningMessage, ConnectorInterface, SenderReceiver, SignerInterface,
     SyncQueryRunnerInterface,
 };
-use quinn::Connection;
-use tokio::sync::{mpsc::Sender, oneshot};
+use quinn::{Connection, RecvStream, SendStream};
+use tokio::sync::{mpsc, oneshot};
 
-use crate::pool::ConnectionPool;
+use crate::{pool::ConnectionPool, receiver::Receiver, sender::Sender};
+
+pub struct ConnectEvent {
+    pk: NodePublicKey,
+    address: SocketAddr,
+    respond: oneshot::Sender<(SendStream, RecvStream)>,
+}
 
 pub struct Connector<Q, S, T> {
+    connection_event_tx: mpsc::Sender<ConnectEvent>,
     _marker: PhantomData<(Q, S, T)>,
 }
 
@@ -29,10 +37,17 @@ where
 {
     type ConnectionPool = ConnectionPool<Q, S>;
 
-    async fn connect(
-        &self,
-        to: &fleek_crypto::NodePublicKey,
-    ) -> Option<SenderReceiver<Self::ConnectionPool, T>> {
-        todo!()
+    async fn connect(&self, to: &NodePublicKey) -> Option<SenderReceiver<Self::ConnectionPool, T>> {
+        let (tx, rx) = oneshot::channel();
+        self.connection_event_tx
+            .send(ConnectEvent {
+                pk: *to,
+                address: "0.0.0.0:0".parse().unwrap(),
+                respond: tx,
+            })
+            .await
+            .ok()?;
+        let (tx_stream, rx_stream) = rx.await.ok()?;
+        Some((Sender::new(tx_stream), Receiver::new(rx_stream)))
     }
 }

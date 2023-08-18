@@ -7,12 +7,12 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
 };
 use quinn::{Connection, ConnectionError, Endpoint, RecvStream, SendStream};
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc;
 
-use crate::{connection::RegisterEvent, pool::ConnectionPool};
+use crate::{connection::RegisterEvent, pool::ConnectionPool, receiver::Receiver, sender::Sender};
 
 pub struct Listener<Q, S, T> {
-    connection_event_rx: Receiver<Option<(SendStream, RecvStream)>>,
+    connection_event_rx: mpsc::Receiver<Option<(SendStream, RecvStream)>>,
     _marker: PhantomData<(Q, S, T)>,
 }
 
@@ -26,6 +26,7 @@ where
     type ConnectionPool = ConnectionPool<Q, S>;
 
     async fn accept(&mut self) -> Option<SenderReceiver<Self::ConnectionPool, T>> {
-        todo!()
+        let (tx, rx) = self.connection_event_rx.recv().await.flatten()?;
+        Some((Sender::new(tx), Receiver::new(rx)))
     }
 }
