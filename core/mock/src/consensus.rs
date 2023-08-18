@@ -151,10 +151,10 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
 
     fn init<S: SignerInterface<C>>(
         config: Self::Config,
-        signer: &S,
+        _signer: &S,
         executor: ExecutionEngineSocket,
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
+        _query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        _pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
     ) -> anyhow::Result<Self> {
         let (tx, rx) = mpsc::channel(128);
         let block_notifier = Arc::new(Notify::new());

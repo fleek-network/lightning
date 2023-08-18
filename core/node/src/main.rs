@@ -9,9 +9,9 @@ use anyhow::Result;
 use chrono::Local;
 use clap::Parser;
 use cli::Cli;
-use lightning_interfaces::{ApplicationInterface, BroadcastInterface, LightningTypes};
+use lightning_interfaces::{ApplicationInterface, BroadcastInterface};
 use log::LevelFilter;
-use mock::consensus::MockConsensus;
+
 use simplelog::{
     ColorChoice, CombinedLogger, ConfigBuilder, TermLogger, TerminalMode, WriteLogger,
 };

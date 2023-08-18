@@ -5,13 +5,21 @@ use lightning_interfaces::{config::ConfigProviderInterface, infu_collection::Col
 use toml::{Table, Value};
 
 /// The implementation of a configuration loader that uses the `toml` backend.
-#[derive(Default)]
 pub struct TomlConfigProvider<C: Collection> {
     /// The [`ConfigProviderInterface`] does not put any constraints on the
     /// format of the document, except that we need a `[key: string]->any`
     /// mapping. The [`Table`] is that map.
     pub table: Mutex<Table>,
     collection: PhantomData<C>,
+}
+
+impl<C: Collection> Default for TomlConfigProvider<C> {
+    fn default() -> Self {
+        Self {
+            table: Default::default(),
+            collection: PhantomData
+        }
+    }
 }
 
 impl<C: Collection> TomlConfigProvider<C> {

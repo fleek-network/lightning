@@ -179,19 +179,67 @@ macro_rules! collection {
 
         #[macro_export]
         macro_rules! forward {
-            (fn $$name:ident($value:ident $$(, $$($$arg:ident : $$ty:ty),*)? ) $$block:block) => {
+            (fn $$name:ident(
+                $$value:ident
+                $$(, $$($$arg:ident : $$ty:ty),*)?
+            ) on [$$($$service:ident),* $$(,)?] $$block:block) => {
+                fn $$name<C: Collection>(
+                    container: &infusion::Container
+                    $$(, $$($$arg: $$ty),*)?
+                ) {
+                $$(
+                    {
+                        let $$value = container.get::<C::$$service>(infusion::tag!(C :: $$service));
+                        $$block
+                    };
+                )*
+                }
+            };
+
+            (fn $$name:ident($$value:ident $$(, $$($$arg:ident : $$ty:ty),*)? ) $$block:block) => {
                 fn $$name<C: Collection>(
                     container: &infusion::Container
                     $$(, $$($$arg: $$ty),*)?
                 ) {
                 $(
                     {
-                        let $value = container.get::<C::$service>(infusion::tag!(C :: $service));
+                        let $$value = container.get::<C::$service>(infusion::tag!(C :: $service));
                         $$block
                     };
                 )*
                 }
-            }
+            };
+
+            (async fn $$name:ident(
+                $$value:ident
+                $$(, $$($$arg:ident : $$ty:ty),*)?
+            ) on [$$($$service:ident),* $$(,)?] $$block:block) => {
+                async fn $$name<C: Collection>(
+                    container: &infusion::Container
+                    $$(, $$($$arg: $$ty),*)?
+                ) {
+                $$(
+                    {
+                        let $$value = container.get::<C::$$service>(infusion::tag!(C :: $$service));
+                        $$block
+                    };
+                )*
+                }
+            };
+
+            (async fn $$name:ident($$value:ident $$(, $$($$arg:ident : $$ty:ty),*)? ) $$block:block) => {
+                async fn $$name<C: Collection>(
+                    container: &infusion::Container
+                    $$(, $$($$arg: $$ty),*)?
+                ) {
+                $(
+                    {
+                        let $$value = container.get::<C::$service>(infusion::tag!(C :: $service));
+                        $$block
+                    };
+                )*
+                }
+            };
         }
 
         #[derive(Clone)]
