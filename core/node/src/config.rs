@@ -17,7 +17,7 @@ impl<C: Collection> Default for TomlConfigProvider<C> {
     fn default() -> Self {
         Self {
             table: Default::default(),
-            collection: PhantomData
+            collection: PhantomData,
         }
     }
 }

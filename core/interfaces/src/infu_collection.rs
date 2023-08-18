@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 pub use infusion::c;
-use infusion::{collection};
+use infusion::collection;
 
 use super::*;
 
@@ -26,28 +26,26 @@ collection!([
     SignerInterface
 ]);
 
-
 /// The Fleek Network node.
 pub struct Node<C: Collection> {
     container: infusion::Container,
-    collection: PhantomData<C>
+    collection: PhantomData<C>,
 }
 
 impl<C: Collection> Node<C> {
-    pub fn init(config: c![C::ConfigProviderInterface]) -> Result<Self, infusion::InitializationError> {
+    pub fn init(
+        config: c![C::ConfigProviderInterface],
+    ) -> Result<Self, infusion::InitializationError> {
         let graph = C::build_graph();
 
         let container = infusion::Container::default()
-            .with(
-                infusion::tag!(C::ConfigProviderInterface),
-                config
-            )
+            .with(infusion::tag!(C::ConfigProviderInterface), config)
             .initialize(graph)
             .unwrap();
 
         Ok(Self {
             container,
-            collection: PhantomData
+            collection: PhantomData,
         })
     }
 
@@ -101,4 +99,3 @@ forward!(async fn start_or_shutdown_node(this, start: bool) on [
         this.shutdown().await;
     }
 });
-

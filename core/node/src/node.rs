@@ -1,10 +1,10 @@
-use lightning_application::{app::Application};
+use lightning_application::app::Application;
 use lightning_blockstore::memory::MemoryBlockStore;
 use lightning_broadcast::Broadcast;
-use lightning_consensus::consensus::{Consensus};
+use lightning_consensus::consensus::Consensus;
 use lightning_dht::dht::Dht;
 use lightning_handshake::server::TcpHandshakeServer;
-use lightning_interfaces::{infu_collection::Collection};
+use lightning_interfaces::infu_collection::Collection;
 use lightning_notifier::Notifier;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_rpc::server::Rpc;

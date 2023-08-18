@@ -3407,6 +3407,7 @@ dependencies = [
  "fleek-crypto",
  "futures",
  "hex",
+ "infusion",
  "lightning-application",
  "lightning-interfaces",
  "lightning-topology",

@@ -4,10 +4,11 @@ use anyhow::{anyhow, Context, Result};
 use clap::{arg, ArgAction, Parser, Subcommand};
 use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_interfaces::{
-    infu_collection::{Collection, Node}, ConfigProviderInterface, SignerInterface, WithStartAndShutdown,
+    infu_collection::{Collection, Node},
+    ConfigProviderInterface, SignerInterface, WithStartAndShutdown,
 };
-use resolved_pathbuf::ResolvedPathBuf;
 use lightning_signer::Signer;
+use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::{config::TomlConfigProvider, shutdown::ShutdownController};
 
@@ -66,7 +67,9 @@ impl<C: Collection> Cli<C> {
     }
 }
 
-impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterface = Signer<C>>> Cli<C> {
+impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterface = Signer<C>>>
+    Cli<C>
+{
     /// Execute the application based on the provided command.
     pub async fn exec(self) -> Result<()> {
         let args = self.0;
@@ -89,7 +92,8 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
         shutdown_controller.install_ctrl_c_handler();
 
         let config = Self::load_or_write_config(config_path).await?;
-        let node = Node::<C>::init(config).map_err(|e| anyhow::anyhow!("Could not start the node: {e}"))?;
+        let node = Node::<C>::init(config)
+            .map_err(|e| anyhow::anyhow!("Could not start the node: {e}"))?;
 
         node.start().await;
 
@@ -192,4 +196,3 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
         Ok(())
     }
 }
-
