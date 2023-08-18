@@ -2,16 +2,14 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
-use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::{
     config::ConfigConsumer,
     notifier::{Notification, NotifierInterface},
     reputation::ReputationAggregatorInterface,
     signer::SubmitTxSocket,
     types::{NodeIndex, ReputationMeasurements, UpdateMethod},
-    ReputationQueryInteface, ReputationReporterInterface, SyncQueryRunnerInterface, Weight,
+    ReputationQueryInteface, ReputationReporterInterface, SyncQueryRunnerInterface, Weight, infu_collection::{Collection, c}, ApplicationInterface,
 };
-use lightning_notifier::Notifier;
 use tokio::sync::mpsc;
 
 use crate::{buffered_mpsc, config::Config, measurement_manager::MeasurementManager};
@@ -21,21 +19,21 @@ const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(3600);
 #[cfg(test)]
 const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(2);
 
-pub struct ReputationAggregator {
+pub struct ReputationAggregator<C: Collection> {
     report_rx: buffered_mpsc::BufferedReceiver<ReportMessage>,
     reporter: MyReputationReporter,
     query: MyReputationQuery,
     measurement_manager: MeasurementManager,
     submit_tx: SubmitTxSocket,
-    notifier: Notifier,
+    notifier: c![C::NotifierInterface],
     notify_rx: mpsc::Receiver<Notification>,
     notify_tx: mpsc::Sender<Notification>,
-    _query_runner: <Notifier as NotifierInterface>::SyncQuery,
+    query_runner: c![C::ApplicationInterface::SyncExecutor],
     _config: Config,
 }
 
 #[allow(dead_code)]
-impl ReputationAggregator {
+impl<C: Collection> ReputationAggregator<C> {
     pub async fn start(mut self) -> anyhow::Result<()> {
         self.notifier
             .notify_before_epoch_change(BEFORE_EPOCH_CHANGE, self.notify_tx.clone());
@@ -94,25 +92,19 @@ impl ReputationAggregator {
 }
 
 #[async_trait]
-impl ReputationAggregatorInterface for ReputationAggregator {
+impl<C: Collection> ReputationAggregatorInterface<C> for ReputationAggregator<C> {
     /// The reputation reporter can be used by our system to report the reputation of other
     type ReputationReporter = MyReputationReporter;
 
     /// The query runner can be used to query the local reputation of other nodes.
     type ReputationQuery = MyReputationQuery;
 
-    /// The notifier can be used to receive notifications on and before epoch changes.
-    type Notifier = Notifier;
-
-    /// The application query runner can be used to query the application state.
-    type SyncQuery = QueryRunner;
-
     /// Create a new reputation
     fn init(
         config: Self::Config,
         submit_tx: SubmitTxSocket,
-        notifier: Self::Notifier,
-        query_runner: Self::SyncQuery,
+        notifier: c!(C::NotifierInterface),
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self> {
         let (report_tx, report_rx) =
             buffered_mpsc::buffered_channel(config.reporter_buffer_size, 2048);
@@ -128,7 +120,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
             notifier,
             notify_rx,
             notify_tx,
-            _query_runner: query_runner,
+            query_runner,
             _config: config,
         })
     }
@@ -142,7 +134,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
             .get_measurements()
             .into_iter()
             .filter_map(|(key, m)| {
-                self._query_runner
+                self.query_runner
                     .pubkey_to_index(key)
                     .map(|index| (index, m))
             })
@@ -171,7 +163,7 @@ impl ReputationAggregatorInterface for ReputationAggregator {
     }
 }
 
-impl ConfigConsumer for ReputationAggregator {
+impl<C: Collection> ConfigConsumer for ReputationAggregator<C> {
     const KEY: &'static str = "rep-collector";
 
     type Config = Config;
@@ -189,9 +181,6 @@ impl MyReputationQuery {
 }
 
 impl ReputationQueryInteface for MyReputationQuery {
-    /// The application layer's synchronize query runner.
-    type SyncQuery = QueryRunner;
-
     /// Returns the reputation of the provided node locally.
     fn get_reputation_of(&self, peer: &NodePublicKey) -> Option<u8> {
         self.local_reputation.get(peer).map(|entry| *entry.get())

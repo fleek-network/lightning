@@ -7,9 +7,7 @@ edition = "2021"
 
 [dependencies]
 lightning-interfaces = {path="../interfaces"}
-lightning-application = {path="../application"}
 lightning-reputation = {path="../reputation"}
-lightning-notifier = {path="../notifier"}
 anyhow.workspace = true
 serde.workspace = true
 async-trait.workspace = true
@@ -22,4 +20,5 @@ scc.workspace = true
 lightning-test-utils = {path="../test-utils"}
 lightning-signer = {path="../signer"}
 lightning-application = {path="../application", features = ["test"]}
+lightning-notifier = {path="../notifier"}
 rand.workspace = true

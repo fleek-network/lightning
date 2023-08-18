@@ -4,7 +4,7 @@ use fleek_crypto::NodePublicKey;
 use infusion::c;
 
 use crate::{
-    application::SyncQueryRunnerInterface, config::ConfigConsumer, infu_collection::Collection,
+    config::ConfigConsumer, infu_collection::Collection,
     notifier::NotifierInterface, signer::SubmitTxSocket, ApplicationInterface,
     ConfigProviderInterface, SignerInterface,
 };
@@ -58,9 +58,6 @@ pub trait ReputationAggregatorInterface<C: Collection>: ConfigConsumer + Sized {
 /// should be taken into account at this layer.
 #[infusion::blank]
 pub trait ReputationQueryInteface: Clone {
-    /// The application layer's synchronize query runner.
-    type SyncQuery: SyncQueryRunnerInterface;
-
     /// Returns the reputation of the provided node locally.
     fn get_reputation_of(&self, peer: &NodePublicKey) -> Option<u8>;
 }
