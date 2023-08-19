@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use affair::Worker;
 use async_trait::async_trait;
@@ -18,7 +18,7 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use quinn::{Endpoint, ServerConfig};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::mpsc;
 
 use crate::connection::RegisterEvent;
 use crate::connector::{ConnectEvent, Connector};
@@ -32,6 +32,7 @@ pub struct ConnectionPool<C> {
     register_tx: mpsc::Sender<RegisterEvent>,
     connector_rx: Arc<Mutex<Option<mpsc::Receiver<ConnectEvent>>>>,
     register_rx: Arc<Mutex<Option<mpsc::Receiver<RegisterEvent>>>>,
+    active_scopes: Mutex<Option<HashSet<ServiceScope>>>,
     endpoint: Endpoint,
     _marker: PhantomData<C>,
 }
@@ -84,6 +85,7 @@ where
             connector_rx: Arc::new(Mutex::new(Some(connector_rx))),
             register_tx,
             register_rx: Arc::new(Mutex::new(Some(register_rx))),
+            active_scopes: Mutex::new(Some(HashSet::new())),
             endpoint,
             _marker: PhantomData::default(),
         }
@@ -93,6 +95,27 @@ where
     where
         T: LightningMessage,
     {
-        todo!()
+        let mut active_scopes = self.active_scopes.lock().unwrap().take().unwrap();
+        match active_scopes.contains(&scope) {
+            true => {
+                panic!("{scope:?} is already active");
+            },
+            false => {
+                active_scopes.insert(scope);
+            },
+        }
+        self.active_scopes.lock().unwrap().replace(active_scopes);
+
+        let (connection_event_tx, connection_event_rx) = mpsc::channel(256);
+
+        (
+            Listener::new(
+                false,
+                self.register_tx.clone(),
+                connection_event_tx,
+                connection_event_rx,
+            ),
+            Connector::new(scope, self.connector_tx.clone()),
+        )
     }
 }

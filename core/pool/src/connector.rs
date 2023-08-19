@@ -31,6 +31,16 @@ pub struct Connector<T> {
     _marker: PhantomData<T>,
 }
 
+impl<T> Connector<T> {
+    pub fn new(scope: ServiceScope, connection_event_tx: mpsc::Sender<ConnectEvent>) -> Self {
+        Self {
+            scope,
+            connection_event_tx,
+            _marker: PhantomData::default(),
+        }
+    }
+}
+
 impl<T> Clone for Connector<T> {
     fn clone(&self) -> Self {
         todo!()

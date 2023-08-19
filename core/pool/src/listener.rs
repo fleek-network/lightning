@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::sync::Mutex;
 
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
@@ -18,8 +19,28 @@ use crate::receiver::Receiver;
 use crate::sender::Sender;
 
 pub struct Listener<T> {
+    registered: bool,
+    register_tx: mpsc::Sender<RegisterEvent>,
+    connection_event_tx: mpsc::Sender<Option<(NodePublicKey, SendStream, RecvStream)>>,
     connection_event_rx: mpsc::Receiver<Option<(NodePublicKey, SendStream, RecvStream)>>,
     _marker: PhantomData<T>,
+}
+
+impl<T> Listener<T> {
+    pub fn new(
+        registered: bool,
+        register_tx: mpsc::Sender<RegisterEvent>,
+        connection_event_tx: mpsc::Sender<Option<(NodePublicKey, SendStream, RecvStream)>>,
+        connection_event_rx: mpsc::Receiver<Option<(NodePublicKey, SendStream, RecvStream)>>,
+    ) -> Self {
+        Self {
+            registered,
+            register_tx,
+            connection_event_tx,
+            connection_event_rx,
+            _marker: PhantomData::default(),
+        }
+    }
 }
 
 #[async_trait]
