@@ -12,7 +12,6 @@ use affair::{AsyncWorker, Executor, TokioSpawn};
 use async_trait::async_trait;
 use axum::{extract::State, routing::post, Json, Router};
 use lightning_interfaces::{
-    broadcast::PubSub,
     infu_collection::{c, Collection},
     types::{Block, UpdateRequest},
     ApplicationInterface, BroadcastInterface, ConfigConsumer, ConsensusInterface,

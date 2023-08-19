@@ -1,4 +1,5 @@
 #![feature(macro_metavar_expr)]
+#![allow(unreachable_code)]
 
 //! A simple example that prints the graph.
 

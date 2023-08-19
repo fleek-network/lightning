@@ -5,7 +5,7 @@ use clap::{arg, ArgAction, Parser, Subcommand};
 use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_interfaces::{
     infu_collection::{Collection, Node},
-    ConfigProviderInterface, SignerInterface, WithStartAndShutdown,
+    ConfigProviderInterface, SignerInterface,
 };
 use lightning_signer::Signer;
 use resolved_pathbuf::ResolvedPathBuf;

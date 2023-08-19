@@ -35,6 +35,7 @@ impl<S: SenderInterface<BroadcastFrame>> BroadcastSender<S> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub struct BroadcastInner<C: Collection> {
     topology: c![C::TopologyInterface],
     node_secret_key: Arc<NodeSecretKey>,
