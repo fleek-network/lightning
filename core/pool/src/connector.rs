@@ -51,6 +51,6 @@ where
             .await
             .ok()?;
         let (tx_stream, rx_stream) = rx.await.ok()?;
-        Some((Sender::new(tx_stream), Receiver::new(rx_stream)))
+        Some((Sender::new(tx_stream, *to), Receiver::new(rx_stream, *to)))
     }
 }

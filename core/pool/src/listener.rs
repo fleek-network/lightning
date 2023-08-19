@@ -12,7 +12,7 @@ use tokio::sync::mpsc;
 use crate::{connection::RegisterEvent, pool::ConnectionPool, receiver::Receiver, sender::Sender};
 
 pub struct Listener<Q, S, T> {
-    connection_event_rx: mpsc::Receiver<Option<(SendStream, RecvStream)>>,
+    connection_event_rx: mpsc::Receiver<Option<(NodePublicKey, SendStream, RecvStream)>>,
     _marker: PhantomData<(Q, S, T)>,
 }
 
@@ -26,7 +26,7 @@ where
     type ConnectionPool = ConnectionPool<Q, S>;
 
     async fn accept(&mut self) -> Option<SenderReceiver<Self::ConnectionPool, T>> {
-        let (tx, rx) = self.connection_event_rx.recv().await.flatten()?;
-        Some((Sender::new(tx), Receiver::new(rx)))
+        let (peer, tx, rx) = self.connection_event_rx.recv().await.flatten()?;
+        Some((Sender::new(tx, peer), Receiver::new(rx, peer)))
     }
 }
