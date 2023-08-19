@@ -3324,6 +3324,7 @@ dependencies = [
  "bincode",
  "blake3-tree",
  "bytes",
+ "infusion",
  "lightning-interfaces",
  "parking_lot",
  "serde",
