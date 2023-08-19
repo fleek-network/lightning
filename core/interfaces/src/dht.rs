@@ -1,28 +1,30 @@
-use std::sync::Arc;
-
 use affair::Socket;
-use async_trait::async_trait;
+use infusion::c;
 
 use crate::{
+    infu_collection::Collection,
     types::{DhtRequest, DhtResponse},
-    ConfigConsumer, SignerInterface, TopologyInterface, WithStartAndShutdown,
+    ConfigConsumer, ConfigProviderInterface, SignerInterface, TopologyInterface,
+    WithStartAndShutdown,
 };
 
 pub type DhtSocket = Socket<DhtRequest, DhtResponse>;
 
-/// The distributed hash table for Fleek Network.
-#[async_trait]
-pub trait DhtInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
-    // -- DYNAMIC TYPES
+#[infusion::service]
+pub trait DhtInterface<C: Collection>:
+    ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
+{
+    fn _init(
+        signer: ::SignerInterface,
+        topology: ::TopologyInterface,
+        config: ::ConfigProviderInterface,
+    ) {
+        Self::init(signer, topology.clone(), config.get::<Self>())
+    }
 
-    type Topology: TopologyInterface;
-
-    // -- BOUNDED TYPES
-    // empty
-
-    fn init<S: SignerInterface>(
-        signer: &S,
-        topology: Arc<Self::Topology>,
+    fn init(
+        signer: &c!(C::SignerInterface),
+        topology: c!(C::TopologyInterface),
         config: Self::Config,
     ) -> anyhow::Result<Self>;
 

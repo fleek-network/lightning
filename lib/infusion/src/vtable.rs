@@ -162,6 +162,16 @@ impl Tag {
     pub fn type_id(&self) -> TypeId {
         self.type_id
     }
+
+    /// Returns the trait name of this tag.
+    pub fn trait_name(&self) -> &'static str {
+        self.trait_name
+    }
+
+    /// Returns the type name of this tag.
+    pub fn type_name(&self) -> &'static str {
+        self.type_name
+    }
 }
 
 impl Object {

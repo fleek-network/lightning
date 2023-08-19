@@ -3087,6 +3087,20 @@ dependencies = [
 [[package]]
 name = "infusion"
 version = "0.1.0"
+dependencies = [
+ "infusion-proc",
+ "serde",
+]
+
+[[package]]
+name = "infusion-proc"
+version = "0.1.0"
+dependencies = [
+ "darling 0.20.3",
+ "proc-macro2 1.0.66",
+ "quote 1.0.31",
+ "syn 2.0.26",
+]
 
 [[package]]
 name = "ink-quill"
@@ -3289,6 +3303,7 @@ dependencies = [
  "fleek-blake3",
  "fleek-crypto",
  "hp-fixed",
+ "infusion",
  "lazy_static",
  "lightning-interfaces",
  "lightning-reputation",
@@ -3310,6 +3325,7 @@ dependencies = [
  "bincode",
  "blake3-tree",
  "bytes",
+ "infusion",
  "lightning-interfaces",
  "parking_lot",
  "serde",
@@ -3393,6 +3409,7 @@ dependencies = [
  "fleek-crypto",
  "futures",
  "hex",
+ "infusion",
  "lightning-application",
  "lightning-interfaces",
  "lightning-topology",
@@ -3402,36 +3419,6 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.8",
  "tracing",
-]
-
-[[package]]
-name = "lightning-e2e"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "clap 4.3.17",
- "fleek-crypto",
- "futures",
- "hp-fixed",
- "lightning-application",
- "lightning-consensus",
- "lightning-dht",
- "lightning-handshake",
- "lightning-interfaces",
- "lightning-node",
- "lightning-notifier",
- "lightning-rpc",
- "lightning-signer",
- "lightning-topology",
- "mock",
- "rand 0.8.5",
- "reqwest",
- "resolve-path",
- "resolved-pathbuf",
- "serde",
- "serde_json",
- "tokio",
- "toml 0.7.6",
 ]
 
 [[package]]
@@ -3465,6 +3452,7 @@ dependencies = [
  "bytes",
  "fleek-crypto",
  "hp-fixed",
+ "infusion",
  "ink-quill",
  "lightning-schema",
  "lightning-types",
@@ -3487,8 +3475,10 @@ dependencies = [
  "chrono",
  "clap 4.3.17",
  "fleek-crypto",
+ "infusion",
  "lightning-application",
  "lightning-blockstore",
+ "lightning-broadcast",
  "lightning-consensus",
  "lightning-dht",
  "lightning-handshake",
@@ -3498,6 +3488,7 @@ dependencies = [
  "lightning-rpc",
  "lightning-signer",
  "lightning-test-utils",
+ "lightning-topology",
  "log",
  "mock",
  "mockall",
@@ -3515,6 +3506,7 @@ name = "lightning-notifier"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "infusion",
  "lightning-application",
  "lightning-interfaces",
  "tokio",
@@ -3550,6 +3542,7 @@ dependencies = [
  "futures",
  "hyper",
  "hyper-rustls",
+ "infusion",
  "lightning-interfaces",
  "lightning-test-utils",
  "multihash 0.19.0",
@@ -3576,6 +3569,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "fleek-crypto",
+ "infusion",
  "lightning-application",
  "lightning-interfaces",
  "lightning-notifier",
@@ -3611,6 +3605,7 @@ dependencies = [
  "bincode",
  "fleek-crypto",
  "hp-fixed",
+ "infusion",
  "jsonrpc-v2",
  "lightning-application",
  "lightning-interfaces",
@@ -3627,6 +3622,7 @@ dependencies = [
  "anyhow",
  "fleek-crypto",
  "flexbuffers",
+ "infusion",
  "ink-quill",
  "lightning-types",
  "serde",
@@ -3642,6 +3638,7 @@ dependencies = [
  "fleek-crypto",
  "futures",
  "hp-fixed",
+ "infusion",
  "lightning-application",
  "lightning-interfaces",
  "lightning-test-utils",
@@ -3682,6 +3679,7 @@ dependencies = [
  "csv",
  "fleek-crypto",
  "fxhash",
+ "infusion",
  "lightning-application",
  "lightning-interfaces",
  "mcmf",

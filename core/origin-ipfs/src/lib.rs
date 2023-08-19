@@ -1,4 +1,5 @@
 use std::{
+    marker::PhantomData,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -13,7 +14,8 @@ use hyper::{
 };
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
 use lightning_interfaces::{
-    ConfigConsumer, OriginProviderInterface, OriginProviderSocket, WithStartAndShutdown,
+    infu_collection::Collection, ConfigConsumer, OriginProviderInterface, OriginProviderSocket,
+    WithStartAndShutdown,
 };
 use tokio::{
     sync::{mpsc, Notify},
@@ -30,16 +32,18 @@ mod tests;
 const GATEWAY_TIMEOUT: Duration = Duration::from_millis(500);
 
 #[allow(clippy::type_complexity)]
-pub struct IPFSOrigin {
+pub struct IPFSOrigin<C: Collection> {
     inner: Arc<IPFSOriginInner>,
     socket: Socket<Vec<u8>, anyhow::Result<IPFSStream>>,
     rx: Arc<Mutex<Option<mpsc::Receiver<Task<Vec<u8>, anyhow::Result<IPFSStream>>>>>>,
     is_running: Arc<Mutex<bool>>,
     shutdown_notify: Arc<Notify>,
+    collection: PhantomData<C>,
 }
 
 #[async_trait]
-impl OriginProviderInterface<IPFSStream> for IPFSOrigin {
+impl<C: Collection> OriginProviderInterface<C> for IPFSOrigin<C> {
+    type Stream = IPFSStream;
     fn init(config: Config) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
         let inner = IPFSOriginInner {
@@ -52,6 +56,7 @@ impl OriginProviderInterface<IPFSStream> for IPFSOrigin {
             rx: Arc::new(Mutex::new(Some(rx))),
             is_running: Arc::new(Mutex::new(false)),
             shutdown_notify: Arc::new(Notify::new()),
+            collection: PhantomData,
         })
     }
 
@@ -61,7 +66,7 @@ impl OriginProviderInterface<IPFSStream> for IPFSOrigin {
 }
 
 #[async_trait]
-impl WithStartAndShutdown for IPFSOrigin {
+impl<C: Collection> WithStartAndShutdown for IPFSOrigin<C> {
     fn is_running(&self) -> bool {
         *self.is_running.lock().unwrap()
     }
@@ -161,7 +166,7 @@ impl IPFSOriginInner {
     }
 }
 
-impl ConfigConsumer for IPFSOrigin {
+impl<C: Collection> ConfigConsumer for IPFSOrigin<C> {
     const KEY: &'static str = "origin-ipfs";
 
     type Config = Config;

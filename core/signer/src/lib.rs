@@ -18,13 +18,13 @@ use fleek_crypto::{
     ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, NodeSignature, SecretKey,
     TransactionSender,
 };
-use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::{
     common::{ToDigest, WithStartAndShutdown},
     config::ConfigConsumer,
+    infu_collection::{c, Collection},
     signer::{SignerInterface, SubmitTxSocket},
     types::{TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest},
-    MempoolSocket, SyncQueryRunnerInterface,
+    ApplicationInterface, MempoolSocket, SyncQueryRunnerInterface,
 };
 use tokio::sync::{mpsc, Notify};
 
@@ -37,7 +37,7 @@ const TIMEOUT: Duration = Duration::from_secs(300);
 const TIMEOUT: Duration = Duration::from_secs(3);
 
 #[allow(clippy::type_complexity)]
-pub struct Signer {
+pub struct Signer<C: Collection> {
     inner: Arc<SignerInner>,
     socket: Socket<UpdateMethod, u64>,
     is_running: Arc<Mutex<bool>>,
@@ -50,7 +50,7 @@ pub struct Signer {
     mempool_socket: Arc<Mutex<Option<MempoolSocket>>>,
     // `mempool_socket` is only parked here for the time from the call to `provide_query_runner` to
     // the call to `start`, when it is moved into SignerInner.
-    query_runner: Arc<Mutex<Option<QueryRunner>>>,
+    query_runner: Arc<Mutex<Option<c![C::ApplicationInterface::SyncExecutor]>>>,
     // `new_block_notify` is only parked here for the time from the call to
     // `provide_new_block_notify` to the call to `start`, when it is moved into SignerInner.
     new_block_notify: Arc<Mutex<Option<Arc<Notify>>>>,
@@ -58,7 +58,7 @@ pub struct Signer {
 }
 
 #[async_trait]
-impl WithStartAndShutdown for Signer {
+impl<C: Collection> WithStartAndShutdown for Signer<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         *self.is_running.lock().unwrap()
@@ -97,11 +97,12 @@ impl WithStartAndShutdown for Signer {
 }
 
 #[async_trait]
-impl SignerInterface for Signer {
-    type SyncQuery = QueryRunner;
-
+impl<C: Collection> SignerInterface<C> for Signer<C> {
     /// Initialize the signature service.
-    fn init(config: Config, query_runner: Self::SyncQuery) -> anyhow::Result<Self> {
+    fn init(
+        config: Config,
+        query_runner: c![C::ApplicationInterface::SyncExecutor],
+    ) -> anyhow::Result<Self> {
         let inner = SignerInner::init(config)?;
         let (socket, rx) = Socket::raw_bounded(2048);
         Ok(Self {
@@ -205,7 +206,7 @@ impl SignerInterface for Signer {
     }
 }
 
-impl Signer {
+impl<C: Collection> Signer<C> {
     fn get_mempool_socket(&self) -> MempoolSocket {
         self.mempool_socket
             .lock()
@@ -214,7 +215,11 @@ impl Signer {
             .expect("Mempool socket must be provided before starting the signer service.")
     }
 
-    fn get_query_runner(&self) -> QueryRunner {
+    // TODO(qti3e): Why are we locking the query runner? It's both `Clone`
+    // and only takes `&self` on every single method.
+    //
+    // We can simply clone here and return.
+    fn get_query_runner(&self) -> c![C::ApplicationInterface::SyncExecutor] {
         self.query_runner
             .lock()
             .unwrap()
@@ -278,12 +283,12 @@ impl SignerInner {
         })
     }
 
-    async fn handle(
+    async fn handle<Q: SyncQueryRunnerInterface>(
         self: Arc<Self>,
         mut rx: mpsc::Receiver<Task<UpdateMethod, u64>>,
         shutdown_notify: Arc<Notify>,
         mempool_socket: MempoolSocket,
-        query_runner: QueryRunner,
+        query_runner: Q,
         new_block_notify: Arc<Notify>,
     ) {
         let mut pending_transactions = VecDeque::new();
@@ -343,9 +348,9 @@ impl SignerInner {
         }
     }
 
-    async fn sync_with_application(
+    async fn sync_with_application<Q: SyncQueryRunnerInterface>(
         node_public_key: NodePublicKey,
-        query_runner: &QueryRunner,
+        query_runner: &Q,
         mempool_socket: &MempoolSocket,
         base_nonce: &mut u64,
         next_nonce: &mut u64,
@@ -416,7 +421,7 @@ struct PendingTransaction {
     pub timestamp: SystemTime,
 }
 
-impl ConfigConsumer for Signer {
+impl<C: Collection> ConfigConsumer for Signer<C> {
     const KEY: &'static str = "signer";
 
     type Config = Config;

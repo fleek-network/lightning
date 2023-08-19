@@ -1,19 +1,23 @@
 use affair::Socket;
-use async_trait::async_trait;
 
 use crate::{
-    common::WithStartAndShutdown, config::ConfigConsumer, signer::SubmitTxSocket,
-    types::DeliveryAcknowledgment,
+    common::WithStartAndShutdown, config::ConfigConsumer, infu_collection::Collection,
+    signer::SubmitTxSocket, types::DeliveryAcknowledgment, ConfigProviderInterface,
+    SignerInterface,
 };
 
 /// The socket which upon receiving a delivery acknowledgment can add it to the aggregator
 /// queue which will later roll up a batch of delivery acknowledgments to the consensus.
 pub type DeliveryAcknowledgmentSocket = Socket<DeliveryAcknowledgment, ()>;
 
-#[async_trait]
-pub trait DeliveryAcknowledgmentAggregatorInterface:
+#[infusion::service]
+pub trait DeliveryAcknowledgmentAggregatorInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
+    fn _init(config: ::ConfigProviderInterface, signer: ::SignerInterface) {
+        Self::init(config.get::<Self>(), signer.get_socket())
+    }
+
     /// Initialize a new delivery acknowledgment aggregator.
     fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self>;
 

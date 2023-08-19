@@ -9,6 +9,8 @@ use fleek_crypto::{
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::{
     application::ExecutionEngineSocket,
+    infu_collection::Collection,
+    partial,
     types::{
         Block, BlockExecutionResponse, DeliveryAcknowledgment, Epoch, ExecutionError, NodeInfo,
         ProofOfConsensus, ProtocolParams, Tokens, TotalServed, TransactionResponse, UpdateMethod,
@@ -25,6 +27,10 @@ use crate::{
     genesis::{Genesis, GenesisCommittee},
     query_runner::QueryRunner,
 };
+
+partial!(TestBinding {
+    ApplicationInterface = Application<Self>;
+});
 
 pub struct Params {
     epoch_time: Option<u64>,
@@ -124,7 +130,7 @@ fn get_new_committee(
 // that could go to anyone
 fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
     let config = config.or_else(|| Some(Config::default()));
-    let app = Application::init(config.unwrap()).unwrap();
+    let app = Application::<TestBinding>::init(config.unwrap()).unwrap();
 
     (app.transaction_executor(), app.sync_query())
 }

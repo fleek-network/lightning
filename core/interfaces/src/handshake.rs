@@ -1,13 +1,15 @@
-use async_trait::async_trait;
+use crate::{
+    common::WithStartAndShutdown, config::ConfigConsumer, infu_collection::Collection,
+    ConfigProviderInterface, ConnectionInterface,
+};
 
-use crate::{common::WithStartAndShutdown, config::ConfigConsumer, ConnectionInterface};
-
-#[async_trait]
-pub trait HandshakeInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
-    // -- DYNAMIC TYPES
-    // empty
-
-    // -- BOUNDED TYPES
+#[infusion::service]
+pub trait HandshakeInterface<C: Collection>:
+    ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
+{
+    fn _init(config: ::ConfigProviderInterface) {
+        Self::init(config.get::<Self>())
+    }
 
     /// The connection type that this handshake implementation offers.
     type Connection: ConnectionInterface;

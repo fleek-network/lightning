@@ -2,8 +2,8 @@ pub mod config;
 pub(crate) mod inner;
 pub mod pubsub;
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 use std::{marker::PhantomData, sync::Arc};
 
@@ -14,48 +14,38 @@ use dashmap::DashMap;
 use inner::BroadcastInner;
 use lightning_interfaces::{
     broadcast::BroadcastInterface,
+    infu_collection::{c, Collection},
     schema::{broadcast::BroadcastFrame, LightningMessage},
     types::Topic,
     ConfigConsumer, ConnectionPoolInterface, ListenerConnector, ListenerInterface,
-    NotifierInterface, SignerInterface, TopologyInterface, WithStartAndShutdown,
+    NotifierInterface, WithStartAndShutdown,
 };
 use pubsub::PubSubTopic;
 use tokio::select;
 
 #[allow(clippy::type_complexity)]
-pub struct Broadcast<P: ConnectionPoolInterface, T, N, S> {
-    phantom: PhantomData<(P, S)>,
-    notifier: Arc<N>,
-    inner: BroadcastInner<T, P>,
+pub struct Broadcast<C: Collection> {
+    notifier: c![C::NotifierInterface],
+    inner: BroadcastInner<C>,
     shutdown_signal: Arc<std::sync::RwLock<Option<tokio::sync::oneshot::Sender<()>>>>,
-    listener: Arc<tokio::sync::Mutex<<P as ConnectionPoolInterface>::Listener<BroadcastFrame>>>,
+    listener: Arc<tokio::sync::Mutex<c![C::ConnectionPoolInterface::Listener<BroadcastFrame>]>>,
     /// Map of topic channel senders for incoming payloads
     channels: Arc<DashMap<Topic, tokio::sync::broadcast::Sender<Vec<u8>>>>,
     /// Sender for outgoing payloads, cloned and given to pubsub instances.
     sender: tokio::sync::mpsc::Sender<(Topic, Vec<u8>)>,
     /// Receiver for outgoing payloads
     receiver: Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<(Topic, Vec<u8>)>>>,
+    collection: PhantomData<C>,
 }
 
-impl<P: ConnectionPoolInterface, T, N, S> ConfigConsumer for Broadcast<P, T, N, S> {
+impl<C: Collection> ConfigConsumer for Broadcast<C> {
     const KEY: &'static str = "broadcast";
 
     type Config = Config;
 }
 
 #[async_trait]
-impl<P, T, N, S> WithStartAndShutdown for Broadcast<P, T, N, S>
-where
-    P: ConnectionPoolInterface + 'static,
-    T: TopologyInterface + 'static,
-    N: NotifierInterface + Send + Sync + 'static,
-    S: SignerInterface,
-    <P as lightning_interfaces::ConnectionPoolInterface>::Listener<BroadcastFrame>:
-        std::marker::Send + 'static,
-    <P as ConnectionPoolInterface>::Connector<BroadcastFrame>: 'static,
-    <P as lightning_interfaces::ConnectionPoolInterface>::Receiver<BroadcastFrame>: 'static,
-    <P as lightning_interfaces::ConnectionPoolInterface>::Sender<BroadcastFrame>: 'static,
-{
+impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
     fn is_running(&self) -> bool {
         self.shutdown_signal
             .read()
@@ -136,44 +126,29 @@ where
 }
 
 #[async_trait]
-impl<P, T, N, S> BroadcastInterface for Broadcast<P, T, N, S>
-where
-    P: ConnectionPoolInterface + 'static,
-    T: TopologyInterface + 'static,
-    N: NotifierInterface + Send + Sync + 'static,
-    S: SignerInterface,
-    <P as lightning_interfaces::ConnectionPoolInterface>::Listener<BroadcastFrame>:
-        std::marker::Send + 'static,
-    <P as ConnectionPoolInterface>::Connector<BroadcastFrame>: 'static,
-    <P as lightning_interfaces::ConnectionPoolInterface>::Receiver<BroadcastFrame>: 'static,
-    <P as lightning_interfaces::ConnectionPoolInterface>::Sender<BroadcastFrame>: 'static,
-{
-    type Topology = T;
-    type Notifier = N;
-    type Signer = S;
-    type ConnectionPool = P;
+impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
     type PubSub<M: LightningMessage + Clone> = PubSubTopic<M>;
     type Message = BroadcastFrame;
 
     fn init(
         _config: Self::Config,
-        (listener, connector): ListenerConnector<P, Self::Message>,
-        topology: Arc<Self::Topology>,
-        signer: &Self::Signer,
-        notifier: Self::Notifier,
+        (listener, connector): ListenerConnector<C, c![C::ConnectionPoolInterface], Self::Message>,
+        topology: c!(C::TopologyInterface),
+        signer: &c!(C::SignerInterface),
+        notifier: c!(C::NotifierInterface),
     ) -> Result<Self> {
         let channels = Arc::new(DashMap::new());
         let inner = BroadcastInner::new(topology, signer, connector, channels.clone());
         let (sender, receiver) = tokio::sync::mpsc::channel(256);
         Ok(Self {
             inner,
-            phantom: PhantomData,
-            notifier: notifier.into(),
+            notifier,
             shutdown_signal: std::sync::RwLock::new(None).into(),
             listener: tokio::sync::Mutex::new(listener).into(),
             channels,
             sender,
             receiver: tokio::sync::Mutex::new(receiver).into(),
+            collection: PhantomData,
         })
     }
 

@@ -1,47 +1,49 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use async_trait::async_trait;
+use infusion::c;
 use lightning_schema::LightningMessage;
 
 use crate::{
-    signer::SignerInterface, topology::TopologyInterface, types::Topic, ConfigConsumer,
-    ConnectionPoolInterface, ListenerConnector, NotifierInterface, WithStartAndShutdown,
+    infu_collection::Collection, signer::SignerInterface, topology::TopologyInterface,
+    types::Topic, ConfigConsumer, ConfigProviderInterface, ConnectionPoolInterface,
+    ListenerConnector, NotifierInterface, WithStartAndShutdown,
 };
 
 /// The gossip system in Fleek Network implements the functionality of broadcasting
 /// messages to the rest of the nodes in the network.
-#[async_trait]
-pub trait BroadcastInterface: WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync {
-    // -- DYNAMIC TYPES
-
-    /// The implementation of the topology algorithm in use.
-    type Topology: TopologyInterface;
-
-    /// The notifier that allows us to refresh the connections once the epoch changes.
-    type Notifier: NotifierInterface;
-
-    /// The signer that we can used to sign and submit messages.
-    type Signer: SignerInterface;
-
-    /// The networking connection pool.
-    type ConnectionPool: ConnectionPoolInterface;
-
-    // -- BOUNDED TYPES
+#[infusion::service]
+pub trait BroadcastInterface<C: Collection>:
+    WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
+{
+    fn _init(
+        config: ::ConfigProviderInterface,
+        pool: ::ConnectionPoolInterface,
+        topology: ::TopologyInterface,
+        signer: ::SignerInterface,
+        notifier: ::NotifierInterface,
+    ) {
+        Self::init(
+            config.get::<Self>(),
+            pool.bind(crate::types::ServiceScope::Broadcast),
+            topology.clone(),
+            signer,
+            notifier.clone(),
+        )
+    }
 
     /// The message type to be encoded/decoded for networking.
     type Message: LightningMessage;
 
     /// Pubsub topic for sending and receiving messages on a topic
-    type PubSub<T: LightningMessage + Clone>: PubSub<T>;
+    type PubSub<T: LightningMessage + Clone>: PubSub<T> = infusion::Blank<T>;
 
     /// Initialize the gossip system with the config and the topology object..
     fn init(
         config: Self::Config,
-        listener_connector: ListenerConnector<Self::ConnectionPool, Self::Message>,
-        topology: Arc<Self::Topology>,
-        signer: &Self::Signer,
-        notifier: Self::Notifier,
+        listener_connector: ListenerConnector<C, c![C::ConnectionPoolInterface], Self::Message>,
+        topology: c!(C::TopologyInterface),
+        signer: &c!(C::SignerInterface),
+        notifier: c!(C::NotifierInterface),
     ) -> Result<Self>;
 
     /// Get a send and receiver for messages in a pub-sub topic.
@@ -49,6 +51,7 @@ pub trait BroadcastInterface: WithStartAndShutdown + ConfigConsumer + Sized + Se
 }
 
 #[async_trait]
+#[infusion::blank]
 pub trait PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
     /// Publish a message.
     async fn send(&self, msg: &T);

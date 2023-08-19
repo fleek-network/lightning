@@ -1,3 +1,5 @@
+#![feature(macro_metavar_expr)]
+
 pub mod application;
 pub mod blockstore;
 pub mod broadcast;
@@ -7,7 +9,7 @@ pub mod connection;
 pub mod consensus;
 pub mod dht;
 pub mod handshake;
-pub mod node;
+pub mod infu_collection;
 pub mod notifier;
 pub mod origin;
 pub mod pod;
@@ -27,8 +29,8 @@ pub use common::*;
 pub use config::*;
 pub use connection::*;
 pub use consensus::*;
+pub use dht::*;
 pub use handshake::*;
-pub use node::*;
 pub use notifier::*;
 pub use origin::*;
 pub use pod::*;

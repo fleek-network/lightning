@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use affair::{Executor, TokioSpawn};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -5,6 +7,7 @@ use lightning_interfaces::{
     application::{ApplicationInterface, ExecutionEngineSocket},
     common::WithStartAndShutdown,
     config::ConfigConsumer,
+    infu_collection::Collection,
 };
 
 use crate::{
@@ -13,13 +16,14 @@ use crate::{
     query_runner::QueryRunner,
 };
 
-pub struct Application {
+pub struct Application<C: Collection> {
     update_socket: ExecutionEngineSocket,
     query_runner: QueryRunner,
+    collection: PhantomData<C>,
 }
 
 #[async_trait]
-impl WithStartAndShutdown for Application {
+impl<C: Collection> WithStartAndShutdown for Application<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         true
@@ -35,14 +39,14 @@ impl WithStartAndShutdown for Application {
     async fn shutdown(&self) {}
 }
 
-impl ConfigConsumer for Application {
+impl<C: Collection> ConfigConsumer for Application<C> {
     const KEY: &'static str = "application";
 
     type Config = Config;
 }
 
 #[async_trait]
-impl ApplicationInterface for Application {
+impl<C: Collection> ApplicationInterface<C> for Application<C> {
     /// The type for the sync query executor.
     type SyncExecutor = QueryRunner;
 
@@ -53,6 +57,7 @@ impl ApplicationInterface for Application {
         Ok(Self {
             query_runner: env.query_runner(),
             update_socket: TokioSpawn::spawn(UpdateWorker::new(env)),
+            collection: PhantomData,
         })
     }
 

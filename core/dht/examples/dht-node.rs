@@ -2,12 +2,17 @@ use std::{net::SocketAddr, time::Duration};
 
 use clap::{Parser, Subcommand};
 use fleek_crypto::{NodePublicKey, NodeSecretKey, PublicKey, SecretKey};
-use lightning_application::query_runner::QueryRunner;
-use lightning_dht::{config::Config, dht::Builder};
+use lightning_application::app::Application;
+use lightning_dht::{
+    config::Config,
+    dht::{Builder, Dht},
+};
 use lightning_interfaces::{
     dht::{DhtInterface, DhtSocket},
+    infu_collection::Collection,
+    partial,
     types::{DhtRequest, DhtResponse, KeyPrefix},
-    Blake3Hash, TopologyInterface, WithStartAndShutdown,
+    Blake3Hash, WithStartAndShutdown,
 };
 use lightning_topology::Topology;
 
@@ -35,6 +40,12 @@ enum Commands {
     Bootstrapper,
 }
 
+partial!(PartialBinding {
+    ApplicationInterface = Application<Self>;
+    TopologyInterface = Topology<Self>;
+    DhtInterface = Dht<Self>;
+});
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -56,8 +67,7 @@ async fn main() {
             let secret_key = NodeSecretKey::generate();
             tracing::info!("public key: {:?}", secret_key.to_pk());
             let dht_socket =
-                start_node::<Topology<QueryRunner>>(secret_key, Some((address, bootstrap_key)))
-                    .await;
+                start_node::<PartialBinding>(secret_key, Some((address, bootstrap_key))).await;
 
             tracing::info!("GET {key:?}");
 
@@ -80,8 +90,7 @@ async fn main() {
             let secret_key = NodeSecretKey::generate();
             tracing::info!("public key: {:?}", secret_key.to_pk());
             let dht_socket =
-                start_node::<Topology<QueryRunner>>(secret_key, Some((address, bootstrap_key)))
-                    .await;
+                start_node::<PartialBinding>(secret_key, Some((address, bootstrap_key))).await;
 
             // Todo: get actual hash.
             let key: Blake3Hash = rand::random();
@@ -108,14 +117,13 @@ async fn main() {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
             let secret_key = NodeSecretKey::generate();
             tracing::info!("public key: {:?}", secret_key.to_pk());
-            let _ = start_node::<Topology<QueryRunner>>(secret_key, Some((address, bootstrap_key)))
-                .await;
+            let _ = start_node::<PartialBinding>(secret_key, Some((address, bootstrap_key))).await;
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
         },
         Commands::Bootstrapper => {
-            let _socket = start_node::<Topology<QueryRunner>>(bootstrap_secret_key, None).await;
+            let _socket = start_node::<PartialBinding>(bootstrap_secret_key, None).await;
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
@@ -125,7 +133,7 @@ async fn main() {
     tracing::info!("shutting down dht-node");
 }
 
-async fn start_node<T: TopologyInterface>(
+async fn start_node<C: Collection>(
     secret_key: NodeSecretKey,
     bootstrapper: Option<(SocketAddr, NodePublicKey)>,
 ) -> DhtSocket {
@@ -136,7 +144,7 @@ async fn start_node<T: TopologyInterface>(
         builder.add_node(key, address);
     }
 
-    let dht = builder.build::<T>().unwrap();
+    let dht = builder.build::<C>().unwrap();
     let socket = dht.get_socket();
     dht.start().await;
 

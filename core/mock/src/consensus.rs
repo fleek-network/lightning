@@ -12,10 +12,10 @@ use affair::{AsyncWorker, Executor, TokioSpawn};
 use async_trait::async_trait;
 use axum::{extract::State, routing::post, Json, Router};
 use lightning_interfaces::{
-    broadcast::PubSub,
+    infu_collection::{c, Collection},
     types::{Block, UpdateRequest},
-    ConfigConsumer, ConsensusInterface, ExecutionEngineSocket, MempoolSocket, SignerInterface,
-    SyncQueryRunnerInterface, WithStartAndShutdown,
+    ApplicationInterface, BroadcastInterface, ConfigConsumer, ConsensusInterface,
+    ExecutionEngineSocket, MempoolSocket, SignerInterface, WithStartAndShutdown,
 };
 use log::{debug, info};
 use rand::{thread_rng, Rng, SeedableRng};
@@ -28,15 +28,14 @@ use tokio::sync::{mpsc, Notify};
 /// post endpoint. Transactions can be sent as JSON values.
 ///
 /// The mempool it provides also has a configurable success rate that must be from 0.0 to 1.0.
-pub struct MockConsensus<Q: SyncQueryRunnerInterface, P: PubSub<()>> {
+pub struct MockConsensus<C: Collection> {
     addr: SocketAddr,
     socket: mpsc::Sender<UpdateRequest>,
     is_running: Arc<AtomicBool>,
     shutdown_notifier: Arc<Notify>,
     block_notifier: Arc<Notify>,
     mempool: MempoolSocket,
-    query_runner: PhantomData<Q>,
-    gossip: PhantomData<P>,
+    collection: PhantomData<C>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -93,7 +92,7 @@ impl Default for Config {
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface, P: PubSub<()>> WithStartAndShutdown for MockConsensus<Q, P> {
+impl<C: Collection> WithStartAndShutdown for MockConsensus<C> {
     fn is_running(&self) -> bool {
         self.is_running.load(Ordering::Relaxed)
     }
@@ -146,17 +145,15 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<()>> WithStartAndShutdown for MockCo
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface, P: PubSub<()>> ConsensusInterface for MockConsensus<Q, P> {
-    type QueryRunner = Q;
+impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
     type Certificate = ();
-    type PubSub = P;
 
-    fn init<S: SignerInterface>(
+    fn init<S: SignerInterface<C>>(
         config: Self::Config,
         _signer: &S,
         executor: ExecutionEngineSocket,
-        _query_runner: Self::QueryRunner,
-        _pubsub: P,
+        _query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        _pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
     ) -> anyhow::Result<Self> {
         let (tx, rx) = mpsc::channel(128);
         let block_notifier = Arc::new(Notify::new());
@@ -178,8 +175,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<()>> ConsensusInterface for MockCons
             shutdown_notifier: Arc::new(Notify::new()),
             block_notifier,
             mempool,
-            query_runner: PhantomData,
-            gossip: PhantomData,
+            collection: PhantomData,
         })
     }
 
@@ -192,7 +188,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<()>> ConsensusInterface for MockCons
     }
 }
 
-impl<Q: SyncQueryRunnerInterface, P: PubSub<()>> ConfigConsumer for MockConsensus<Q, P> {
+impl<C: Collection> ConfigConsumer for MockConsensus<C> {
     const KEY: &'static str = "consensus";
 
     type Config = Config;

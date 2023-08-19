@@ -1,19 +1,28 @@
-use std::{fs, path::Path, sync::Mutex};
+use std::{fs, marker::PhantomData, path::Path, sync::Mutex};
 
 use anyhow::Context;
-use lightning_interfaces::config::ConfigProviderInterface;
+use lightning_interfaces::{config::ConfigProviderInterface, infu_collection::Collection};
 use toml::{Table, Value};
 
 /// The implementation of a configuration loader that uses the `toml` backend.
-#[derive(Default)]
-pub struct TomlConfigProvider {
+pub struct TomlConfigProvider<C: Collection> {
     /// The [`ConfigProviderInterface`] does not put any constraints on the
     /// format of the document, except that we need a `[key: string]->any`
     /// mapping. The [`Table`] is that map.
     pub table: Mutex<Table>,
+    collection: PhantomData<C>,
 }
 
-impl TomlConfigProvider {
+impl<C: Collection> Default for TomlConfigProvider<C> {
+    fn default() -> Self {
+        Self {
+            table: Default::default(),
+            collection: PhantomData,
+        }
+    }
+}
+
+impl<C: Collection> TomlConfigProvider<C> {
     pub fn open<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let path = path.as_ref();
 
@@ -37,11 +46,14 @@ impl TomlConfigProvider {
         }
         .into();
 
-        Ok(Self { table })
+        Ok(Self {
+            table,
+            collection: PhantomData,
+        })
     }
 }
 
-impl ConfigProviderInterface for TomlConfigProvider {
+impl<C: Collection> ConfigProviderInterface<C> for TomlConfigProvider<C> {
     fn get<S: lightning_interfaces::config::ConfigConsumer>(&self) -> S::Config {
         let mut table = self.table.lock().expect("failed to acquire lock");
 

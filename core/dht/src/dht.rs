@@ -10,8 +10,9 @@ use async_trait::async_trait;
 use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
 use lightning_interfaces::{
     dht::{DhtInterface, DhtSocket},
+    infu_collection::{c, Collection},
     types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry},
-    ConfigConsumer, SignerInterface, TopologyInterface, WithStartAndShutdown,
+    ConfigConsumer, SignerInterface, WithStartAndShutdown,
 };
 use tokio::{
     net::UdpSocket,
@@ -60,7 +61,7 @@ impl Builder {
     }
 
     /// Build and initiates the DHT.
-    pub fn build<T: TopologyInterface>(self) -> Result<Dht<T>> {
+    pub fn build<C: Collection>(self) -> Result<Dht<C>> {
         let buffer_size = self.buffer_size.unwrap_or(10_000);
 
         let (socket, rx) = Socket::raw_bounded(2048);
@@ -78,14 +79,14 @@ impl Builder {
             bootstrap_rx: Arc::new(Mutex::new(Some(bootstrap_rx))),
             is_running: Arc::new(Mutex::new(false)),
             shutdown_notify: Arc::new(Notify::new()),
-            topology: PhantomData,
+            collection: PhantomData,
         })
     }
 }
 
 /// Maintains the DHT.
 #[allow(clippy::type_complexity)]
-pub struct Dht<T: TopologyInterface> {
+pub struct Dht<C: Collection> {
     socket: DhtSocket,
     socket_rx: Arc<Mutex<Option<mpsc::Receiver<Task<DhtRequest, DhtResponse>>>>>,
     buffer_size: usize,
@@ -96,10 +97,10 @@ pub struct Dht<T: TopologyInterface> {
     nodes: Arc<Mutex<Option<Vec<NodeInfo>>>>,
     is_running: Arc<Mutex<bool>>,
     shutdown_notify: Arc<Notify>,
-    topology: PhantomData<T>,
+    collection: PhantomData<C>,
 }
 
-impl<T: TopologyInterface> Dht<T> {
+impl<C: Collection> Dht<C> {
     /// Return one value associated with the given key.
     pub async fn get(&self, prefix: KeyPrefix, key: &[u8]) -> Option<TableEntry> {
         match self
@@ -142,7 +143,7 @@ impl<T: TopologyInterface> Dht<T> {
 }
 
 #[async_trait]
-impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
+impl<C: Collection> WithStartAndShutdown for Dht<C> {
     fn is_running(&self) -> bool {
         *self.is_running.lock().unwrap()
     }
@@ -219,12 +220,10 @@ impl<T: TopologyInterface> WithStartAndShutdown for Dht<T> {
 }
 
 #[async_trait]
-impl<T: TopologyInterface> DhtInterface for Dht<T> {
-    type Topology = T;
-
-    fn init<S: SignerInterface>(
-        signer: &S,
-        _: Arc<Self::Topology>,
+impl<C: Collection> DhtInterface<C> for Dht<C> {
+    fn init(
+        signer: &c![C::SignerInterface],
+        _: c![C::TopologyInterface],
         config: Self::Config,
     ) -> Result<Self> {
         let (_, node_public_key) = signer.get_sk();
@@ -236,7 +235,7 @@ impl<T: TopologyInterface> DhtInterface for Dht<T> {
     }
 }
 
-impl<T: TopologyInterface> ConfigConsumer for Dht<T> {
+impl<C: Collection> ConfigConsumer for Dht<C> {
     const KEY: &'static str = "dht";
 
     type Config = Config;

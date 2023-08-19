@@ -6,10 +6,11 @@ use anyhow::{anyhow, Result};
 use dashmap::{mapref::entry::Entry, DashMap};
 use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
 use lightning_interfaces::{
+    infu_collection::{c, Collection},
     schema::broadcast::{BroadcastFrame, BroadcastMessage},
     types::Topic,
-    Blake3Hash, ConnectionPoolInterface, ConnectorInterface, ReceiverInterface, SenderInterface,
-    SignerInterface, ToDigest, TopologyInterface,
+    Blake3Hash, ConnectionPoolInterface, ConnectorInterface, PoolReceiver, PoolSender,
+    ReceiverInterface, SenderInterface, SignerInterface, ToDigest, TopologyInterface,
 };
 
 pub struct BroadcastSender<S> {
@@ -34,17 +35,18 @@ impl<S: SenderInterface<BroadcastFrame>> BroadcastSender<S> {
     }
 }
 
-pub struct BroadcastInner<T, P: ConnectionPoolInterface> {
-    topology: Arc<T>,
+#[allow(clippy::type_complexity)]
+pub struct BroadcastInner<C: Collection> {
+    topology: c![C::TopologyInterface],
     node_secret_key: Arc<NodeSecretKey>,
     // Current topology peers
     peers: Arc<tokio::sync::RwLock<Arc<Vec<Vec<NodePublicKey>>>>>,
-    connector: Arc<<P as ConnectionPoolInterface>::Connector<BroadcastFrame>>,
+    connector: Arc<c![C::ConnectionPoolInterface::Connector<BroadcastFrame>]>,
     // connection map
     connections: Arc<
         DashMap<
             NodePublicKey,
-            BroadcastSender<<P as ConnectionPoolInterface>::Sender<BroadcastFrame>>,
+            BroadcastSender<PoolSender<C, c![C::ConnectionPoolInterface], BroadcastFrame>>,
         >,
     >,
     // received messages + signatures
@@ -55,7 +57,7 @@ pub struct BroadcastInner<T, P: ConnectionPoolInterface> {
     channels: Arc<DashMap<Topic, tokio::sync::broadcast::Sender<Vec<u8>>>>,
 }
 
-impl<T, P: ConnectionPoolInterface> Clone for BroadcastInner<T, P> {
+impl<C: Collection> Clone for BroadcastInner<C> {
     fn clone(&self) -> Self {
         Self {
             topology: self.topology.clone(),
@@ -69,15 +71,11 @@ impl<T, P: ConnectionPoolInterface> Clone for BroadcastInner<T, P> {
     }
 }
 
-impl<T, P> BroadcastInner<T, P>
-where
-    T: TopologyInterface + 'static,
-    P: ConnectionPoolInterface + 'static,
-{
-    pub fn new<Signer: SignerInterface>(
-        topology: Arc<T>,
+impl<C: Collection> BroadcastInner<C> {
+    pub fn new<Signer: SignerInterface<C>>(
+        topology: c![C::TopologyInterface],
         signer: &Signer,
-        connector: <P as ConnectionPoolInterface>::Connector<BroadcastFrame>,
+        connector: c![C::ConnectionPoolInterface::Connector<BroadcastFrame>],
         channels: Arc<DashMap<Topic, tokio::sync::broadcast::Sender<Vec<u8>>>>,
     ) -> Self {
         let peers = tokio::sync::RwLock::new(topology.suggest_connections()).into();
@@ -153,8 +151,8 @@ where
 
     pub async fn handle_connection(
         &self,
-        mut receiver: <P as ConnectionPoolInterface>::Receiver<BroadcastFrame>,
-        sender: <P as ConnectionPoolInterface>::Sender<BroadcastFrame>,
+        mut receiver: PoolReceiver<C, c![C::ConnectionPoolInterface], BroadcastFrame>,
+        sender: PoolSender<C, c![C::ConnectionPoolInterface], BroadcastFrame>,
     ) -> anyhow::Result<()> {
         let pubkey = *receiver.pk();
 

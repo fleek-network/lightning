@@ -30,6 +30,7 @@ hp-fixed.workspace = true
 lightning-test-utils = { path = "../test-utils" }
 tokio.workspace = true
 rand.workspace = true
+infusion.workspace = true
 
 [features]
 test = []

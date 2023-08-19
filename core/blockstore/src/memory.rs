@@ -1,7 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 use async_trait::async_trait;
 use lightning_interfaces::{
+    infu_collection::Collection,
     types::{CompressionAlgoSet, CompressionAlgorithm},
     Blake3Hash, Blake3Tree, BlockStoreInterface, ConfigConsumer, ContentChunk,
 };
@@ -10,23 +11,25 @@ use parking_lot::RwLock;
 use crate::{config::Config, put::IncrementalPut, store::Store, Block, BlockContent, Key};
 
 #[derive(Clone, Default)]
-pub struct MemoryBlockStore {
+pub struct MemoryBlockStore<C: Collection> {
     inner: Arc<RwLock<HashMap<Key, Block>>>,
+    collection: PhantomData<C>,
 }
 
-impl ConfigConsumer for MemoryBlockStore {
+impl<C: Collection> ConfigConsumer for MemoryBlockStore<C> {
     const KEY: &'static str = "blockstore";
     type Config = Config;
 }
 
 #[async_trait]
-impl BlockStoreInterface for MemoryBlockStore {
+impl<C: Collection> BlockStoreInterface<C> for MemoryBlockStore<C> {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
     type Put = IncrementalPut<Self>;
 
     fn init(_: Self::Config) -> anyhow::Result<Self> {
         Ok(Self {
             inner: Default::default(),
+            collection: PhantomData,
         })
     }
 
@@ -71,7 +74,10 @@ impl BlockStoreInterface for MemoryBlockStore {
 }
 
 #[async_trait]
-impl Store for MemoryBlockStore {
+impl<C> Store for MemoryBlockStore<C>
+where
+    C: Collection,
+{
     async fn fetch(&self, key: &Key) -> Option<Block> {
         self.inner.read().get(key).cloned()
     }

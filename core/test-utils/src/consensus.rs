@@ -10,9 +10,10 @@ use lightning_interfaces::{
     application::{ExecutionEngineSocket, SyncQueryRunnerInterface},
     config::ConfigConsumer,
     consensus::{ConsensusInterface, MempoolSocket},
+    infu_collection::{c, Collection},
     signer::SignerInterface,
     types::{Block, UpdateRequest},
-    PubSub, WithStartAndShutdown,
+    ApplicationInterface, BroadcastInterface, PubSub, WithStartAndShutdown,
 };
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -37,9 +38,10 @@ impl PubSub<()> for MockPubSub {
     }
 }
 
+// TODO(qti3e): Should we deprecate this?
 #[allow(clippy::type_complexity)]
-pub struct MockConsensus<Q: SyncQueryRunnerInterface + 'static> {
-    inner: Arc<MockConsensusInner<Q>>,
+pub struct MockConsensus<C: Collection> {
+    inner: Arc<MockConsensusInner<c![C::ApplicationInterface::SyncExecutor]>>,
     socket: Socket<UpdateRequest, ()>,
     is_running: Arc<Mutex<bool>>,
     shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
@@ -55,18 +57,16 @@ struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static> {
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface> ConsensusInterface for MockConsensus<Q> {
-    type QueryRunner = Q;
+impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
     type Certificate = ();
-    type PubSub = MockPubSub;
 
     /// Create a new consensus service with the provided config and executor.
-    fn init<S: SignerInterface>(
-        config: Config,
+    fn init<S: SignerInterface<C>>(
+        config: Self::Config,
         _signer: &S,
         executor: ExecutionEngineSocket,
-        query_runner: Self::QueryRunner,
-        _pubsub: Self::PubSub,
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        _pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
     ) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
         let new_block_notify = Arc::new(Notify::new());
@@ -99,7 +99,7 @@ impl<Q: SyncQueryRunnerInterface> ConsensusInterface for MockConsensus<Q> {
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface + 'static> WithStartAndShutdown for MockConsensus<Q> {
+impl<C: Collection> WithStartAndShutdown for MockConsensus<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         *self.is_running.lock().unwrap()
@@ -128,13 +128,13 @@ impl<Q: SyncQueryRunnerInterface + 'static> WithStartAndShutdown for MockConsens
     }
 }
 
-impl<Q: SyncQueryRunnerInterface> MockConsensus<Q> {
+impl<C: Collection> MockConsensus<C> {
     fn get_shutdown_tx(&self) -> Option<mpsc::Sender<()>> {
         self.shutdown_tx.lock().unwrap().take()
     }
 }
 
-impl<Q: SyncQueryRunnerInterface> ConfigConsumer for MockConsensus<Q> {
+impl<C: Collection> ConfigConsumer for MockConsensus<C> {
     const KEY: &'static str = "consensus";
 
     type Config = Config;

@@ -1,11 +1,13 @@
-use std::{fmt::Debug, ops::Deref};
+use std::{ops::Deref, sync::Arc};
 
 use async_trait::async_trait;
 use thiserror::Error;
 
 use crate::{
     config::ConfigConsumer,
+    infu_collection::Collection,
     types::{CompressionAlgoSet, CompressionAlgorithm},
+    ConfigProviderInterface,
 };
 
 pub type Blake3Hash = [u8; 32];
@@ -83,16 +85,17 @@ pub struct ContentChunk {
 /// we use it at the chunk level, we don't compress the entire file and then perform the chunking,
 /// we chunk first, and compress each chunk later for obvious technical reasons.
 #[async_trait]
-pub trait BlockStoreInterface: Clone + Send + Sync + ConfigConsumer {
-    // -- DYNAMIC TYPES
-    // empty
-
-    // -- BOUNDED TYPES
+#[infusion::service]
+pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsumer {
+    fn _init(config: ::ConfigProviderInterface) {
+        let config = config.get::<Self>();
+        Self::init(config)
+    }
 
     /// The block store has the ability to use a smart pointer to avoid duplicating
     /// the same content multiple times in memory, this can be used for when multiple
     /// services want access to the same buffer of data.
-    type SharedPointer<T: ?Sized + Send + Sync>: Deref<Target = T> + Clone + Send + Sync;
+    type SharedPointer<T: ?Sized + Send + Sync>: Deref<Target = T> + Clone + Send + Sync = Arc<T>;
 
     /// The incremental putter which can be used to write a file to block store.
     type Put: IncrementalPutInterface;
@@ -126,6 +129,7 @@ pub trait BlockStoreInterface: Clone + Send + Sync + ConfigConsumer {
 
 /// The interface for the writer to a [`BlockStoreInterface`].
 #[async_trait]
+#[infusion::blank]
 pub trait IncrementalPutInterface {
     /// Write the proof for the buffer.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError>;

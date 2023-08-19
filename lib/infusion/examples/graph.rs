@@ -1,75 +1,53 @@
+#![feature(macro_metavar_expr)]
+#![allow(unreachable_code)]
+
 //! A simple example that prints the graph.
 
-use std::{convert::Infallible, marker::PhantomData};
+use std::marker::PhantomData;
 
-use infusion::{infu, p, tag};
+use infusion::{collection, ok, tag};
 
-pub trait A: Sized {
-    infu!(A, {
-        fn init(b: B) {
-            Result::<Self, Infallible>::Ok(Self::init(b))
-        }
+#[infusion::service]
+pub trait A<C: Collection>: Sized {
+    fn _init(_b: ::B) {
+        ok!(todo!())
+    }
 
-        fn post() {}
-    });
-
-    fn init(b: &p![::B]) -> Self;
-}
-
-pub trait B: Sized {
-    infu!(B @ Input);
-}
-
-infu!(@Collection [
-    A,
-    B
-]);
-
-struct I<C: Collection>(PhantomData<C>);
-
-impl<C> A for I<C>
-where
-    C: Collection<A = Self>,
-{
-    type Collection = C;
-
-    infu!(impl {
-        fn post() {
-            println!("Running post initialization for A");
-        }
-    });
-
-    fn init(_b: &p![::B]) -> Self {
-        I(PhantomData)
+    fn hello(&self) {
+        println!("Hello from A");
     }
 }
 
-impl<C> B for I<C>
-where
-    C: Collection<B = Self>,
-{
-    type Collection = C;
-
-    infu!(impl {
-        fn post() {
-            println!("Running post initialization for B");
-        }
-    });
+#[infusion::service]
+pub trait B<C: Collection>: Sized {
+    fn hello(&self) {
+        println!("Hello from B");
+    }
 }
 
-struct Binding;
+collection!([A, B]);
 
-impl Collection for Binding {
-    type A = I<Binding>;
-    type B = I<Binding>;
-}
+forward!(fn start(this, _x: u8) {
+    this.hello();
+});
+
+struct I<C: Collection>(PhantomData<C>);
+
+impl<C> A<C> for I<C> where C: Collection<A = Self> {}
+
+impl<C> B<C> for I<C> where C: Collection<B = Self> {}
 
 fn main() {
-    let graph = Binding::build_graph();
+    let graph = BlankBinding::build_graph();
     println!("{graph:#?}");
 
-    let _container = infusion::Container::default()
-        .with(tag!(I<Binding> as B), I::<Binding>(PhantomData))
+    let container = infusion::Container::default()
+        .with(
+            tag!(BlankBinding::A),
+            infusion::Blank::<BlankBinding>::default(),
+        )
         .initialize(graph)
         .unwrap();
+
+    start::<BlankBinding>(&container, 10);
 }

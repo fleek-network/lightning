@@ -15,9 +15,10 @@ use lightning_interfaces::{
     common::WithStartAndShutdown,
     config::ConfigConsumer,
     consensus::{ConsensusInterface, MempoolSocket},
+    infu_collection::{c, Collection},
     signer::{SignerInterface, SubmitTxSocket},
     types::{Epoch, EpochInfo, UpdateMethod},
-    PubSub, SyncQueryRunnerInterface,
+    ApplicationInterface, BroadcastInterface, PubSub, SyncQueryRunnerInterface,
 };
 use lightning_schema::AutoImplSerde;
 use log::{error, info};
@@ -47,11 +48,19 @@ use crate::{
     narwhal::{NarwhalArgs, NarwhalService},
 };
 
-pub struct Consensus<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
+pub struct Consensus<C: Collection> {
     /// Inner state of the consensus
     /// todo(dalton): We can probably get a little more effecient then a mutex here
     /// maybe a once box
-    epoch_state: Mutex<Option<EpochState<Q, P>>>,
+    #[allow(clippy::type_complexity)]
+    epoch_state: Mutex<
+        Option<
+            EpochState<
+                c![C::ApplicationInterface::SyncExecutor],
+                c![C::BroadcastInterface::PubSub<PubSubMsg>],
+            >,
+        >,
+    >,
     /// This socket recieves signed transactions and forwards them to an active committee member to
     /// be ordered
     mempool_socket: MempoolSocket,
@@ -292,7 +301,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> WithStartAndShutdown for Consensus<Q, P> {
+impl<C: Collection> WithStartAndShutdown for Consensus<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         self.is_running.load(Ordering::Relaxed)
@@ -343,25 +352,23 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> WithStartAndShutdown for
     }
 }
 
-impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> ConfigConsumer for Consensus<Q, P> {
+impl<C: Collection> ConfigConsumer for Consensus<C> {
     const KEY: &'static str = "consensus";
 
     type Config = Config;
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg>> ConsensusInterface for Consensus<Q, P> {
-    type QueryRunner = Q;
+impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
     type Certificate = PubSubMsg;
-    type PubSub = P;
 
     /// Create a new consensus service with the provided config and executor.
-    fn init<S: SignerInterface>(
+    fn init<S: SignerInterface<C>>(
         config: Self::Config,
         signer: &S,
         executor: ExecutionEngineSocket,
-        query_runner: Q,
-        pubsub: P,
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
     ) -> anyhow::Result<Self> {
         // Spawn the registry for narwhal
         let registry = Registry::new();

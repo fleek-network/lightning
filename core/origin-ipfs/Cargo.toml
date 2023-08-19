@@ -25,3 +25,4 @@ affair.workspace = true
 [dev-dependencies]
 tokio-util = {version = "0.7.8", features = ["io"]}
 lightning-test-utils = { path = "../test-utils" }
+infusion.workspace = true

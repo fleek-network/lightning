@@ -4,7 +4,8 @@ use anyhow::{anyhow, Context, Result};
 use clap::{arg, ArgAction, Parser, Subcommand};
 use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_interfaces::{
-    ConfigProviderInterface, LightningTypes, Node, SignerInterface, WithStartAndShutdown,
+    infu_collection::{Collection, Node},
+    ConfigProviderInterface, SignerInterface,
 };
 use lightning_signer::Signer;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -58,17 +59,16 @@ pub enum Keys {
 }
 
 /// Create a new command line application.
-pub struct Cli<T: LightningTypes>(CliArgs, PhantomData<T>);
+pub struct Cli<C: Collection>(CliArgs, PhantomData<C>);
 
-impl<T: LightningTypes> Cli<T> {
+impl<C: Collection> Cli<C> {
     pub fn new(args: CliArgs) -> Self {
         Self(args, PhantomData)
     }
 }
 
-impl<T: LightningTypes<ConfigProvider = TomlConfigProvider>> Cli<T>
-where
-    Node<T>: Send + Sync,
+impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterface = Signer<C>>>
+    Cli<C>
 {
     /// Execute the application based on the provided command.
     pub async fn exec(self) -> Result<()> {
@@ -91,8 +91,9 @@ where
         let shutdown_controller = ShutdownController::default();
         shutdown_controller.install_ctrl_c_handler();
 
-        let config = Arc::new(Self::load_or_write_config(config_path).await?);
-        let node = Node::<T>::init(config)?;
+        let config = Self::load_or_write_config(config_path).await?;
+        let node = Node::<C>::init(config)
+            .map_err(|e| anyhow::anyhow!("Could not start the node: {e}"))?;
 
         node.start().await;
 
@@ -105,8 +106,8 @@ where
     /// Print the default configuration for the node, this function does not
     /// create a new file.
     async fn print_default_config() -> Result<()> {
-        let config = TomlConfigProvider::default();
-        Node::<T>::fill_configuration(&config);
+        let config = TomlConfigProvider::<C>::default();
+        Node::<C>::fill_configuration(&config);
         println!("{}", config.serialize_config());
         Ok(())
     }
@@ -119,9 +120,9 @@ where
     }
 
     /// Load the configuration file and write the default to the disk.
-    async fn load_or_write_config(config_path: ResolvedPathBuf) -> Result<TomlConfigProvider> {
+    async fn load_or_write_config(config_path: ResolvedPathBuf) -> Result<TomlConfigProvider<C>> {
         let config = TomlConfigProvider::open(&config_path)?;
-        Node::<T>::fill_configuration(&config);
+        Node::<C>::fill_configuration(&config);
 
         if !config_path.exists() {
             std::fs::write(&config_path, config.serialize_config())?;
@@ -132,25 +133,29 @@ where
 
     async fn generate_keys(config_path: ResolvedPathBuf) -> Result<()> {
         let config = Arc::new(Self::load_or_write_config(config_path).await?);
-        let signer_config = config.get::<Signer>();
+        let signer_config = config.get::<C::SignerInterface>();
+
         if signer_config.node_key_path.exists() {
             return Err(anyhow!(
                 "Node secret key exists at specified path. Not generating keys."
             ));
         }
+
         if signer_config.consensus_key_path.exists() {
             return Err(anyhow!(
                 "Consensus secret key exists at specified path. Not generating keys."
             ));
         }
-        match Signer::generate_node_key(&signer_config.node_key_path) {
+
+        match Signer::<C>::generate_node_key(&signer_config.node_key_path) {
             Ok(_) => println!(
                 "Successfully created node secret key at: {:?}",
                 signer_config.node_key_path
             ),
             Err(err) => return Err(anyhow!("Failed to create node secret key: {err:?}")),
         };
-        match Signer::generate_consensus_key(&signer_config.consensus_key_path) {
+
+        match Signer::<C>::generate_consensus_key(&signer_config.consensus_key_path) {
             Ok(_) => println!(
                 "Successfully created consensus secret key at: {:?}",
                 signer_config.consensus_key_path
@@ -165,7 +170,7 @@ where
 
     async fn show_keys(config_path: ResolvedPathBuf) -> Result<()> {
         let config = Arc::new(Self::load_or_write_config(config_path).await?);
-        let signer_config = config.get::<Signer>();
+        let signer_config = config.get::<C::SignerInterface>();
         if signer_config.node_key_path.exists() {
             let node_secret_key = fs::read_to_string(&signer_config.node_key_path)
                 .with_context(|| "Failed to read node pem file")?;

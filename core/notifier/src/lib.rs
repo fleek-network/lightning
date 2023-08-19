@@ -1,18 +1,27 @@
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
-use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::{
     application::SyncQueryRunnerInterface,
+    infu_collection::{c, Collection},
     notifier::{Notification, NotifierInterface},
+    ApplicationInterface,
 };
 use tokio::{sync::mpsc, time::sleep};
 
-pub struct Notifier {
-    query_runner: <Notifier as NotifierInterface>::SyncQuery,
+pub struct Notifier<C: Collection> {
+    query_runner: c![C::ApplicationInterface::SyncExecutor],
 }
 
-impl Notifier {
+impl<C: Collection> Clone for Notifier<C> {
+    fn clone(&self) -> Self {
+        Self {
+            query_runner: self.query_runner.clone(),
+        }
+    }
+}
+
+impl<C: Collection> Notifier<C> {
     fn get_until_epoch_end(&self) -> Duration {
         let epoch_info = self.query_runner.get_epoch_info();
         let now = SystemTime::now()
@@ -28,10 +37,8 @@ impl Notifier {
 }
 
 #[async_trait]
-impl NotifierInterface for Notifier {
-    type SyncQuery = QueryRunner;
-
-    fn init(query_runner: Self::SyncQuery) -> Self {
+impl<C: Collection> NotifierInterface<C> for Notifier<C> {
+    fn init(query_runner: c![C::ApplicationInterface::SyncExecutor]) -> Self {
         Self { query_runner }
     }
 
@@ -62,9 +69,18 @@ mod tests {
         genesis::Genesis,
         query_runner::QueryRunner,
     };
-    use lightning_interfaces::application::{ApplicationInterface, ExecutionEngineSocket};
+    use lightning_interfaces::{
+        application::{ApplicationInterface, ExecutionEngineSocket},
+        infu_collection::Collection,
+        partial,
+    };
 
     use super::*;
+
+    partial!(TestBinding {
+        ApplicationInterface = Application<Self>;
+        NotifierInterface = Notifier<Self>;
+    });
 
     const EPSILON: f64 = 0.1;
 
@@ -81,7 +97,7 @@ mod tests {
             mode: Mode::Test,
         };
 
-        let app = Application::init(config).unwrap();
+        let app = Application::<TestBinding>::init(config).unwrap();
 
         (app.transaction_executor(), app.sync_query())
     }
@@ -90,7 +106,7 @@ mod tests {
     async fn test_on_new_epoch() {
         let (_, query_runner) = init_app(2000);
 
-        let notifier = Notifier::init(query_runner);
+        let notifier = Notifier::<TestBinding>::init(query_runner);
 
         // Request to be notified when the epoch ends.
         let (tx, mut rx) = mpsc::channel(2048);
@@ -109,7 +125,7 @@ mod tests {
     async fn test_before_epoch_change() {
         let (_, query_runner) = init_app(3000);
 
-        let notifier = Notifier::init(query_runner);
+        let notifier = Notifier::<TestBinding>::init(query_runner);
 
         // Request to be notified 1 sec before the epoch ends.
         let (tx, mut rx) = mpsc::channel(2048);

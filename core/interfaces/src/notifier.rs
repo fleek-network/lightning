@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use async_trait::async_trait;
+use infusion::{c, ok};
 use tokio::sync::mpsc;
 
-use crate::application::SyncQueryRunnerInterface;
+use crate::{infu_collection::Collection, ApplicationInterface};
 
 #[derive(Debug)]
 pub enum Notification {
@@ -11,15 +11,13 @@ pub enum Notification {
     BeforeEpochChange,
 }
 
-#[async_trait]
-pub trait NotifierInterface {
-    // -- DYNAMIC TYPES
-    type SyncQuery: SyncQueryRunnerInterface;
+#[infusion::service]
+pub trait NotifierInterface<C: Collection>: Sync + Send + Clone {
+    fn _init(app: ::ApplicationInterface) {
+        ok!(Self::init(app.sync_query()))
+    }
 
-    // -- BOUNDED TYPES
-    // empty
-
-    fn init(query_runner: Self::SyncQuery) -> Self;
+    fn init(query_runner: c!(C::ApplicationInterface::SyncExecutor)) -> Self;
 
     fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>);
 

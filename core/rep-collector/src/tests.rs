@@ -15,7 +15,9 @@ use lightning_interfaces::{
     application::ApplicationInterface,
     common::WithStartAndShutdown,
     consensus::ConsensusInterface,
+    infu_collection::Collection,
     notifier::NotifierInterface,
+    partial,
     reputation::{ReputationAggregatorInterface, ReputationReporterInterface},
     signer::SignerInterface,
     types::{Block, UpdateMethod, UpdatePayload, UpdateRequest},
@@ -23,9 +25,17 @@ use lightning_interfaces::{
 };
 use lightning_notifier::Notifier;
 use lightning_signer::{Config as SignerConfig, Signer};
-use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockPubSub};
+use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 
 use crate::{aggregator::ReputationAggregator, config::Config, measurement_manager::Interactions};
+
+partial!(TestBinding {
+    ReputationAggregatorInterface = ReputationAggregator<Self>;
+    ApplicationInterface = Application<Self>;
+    NotifierInterface = Notifier<Self>;
+    ConsensusInterface = MockConsensus<Self>;
+    SignerInterface = Signer<Self>;
+});
 
 // TODO(matthias): the same struct and `get_genesis_committee` already exist in the application
 // tests. This should be moved to test-utils, however, fot his to work, we have to move the genesis
@@ -91,7 +101,7 @@ async fn test_query() {
         None,
     ));
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -100,7 +110,7 @@ async fn test_query() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer = Signer::init(signer_config, query_runner.clone()).unwrap();
+    let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
 
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
@@ -109,12 +119,12 @@ async fn test_query() {
         transactions_to_lose: HashSet::new(),
         new_block_interval: Duration::from_secs(5),
     };
-    let consensus = MockConsensus::init(
+    let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        MockPubSub {},
+        infusion::Blank::default(),
     )
     .unwrap();
 
@@ -123,12 +133,17 @@ async fn test_query() {
     signer.start().await;
     consensus.start().await;
 
-    let notifier = Notifier::init(query_runner.clone());
+    let notifier = Notifier::<TestBinding>::init(query_runner.clone());
     let config = Config {
         reporter_buffer_size: 1,
     };
-    let rep_aggregator =
-        ReputationAggregator::init(config, signer.get_socket(), notifier, query_runner).unwrap();
+    let rep_aggregator = ReputationAggregator::<TestBinding>::init(
+        config,
+        signer.get_socket(),
+        notifier,
+        query_runner,
+    )
+    .unwrap();
 
     let rep_reporter = rep_aggregator.get_reporter();
     let rep_query = rep_aggregator.get_query();
@@ -215,7 +230,7 @@ async fn test_submit_measurements() {
     genesis.epoch_start = epoch_start;
     genesis.epoch_time = 4000; // millis
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -224,7 +239,7 @@ async fn test_submit_measurements() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer = Signer::init(signer_config, query_runner.clone()).unwrap();
+    let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
 
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
@@ -233,12 +248,12 @@ async fn test_submit_measurements() {
         transactions_to_lose: HashSet::new(),
         new_block_interval: Duration::from_secs(5),
     };
-    let consensus = MockConsensus::init(
+    let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        MockPubSub {},
+        infusion::Blank::default(),
     )
     .unwrap();
 
@@ -247,13 +262,17 @@ async fn test_submit_measurements() {
     signer.start().await;
     consensus.start().await;
 
-    let notifier = Notifier::init(query_runner.clone());
+    let notifier = Notifier::<TestBinding>::init(query_runner.clone());
     let config = Config {
         reporter_buffer_size: 1,
     };
-    let rep_aggregator =
-        ReputationAggregator::init(config, signer.get_socket(), notifier, query_runner.clone())
-            .unwrap();
+    let rep_aggregator = ReputationAggregator::<TestBinding>::init(
+        config,
+        signer.get_socket(),
+        notifier,
+        query_runner.clone(),
+    )
+    .unwrap();
 
     let rep_reporter = rep_aggregator.get_reporter();
     let mut aggregator_handle = tokio::spawn(async move {
@@ -367,7 +386,7 @@ async fn test_reputation_calculation_and_query() {
     genesis.epoch_start = epoch_start;
     genesis.epoch_time = 4000; // millis
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -376,10 +395,9 @@ async fn test_reputation_calculation_and_query() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer1 = Signer::init(signer_config1, query_runner.clone()).unwrap();
-    let mut signer2 = Signer::init(signer_config2, query_runner.clone()).unwrap();
+    let mut signer1 = Signer::<TestBinding>::init(signer_config1, query_runner.clone()).unwrap();
+    let mut signer2 = Signer::<TestBinding>::init(signer_config2, query_runner.clone()).unwrap();
 
-    let mock_gossip = MockPubSub {};
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 1,
@@ -387,20 +405,20 @@ async fn test_reputation_calculation_and_query() {
         transactions_to_lose: HashSet::new(),
         new_block_interval: Duration::from_secs(5),
     };
-    let consensus1 = MockConsensus::init(
+    let consensus1 = MockConsensus::<TestBinding>::init(
         consensus_config.clone(),
         &signer1,
         update_socket.clone(),
         query_runner.clone(),
-        mock_gossip.clone(),
+        infusion::Blank::default(),
     )
     .unwrap();
-    let consensus2 = MockConsensus::init(
+    let consensus2 = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer2,
         update_socket.clone(),
         query_runner.clone(),
-        mock_gossip.clone(),
+        infusion::Blank::default(),
     )
     .unwrap();
 
@@ -416,20 +434,20 @@ async fn test_reputation_calculation_and_query() {
 
     consensus2.start().await;
 
-    let notifier1 = Notifier::init(query_runner.clone());
+    let notifier1 = Notifier::<TestBinding>::init(query_runner.clone());
 
-    let notifier2 = Notifier::init(query_runner.clone());
+    let notifier2 = Notifier::<TestBinding>::init(query_runner.clone());
     let config = Config {
         reporter_buffer_size: 1,
     };
-    let rep_aggregator1 = ReputationAggregator::init(
+    let rep_aggregator1 = ReputationAggregator::<TestBinding>::init(
         config.clone(),
         signer1.get_socket(),
         notifier1,
         query_runner.clone(),
     )
     .unwrap();
-    let rep_aggregator2 = ReputationAggregator::init(
+    let rep_aggregator2 = ReputationAggregator::<TestBinding>::init(
         config,
         signer2.get_socket(),
         notifier2,

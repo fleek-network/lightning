@@ -1,15 +1,16 @@
 use std::{path::Path, sync::Arc};
 
 use affair::Socket;
-use async_trait::async_trait;
 use fleek_crypto::{
     ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
 };
+use infusion::c;
 use tokio::sync::Notify;
 
 use crate::{
-    application::SyncQueryRunnerInterface, config::ConfigConsumer, consensus::MempoolSocket,
-    types::UpdateMethod, WithStartAndShutdown,
+    config::ConfigConsumer, consensus::MempoolSocket, infu_collection::Collection,
+    types::UpdateMethod, ApplicationInterface, ConfigProviderInterface, ConsensusInterface,
+    WithStartAndShutdown,
 };
 
 /// A socket that is responsible to submit a transaction to the consensus from our node,
@@ -19,17 +20,24 @@ pub type SubmitTxSocket = Socket<UpdateMethod, u64>;
 
 /// The signature provider is responsible for signing messages using the private key of
 /// the node.
-#[async_trait]
-pub trait SignerInterface: ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync {
-    // -- DYNAMIC TYPES
+#[infusion::service]
+pub trait SignerInterface<C: Collection>:
+    ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
+{
+    fn _init(config: ::ConfigProviderInterface, app: ::ApplicationInterface) {
+        Self::init(config.get::<Self>(), app.sync_query())
+    }
 
-    type SyncQuery: SyncQueryRunnerInterface;
-
-    // -- BOUNDED TYPES
-    // empty
+    fn _post(&mut self, c: ::ConsensusInterface) {
+        self.provide_mempool(c.mempool());
+        self.provide_new_block_notify(c.new_block_notifier());
+    }
 
     /// Initialize the signature service.
-    fn init(config: Self::Config, query_runner: Self::SyncQuery) -> anyhow::Result<Self>;
+    fn init(
+        config: Self::Config,
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    ) -> anyhow::Result<Self>;
 
     /// Provide the signer service with the mempool socket after initialization, this function
     /// should only be called once.

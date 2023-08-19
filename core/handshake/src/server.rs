@@ -1,4 +1,5 @@
 use std::{
+    marker::PhantomData,
     net::SocketAddr,
     str::FromStr,
     sync::{Arc, Mutex},
@@ -9,8 +10,8 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use fleek_crypto::{ClientPublicKey, NodePublicKey};
 use lightning_interfaces::{
-    handshake::HandshakeInterface, types::CompressionAlgoSet, ConfigConsumer, ConnectionInterface,
-    WithStartAndShutdown,
+    handshake::HandshakeInterface, infu_collection::Collection, types::CompressionAlgoSet,
+    ConfigConsumer, ConnectionInterface, WithStartAndShutdown,
 };
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -82,12 +83,13 @@ pub enum LaneState {
     Disconnected,
 }
 
-pub type TcpHandshakeServer = HandshakeServer<TcpProvider>;
+pub type TcpHandshakeServer<C> = HandshakeServer<C, TcpProvider>;
 
-pub struct HandshakeServer<L: StreamProvider> {
+pub struct HandshakeServer<C: Collection, L: StreamProvider> {
     shutdown_channel: Arc<Mutex<Option<Sender<()>>>>,
     inner: Arc<HandshakeServerInner>,
     listener: Arc<L>,
+    collection: PhantomData<C>,
 }
 
 #[derive(Clone, Default)]
@@ -95,14 +97,14 @@ pub struct HandshakeServerInner {
     lanes: Arc<DashMap<ClientPublicKey, [LaneState; 24]>>,
 }
 
-impl<L: StreamProvider> ConfigConsumer for HandshakeServer<L> {
+impl<C: Collection, L: StreamProvider> ConfigConsumer for HandshakeServer<C, L> {
     const KEY: &'static str = "handshake";
 
     type Config = HandshakeServerConfig;
 }
 
 #[async_trait]
-impl<L: StreamProvider + 'static> WithStartAndShutdown for HandshakeServer<L> {
+impl<C: Collection, L: StreamProvider + 'static> WithStartAndShutdown for HandshakeServer<C, L> {
     fn is_running(&self) -> bool {
         self.shutdown_channel.lock().unwrap().is_some()
     }
@@ -144,10 +146,11 @@ impl<L: StreamProvider + 'static> WithStartAndShutdown for HandshakeServer<L> {
 
 #[async_trait]
 impl<
+    C: Collection,
     // This implementation accepts an SDK that uses our [`RawLaneConnection`],
     // and the same reader/writer types that the StreamProvider yields.
     L: StreamProvider + 'static,
-> HandshakeInterface for HandshakeServer<L>
+> HandshakeInterface<C> for HandshakeServer<C, L>
 {
     type Connection = RawLaneConnection<L::Reader, L::Writer>;
 
@@ -159,6 +162,7 @@ impl<
             listener,
             inner: Arc::new(HandshakeServerInner::new()),
             shutdown_channel: Mutex::new(None).into(),
+            collection: PhantomData,
         })
     }
 }

@@ -14,12 +14,19 @@ use lightning_application::{
 };
 use lightning_interfaces::{
     application::ApplicationInterface, common::WithStartAndShutdown, consensus::ConsensusInterface,
-    signer::SignerInterface, types::UpdateMethod, SyncQueryRunnerInterface,
+    infu_collection::Collection, partial, signer::SignerInterface, types::UpdateMethod,
+    SyncQueryRunnerInterface,
 };
-use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockPubSub};
+use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::{config::Config, utils, Signer};
+
+partial!(TestBinding {
+    SignerInterface = Signer<Self>;
+    ApplicationInterface = Application<Self>;
+    ConsensusInterface = MockConsensus<Self>;
+});
 
 #[tokio::test]
 async fn test_send_two_txs_in_a_row() {
@@ -43,7 +50,7 @@ async fn test_send_two_txs_in_a_row() {
         None,
     ));
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -52,7 +59,7 @@ async fn test_send_two_txs_in_a_row() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer = Signer::init(signer_config, query_runner.clone()).unwrap();
+    let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
     let signer_socket = signer.get_socket();
 
     let consensus_config = ConsensusConfig {
@@ -62,12 +69,12 @@ async fn test_send_two_txs_in_a_row() {
         transactions_to_lose: HashSet::new(),
         new_block_interval: Duration::from_secs(5),
     };
-    let consensus = MockConsensus::init(
+    let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        MockPubSub {},
+        infusion::Blank::default(),
     )
     .unwrap();
 
@@ -118,7 +125,7 @@ async fn test_retry_send() {
         None,
     ));
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -127,7 +134,7 @@ async fn test_retry_send() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer = Signer::init(signer_config, app.sync_query()).unwrap();
+    let mut signer = Signer::<TestBinding>::init(signer_config, app.sync_query()).unwrap();
 
     let signer_socket = signer.get_socket();
 
@@ -138,12 +145,12 @@ async fn test_retry_send() {
         transactions_to_lose: HashSet::from([2]), // drop the 2nd transaction arriving
         new_block_interval: Duration::from_secs(5),
     };
-    let consensus = MockConsensus::init(
+    let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        MockPubSub {},
+        infusion::Blank::default(),
     )
     .unwrap();
 
@@ -182,15 +189,15 @@ async fn test_retry_send() {
 
 #[tokio::test]
 async fn test_shutdown() {
-    let app = Application::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-    let mut signer = Signer::init(Config::test(), query_runner.clone()).unwrap();
-    let consensus = MockConsensus::init(
+    let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
+    let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        MockPubSub {},
+        infusion::Blank::default(),
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());
@@ -205,15 +212,15 @@ async fn test_shutdown() {
 
 #[tokio::test]
 async fn test_sign_raw_digest() {
-    let app = Application::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-    let mut signer = Signer::init(Config::test(), query_runner.clone()).unwrap();
-    let consensus = MockConsensus::init(
+    let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
+    let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
         update_socket.clone(),
         query_runner.clone(),
-        MockPubSub {},
+        infusion::Blank::default(),
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());
@@ -248,9 +255,9 @@ async fn test_load_keys() {
             .expect("Failed to resolve path"),
     };
 
-    let app = Application::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
     let (_, query_runner) = (app.transaction_executor(), app.sync_query());
-    let signer = Signer::init(config, query_runner).unwrap();
+    let signer = Signer::<TestBinding>::init(config, query_runner).unwrap();
 
     // Make sure that the signer loaded the keys from the provided paths.
     let (consensus_secret_key_loaded, node_secret_key_loaded) = signer.get_sk();
@@ -282,9 +289,9 @@ async fn test_fail_to_encode_keys() {
 
     let result = std::panic::catch_unwind(|| {
         futures::executor::block_on(async move {
-            let app = Application::init(AppConfig::default()).unwrap();
+            let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
             let (_, query_runner) = (app.transaction_executor(), app.sync_query());
-            Signer::init(config, query_runner).unwrap();
+            Signer::<TestBinding>::init(config, query_runner).unwrap();
         })
     });
 
@@ -315,9 +322,9 @@ async fn test_no_keys_exist() {
             .expect("Failed to resolve path"),
     };
 
-    let app = Application::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
     let (_, query_runner) = (app.transaction_executor(), app.sync_query());
-    let signer = Signer::init(config, query_runner);
+    let signer = Signer::<TestBinding>::init(config, query_runner);
 
     // Initiating the signer should return an error if no keys exist.
     assert!(signer.is_err());
@@ -334,7 +341,7 @@ async fn test_generate_node_key() {
     }
 
     let node_key_path = path.join("node.pem");
-    Signer::generate_node_key(&node_key_path).unwrap();
+    Signer::<TestBinding>::generate_node_key(&node_key_path).unwrap();
 
     // Make sure that a valid key was created.
     let node_secret_key = fs::read_to_string(&node_key_path).expect("Failed to read node pem file");
@@ -354,7 +361,7 @@ async fn test_generate_consensus_key() {
     }
 
     let network_key_path = path.join("consensus.pem");
-    Signer::generate_consensus_key(&network_key_path).unwrap();
+    Signer::<TestBinding>::generate_consensus_key(&network_key_path).unwrap();
 
     // Make sure that a valid key was created.
     let network_secret_key =
