@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -17,14 +18,20 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use quinn::{Endpoint, ServerConfig};
+use tokio::sync::{mpsc, Mutex};
 
-use crate::connector::Connector;
+use crate::connection::RegisterEvent;
+use crate::connector::{ConnectEvent, Connector};
 use crate::listener::Listener;
 use crate::netkit;
 use crate::receiver::Receiver;
 use crate::sender::Sender;
 
 pub struct ConnectionPool<C> {
+    connector_tx: mpsc::Sender<ConnectEvent>,
+    register_tx: mpsc::Sender<RegisterEvent>,
+    connector_rx: Arc<Mutex<Option<mpsc::Receiver<ConnectEvent>>>>,
+    register_rx: Arc<Mutex<Option<mpsc::Receiver<RegisterEvent>>>>,
     endpoint: Endpoint,
     _marker: PhantomData<C>,
 }
@@ -68,7 +75,15 @@ where
         let tls_config = netkit::server_config();
         let server_config = ServerConfig::with_crypto(Arc::new(tls_config));
         let endpoint = Endpoint::server(server_config, address).unwrap();
+
+        let (register_tx, register_rx) = mpsc::channel(256);
+        let (connector_tx, connector_rx) = mpsc::channel(256);
+
         Self {
+            connector_tx,
+            connector_rx: Arc::new(Mutex::new(Some(connector_rx))),
+            register_tx,
+            register_rx: Arc::new(Mutex::new(Some(register_rx))),
             endpoint,
             _marker: PhantomData::default(),
         }

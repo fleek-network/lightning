@@ -37,7 +37,7 @@ pub async fn start_listener_driver(mut driver: ListenerDriver) {
                     let data = rx.read_to_end(4096).await.unwrap();
                     let message: ScopedMessage = ScopedMessage::decode(&data).unwrap();
                     if let Some(handle) = handles.get(&message.scope) {
-                        handle.send((tx, rx)).await.unwrap();
+                        handle.send((message.pk, tx, rx)).await.unwrap();
                     }
                 });
             }
@@ -67,8 +67,14 @@ pub async fn start_connector_driver<T: LightningMessage>(mut driver: ConnectorDr
         let (mut tx, mut rx) = connection.open_bi().await.unwrap();
         let mut writer = Vec::with_capacity(4096);
 
-        LightningMessage::encode::<Vec<_>>(&ScopedMessage { scope: event.scope }, writer.as_mut())
-            .unwrap();
+        LightningMessage::encode::<Vec<_>>(
+            &ScopedMessage {
+                pk: event.pk,
+                scope: event.scope,
+            },
+            writer.as_mut(),
+        )
+        .unwrap();
         let _ = tx.write(writer.as_mut()).await.unwrap();
         event.respond.send((tx, rx)).unwrap();
     }
@@ -77,7 +83,7 @@ pub async fn start_connector_driver<T: LightningMessage>(mut driver: ConnectorDr
 /// Driver for driving the connection events from the transport connection.
 pub struct ListenerDriver {
     /// Current active connections.
-    handles: HashMap<ServiceScope, Sender<(SendStream, RecvStream)>>,
+    handles: HashMap<ServiceScope, Sender<(NodePublicKey, SendStream, RecvStream)>>,
     /// Listens for scoped service registration.
     register_rx: Receiver<RegisterEvent>,
     /// QUIC endpoint.
@@ -98,6 +104,7 @@ pub struct ConnectorDriver {
 pub struct ScopedMessage {
     /// Channel ID.
     scope: ServiceScope,
+    pk: NodePublicKey,
 }
 
 impl LightningMessage for ScopedMessage {
@@ -117,5 +124,5 @@ pub struct RegisterEvent {
     /// Scope to be registered.
     scope: ServiceScope,
     /// Handle to send back stream.
-    handle: Sender<(SendStream, RecvStream)>,
+    handle: Sender<(NodePublicKey, SendStream, RecvStream)>,
 }
