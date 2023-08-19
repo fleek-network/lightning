@@ -2,31 +2,22 @@ use std::{
     collections::{HashMap, HashSet},
     io::Write,
     net::SocketAddr,
+    sync::Arc,
 };
 
 use affair::AsyncWorker;
 use anyhow::{bail, Result};
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::{schema::LightningMessage, types::ServiceScope};
-use quinn::{Connection, Endpoint, RecvStream, SendStream};
+use quinn::{ClientConfig, Connection, Endpoint, RecvStream, SendStream};
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
 
-use crate::connector::ConnectEvent;
+use crate::{connector::ConnectEvent, netkit};
 
-/// Driver for driving the connection events from the transport connection.
-pub struct ListenerDriver {
-    /// Current active connections.
-    handles: HashMap<ServiceScope, Sender<(SendStream, RecvStream)>>,
-    /// Listens for scoped service registration.
-    register_rx: Receiver<RegisterEvent>,
-    /// QUIC endpoint.
-    endpoint: Endpoint,
-}
-
-pub async fn start_listener_driver<T: LightningMessage>(mut driver: ListenerDriver) {
+pub async fn start_listener_driver(mut driver: ListenerDriver) {
     loop {
         tokio::select! {
             event = driver.register_rx.recv() => {
@@ -44,17 +35,55 @@ pub async fn start_listener_driver<T: LightningMessage>(mut driver: ListenerDriv
                 let connection = connecting.await.unwrap();
                 let handles = driver.handles.clone();
                 tokio::spawn(async move {
-                    let mut stream = connection.accept_uni().await.unwrap();
-                    let data = stream.read_to_end(4096).await.unwrap();
-                    let message: ScopedMessage<T> = ScopedMessage::decode(&data).unwrap();
+                    let (tx, mut rx) = connection.accept_bi().await.unwrap();
+                    let data = rx.read_to_end(4096).await.unwrap();
+                    let message: ScopedMessage = ScopedMessage::decode(&data).unwrap();
                     if let Some(handle) = handles.get(&message.scope) {
-                        let bi_stream = connection.accept_bi().await.unwrap();
-                        handle.send(bi_stream).await.unwrap();
+                        handle.send((tx, rx)).await.unwrap();
                     }
                 });
             }
         }
     }
+}
+
+pub async fn start_connector_driver<T: LightningMessage>(mut driver: ConnectorDriver) {
+    while let Some(event) = driver.connect_rx.recv().await {
+        let connection = match driver.pool.get(&(event.pk, event.address)) {
+            None => {
+                let config = netkit::client_config();
+                let client_config = ClientConfig::new(Arc::new(config));
+                let connection = driver
+                    .endpoint
+                    .connect_with(client_config, event.address, "")
+                    .unwrap()
+                    .await
+                    .unwrap();
+                driver
+                    .pool
+                    .insert((event.pk, event.address), connection.clone());
+                connection
+            },
+            Some(connection) => connection.clone(),
+        };
+        let (mut tx, mut rx) = connection.open_bi().await.unwrap();
+        let mut writer = Vec::with_capacity(4096);
+
+        LightningMessage::encode::<Vec<_>>(&ScopedMessage { scope: event.scope }, writer.as_mut())
+            .unwrap();
+        let _ = tx.write(writer.as_mut()).await.unwrap();
+        event.respond.send((tx, rx)).unwrap();
+    }
+}
+
+/// Driver for driving the connection events from the transport connection.
+pub struct ListenerDriver {
+    /// Current active connections.
+    handles: HashMap<ServiceScope, Sender<(SendStream, RecvStream)>>,
+    /// Listens for scoped service registration.
+    register_rx: Receiver<RegisterEvent>,
+    /// QUIC endpoint.
+    endpoint: Endpoint,
 }
 
 /// Driver for driving the connection events from the transport connection.
@@ -68,17 +97,12 @@ pub struct ConnectorDriver {
 }
 
 /// Wrapper that allows us to create logical channels.
-pub struct ScopedMessage<T> {
+pub struct ScopedMessage {
     /// Channel ID.
     scope: ServiceScope,
-    /// The actual message.
-    message: T,
 }
 
-impl<T> LightningMessage for ScopedMessage<T>
-where
-    T: LightningMessage,
-{
+impl LightningMessage for ScopedMessage {
     fn decode(buffer: &[u8]) -> Result<Self> {
         todo!()
     }

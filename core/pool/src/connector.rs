@@ -3,8 +3,8 @@ use std::{marker::PhantomData, net::SocketAddr};
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::{
-    schema::LightningMessage, ConnectorInterface, SenderReceiver, SignerInterface,
-    SyncQueryRunnerInterface,
+    schema::LightningMessage, types::ServiceScope, ConnectorInterface, SenderReceiver,
+    SignerInterface, SyncQueryRunnerInterface,
 };
 use quinn::{Connection, RecvStream, SendStream};
 use tokio::sync::{mpsc, oneshot};
@@ -12,12 +12,14 @@ use tokio::sync::{mpsc, oneshot};
 use crate::{pool::ConnectionPool, receiver::Receiver, sender::Sender};
 
 pub struct ConnectEvent {
-    pk: NodePublicKey,
-    address: SocketAddr,
-    respond: oneshot::Sender<(SendStream, RecvStream)>,
+    pub scope: ServiceScope,
+    pub pk: NodePublicKey,
+    pub address: SocketAddr,
+    pub respond: oneshot::Sender<(SendStream, RecvStream)>,
 }
 
 pub struct Connector<Q, S, T> {
+    scope: ServiceScope,
     connection_event_tx: mpsc::Sender<ConnectEvent>,
     _marker: PhantomData<(Q, S, T)>,
 }
@@ -41,6 +43,7 @@ where
         let (tx, rx) = oneshot::channel();
         self.connection_event_tx
             .send(ConnectEvent {
+                scope: self.scope,
                 pk: *to,
                 address: "0.0.0.0:0".parse().unwrap(),
                 respond: tx,
