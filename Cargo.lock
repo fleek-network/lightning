@@ -3303,6 +3303,7 @@ dependencies = [
  "fleek-blake3",
  "fleek-crypto",
  "hp-fixed",
+ "infusion",
  "lazy_static",
  "lightning-interfaces",
  "lightning-reputation",
