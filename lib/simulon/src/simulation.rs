@@ -1,24 +1,18 @@
-use std::{
-    any::Any,
-    cell::UnsafeCell,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    thread::JoinHandle,
-    time::Duration,
-};
+use std::any::Any;
+use std::cell::UnsafeCell;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::thread::JoinHandle;
+use std::time::Duration;
 
 use indicatif::ProgressBar;
 
-use crate::{
-    latency::{DefaultLatencyProvider, LatencyProvider},
-    message::Message,
-    report::{Metrics, Report},
-    state::{hook_node, with_node, NodeState},
-    storage::TypedStorage,
-    FRAME_DURATION, FRAME_TO_MS,
-};
+use crate::latency::{DefaultLatencyProvider, LatencyProvider};
+use crate::message::Message;
+use crate::report::{Metrics, Report};
+use crate::state::{hook_node, with_node, NodeState};
+use crate::storage::TypedStorage;
+use crate::{FRAME_DURATION, FRAME_TO_MS};
 
 /// Constructor for a simulation which allows you to set the parameters of a simulation.
 pub struct SimulationBuilder<L = DefaultLatencyProvider> {

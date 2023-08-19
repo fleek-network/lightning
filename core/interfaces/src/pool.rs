@@ -4,9 +4,13 @@ use infusion::{c, ok};
 use lightning_schema::LightningMessage;
 use lightning_types::ServiceScope;
 
+use crate::infu_collection::Collection;
 use crate::{
-    infu_collection::Collection, ApplicationInterface, ConfigConsumer, ConfigProviderInterface,
-    SignerInterface, WithStartAndShutdown,
+    ApplicationInterface,
+    ConfigConsumer,
+    ConfigProviderInterface,
+    SignerInterface,
+    WithStartAndShutdown,
 };
 
 /// Type alias for the return type of accept and connect.

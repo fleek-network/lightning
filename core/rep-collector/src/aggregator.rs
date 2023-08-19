@@ -1,20 +1,27 @@
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::collections::BTreeMap;
+use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::config::ConfigConsumer;
+use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::notifier::{Notification, NotifierInterface};
+use lightning_interfaces::reputation::ReputationAggregatorInterface;
+use lightning_interfaces::signer::SubmitTxSocket;
+use lightning_interfaces::types::{NodeIndex, ReputationMeasurements, UpdateMethod};
 use lightning_interfaces::{
-    config::ConfigConsumer,
-    infu_collection::{c, Collection},
-    notifier::{Notification, NotifierInterface},
-    reputation::ReputationAggregatorInterface,
-    signer::SubmitTxSocket,
-    types::{NodeIndex, ReputationMeasurements, UpdateMethod},
-    ApplicationInterface, ReputationQueryInteface, ReputationReporterInterface,
-    SyncQueryRunnerInterface, Weight,
+    ApplicationInterface,
+    ReputationQueryInteface,
+    ReputationReporterInterface,
+    SyncQueryRunnerInterface,
+    Weight,
 };
 use tokio::sync::mpsc;
 
-use crate::{buffered_mpsc, config::Config, measurement_manager::MeasurementManager};
+use crate::buffered_mpsc;
+use crate::config::Config;
+use crate::measurement_manager::MeasurementManager;
 
 #[cfg(not(test))]
 const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(3600);

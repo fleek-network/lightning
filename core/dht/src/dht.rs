@@ -1,27 +1,22 @@
-use std::{
-    marker::PhantomData,
-    net::SocketAddr,
-    sync::{Arc, Mutex},
-};
+use std::marker::PhantomData;
+use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 
 use affair::{Socket, Task};
 use anyhow::Result;
 use async_trait::async_trait;
 use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
-use lightning_interfaces::{
-    dht::{DhtInterface, DhtSocket},
-    infu_collection::{c, Collection},
-    types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry},
-    ConfigConsumer, SignerInterface, WithStartAndShutdown,
-};
-use tokio::{
-    net::UdpSocket,
-    sync::{mpsc, Notify},
-};
+use lightning_interfaces::dht::{DhtInterface, DhtSocket};
+use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
+use lightning_interfaces::{ConfigConsumer, SignerInterface, WithStartAndShutdown};
+use tokio::net::UdpSocket;
+use tokio::sync::{mpsc, Notify};
 
-use crate::{
-    api, config::Config, network, node::NodeInfo, store, table, task, task::bootstrap::Bootstrapper,
-};
+use crate::config::Config;
+use crate::node::NodeInfo;
+use crate::task::bootstrap::Bootstrapper;
+use crate::{api, network, store, table, task};
 
 /// Builds the DHT.
 pub struct Builder {

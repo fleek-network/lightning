@@ -463,10 +463,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use tokio::{
-        net::{TcpListener, TcpStream},
-        sync::mpsc::channel,
-    };
+    use tokio::net::{TcpListener, TcpStream};
+    use tokio::sync::mpsc::channel;
 
     use super::*;
 

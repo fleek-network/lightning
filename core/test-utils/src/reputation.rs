@@ -1,7 +1,8 @@
 use std::time::Duration;
 
 use lightning_interfaces::types::ReputationMeasurements;
-use rand::{rngs::StdRng, Rng};
+use rand::rngs::StdRng;
+use rand::Rng;
 
 pub fn generate_reputation_measurements(
     rng: &mut StdRng,

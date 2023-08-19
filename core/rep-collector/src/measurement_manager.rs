@@ -1,7 +1,11 @@
-use std::{collections::BTreeMap, num::NonZeroUsize, sync::Arc, time::Duration};
+use std::collections::BTreeMap;
+use std::num::NonZeroUsize;
+use std::sync::Arc;
+use std::time::Duration;
 
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::{types::ReputationMeasurements, Weight};
+use lightning_interfaces::types::ReputationMeasurements;
+use lightning_interfaces::Weight;
 use lightning_reputation::statistics::try_min_max_normalize;
 use lru::LruCache;
 
@@ -742,7 +746,8 @@ impl NormalizedMeasurements {
 #[cfg(test)]
 mod tests {
     use fleek_crypto::NodePublicKey;
-    use lightning_interfaces::{types::ReputationMeasurements, Weight};
+    use lightning_interfaces::types::ReputationMeasurements;
+    use lightning_interfaces::Weight;
     use lightning_test_utils::{random, reputation};
     use rand::Rng;
 

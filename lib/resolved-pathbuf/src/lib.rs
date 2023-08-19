@@ -1,7 +1,5 @@
-use std::{
-    fmt::Debug,
-    path::{Path, PathBuf},
-};
+use std::fmt::Debug;
+use std::path::{Path, PathBuf};
 
 use derive_more::{AsRef, Deref};
 use resolve_path::PathResolveExt;

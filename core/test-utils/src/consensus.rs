@@ -1,26 +1,25 @@
-use std::{
-    collections::HashSet,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use affair::{Socket, Task};
 use async_trait::async_trait;
+use lightning_interfaces::application::{ExecutionEngineSocket, SyncQueryRunnerInterface};
+use lightning_interfaces::config::ConfigConsumer;
+use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
+use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::signer::SignerInterface;
+use lightning_interfaces::types::{Block, UpdateRequest};
 use lightning_interfaces::{
-    application::{ExecutionEngineSocket, SyncQueryRunnerInterface},
-    config::ConfigConsumer,
-    consensus::{ConsensusInterface, MempoolSocket},
-    infu_collection::{c, Collection},
-    signer::SignerInterface,
-    types::{Block, UpdateRequest},
-    ApplicationInterface, BroadcastInterface, PubSub, WithStartAndShutdown,
+    ApplicationInterface,
+    BroadcastInterface,
+    PubSub,
+    WithStartAndShutdown,
 };
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    sync::{mpsc, Notify},
-    time::{interval, sleep},
-};
+use tokio::sync::{mpsc, Notify};
+use tokio::time::{interval, sleep};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct MockPubSub {}

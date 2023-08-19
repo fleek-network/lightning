@@ -1,11 +1,14 @@
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::time::Duration;
 
 use fxhash::{FxHashMap, FxHashSet};
 use rand::Rng;
 use rand_chacha::ChaCha8Rng;
 use rand_core::SeedableRng;
 use serde::{Deserialize, Serialize};
-use simulon::{api, simulation::SimulationBuilder};
+use simulon::api;
+use simulon::simulation::SimulationBuilder;
 
 #[derive(Serialize, Deserialize, Debug)]
 enum Message {

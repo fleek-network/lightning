@@ -1,8 +1,6 @@
-use std::{
-    fmt,
-    ops::{Add, AddAssign, Div, Mul, Sub, SubAssign},
-    str::FromStr,
-};
+use std::fmt;
+use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
+use std::str::FromStr;
 
 use num_bigint::BigUint;
 use num_traits::{CheckedDiv, FromPrimitive, ToPrimitive, Zero};

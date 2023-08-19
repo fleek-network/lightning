@@ -1,20 +1,29 @@
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
+use std::time::Duration;
 
 use affair::Socket;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 
-use crate::{
-    common::WithStartAndShutdown,
-    config::ConfigConsumer,
-    infu_collection::Collection,
-    types::{
-        Block, BlockExecutionResponse, Epoch, EpochInfo, NodeInfo, NodeServed, ProtocolParams,
-        ReportedReputationMeasurements, Service, ServiceId, TotalServed, TransactionResponse,
-        UpdateRequest,
-    },
-    ConfigProviderInterface,
+use crate::common::WithStartAndShutdown;
+use crate::config::ConfigConsumer;
+use crate::infu_collection::Collection;
+use crate::types::{
+    Block,
+    BlockExecutionResponse,
+    Epoch,
+    EpochInfo,
+    NodeInfo,
+    NodeServed,
+    ProtocolParams,
+    ReportedReputationMeasurements,
+    Service,
+    ServiceId,
+    TotalServed,
+    TransactionResponse,
+    UpdateRequest,
 };
+use crate::ConfigProviderInterface;
 
 /// The socket that is handled by the application layer and fed by consensus (or other
 /// synchronization systems in place) which executes and persists transactions that

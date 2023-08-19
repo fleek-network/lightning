@@ -3,20 +3,17 @@
    will then forward the transaction to an active narwhal committee member, prefering its own worker if the node is currently
    on the committee. Retry logic should be done on the proccess that has the sender side of the socket.
 */
-use std::{
-    cmp,
-    collections::{hash_map::Entry, HashMap},
-};
+use std::cmp;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 
 use affair::AsyncWorker;
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use fastcrypto::bls12381::min_sig::BLS12381PublicKey;
 use fleek_crypto::ConsensusPublicKey;
-use lightning_interfaces::{
-    types::{Epoch, EpochInfo, NodeInfo, UpdateRequest},
-    SyncQueryRunnerInterface,
-};
+use lightning_interfaces::types::{Epoch, EpochInfo, NodeInfo, UpdateRequest};
+use lightning_interfaces::SyncQueryRunnerInterface;
 use log::error;
 use narwhal_types::{TransactionProto, TransactionsClient};
 use rand::seq::SliceRandom;

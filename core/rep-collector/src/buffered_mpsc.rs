@@ -1,9 +1,8 @@
-use std::{
-    collections::VecDeque,
-    sync::{Arc, Mutex},
-};
+use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 
-use tokio::sync::mpsc::{channel, error::SendError, Receiver, Sender};
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 pub struct BufferedSender<T> {
     inner: Sender<Vec<T>>,

@@ -1,4 +1,7 @@
-use std::{borrow::Borrow, cmp::Ordering, fmt::Debug, ptr};
+use std::borrow::Borrow;
+use std::cmp::Ordering;
+use std::fmt::Debug;
+use std::ptr;
 
 use arrayref::array_ref;
 use arrayvec::ArrayVec;

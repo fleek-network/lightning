@@ -3,7 +3,13 @@ use std::collections::HashMap;
 use anyhow::{Context, Result};
 use fleek_crypto::{AccountOwnerPublicKey, ConsensusPublicKey, NodePublicKey, PublicKey};
 use lightning_interfaces::types::{
-    CommodityTypes, Epoch, NodeInfo, NodeServed, Staking, TotalServed, Worker,
+    CommodityTypes,
+    Epoch,
+    NodeInfo,
+    NodeServed,
+    Staking,
+    TotalServed,
+    Worker,
 };
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};

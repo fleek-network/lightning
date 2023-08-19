@@ -1,4 +1,6 @@
-use axum::{http::HeaderMap, routing::get, Router};
+use axum::http::HeaderMap;
+use axum::routing::get;
+use axum::Router;
 
 pub async fn spawn_gateway(port: u16) -> anyhow::Result<()> {
     // Mostly taken from:

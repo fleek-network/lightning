@@ -1,26 +1,23 @@
-use std::{
-    marker::PhantomData,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::marker::PhantomData;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use affair::{Socket, Task};
 use anyhow::Context;
 use async_trait::async_trait;
 use cid::Cid;
-use hyper::{
-    client::{self, HttpConnector},
-    Body, Client, Request, Uri,
-};
+use hyper::client::{self, HttpConnector};
+use hyper::{Body, Client, Request, Uri};
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
+use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
-    infu_collection::Collection, ConfigConsumer, OriginProviderInterface, OriginProviderSocket,
+    ConfigConsumer,
+    OriginProviderInterface,
+    OriginProviderSocket,
     WithStartAndShutdown,
 };
-use tokio::{
-    sync::{mpsc, Notify},
-    time::timeout,
-};
+use tokio::sync::{mpsc, Notify};
+use tokio::time::timeout;
 
 mod config;
 use config::{Config, Gateway};

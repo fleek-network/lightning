@@ -1,7 +1,6 @@
-use crate::{
-    infu_collection::Collection, types::ServiceId, ConfigConsumer, ConfigProviderInterface,
-    ConnectionInterface, WithStartAndShutdown,
-};
+use crate::infu_collection::Collection;
+use crate::types::ServiceId;
+use crate::{ConfigConsumer, ConfigProviderInterface, ConnectionInterface, WithStartAndShutdown};
 
 #[infusion::service]
 pub trait ServiceExecutorInterface<C: Collection>:

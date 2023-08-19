@@ -1,8 +1,10 @@
 use std::net::SocketAddr;
 
-use fleek_cdn::{client::CdnClient, connection::ServiceMode};
+use fleek_cdn::client::CdnClient;
+use fleek_cdn::connection::ServiceMode;
 use fleek_crypto::ClientPublicKey;
-use rand::{rngs::ThreadRng, Rng};
+use rand::rngs::ThreadRng;
+use rand::Rng;
 use tokio::net::TcpStream;
 
 const HASH: [u8; 32] = [

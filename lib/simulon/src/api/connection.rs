@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use super::RemoteAddr;
 use crate::state::{with_node, ResourceId};

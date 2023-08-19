@@ -3,7 +3,8 @@ use std::time::Duration;
 use infusion::{c, ok};
 use tokio::sync::mpsc;
 
-use crate::{infu_collection::Collection, ApplicationInterface};
+use crate::infu_collection::Collection;
+use crate::ApplicationInterface;
 
 #[derive(Debug)]
 pub enum Notification {

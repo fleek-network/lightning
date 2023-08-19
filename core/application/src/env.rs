@@ -3,23 +3,41 @@ use std::time::{Duration, SystemTime};
 use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use fleek_crypto::{
-    AccountOwnerPublicKey, ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey,
+    AccountOwnerPublicKey,
+    ClientPublicKey,
+    ConsensusPublicKey,
+    EthAddress,
+    NodePublicKey,
     PublicKey,
 };
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
-    AccountInfo, Block, BlockExecutionResponse, Committee, CommodityTypes, Epoch, ExecutionData,
-    Metadata, NodeIndex, NodeInfo, NodeServed, ProtocolParams, ReportedReputationMeasurements,
-    Service, ServiceId, ServiceRevenue, TotalServed, TransactionResponse, Value,
+    AccountInfo,
+    Block,
+    BlockExecutionResponse,
+    Committee,
+    CommodityTypes,
+    Epoch,
+    ExecutionData,
+    Metadata,
+    NodeIndex,
+    NodeInfo,
+    NodeServed,
+    ProtocolParams,
+    ReportedReputationMeasurements,
+    Service,
+    ServiceId,
+    ServiceRevenue,
+    TotalServed,
+    TransactionResponse,
+    Value,
 };
 
-use crate::{
-    config::{Config, Mode},
-    genesis::{Genesis, GenesisPrices},
-    query_runner::QueryRunner,
-    state::State,
-    table::StateTables,
-};
+use crate::config::{Config, Mode};
+use crate::genesis::{Genesis, GenesisPrices};
+use crate::query_runner::QueryRunner;
+use crate::state::State;
+use crate::table::StateTables;
 
 pub struct Env<P> {
     inner: Atomo<P>,

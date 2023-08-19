@@ -1,30 +1,21 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-    time::Duration,
-};
+use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
-use tokio::{
-    net::UdpSocket,
-    select,
-    sync::{
-        mpsc::{Receiver, Sender},
-        oneshot,
-    },
-    time,
-};
+use tokio::net::UdpSocket;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::oneshot;
+use tokio::{select, time};
 
-use crate::{
-    bucket::MAX_BUCKET_SIZE,
-    distance::{self, Distance},
-    network::{Message, MessageType, Request},
-    node::NodeInfo,
-    socket,
-    table::{TableKey, TableRequest},
-    task::{ResponseEvent, TaskResponse},
-};
+use crate::bucket::MAX_BUCKET_SIZE;
+use crate::distance::{self, Distance};
+use crate::network::{Message, MessageType, Request};
+use crate::node::NodeInfo;
+use crate::socket;
+use crate::table::{TableKey, TableRequest};
+use crate::task::{ResponseEvent, TaskResponse};
 
 /// Kademlia's lookup procedure.
 pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {

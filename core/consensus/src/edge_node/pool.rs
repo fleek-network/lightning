@@ -1,11 +1,13 @@
-use std::{sync::Arc, time::Instant};
+use std::sync::Arc;
+use std::time::Instant;
 
 use dashmap::DashMap;
 use fastcrypto::hash::Hash;
 use log::error;
 use narwhal_types::{Batch, BatchDigest};
 use tokio::sync::Notify;
-use typed_store::{rocks::DBMap, Map};
+use typed_store::rocks::DBMap;
+use typed_store::Map;
 
 /// A batch pool can be used to resolve batches.
 #[derive(Clone)]

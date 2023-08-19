@@ -2,7 +2,9 @@ use std::cmp::Reverse;
 
 use derive_more::{Deref, DerefMut};
 
-use crate::{api::RemoteAddr, future::DeferredFutureWaker, state::ResourceId};
+use crate::api::RemoteAddr;
+use crate::future::DeferredFutureWaker;
+use crate::state::ResourceId;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Message {

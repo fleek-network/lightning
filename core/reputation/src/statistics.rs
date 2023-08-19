@@ -2,7 +2,8 @@ use std::ops::{Add, Div, Mul, Sub};
 
 use hp_fixed::signed::HpFixed;
 
-use crate::{types::WeightedValue, PRECISION};
+use crate::types::WeightedValue;
+use crate::PRECISION;
 
 const EPSILON: f64 = 1e-8;
 

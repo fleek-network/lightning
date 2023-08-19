@@ -1,4 +1,5 @@
-use std::{ops::Add, time::Duration};
+use std::ops::Add;
+use std::time::Duration;
 
 use arrayref::array_ref;
 use num::integer::Roots;

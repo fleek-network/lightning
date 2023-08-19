@@ -1,26 +1,29 @@
-use std::{
-    collections::{BTreeMap, HashSet},
-    fs,
-    time::Duration,
-};
+use std::collections::{BTreeMap, HashSet};
+use std::fs;
+use std::time::Duration;
 
 use fleek_crypto::{
-    AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey,
+    AccountOwnerSecretKey,
+    ConsensusSecretKey,
+    NodeSecretKey,
+    PublicKey,
+    SecretKey,
 };
-use lightning_application::{
-    app::Application,
-    config::{Config as AppConfig, Mode},
-    genesis::{Genesis, GenesisCommittee},
-};
-use lightning_interfaces::{
-    application::ApplicationInterface, common::WithStartAndShutdown, consensus::ConsensusInterface,
-    infu_collection::Collection, partial, signer::SignerInterface, types::UpdateMethod,
-    SyncQueryRunnerInterface,
-};
+use lightning_application::app::Application;
+use lightning_application::config::{Config as AppConfig, Mode};
+use lightning_application::genesis::{Genesis, GenesisCommittee};
+use lightning_interfaces::application::ApplicationInterface;
+use lightning_interfaces::common::WithStartAndShutdown;
+use lightning_interfaces::consensus::ConsensusInterface;
+use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::signer::SignerInterface;
+use lightning_interfaces::types::UpdateMethod;
+use lightning_interfaces::{partial, SyncQueryRunnerInterface};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use resolved_pathbuf::ResolvedPathBuf;
 
-use crate::{config::Config, utils, Signer};
+use crate::config::Config;
+use crate::{utils, Signer};
 
 partial!(TestBinding {
     SignerInterface = Signer<Self>;

@@ -3,10 +3,8 @@ use std::sync::Arc;
 use fleek_crypto::NodePublicKey;
 use infusion::c;
 
-use crate::{
-    infu_collection::Collection, ApplicationInterface, ConfigConsumer, ConfigProviderInterface,
-    SignerInterface,
-};
+use crate::infu_collection::Collection;
+use crate::{ApplicationInterface, ConfigConsumer, ConfigProviderInterface, SignerInterface};
 
 /// The algorithm used for clustering our network and dynamically creating a network topology.
 /// This clustering is later used in other parts of the codebase when connection to other nodes

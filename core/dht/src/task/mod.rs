@@ -2,35 +2,25 @@ mod lookup;
 
 pub mod bootstrap;
 
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 use anyhow::Error;
 use fleek_crypto::NodePublicKey;
-use tokio::{
-    net::UdpSocket,
-    sync::{
-        mpsc,
-        mpsc::{Receiver, Sender},
-        oneshot, Notify,
-    },
-    task::JoinSet,
-};
+use tokio::net::UdpSocket;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{mpsc, oneshot, Notify};
+use tokio::task::JoinSet;
 use tokio_util::time::DelayQueue;
 
-use crate::{
-    network::{Message, MessageType, Request, Response},
-    node::NodeInfo,
-    socket,
-    table::{TableKey, TableRequest},
-    task::{
-        bootstrap::{Bootstrapper, BOOTSTRAP_TASK_ID},
-        lookup::LookupTask,
-    },
-};
+use crate::network::{Message, MessageType, Request, Response};
+use crate::node::NodeInfo;
+use crate::socket;
+use crate::table::{TableKey, TableRequest};
+use crate::task::bootstrap::{Bootstrapper, BOOTSTRAP_TASK_ID};
+use crate::task::lookup::LookupTask;
 
 type TaskResult = Result<u64, TaskFailed>;
 

@@ -1,13 +1,9 @@
-use std::{
-    io::{self, ErrorKind},
-    pin::Pin,
-    task::Poll,
-};
+use std::io::{self, ErrorKind};
+use std::pin::Pin;
+use std::task::Poll;
 
-use cid::{
-    multihash::{Code, MultihashDigest},
-    Cid,
-};
+use cid::multihash::{Code, MultihashDigest};
+use cid::Cid;
 use futures::ready;
 use hyper::Body;
 use lightning_interfaces::UntrustedStream;

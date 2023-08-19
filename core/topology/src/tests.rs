@@ -1,19 +1,26 @@
 use std::collections::HashMap;
 
 use fleek_crypto::{
-    AccountOwnerSecretKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, PublicKey, SecretKey,
+    AccountOwnerSecretKey,
+    ConsensusSecretKey,
+    NodePublicKey,
+    NodeSecretKey,
+    PublicKey,
+    SecretKey,
 };
-use lightning_application::{
-    app::Application,
-    config::{Config as AppConfig, Mode},
-    genesis::{Genesis, GenesisCommittee, GenesisLatency},
-};
+use lightning_application::app::Application;
+use lightning_application::config::{Config as AppConfig, Mode};
+use lightning_application::genesis::{Genesis, GenesisCommittee, GenesisLatency};
+use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
-    infu_collection::Collection, partial, ApplicationInterface, TopologyInterface,
+    partial,
+    ApplicationInterface,
+    TopologyInterface,
     WithStartAndShutdown,
 };
 
-use crate::{config::Config, Topology};
+use crate::config::Config;
+use crate::Topology;
 
 partial!(TestBinding {
     TopologyInterface = Topology<Self>;

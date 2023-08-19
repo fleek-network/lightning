@@ -1,27 +1,25 @@
+use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 #[cfg(feature = "e2e-test")]
 use std::sync::Mutex;
-use std::{
-    net::SocketAddr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
 
 use async_trait::async_trait;
-use axum::{
-    routing::{get, post},
-    Extension, Router,
-};
+use axum::routing::{get, post};
+use axum::{Extension, Router};
+use lightning_interfaces::common::WithStartAndShutdown;
+use lightning_interfaces::config::ConfigConsumer;
 #[cfg(feature = "e2e-test")]
 use lightning_interfaces::dht::DhtSocket;
+use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::{
-    common::WithStartAndShutdown,
-    config::ConfigConsumer,
-    infu_collection::{c, Collection},
-    ApplicationInterface, MempoolSocket, RpcInterface, SyncQueryRunnerInterface,
+    ApplicationInterface,
+    MempoolSocket,
+    RpcInterface,
+    SyncQueryRunnerInterface,
 };
-use tokio::{sync::Notify, task};
+use tokio::sync::Notify;
+use tokio::task;
 
 use super::config::Config;
 use crate::handlers::{rpc_handler, RpcServer};

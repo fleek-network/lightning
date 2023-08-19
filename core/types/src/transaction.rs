@@ -1,7 +1,11 @@
 use std::collections::BTreeMap;
 
 use fleek_crypto::{
-    ConsensusPublicKey, EthAddress, NodePublicKey, TransactionSender, TransactionSignature,
+    ConsensusPublicKey,
+    EthAddress,
+    NodePublicKey,
+    TransactionSender,
+    TransactionSignature,
 };
 use hp_fixed::unsigned::HpUfixed;
 use ink_quill::{ToDigest, TranscriptBuilder, TranscriptBuilderInput};
@@ -9,8 +13,15 @@ use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    DeliveryAcknowledgment, Epoch, ProofOfConsensus, ProofOfMisbehavior, ProtocolParams,
-    ReputationMeasurements, Service, ServiceId, Tokens,
+    DeliveryAcknowledgment,
+    Epoch,
+    ProofOfConsensus,
+    ProofOfMisbehavior,
+    ProtocolParams,
+    ReputationMeasurements,
+    Service,
+    ServiceId,
+    Tokens,
 };
 use crate::NodeIndex;
 

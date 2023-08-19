@@ -1,14 +1,10 @@
-use std::{
-    any::TypeId,
-    collections::{HashMap, HashSet, VecDeque},
-    fmt::Debug,
-};
+use std::any::TypeId;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt::Debug;
 
-use crate::{
-    error::CycleFound,
-    vtable::{self, Object, Tag, VTable},
-    DependencyGraph, InitializationError,
-};
+use crate::error::CycleFound;
+use crate::vtable::{self, Object, Tag, VTable};
+use crate::{DependencyGraph, InitializationError};
 
 /// The container contains an instance of every `<Type as Trait>`s.
 #[derive(Default)]

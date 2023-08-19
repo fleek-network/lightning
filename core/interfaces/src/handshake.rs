@@ -1,7 +1,7 @@
-use crate::{
-    common::WithStartAndShutdown, config::ConfigConsumer, infu_collection::Collection,
-    ConfigProviderInterface, ConnectionInterface,
-};
+use crate::common::WithStartAndShutdown;
+use crate::config::ConfigConsumer;
+use crate::infu_collection::Collection;
+use crate::{ConfigProviderInterface, ConnectionInterface};
 
 #[infusion::service]
 pub trait HandshakeInterface<C: Collection>:

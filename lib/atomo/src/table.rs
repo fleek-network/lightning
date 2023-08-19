@@ -1,24 +1,21 @@
-use std::{
-    any::{Any, TypeId},
-    borrow::Borrow,
-    cell::RefCell,
-    hash::Hash,
-    marker::PhantomData,
-    sync::Arc,
-};
+use std::any::{Any, TypeId};
+use std::borrow::Borrow;
+use std::cell::RefCell;
+use std::hash::Hash;
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 use fxhash::FxHashSet;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
-use crate::{
-    batch::{BatchReference, Operation, VerticalBatch},
-    db::TableId,
-    inner::AtomoInner,
-    keys::VerticalKeys,
-    serder::SerdeBackend,
-    snapshot::Snapshot,
-    KeyIterator,
-};
+use crate::batch::{BatchReference, Operation, VerticalBatch};
+use crate::db::TableId;
+use crate::inner::AtomoInner;
+use crate::keys::VerticalKeys;
+use crate::serder::SerdeBackend;
+use crate::snapshot::Snapshot;
+use crate::KeyIterator;
 
 pub struct TableMeta {
     pub _name: String,

@@ -1,12 +1,14 @@
 use anyhow::{anyhow, Result};
-use blake3_tree::{blake3::tree::BlockHasher, IncrementalVerifier};
+use blake3_tree::blake3::tree::BlockHasher;
+use blake3_tree::IncrementalVerifier;
 use bytes::{BufMut, Bytes, BytesMut};
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use lightning_handshake::client::HandshakeClient;
 use lightning_interfaces::Blake3Hash;
 use tokio::io::{AsyncRead, AsyncWrite};
 
-use crate::connection::{consts::RESPONSE_BLOCK_TAG, CdnConnection, CdnFrame, ServiceMode};
+use crate::connection::consts::RESPONSE_BLOCK_TAG;
+use crate::connection::{CdnConnection, CdnFrame, ServiceMode};
 
 pub struct CdnClient<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> {
     conn: CdnConnection<R, W>,

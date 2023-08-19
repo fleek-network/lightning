@@ -6,19 +6,20 @@ pub mod pairing;
 #[cfg(test)]
 mod tests;
 
-use std::{
-    collections::{BTreeSet, HashMap},
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::collections::{BTreeSet, HashMap};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use async_trait::async_trait;
 pub use config::Config;
 use divisive::DivisiveHierarchy;
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::{
-    infu_collection::{c, Collection},
-    ApplicationInterface, ConfigConsumer, SyncQueryRunnerInterface, TopologyInterface,
+    ApplicationInterface,
+    ConfigConsumer,
+    SyncQueryRunnerInterface,
+    TopologyInterface,
 };
 use ndarray::{Array, Array2};
 use rand::SeedableRng;

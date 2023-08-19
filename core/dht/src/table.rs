@@ -1,18 +1,15 @@
-use std::{
-    collections::{BTreeMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashSet};
+use std::sync::Arc;
 
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
 use thiserror::Error;
-use tokio::sync::{mpsc::Receiver, oneshot, Notify};
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::{oneshot, Notify};
 
-use crate::{
-    bucket::{Bucket, MAX_BUCKETS, MAX_BUCKET_SIZE},
-    distance,
-    node::NodeInfo,
-};
+use crate::bucket::{Bucket, MAX_BUCKETS, MAX_BUCKET_SIZE};
+use crate::distance;
+use crate::node::NodeInfo;
 
 pub type TableKey = [u8; 32];
 

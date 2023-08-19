@@ -1,15 +1,19 @@
 use async_trait::async_trait;
-use blake3_tree::{
-    blake3::tree::{BlockHasher, HashTreeBuilder},
-    IncrementalVerifier,
-};
+use blake3_tree::blake3::tree::{BlockHasher, HashTreeBuilder};
+use blake3_tree::IncrementalVerifier;
 use bytes::{BufMut, Bytes, BytesMut};
+use lightning_interfaces::types::CompressionAlgorithm;
 use lightning_interfaces::{
-    types::CompressionAlgorithm, Blake3Hash, ContentChunk, IncrementalPutInterface,
-    PutFeedProofError, PutFinalizeError, PutWriteError,
+    Blake3Hash,
+    ContentChunk,
+    IncrementalPutInterface,
+    PutFeedProofError,
+    PutFinalizeError,
+    PutWriteError,
 };
 
-use crate::{store::Store, BlockContent, Key, BLAKE3_CHUNK_SIZE};
+use crate::store::Store;
+use crate::{BlockContent, Key, BLAKE3_CHUNK_SIZE};
 
 struct Chunk {
     hash: Blake3Hash,

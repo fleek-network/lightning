@@ -1,19 +1,24 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 use async_trait::async_trait;
+use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::types::{CompressionAlgoSet, CompressionAlgorithm};
 use lightning_interfaces::{
-    infu_collection::Collection,
-    types::{CompressionAlgoSet, CompressionAlgorithm},
-    Blake3Hash, Blake3Tree, BlockStoreInterface, ConfigConsumer, ContentChunk,
+    Blake3Hash,
+    Blake3Tree,
+    BlockStoreInterface,
+    ConfigConsumer,
+    ContentChunk,
 };
 use serde::{Deserialize, Serialize};
 use tempdir::TempDir;
-use tokio::{
-    fs::{self, File},
-    io::AsyncWriteExt,
-};
+use tokio::fs::{self, File};
+use tokio::io::AsyncWriteExt;
 
-use crate::{put::IncrementalPut, store::Store, Block, BlockContent, Key};
+use crate::put::IncrementalPut;
+use crate::store::Store;
+use crate::{Block, BlockContent, Key};
 
 const TMP_DIR_PREFIX: &str = "tmp-store";
 

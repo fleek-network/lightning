@@ -1,4 +1,5 @@
-use futures::{future::LocalBoxFuture, Future};
+use futures::future::LocalBoxFuture;
+use futures::Future;
 use futures_task::{LocalFutureObj, LocalSpawn};
 
 use crate::state::with_node;

@@ -7,9 +7,12 @@ use narwhal_config::{Committee, Parameters, WorkerCache};
 use narwhal_crypto::{KeyPair, NetworkKeyPair};
 use narwhal_executor::ExecutionState;
 use narwhal_network::client::NetworkClient;
-use narwhal_node::{primary_node::PrimaryNode, worker_node::WorkerNode, NodeStorage};
+use narwhal_node::primary_node::PrimaryNode;
+use narwhal_node::worker_node::WorkerNode;
+use narwhal_node::NodeStorage;
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
-use tokio::{sync::Mutex, time::Instant};
+use tokio::sync::Mutex;
+use tokio::time::Instant;
 
 use crate::validator::Validator;
 

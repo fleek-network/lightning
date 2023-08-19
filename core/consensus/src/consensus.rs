@@ -1,52 +1,44 @@
-use std::{
-    collections::BTreeMap,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::{Duration, SystemTime},
-};
+use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use affair::{Executor, TokioSpawn};
 use async_trait::async_trait;
 use derive_more::{From, IsVariant, TryInto};
+use lightning_interfaces::application::ExecutionEngineSocket;
+use lightning_interfaces::common::WithStartAndShutdown;
+use lightning_interfaces::config::ConfigConsumer;
+use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
+use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
+use lightning_interfaces::types::{Epoch, EpochInfo, UpdateMethod};
 use lightning_interfaces::{
-    application::ExecutionEngineSocket,
-    common::WithStartAndShutdown,
-    config::ConfigConsumer,
-    consensus::{ConsensusInterface, MempoolSocket},
-    infu_collection::{c, Collection},
-    signer::{SignerInterface, SubmitTxSocket},
-    types::{Epoch, EpochInfo, UpdateMethod},
-    ApplicationInterface, BroadcastInterface, PubSub, SyncQueryRunnerInterface,
+    ApplicationInterface,
+    BroadcastInterface,
+    PubSub,
+    SyncQueryRunnerInterface,
 };
 use lightning_schema::AutoImplSerde;
 use log::{error, info};
 use mysten_metrics::RegistryService;
 use mysten_network::Multiaddr;
 use narwhal_config::{Committee, CommitteeBuilder, WorkerCache, WorkerIndex, WorkerInfo};
-use narwhal_crypto::{
-    traits::{KeyPair as _, ToFromBytes},
-    KeyPair, NetworkKeyPair, NetworkPublicKey, PublicKey,
-};
+use narwhal_crypto::traits::{KeyPair as _, ToFromBytes};
+use narwhal_crypto::{KeyPair, NetworkKeyPair, NetworkPublicKey, PublicKey};
 use narwhal_node::NodeStorage;
 use prometheus::Registry;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    pin, select,
-    sync::{Mutex, Notify},
-    task, time,
-};
+use tokio::sync::{Mutex, Notify};
+use tokio::{pin, select, task, time};
 use typed_store::DBMetrics;
 
-use crate::{
-    config::Config,
-    edge_node::EdgeService,
-    execution::Execution,
-    forwarder::Forwarder,
-    narwhal::{NarwhalArgs, NarwhalService},
-};
+use crate::config::Config;
+use crate::edge_node::EdgeService;
+use crate::execution::Execution;
+use crate::forwarder::Forwarder;
+use crate::narwhal::{NarwhalArgs, NarwhalService};
 
 pub struct Consensus<C: Collection> {
     /// Inner state of the consensus

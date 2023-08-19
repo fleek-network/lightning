@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::NodeIndex;
 use lightning_test_utils::{random, reputation};
-use rand::{rngs::StdRng, Rng};
+use rand::rngs::StdRng;
+use rand::Rng;
 
 use crate::{NormalizedMeasurements, WeightedReputationMeasurements};
 

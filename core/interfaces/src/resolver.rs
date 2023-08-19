@@ -1,11 +1,15 @@
 use async_trait::async_trait;
 use infusion::c;
 
+use crate::dht::DhtInterface;
+use crate::infu_collection::Collection;
+use crate::types::{ImmutablePointer, ResolvedImmutablePointerRecord};
 use crate::{
-    dht::DhtInterface,
-    infu_collection::Collection,
-    types::{ImmutablePointer, ResolvedImmutablePointerRecord},
-    Blake3Hash, ConfigConsumer, ConfigProviderInterface, DhtSocket, SignerInterface,
+    Blake3Hash,
+    ConfigConsumer,
+    ConfigProviderInterface,
+    DhtSocket,
+    SignerInterface,
     WithStartAndShutdown,
 };
 

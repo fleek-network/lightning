@@ -1,17 +1,14 @@
 use std::collections::HashSet;
 
 use anyhow::{anyhow, Result};
-use tokio::{
-    sync::{mpsc::Sender, oneshot},
-    task::{JoinHandle, JoinSet},
-};
+use tokio::sync::mpsc::Sender;
+use tokio::sync::oneshot;
+use tokio::task::{JoinHandle, JoinSet};
 
-use crate::{
-    bucket::MAX_BUCKETS,
-    node::NodeInfo,
-    table::{TableKey, TableRequest},
-    task::{Task, TaskFailed, TaskResult},
-};
+use crate::bucket::MAX_BUCKETS;
+use crate::node::NodeInfo;
+use crate::table::{TableKey, TableRequest};
+use crate::task::{Task, TaskFailed, TaskResult};
 
 pub const BOOTSTRAP_TASK_ID: u64 = 0;
 
@@ -207,7 +204,8 @@ mod tests {
     use rand::Rng;
 
     use super::*;
-    use crate::{bucket::MAX_BUCKETS, distance};
+    use crate::bucket::MAX_BUCKETS;
+    use crate::distance;
 
     #[test]
     fn test_random_key_in_bucket() {

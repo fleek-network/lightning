@@ -13,16 +13,12 @@
 //! [ header (u64) . tree bytes . block bytes . block bytes . tree bytes . block bytes ... ]
 //! ```
 
-use std::{
-    fmt::Debug,
-    io::{self, Read, Write},
-};
+use std::fmt::Debug;
+use std::io::{self, Read, Write};
 
 use arrayref::array_ref;
-use blake3_tree::{
-    blake3::tree::{BlockHasher, HashTree},
-    IncrementalVerifier, ProofBuf, ProofSizeEstimator,
-};
+use blake3_tree::blake3::tree::{BlockHasher, HashTree};
+use blake3_tree::{IncrementalVerifier, ProofBuf, ProofSizeEstimator};
 use bytes::{BufMut, BytesMut};
 
 pub const BLOCK_SIZE: usize = 256 * 1024;

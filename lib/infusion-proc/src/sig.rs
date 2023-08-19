@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
-use syn::{spanned::Spanned, Error, Result};
+use syn::spanned::Spanned;
+use syn::{Error, Result};
 
 /// The infusion function.
 #[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Copy)]

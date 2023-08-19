@@ -1,7 +1,11 @@
-use std::{fs, marker::PhantomData, path::Path, sync::Mutex};
+use std::fs;
+use std::marker::PhantomData;
+use std::path::Path;
+use std::sync::Mutex;
 
 use anyhow::Context;
-use lightning_interfaces::{config::ConfigProviderInterface, infu_collection::Collection};
+use lightning_interfaces::config::ConfigProviderInterface;
+use lightning_interfaces::infu_collection::Collection;
 use toml::{Table, Value};
 
 /// The implementation of a configuration loader that uses the `toml` backend.

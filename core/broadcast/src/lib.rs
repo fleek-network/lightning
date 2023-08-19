@@ -5,20 +5,26 @@ pub mod pubsub;
 // #[cfg(test)]
 // mod tests;
 
-use std::{marker::PhantomData, sync::Arc};
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
 use config::Config;
 use dashmap::DashMap;
 use inner::BroadcastInner;
+use lightning_interfaces::broadcast::BroadcastInterface;
+use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::schema::broadcast::BroadcastFrame;
+use lightning_interfaces::schema::LightningMessage;
+use lightning_interfaces::types::Topic;
 use lightning_interfaces::{
-    broadcast::BroadcastInterface,
-    infu_collection::{c, Collection},
-    schema::{broadcast::BroadcastFrame, LightningMessage},
-    types::Topic,
-    ConfigConsumer, ConnectionPoolInterface, ListenerConnector, ListenerInterface,
-    NotifierInterface, WithStartAndShutdown,
+    ConfigConsumer,
+    ConnectionPoolInterface,
+    ListenerConnector,
+    ListenerInterface,
+    NotifierInterface,
+    WithStartAndShutdown,
 };
 use pubsub::PubSubTopic;
 use tokio::select;

@@ -33,19 +33,16 @@ pub enum BlockContent {
 
 #[cfg(test)]
 mod tests {
-    use blake3_tree::{
-        blake3::tree::{BlockHasher, HashTree, HashTreeBuilder},
-        ProofBuf,
-    };
-    use lightning_interfaces::{
-        infu_collection::Collection,
-        partial,
-        types::{CompressionAlgoSet, CompressionAlgorithm},
-        Blake3Hash, BlockStoreInterface, IncrementalPutInterface,
-    };
+    use blake3_tree::blake3::tree::{BlockHasher, HashTree, HashTreeBuilder};
+    use blake3_tree::ProofBuf;
+    use lightning_interfaces::infu_collection::Collection;
+    use lightning_interfaces::types::{CompressionAlgoSet, CompressionAlgorithm};
+    use lightning_interfaces::{partial, Blake3Hash, BlockStoreInterface, IncrementalPutInterface};
     use tokio::test;
 
-    use crate::{config::Config, memory::MemoryBlockStore, BLAKE3_CHUNK_SIZE};
+    use crate::config::Config;
+    use crate::memory::MemoryBlockStore;
+    use crate::BLAKE3_CHUNK_SIZE;
 
     partial!(TestBinding {
         BlockStoreInterface = MemoryBlockStore<Self>;

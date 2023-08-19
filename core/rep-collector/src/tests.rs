@@ -1,33 +1,42 @@
-use std::{
-    collections::HashSet,
-    time::{Duration, SystemTime},
-};
+use std::collections::HashSet;
+use std::time::{Duration, SystemTime};
 
 use fleek_crypto::{
-    AccountOwnerSecretKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, PublicKey, SecretKey,
+    AccountOwnerSecretKey,
+    ConsensusSecretKey,
+    NodePublicKey,
+    NodeSecretKey,
+    PublicKey,
+    SecretKey,
 };
-use lightning_application::{
-    app::Application,
-    config::{Config as AppConfig, Mode},
-    genesis::{Genesis, GenesisCommittee},
+use lightning_application::app::Application;
+use lightning_application::config::{Config as AppConfig, Mode};
+use lightning_application::genesis::{Genesis, GenesisCommittee};
+use lightning_interfaces::application::ApplicationInterface;
+use lightning_interfaces::common::WithStartAndShutdown;
+use lightning_interfaces::consensus::ConsensusInterface;
+use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::notifier::NotifierInterface;
+use lightning_interfaces::reputation::{
+    ReputationAggregatorInterface,
+    ReputationReporterInterface,
 };
+use lightning_interfaces::signer::SignerInterface;
+use lightning_interfaces::types::{Block, UpdateMethod, UpdatePayload, UpdateRequest};
 use lightning_interfaces::{
-    application::ApplicationInterface,
-    common::WithStartAndShutdown,
-    consensus::ConsensusInterface,
-    infu_collection::Collection,
-    notifier::NotifierInterface,
     partial,
-    reputation::{ReputationAggregatorInterface, ReputationReporterInterface},
-    signer::SignerInterface,
-    types::{Block, UpdateMethod, UpdatePayload, UpdateRequest},
-    ReputationQueryInteface, SyncQueryRunnerInterface, ToDigest, Weight,
+    ReputationQueryInteface,
+    SyncQueryRunnerInterface,
+    ToDigest,
+    Weight,
 };
 use lightning_notifier::Notifier;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 
-use crate::{aggregator::ReputationAggregator, config::Config, measurement_manager::Interactions};
+use crate::aggregator::ReputationAggregator;
+use crate::config::Config;
+use crate::measurement_manager::Interactions;
 
 partial!(TestBinding {
     ReputationAggregatorInterface = ReputationAggregator<Self>;

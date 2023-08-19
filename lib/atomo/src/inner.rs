@@ -1,22 +1,19 @@
-use std::{
-    any::{Any, TypeId},
-    hash::Hash,
-    marker::PhantomData,
-    sync::atomic::AtomicUsize,
-};
+use std::any::{Any, TypeId};
+use std::hash::Hash;
+use std::marker::PhantomData;
+use std::sync::atomic::AtomicUsize;
 
 use dashmap::DashMap;
 use fxhash::FxHashMap;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
-use crate::{
-    batch::{Operation, VerticalBatch},
-    db::TableId,
-    keys::VerticalKeys,
-    serder::SerdeBackend,
-    snapshot::SnapshotList,
-    table::{ResolvedTableReference, TableMeta},
-};
+use crate::batch::{Operation, VerticalBatch};
+use crate::db::TableId;
+use crate::keys::VerticalKeys;
+use crate::serder::SerdeBackend;
+use crate::snapshot::SnapshotList;
+use crate::table::{ResolvedTableReference, TableMeta};
 
 static INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -169,10 +166,8 @@ impl<S: SerdeBackend> AtomoInner<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        batch::{Operation, VerticalBatch},
-        AtomoBuilder, BincodeSerde,
-    };
+    use crate::batch::{Operation, VerticalBatch};
+    use crate::{AtomoBuilder, BincodeSerde};
 
     #[test]
     fn resolve_valid_should_work() {

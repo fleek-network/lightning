@@ -1,15 +1,16 @@
-use std::{any::Any, hash::Hash, sync::Arc};
+use std::any::Any;
+use std::hash::Hash;
+use std::sync::Arc;
 
 use dashmap::DashMap;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
-use crate::{
-    db::{Atomo, TableId, UpdatePerm},
-    inner::AtomoInner,
-    serder::SerdeBackend,
-    table::TableMeta,
-    DefaultSerdeBackend,
-};
+use crate::db::{Atomo, TableId, UpdatePerm};
+use crate::inner::AtomoInner;
+use crate::serder::SerdeBackend;
+use crate::table::TableMeta;
+use crate::DefaultSerdeBackend;
 
 /// The builder API to use for opening an [`Atomo`] database.
 pub struct AtomoBuilder<S: SerdeBackend = DefaultSerdeBackend> {

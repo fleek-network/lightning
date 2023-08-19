@@ -1,10 +1,8 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    env::args,
-    error::Error,
-    path::Path,
-    process::exit,
-};
+use std::collections::{BTreeMap, BTreeSet};
+use std::env::args;
+use std::error::Error;
+use std::path::Path;
+use std::process::exit;
 
 use csv::{ReaderBuilder, WriterBuilder};
 

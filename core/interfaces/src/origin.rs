@@ -1,9 +1,8 @@
 use affair::Socket;
 use anyhow;
 
-use crate::{
-    infu_collection::Collection, ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown,
-};
+use crate::infu_collection::Collection;
+use crate::{ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown};
 
 /// A socket for submitting a fetch request to an origin.
 pub type OriginProviderSocket<Stream> = Socket<Vec<u8>, anyhow::Result<Stream>>;

@@ -1,34 +1,25 @@
-use std::{
-    marker::PhantomData,
-    net::SocketAddr,
-    str::FromStr,
-    sync::{Arc, Mutex},
-};
+use std::marker::PhantomData;
+use std::net::SocketAddr;
+use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use fleek_crypto::{ClientPublicKey, NodePublicKey};
-use lightning_interfaces::{
-    handshake::HandshakeInterface, infu_collection::Collection, types::CompressionAlgoSet,
-    ConfigConsumer, ConnectionInterface, WithStartAndShutdown,
-};
+use lightning_interfaces::handshake::HandshakeInterface;
+use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::types::CompressionAlgoSet;
+use lightning_interfaces::{ConfigConsumer, ConnectionInterface, WithStartAndShutdown};
 use serde::{Deserialize, Serialize};
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    net::{
-        tcp::{OwnedReadHalf, OwnedWriteHalf},
-        TcpListener, ToSocketAddrs,
-    },
-    select,
-    sync::oneshot::{channel, Sender},
-    task,
-};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::net::{TcpListener, ToSocketAddrs};
+use tokio::sync::oneshot::{channel, Sender};
+use tokio::{select, task};
 
-use crate::connection::{
-    consts::{DELIVERY_ACK_TAG, HANDSHAKE_REQ_TAG, SERVICE_REQ_TAG},
-    HandshakeConnection, HandshakeFrame, Reason,
-};
+use crate::connection::consts::{DELIVERY_ACK_TAG, HANDSHAKE_REQ_TAG, SERVICE_REQ_TAG};
+use crate::connection::{HandshakeConnection, HandshakeFrame, Reason};
 
 /// Generic listener to accept new connection streams with.
 /// TODO: Move into interfaces

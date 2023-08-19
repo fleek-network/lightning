@@ -1,10 +1,11 @@
 use affair::Socket;
 
-use crate::{
-    common::WithStartAndShutdown, config::ConfigConsumer, infu_collection::Collection,
-    signer::SubmitTxSocket, types::DeliveryAcknowledgment, ConfigProviderInterface,
-    SignerInterface,
-};
+use crate::common::WithStartAndShutdown;
+use crate::config::ConfigConsumer;
+use crate::infu_collection::Collection;
+use crate::signer::SubmitTxSocket;
+use crate::types::DeliveryAcknowledgment;
+use crate::{ConfigProviderInterface, SignerInterface};
 
 /// The socket which upon receiving a delivery acknowledgment can add it to the aggregator
 /// queue which will later roll up a batch of delivery acknowledgments to the consensus.

@@ -1,32 +1,45 @@
-use std::{collections::BTreeMap, time::SystemTime, vec};
+use std::collections::BTreeMap;
+use std::time::SystemTime;
+use std::vec;
 
 use affair::Socket;
 use anyhow::{anyhow, Result};
 use fleek_crypto::{
-    AccountOwnerSecretKey, ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey,
-    PublicKey, SecretKey,
+    AccountOwnerSecretKey,
+    ConsensusPublicKey,
+    ConsensusSecretKey,
+    NodePublicKey,
+    NodeSecretKey,
+    PublicKey,
+    SecretKey,
 };
 use hp_fixed::unsigned::HpUfixed;
-use lightning_interfaces::{
-    application::ExecutionEngineSocket,
-    infu_collection::Collection,
-    partial,
-    types::{
-        Block, BlockExecutionResponse, DeliveryAcknowledgment, Epoch, ExecutionError, NodeInfo,
-        ProofOfConsensus, ProtocolParams, Tokens, TotalServed, TransactionResponse, UpdateMethod,
-        UpdatePayload, UpdateRequest,
-    },
-    ApplicationInterface, SyncQueryRunnerInterface, ToDigest,
+use lightning_interfaces::application::ExecutionEngineSocket;
+use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::types::{
+    Block,
+    BlockExecutionResponse,
+    DeliveryAcknowledgment,
+    Epoch,
+    ExecutionError,
+    NodeInfo,
+    ProofOfConsensus,
+    ProtocolParams,
+    Tokens,
+    TotalServed,
+    TransactionResponse,
+    UpdateMethod,
+    UpdatePayload,
+    UpdateRequest,
 };
+use lightning_interfaces::{partial, ApplicationInterface, SyncQueryRunnerInterface, ToDigest};
 use lightning_test_utils::{random, reputation};
 use tokio::test;
 
-use crate::{
-    app::Application,
-    config::{Config, Mode},
-    genesis::{Genesis, GenesisCommittee},
-    query_runner::QueryRunner,
-};
+use crate::app::Application;
+use crate::config::{Config, Mode};
+use crate::genesis::{Genesis, GenesisCommittee};
+use crate::query_runner::QueryRunner;
 
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;

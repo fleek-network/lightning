@@ -1,1 +1,2 @@
-pub use lightning_blockstore::{config::Config, memory::MemoryBlockStore};
+pub use lightning_blockstore::config::Config;
+pub use lightning_blockstore::memory::MemoryBlockStore;

@@ -1,4 +1,5 @@
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::infu_collection::Collection;
 

@@ -1,4 +1,5 @@
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 /// The serialization backend that can empower [`Atomo`] with Serde for
 /// serializing the data for the persistence layer.

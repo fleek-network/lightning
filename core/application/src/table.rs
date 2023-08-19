@@ -1,7 +1,10 @@
-use std::{any::Any, cell::RefCell, hash::Hash};
+use std::any::Any;
+use std::cell::RefCell;
+use std::hash::Hash;
 
 use atomo::{KeyIterator, SerdeBackend, TableRef as AtomoTableRef, TableSelector};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 pub trait Backend {
     type Ref<K: Eq + Hash + Send + Serialize + DeserializeOwned

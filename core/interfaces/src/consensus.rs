@@ -5,11 +5,13 @@ use infusion::c;
 use lightning_schema::LightningMessage;
 use tokio::sync::Notify;
 
-use crate::{
-    application::ExecutionEngineSocket, common::WithStartAndShutdown, config::ConfigConsumer,
-    infu_collection::Collection, signer::SignerInterface, types::UpdateRequest,
-    ApplicationInterface, BroadcastInterface, ConfigProviderInterface,
-};
+use crate::application::ExecutionEngineSocket;
+use crate::common::WithStartAndShutdown;
+use crate::config::ConfigConsumer;
+use crate::infu_collection::Collection;
+use crate::signer::SignerInterface;
+use crate::types::UpdateRequest;
+use crate::{ApplicationInterface, BroadcastInterface, ConfigProviderInterface};
 
 /// A socket that gives services and other sub-systems the required functionality to
 /// submit messages/transactions to the consensus.

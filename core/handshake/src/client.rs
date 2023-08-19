@@ -3,10 +3,8 @@ use fleek_crypto::{ClientPublicKey, ClientSignature};
 use lightning_interfaces::types::{CompressionAlgoSet, ServiceId};
 use tokio::io::{AsyncRead, AsyncWrite};
 
-use crate::connection::{
-    consts::{HANDSHAKE_RES_TAG, HANDSHAKE_RES_UNLOCK_TAG},
-    HandshakeConnection, HandshakeFrame,
-};
+use crate::connection::consts::{HANDSHAKE_RES_TAG, HANDSHAKE_RES_UNLOCK_TAG};
+use crate::connection::{HandshakeConnection, HandshakeFrame};
 
 pub struct HandshakeClient<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> {
     conn: HandshakeConnection<R, W>,

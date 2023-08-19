@@ -1,6 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+use std::sync::Arc;
 
-use tokio::sync::{mpsc::Receiver, oneshot, Notify};
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::{oneshot, Notify};
 
 use crate::table::TableKey;
 

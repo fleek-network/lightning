@@ -1,10 +1,12 @@
-use std::{collections::BTreeMap, fmt::Display};
+use std::collections::BTreeMap;
+use std::fmt::Display;
 
 use ndarray::Array2;
 use rand::Rng;
 use serde::Serialize;
 
-use crate::{clustering::constrained_fasterpam, pairing::greedy_pairs};
+use crate::clustering::constrained_fasterpam;
+use crate::pairing::greedy_pairs;
 
 /// A divisive hierarchy strategy that recursively uses constrained fasterpam to cluster nodes at
 /// each depth.

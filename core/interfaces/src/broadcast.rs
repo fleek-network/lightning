@@ -3,10 +3,17 @@ use async_trait::async_trait;
 use infusion::c;
 use lightning_schema::LightningMessage;
 
+use crate::infu_collection::Collection;
+use crate::signer::SignerInterface;
+use crate::topology::TopologyInterface;
+use crate::types::Topic;
 use crate::{
-    infu_collection::Collection, signer::SignerInterface, topology::TopologyInterface,
-    types::Topic, ConfigConsumer, ConfigProviderInterface, ConnectionPoolInterface,
-    ListenerConnector, NotifierInterface, WithStartAndShutdown,
+    ConfigConsumer,
+    ConfigProviderInterface,
+    ConnectionPoolInterface,
+    ListenerConnector,
+    NotifierInterface,
+    WithStartAndShutdown,
 };
 
 /// The gossip system in Fleek Network implements the functionality of broadcasting

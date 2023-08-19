@@ -3,21 +3,15 @@ use std::sync::Arc;
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
-use tokio::{
-    net::UdpSocket,
-    select,
-    sync::{
-        mpsc::{Receiver, Sender},
-        oneshot, Notify,
-    },
-};
+use tokio::net::UdpSocket;
+use tokio::select;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{oneshot, Notify};
 
-use crate::{
-    network::{Message, MessageType, Request},
-    socket,
-    table::TableKey,
-    task::Task,
-};
+use crate::network::{Message, MessageType, Request};
+use crate::socket;
+use crate::table::TableKey;
+use crate::task::Task;
 
 pub async fn start_worker(
     mut rx: Receiver<affair::Task<DhtRequest, DhtResponse>>,

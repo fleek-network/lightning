@@ -1,6 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{parse_quote, spanned::Spanned, Error, Result};
+use syn::spanned::Spanned;
+use syn::{parse_quote, Error, Result};
 
 use crate::{sig, utils};
 

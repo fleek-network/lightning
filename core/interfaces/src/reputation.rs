@@ -3,10 +3,11 @@ use std::time::Duration;
 use fleek_crypto::NodePublicKey;
 use infusion::c;
 
-use crate::{
-    config::ConfigConsumer, infu_collection::Collection, notifier::NotifierInterface,
-    signer::SubmitTxSocket, ApplicationInterface, ConfigProviderInterface, SignerInterface,
-};
+use crate::config::ConfigConsumer;
+use crate::infu_collection::Collection;
+use crate::notifier::NotifierInterface;
+use crate::signer::SubmitTxSocket;
+use crate::{ApplicationInterface, ConfigProviderInterface, SignerInterface};
 
 #[infusion::service]
 pub trait ReputationAggregatorInterface<C: Collection>: ConfigConsumer + Sized {

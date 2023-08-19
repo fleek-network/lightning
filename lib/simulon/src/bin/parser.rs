@@ -1,9 +1,7 @@
 //! Parse the CSV from https://wonderproxy.com/blog/a-day-in-the-life-of-the-internet/
 
-use std::{
-    collections::HashMap,
-    io::{BufRead, BufReader},
-};
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader};
 
 use fxhash::FxHashSet;
 use simulon::latency::ping::PingStat;

@@ -1,13 +1,15 @@
-use std::{any::Any, hash::Hash, marker::PhantomData, sync::Arc};
+use std::any::Any;
+use std::hash::Hash;
+use std::marker::PhantomData;
+use std::sync::Arc;
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
-use crate::{
-    inner::AtomoInner,
-    serder::SerdeBackend,
-    table::{ResolvedTableReference, TableSelector},
-    DefaultSerdeBackend,
-};
+use crate::inner::AtomoInner;
+use crate::serder::SerdeBackend;
+use crate::table::{ResolvedTableReference, TableSelector};
+use crate::DefaultSerdeBackend;
 
 /// The id of a table. Currently we are limited to 256 tables which is something
 /// I believe to be reasonable limitation for the use cases we care to support.

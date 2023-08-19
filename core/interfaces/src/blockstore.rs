@@ -1,14 +1,13 @@
-use std::{ops::Deref, sync::Arc};
+use std::ops::Deref;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use thiserror::Error;
 
-use crate::{
-    config::ConfigConsumer,
-    infu_collection::Collection,
-    types::{CompressionAlgoSet, CompressionAlgorithm},
-    ConfigProviderInterface,
-};
+use crate::config::ConfigConsumer;
+use crate::infu_collection::Collection;
+use crate::types::{CompressionAlgoSet, CompressionAlgorithm};
+use crate::ConfigProviderInterface;
 
 pub type Blake3Hash = [u8; 32];
 

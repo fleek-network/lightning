@@ -1,9 +1,7 @@
-use std::{
-    fs::{self, create_dir_all, File},
-    io::Write,
-    os::unix::fs::PermissionsExt,
-    path::Path,
-};
+use std::fs::{self, create_dir_all, File};
+use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 
 pub fn save<T: AsRef<[u8]>>(path: &Path, data: T) -> anyhow::Result<()> {
     // Mostly taken from: https://github.com/fleek-network/ursa/blob/feat/pod/crates/ursa/src/ursa/identity.rs

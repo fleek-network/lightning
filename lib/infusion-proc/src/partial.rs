@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse::Parse, Token};
+use syn::parse::Parse;
+use syn::Token;
 
 pub struct IdentSetPair {
     pub left: IdentSet,

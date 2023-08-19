@@ -1,8 +1,6 @@
-use std::{
-    num::NonZeroU64,
-    ptr::null_mut,
-    sync::atomic::{AtomicPtr, AtomicUsize, Ordering},
-};
+use std::num::NonZeroU64;
+use std::ptr::null_mut;
+use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
 
 use once_ptr::OncePtr;
 use seize::{reclaim, Collector, Linked};

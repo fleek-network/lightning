@@ -6,10 +6,8 @@
 // `trait` and an `impl`.
 
 use proc_macro2::Span;
-use syn::{
-    parse::{Error, Parse, ParseStream, Result},
-    Attribute, ItemImpl, ItemTrait, Token,
-};
+use syn::parse::{Error, Parse, ParseStream, Result};
+use syn::{Attribute, ItemImpl, ItemTrait, Token};
 
 pub enum Item {
     Trait(ItemTrait),

@@ -1,19 +1,15 @@
-use std::{
-    cell::RefCell,
-    collections::{BinaryHeap, HashMap, VecDeque},
-    sync::Arc,
-};
+use std::cell::RefCell;
+use std::collections::{BinaryHeap, HashMap, VecDeque};
+use std::sync::Arc;
 
 use futures::executor::LocalPool;
 use fxhash::FxHashMap;
 
-use crate::{
-    api::{ConnectError, RemoteAddr},
-    future::{DeferredFuture, DeferredFutureWaker},
-    message::{Ignored, Message, MessageDetail},
-    report::{Metrics, NodeMetrics},
-    storage::TypedStorage,
-};
+use crate::api::{ConnectError, RemoteAddr};
+use crate::future::{DeferredFuture, DeferredFutureWaker};
+use crate::message::{Ignored, Message, MessageDetail};
+use crate::report::{Metrics, NodeMetrics};
+use crate::storage::TypedStorage;
 
 thread_local! {
     static NODES: RefCell<*mut NodeState> = RefCell::new(std::ptr::null_mut());

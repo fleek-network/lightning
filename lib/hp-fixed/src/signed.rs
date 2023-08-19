@@ -1,14 +1,10 @@
-use std::{
-    convert::TryInto,
-    fmt,
-    ops::{Add, AddAssign, Div, Mul, Sub, SubAssign},
-    str::FromStr,
-};
+use std::convert::TryInto;
+use std::fmt;
+use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
+use std::str::FromStr;
 
-use num_bigint::{
-    BigInt, BigUint,
-    Sign::{Minus, Plus},
-};
+use num_bigint::Sign::{Minus, Plus};
+use num_bigint::{BigInt, BigUint};
 use num_traits::{FromPrimitive, Signed, ToPrimitive, Zero};
 use serde::{Deserialize, Deserializer, Serialize};
 

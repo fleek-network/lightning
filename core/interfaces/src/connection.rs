@@ -1,8 +1,6 @@
 use fleek_crypto::ClientPublicKey;
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    net::tcp::{OwnedReadHalf, OwnedWriteHalf},
-};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 
 use crate::types::CompressionAlgoSet;
 

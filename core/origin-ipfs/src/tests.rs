@@ -1,19 +1,18 @@
-use cid::{
-    multihash::{Code, MultihashDigest},
-    Cid,
-};
+use cid::multihash::{Code, MultihashDigest};
+use cid::Cid;
+use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
-    infu_collection::Collection, partial, OriginProviderInterface, UntrustedStream,
+    partial,
+    OriginProviderInterface,
+    UntrustedStream,
     WithStartAndShutdown,
 };
 use lightning_test_utils::ipfs_gateway::spawn_gateway;
 use tokio::io::AsyncReadExt;
 use tokio_util::io::StreamReader;
 
-use crate::{
-    config::{Config, Gateway, Protocol},
-    IPFSOrigin,
-};
+use crate::config::{Config, Gateway, Protocol};
+use crate::IPFSOrigin;
 
 partial!(TestBinding {
     OriginProviderInterface = IPFSOrigin<Self>;

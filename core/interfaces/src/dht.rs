@@ -1,10 +1,13 @@
 use affair::Socket;
 use infusion::c;
 
+use crate::infu_collection::Collection;
+use crate::types::{DhtRequest, DhtResponse};
 use crate::{
-    infu_collection::Collection,
-    types::{DhtRequest, DhtResponse},
-    ConfigConsumer, ConfigProviderInterface, SignerInterface, TopologyInterface,
+    ConfigConsumer,
+    ConfigProviderInterface,
+    SignerInterface,
+    TopologyInterface,
     WithStartAndShutdown,
 };
 

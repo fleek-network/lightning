@@ -1,16 +1,18 @@
-use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
+use std::fs;
+use std::marker::PhantomData;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, ArgAction, Parser, Subcommand};
 use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
-use lightning_interfaces::{
-    infu_collection::{Collection, Node},
-    ConfigProviderInterface, SignerInterface,
-};
+use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_interfaces::{ConfigProviderInterface, SignerInterface};
 use lightning_signer::Signer;
 use resolved_pathbuf::ResolvedPathBuf;
 
-use crate::{config::TomlConfigProvider, shutdown::ShutdownController};
+use crate::config::TomlConfigProvider;
+use crate::shutdown::ShutdownController;
 
 #[derive(Parser)]
 #[command(about, version)]

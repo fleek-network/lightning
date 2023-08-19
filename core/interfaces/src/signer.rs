@@ -1,15 +1,25 @@
-use std::{path::Path, sync::Arc};
+use std::path::Path;
+use std::sync::Arc;
 
 use affair::Socket;
 use fleek_crypto::{
-    ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, NodeSignature,
+    ConsensusPublicKey,
+    ConsensusSecretKey,
+    NodePublicKey,
+    NodeSecretKey,
+    NodeSignature,
 };
 use infusion::c;
 use tokio::sync::Notify;
 
+use crate::config::ConfigConsumer;
+use crate::consensus::MempoolSocket;
+use crate::infu_collection::Collection;
+use crate::types::UpdateMethod;
 use crate::{
-    config::ConfigConsumer, consensus::MempoolSocket, infu_collection::Collection,
-    types::UpdateMethod, ApplicationInterface, ConfigProviderInterface, ConsensusInterface,
+    ApplicationInterface,
+    ConfigProviderInterface,
+    ConsensusInterface,
     WithStartAndShutdown,
 };
 

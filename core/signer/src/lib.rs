@@ -1,12 +1,10 @@
 mod config;
 pub mod utils;
-use std::{
-    collections::VecDeque,
-    fs::read_to_string,
-    path::Path,
-    sync::{Arc, Mutex},
-    time::{Duration, SystemTime},
-};
+use std::collections::VecDeque;
+use std::fs::read_to_string;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime};
 #[cfg(test)]
 pub mod tests;
 
@@ -15,17 +13,25 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 pub use config::Config;
 use fleek_crypto::{
-    ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey, NodeSignature, SecretKey,
+    ConsensusPublicKey,
+    ConsensusSecretKey,
+    NodePublicKey,
+    NodeSecretKey,
+    NodeSignature,
+    SecretKey,
     TransactionSender,
 };
-use lightning_interfaces::{
-    common::{ToDigest, WithStartAndShutdown},
-    config::ConfigConsumer,
-    infu_collection::{c, Collection},
-    signer::{SignerInterface, SubmitTxSocket},
-    types::{TransactionResponse, UpdateMethod, UpdatePayload, UpdateRequest},
-    ApplicationInterface, MempoolSocket, SyncQueryRunnerInterface,
+use lightning_interfaces::common::{ToDigest, WithStartAndShutdown};
+use lightning_interfaces::config::ConfigConsumer;
+use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
+use lightning_interfaces::types::{
+    TransactionResponse,
+    UpdateMethod,
+    UpdatePayload,
+    UpdateRequest,
 };
+use lightning_interfaces::{ApplicationInterface, MempoolSocket, SyncQueryRunnerInterface};
 use tokio::sync::{mpsc, Notify};
 
 // If a transaction does not get ordered, the signer will try to resend it.

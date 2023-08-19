@@ -18,14 +18,13 @@
 //! [Tag]: ./struct.Tag.html
 //! [Object]: ./struct.Object.html
 
-use std::{
-    any::{type_name, TypeId},
-    fmt::Debug,
-    hash::Hash,
-    mem::transmute,
-};
+use std::any::{type_name, TypeId};
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::mem::transmute;
 
-use crate::{container::Container, graph::DependencyGraphVisitor};
+use crate::container::Container;
+use crate::graph::DependencyGraphVisitor;
 
 /// The description of a dependency node.
 pub struct VTable {
@@ -268,7 +267,8 @@ fn v_drop<T: 'static>(ptr: *mut ()) {
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, rc::Rc};
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     use super::*;
 

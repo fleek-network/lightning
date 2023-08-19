@@ -1,4 +1,5 @@
-use std::{fs, sync::Arc};
+use std::fs;
+use std::sync::Arc;
 
 use axum::{Extension, Json};
 use fleek_crypto::{EthAddress, NodePublicKey};
@@ -6,17 +7,20 @@ use hp_fixed::unsigned::HpUfixed;
 use jsonrpc_v2::{Data, Error, MapRouter, Params, RequestObject, ResponseObjects, Server};
 #[cfg(feature = "e2e-test")]
 use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
-use lightning_interfaces::{
-    types::{EpochInfo, NodeInfo, NodeServed, ProtocolParams, TotalServed, UpdateRequest},
-    SyncQueryRunnerInterface,
+use lightning_interfaces::types::{
+    EpochInfo,
+    NodeInfo,
+    NodeServed,
+    ProtocolParams,
+    TotalServed,
+    UpdateRequest,
 };
+use lightning_interfaces::SyncQueryRunnerInterface;
 
+use crate::server::RpcData;
 #[cfg(feature = "e2e-test")]
 use crate::types::{DhtGetParam, DhtPutParam};
-use crate::{
-    server::RpcData,
-    types::{NodeKeyParam, PublicKeyParam},
-};
+use crate::types::{NodeKeyParam, PublicKeyParam};
 static OPEN_RPC_DOCS: &str = "../../docs/rpc/openrpc.json";
 
 pub type Result<T> = anyhow::Result<T, Error>;

@@ -1,7 +1,5 @@
-use std::{
-    collections::HashMap,
-    ops::{Add, Div, Mul, Sub},
-};
+use std::collections::HashMap;
+use std::ops::{Add, Div, Mul, Sub};
 
 use hp_fixed::signed::HpFixed;
 use lightning_interfaces::types::{NodeIndex, ReputationMeasurements};

@@ -1,12 +1,11 @@
-use std::{
-    collections::BTreeMap,
-    error::Error,
-    time::{Duration, Instant},
-};
+use std::collections::BTreeMap;
+use std::error::Error;
+use std::time::{Duration, Instant};
 
 use base64::Engine;
 use csv::ReaderBuilder;
-use lightning_topology::{clustering, divisive::DivisiveHierarchy};
+use lightning_topology::clustering;
+use lightning_topology::divisive::DivisiveHierarchy;
 use ndarray::{Array, Dim};
 use ndarray_rand::rand_distr::{Distribution, UnitDisc};
 use plotters::prelude::*;

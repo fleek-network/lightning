@@ -11,10 +11,16 @@ use clap::Parser;
 use cli::Cli;
 use log::LevelFilter;
 use simplelog::{
-    ColorChoice, CombinedLogger, ConfigBuilder, TermLogger, TerminalMode, WriteLogger,
+    ColorChoice,
+    CombinedLogger,
+    ConfigBuilder,
+    TermLogger,
+    TerminalMode,
+    WriteLogger,
 };
 
-use crate::{cli::CliArgs, node::FinalTypes};
+use crate::cli::CliArgs;
+use crate::node::FinalTypes;
 
 #[tokio::main]
 async fn main() -> Result<()> {

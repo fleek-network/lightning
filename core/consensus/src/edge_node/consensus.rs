@@ -5,24 +5,29 @@ use futures_util::stream::FuturesOrdered;
 use lightning_interfaces::PubSub;
 use mysten_metrics::{metered_channel, RegistryService};
 use narwhal_config::{Committee, Parameters, WorkerCache};
-use narwhal_consensus::{
-    bullshark::Bullshark,
-    consensus::ConsensusRound,
-    metrics::{ChannelMetrics, ConsensusMetrics},
-    Consensus,
-};
+use narwhal_consensus::bullshark::Bullshark;
+use narwhal_consensus::consensus::ConsensusRound;
+use narwhal_consensus::metrics::{ChannelMetrics, ConsensusMetrics};
+use narwhal_consensus::Consensus;
 use narwhal_executor::ExecutionState;
 use narwhal_node::NodeStorage;
 use narwhal_primary::PrimaryChannelMetrics;
 use narwhal_types::{
-    Certificate, CertificateAPI, CommittedSubDag, ConditionalBroadcastReceiver, ConsensusOutput,
-    HeaderAPI, PreSubscribedBroadcastSender,
+    Certificate,
+    CertificateAPI,
+    CommittedSubDag,
+    ConditionalBroadcastReceiver,
+    ConsensusOutput,
+    HeaderAPI,
+    PreSubscribedBroadcastSender,
 };
 use prometheus::IntGauge;
-use tokio::{sync::watch, task::JoinHandle};
+use tokio::sync::watch;
+use tokio::task::JoinHandle;
 
 use super::pool::BatchPool;
-use crate::{consensus::PubSubMsg, execution::Execution};
+use crate::consensus::PubSubMsg;
+use crate::execution::Execution;
 
 pub struct EdgeConsensus {
     handles: Vec<JoinHandle<()>>,

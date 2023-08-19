@@ -1,13 +1,12 @@
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
-use lightning_interfaces::{
-    application::SyncQueryRunnerInterface,
-    infu_collection::{c, Collection},
-    notifier::{Notification, NotifierInterface},
-    ApplicationInterface,
-};
-use tokio::{sync::mpsc, time::sleep};
+use lightning_interfaces::application::SyncQueryRunnerInterface;
+use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::notifier::{Notification, NotifierInterface};
+use lightning_interfaces::ApplicationInterface;
+use tokio::sync::mpsc;
+use tokio::time::sleep;
 
 pub struct Notifier<C: Collection> {
     query_runner: c![C::ApplicationInterface::SyncExecutor],
@@ -63,17 +62,13 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
 
 #[cfg(test)]
 mod tests {
-    use lightning_application::{
-        app::Application,
-        config::{Config, Mode},
-        genesis::Genesis,
-        query_runner::QueryRunner,
-    };
-    use lightning_interfaces::{
-        application::{ApplicationInterface, ExecutionEngineSocket},
-        infu_collection::Collection,
-        partial,
-    };
+    use lightning_application::app::Application;
+    use lightning_application::config::{Config, Mode};
+    use lightning_application::genesis::Genesis;
+    use lightning_application::query_runner::QueryRunner;
+    use lightning_interfaces::application::{ApplicationInterface, ExecutionEngineSocket};
+    use lightning_interfaces::infu_collection::Collection;
+    use lightning_interfaces::partial;
 
     use super::*;
 

@@ -1,21 +1,19 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    net::UdpSocket,
-    select,
-    sync::{mpsc::Sender, oneshot, Notify},
-};
+use tokio::net::UdpSocket;
+use tokio::select;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::{oneshot, Notify};
 
-use crate::{
-    node::NodeInfo,
-    socket,
-    store::StoreRequest,
-    table::{TableKey, TableRequest},
-    task::ResponseEvent,
-};
+use crate::node::NodeInfo;
+use crate::socket;
+use crate::store::StoreRequest;
+use crate::table::{TableKey, TableRequest};
+use crate::task::ResponseEvent;
 
 pub async fn start_worker(
     response_queue_tx: Sender<ResponseEvent>,

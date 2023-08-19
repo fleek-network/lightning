@@ -1,8 +1,11 @@
-use std::{hash::Hash, marker::PhantomData};
+use std::hash::Hash;
+use std::marker::PhantomData;
 
 use serde::de::DeserializeOwned;
 
-use crate::{batch::BoxedVec, keys::ImKeyCollection, DefaultSerdeBackend, SerdeBackend};
+use crate::batch::BoxedVec;
+use crate::keys::ImKeyCollection;
+use crate::{DefaultSerdeBackend, SerdeBackend};
 
 /// An iterator over the keys of the table.
 pub struct KeyIterator<K, S: SerdeBackend = DefaultSerdeBackend> {

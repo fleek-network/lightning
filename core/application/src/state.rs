@@ -1,28 +1,53 @@
-use std::{
-    cmp::Ordering,
-    collections::{BTreeMap, HashMap},
-    time::Duration,
-};
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, HashMap};
+use std::time::Duration;
 
 use fleek_blake3::Hasher;
 use fleek_crypto::{
-    ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey, TransactionSender,
+    ClientPublicKey,
+    ConsensusPublicKey,
+    EthAddress,
+    NodePublicKey,
+    TransactionSender,
 };
 use hp_fixed::unsigned::HpUfixed;
 use lazy_static::lazy_static;
-use lightning_interfaces::{
-    types::{
-        AccountInfo, Committee, CommodityTypes, DeliveryAcknowledgment, Epoch, ExecutionData,
-        ExecutionError, Metadata, NodeIndex, NodeInfo, NodeServed, ProofOfConsensus,
-        ProofOfMisbehavior, ProtocolParams, ReportedReputationMeasurements, ReputationMeasurements,
-        Service, ServiceId, ServiceRevenue, Staking, Tokens, TotalServed, TransactionResponse,
-        UpdateMethod, UpdateRequest, Value, Worker,
-    },
-    ToDigest,
+use lightning_interfaces::types::{
+    AccountInfo,
+    Committee,
+    CommodityTypes,
+    DeliveryAcknowledgment,
+    Epoch,
+    ExecutionData,
+    ExecutionError,
+    Metadata,
+    NodeIndex,
+    NodeInfo,
+    NodeServed,
+    ProofOfConsensus,
+    ProofOfMisbehavior,
+    ProtocolParams,
+    ReportedReputationMeasurements,
+    ReputationMeasurements,
+    Service,
+    ServiceId,
+    ServiceRevenue,
+    Staking,
+    Tokens,
+    TotalServed,
+    TransactionResponse,
+    UpdateMethod,
+    UpdateRequest,
+    Value,
+    Worker,
 };
-use lightning_reputation::{statistics, types::WeightedReputationMeasurements};
+use lightning_interfaces::ToDigest;
+use lightning_reputation::statistics;
+use lightning_reputation::types::WeightedReputationMeasurements;
 use multiaddr::Multiaddr;
-use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
+use rand::rngs::StdRng;
+use rand::seq::SliceRandom;
+use rand::SeedableRng;
 
 use crate::table::{Backend, TableRef};
 

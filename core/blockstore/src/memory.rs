@@ -1,14 +1,23 @@
-use std::{collections::HashMap, marker::PhantomData, sync::Arc};
+use std::collections::HashMap;
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 use async_trait::async_trait;
+use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::types::{CompressionAlgoSet, CompressionAlgorithm};
 use lightning_interfaces::{
-    infu_collection::Collection,
-    types::{CompressionAlgoSet, CompressionAlgorithm},
-    Blake3Hash, Blake3Tree, BlockStoreInterface, ConfigConsumer, ContentChunk,
+    Blake3Hash,
+    Blake3Tree,
+    BlockStoreInterface,
+    ConfigConsumer,
+    ContentChunk,
 };
 use parking_lot::RwLock;
 
-use crate::{config::Config, put::IncrementalPut, store::Store, Block, BlockContent, Key};
+use crate::config::Config;
+use crate::put::IncrementalPut;
+use crate::store::Store;
+use crate::{Block, BlockContent, Key};
 
 #[derive(Clone, Default)]
 pub struct MemoryBlockStore<C: Collection> {

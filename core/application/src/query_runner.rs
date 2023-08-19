@@ -1,18 +1,33 @@
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
+use std::time::Duration;
 
 use atomo::{Atomo, QueryPerm, ResolvedTableReference};
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use lightning_interfaces::{
-    application::SyncQueryRunnerInterface,
-    types::{
-        AccountInfo, Committee, CommodityTypes, Epoch, EpochInfo, Metadata, NodeIndex, NodeInfo,
-        NodeServed, ProtocolParams, ReportedReputationMeasurements, Service, ServiceId,
-        ServiceRevenue, TotalServed, TransactionResponse, UpdateRequest, Value,
-    },
+use lightning_interfaces::application::SyncQueryRunnerInterface;
+use lightning_interfaces::types::{
+    AccountInfo,
+    Committee,
+    CommodityTypes,
+    Epoch,
+    EpochInfo,
+    Metadata,
+    NodeIndex,
+    NodeInfo,
+    NodeServed,
+    ProtocolParams,
+    ReportedReputationMeasurements,
+    Service,
+    ServiceId,
+    ServiceRevenue,
+    TotalServed,
+    TransactionResponse,
+    UpdateRequest,
+    Value,
 };
 
-use crate::{state::State, table::StateTables};
+use crate::state::State;
+use crate::table::StateTables;
 
 #[derive(Clone)]
 pub struct QueryRunner {

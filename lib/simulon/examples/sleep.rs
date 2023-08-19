@@ -1,6 +1,7 @@
 use std::time::Duration;
 
-use simulon::{api, simulation::SimulationBuilder};
+use simulon::api;
+use simulon::simulation::SimulationBuilder;
 
 async fn exec() {
     api::sleep(Duration::from_secs(1_000)).await;

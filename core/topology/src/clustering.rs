@@ -9,7 +9,8 @@
 //! reference implementation of constrained k-means.
 
 use core::ops::AddAssign;
-use std::{collections::BTreeMap, convert::From};
+use std::collections::BTreeMap;
+use std::convert::From;
 
 use mcmf::{Capacity, Cost, GraphBuilder, Vertex};
 use num_traits::{Signed, Zero};

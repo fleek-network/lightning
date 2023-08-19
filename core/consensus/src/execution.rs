@@ -1,13 +1,9 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use async_trait::async_trait;
-use lightning_interfaces::{
-    types::{Block, UpdateRequest},
-    ExecutionEngineSocket, PubSub,
-};
+use lightning_interfaces::types::{Block, UpdateRequest};
+use lightning_interfaces::{ExecutionEngineSocket, PubSub};
 use log::info;
 use narwhal_executor::ExecutionState;
 use narwhal_types::{Batch, BatchAPI, ConsensusOutput};

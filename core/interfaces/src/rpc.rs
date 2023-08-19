@@ -1,9 +1,10 @@
 use infusion::c;
 
-use crate::{
-    common::WithStartAndShutdown, config::ConfigConsumer, consensus::MempoolSocket,
-    infu_collection::Collection, ApplicationInterface, ConfigProviderInterface, ConsensusInterface,
-};
+use crate::common::WithStartAndShutdown;
+use crate::config::ConfigConsumer;
+use crate::consensus::MempoolSocket;
+use crate::infu_collection::Collection;
+use crate::{ApplicationInterface, ConfigProviderInterface, ConsensusInterface};
 
 /// The interface for the *RPC* server. Which is supposed to be opening a public
 /// port (possibly an HTTP server) and accepts queries or updates from the user.

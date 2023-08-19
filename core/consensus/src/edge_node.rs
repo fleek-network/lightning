@@ -6,7 +6,8 @@ use narwhal_config::{Committee, Parameters, WorkerCache};
 use narwhal_node::NodeStorage;
 
 use self::consensus::EdgeConsensus;
-use crate::{consensus::PubSubMsg, execution::Execution};
+use crate::consensus::PubSubMsg;
+use crate::execution::Execution;
 
 mod consensus;
 mod pool;

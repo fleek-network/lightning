@@ -1,4 +1,5 @@
-use crate::{batch::BoxedVec, db::TableId};
+use crate::batch::BoxedVec;
+use crate::db::TableId;
 
 pub type ImKeyCollection = im::HashSet<BoxedVec, fxhash::FxBuildHasher>;
 

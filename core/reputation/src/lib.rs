@@ -7,7 +7,10 @@ pub mod types;
 
 use lightning_interfaces::types::NodeIndex;
 use types::{
-    CollectedMeasurements, MinMaxValues, NormalizedMeasurements, WeightedReputationMeasurements,
+    CollectedMeasurements,
+    MinMaxValues,
+    NormalizedMeasurements,
+    WeightedReputationMeasurements,
 };
 
 pub(crate) const PRECISION: usize = 18;
@@ -51,7 +54,8 @@ mod tests {
     use rand::Rng;
 
     use super::*;
-    use crate::{test_utils::*, types::*};
+    use crate::test_utils::*;
+    use crate::types::*;
 
     const EPSILON: f64 = 1e-8;
 

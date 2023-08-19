@@ -1,21 +1,25 @@
-use std::{
-    marker::PhantomData,
-    net::SocketAddr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::marker::PhantomData;
+use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 
 use affair::{AsyncWorker, Executor, TokioSpawn};
 use async_trait::async_trait;
-use axum::{extract::State, routing::post, Json, Router};
+use axum::extract::State;
+use axum::routing::post;
+use axum::{Json, Router};
+use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::types::{Block, UpdateRequest};
 use lightning_interfaces::{
-    infu_collection::{c, Collection},
-    types::{Block, UpdateRequest},
-    ApplicationInterface, BroadcastInterface, ConfigConsumer, ConsensusInterface,
-    ExecutionEngineSocket, MempoolSocket, SignerInterface, WithStartAndShutdown,
+    ApplicationInterface,
+    BroadcastInterface,
+    ConfigConsumer,
+    ConsensusInterface,
+    ExecutionEngineSocket,
+    MempoolSocket,
+    SignerInterface,
+    WithStartAndShutdown,
 };
 use log::{debug, info};
 use rand::{thread_rng, Rng, SeedableRng};

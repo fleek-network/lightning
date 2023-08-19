@@ -1,28 +1,32 @@
-use std::{borrow::Borrow, fmt::Display, str::FromStr};
+use std::borrow::Borrow;
+use std::fmt::Display;
+use std::str::FromStr;
 
 use arrayref::array_ref;
-use fastcrypto::{
-    bls12381::min_sig::{
-        BLS12381KeyPair, BLS12381PrivateKey, BLS12381PublicKey, BLS12381Signature,
-    },
-    ed25519::{Ed25519KeyPair, Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
-    encoding::{Base64, Encoding},
-    hash::{HashFunction, Keccak256},
-    secp256k1::{
-        recoverable::Secp256k1RecoverableSignature, Secp256k1KeyPair, Secp256k1PrivateKey,
-        Secp256k1PublicKey,
-    },
-    traits::{
-        KeyPair, RecoverableSignature, RecoverableSigner, Signer, ToFromBytes, VerifyRecoverable,
-        VerifyingKey,
-    },
+use fastcrypto::bls12381::min_sig::{
+    BLS12381KeyPair,
+    BLS12381PrivateKey,
+    BLS12381PublicKey,
+    BLS12381Signature,
+};
+use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature};
+use fastcrypto::encoding::{Base64, Encoding};
+use fastcrypto::hash::{HashFunction, Keccak256};
+use fastcrypto::secp256k1::recoverable::Secp256k1RecoverableSignature;
+use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1PrivateKey, Secp256k1PublicKey};
+use fastcrypto::traits::{
+    KeyPair,
+    RecoverableSignature,
+    RecoverableSigner,
+    Signer,
+    ToFromBytes,
+    VerifyRecoverable,
+    VerifyingKey,
 };
 use rand::rngs::ThreadRng;
-use sec1::{
-    pem,
-    pkcs8::{der::EncodePem, AlgorithmIdentifierRef, ObjectIdentifier, PrivateKeyInfo},
-    EcParameters, EcPrivateKey,
-};
+use sec1::pkcs8::der::EncodePem;
+use sec1::pkcs8::{AlgorithmIdentifierRef, ObjectIdentifier, PrivateKeyInfo};
+use sec1::{pem, EcParameters, EcPrivateKey};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_big_array::BigArray;
 use zeroize::{Zeroize, ZeroizeOnDrop};

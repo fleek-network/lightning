@@ -2,7 +2,8 @@
 
 use std::time::Duration;
 
-use criterion::{measurement::Measurement, *};
+use criterion::measurement::Measurement;
+use criterion::*;
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
 use futures::executor::block_on;
 use lightning_handshake::connection::{HandshakeConnection, HandshakeFrame, Reason};

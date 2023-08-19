@@ -1,25 +1,38 @@
-use std::{thread, time::Duration};
+use std::thread;
+use std::time::Duration;
 
 use affair::{Executor, TokioSpawn, Worker};
 use anyhow::Result;
 use fleek_crypto::{
-    AccountOwnerSecretKey, ConsensusSecretKey, EthAddress, NodePublicKey, NodeSecretKey, PublicKey,
+    AccountOwnerSecretKey,
+    ConsensusSecretKey,
+    EthAddress,
+    NodePublicKey,
+    NodeSecretKey,
+    PublicKey,
     SecretKey,
 };
 use hp_fixed::unsigned::HpUfixed;
-use lightning_application::{
-    app::Application,
-    config::{Config as AppConfig, Mode},
-    genesis::{Genesis, GenesisAccount, GenesisCommittee},
+use lightning_application::app::Application;
+use lightning_application::config::{Config as AppConfig, Mode};
+use lightning_application::genesis::{Genesis, GenesisAccount, GenesisCommittee};
+use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::types::{
+    EpochInfo,
+    NodeInfo,
+    NodeServed,
+    ProtocolParams,
+    Staking,
+    TotalServed,
+    UpdateRequest,
+    Worker as NodeWorker,
 };
 use lightning_interfaces::{
-    infu_collection::Collection,
     partial,
-    types::{
-        EpochInfo, NodeInfo, NodeServed, ProtocolParams, Staking, TotalServed, UpdateRequest,
-        Worker as NodeWorker,
-    },
-    ApplicationInterface, MempoolSocket, RpcInterface, SyncQueryRunnerInterface,
+    ApplicationInterface,
+    MempoolSocket,
+    RpcInterface,
+    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use reqwest::{Client, Response};
@@ -27,7 +40,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::{task, test};
 
-use crate::{config::Config as RpcConfig, server::Rpc};
+use crate::config::Config as RpcConfig;
+use crate::server::Rpc;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RpcSuccessResponse<T> {

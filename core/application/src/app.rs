@@ -3,18 +3,14 @@ use std::marker::PhantomData;
 use affair::{Executor, TokioSpawn};
 use anyhow::Result;
 use async_trait::async_trait;
-use lightning_interfaces::{
-    application::{ApplicationInterface, ExecutionEngineSocket},
-    common::WithStartAndShutdown,
-    config::ConfigConsumer,
-    infu_collection::Collection,
-};
+use lightning_interfaces::application::{ApplicationInterface, ExecutionEngineSocket};
+use lightning_interfaces::common::WithStartAndShutdown;
+use lightning_interfaces::config::ConfigConsumer;
+use lightning_interfaces::infu_collection::Collection;
 
-use crate::{
-    config::Config,
-    env::{Env, UpdateWorker},
-    query_runner::QueryRunner,
-};
+use crate::config::Config;
+use crate::env::{Env, UpdateWorker};
+use crate::query_runner::QueryRunner;
 
 pub struct Application<C: Collection> {
     update_socket: ExecutionEngineSocket,

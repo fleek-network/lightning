@@ -1,14 +1,10 @@
-use std::{
-    any::TypeId,
-    collections::{HashMap, HashSet, VecDeque},
-    fmt::{Debug, Display},
-};
+use std::any::TypeId;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt::{Debug, Display};
 
-use crate::{
-    error::CycleFound,
-    vtable::{Object, Tag, VTable},
-    InitializationError,
-};
+use crate::error::CycleFound;
+use crate::vtable::{Object, Tag, VTable};
+use crate::InitializationError;
 
 /// The raw dependency graph of a collection. It contains the project model.
 ///
