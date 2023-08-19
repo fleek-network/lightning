@@ -2,7 +2,7 @@ use cid::{
     multihash::{Code, MultihashDigest},
     Cid,
 };
-use lightning_interfaces::{OriginProviderInterface, UntrustedStream, WithStartAndShutdown};
+use lightning_interfaces::{infu_collection::Collection, OriginProviderInterface, UntrustedStream, WithStartAndShutdown, partial};
 use lightning_test_utils::ipfs_gateway::spawn_gateway;
 use tokio::io::AsyncReadExt;
 use tokio_util::io::StreamReader;
@@ -11,6 +11,10 @@ use crate::{
     config::{Config, Gateway, Protocol},
     IPFSOrigin,
 };
+
+partial!(TestBinding {
+    OriginProviderInterface = IPFSOrigin<Self>;
+});
 
 #[tokio::test]
 async fn test_origin() {
@@ -23,7 +27,7 @@ async fn test_origin() {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30100".to_string(),
         });
-        let ipfs_origin = IPFSOrigin::init(config).unwrap();
+        let ipfs_origin = IPFSOrigin::<TestBinding>::init(config).unwrap();
         ipfs_origin.start().await;
 
         let socket = ipfs_origin.get_socket();
@@ -62,7 +66,7 @@ async fn test_origin() {
 
 #[tokio::test]
 async fn test_shutdown() {
-    let ipfs_origin = IPFSOrigin::init(Config::default()).unwrap();
+    let ipfs_origin = IPFSOrigin::<TestBinding>::init(Config::default()).unwrap();
     assert!(!ipfs_origin.is_running());
     ipfs_origin.start().await;
     assert!(ipfs_origin.is_running());

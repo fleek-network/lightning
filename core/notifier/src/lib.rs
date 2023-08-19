@@ -69,9 +69,14 @@ mod tests {
         genesis::Genesis,
         query_runner::QueryRunner,
     };
-    use lightning_interfaces::application::{ApplicationInterface, ExecutionEngineSocket};
+    use lightning_interfaces::{infu_collection::Collection,application::{ApplicationInterface, ExecutionEngineSocket}, partial};
 
     use super::*;
+
+    partial!(TestBinding {
+        ApplicationInterface = Application<Self>;
+        NotifierInterface = Notifier<Self>;
+    });
 
     const EPSILON: f64 = 0.1;
 
@@ -88,7 +93,7 @@ mod tests {
             mode: Mode::Test,
         };
 
-        let app = Application::init(config).unwrap();
+        let app = Application::<TestBinding>::init(config).unwrap();
 
         (app.transaction_executor(), app.sync_query())
     }
@@ -97,7 +102,7 @@ mod tests {
     async fn test_on_new_epoch() {
         let (_, query_runner) = init_app(2000);
 
-        let notifier = Notifier::init(query_runner);
+        let notifier = Notifier::<TestBinding>::init(query_runner);
 
         // Request to be notified when the epoch ends.
         let (tx, mut rx) = mpsc::channel(2048);
@@ -116,7 +121,7 @@ mod tests {
     async fn test_before_epoch_change() {
         let (_, query_runner) = init_app(3000);
 
-        let notifier = Notifier::init(query_runner);
+        let notifier = Notifier::<TestBinding>::init(query_runner);
 
         // Request to be notified 1 sec before the epoch ends.
         let (tx, mut rx) = mpsc::channel(2048);

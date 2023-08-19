@@ -9,3 +9,7 @@ edition = "2021"
 lightning-interfaces = {path="../interfaces"}
 tokio.workspace = true
 async-trait = "0.1"
+
+[dev-dependencies]
+infusion.workspace = true
+lightning-application = {path="../application", features = ["test"]}

@@ -3536,6 +3536,8 @@ name = "lightning-notifier"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "infusion",
+ "lightning-application",
  "lightning-interfaces",
  "tokio",
 ]
@@ -3570,6 +3572,7 @@ dependencies = [
  "futures",
  "hyper",
  "hyper-rustls",
+ "infusion",
  "lightning-interfaces",
  "lightning-test-utils",
  "multihash 0.19.0",
