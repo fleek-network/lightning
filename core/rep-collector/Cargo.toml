@@ -21,4 +21,5 @@ lightning-test-utils = {path="../test-utils"}
 lightning-signer = {path="../signer"}
 lightning-application = {path="../application", features = ["test"]}
 lightning-notifier = {path="../notifier"}
+infusion.workspace = true
 rand.workspace = true
