@@ -1,21 +1,19 @@
-use std::{
-    collections::{HashMap, HashSet},
-    io::Write,
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
+use std::io::Write;
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 use affair::AsyncWorker;
 use anyhow::{bail, Result};
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::{schema::LightningMessage, types::ServiceScope};
+use lightning_interfaces::schema::LightningMessage;
+use lightning_interfaces::types::ServiceScope;
 use quinn::{ClientConfig, Connection, Endpoint, RecvStream, SendStream};
-use tokio::sync::{
-    mpsc::{Receiver, Sender},
-    oneshot,
-};
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::oneshot;
 
-use crate::{connector::ConnectEvent, netkit};
+use crate::connector::ConnectEvent;
+use crate::netkit;
 
 pub async fn start_listener_driver(mut driver: ListenerDriver) {
     loop {

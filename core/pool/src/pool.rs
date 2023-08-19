@@ -1,34 +1,43 @@
-use std::{marker::PhantomData, net::SocketAddr, sync::Arc};
+use std::marker::PhantomData;
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 use affair::Worker;
 use async_trait::async_trait;
+use infusion::c;
+use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::schema::LightningMessage;
+use lightning_interfaces::types::ServiceScope;
 use lightning_interfaces::{
-    schema::LightningMessage, types::ServiceScope, ConfigConsumer, ConnectionPoolInterface,
-    SignerInterface, SyncQueryRunnerInterface, WithStartAndShutdown,
+    ApplicationInterface,
+    ConfigConsumer,
+    ConnectionPoolInterface,
+    SignerInterface,
+    SyncQueryRunnerInterface,
+    WithStartAndShutdown,
 };
 use quinn::{Endpoint, ServerConfig};
 
-use crate::{connector::Connector, listener::Listener, netkit, receiver::Receiver, sender::Sender};
+use crate::connector::Connector;
+use crate::listener::Listener;
+use crate::netkit;
+use crate::receiver::Receiver;
+use crate::sender::Sender;
 
-pub struct ConnectionPool<Q, S> {
+pub struct ConnectionPool<C> {
     endpoint: Endpoint,
-    _marker: PhantomData<(Q, S)>,
+    _marker: PhantomData<C>,
 }
 
-impl<Q, S> ConfigConsumer for ConnectionPool<Q, S>
-where
-    Q: SyncQueryRunnerInterface,
-    S: SignerInterface,
-{
+impl<C> ConfigConsumer for ConnectionPool<C> {
     const KEY: &'static str = "";
     type Config = ();
 }
 
 #[async_trait]
-impl<Q, S> WithStartAndShutdown for ConnectionPool<Q, S>
+impl<C> WithStartAndShutdown for ConnectionPool<C>
 where
-    Q: SyncQueryRunnerInterface,
-    S: SignerInterface,
+    C: Collection,
 {
     fn is_running(&self) -> bool {
         todo!()
@@ -43,19 +52,18 @@ where
     }
 }
 
-impl<Q, S> ConnectionPoolInterface for ConnectionPool<Q, S>
+impl<C> ConnectionPoolInterface<C> for ConnectionPool<C>
 where
-    Q: SyncQueryRunnerInterface,
-    S: SignerInterface,
+    C: Collection,
 {
-    type QueryRunner = Q;
-    type Signer = S;
-    type Listener<T: LightningMessage> = Listener<Q, S, T>;
-    type Connector<T: LightningMessage> = Connector<Q, S, T>;
-    type Sender<T: LightningMessage> = Sender<T>;
-    type Receiver<T: LightningMessage> = Receiver<T>;
+    type Listener<T: LightningMessage> = Listener<T>;
+    type Connector<T: LightningMessage> = Connector<T>;
 
-    fn init(_: Self::Config, _: &Self::Signer, _: Self::QueryRunner) -> Self {
+    fn init(
+        config: Self::Config,
+        signer: &c!(C::SignerInterface),
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    ) -> Self {
         let address: SocketAddr = "0.0.0.0".parse().unwrap();
         let tls_config = netkit::server_config();
         let server_config = ServerConfig::with_crypto(Arc::new(tls_config));

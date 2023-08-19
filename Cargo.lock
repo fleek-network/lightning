@@ -3648,6 +3648,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "fleek-crypto",
+ "infusion",
  "lightning-interfaces",
  "quinn",
  "rcgen 0.11.1",

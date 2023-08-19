@@ -1,4 +1,5 @@
 #![feature(macro_metavar_expr)]
+#![feature(associated_type_defaults)]
 
 pub mod application;
 pub mod blockstore;

@@ -1,11 +1,10 @@
-use std::{
-    marker::PhantomData,
-    sync::{Arc, Mutex},
-};
+use std::marker::PhantomData;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::{schema::LightningMessage, SenderInterface};
+use lightning_interfaces::schema::LightningMessage;
+use lightning_interfaces::SenderInterface;
 use quinn::{Connection, SendStream};
 
 pub struct Sender<T> {
@@ -41,9 +40,13 @@ where
     async fn send(&self, msg: T) -> bool {
         let mut send = self.send.lock().unwrap().take().unwrap();
         let mut writer = Vec::new();
-        msg.encode::<Vec<_>>(writer.as_mut()).unwrap();
-        let write_result = send.write(&writer).await.is_err();
-        self.send.lock().unwrap().replace(send);
-        write_result
+        match msg.encode::<Vec<_>>(writer.as_mut()) {
+            Ok(_) => {
+                let write_result = send.write(&writer).await.is_err();
+                self.send.lock().unwrap().replace(send);
+                write_result
+            },
+            Err(_) => false,
+        }
     }
 }

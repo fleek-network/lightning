@@ -2,7 +2,8 @@ use std::marker::PhantomData;
 
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::{schema::LightningMessage, ReceiverInterface};
+use lightning_interfaces::schema::LightningMessage;
+use lightning_interfaces::ReceiverInterface;
 use quinn::{Connection, RecvStream};
 
 pub struct Receiver<T> {

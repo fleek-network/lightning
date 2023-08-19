@@ -8,6 +8,7 @@ anyhow.workspace = true
 affair.workspace = true
 async-trait.workspace = true
 bincode.workspace = true
+infusion.workspace = true
 quinn.workspace = true
 fleek-crypto = { path = "../../lib/fleek-crypto" }
 lightning-interfaces = { path = "../interfaces" }

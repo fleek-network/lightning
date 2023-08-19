@@ -1,15 +1,22 @@
-use std::{marker::PhantomData, net::SocketAddr};
+use std::marker::PhantomData;
+use std::net::SocketAddr;
 
 use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::schema::LightningMessage;
+use lightning_interfaces::types::ServiceScope;
 use lightning_interfaces::{
-    schema::LightningMessage, types::ServiceScope, ConnectorInterface, SenderReceiver,
-    SignerInterface, SyncQueryRunnerInterface,
+    ConnectorInterface,
+    SenderReceiver,
+    SignerInterface,
+    SyncQueryRunnerInterface,
 };
 use quinn::{Connection, RecvStream, SendStream};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{pool::ConnectionPool, receiver::Receiver, sender::Sender};
+use crate::pool::ConnectionPool;
+use crate::receiver::Receiver;
+use crate::sender::Sender;
 
 pub struct ConnectEvent {
     pub scope: ServiceScope,
@@ -18,28 +25,26 @@ pub struct ConnectEvent {
     pub respond: oneshot::Sender<(SendStream, RecvStream)>,
 }
 
-pub struct Connector<Q, S, T> {
+pub struct Connector<T> {
     scope: ServiceScope,
     connection_event_tx: mpsc::Sender<ConnectEvent>,
-    _marker: PhantomData<(Q, S, T)>,
+    _marker: PhantomData<T>,
 }
 
-impl<Q, S, T> Clone for Connector<Q, S, T> {
+impl<T> Clone for Connector<T> {
     fn clone(&self) -> Self {
         todo!()
     }
 }
 
 #[async_trait]
-impl<Q, S, T> ConnectorInterface<T> for Connector<Q, S, T>
+impl<T> ConnectorInterface<T> for Connector<T>
 where
     T: LightningMessage,
-    Q: SyncQueryRunnerInterface,
-    S: SignerInterface,
 {
-    type ConnectionPool = ConnectionPool<Q, S>;
-
-    async fn connect(&self, to: &NodePublicKey) -> Option<SenderReceiver<Self::ConnectionPool, T>> {
+    type Sender = Sender<T>;
+    type Receiver = Receiver<T>;
+    async fn connect(&self, to: &NodePublicKey) -> Option<(Self::Sender, Self::Receiver)> {
         let (tx, rx) = oneshot::channel();
         self.connection_event_tx
             .send(ConnectEvent {
