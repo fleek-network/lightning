@@ -39,8 +39,9 @@ mod tests {
     };
     use lightning_interfaces::{
         infu_collection::Collection,
+        partial,
         types::{CompressionAlgoSet, CompressionAlgorithm},
-        Blake3Hash, BlockStoreInterface, IncrementalPutInterface, partial,
+        Blake3Hash, BlockStoreInterface, IncrementalPutInterface,
     };
     use tokio::test;
 

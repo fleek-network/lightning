@@ -13,9 +13,9 @@ use lightning_application::{
     genesis::{Genesis, GenesisCommittee},
 };
 use lightning_interfaces::{
-    infu_collection::Collection,
     application::ApplicationInterface, common::WithStartAndShutdown, consensus::ConsensusInterface,
-    signer::SignerInterface, types::UpdateMethod, SyncQueryRunnerInterface, partial,
+    infu_collection::Collection, partial, signer::SignerInterface, types::UpdateMethod,
+    SyncQueryRunnerInterface,
 };
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use resolved_pathbuf::ResolvedPathBuf;

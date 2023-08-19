@@ -12,15 +12,16 @@ use lightning_application::{
     genesis::{Genesis, GenesisCommittee},
 };
 use lightning_interfaces::{
-    infu_collection::Collection,
     application::ApplicationInterface,
     common::WithStartAndShutdown,
     consensus::ConsensusInterface,
+    infu_collection::Collection,
     notifier::NotifierInterface,
+    partial,
     reputation::{ReputationAggregatorInterface, ReputationReporterInterface},
     signer::SignerInterface,
     types::{Block, UpdateMethod, UpdatePayload, UpdateRequest},
-    ReputationQueryInteface, SyncQueryRunnerInterface, ToDigest, Weight, partial,
+    ReputationQueryInteface, SyncQueryRunnerInterface, ToDigest, Weight,
 };
 use lightning_notifier::Notifier;
 use lightning_signer::{Config as SignerConfig, Signer};
@@ -136,8 +137,13 @@ async fn test_query() {
     let config = Config {
         reporter_buffer_size: 1,
     };
-    let rep_aggregator =
-        ReputationAggregator::<TestBinding>::init(config, signer.get_socket(), notifier, query_runner).unwrap();
+    let rep_aggregator = ReputationAggregator::<TestBinding>::init(
+        config,
+        signer.get_socket(),
+        notifier,
+        query_runner,
+    )
+    .unwrap();
 
     let rep_reporter = rep_aggregator.get_reporter();
     let rep_query = rep_aggregator.get_query();
@@ -260,9 +266,13 @@ async fn test_submit_measurements() {
     let config = Config {
         reporter_buffer_size: 1,
     };
-    let rep_aggregator =
-        ReputationAggregator::<TestBinding>::init(config, signer.get_socket(), notifier, query_runner.clone())
-            .unwrap();
+    let rep_aggregator = ReputationAggregator::<TestBinding>::init(
+        config,
+        signer.get_socket(),
+        notifier,
+        query_runner.clone(),
+    )
+    .unwrap();
 
     let rep_reporter = rep_aggregator.get_reporter();
     let mut aggregator_handle = tokio::spawn(async move {

@@ -11,9 +11,10 @@ use lightning_application::{
     app::Application,
     config::{Config as AppConfig, Mode},
     genesis::{Genesis, GenesisAccount, GenesisCommittee},
-    query_runner::QueryRunner,
 };
 use lightning_interfaces::{
+    infu_collection::Collection,
+    partial,
     types::{
         EpochInfo, NodeInfo, NodeServed, ProtocolParams, Staking, TotalServed, UpdateRequest,
         Worker as NodeWorker,
@@ -52,10 +53,15 @@ impl Worker for MockWorker {
     fn handle(&mut self, _req: Self::Request) -> Self::Response {}
 }
 
-fn init_rpc_without_consensus() -> Result<Rpc<QueryRunner>> {
-    let app = Application::init(AppConfig::default()).unwrap();
+partial!(TestBinding {
+    ApplicationInterface = Application<Self>;
+    RpcInterface = Rpc<Self>;
+});
 
-    let rpc = Rpc::init(
+fn init_rpc_without_consensus() -> Result<Rpc<TestBinding>> {
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
+
+    let rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         app.sync_query(),
@@ -149,7 +155,7 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
         bandwidth_balance: 0,
     });
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -159,7 +165,7 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
 
     // Init rpc service
     let port = 30001;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
@@ -220,7 +226,7 @@ async fn test_rpc_get_reputation() -> Result<()> {
     // Init application service and store reputation score in application state.
     genesis.rep_scores.insert(node_public_key.to_base64(), 46);
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -230,7 +236,7 @@ async fn test_rpc_get_reputation() -> Result<()> {
 
     // Init rpc service
     let port = 30002;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
@@ -304,7 +310,7 @@ async fn test_rpc_get_staked() -> Result<()> {
         .node_info
         .insert(node_public_key.to_base64(), node_info);
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -314,7 +320,7 @@ async fn test_rpc_get_staked() -> Result<()> {
 
     // Init rpc service
     let port = 30003;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
@@ -364,7 +370,7 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
         bandwidth_balance: 0,
     });
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -374,7 +380,7 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
 
     // Init rpc service
     let port = 30004;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
@@ -448,7 +454,7 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
         .node_info
         .insert(node_public_key.to_base64(), node_info);
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -458,7 +464,7 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
 
     // Init rpc service
     let port = 30005;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
@@ -532,7 +538,7 @@ async fn test_rpc_get_locked_time() -> Result<()> {
         .node_info
         .insert(node_public_key.to_base64(), node_info);
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -542,7 +548,7 @@ async fn test_rpc_get_locked_time() -> Result<()> {
 
     // Init rpc service
     let port = 30006;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
@@ -616,7 +622,7 @@ async fn test_rpc_get_locked() -> Result<()> {
         .node_info
         .insert(node_public_key.to_base64(), node_info);
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -626,7 +632,7 @@ async fn test_rpc_get_locked() -> Result<()> {
 
     // Init rpc service
     let port = 30007;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
@@ -678,7 +684,7 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
         bandwidth_balance: 10_000,
     });
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -688,7 +694,7 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
 
     // Init rpc service
     let port = 30008;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
@@ -762,7 +768,7 @@ async fn test_rpc_get_node_info() -> Result<()> {
         .node_info
         .insert(node_public_key.to_base64(), node_info.clone());
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -772,7 +778,7 @@ async fn test_rpc_get_node_info() -> Result<()> {
 
     // Init rpc service
     let port = 30009;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
@@ -811,13 +817,13 @@ async fn test_rpc_get_node_info() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_staking_amount() -> Result<()> {
-    let app = Application::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
     // Init rpc service
     let port = 30010;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
@@ -856,13 +862,13 @@ async fn test_rpc_get_staking_amount() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_committee_members() -> Result<()> {
-    let app = Application::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
     // Init rpc service
     let port = 30011;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
@@ -905,13 +911,13 @@ async fn test_rpc_get_committee_members() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_epoch() -> Result<()> {
-    let app = Application::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
     // Init rpc service
     let port = 30012;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
@@ -950,13 +956,13 @@ async fn test_rpc_get_epoch() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_epoch_info() -> Result<()> {
-    let app = Application::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
     // Init rpc service
     let port = 30013;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
@@ -995,13 +1001,13 @@ async fn test_rpc_get_epoch_info() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_total_supply() -> Result<()> {
-    let app = Application::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
     // Init rpc service
     let port = 30014;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
@@ -1040,13 +1046,13 @@ async fn test_rpc_get_total_supply() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_year_start_supply() -> Result<()> {
-    let app = Application::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
     // Init rpc service
     let port = 30015;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
@@ -1088,13 +1094,13 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_protocol_fund_address() -> Result<()> {
-    let app = Application::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
     // Init rpc service
     let port = 30016;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
@@ -1136,13 +1142,13 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_protocol_params() -> Result<()> {
-    let app = Application::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
     // Init rpc service
     let port = 30017;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
@@ -1195,7 +1201,7 @@ async fn test_rpc_get_total_served() -> Result<()> {
     };
     genesis.total_served.insert(0, total_served.clone());
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -1205,7 +1211,7 @@ async fn test_rpc_get_total_served() -> Result<()> {
 
     // Init rpc service
     let port = 30018;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
@@ -1271,7 +1277,7 @@ async fn test_rpc_get_node_served() -> Result<()> {
         },
     );
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -1281,7 +1287,7 @@ async fn test_rpc_get_node_served() -> Result<()> {
 
     // Init rpc service
     let port = 30019;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
@@ -1355,7 +1361,7 @@ async fn test_rpc_is_valid_node() -> Result<()> {
         .node_info
         .insert(node_public_key.to_base64(), node_info);
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -1365,7 +1371,7 @@ async fn test_rpc_is_valid_node() -> Result<()> {
 
     // Init rpc service
     let port = 30020;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,
@@ -1441,7 +1447,7 @@ async fn test_rpc_get_node_registry() -> Result<()> {
 
     let committee_size = genesis.committee.len();
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -1451,7 +1457,7 @@ async fn test_rpc_get_node_registry() -> Result<()> {
 
     // Init rpc service
     let port = 30021;
-    let mut rpc = Rpc::init(
+    let mut rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner,

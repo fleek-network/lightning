@@ -69,7 +69,11 @@ mod tests {
         genesis::Genesis,
         query_runner::QueryRunner,
     };
-    use lightning_interfaces::{infu_collection::Collection,application::{ApplicationInterface, ExecutionEngineSocket}, partial};
+    use lightning_interfaces::{
+        application::{ApplicationInterface, ExecutionEngineSocket},
+        infu_collection::Collection,
+        partial,
+    };
 
     use super::*;
 

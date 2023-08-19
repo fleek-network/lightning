@@ -2,7 +2,10 @@ use cid::{
     multihash::{Code, MultihashDigest},
     Cid,
 };
-use lightning_interfaces::{infu_collection::Collection, OriginProviderInterface, UntrustedStream, WithStartAndShutdown, partial};
+use lightning_interfaces::{
+    infu_collection::Collection, partial, OriginProviderInterface, UntrustedStream,
+    WithStartAndShutdown,
+};
 use lightning_test_utils::ipfs_gateway::spawn_gateway;
 use tokio::io::AsyncReadExt;
 use tokio_util::io::StreamReader;

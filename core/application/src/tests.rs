@@ -8,14 +8,15 @@ use fleek_crypto::{
 };
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::{
-    infu_collection::Collection,
     application::ExecutionEngineSocket,
+    infu_collection::Collection,
+    partial,
     types::{
         Block, BlockExecutionResponse, DeliveryAcknowledgment, Epoch, ExecutionError, NodeInfo,
         ProofOfConsensus, ProtocolParams, Tokens, TotalServed, TransactionResponse, UpdateMethod,
         UpdatePayload, UpdateRequest,
     },
-    ApplicationInterface, SyncQueryRunnerInterface, ToDigest, partial,
+    ApplicationInterface, SyncQueryRunnerInterface, ToDigest,
 };
 use lightning_test_utils::{random, reputation};
 use tokio::test;

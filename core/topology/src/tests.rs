@@ -8,9 +8,17 @@ use lightning_application::{
     config::{Config as AppConfig, Mode},
     genesis::{Genesis, GenesisCommittee, GenesisLatency},
 };
-use lightning_interfaces::{ApplicationInterface, TopologyInterface, WithStartAndShutdown};
+use lightning_interfaces::{
+    infu_collection::Collection, partial, ApplicationInterface, TopologyInterface,
+    WithStartAndShutdown,
+};
 
 use crate::{config::Config, Topology};
+
+partial!(TestBinding {
+    TopologyInterface = Topology<Self>;
+    ApplicationInterface = Application<Self>;
+});
 
 #[tokio::test]
 async fn test_build_latency_matrix() {
@@ -105,7 +113,7 @@ async fn test_build_latency_matrix() {
     });
     genesis.latencies = Some(latencies);
 
-    let app = Application::init(AppConfig {
+    let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
     })
@@ -114,7 +122,8 @@ async fn test_build_latency_matrix() {
     let query_runner = app.sync_query();
     app.start().await;
 
-    let topology = Topology::init(Config::default(), our_public_key, query_runner).unwrap();
+    let topology =
+        Topology::<TestBinding>::init(Config::default(), our_public_key, query_runner).unwrap();
     let (matrix, index_to_pubkey, our_index) = topology.inner.build_latency_matrix();
     let pubkey_to_index: HashMap<NodePublicKey, usize> = index_to_pubkey
         .iter()
