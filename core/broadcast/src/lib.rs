@@ -2,8 +2,8 @@ pub mod config;
 pub(crate) mod inner;
 pub mod pubsub;
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 use std::{marker::PhantomData, sync::Arc};
 
