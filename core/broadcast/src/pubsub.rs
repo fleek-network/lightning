@@ -44,7 +44,7 @@ impl<M: LightningMessage> Clone for PubSubTopic<M> {
             receiver: self
                 .channels
                 .get(&self.topic)
-                .expect("failed to find sender")
+                .expect("failed to find topic broadcast sender")
                 .subscribe(),
             channels: self.channels.clone(),
         }

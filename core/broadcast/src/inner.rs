@@ -2,9 +2,9 @@
 
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{anyhow, Result};
-use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
 use lightning_interfaces::infu_collection::{c, Collection};
@@ -22,6 +22,9 @@ use lightning_interfaces::{
     ToDigest,
     TopologyInterface,
 };
+use mini_moka::sync::Cache;
+
+const MAX_MESSAGE_CACHE_LEN: u64 = 65535;
 
 pub struct BroadcastSender<S> {
     writer: S,
@@ -60,9 +63,7 @@ pub struct BroadcastInner<C: Collection> {
         >,
     >,
     // received messages + signatures
-    /// PERF: This should be a cache. Maybe TTL = 24hrs, a simple LRU cache, or even prune this at
-    /// each epoch
-    messages: Arc<DashMap<Blake3Hash, Option<(BroadcastMessage, NodeSignature)>>>,
+    message_cache: Cache<Blake3Hash, Option<(BroadcastMessage, NodeSignature)>>,
     // incoming channels for pubsub messages
     channels: Arc<DashMap<Topic, tokio::sync::broadcast::Sender<Vec<u8>>>>,
 }
@@ -75,7 +76,7 @@ impl<C: Collection> Clone for BroadcastInner<C> {
             peers: self.peers.clone(),
             connector: self.connector.clone(),
             connections: self.connections.clone(),
-            messages: self.messages.clone(),
+            message_cache: self.message_cache.clone(),
             channels: self.channels.clone(),
         }
     }
@@ -97,7 +98,10 @@ impl<C: Collection> BroadcastInner<C> {
             node_secret_key: node_key.into(),
             connector: connector.into(),
             connections: DashMap::new().into(),
-            messages: DashMap::new().into(),
+            message_cache: Cache::builder()
+                .time_to_live(Duration::from_secs(60 * 60))
+                .time_to_idle(Duration::from_secs(5 * 60))
+                .build(),
         }
     }
 
@@ -112,7 +116,7 @@ impl<C: Collection> BroadcastInner<C> {
         // remove old peers
         for peer in difference {
             // drop senders from the connection map
-            // TODO: Verify if anything else is needed to gracefully disconnect
+            // TODO: Verify if anything else is needed to gracefully close the connection
             self.connections.remove(peer);
         }
 
@@ -146,7 +150,8 @@ impl<C: Collection> BroadcastInner<C> {
         let signature = self.node_secret_key.sign(&digest);
 
         // insert the message into the map
-        self.messages.insert(digest, Some((message, signature)));
+        self.message_cache
+            .insert(digest, Some((message, signature)));
 
         // construct an advertisement are there any helpers and send it to all current connection
         for mut conn in self.connections.iter_mut() {
@@ -194,11 +199,12 @@ impl<C: Collection> BroadcastInner<C> {
         digest: &Blake3Hash,
     ) -> anyhow::Result<()> {
         // check if we have the message already
-        let Entry::Vacant(entry) = self.messages.entry(*digest) else {
+        if self.message_cache.contains_key(digest) {
             return Ok(());
-        };
+        }
+
         // if not, send a want, and mark the digest as wanted
-        entry.insert(None);
+        self.message_cache.insert(*digest, None);
         self.connections
             .get_mut(pubkey)
             // TODO: Implement a fallback here. We should probably retain a queue to attempt to
@@ -215,11 +221,11 @@ impl<C: Collection> BroadcastInner<C> {
     ) -> anyhow::Result<()> {
         // check if we have the message
         let (message, signature) = self
-            .messages
+            .message_cache
             .get(digest)
-            // these errors should never actually happen, unless someone is being funny
+            // these errors will never actually happen, unless someone is misbehaving and sending
+            // wants for invalid digests.
             .ok_or(anyhow!("recieved want but digest was unknown"))?
-            .clone()
             .ok_or(anyhow!("recieved want but content was missing"))?;
 
         let Some(mut conn) = self.connections.get_mut(pubkey) else {
@@ -244,9 +250,11 @@ impl<C: Collection> BroadcastInner<C> {
         // compute message digest
         let digest = message.to_digest();
 
-        // check if the digest is marked as wanted
-        let Some(mut entry) = self.messages.get_mut(&digest) else {
-            return Ok(())
+        // check if the digest is (at a minimum) marked as wanted
+        if let Some(entry) = self.message_cache.get(&digest) {
+            if entry.is_some() {
+                return Ok(());
+            }
         };
 
         // check if the signature is valid for the originator
@@ -259,15 +267,14 @@ impl<C: Collection> BroadcastInner<C> {
             .get_mut(pubkey)
             .map(|mut c| c.seen.insert(digest));
 
-        // send the content to the corresponding pubsub channel
-        //
-
+        // send the content to the corresponding pubsub broadcast channel
         if let Some(channel) = self.channels.get(&message.topic) {
             channel.send(message.payload.clone())?;
         }
 
         // store the content for future wants
-        *entry = Some((message, signature));
+        self.message_cache
+            .insert(digest, Some((message, signature)));
 
         // Advertise the digest to other peers
         for mut conn in self
