@@ -1,44 +1,40 @@
-use std::{borrow::BorrowMut, collections::HashMap, fs, net::SocketAddr, str::FromStr, sync::Arc};
+use std::collections::HashMap;
+use std::fs;
+use std::net::SocketAddr;
+use std::path::Path;
+use std::str::FromStr;
 
 use fleek_crypto::{
-    AccountOwnerSecretKey, ConsensusSecretKey, EthAddress, NodePublicKey, NodeSecretKey, PublicKey,
+    AccountOwnerSecretKey,
+    ConsensusPublicKey,
+    ConsensusSecretKey,
+    EthAddress,
+    NodePublicKey,
+    NodeSecretKey,
+    PublicKey,
     SecretKey,
 };
 use futures::future::try_join_all;
 use hp_fixed::unsigned::HpUfixed;
-use lightning_application::{
-    app::Application,
-    config::{Config as AppConfig, Mode},
-    genesis::{Genesis, GenesisCommittee},
-    query_runner::QueryRunner,
-};
-use lightning_consensus::{
-    config::Config as ConsensusConfig,
-    consensus::{Consensus, PubSubMsg},
-};
-use lightning_dht::{
-    config::{Bootstrapper, Config as DhtConfig},
-    dht::Dht,
-};
-use lightning_handshake::server::{HandshakeServer, HandshakeServerConfig, TcpProvider};
-use lightning_interfaces::{
-    types::{NodeInfo, Staking, Worker},
-    BroadcastInterface, ConfigConsumer,
-};
-use lightning_node::{config::TomlConfigProvider, template::broadcast::Broadcast};
-use lightning_notifier::Notifier;
-use lightning_rpc::{config::Config as RpcConfig, server::Rpc};
+use lightning_application::app::Application;
+use lightning_application::config::{Config as AppConfig, Mode};
+use lightning_application::genesis::Genesis;
+use lightning_consensus::config::Config as ConsensusConfig;
+use lightning_consensus::consensus::Consensus;
+use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
+use lightning_dht::dht::Dht;
+use lightning_handshake::server::{HandshakeServerConfig, TcpHandshakeServer};
+use lightning_interfaces::types::{NodeInfo, Staking, Worker};
+use lightning_interfaces::ConfigProviderInterface;
+use lightning_node::config::TomlConfigProvider;
+use lightning_node::node::FinalTypes;
+use lightning_rpc::config::Config as RpcConfig;
+use lightning_rpc::server::Rpc;
 use lightning_signer::{utils, Config as SignerConfig, Signer};
-use lightning_topology::Topology;
 use resolved_pathbuf::ResolvedPathBuf;
-use toml::Value;
 
-use crate::{
-    containerized_node::ContainerizedNode,
-    utils::networking::{PortAssigner, Transport},
-};
-
-type MyBroadcast = Broadcast<QueryRunner, Signer, Topology<QueryRunner>, Notifier>;
+use crate::containerized_node::ContainerizedNode;
+use crate::utils::networking::{PortAssigner, Transport};
 
 pub struct Swarm {
     nodes: HashMap<NodePublicKey, ContainerizedNode>,
@@ -135,197 +131,178 @@ impl SwarmBuilder {
         let min_port = self.min_port.expect("Minimum port must be provided.");
         let max_port = self.max_port.expect("Maximum port must be provided.");
 
-        let mut genesis = Genesis::load().unwrap();
-        if let Some(epoch_start) = self.epoch_start {
-            genesis.epoch_start = epoch_start;
-        }
-        if let Some(epoch_time) = self.epoch_time {
-            genesis.epoch_time = epoch_time;
-        }
-        if let Some(committee_size) = self.committee_size {
-            genesis.committee_size = committee_size;
-        }
-
-        let mut nodes = HashMap::with_capacity(num_nodes);
-
-        fs::create_dir_all(&directory).expect("Failed to create swarm directory");
-
-        let mut port_assigner = match self.port_assigner {
-            Some(port_assigner) => port_assigner,
-            None => PortAssigner::default(),
-        };
-
         let bootstrappers = self.bootstrappers.unwrap_or(Vec::new());
+        let mut port_assigner = self.port_assigner.unwrap_or_default();
 
-        let min_stake = genesis.min_stake;
+        // Load the default genesis. Clear the committee and node info and overwrite
+        // the provided values from config.
+        let mut genesis = Genesis::load().unwrap();
         genesis.committee = Vec::new();
         genesis.node_info = HashMap::new();
-        for i in 0..num_nodes {
-            let primary_addr_port = port_assigner
-                .get_port(min_port, max_port, Transport::Udp)
-                .expect("Failed to get available port.");
-            let worker_addr_port = port_assigner
-                .get_port(min_port, max_port, Transport::Udp)
-                .expect("Failed to get available port.");
-            let mempool_addr_port = port_assigner
-                .get_port(min_port, max_port, Transport::Tcp)
-                .expect("Failed to get available port.");
-            let dht_port = port_assigner
-                .get_port(min_port, max_port, Transport::Udp)
-                .expect("Failed to get available port.");
+        genesis.epoch_start = self.epoch_start.unwrap_or(genesis.epoch_start);
+        genesis.epoch_time = self.epoch_time.unwrap_or(genesis.epoch_time);
+        genesis.committee_size = self.committee_size.unwrap_or(genesis.committee_size);
 
-            let node_directory = directory.join(format!("swarm/nodes/{i}"));
-            fs::create_dir_all(&directory).expect("Failed to create node directory");
+        assert!(
+            genesis.committee_size >= num_nodes as u64,
+            "Committee size can not be smaller than number of nodes."
+        );
 
-            let config = TomlConfigProvider::default();
+        // Make sure the test directory exists by recursively creating it.
+        fs::create_dir_all(&directory).expect("Failed to create swarm directory");
 
-            let mut rpc_config = RpcConfig::default();
-            rpc_config.port += i as u16;
-            config.table.lock().expect("Failed to aqcuire lock").insert(
-                Rpc::<QueryRunner>::KEY.into(),
-                Value::try_from(&rpc_config).unwrap(),
+        // For the number of nodes that we need. Create the distinct configuration objects which
+        // we can pass to the containerized nodes.
+        let mut tmp_nodes = Vec::with_capacity(num_nodes);
+
+        for index in 0..num_nodes {
+            let root = directory.join("node-{index}");
+            fs::create_dir_all(&root).expect("Failed to create node directory");
+
+            let config = build_config(
+                &root,
+                |t| {
+                    port_assigner
+                        .get_port(min_port, max_port, t)
+                        .expect("Could not get the port.")
+                },
+                bootstrappers.clone(),
             );
 
-            let dht_config = DhtConfig {
-                address: format!("0.0.0.0:{dht_port}").parse().unwrap(),
-                bootstrappers: bootstrappers.clone(),
-            };
-            config.table.lock().expect("Failed to aqcuire lock").insert(
-                Dht::<Topology<QueryRunner>>::KEY.into(),
-                Value::try_from(&dht_config).unwrap(),
-            );
+            // Generate and store the node public key.
+            let (node_pk, consensus_pk) = generate_and_store_node_secret(&config);
+            let owner_sk = AccountOwnerSecretKey::generate();
+            let owner_pk = owner_sk.to_pk();
+            let owner_eth: EthAddress = owner_pk.into();
 
-            let consensus_config = ConsensusConfig {
-                address: format!("/ip4/0.0.0.0/udp/{primary_addr_port}")
-                    .parse()
-                    .unwrap(),
-                worker_address: format!("/ip4/0.0.0.0/udp/{worker_addr_port}")
-                    .parse()
-                    .unwrap(),
-                mempool_address: format!("/ip4/0.0.0.0/tcp/{mempool_addr_port}")
-                    .parse()
-                    .unwrap(),
-                store_path: node_directory
-                    .join("data/narwhal_store")
-                    .try_into()
-                    .expect("Failed to resolve path"),
+            // Make the node info using the generated config.
+            let consensus_config = config.get::<Consensus<FinalTypes>>();
+
+            let worker = Worker {
+                public_key: node_pk,
+                address: consensus_config.worker_address.clone(),
+                mempool: consensus_config.mempool_address.clone(),
             };
 
-            config.table.lock().expect("Failed to aqcuire lock").insert(
-                Consensus::<
-                    QueryRunner,
-                    <MyBroadcast as BroadcastInterface>::PubSub<PubSubMsg>
-                >::KEY
-                    .into(),
-                Value::try_from(&consensus_config).unwrap(),
-            );
-
-            let handshake_addr_port = port_assigner
-                .get_port(min_port, max_port, Transport::Tcp)
-                .expect("Failed to get available port.");
-            let handshake_config = HandshakeServerConfig {
-                listen_addr: SocketAddr::from_str(&format!("0.0.0.0:{handshake_addr_port}"))
-                    .unwrap(),
+            let node_info = NodeInfo {
+                owner: owner_eth,
+                public_key: node_pk,
+                consensus_key: consensus_pk,
+                staked_since: 0,
+                stake: Staking {
+                    staked: HpUfixed::<18>::from(genesis.min_stake),
+                    ..Default::default()
+                },
+                domain: consensus_config.address.clone(),
+                workers: vec![worker],
+                nonce: 0,
             };
 
-            let keys_path = node_directory.join("keys");
-            let owner_secret_key_path = keys_path.join("account.pem");
-            let owner_secret_key = AccountOwnerSecretKey::generate();
-            utils::save(&owner_secret_key_path, owner_secret_key.encode_pem())
-                .expect("Failed to save account owner secret key.");
-            let node_secret_key = NodeSecretKey::generate();
-            let node_secret_key_path = keys_path.join("node.pem");
-            utils::save(&node_secret_key_path, node_secret_key.encode_pem())
-                .expect("Failed to save node secret key.");
-            let node_consensus_secret_key = ConsensusSecretKey::generate();
-            let node_consensus_secret_key_path = keys_path.join("consensus.pem");
-            utils::save(
-                &node_consensus_secret_key_path,
-                node_consensus_secret_key.encode_pem(),
-            )
-            .expect("Failed to save node secret key.");
-            let signer_config = SignerConfig {
-                node_key_path: node_secret_key_path
-                    .try_into()
-                    .expect("Failed to resolve path"),
-                consensus_key_path: node_consensus_secret_key_path
-                    .try_into()
-                    .expect("Failed to resolve path"),
-            };
-
-            config
-                .table
-                .lock()
-                .expect("Failed to aqcurie lock")
-                .insert(Signer::KEY.into(), Value::try_from(&signer_config).unwrap());
-
-            config.table.lock().expect("Failed to aqcuire lock").insert(
-                HandshakeServer::<TcpProvider>::KEY.into(),
-                Value::try_from(&handshake_config).unwrap(),
-            );
-
-            if i < genesis.committee_size as usize {
-                genesis.borrow_mut().committee.push(GenesisCommittee::new(
-                    owner_secret_key.to_pk().to_base64(),
-                    node_secret_key.to_pk().to_base64(),
-                    format!("/ip4/127.0.0.1/udp/{primary_addr_port}"),
-                    node_consensus_secret_key.to_pk().to_base64(),
-                    format!("/ip4/127.0.0.1/udp/{worker_addr_port}/http"),
-                    node_secret_key.to_pk().to_base64(),
-                    format!("/ip4/127.0.0.1/tcp/{mempool_addr_port}/http"),
-                    Some(min_stake),
-                ));
+            if (index as u64) < genesis.committee_size {
+                genesis.committee.push(node_info.into());
             } else {
-                let owner: EthAddress = owner_secret_key.to_pk().into();
-                let worker = Worker {
-                    public_key: node_secret_key.to_pk(),
-                    address: format!("/ip4/127.0.0.1/udp/{worker_addr_port}/http")
-                        .parse()
-                        .unwrap(),
-                    mempool: format!("/ip4/127.0.0.1/tcp/{mempool_addr_port}/http")
-                        .parse()
-                        .unwrap(),
-                };
-                let mut node_info = NodeInfo {
-                    owner,
-                    public_key: node_secret_key.to_pk(),
-                    consensus_key: node_consensus_secret_key.to_pk(),
-                    staked_since: 0,
-                    stake: Staking::default(),
-                    domain: format!("/ip4/127.0.0.1/udp/{primary_addr_port}")
-                        .parse()
-                        .unwrap(),
-                    workers: vec![worker],
-                    nonce: 0,
-                };
-                node_info.stake.staked = HpUfixed::<18>::from(genesis.min_stake);
-                genesis
-                    .node_info
-                    .insert(node_secret_key.to_pk().to_base64(), node_info);
+                genesis.node_info.insert(node_pk.to_base64(), node_info);
             }
 
-            nodes.insert(node_secret_key.to_pk(), (config, owner_secret_key, i));
+            tmp_nodes.push((owner_sk, node_pk, config));
         }
-        let nodes = nodes
-            .into_iter()
-            .map(|(node_pub_key, (config, owner_secret_key, index))| {
-                let app_config = AppConfig {
-                    mode: Mode::Test,
-                    genesis: Some(genesis.clone()),
-                };
 
-                config.table.lock().expect("Failed to aqcuire lock").insert(
-                    Application::KEY.into(),
-                    Value::try_from(&app_config).unwrap(),
-                );
+        // Now that we have built the configuration of all nodes and also have compiled the
+        // proper genesis config. We can inject the genesis config.
 
-                (
-                    node_pub_key,
-                    ContainerizedNode::new(Arc::new(config), owner_secret_key, index),
-                )
-            })
-            .collect();
+        let mut nodes = HashMap::new();
+        for (index, (owner_sk, node_pk, config)) in tmp_nodes.into_iter().enumerate() {
+            config.inject::<Application<FinalTypes>>(AppConfig {
+                mode: Mode::Test,
+                genesis: Some(genesis.clone()),
+            });
+
+            let node = ContainerizedNode::new(config, owner_sk, index);
+            nodes.insert(node_pk, node);
+        }
 
         Swarm { nodes, directory }
     }
+}
+
+/// Build the configuration object for a
+fn build_config<P>(
+    root: &Path,
+    mut get_port: P,
+    bootstrappers: Vec<Bootstrapper>,
+) -> TomlConfigProvider<FinalTypes>
+where
+    P: FnMut(Transport) -> u16,
+{
+    let config = TomlConfigProvider::<FinalTypes>::default();
+
+    config.inject::<Rpc<FinalTypes>>(RpcConfig {
+        port: get_port(Transport::Tcp),
+        ..Default::default()
+    });
+
+    config.inject::<Consensus<FinalTypes>>(ConsensusConfig {
+        address: format!("/ip4/0.0.0.0/udp/{}", get_port(Transport::Udp))
+            .parse()
+            .unwrap(),
+        worker_address: format!("/ip4/0.0.0.0/udp/{}", get_port(Transport::Udp))
+            .parse()
+            .unwrap(),
+        mempool_address: format!("/ip4/0.0.0.0/tcp/{}", get_port(Transport::Tcp))
+            .parse()
+            .unwrap(),
+        store_path: root
+            .join("data/narwhal_store")
+            .try_into()
+            .expect("Failed to resolve path"),
+    });
+
+    config.inject::<Dht<FinalTypes>>(DhtConfig {
+        address: format!("0.0.0.0:{}", get_port(Transport::Udp))
+            .parse()
+            .unwrap(),
+        bootstrappers,
+    });
+
+    config.inject::<TcpHandshakeServer<FinalTypes>>(HandshakeServerConfig {
+        listen_addr: SocketAddr::from_str(&format!("0.0.0.0:{}", get_port(Transport::Tcp)))
+            .unwrap(),
+    });
+
+    config.inject::<Signer<FinalTypes>>(SignerConfig {
+        node_key_path: root
+            .join("keys/node.pem")
+            .try_into()
+            .expect("Failed to resolve path"),
+        consensus_key_path: root
+            .join("keys/consensus.pem")
+            .try_into()
+            .expect("Failed to resolve path"),
+    });
+
+    config
+}
+
+/// Given the configuration of a node, generate and store the networking and consensus secret keys
+/// of the node and write them into the path specified by the configuration of the signer.
+///
+/// Returns the public keys of the generated keys.
+fn generate_and_store_node_secret(
+    config: &TomlConfigProvider<FinalTypes>,
+) -> (NodePublicKey, ConsensusPublicKey) {
+    let config = config.get::<Signer<FinalTypes>>();
+
+    let node_secret_key = NodeSecretKey::generate();
+    let node_consensus_secret_key = ConsensusSecretKey::generate();
+
+    utils::save(&config.node_key_path, node_secret_key.encode_pem())
+        .expect("Failed to save node secret key.");
+
+    utils::save(
+        &config.consensus_key_path,
+        node_consensus_secret_key.encode_pem(),
+    )
+    .expect("Failed to save consensus secret key.");
+
+    (node_secret_key.to_pk(), node_consensus_secret_key.to_pk())
 }

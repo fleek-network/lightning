@@ -1,8 +1,5 @@
-#940 packages
-
 [workspace]
 members = ["core/*", "lib/*", "services/*"]
-exclude = ["core/e2e"]
 
 [workspace.package]
 version = "0.1.0"

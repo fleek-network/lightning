@@ -1,6 +1,7 @@
 use anyhow::Result;
 use reqwest::{Client, Response};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub async fn parse_response<T: DeserializeOwned>(response: Response) -> Result<T> {

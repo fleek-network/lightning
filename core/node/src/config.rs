@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use anyhow::Context;
 use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::ConfigConsumer;
 use toml::{Table, Value};
 
 /// The implementation of a configuration loader that uses the `toml` backend.
@@ -13,8 +14,19 @@ pub struct TomlConfigProvider<C: Collection> {
     /// The [`ConfigProviderInterface`] does not put any constraints on the
     /// format of the document, except that we need a `[key: string]->any`
     /// mapping. The [`Table`] is that map.
-    pub table: Mutex<Table>,
+    table: Mutex<Table>,
     collection: PhantomData<C>,
+}
+
+impl<C: Collection> Clone for TomlConfigProvider<C> {
+    fn clone(&self) -> Self {
+        let guard = self.table.lock().expect("Failed to lock.");
+        let table = guard.clone();
+        Self {
+            table: Mutex::new(table),
+            collection: PhantomData,
+        }
+    }
 }
 
 impl<C: Collection> Default for TomlConfigProvider<C> {
@@ -27,6 +39,11 @@ impl<C: Collection> Default for TomlConfigProvider<C> {
 }
 
 impl<C: Collection> TomlConfigProvider<C> {
+    pub fn inject<T: ConfigConsumer>(&self, config: T::Config) {
+        let mut table = self.table.lock().expect("Failed to acquire lock");
+        table.insert(T::KEY.to_owned(), Value::try_from(&config).unwrap());
+    }
+
     pub fn open<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let path = path.as_ref();
 

@@ -1,7 +1,7 @@
-mod cli;
-mod config;
-mod node;
-mod shutdown;
+pub mod cli;
+pub mod config;
+pub mod node;
+pub mod shutdown;
 
 use std::fs::File;
 

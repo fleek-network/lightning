@@ -123,6 +123,23 @@ impl From<&GenesisCommittee> for NodeInfo {
     }
 }
 
+impl From<NodeInfo> for GenesisCommittee {
+    fn from(value: NodeInfo) -> Self {
+        let worker = value.workers.first().expect("At least one worker.");
+
+        GenesisCommittee {
+            owner: value.owner.to_string(),
+            primary_public_key: value.public_key.to_base64(),
+            primary_address: value.domain.to_string(),
+            consensus_public_key: value.consensus_key.to_base64(),
+            worker_address: worker.address.to_string(),
+            worker_public_key: worker.public_key.to_base64(),
+            worker_mempool: worker.mempool.to_string(),
+            staking: Some(value.stake.staked.try_into().unwrap()),
+        }
+    }
+}
+
 impl GenesisCommittee {
     #[allow(clippy::too_many_arguments)]
     pub fn new(

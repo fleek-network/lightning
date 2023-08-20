@@ -1,24 +1,24 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use fleek_crypto::AccountOwnerSecretKey;
-use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
+use lightning_node::node::FinalTypes;
 use lightning_rpc::server::Rpc;
 
 use crate::container::Container;
 
 pub struct ContainerizedNode {
-    config: Arc<TomlConfigProvider>,
+    config: TomlConfigProvider<FinalTypes>,
     owner_secret_key: AccountOwnerSecretKey,
-    container: Mutex<Option<Container>>,
+    container: Mutex<Option<Container<FinalTypes>>>,
     runtime_type: RuntimeType,
     index: usize,
 }
 
 impl ContainerizedNode {
     pub fn new(
-        config: Arc<TomlConfigProvider>,
+        config: TomlConfigProvider<FinalTypes>,
         owner_secret_key: AccountOwnerSecretKey,
         index: usize,
     ) -> Self {
@@ -47,7 +47,7 @@ impl ContainerizedNode {
     }
 
     pub fn get_rpc_address(&self) -> String {
-        let config = self.config.get::<Rpc<QueryRunner>>();
+        let config = self.config.get::<Rpc<FinalTypes>>();
         format!("http://{}:{}/rpc/v0", config.addr, config.port)
     }
 

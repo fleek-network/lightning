@@ -1,7 +1,8 @@
 use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
-use lightning_e2e::{swarm::Swarm, utils::rpc};
+use lightning_e2e::swarm::Swarm;
+use lightning_e2e::utils::rpc;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
 

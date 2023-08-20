@@ -3469,6 +3469,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-e2e"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "clap 4.3.17",
+ "fleek-crypto",
+ "futures",
+ "hp-fixed",
+ "lightning-application",
+ "lightning-consensus",
+ "lightning-dht",
+ "lightning-handshake",
+ "lightning-interfaces",
+ "lightning-node",
+ "lightning-notifier",
+ "lightning-rpc",
+ "lightning-signer",
+ "lightning-topology",
+ "mock",
+ "rand 0.8.5",
+ "reqwest",
+ "resolve-path",
+ "resolved-pathbuf",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml 0.7.6",
+]
+
+[[package]]
 name = "lightning-handshake"
 version = "0.0.0"
 dependencies = [

@@ -1,22 +1,17 @@
-use std::{sync::Arc, thread, time::SystemTime};
+use std::sync::Arc;
+use std::thread;
+use std::time::SystemTime;
 
 use anyhow::Result;
 use clap::Parser;
 use fleek_crypto::{NodeSecretKey, PublicKey, SecretKey};
-use lightning_application::query_runner::QueryRunner;
-use lightning_dht::{
-    config::{Bootstrapper, Config as DhtConfig},
-    dht::Builder as DhtBuilder,
-};
-use lightning_e2e::{
-    swarm::Swarm,
-    utils::{
-        networking::{PortAssigner, Transport},
-        shutdown,
-    },
-};
+use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
+use lightning_dht::dht::Builder as DhtBuilder;
+use lightning_e2e::swarm::Swarm;
+use lightning_e2e::utils::networking::{PortAssigner, Transport};
+use lightning_e2e::utils::shutdown;
 use lightning_interfaces::WithStartAndShutdown;
-use lightning_topology::Topology;
+use lightning_node::node::FinalTypes;
 use resolved_pathbuf::ResolvedPathBuf;
 use tokio::sync::Notify;
 
@@ -63,7 +58,7 @@ async fn main() -> Result<()> {
 
         runtime.block_on(async move {
             let builder = DhtBuilder::new(key_cloned, bootstrapper_config);
-            let dht = builder.build::<Topology<QueryRunner>>().unwrap();
+            let dht = builder.build::<FinalTypes>().unwrap();
             dht.start().await;
             bootstrap_ready_rx.notify_one();
 

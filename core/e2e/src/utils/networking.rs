@@ -1,7 +1,5 @@
-use std::{
-    collections::HashSet,
-    net::{TcpListener, UdpSocket},
-};
+use std::collections::HashSet;
+use std::net::{TcpListener, UdpSocket};
 
 #[derive(Debug, Copy, Clone)]
 pub enum Transport {
