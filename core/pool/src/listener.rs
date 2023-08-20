@@ -22,7 +22,6 @@ use crate::receiver::Receiver;
 use crate::sender::Sender;
 
 pub struct Listener<T> {
-    register_tx: mpsc::Sender<RegisterEvent>,
     connection_event_rx: mpsc::Receiver<(NodePublicKey, SendStream, RecvStream)>,
     active_scope: Arc<DashMap<ServiceScope, ScopeHandle>>,
     _marker: PhantomData<T>,
@@ -30,16 +29,20 @@ pub struct Listener<T> {
 
 impl<T> Listener<T> {
     pub fn new(
-        register_tx: mpsc::Sender<RegisterEvent>,
         connection_event_rx: mpsc::Receiver<(NodePublicKey, SendStream, RecvStream)>,
         active_scope: Arc<DashMap<ServiceScope, ScopeHandle>>,
     ) -> Self {
         Self {
-            register_tx,
             connection_event_rx,
             active_scope,
             _marker: PhantomData::default(),
         }
+    }
+}
+
+impl<T> Drop for Listener<T> {
+    fn drop(&mut self) {
+        self.connection_event_rx.close();
     }
 }
 

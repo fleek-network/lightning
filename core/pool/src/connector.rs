@@ -61,6 +61,14 @@ impl<T> Clone for Connector<T> {
     }
 }
 
+impl<T> Drop for Connector<T> {
+    fn drop(&mut self) {
+        let scope = self.scope;
+        // Unwrap is safe here because we are currently in the scope.
+        self.active_scope.get_mut(&scope).unwrap().connector_active = false;
+    }
+}
+
 #[async_trait]
 impl<T> ConnectorInterface<T> for Connector<T>
 where
