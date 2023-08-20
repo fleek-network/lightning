@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use affair::AsyncWorker;
 use anyhow::{bail, Result};
@@ -14,34 +14,25 @@ use tokio::sync::oneshot;
 
 use crate::connector::ConnectEvent;
 use crate::netkit;
+use crate::pool::ScopeHandle;
 
 pub async fn start_listener_driver(mut driver: ListenerDriver) {
-    loop {
-        tokio::select! {
-            event = driver.register_rx.recv() => {
-                let event = match event {
-                    Some(event) => event,
-                    None => break,
-                };
-                driver.handles.insert(event.scope, event.handle);
+    while let Some(connecting) = driver.endpoint.accept().await {
+        let connection = connecting.await.unwrap();
+        let handles = driver.handles.clone();
+        tokio::spawn(async move {
+            let (tx, mut rx) = connection.accept_bi().await.unwrap();
+            let data = rx.read_to_end(4096).await.unwrap();
+            let message: ScopedMessage = ScopedMessage::decode(&data).unwrap();
+            let send = {
+                (*handles.read().unwrap())
+                    .get(&message.scope)
+                    .map(|handle| handle.listener_tx.clone())
+            };
+            if let Some(sender) = send {
+                sender.send((message.pk, tx, rx)).await.unwrap();
             }
-            connecting = driver.endpoint.accept() => {
-                let connecting = match connecting {
-                    Some(connecting) => connecting,
-                    None => break,
-                };
-                let connection = connecting.await.unwrap();
-                let handles = driver.handles.clone();
-                tokio::spawn(async move {
-                    let (tx, mut rx) = connection.accept_bi().await.unwrap();
-                    let data = rx.read_to_end(4096).await.unwrap();
-                    let message: ScopedMessage = ScopedMessage::decode(&data).unwrap();
-                    if let Some(handle) = handles.get(&message.scope) {
-                        handle.send((message.pk, tx, rx)).await.unwrap();
-                    }
-                });
-            }
-        }
+        });
     }
 }
 
@@ -83,7 +74,7 @@ pub async fn start_connector_driver(mut driver: ConnectorDriver) {
 /// Driver for driving the connection events from the transport connection.
 pub struct ListenerDriver {
     /// Current active connections.
-    handles: HashMap<ServiceScope, Sender<(NodePublicKey, SendStream, RecvStream)>>,
+    handles: Arc<RwLock<HashMap<ServiceScope, ScopeHandle>>>,
     /// Listens for scoped service registration.
     register_rx: Receiver<RegisterEvent>,
     /// QUIC endpoint.
@@ -91,9 +82,13 @@ pub struct ListenerDriver {
 }
 
 impl ListenerDriver {
-    pub fn new(register_rx: Receiver<RegisterEvent>, endpoint: Endpoint) -> Self {
+    pub fn new(
+        handles: Arc<RwLock<HashMap<ServiceScope, ScopeHandle>>>,
+        register_rx: Receiver<RegisterEvent>,
+        endpoint: Endpoint,
+    ) -> Self {
         Self {
-            handles: HashMap::new(),
+            handles,
             register_rx,
             endpoint,
         }

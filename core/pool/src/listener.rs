@@ -21,8 +21,7 @@ use crate::sender::Sender;
 pub struct Listener<T> {
     registered: bool,
     register_tx: mpsc::Sender<RegisterEvent>,
-    connection_event_tx: mpsc::Sender<Option<(NodePublicKey, SendStream, RecvStream)>>,
-    connection_event_rx: mpsc::Receiver<Option<(NodePublicKey, SendStream, RecvStream)>>,
+    connection_event_rx: mpsc::Receiver<(NodePublicKey, SendStream, RecvStream)>,
     _marker: PhantomData<T>,
 }
 
@@ -30,13 +29,11 @@ impl<T> Listener<T> {
     pub fn new(
         registered: bool,
         register_tx: mpsc::Sender<RegisterEvent>,
-        connection_event_tx: mpsc::Sender<Option<(NodePublicKey, SendStream, RecvStream)>>,
-        connection_event_rx: mpsc::Receiver<Option<(NodePublicKey, SendStream, RecvStream)>>,
+        connection_event_rx: mpsc::Receiver<(NodePublicKey, SendStream, RecvStream)>,
     ) -> Self {
         Self {
             registered,
             register_tx,
-            connection_event_tx,
             connection_event_rx,
             _marker: PhantomData::default(),
         }
@@ -51,7 +48,7 @@ where
     type Sender = Sender<T>;
     type Receiver = Receiver<T>;
     async fn accept(&mut self) -> Option<(Self::Sender, Self::Receiver)> {
-        let (peer, tx, rx) = self.connection_event_rx.recv().await.flatten()?;
+        let (peer, tx, rx) = self.connection_event_rx.recv().await?;
         Some((Sender::new(tx, peer), Receiver::new(rx, peer)))
     }
 }

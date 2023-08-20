@@ -1,10 +1,11 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use affair::Worker;
 use async_trait::async_trait;
+use fleek_crypto::NodePublicKey;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::schema::LightningMessage;
@@ -17,7 +18,7 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
-use quinn::{Endpoint, ServerConfig};
+use quinn::{Endpoint, RecvStream, SendStream, ServerConfig};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
@@ -34,7 +35,7 @@ pub struct ConnectionPool<C> {
     register_tx: mpsc::Sender<RegisterEvent>,
     connector_rx: Arc<Mutex<Option<mpsc::Receiver<ConnectEvent>>>>,
     register_rx: Arc<Mutex<Option<mpsc::Receiver<RegisterEvent>>>>,
-    active_scopes: Mutex<Option<HashSet<ServiceScope>>>,
+    scope_handles: Arc<RwLock<HashMap<ServiceScope, ScopeHandle>>>,
     endpoint: Endpoint,
     is_running: Arc<Mutex<bool>>,
     drivers: Mutex<JoinSet<()>>,
@@ -56,7 +57,7 @@ impl<C> ConnectionPool<C> {
             connector_rx: Arc::new(Mutex::new(Some(connector_rx))),
             register_tx,
             register_rx: Arc::new(Mutex::new(Some(register_rx))),
-            active_scopes: Mutex::new(Some(HashSet::new())),
+            scope_handles: Arc::new(RwLock::new(HashMap::new())),
             endpoint,
             is_running: Arc::new(Mutex::new(false)),
             drivers: Mutex::new(JoinSet::new()),
@@ -68,6 +69,12 @@ impl<C> ConnectionPool<C> {
 #[derive(Deserialize, Serialize)]
 pub struct PoolConfig {
     address: SocketAddr,
+}
+
+impl PoolConfig {
+    pub fn new(address: SocketAddr) -> Self {
+        Self { address }
+    }
 }
 
 impl Default for PoolConfig {
@@ -94,7 +101,11 @@ where
 
     async fn start(&self) {
         let register_rx = self.register_rx.lock().unwrap().take().unwrap();
-        let listener_driver = ListenerDriver::new(register_rx, self.endpoint.clone());
+        let listener_driver = ListenerDriver::new(
+            self.scope_handles.clone(),
+            register_rx,
+            self.endpoint.clone(),
+        );
         self.drivers
             .lock()
             .unwrap()
@@ -125,8 +136,8 @@ where
 
     fn init(
         config: Self::Config,
-        signer: &c!(C::SignerInterface),
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        _signer: &c!(C::SignerInterface),
+        _query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> Self {
         ConnectionPool::new(config)
     }
@@ -135,27 +146,31 @@ where
     where
         T: LightningMessage,
     {
-        let mut active_scopes = self.active_scopes.lock().unwrap().take().unwrap();
-        match active_scopes.contains(&scope) {
-            true => {
+        let mut active_scopes = self.scope_handles.write().unwrap();
+        if let Some(handle) = active_scopes.get(&scope) {
+            if handle.connector_active || !handle.listener_tx.is_closed() {
                 panic!("{scope:?} is already active");
-            },
-            false => {
-                active_scopes.insert(scope);
-            },
+            }
         }
-        self.active_scopes.lock().unwrap().replace(active_scopes);
 
+        // If we didn't panic, we are safe to create new listeners and connectors.
         let (connection_event_tx, connection_event_rx) = mpsc::channel(256);
+        let new_handle = ScopeHandle {
+            connector_active: true,
+            listener_tx: connection_event_tx,
+        };
+        active_scopes.insert(scope, new_handle);
 
         (
-            Listener::new(
-                false,
-                self.register_tx.clone(),
-                connection_event_tx,
-                connection_event_rx,
-            ),
+            Listener::new(false, self.register_tx.clone(), connection_event_rx),
             Connector::new(scope, self.connector_tx.clone()),
         )
     }
+}
+
+pub struct ScopeHandle {
+    /// Indicates whether connector is active.
+    pub connector_active: bool,
+    /// Used to send new connection events to Listener.
+    pub listener_tx: mpsc::Sender<(NodePublicKey, SendStream, RecvStream)>,
 }
