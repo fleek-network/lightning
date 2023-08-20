@@ -6,35 +6,37 @@ pub mod schema;
 pub mod scope;
 pub mod transport;
 
-use std::{
-    collections::HashSet,
-    marker::PhantomData,
-    sync::{Arc, Mutex},
-};
+use std::collections::HashSet;
+use std::marker::PhantomData;
+use std::sync::{Arc, Mutex};
 
 use affair::{Executor, TokioSpawn};
 use async_trait::async_trait;
-use connection::{Receiver, Sender};
+use connection::Sender;
 use dashmap::DashMap;
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::schema::LightningMessage;
+use lightning_interfaces::types::ServiceScope;
 use lightning_interfaces::{
-    schema::LightningMessage, types::ServiceScope, ConfigConsumer, ConnectionPoolInterface,
-    SignerInterface, SyncQueryRunnerInterface, WithStartAndShutdown,
+    ApplicationInterface,
+    ConfigConsumer,
+    ConnectionPoolInterface,
+    SignerInterface,
+    WithStartAndShutdown,
 };
 use scope::{Connector, Listener};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::channel;
 
-use self::{
-    schema::ScopedFrame,
-    scope::ConnectorWorker,
-    transport::{GlobalMemoryTransport, MemoryConnection},
-};
+use self::schema::ScopedFrame;
+use self::scope::ConnectorWorker;
+use self::transport::{GlobalMemoryTransport, MemoryConnection};
 
 pub const CHANNEL_BUFFER_LEN: usize = 64;
 
-pub struct ConnectionPool<S, Q: SyncQueryRunnerInterface> {
-    _q: PhantomData<(S, Q)>,
+pub struct ConnectionPool<C: Collection> {
+    _p: PhantomData<C>,
     pubkey: NodePublicKey,
     shutdown_signal: Arc<Mutex<Option<Sender<()>>>>,
     transport: Arc<Mutex<Option<GlobalMemoryTransport<ScopedFrame>>>>,
@@ -49,16 +51,14 @@ pub struct ConnectionPool<S, Q: SyncQueryRunnerInterface> {
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Config {}
 
-impl<S, Q: SyncQueryRunnerInterface> ConfigConsumer for ConnectionPool<S, Q> {
+impl<C: Collection> ConfigConsumer for ConnectionPool<C> {
     const KEY: &'static str = "connection-pool";
 
     type Config = Config;
 }
 
 #[async_trait]
-impl<S: SignerInterface, Q: SyncQueryRunnerInterface> WithStartAndShutdown
-    for ConnectionPool<S, Q>
-{
+impl<C: Collection> WithStartAndShutdown for ConnectionPool<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         self.shutdown_signal
@@ -160,7 +160,7 @@ pub(crate) async fn handle_raw_receiver(
     }
 }
 
-impl<S, Q: SyncQueryRunnerInterface> ConnectionPool<S, Q> {
+impl<C: Collection> ConnectionPool<C> {
     /// Required for mock initialization, provides the pool with a global memory transport
     /// to bind and request new connections with.
     pub fn with_transport(&mut self, transport: GlobalMemoryTransport<ScopedFrame>) {
@@ -172,27 +172,20 @@ impl<S, Q: SyncQueryRunnerInterface> ConnectionPool<S, Q> {
     }
 }
 
-impl<S: SignerInterface + 'static, Q: SyncQueryRunnerInterface + 'static> ConnectionPoolInterface
-    for ConnectionPool<S, Q>
-{
-    type QueryRunner = Q;
-    type Signer = S;
-
+impl<C: Collection> ConnectionPoolInterface<C> for ConnectionPool<C> {
     // Bounded Types
-    type Connector<T: LightningMessage> = Connector<S, Q, T>;
-    type Listener<T: LightningMessage> = Listener<S, Q, T>;
-    type Sender<T: LightningMessage> = Sender<T>;
-    type Receiver<T: LightningMessage> = Receiver<T>;
+    type Connector<T: LightningMessage> = Connector<C, T>;
+    type Listener<T: LightningMessage> = Listener<C, T>;
 
     fn init(
         _config: Self::Config,
-        signer: &Self::Signer,
-        _query_runner: Self::QueryRunner,
+        signer: &c!(C::SignerInterface),
+        _query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> Self {
         let pubkey = signer.get_ed25519_pk();
         Self {
             pubkey,
-            _q: PhantomData,
+            _p: PhantomData,
             transport: Mutex::new(None).into(),
             incoming: DashMap::new().into(),
             shutdown_signal: Mutex::new(None).into(),
@@ -212,7 +205,7 @@ impl<S: SignerInterface + 'static, Q: SyncQueryRunnerInterface + 'static> Connec
             .clone()
             .expect("transport not found, has `with_transport` been called?");
 
-        let worker = ConnectorWorker::<S, Q, T> {
+        let worker = ConnectorWorker::<C, T> {
             _x: PhantomData,
             transport,
             scope,
@@ -224,13 +217,13 @@ impl<S: SignerInterface + 'static, Q: SyncQueryRunnerInterface + 'static> Connec
 
         // get the connector socket and spawn a worker for getting new node connections
         let socket = TokioSpawn::spawn_async(worker);
-        let connector = Connector::<S, Q, T>::new(socket);
+        let connector = Connector::<C, T>::new(socket);
 
         // create a channel to notify the listener about new scoped connections
         let (tx, rx) = channel(CHANNEL_BUFFER_LEN);
         self.incoming.insert(scope, tx);
         let listener =
-            Listener::<S, Q, T>::new(scope, rx, self.senders.clone(), self.receivers.clone());
+            Listener::<C, T>::new(scope, rx, self.senders.clone(), self.receivers.clone());
 
         (listener, connector)
     }
@@ -241,17 +234,32 @@ mod tests {
     use std::path::PathBuf;
 
     use anyhow::anyhow;
+    use lightning_application::app::Application;
     use lightning_application::config::Mode;
+    use lightning_interfaces::infu_collection::Collection;
+    use lightning_interfaces::types::ServiceScope;
     use lightning_interfaces::{
-        types::ServiceScope, ApplicationInterface, ConnectionPoolInterface, ConnectorInterface,
-        ListenerInterface, ReceiverInterface, SenderInterface, SignerInterface,
+        partial,
+        ApplicationInterface,
+        ConnectionPoolInterface,
+        ConnectorInterface,
+        ListenerInterface,
+        ReceiverInterface,
+        SenderInterface,
+        SignerInterface,
         WithStartAndShutdown,
     };
     use lightning_schema::AutoImplSerde;
     use lightning_signer::Signer;
     use serde::{Deserialize, Serialize};
 
-    use crate::pool::{transport::GlobalMemoryTransport, Config, ConnectionPool};
+    use crate::pool::transport::GlobalMemoryTransport;
+    use crate::pool::{Config, ConnectionPool};
+
+    partial!(TestBinding {
+        ApplicationInterface = Application<Self>;
+        SignerInterface = Signer<Self>;
+    });
 
     #[tokio::test]
     async fn ping_pong() -> anyhow::Result<()> {
@@ -266,14 +274,14 @@ mod tests {
 
         // we dont actually use query runner, so it doesn't really matter
         let application =
-            lightning_application::app::Application::init(lightning_application::config::Config {
+            Application::<TestBinding>::init(lightning_application::config::Config {
                 mode: Mode::Test,
                 genesis: None,
             })?;
         let query_runner = application.sync_query();
 
         // create pool a
-        let signer_a = Signer::init(
+        let signer_a = Signer::<TestBinding>::init(
             lightning_signer::Config {
                 node_key_path: PathBuf::from("../test-utils/keys/test_node.pem")
                     .try_into()
@@ -285,7 +293,8 @@ mod tests {
             query_runner.clone(),
         )
         .map_err(|e| anyhow!("{e:?}"))?;
-        let mut pool_a = ConnectionPool::init(Config {}, &signer_a, query_runner.clone());
+        let mut pool_a =
+            ConnectionPool::<TestBinding>::init(Config {}, &signer_a, query_runner.clone());
         pool_a.with_transport(global_transport.clone());
         pool_a.start().await;
         let (mut listener_a, _) = pool_a.bind::<TestFrame>(ServiceScope::Debug);
@@ -307,7 +316,7 @@ mod tests {
             }
         });
 
-        let signer_b = Signer::init(
+        let signer_b = Signer::<TestBinding>::init(
             lightning_signer::Config {
                 node_key_path: PathBuf::from("../test-utils/keys/test_node2.pem")
                     .try_into()
@@ -318,7 +327,7 @@ mod tests {
             },
             query_runner.clone(),
         )?;
-        let mut pool_b = ConnectionPool::init(Config {}, &signer_b, query_runner);
+        let mut pool_b = ConnectionPool::<TestBinding>::init(Config {}, &signer_b, query_runner);
         pool_b.with_transport(global_transport.clone());
         pool_b.start().await;
         let (_, connector_b) = pool_b.bind::<TestFrame>(ServiceScope::Debug);

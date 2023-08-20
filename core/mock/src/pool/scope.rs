@@ -1,29 +1,26 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 use affair::{AsyncWorker, Socket};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::{
-    schema::LightningMessage, types::ServiceScope, ConnectorInterface, ListenerInterface,
-    SenderReceiver, SignerInterface, SyncQueryRunnerInterface,
-};
+use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::schema::LightningMessage;
+use lightning_interfaces::types::ServiceScope;
+use lightning_interfaces::{ConnectorInterface, ListenerInterface, SenderReceiver};
 use tokio::sync::mpsc::{channel, Receiver};
 
-use super::{
-    connection::Sender,
-    handle_raw_receiver,
-    schema::ScopedFrame,
-    transport::{GlobalMemoryTransport, MemoryConnection},
-    ConnectionPool, CHANNEL_BUFFER_LEN,
-};
+use super::connection::{self, Sender};
+use super::schema::ScopedFrame;
+use super::transport::{GlobalMemoryTransport, MemoryConnection};
+use super::{handle_raw_receiver, ConnectionPool, CHANNEL_BUFFER_LEN};
 
-type ConnectorSocket<C, T> =
-    Socket<NodePublicKey, Option<SenderReceiver<<C as ConnectorInterface<T>>::ConnectionPool, T>>>;
+type ConnectorSocket<C, T> = Socket<NodePublicKey, Option<SenderReceiver<C, ConnectionPool<C>, T>>>;
 
 /// ConnectorWorker for each scope
-pub struct ConnectorWorker<S, Q: SyncQueryRunnerInterface, T> {
-    pub _x: PhantomData<(S, Q, T)>,
+pub struct ConnectorWorker<C, T> {
+    pub _x: PhantomData<(C, T)>,
     pub node: NodePublicKey,
     pub scope: ServiceScope,
     pub transport: GlobalMemoryTransport<ScopedFrame>,
@@ -33,11 +30,9 @@ pub struct ConnectorWorker<S, Q: SyncQueryRunnerInterface, T> {
 }
 
 #[async_trait]
-impl<S: SignerInterface + 'static, Q: SyncQueryRunnerInterface, T: LightningMessage + 'static>
-    AsyncWorker for ConnectorWorker<S, Q, T>
-{
+impl<C: Collection, T: LightningMessage + 'static> AsyncWorker for ConnectorWorker<C, T> {
     type Request = NodePublicKey;
-    type Response = Option<SenderReceiver<ConnectionPool<S, Q>, T>>;
+    type Response = Option<SenderReceiver<C, ConnectionPool<C>, T>>;
 
     /// Returns [`None`] if a connection for this scope already exists, or cannot be made.
     async fn handle(&mut self, key: Self::Request) -> Self::Response {
@@ -94,57 +89,49 @@ impl<S: SignerInterface + 'static, Q: SyncQueryRunnerInterface, T: LightningMess
 }
 
 /// Mock connector for initializing new connections for a scope
-pub struct Connector<S, Q, T>
+pub struct Connector<C, T>
 where
-    S: SignerInterface + 'static,
-    Q: SyncQueryRunnerInterface,
+    C: Collection,
     T: LightningMessage,
 {
-    _x: PhantomData<Q>,
-    socket: ConnectorSocket<Self, T>,
+    socket: ConnectorSocket<C, T>,
 }
 
-impl<S, Q, T> Clone for Connector<S, Q, T>
+impl<C, T> Clone for Connector<C, T>
 where
-    S: SignerInterface,
-    Q: SyncQueryRunnerInterface,
+    C: Collection,
     T: LightningMessage,
 {
     fn clone(&self) -> Self {
         Self {
-            _x: self._x,
             socket: self.socket.clone(),
         }
     }
 }
 
-impl<S, Q, T> Connector<S, Q, T>
+impl<C, T> Connector<C, T>
 where
-    S: SignerInterface + 'static,
-    Q: SyncQueryRunnerInterface,
+    C: Collection,
     T: LightningMessage,
 {
-    pub fn new(socket: ConnectorSocket<Self, T>) -> Self {
-        Self {
-            _x: PhantomData,
-            socket,
-        }
+    pub fn new(socket: ConnectorSocket<C, T>) -> Self {
+        Self { socket }
     }
 }
 
 #[async_trait]
-impl<S, Q, T> ConnectorInterface<T> for Connector<S, Q, T>
+impl<C, T> ConnectorInterface<T> for Connector<C, T>
 where
-    S: SignerInterface + 'static,
-    Q: SyncQueryRunnerInterface,
+    C: Collection,
     T: LightningMessage,
 {
-    type ConnectionPool = ConnectionPool<S, Q>;
+    type Sender = connection::Sender<T>;
+    type Receiver = connection::Receiver<T>;
 
     async fn connect(
         &self,
         to: &fleek_crypto::NodePublicKey,
-    ) -> Option<lightning_interfaces::SenderReceiver<Self::ConnectionPool, T>> {
+    ) -> Option<lightning_interfaces::SenderReceiver<C, ConnectionPool<C>, T>> {
         self.socket
             .run(*to)
             .await
@@ -153,23 +140,21 @@ where
 }
 
 /// Listener for accepting new connections for a scope
-pub struct Listener<S, Q, T>
+pub struct Listener<C, T>
 where
-    S: SignerInterface + 'static,
-    Q: SyncQueryRunnerInterface,
+    C: Collection,
     T: LightningMessage,
 {
-    _x: PhantomData<(S, Q, T)>,
+    _x: PhantomData<(C, T)>,
     scope: ServiceScope,
     channel: Receiver<NodePublicKey>,
     senders: Arc<DashMap<NodePublicKey, tokio::sync::mpsc::Sender<ScopedFrame>>>,
     receivers: Arc<DashMap<(NodePublicKey, ServiceScope), tokio::sync::mpsc::Sender<Vec<u8>>>>,
 }
 
-impl<S, Q, T> Listener<S, Q, T>
+impl<C, T> Listener<C, T>
 where
-    S: SignerInterface,
-    Q: SyncQueryRunnerInterface,
+    C: Collection,
     T: LightningMessage,
 {
     pub fn new(
@@ -189,15 +174,15 @@ where
 }
 
 #[async_trait]
-impl<S, Q, T> ListenerInterface<T> for Listener<S, Q, T>
+impl<C, T> ListenerInterface<T> for Listener<C, T>
 where
-    S: SignerInterface,
-    Q: SyncQueryRunnerInterface,
+    C: Collection,
     T: LightningMessage,
 {
-    type ConnectionPool = ConnectionPool<S, Q>;
+    type Sender = connection::Sender<T>;
+    type Receiver = connection::Receiver<T>;
 
-    async fn accept(&mut self) -> Option<SenderReceiver<Self::ConnectionPool, T>> {
+    async fn accept(&mut self) -> Option<SenderReceiver<C, ConnectionPool<C>, T>> {
         let node = self.channel.recv().await?;
 
         // create new channel for incoming messages and insert it

@@ -31,3 +31,4 @@ futures.workspace = true
 [dev-dependencies]
 lightning-application = { path = "../application" }
 lightning-signer = { path = "../signer" }
+infusion.workspace = true

@@ -3,7 +3,8 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use dashmap::{mapref::entry::Entry, DashMap};
+use dashmap::mapref::entry::Entry;
+use dashmap::DashMap;
 use fleek_crypto::NodePublicKey;
 use lightning_schema::LightningMessage;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
