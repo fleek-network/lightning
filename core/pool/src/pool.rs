@@ -18,6 +18,7 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use quinn::{Endpoint, ServerConfig};
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 
@@ -40,9 +41,46 @@ pub struct ConnectionPool<C> {
     _marker: PhantomData<C>,
 }
 
+impl<C> ConnectionPool<C> {
+    pub fn new(config: PoolConfig) -> Self {
+        let address: SocketAddr = config.address;
+        let tls_config = netkit::server_config();
+        let server_config = ServerConfig::with_crypto(Arc::new(tls_config));
+        let endpoint = Endpoint::server(server_config, address).unwrap();
+
+        let (register_tx, register_rx) = mpsc::channel(256);
+        let (connector_tx, connector_rx) = mpsc::channel(256);
+
+        Self {
+            connector_tx,
+            connector_rx: Arc::new(Mutex::new(Some(connector_rx))),
+            register_tx,
+            register_rx: Arc::new(Mutex::new(Some(register_rx))),
+            active_scopes: Mutex::new(Some(HashSet::new())),
+            endpoint,
+            is_running: Arc::new(Mutex::new(false)),
+            drivers: Mutex::new(JoinSet::new()),
+            _marker: PhantomData::default(),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct PoolConfig {
+    address: SocketAddr,
+}
+
+impl Default for PoolConfig {
+    fn default() -> Self {
+        Self {
+            address: "0.0.0.0:0".parse().unwrap(),
+        }
+    }
+}
+
 impl<C> ConfigConsumer for ConnectionPool<C> {
     const KEY: &'static str = "";
-    type Config = ();
+    type Config = PoolConfig;
 }
 
 #[async_trait]
@@ -90,25 +128,7 @@ where
         signer: &c!(C::SignerInterface),
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> Self {
-        let address: SocketAddr = "0.0.0.0".parse().unwrap();
-        let tls_config = netkit::server_config();
-        let server_config = ServerConfig::with_crypto(Arc::new(tls_config));
-        let endpoint = Endpoint::server(server_config, address).unwrap();
-
-        let (register_tx, register_rx) = mpsc::channel(256);
-        let (connector_tx, connector_rx) = mpsc::channel(256);
-
-        Self {
-            connector_tx,
-            connector_rx: Arc::new(Mutex::new(Some(connector_rx))),
-            register_tx,
-            register_rx: Arc::new(Mutex::new(Some(register_rx))),
-            active_scopes: Mutex::new(Some(HashSet::new())),
-            endpoint,
-            is_running: Arc::new(Mutex::new(false)),
-            drivers: Mutex::new(JoinSet::new()),
-            _marker: PhantomData::default(),
-        }
+        ConnectionPool::new(config)
     }
 
     fn bind<T>(&self, scope: ServiceScope) -> (Self::Listener<T>, Self::Connector<T>)
