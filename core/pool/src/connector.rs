@@ -47,7 +47,7 @@ impl<T> Connector<T> {
 impl<T> Clone for Connector<T> {
     fn clone(&self) -> Self {
         Self {
-            scope: self.scope.clone(),
+            scope: self.scope,
             connection_event_tx: self.connection_event_tx.clone(),
             active_scope: self.active_scope.clone(),
             _marker: PhantomData::default(),
