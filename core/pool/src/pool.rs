@@ -23,7 +23,7 @@ use tokio::task::JoinSet;
 use crate::connector::{ConnectEvent, Connector};
 use crate::driver::{ConnectorDriver, ListenerDriver};
 use crate::listener::Listener;
-use crate::{driver, netkit};
+use crate::{driver, tls};
 
 pub struct ConnectionPool<C: Collection> {
     connector_tx: mpsc::Sender<ConnectEvent>,
@@ -42,7 +42,7 @@ impl<C: Collection> ConnectionPool<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> Self {
         let address: SocketAddr = config.address;
-        let tls_config = netkit::server_config();
+        let tls_config = tls::server_config();
         let server_config = ServerConfig::with_crypto(Arc::new(tls_config));
         let endpoint = Endpoint::server(server_config, address).unwrap();
 

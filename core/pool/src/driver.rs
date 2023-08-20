@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Receiver;
 
 use crate::connector::ConnectEvent;
-use crate::netkit;
 use crate::pool::ScopeHandle;
+use crate::tls;
 
 pub async fn start_listener_driver(driver: ListenerDriver) {
     while let Some(connecting) = driver.endpoint.accept().await {
@@ -85,7 +85,7 @@ async fn handle_new_outgoing_connection(
     event: ConnectEvent,
     pool: Arc<DashMap<(NodePublicKey, SocketAddr), Connection>>,
 ) -> Result<()> {
-    let config = netkit::client_config();
+    let config = tls::client_config();
     let client_config = ClientConfig::new(Arc::new(config));
     let connection = endpoint
         .connect_with(client_config, event.address, "")?
