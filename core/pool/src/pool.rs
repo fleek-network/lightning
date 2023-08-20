@@ -1,9 +1,7 @@
-use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 
-use affair::Worker;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use fleek_crypto::NodePublicKey;
@@ -15,8 +13,6 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
     ConnectionPoolInterface,
-    SignerInterface,
-    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use quinn::{Endpoint, RecvStream, SendStream, ServerConfig};
@@ -27,8 +23,6 @@ use tokio::task::JoinSet;
 use crate::connection::{ConnectorDriver, ListenerDriver};
 use crate::connector::{ConnectEvent, Connector};
 use crate::listener::Listener;
-use crate::receiver::Receiver;
-use crate::sender::Sender;
 use crate::{connection, netkit};
 
 pub struct ConnectionPool<C> {
@@ -153,7 +147,7 @@ where
         self.active_scopes.insert(scope, new_handle);
 
         (
-            Listener::new(connection_event_rx, self.active_scopes.clone()),
+            Listener::new(connection_event_rx),
             Connector::new(scope, self.connector_tx.clone(), self.active_scopes.clone()),
         )
     }

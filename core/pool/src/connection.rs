@@ -1,24 +1,20 @@
-use std::collections::{HashMap, HashSet};
-use std::io::Write;
+use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
-use affair::AsyncWorker;
-use anyhow::{bail, Result};
 use dashmap::DashMap;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::schema::{AutoImplSerde, LightningMessage};
 use lightning_interfaces::types::ServiceScope;
-use quinn::{ClientConfig, Connection, Endpoint, RecvStream, SendStream};
+use quinn::{ClientConfig, Connection, Endpoint};
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::oneshot;
+use tokio::sync::mpsc::Receiver;
 
 use crate::connector::ConnectEvent;
 use crate::netkit;
 use crate::pool::ScopeHandle;
 
-pub async fn start_listener_driver(mut driver: ListenerDriver) {
+pub async fn start_listener_driver(driver: ListenerDriver) {
     while let Some(connecting) = driver.endpoint.accept().await {
         let connection = connecting.await.unwrap();
         let handles = driver.handles.clone();
@@ -27,7 +23,11 @@ pub async fn start_listener_driver(mut driver: ListenerDriver) {
             let data = rx.read_to_end(4096).await.unwrap();
             let message: StreamRequest = StreamRequest::decode(&data).unwrap();
             if let Some(handle) = handles.get(&message.scope) {
-                handle.listener_tx.send((message.source_peer, tx, rx)).await.unwrap();
+                handle
+                    .listener_tx
+                    .send((message.source_peer, tx, rx))
+                    .await
+                    .unwrap();
             }
         });
     }
@@ -52,7 +52,7 @@ pub async fn start_connector_driver(mut driver: ConnectorDriver) {
             },
             Some(connection) => connection.clone(),
         };
-        let (mut tx, mut rx) = connection.open_bi().await.unwrap();
+        let (mut tx, rx) = connection.open_bi().await.unwrap();
         let mut writer = Vec::with_capacity(4096);
 
         LightningMessage::encode::<Vec<_>>(

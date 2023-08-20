@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::SenderInterface;
-use quinn::{Connection, SendStream};
+use quinn::SendStream;
 
 pub struct Sender<T> {
     peer: NodePublicKey,

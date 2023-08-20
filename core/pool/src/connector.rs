@@ -1,23 +1,17 @@
-use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::ServiceScope;
-use lightning_interfaces::{
-    ConnectorInterface,
-    SenderReceiver,
-    SignerInterface,
-    SyncQueryRunnerInterface,
-};
-use quinn::{Connection, RecvStream, SendStream};
+use lightning_interfaces::ConnectorInterface;
+use quinn::{RecvStream, SendStream};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::pool::{ConnectionPool, ScopeHandle};
+use crate::pool::ScopeHandle;
 use crate::receiver::Receiver;
 use crate::sender::Sender;
 
