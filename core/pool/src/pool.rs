@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use affair::Worker;
 use async_trait::async_trait;
+use dashmap::DashMap;
 use fleek_crypto::NodePublicKey;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
@@ -35,7 +36,7 @@ pub struct ConnectionPool<C> {
     register_tx: mpsc::Sender<RegisterEvent>,
     connector_rx: Arc<Mutex<Option<mpsc::Receiver<ConnectEvent>>>>,
     register_rx: Arc<Mutex<Option<mpsc::Receiver<RegisterEvent>>>>,
-    scope_handles: Arc<RwLock<HashMap<ServiceScope, ScopeHandle>>>,
+    scope_handles: Arc<DashMap<ServiceScope, ScopeHandle>>,
     endpoint: Endpoint,
     is_running: Arc<Mutex<bool>>,
     drivers: Mutex<JoinSet<()>>,
@@ -57,7 +58,7 @@ impl<C> ConnectionPool<C> {
             connector_rx: Arc::new(Mutex::new(Some(connector_rx))),
             register_tx,
             register_rx: Arc::new(Mutex::new(Some(register_rx))),
-            scope_handles: Arc::new(RwLock::new(HashMap::new())),
+            scope_handles: Arc::new(DashMap::new()),
             endpoint,
             is_running: Arc::new(Mutex::new(false)),
             drivers: Mutex::new(JoinSet::new()),
@@ -146,8 +147,7 @@ where
     where
         T: LightningMessage,
     {
-        let mut active_scopes = self.scope_handles.write().unwrap();
-        if let Some(handle) = active_scopes.get(&scope) {
+        if let Some(handle) = self.scope_handles.get(&scope) {
             if handle.connector_active || !handle.listener_tx.is_closed() {
                 panic!("{scope:?} is already active");
             }
@@ -159,11 +159,15 @@ where
             connector_active: true,
             listener_tx: connection_event_tx,
         };
-        active_scopes.insert(scope, new_handle);
+        self.scope_handles.insert(scope, new_handle);
 
         (
-            Listener::new(self.register_tx.clone(), connection_event_rx),
-            Connector::new(scope, self.connector_tx.clone()),
+            Listener::new(
+                self.register_tx.clone(),
+                connection_event_rx,
+                self.scope_handles.clone(),
+            ),
+            Connector::new(scope, self.connector_tx.clone(), self.scope_handles.clone()),
         )
     }
 }

@@ -5,6 +5,7 @@ use std::sync::{Arc, RwLock};
 
 use affair::AsyncWorker;
 use anyhow::{bail, Result};
+use dashmap::DashMap;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::ServiceScope;
@@ -24,13 +25,8 @@ pub async fn start_listener_driver(mut driver: ListenerDriver) {
             let (tx, mut rx) = connection.accept_bi().await.unwrap();
             let data = rx.read_to_end(4096).await.unwrap();
             let message: ScopedMessage = ScopedMessage::decode(&data).unwrap();
-            let send = {
-                (*handles.read().unwrap())
-                    .get(&message.scope)
-                    .map(|handle| handle.listener_tx.clone())
-            };
-            if let Some(sender) = send {
-                sender.send((message.pk, tx, rx)).await.unwrap();
+            if let Some(handle) = handles.get(&message.scope) {
+                handle.listener_tx.send((message.pk, tx, rx)).await.unwrap();
             }
         });
     }
@@ -74,7 +70,7 @@ pub async fn start_connector_driver(mut driver: ConnectorDriver) {
 /// Driver for driving the connection events from the transport connection.
 pub struct ListenerDriver {
     /// Current active connections.
-    handles: Arc<RwLock<HashMap<ServiceScope, ScopeHandle>>>,
+    handles: Arc<DashMap<ServiceScope, ScopeHandle>>,
     /// Listens for scoped service registration.
     register_rx: Receiver<RegisterEvent>,
     /// QUIC endpoint.
@@ -83,7 +79,7 @@ pub struct ListenerDriver {
 
 impl ListenerDriver {
     pub fn new(
-        handles: Arc<RwLock<HashMap<ServiceScope, ScopeHandle>>>,
+        handles: Arc<DashMap<ServiceScope, ScopeHandle>>,
         register_rx: Receiver<RegisterEvent>,
         endpoint: Endpoint,
     ) -> Self {

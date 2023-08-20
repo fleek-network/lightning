@@ -1,7 +1,10 @@
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
+use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
+use dashmap::DashMap;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::ServiceScope;
@@ -14,7 +17,7 @@ use lightning_interfaces::{
 use quinn::{Connection, RecvStream, SendStream};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::pool::ConnectionPool;
+use crate::pool::{ConnectionPool, ScopeHandle};
 use crate::receiver::Receiver;
 use crate::sender::Sender;
 
@@ -28,14 +31,20 @@ pub struct ConnectEvent {
 pub struct Connector<T> {
     scope: ServiceScope,
     connection_event_tx: mpsc::Sender<ConnectEvent>,
+    active_scope: Arc<DashMap<ServiceScope, ScopeHandle>>,
     _marker: PhantomData<T>,
 }
 
 impl<T> Connector<T> {
-    pub fn new(scope: ServiceScope, connection_event_tx: mpsc::Sender<ConnectEvent>) -> Self {
+    pub fn new(
+        scope: ServiceScope,
+        connection_event_tx: mpsc::Sender<ConnectEvent>,
+        active_scope: Arc<DashMap<ServiceScope, ScopeHandle>>,
+    ) -> Self {
         Self {
             scope,
             connection_event_tx,
+            active_scope,
             _marker: PhantomData::default(),
         }
     }
@@ -46,6 +55,7 @@ impl<T> Clone for Connector<T> {
         Self {
             scope: self.scope.clone(),
             connection_event_tx: self.connection_event_tx.clone(),
+            active_scope: self.active_scope.clone(),
             _marker: PhantomData::default(),
         }
     }
