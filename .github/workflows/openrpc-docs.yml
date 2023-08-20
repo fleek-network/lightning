@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - chore/docs-rpc-publisher
+    paths:
+      - docs/rpc
 
   workflow_dispatch:
 
