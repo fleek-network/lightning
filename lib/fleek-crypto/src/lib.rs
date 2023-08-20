@@ -26,7 +26,7 @@ use fastcrypto::traits::{
 use rand::rngs::ThreadRng;
 use sec1::pkcs8::der::EncodePem;
 use sec1::pkcs8::{AlgorithmIdentifierRef, ObjectIdentifier, PrivateKeyInfo};
-use sec1::{pem, EcParameters, EcPrivateKey};
+use sec1::{pem, EcParameters, EcPrivateKey, LineEnding};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_big_array::BigArray;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -182,7 +182,7 @@ impl SecretKey for ConsensusSecretKey {
 
     /// Decode a BLS12-381 secret key from a custom protobuf pem file
     fn decode_pem(encoded: &str) -> Option<ConsensusSecretKey> {
-        let (label, bytes) = sec1::pem::decode_vec(encoded.as_bytes()).ok()?;
+        let (label, bytes) = pem::decode_vec(encoded.as_bytes()).ok()?;
         // todo: verify ec point
         (label == BLS12_381_PEM_LABEL && bytes.len() == 32)
             .then(|| ConsensusSecretKey(*array_ref!(bytes, 0, 32)))
@@ -190,7 +190,7 @@ impl SecretKey for ConsensusSecretKey {
 
     /// Encode the BLS12-381 secret key to a custom protobuf pem file
     fn encode_pem(&self) -> String {
-        sec1::pem::encode_string(BLS12_381_PEM_LABEL, sec1::LineEnding::LF, &self.0).unwrap()
+        pem::encode_string(BLS12_381_PEM_LABEL, LineEnding::LF, &self.0).unwrap()
     }
 
     fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
@@ -366,7 +366,7 @@ impl SecretKey for NodeSecretKey {
             key.append(&mut self.0.into());
             key
         })
-        .to_pem(sec1::pkcs8::LineEnding::LF)
+        .to_pem(LineEnding::LF)
         .unwrap()
     }
 
@@ -685,11 +685,12 @@ impl SecretKey for AccountOwnerSecretKey {
         EcPrivateKey {
             private_key: &self.0,
             parameters: Some(EcParameters::NamedCurve(
+                // http://oid-info.com/get/1.3.132.0.10
                 ObjectIdentifier::new("1.3.132.0.10").unwrap(),
             )),
             public_key: Some(&pubkey.0),
         }
-        .to_pem(sec1::pkcs8::LineEnding::LF)
+        .to_pem(LineEnding::LF)
         .unwrap()
     }
 
