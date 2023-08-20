@@ -7,4 +7,5 @@ use serde::{Deserialize, Serialize};
 pub struct NodeInfo {
     pub address: SocketAddr,
     pub key: NodePublicKey,
+    pub last_responded: Option<u64>,
 }

@@ -107,6 +107,7 @@ async fn handle_query(
                     node: NodeInfo {
                         address,
                         key: message.sender_key,
+                        last_responded: None,
                     },
                     respond: None,
                 })

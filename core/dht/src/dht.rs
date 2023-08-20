@@ -35,6 +35,7 @@ impl Builder {
             .map(|b| NodeInfo {
                 key: b.network_public_key,
                 address: b.address,
+                last_responded: None,
             })
             .collect();
         Self {
@@ -47,7 +48,11 @@ impl Builder {
 
     /// Add node which will be added to routing table.
     pub fn add_node(&mut self, key: NodePublicKey, address: SocketAddr) {
-        self.nodes.push(NodeInfo { key, address });
+        self.nodes.push(NodeInfo {
+            key,
+            address,
+            last_responded: None,
+        });
     }
 
     /// Set buffer size for tasks.

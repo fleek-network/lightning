@@ -22,6 +22,10 @@ impl Bucket {
         self.inner.iter()
     }
 
+    pub fn nodes_mut(&mut self) -> impl Iterator<Item = &mut NodeInfo> {
+        self.inner.iter_mut()
+    }
+
     // Todo: Handle duplicates.
     pub fn add_node(&mut self, node: NodeInfo) -> bool {
         if self.inner.len() == MAX_BUCKET_SIZE {

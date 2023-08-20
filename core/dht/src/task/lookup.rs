@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
@@ -126,12 +126,27 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
                         continue;
                     }
 
+                    // Set the last_responded timestamp of the sender node
+                    let timestamp = SystemTime::now()
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis() as u64;
+                    let table_query = TableRequest::UpdateNodeTimestamp {
+                        node_key: sender_key,
+                        timestamp
+                    };
+                    lookup
+                        .table_tx
+                        .send(table_query)
+                        .await
+                        .expect("failed to update node timestamp");
+
                     // If this is look up is a find a value, we check if the value is in the response.
                     if lookup.find_value_lookup && response.value.is_some() {
                         return Ok(TaskResponse { value: response.value, ..Default::default() });
                     }
 
-                    let nodes = response
+                    let nodes: Vec<(TableKey, LookupNode)> = response
                         .nodes
                         .into_iter()
                         .filter(|node| {
@@ -149,7 +164,6 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
                             )
                         })
                         .collect();
-
 
                     // Add new nodes to closest nodes list.
                     lookup.closest_nodes.insert_new_entries(nodes);

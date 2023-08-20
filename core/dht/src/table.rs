@@ -56,6 +56,9 @@ pub async fn start_worker(
                                 },
                             }
                         },
+                        TableRequest::UpdateNodeTimestamp { node_key, timestamp } => {
+                            table.update_node_timestamp(node_key, timestamp);
+                        }
                     }
                 }
             }
@@ -83,6 +86,10 @@ pub enum TableRequest {
     // Returns index for non-empty bucket containing closest neighbors. Used for bootstrapping.
     NearestNeighborsBucket {
         respond: oneshot::Sender<Option<usize>>,
+    },
+    UpdateNodeTimestamp {
+        node_key: NodePublicKey,
+        timestamp: u64,
     },
 }
 
@@ -163,6 +170,16 @@ impl Table {
         let bucket_index = calculate_bucket_index(self.buckets.len(), index);
         if !self.buckets[bucket_index].add_node(node.clone()) && self.split_bucket(bucket_index) {
             self._add_node(node)
+        }
+    }
+
+    fn update_node_timestamp(&mut self, node_key: NodePublicKey, timestamp: u64) {
+        let index = distance::leading_zero_bits(&self.local_node_key.0, &node_key.0);
+        let bucket_index = calculate_bucket_index(self.buckets.len(), index);
+        for node in self.buckets[bucket_index].nodes_mut() {
+            if node.key == node_key {
+                node.last_responded = Some(timestamp);
+            }
         }
     }
 
@@ -254,6 +271,7 @@ mod tests {
             let node = NodeInfo {
                 address: "0.0.0.0:0".parse().unwrap(),
                 key: key.into(),
+                last_responded: None,
             };
             table.add_node(node).unwrap();
         }
