@@ -45,7 +45,7 @@ pub async fn start_listener_driver(mut driver: ListenerDriver) {
     }
 }
 
-pub async fn start_connector_driver<T: LightningMessage>(mut driver: ConnectorDriver) {
+pub async fn start_connector_driver(mut driver: ConnectorDriver) {
     while let Some(event) = driver.connect_rx.recv().await {
         let connection = match driver.pool.get(&(event.pk, event.address)) {
             None => {
@@ -90,6 +90,16 @@ pub struct ListenerDriver {
     endpoint: Endpoint,
 }
 
+impl ListenerDriver {
+    pub fn new(register_rx: Receiver<RegisterEvent>, endpoint: Endpoint) -> Self {
+        Self {
+            handles: HashMap::new(),
+            register_rx,
+            endpoint,
+        }
+    }
+}
+
 /// Driver for driving the connection events from the transport connection.
 pub struct ConnectorDriver {
     /// Listens for scoped service registration.
@@ -98,6 +108,16 @@ pub struct ConnectorDriver {
     pool: HashMap<(NodePublicKey, SocketAddr), Connection>,
     /// QUIC endpoint.
     endpoint: Endpoint,
+}
+
+impl ConnectorDriver {
+    pub fn new(connect_rx: Receiver<ConnectEvent>, endpoint: Endpoint) -> Self {
+        Self {
+            connect_rx,
+            pool: HashMap::new(),
+            endpoint,
+        }
+    }
 }
 
 /// Wrapper that allows us to create logical channels.

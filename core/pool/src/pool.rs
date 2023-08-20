@@ -19,13 +19,14 @@ use lightning_interfaces::{
 };
 use quinn::{Endpoint, ServerConfig};
 use tokio::sync::mpsc;
+use tokio::task::JoinSet;
 
-use crate::connection::RegisterEvent;
+use crate::connection::{ConnectorDriver, ListenerDriver, RegisterEvent};
 use crate::connector::{ConnectEvent, Connector};
 use crate::listener::Listener;
-use crate::netkit;
 use crate::receiver::Receiver;
 use crate::sender::Sender;
+use crate::{connection, netkit};
 
 pub struct ConnectionPool<C> {
     connector_tx: mpsc::Sender<ConnectEvent>,
@@ -34,6 +35,8 @@ pub struct ConnectionPool<C> {
     register_rx: Arc<Mutex<Option<mpsc::Receiver<RegisterEvent>>>>,
     active_scopes: Mutex<Option<HashSet<ServiceScope>>>,
     endpoint: Endpoint,
+    is_running: Arc<Mutex<bool>>,
+    drivers: Mutex<JoinSet<()>>,
     _marker: PhantomData<C>,
 }
 
@@ -48,15 +51,30 @@ where
     C: Collection,
 {
     fn is_running(&self) -> bool {
-        todo!()
+        *self.is_running.lock().unwrap()
     }
 
     async fn start(&self) {
-        todo!()
+        let register_rx = self.register_rx.lock().unwrap().take().unwrap();
+        let listener_driver = ListenerDriver::new(register_rx, self.endpoint.clone());
+        self.drivers
+            .lock()
+            .unwrap()
+            .spawn(connection::start_listener_driver(listener_driver));
+
+        let connector_rx = self.connector_rx.lock().unwrap().take().unwrap();
+        let listener_driver = ConnectorDriver::new(connector_rx, self.endpoint.clone());
+        self.drivers
+            .lock()
+            .unwrap()
+            .spawn(connection::start_connector_driver(listener_driver));
+
+        *self.is_running.lock().unwrap() = true;
     }
 
     async fn shutdown(&self) {
-        todo!()
+        self.drivers.lock().unwrap().abort_all();
+        *self.is_running.lock().unwrap() = false;
     }
 }
 
@@ -87,6 +105,8 @@ where
             register_rx: Arc::new(Mutex::new(Some(register_rx))),
             active_scopes: Mutex::new(Some(HashSet::new())),
             endpoint,
+            is_running: Arc::new(Mutex::new(false)),
+            drivers: Mutex::new(JoinSet::new()),
             _marker: PhantomData::default(),
         }
     }
