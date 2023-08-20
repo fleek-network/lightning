@@ -46,6 +46,9 @@ struct TopologyInner<Q: SyncQueryRunnerInterface + 'static> {
 }
 
 impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
+    /// Build a latency matrix according to the current application state.
+    /// Returns the matrix, a map of node ids to public keys, and an optional node index for
+    /// ourselves if we're included in the topology.
     fn build_latency_matrix(&self) -> (Array2<i32>, HashMap<usize, NodePublicKey>, Option<usize>) {
         let latencies = self.query.get_latencies();
         let valid_pubkeys: BTreeSet<NodePublicKey> = self
@@ -93,8 +96,8 @@ impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
         let mut current = self.current_peers.lock().expect("failed to acquire lock");
         let mut current_epoch = self.current_epoch.lock().expect("failed to acquire lock");
 
-        // if it's the initial epoch or the epoch has changed
-        if *current_epoch == u64::MAX || *current_epoch < epoch {
+        // if the epoch has changed, or the object has been newly initialized
+        if *current_epoch < epoch || *current_epoch == u64::MAX {
             let (matrix, mappings, our_index) = self.build_latency_matrix();
 
             *current = if let Some(our_index) = our_index {
