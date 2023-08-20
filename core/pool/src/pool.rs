@@ -162,7 +162,7 @@ where
         active_scopes.insert(scope, new_handle);
 
         (
-            Listener::new(false, self.register_tx.clone(), connection_event_rx),
+            Listener::new(self.register_tx.clone(), connection_event_rx),
             Connector::new(scope, self.connector_tx.clone()),
         )
     }
