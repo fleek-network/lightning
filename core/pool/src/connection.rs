@@ -71,23 +71,13 @@ pub async fn start_connector_driver(mut driver: ConnectorDriver) {
 pub struct ListenerDriver {
     /// Current active connections.
     handles: Arc<DashMap<ServiceScope, ScopeHandle>>,
-    /// Listens for scoped service registration.
-    register_rx: Receiver<RegisterEvent>,
     /// QUIC endpoint.
     endpoint: Endpoint,
 }
 
 impl ListenerDriver {
-    pub fn new(
-        handles: Arc<DashMap<ServiceScope, ScopeHandle>>,
-        register_rx: Receiver<RegisterEvent>,
-        endpoint: Endpoint,
-    ) -> Self {
-        Self {
-            handles,
-            register_rx,
-            endpoint,
-        }
+    pub fn new(handles: Arc<DashMap<ServiceScope, ScopeHandle>>, endpoint: Endpoint) -> Self {
+        Self { handles, endpoint }
     }
 }
 
@@ -126,14 +116,4 @@ impl LightningMessage for ScopedMessage {
     fn encode<W: Write>(&self, writer: &mut W) -> std::io::Result<usize> {
         todo!()
     }
-}
-
-/// Event created on `listen` and `connect`.
-pub struct RegisterEvent {
-    /// Whether we should remove this scope.
-    close: bool,
-    /// Scope to be registered.
-    scope: ServiceScope,
-    /// Handle to send back stream.
-    handle: Sender<(NodePublicKey, SendStream, RecvStream)>,
 }

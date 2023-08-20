@@ -16,7 +16,6 @@ use lightning_interfaces::{
 use quinn::{Connection, ConnectionError, Endpoint, RecvStream, SendStream};
 use tokio::sync::mpsc;
 
-use crate::connection::RegisterEvent;
 use crate::pool::{ConnectionPool, ScopeHandle};
 use crate::receiver::Receiver;
 use crate::sender::Sender;

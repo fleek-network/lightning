@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 
-use crate::connection::{ConnectorDriver, ListenerDriver, RegisterEvent};
+use crate::connection::{ConnectorDriver, ListenerDriver};
 use crate::connector::{ConnectEvent, Connector};
 use crate::listener::Listener;
 use crate::receiver::Receiver;
@@ -33,9 +33,7 @@ use crate::{connection, netkit};
 
 pub struct ConnectionPool<C> {
     connector_tx: mpsc::Sender<ConnectEvent>,
-    register_tx: mpsc::Sender<RegisterEvent>,
     connector_rx: Arc<Mutex<Option<mpsc::Receiver<ConnectEvent>>>>,
-    register_rx: Arc<Mutex<Option<mpsc::Receiver<RegisterEvent>>>>,
     active_scopes: Arc<DashMap<ServiceScope, ScopeHandle>>,
     endpoint: Endpoint,
     is_running: Arc<Mutex<bool>>,
@@ -50,14 +48,11 @@ impl<C> ConnectionPool<C> {
         let server_config = ServerConfig::with_crypto(Arc::new(tls_config));
         let endpoint = Endpoint::server(server_config, address).unwrap();
 
-        let (register_tx, register_rx) = mpsc::channel(256);
         let (connector_tx, connector_rx) = mpsc::channel(256);
 
         Self {
             connector_tx,
             connector_rx: Arc::new(Mutex::new(Some(connector_rx))),
-            register_tx,
-            register_rx: Arc::new(Mutex::new(Some(register_rx))),
             active_scopes: Arc::new(DashMap::new()),
             endpoint,
             is_running: Arc::new(Mutex::new(false)),
@@ -101,12 +96,8 @@ where
     }
 
     async fn start(&self) {
-        let register_rx = self.register_rx.lock().unwrap().take().unwrap();
-        let listener_driver = ListenerDriver::new(
-            self.active_scopes.clone(),
-            register_rx,
-            self.endpoint.clone(),
-        );
+        let listener_driver =
+            ListenerDriver::new(self.active_scopes.clone(), self.endpoint.clone());
         self.drivers
             .lock()
             .unwrap()
