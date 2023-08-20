@@ -3651,6 +3651,7 @@ dependencies = [
  "fleek-crypto",
  "infusion",
  "lightning-interfaces",
+ "multiaddr",
  "quinn",
  "rcgen 0.11.1",
  "rustls 0.21.5",

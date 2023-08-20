@@ -25,18 +25,22 @@ use crate::driver::{ConnectorDriver, ListenerDriver};
 use crate::listener::Listener;
 use crate::{driver, netkit};
 
-pub struct ConnectionPool<C> {
+pub struct ConnectionPool<C: Collection> {
     connector_tx: mpsc::Sender<ConnectEvent>,
     connector_rx: Arc<Mutex<Option<mpsc::Receiver<ConnectEvent>>>>,
     active_scopes: Arc<DashMap<ServiceScope, ScopeHandle>>,
     endpoint: Endpoint,
     is_running: Arc<Mutex<bool>>,
     drivers: Mutex<JoinSet<()>>,
+    query_runner: c!(C::ApplicationInterface::SyncExecutor),
     _marker: PhantomData<C>,
 }
 
-impl<C> ConnectionPool<C> {
-    pub fn new(config: PoolConfig) -> Self {
+impl<C: Collection> ConnectionPool<C> {
+    pub fn new(
+        config: PoolConfig,
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    ) -> Self {
         let address: SocketAddr = config.address;
         let tls_config = netkit::server_config();
         let server_config = ServerConfig::with_crypto(Arc::new(tls_config));
@@ -51,6 +55,7 @@ impl<C> ConnectionPool<C> {
             endpoint,
             is_running: Arc::new(Mutex::new(false)),
             drivers: Mutex::new(JoinSet::new()),
+            query_runner,
             _marker: PhantomData::default(),
         }
     }
@@ -75,16 +80,13 @@ impl Default for PoolConfig {
     }
 }
 
-impl<C> ConfigConsumer for ConnectionPool<C> {
+impl<C: Collection> ConfigConsumer for ConnectionPool<C> {
     const KEY: &'static str = "";
     type Config = PoolConfig;
 }
 
 #[async_trait]
-impl<C> WithStartAndShutdown for ConnectionPool<C>
-where
-    C: Collection,
-{
+impl<C: Collection> WithStartAndShutdown for ConnectionPool<C> {
     fn is_running(&self) -> bool {
         *self.is_running.lock().unwrap()
     }
@@ -113,19 +115,16 @@ where
     }
 }
 
-impl<C> ConnectionPoolInterface<C> for ConnectionPool<C>
-where
-    C: Collection,
-{
+impl<C: Collection> ConnectionPoolInterface<C> for ConnectionPool<C> {
     type Listener<T: LightningMessage> = Listener<T>;
-    type Connector<T: LightningMessage> = Connector<T>;
+    type Connector<T: LightningMessage> = Connector<c![C::ApplicationInterface::SyncExecutor], T>;
 
     fn init(
         config: Self::Config,
         _signer: &c!(C::SignerInterface),
-        _query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> Self {
-        ConnectionPool::new(config)
+        ConnectionPool::new(config, query_runner)
     }
 
     fn bind<T>(&self, scope: ServiceScope) -> (Self::Listener<T>, Self::Connector<T>)
@@ -148,7 +147,12 @@ where
 
         (
             Listener::new(connection_event_rx),
-            Connector::new(scope, self.connector_tx.clone(), self.active_scopes.clone()),
+            Connector::new(
+                scope,
+                self.connector_tx.clone(),
+                self.active_scopes.clone(),
+                self.query_runner.clone(),
+            ),
         )
     }
 }

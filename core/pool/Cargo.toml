@@ -13,6 +13,7 @@ infusion.workspace = true
 quinn.workspace = true
 fleek-crypto = { path = "../../lib/fleek-crypto" }
 lightning-interfaces = { path = "../interfaces" }
+multiaddr = "0.17.1"
 tokio.workspace = true
 rustls = { version = "0.21", default-features = false, features = ["dangerous_configuration"] }
 rcgen = "0.11.1"
