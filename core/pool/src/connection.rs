@@ -7,9 +7,10 @@ use affair::AsyncWorker;
 use anyhow::{bail, Result};
 use dashmap::DashMap;
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::schema::LightningMessage;
+use lightning_interfaces::schema::{AutoImplSerde, LightningMessage};
 use lightning_interfaces::types::ServiceScope;
 use quinn::{ClientConfig, Connection, Endpoint, RecvStream, SendStream};
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
 
@@ -24,9 +25,9 @@ pub async fn start_listener_driver(mut driver: ListenerDriver) {
         tokio::spawn(async move {
             let (tx, mut rx) = connection.accept_bi().await.unwrap();
             let data = rx.read_to_end(4096).await.unwrap();
-            let message: ScopedMessage = ScopedMessage::decode(&data).unwrap();
+            let message: StreamRequest = StreamRequest::decode(&data).unwrap();
             if let Some(handle) = handles.get(&message.scope) {
-                handle.listener_tx.send((message.pk, tx, rx)).await.unwrap();
+                handle.listener_tx.send((message.source_peer, tx, rx)).await.unwrap();
             }
         });
     }
@@ -55,8 +56,8 @@ pub async fn start_connector_driver(mut driver: ConnectorDriver) {
         let mut writer = Vec::with_capacity(4096);
 
         LightningMessage::encode::<Vec<_>>(
-            &ScopedMessage {
-                pk: event.pk,
+            &StreamRequest {
+                source_peer: event.pk,
                 scope: event.scope,
             },
             writer.as_mut(),
@@ -101,19 +102,11 @@ impl ConnectorDriver {
     }
 }
 
-/// Wrapper that allows us to create logical channels.
-pub struct ScopedMessage {
-    /// Channel ID.
+/// Request use for establishing new stream connection.
+#[derive(Deserialize, Serialize)]
+pub struct StreamRequest {
     scope: ServiceScope,
-    pk: NodePublicKey,
+    source_peer: NodePublicKey,
 }
 
-impl LightningMessage for ScopedMessage {
-    fn decode(buffer: &[u8]) -> Result<Self> {
-        todo!()
-    }
-
-    fn encode<W: Write>(&self, writer: &mut W) -> std::io::Result<usize> {
-        todo!()
-    }
-}
+impl AutoImplSerde for StreamRequest {}
