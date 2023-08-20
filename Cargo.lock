@@ -4658,6 +4658,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "netkit"
+version = "0.0.0"
+
+[[package]]
 name = "no-std-compat"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

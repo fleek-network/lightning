@@ -20,10 +20,10 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 
-use crate::connection::{ConnectorDriver, ListenerDriver};
 use crate::connector::{ConnectEvent, Connector};
+use crate::driver::{ConnectorDriver, ListenerDriver};
 use crate::listener::Listener;
-use crate::{connection, netkit};
+use crate::{driver, netkit};
 
 pub struct ConnectionPool<C> {
     connector_tx: mpsc::Sender<ConnectEvent>,
@@ -95,14 +95,14 @@ where
         self.drivers
             .lock()
             .unwrap()
-            .spawn(connection::start_listener_driver(listener_driver));
+            .spawn(driver::start_listener_driver(listener_driver));
 
         let connector_rx = self.connector_rx.lock().unwrap().take().unwrap();
         let listener_driver = ConnectorDriver::new(connector_rx, self.endpoint.clone());
         self.drivers
             .lock()
             .unwrap()
-            .spawn(connection::start_connector_driver(listener_driver));
+            .spawn(driver::start_connector_driver(listener_driver));
 
         *self.is_running.lock().unwrap() = true;
     }
