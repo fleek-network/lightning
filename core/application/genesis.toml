@@ -10,60 +10,100 @@ service_builder_share = 20
 max_inflation = 10
 consumer_rebate = 0
 max_boost = 4
-max_lock_time = 1460                                                   # 1460 days(epoch) meaning 4 years
-supply_at_genesis = 1000000                                            # set to 1 million for testing, to be determined when initial allocations are set
-protocol_fund_address = "Agio046PQ/xQ3UnqxlhSaoHVtJTWXegU/TdpLwnEMIFW"
-governance_address = "A4MYU1tUEF1Keq5gwI/EX5aHGBtP38YlvRp1P6c5f+11"
+max_lock_time = 1460                                                 # 1460 days(epoch) meaning 4 years
+supply_at_genesis = 1000000                                          # set to 1 million for testing, to be determined when initial allocations are set
+protocol_fund_address = "0x959807B8D94B324A74117956731F09E2893aCd72"
+governance_address = "0x959807B8D94B324A74117956731F09E2893aCd72"
 
-[[committee]]
-owner = "Atw4vg1vuqs1yFA+POhP2IM8H+f+bHkxq2Y4pBhUQfbP"
+[[node_info]]
+owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
 primary_public_key = "0UQnMH+oHTzvNCw+TGhXLgIo1uim+JDiTvQxdGqAu/A="
-primary_address = "/ip4/127.0.0.1/udp/18000"
 consensus_public_key = "l0Jel6KEFG7H6sV2nWKOQxDaMKWMeiUBqK5VHKcStWrLPHAANRB+dt7gp0jQ7ooxEaI7ukOQZk6U5vcL7ESHA1J/iAWQ7YNO/ZCvR1pfWfcTNBONIzeiUWAN+iyKfV10"
-worker_address = "/ip4/127.0.0.1/udp/18101/http"
 worker_public_key = "0UQnMH+oHTzvNCw+TGhXLgIo1uim+JDiTvQxdGqAu/A="
-worker_mempool = "/ip4/127.0.0.1/tcp/18102/http"
+primary_domain = "127.0.0.1"
+worker_domain = "127.0.0.1"
+ports.primary = 18000
+ports.worker = 18101
+ports.mempool = 18102
+ports.rpc = 18103
+ports.pool = 18104
+ports.dht = 18105
+stake.staked = "1000"
+stake.stake_locked_until = 0
+stake.locked = "0"
+stake.locked_until = 0
+genesis_committee = true
 
-[[committee]]
-owner = "ArKFx+pWTH8KKWHT/y9fCUMjddQ1aXpRDFYD2ZYc42vd"
+[[node_info]]
+owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
 primary_public_key = "Bh4HY09Du+3UqAlVXTk9oyJaIj0o3JPA/0scTCwaEWc="
-primary_address = "/ip4/127.0.0.1/udp/28000"
 consensus_public_key = "qipezx5pzmPFWICevMx+SL5+bIjG4yw3A9ieYKKwf2wTEvK0gMRYOln9+KmbNRB3FRbVQBLuCEWIHT0V9GxATT9VeJ+HT88vh/B/6dj7CbWBdWbZ4QXzo0q+uyGchopl"
-worker_address = "/ip4/127.0.0.1/udp/28101/http"
 worker_public_key = "Bh4HY09Du+3UqAlVXTk9oyJaIj0o3JPA/0scTCwaEWc="
-worker_mempool = "/ip4/127.0.0.1/tcp/28102/http"
+primary_domain = "127.0.0.1"
+worker_domain = "127.0.0.1"
+ports.primary = 28000
+ports.worker = 28101
+ports.mempool = 28102
+ports.rpc = 28103
+ports.pool = 28104
+ports.dht = 28105
+stake.staked = "1000"
+stake.stake_locked_until = 0
+stake.locked = "0"
+stake.locked_until = 0
+genesis_committee = true
 
-[[committee]]
-owner = "AzKhol9Ut1NsdXYzIqrYd9YuzCAGShiYgNgkeTkR8qOX"
+[[node_info]]
+owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
 primary_public_key = "b87GFUI1X6OSU4pDDHkx3bIPVDAedUWU3UDU07oeDO0="
-primary_address = "/ip4/127.0.0.1/udp/38000"
 consensus_public_key = "mAT9YIKvBhmi8L3e50/pr/dna1EaYELYTBuTwWgc7qoj5GrJ86/+7aX2mubVYOMxCUr2CO4H5nCgBBssNJ2u/buAPeM4MmEl+wmPgrX0uAAMzHyUOYQKVHCBFeFWsHJR"
-worker_address = "/ip4/127.0.0.1/udp/38101/http"
 worker_public_key = "b87GFUI1X6OSU4pDDHkx3bIPVDAedUWU3UDU07oeDO0="
-worker_mempool = "/ip4/127.0.0.1/tcp/38102/http"
+primary_domain = "127.0.0.1"
+worker_domain = "127.0.0.1"
+ports.primary = 38000
+ports.worker = 38101
+ports.mempool = 38102
+ports.rpc = 38103
+ports.pool = 38104
+ports.dht = 38105
+stake.staked = "1000"
+stake.stake_locked_until = 0
+stake.locked = "0"
+stake.locked_until = 0
+genesis_committee = true
 
-[[committee]]
-owner = "AhlKp53o4Jn3BzfUeFndv/84smRH5tmEmntxoqZhqey9"
+[[node_info]]
+owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
 primary_public_key = "FzAP+CZcG2HTzYHaGzGsamJDpw1nq0CRnmzl5SgUqmE="
-primary_address = "/ip4/127.0.0.1/udp/8000"
 consensus_public_key = "tgLk6pAP2M9GrlrZnB9Y2zOCSbtAhc+bVXtnkX2oBZa0iH5JNPhyQWO0YhAHCisjCMbGSQEm8D2q/4THiCQOmXOXETHQ5Mb1SJQ5PvIRaavZ/UZm5KVYOfj2Zg415aUa"
-worker_address = "/ip4/127.0.0.1/udp/8101/http"
 worker_public_key = "FzAP+CZcG2HTzYHaGzGsamJDpw1nq0CRnmzl5SgUqmE="
-worker_mempool = "/ip4/127.0.0.1/tcp/8102/http"
+primary_domain = "127.0.0.1"
+worker_domain = "127.0.0.1"
+ports.primary = 8000
+ports.worker = 8101
+ports.mempool = 8102
+ports.rpc = 8103
+ports.pool = 8104
+ports.dht = 8105
+stake.staked = "1000"
+stake.stake_locked_until = 0
+stake.locked = "0"
+stake.locked_until = 0
+genesis_committee = true
 
 [[service]]
 id = 0
-owner = "AuFr10sT3ObVRNoTuvJbh0ncSJS6o18oWCFmyXKirdKF"
+owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
 commodity_type = "Bandwidth"
 
 [[service]]
 id = 1
-owner = "A2wabLjqOtlgI8XlpTtq5ieDfyA04afQdyq4a7NQFXZB"
+owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
 commodity_type = "Compute"
 
 
 [[account]]
-public_key = "AtQVhl1ZlXlEF4Kd3rMFlRkXBd5T0dxumfdSheh3v2eY"
+public_key = "0x959807B8D94B324A74117956731F09E2893aCd72"
 flk_balance = 100
 stables_balance = 100
 bandwidth_balance = 100
@@ -78,13 +118,6 @@ price = 0.2
 
 [rep_scores]
 
-[node_info]
-
 [total_served]
 
 [current_epoch_served]
-
-
-
-
-

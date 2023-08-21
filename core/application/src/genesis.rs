@@ -1,24 +1,16 @@
 use std::collections::HashMap;
-use std::str::FromStr;
 
 use anyhow::{Context, Result};
-use fleek_crypto::{
-    AccountOwnerPublicKey,
-    ConsensusPublicKey,
-    EthAddress,
-    NodePublicKey,
-    PublicKey,
-};
+use fleek_crypto::{ConsensusPublicKey, EthAddress, NodePublicKey};
 use lightning_interfaces::types::{
     CommodityTypes,
     Epoch,
     NodeInfo,
+    NodePorts,
     NodeServed,
     Staking,
     TotalServed,
-    Worker,
 };
-use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -36,23 +28,20 @@ pub struct Genesis {
     pub consumer_rebate: u64,
     pub max_boost: u16,
     pub max_lock_time: u64,
-    pub committee: Vec<GenesisCommittee>,
+    pub node_info: Vec<GenesisNode>,
     pub service: Vec<GenesisService>,
     pub account: Vec<GenesisAccount>,
     pub commodity_prices: Vec<GenesisPrices>,
     pub supply_at_genesis: u64,
-    pub protocol_fund_address: String,
-    pub governance_address: String,
-    pub rep_scores: HashMap<String, u8>,
-    pub node_info: HashMap<String, NodeInfo>,
+    pub protocol_fund_address: EthAddress,
+    pub governance_address: EthAddress,
     pub total_served: HashMap<Epoch, TotalServed>,
-    pub current_epoch_served: HashMap<String, NodeServed>,
     pub latencies: Option<Vec<GenesisLatency>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenesisAccount {
-    pub public_key: String,
+    pub public_key: EthAddress,
     pub flk_balance: u64,
     pub stables_balance: u64,
     pub bandwidth_balance: u64,
@@ -61,20 +50,23 @@ pub struct GenesisAccount {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenesisService {
     pub id: u32,
-    pub owner: String,
+    pub owner: EthAddress,
     pub commodity_type: CommodityTypes,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct GenesisCommittee {
-    owner: String,
-    pub primary_public_key: String,
-    primary_address: String,
-    consensus_public_key: String,
-    worker_address: String,
-    worker_public_key: String,
-    worker_mempool: String,
-    pub staking: Option<u64>,
+pub struct GenesisNode {
+    owner: EthAddress,
+    pub primary_public_key: NodePublicKey,
+    consensus_public_key: ConsensusPublicKey,
+    primary_domain: String,
+    worker_domain: String,
+    worker_public_key: NodePublicKey,
+    ports: NodePorts,
+    stake: Staking,
+    reputation: Option<u8>,
+    current_epoch_served: Option<NodeServed>,
+    genesis_committee: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -103,77 +95,37 @@ fn test() {
     Genesis::load().unwrap();
 }
 
-impl From<&GenesisCommittee> for NodeInfo {
-    fn from(value: &GenesisCommittee) -> Self {
-        // TODO: Owner should be an EthAddress.
-        let owner = EthAddress::from_str(&value.owner).unwrap_or_else(|_| {
-            AccountOwnerPublicKey::from_base64(&value.owner)
-                .unwrap()
-                .into()
-        });
-
-        let public_key = NodePublicKey::from_base64(&value.primary_public_key).unwrap();
-        let consensus_key = ConsensusPublicKey::from_base64(&value.consensus_public_key).unwrap();
-
-        let domain: Multiaddr = value.primary_address.parse().unwrap();
-
-        let worker = Worker {
-            public_key: NodePublicKey::from_base64(&value.worker_public_key).unwrap(),
-            address: value.worker_address.parse().unwrap(),
-            mempool: value.worker_mempool.parse().unwrap(),
-        };
-
+impl From<&GenesisNode> for NodeInfo {
+    fn from(value: &GenesisNode) -> Self {
         NodeInfo {
-            owner,
-            public_key,
-            consensus_key,
-            domain,
-            workers: [worker].to_vec(),
+            owner: value.owner,
+            public_key: value.primary_public_key,
+            consensus_key: value.consensus_public_key,
+            domain: value.primary_domain.clone(),
+            worker_domain: value.worker_domain.clone(),
+            worker_public_key: value.worker_public_key,
             staked_since: 0,
-            stake: Staking::default(),
+            stake: value.stake.clone(),
             nonce: 0,
+            ports: value.ports.clone(),
         }
     }
 }
 
-impl From<NodeInfo> for GenesisCommittee {
+impl From<NodeInfo> for GenesisNode {
     fn from(value: NodeInfo) -> Self {
-        let worker = value.workers.first().expect("At least one worker.");
-
-        GenesisCommittee {
-            owner: value.owner.to_string(),
-            primary_public_key: value.public_key.to_base64(),
-            primary_address: value.domain.to_string(),
-            consensus_public_key: value.consensus_key.to_base64(),
-            worker_address: worker.address.to_string(),
-            worker_public_key: worker.public_key.to_base64(),
-            worker_mempool: worker.mempool.to_string(),
-            staking: Some(value.stake.staked.try_into().unwrap()),
-        }
-    }
-}
-
-impl GenesisCommittee {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        owner: String,
-        primary_public_key: String,
-        primary_address: String,
-        consensus_public_key: String,
-        worker_address: String,
-        worker_public_key: String,
-        worker_mempool: String,
-        staking: Option<u64>,
-    ) -> Self {
-        Self {
-            owner,
-            primary_public_key,
-            primary_address,
-            consensus_public_key,
-            worker_address,
-            worker_public_key,
-            worker_mempool,
-            staking,
+        GenesisNode {
+            owner: value.owner,
+            primary_public_key: value.public_key,
+            primary_domain: value.domain,
+            consensus_public_key: value.consensus_key,
+            worker_domain: value.worker_domain,
+            worker_public_key: value.worker_public_key,
+            stake: value.stake,
+            ports: value.ports,
+            reputation: None,
+            current_epoch_served: None,
+            genesis_committee: false,
         }
     }
 }
