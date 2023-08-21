@@ -6,8 +6,11 @@ use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::ReceiverInterface;
 use quinn::RecvStream;
 
+/// The receiver on this stream.
 pub struct Receiver<T> {
+    /// The peer's public key.
     peer: NodePublicKey,
+    /// QUIC receive stream.
     receive: RecvStream,
     _marker: PhantomData<T>,
 }

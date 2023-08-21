@@ -16,17 +16,27 @@ use crate::pool::ScopeHandle;
 use crate::receiver::Receiver;
 use crate::sender::Sender;
 
+/// Connect event sent by connector.
 pub struct ConnectEvent {
+    /// The scope that the connector belongs to.
     pub scope: ServiceScope,
-    pub pk: NodePublicKey,
+    /// The peer we are trying to connect to.
+    pub peer: NodePublicKey,
+    /// The address of the peer we want to connect to.
     pub address: SocketAddr,
+    /// Receiver for getting back a QUIC stream.
     pub respond: oneshot::Sender<(SendStream, RecvStream)>,
 }
 
+/// Pool connector.
 pub struct Connector<Q, T> {
+    /// The scope that the connector belongs to.
     scope: ServiceScope,
+    /// Sender for connect events.
     connection_event_tx: mpsc::Sender<ConnectEvent>,
+    /// Current active scopes. Used for updating when dropping.
     active_scope: Arc<DashMap<ServiceScope, ScopeHandle>>,
+    /// Query runner.
     query_runner: Q,
     _marker: PhantomData<T>,
 }
@@ -89,7 +99,7 @@ where
         self.connection_event_tx
             .send(ConnectEvent {
                 scope: self.scope,
-                pk: *to,
+                peer: *to,
                 address,
                 respond: tx,
             })

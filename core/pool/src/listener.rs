@@ -10,7 +10,9 @@ use tokio::sync::mpsc;
 use crate::receiver::Receiver;
 use crate::sender::Sender;
 
+/// Pool listener.
 pub struct Listener<T> {
+    /// Receiver of new connection streams.
     connection_event_rx: mpsc::Receiver<(NodePublicKey, SendStream, RecvStream)>,
     _marker: PhantomData<T>,
 }

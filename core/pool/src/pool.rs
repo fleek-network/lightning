@@ -25,14 +25,23 @@ use crate::driver::{ConnectorDriver, ListenerDriver};
 use crate::listener::Listener;
 use crate::{driver, tls};
 
+/// QUIC connection pool.
 pub struct ConnectionPool<C: Collection> {
+    /// Sender of connect events for connector.
     connector_tx: mpsc::Sender<ConnectEvent>,
+    /// Receiver of connect events for connector.
     connector_rx: Arc<Mutex<Option<mpsc::Receiver<ConnectEvent>>>>,
+    /// The scopes currently active.
     active_scopes: Arc<DashMap<ServiceScope, ScopeHandle>>,
+    /// QUIC endpoint.
     endpoint: Mutex<Option<Endpoint>>,
+    /// Flag to indicate if pool is running.
     is_running: Arc<Mutex<bool>>,
+    /// Pool config.
     config: PoolConfig,
+    /// Set of spawned driver workers.
     drivers: Mutex<JoinSet<()>>,
+    /// Query runner.
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     _marker: PhantomData<C>,
 }

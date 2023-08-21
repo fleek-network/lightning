@@ -14,6 +14,9 @@ use crate::connector::ConnectEvent;
 use crate::pool::ScopeHandle;
 use crate::tls;
 
+/// Task that listens for QUIC connections.
+///
+/// Sends new QUIC streams to pool listener.
 pub async fn start_listener_driver(driver: ListenerDriver) {
     while let Some(connecting) = driver.endpoint.accept().await {
         let remote_address = connecting.remote_address();
@@ -56,9 +59,12 @@ async fn handle_incoming_connection(
     Ok(())
 }
 
+/// Task that listens for connect events and creates QUIC connections.
+///
+/// Sends new QUIC streams to pool connector.
 pub async fn start_connector_driver(mut driver: ConnectorDriver) {
     while let Some(event) = driver.connect_rx.recv().await {
-        match driver.pool.get(&(event.pk, event.address)) {
+        match driver.pool.get(&(event.peer, event.address)) {
             None => {
                 let endpoint = driver.endpoint.clone();
                 let pool = driver.pool.clone();
@@ -90,7 +96,7 @@ async fn handle_new_outgoing_connection(
     let connection = endpoint
         .connect_with(client_config, event.address, "")?
         .await?;
-    pool.insert((event.pk, event.address), connection.clone());
+    pool.insert((event.peer, event.address), connection.clone());
 
     handle_existing_outgoing_connection(connection, event).await
 }
@@ -104,7 +110,7 @@ async fn handle_existing_outgoing_connection(
     let mut writer = Vec::with_capacity(1024);
     LightningMessage::encode::<Vec<_>>(
         &StreamRequest {
-            source_peer: event.pk,
+            source_peer: event.peer,
             scope: event.scope,
         },
         writer.as_mut(),
@@ -117,7 +123,7 @@ async fn handle_existing_outgoing_connection(
     Ok(())
 }
 
-/// Driver for driving the connection events from the transport connection.
+/// Driver for listening to incoming QUIC connections.
 pub struct ListenerDriver {
     /// Current active connections.
     handles: Arc<DashMap<ServiceScope, ScopeHandle>>,
@@ -131,7 +137,7 @@ impl ListenerDriver {
     }
 }
 
-/// Driver for driving the connection events from the transport connection.
+/// Driver for making QUIC connections.
 pub struct ConnectorDriver {
     /// Listens for scoped service registration.
     connect_rx: Receiver<ConnectEvent>,

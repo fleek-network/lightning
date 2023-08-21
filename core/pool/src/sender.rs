@@ -7,10 +7,13 @@ use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::SenderInterface;
 use quinn::SendStream;
 
+/// The sender on this stream.
 pub struct Sender<T> {
+    /// The peer's public key.
     peer: NodePublicKey,
     // Todo: Fix.
     // SendStream needs to be mutable to send which conflicts with interface.
+    /// QUIC send stream.
     send: Arc<Mutex<Option<SendStream>>>,
     _marker: PhantomData<T>,
 }
