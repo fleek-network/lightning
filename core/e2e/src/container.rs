@@ -27,6 +27,7 @@ impl<C: Collection> Container<C> {
     pub async fn spawn(config: C::ConfigProviderInterface, runtime_type: RuntimeType) -> Self {
         let shutdown_notify = Arc::new(Notify::new());
         let shutdown_notify_rx = shutdown_notify.clone();
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel::<()>();
 
         let handle = thread::spawn(move || {
             let mut builder = match runtime_type {
@@ -43,10 +44,14 @@ impl<C: Collection> Container<C> {
                 let node = Node::<C>::init(config).unwrap();
                 node.start().await;
 
+                let _ = started_tx.send(());
+
                 shutdown_notify_rx.notified().await;
                 node.shutdown().await;
             });
         });
+
+        started_rx.await.expect("Failed to start the node.");
 
         Self {
             join_handle: Some(handle),
