@@ -20,7 +20,7 @@ async fn e2e_epoch_change() -> Result<()> {
         .with_min_port(10000)
         .with_max_port(11000)
         .with_num_nodes(4)
-        .with_epoch_time(20000)
+        .with_epoch_time(40000)
         .with_epoch_start(epoch_start)
         .build();
     swarm.launch().await.unwrap();
@@ -47,7 +47,7 @@ async fn e2e_epoch_change() -> Result<()> {
 
     // The epoch will change after 20 seconds, and we already waited 5 seconds.
     // To give some time for the epoch change, we will wait another 30 seconds here.
-    tokio::time::sleep(Duration::from_secs(20)).await;
+    tokio::time::sleep(Duration::from_secs(40)).await;
 
     let request = json!({
         "jsonrpc": "2.0",
