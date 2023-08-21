@@ -1,25 +1,41 @@
-use std::{sync::Arc, time::SystemTime};
+use std::time::SystemTime;
 
 use anyhow::Result;
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, PublicKey, SecretKey};
-use lightning_application::{
-    config::Mode,
-    genesis::{Genesis, GenesisCommittee, GenesisLatency},
-    query_runner::QueryRunner,
-};
+use lightning_application::app::Application;
+use lightning_application::config::Mode;
+use lightning_application::genesis::{Genesis, GenesisCommittee, GenesisLatency};
+use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::schema::broadcast::BroadcastFrame;
+use lightning_interfaces::schema::AutoImplSerde;
+use lightning_interfaces::types::{ServiceScope, Topic};
 use lightning_interfaces::{
-    schema::{broadcast::BroadcastFrame, AutoImplSerde},
-    types::{ServiceScope, Topic},
-    ApplicationInterface, BroadcastInterface, ConnectionPoolInterface, NotifierInterface, PubSub,
-    SignerInterface, TopologyInterface, WithStartAndShutdown,
+    partial,
+    ApplicationInterface,
+    BroadcastInterface,
+    ConnectionPoolInterface,
+    NotifierInterface,
+    PubSub,
+    SignerInterface,
+    TopologyInterface,
+    WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
 use lightning_topology::Topology;
-use mock::pool::{transport::GlobalMemoryTransport, Config, ConnectionPool};
+use mock::pool::transport::GlobalMemoryTransport;
+use mock::pool::{Config, ConnectionPool};
 use serde::{Deserialize, Serialize};
 
-use crate::Broadcast;
+use crate::{config, Broadcast};
+
+partial!(TestBinding {
+    ApplicationInterface = Application<Self>;
+    SignerInterface = Signer<Self>;
+    ConnectionPoolInterface = ConnectionPool<Self>;
+    TopologyInterface = Topology<Self>;
+    NotifierInterface = Notifier<Self>;
+});
 
 /// Mock pubsub topic message
 #[derive(Clone, Serialize, Deserialize)]
@@ -77,32 +93,34 @@ async fn pubsub_send_recv() -> Result<()> {
         .as_millis() as u64;
 
     // Setup shared application state (it will never get modified)
-    let application =
-        lightning_application::app::Application::init(lightning_application::config::Config {
+    let application = lightning_application::app::Application::<TestBinding>::init(
+        lightning_application::config::Config {
             mode: Mode::Test,
             genesis: Some(genesis),
-        })?;
+        },
+    )?;
     let query_runner = application.sync_query();
 
     // setup signers
-    let signer_a = Signer::init(signer_config_a, query_runner.clone())?;
-    let signer_b = Signer::init(signer_config_b, query_runner.clone())?;
+    let signer_a = Signer::<TestBinding>::init(signer_config_a, query_runner.clone())?;
+    let signer_b = Signer::<TestBinding>::init(signer_config_b, query_runner.clone())?;
 
-    let topology = Arc::new(Topology::init(
+    let topology = Topology::<TestBinding>::init(
         lightning_topology::config::Config::default(),
         // use a dummy key to force topology to always return all nodes
         NodePublicKey([0u8; 32]),
         query_runner.clone(),
-    )?);
+    )?;
 
     // Node A
-    let mut pool_a = ConnectionPool::init(Config {}, &signer_a, query_runner.clone());
+    let mut pool_a =
+        ConnectionPool::<TestBinding>::init(Config {}, &signer_a, query_runner.clone());
     pool_a.with_transport(global_transport.clone());
     pool_a.start().await;
     let listener_connector = pool_a.bind::<BroadcastFrame>(ServiceScope::Broadcast);
-    let notifier = Notifier::init(query_runner.clone());
-    let broadcast_a = Broadcast::<ConnectionPool<Signer, QueryRunner>, _, _, _>::init(
-        crate::config::Config {},
+    let notifier = Notifier::<TestBinding>::init(query_runner.clone());
+    let broadcast_a = Broadcast::<TestBinding>::init(
+        config::Config::default(),
         listener_connector,
         topology.clone(),
         &signer_a,
@@ -116,8 +134,8 @@ async fn pubsub_send_recv() -> Result<()> {
     pool_b.start().await;
     let listener_connector = pool_b.bind::<BroadcastFrame>(ServiceScope::Broadcast);
     let notifier = Notifier::init(query_runner.clone());
-    let broadcast_b = Broadcast::<ConnectionPool<Signer, QueryRunner>, _, _, _>::init(
-        crate::config::Config {},
+    let broadcast_b = Broadcast::<TestBinding>::init(
+        config::Config::default(),
         listener_connector,
         topology.clone(),
         &signer_b,

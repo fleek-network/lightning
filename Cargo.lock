@@ -3392,6 +3392,7 @@ dependencies = [
  "dashmap",
  "fleek-crypto",
  "flexbuffers",
+ "infusion",
  "ink-quill",
  "lightning-application",
  "lightning-interfaces",

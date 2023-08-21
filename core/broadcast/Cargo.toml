@@ -26,3 +26,4 @@ lightning-signer = { path = "../signer" }
 lightning-topology = { path = "../topology" }
 lightning-notifier = { path = "../notifier" }
 mock = { path = "../mock" }
+infusion.workspace = true
