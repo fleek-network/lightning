@@ -37,7 +37,8 @@ async fn main() -> Result<()> {
         .get_port(12001, 13000, Transport::Udp)
         .expect("Failed to assign port");
 
-    let bootstrapper_address = format!("0.0.0.0:{bootstrapper_port}").parse().unwrap();
+    // Todo: get IP from application.
+    let bootstrapper_address = format!("127.0.0.1:{bootstrapper_port}").parse().unwrap();
     let bootstrapper_config = DhtConfig {
         address: bootstrapper_address,
         bootstrappers: vec![],
