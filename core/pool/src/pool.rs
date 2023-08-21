@@ -29,8 +29,9 @@ pub struct ConnectionPool<C: Collection> {
     connector_tx: mpsc::Sender<ConnectEvent>,
     connector_rx: Arc<Mutex<Option<mpsc::Receiver<ConnectEvent>>>>,
     active_scopes: Arc<DashMap<ServiceScope, ScopeHandle>>,
-    endpoint: Endpoint,
+    endpoint: Mutex<Option<Endpoint>>,
     is_running: Arc<Mutex<bool>>,
+    config: PoolConfig,
     drivers: Mutex<JoinSet<()>>,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     _marker: PhantomData<C>,
@@ -41,19 +42,15 @@ impl<C: Collection> ConnectionPool<C> {
         config: PoolConfig,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> Self {
-        let address: SocketAddr = config.address;
-        let tls_config = tls::server_config();
-        let server_config = ServerConfig::with_crypto(Arc::new(tls_config));
-        let endpoint = Endpoint::server(server_config, address).unwrap();
-
         let (connector_tx, connector_rx) = mpsc::channel(256);
 
         Self {
             connector_tx,
             connector_rx: Arc::new(Mutex::new(Some(connector_rx))),
             active_scopes: Arc::new(DashMap::new()),
-            endpoint,
+            endpoint: Mutex::new(None),
             is_running: Arc::new(Mutex::new(false)),
+            config,
             drivers: Mutex::new(JoinSet::new()),
             query_runner,
             _marker: PhantomData::default(),
@@ -92,15 +89,19 @@ impl<C: Collection> WithStartAndShutdown for ConnectionPool<C> {
     }
 
     async fn start(&self) {
-        let listener_driver =
-            ListenerDriver::new(self.active_scopes.clone(), self.endpoint.clone());
+        let tls_config = tls::server_config();
+        let server_config = ServerConfig::with_crypto(Arc::new(tls_config));
+        let endpoint = Endpoint::server(server_config, self.config.address).unwrap();
+        self.endpoint.lock().unwrap().replace(endpoint.clone());
+
+        let listener_driver = ListenerDriver::new(self.active_scopes.clone(), endpoint.clone());
         self.drivers
             .lock()
             .unwrap()
             .spawn(driver::start_listener_driver(listener_driver));
 
         let connector_rx = self.connector_rx.lock().unwrap().take().unwrap();
-        let listener_driver = ConnectorDriver::new(connector_rx, self.endpoint.clone());
+        let listener_driver = ConnectorDriver::new(connector_rx, endpoint);
         self.drivers
             .lock()
             .unwrap()
