@@ -1,3 +1,5 @@
+use paste::paste;
+
 #[macro_export]
 macro_rules! infu {
     // The `infu!(@ Input)` specifies that the current trait is an input trait and can
@@ -126,6 +128,40 @@ macro_rules! infu {
 macro_rules! collection {
     // Case 1: Handle creation of the collection.
     ([$($service:tt),* $(,)?]) => {
+        pub trait CollectionBase: Clone + Send + Sync + Sized + 'static {
+        $(
+            type $service<C: Collection>: $service<C> + 'static;
+         )*
+        }
+
+        impl<T: CollectionBase> Collection for T {
+        $(
+            type $service = T::$service<Self>;
+         )*
+        }
+
+        $crate::paste! {
+        $(
+        pub trait [ < $service Container > ]: Send + Sync + 'static {
+            type $service<C: Collection>: $service<C> + 'static;
+        }
+
+        pub struct [ < $service Modifier > ]<
+                N: [ < $service Container > ],
+                O: CollectionBase
+        >(core::marker::PhantomData<(N, O)>);
+
+        impl<N: [ < $service Container > ], O: CollectionBase> Clone
+                    for [ < $service Modifier > ]<N, O> {
+            fn clone(&self) -> Self {
+                Self(Default::default())
+            }
+        }
+         )*
+        }
+
+        $crate::__modifier_helper!({$($service),*});
+
         pub trait Collection: Clone + Send + Sync + Sized + 'static {
         $(
             type $service: $service<Self> + 'static;
@@ -172,7 +208,7 @@ macro_rules! collection {
                 struct $$struct;
                 impl Collection for $$struct {
                     $$(type $$name = $$ty;)*
-                    infusion::__blank_helper!({$($service),*}, {$$($$name),*});
+                    $crate::__blank_helper!({$($service),*}, {$$($$name),*});
                 }
             };
         }
@@ -248,9 +284,9 @@ macro_rules! collection {
         #[derive(Clone)]
         pub struct BlankBinding;
 
-        impl Collection for BlankBinding {
+        impl CollectionBase for BlankBinding {
         $(
-            type $service = $crate::Blank<Self>;
+            type $service<C: Collection> = $crate::Blank<C>;
          )*
         }
     };

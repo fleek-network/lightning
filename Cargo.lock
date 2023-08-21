@@ -3135,6 +3135,7 @@ name = "infusion"
 version = "0.1.0"
 dependencies = [
  "infusion-proc",
+ "paste",
  "serde",
 ]
 
@@ -4657,10 +4658,6 @@ dependencies = [
  "rand 0.8.5",
  "rand_distr",
 ]
-
-[[package]]
-name = "netkit"
-version = "0.0.0"
 
 [[package]]
 name = "no-std-compat"

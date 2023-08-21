@@ -51,3 +51,31 @@ pub fn generate_partial_blank(pair: IdentSetPair) -> TokenStream {
         #(type #result = infusion::Blank<Self>;)*
     }
 }
+
+pub fn generate_partial_modifier(set: IdentSet) -> TokenStream {
+    fn generate_code(current: syn::Ident, set: &IdentSet) -> TokenStream {
+        let trait_name = syn::Ident::new(&format!("{current}Container"), current.span());
+        let struct_name = syn::Ident::new(&format!("{current}Modifier"), current.span());
+        let services = set.ident.iter().filter(|ident| *ident != &current);
+
+        quote! {
+            impl<N: #trait_name, O: CollectionBase> CollectionBase for #struct_name<N, O> {
+                type #current<C: Collection> = N::#current<C>;
+            #(
+                type #services<C: Collection> = O::#services<C>;
+            )*
+            }
+        }
+    }
+
+    let items = set
+        .ident
+        .iter()
+        .map(|current| generate_code(current.clone(), &set));
+
+    quote! {
+        #(
+        #items
+        )*
+    }
+}

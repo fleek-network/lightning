@@ -39,3 +39,9 @@ pub fn __blank_helper(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     let pair = parse_macro_input!(input as partial::IdentSetPair);
     partial::generate_partial_blank(pair).into()
 }
+
+#[proc_macro]
+pub fn __modifier_helper(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let pair = parse_macro_input!(input as partial::IdentSet);
+    partial::generate_partial_modifier(pair).into()
+}

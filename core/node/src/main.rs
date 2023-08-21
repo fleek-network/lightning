@@ -20,7 +20,7 @@ use simplelog::{
 };
 
 use crate::cli::CliArgs;
-use crate::node::FinalTypes;
+use crate::node::{FinalTypes, WithMockConsensus};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -70,16 +70,7 @@ async fn main() -> Result<()> {
 
     if args.with_mock_consensus {
         log::info!("Using MockConsensus");
-
-        // type Node = transformers::WithConsensus<
-        //     FinalTypes,
-        //     MockConsensus<
-        //         <<FinalTypes as LightningTypes>::Application as
-        // ApplicationInterface>::SyncExecutor,         <<FinalTypes as
-        // LightningTypes>::Broadcast as BroadcastInterface>::PubSub<()>,     >,
-        // >;
-        // Cli::<Node>::new(args).exec().await
-        todo!("partial! should work for reassignment.")
+        Cli::<WithMockConsensus>::new(args).exec().await
     } else {
         Cli::<FinalTypes>::new(args).exec().await
     }

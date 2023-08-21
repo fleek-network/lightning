@@ -73,8 +73,10 @@ pub use container::Container;
 pub use error::InitializationError;
 pub use graph::DependencyGraph;
 #[doc(hidden)]
-pub use infusion_proc::__blank_helper;
+pub use infusion_proc::{__blank_helper, __modifier_helper};
 pub use infusion_proc::{blank, service};
+#[doc(hidden)]
+pub use paste::paste;
 use serde::{Deserialize, Serialize};
 
 /// The object that is meant to be the placeholder nullified implementer
