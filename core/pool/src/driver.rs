@@ -94,7 +94,7 @@ async fn handle_new_outgoing_connection(
     let config = tls::client_config();
     let client_config = ClientConfig::new(Arc::new(config));
     let connection = endpoint
-        .connect_with(client_config, event.address, "")?
+        .connect_with(client_config, event.address, "localhost")?
         .await?;
     pool.insert((event.peer, event.address), connection.clone());
 
