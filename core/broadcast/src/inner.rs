@@ -127,7 +127,8 @@ impl<C: Collection> BroadcastInner<C> {
                     let inner = self.clone();
                     tokio::spawn(async move { inner.handle_connection(receiver, sender).await });
                 } else {
-                    eprintln!("failed to connect to {peer}");
+                    // TODO(oz): Use log or tracing. idk. - parsa
+                    // eprintln!("failed to connect to {peer}");
                 }
             }
         }
