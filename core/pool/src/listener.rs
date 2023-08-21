@@ -23,7 +23,7 @@ impl<T> Listener<T> {
     ) -> Self {
         Self {
             connection_event_rx,
-            _marker: PhantomData::default(),
+            _marker: PhantomData,
         }
     }
 }

@@ -53,7 +53,7 @@ impl<Q, T> Connector<Q, T> {
             connection_event_tx,
             active_scope,
             query_runner,
-            _marker: PhantomData::default(),
+            _marker: PhantomData,
         }
     }
 }
@@ -68,7 +68,7 @@ where
             connection_event_tx: self.connection_event_tx.clone(),
             active_scope: self.active_scope.clone(),
             query_runner: self.query_runner.clone(),
-            _marker: PhantomData::default(),
+            _marker: PhantomData,
         }
     }
 }

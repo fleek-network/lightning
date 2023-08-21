@@ -62,7 +62,7 @@ impl<C: Collection> ConnectionPool<C> {
             config,
             drivers: Mutex::new(JoinSet::new()),
             query_runner,
-            _marker: PhantomData::default(),
+            _marker: PhantomData,
         }
     }
 }

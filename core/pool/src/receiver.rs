@@ -23,7 +23,7 @@ where
         Self {
             peer,
             receive,
-            _marker: PhantomData::default(),
+            _marker: PhantomData,
         }
     }
 }

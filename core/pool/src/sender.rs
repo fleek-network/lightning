@@ -26,7 +26,7 @@ where
         Self {
             peer,
             send: Arc::new(Mutex::new(Some(send))),
-            _marker: PhantomData::default(),
+            _marker: PhantomData,
         }
     }
 }
