@@ -15,10 +15,7 @@ ink-quill = { path = "../../lib/ink-quill" }
 lightning-interfaces = { path = "../interfaces" }
 dashmap = "5.5.0"
 mini-moka = "0.10.2"
-
-#temp
-flexbuffers = "2.0.0"
-
+tracing = "0.1.37"
 
 [dev-dependencies]
 lightning-application = { path = "../application" }

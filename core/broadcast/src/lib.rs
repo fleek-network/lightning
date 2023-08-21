@@ -28,6 +28,7 @@ use lightning_interfaces::{
 };
 use pubsub::PubSubTopic;
 use tokio::select;
+use tracing::error;
 
 #[allow(clippy::type_complexity)]
 pub struct Broadcast<C: Collection> {
@@ -97,13 +98,13 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
                             break
                         };
                         if let Err(e) = inner.handle_connection(conn.1, conn.0).await {
-                            eprintln!("Error handling broadcast connection: {e}");
+                            error!("Error handling broadcast connection: {e}");
                         }
                     }
                     // Outgoing messages
                     Some((topic, payload)) = outgoing.recv() => {
                         if let Err(e) = inner.broadcast(topic, payload).await {
-                            eprintln!("Failed to broadcast message: {e}");
+                            error!("Failed to broadcast message: {e}");
                         }
                     }
                     // Epoch change

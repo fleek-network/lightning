@@ -23,6 +23,7 @@ use lightning_interfaces::{
     TopologyInterface,
 };
 use mini_moka::sync::Cache;
+use tracing::error;
 
 const MAX_MESSAGE_CACHE_LEN: u64 = 65535;
 
@@ -127,8 +128,7 @@ impl<C: Collection> BroadcastInner<C> {
                     let inner = self.clone();
                     tokio::spawn(async move { inner.handle_connection(receiver, sender).await });
                 } else {
-                    // TODO(oz): Use log or tracing. idk. - parsa
-                    // eprintln!("failed to connect to {peer}");
+                    error!("failed to connect to {peer}");
                 }
             }
         }
@@ -158,7 +158,7 @@ impl<C: Collection> BroadcastInner<C> {
         for mut conn in self.connections.iter_mut() {
             if let Err(e) = conn.send(BroadcastFrame::Advertise { digest }).await {
                 // gracefully error when sending to multiple connections
-                eprintln!("failed to send broadcast message: {e}");
+                error!("failed to send broadcast message: {e}");
             }
         }
 
@@ -285,7 +285,7 @@ impl<C: Collection> BroadcastInner<C> {
         {
             if let Err(e) = conn.send(BroadcastFrame::Advertise { digest }).await {
                 // don't return hard errors here, only log them
-                eprintln!("error sending broadcast advertisement: {e}");
+                error!("error sending broadcast advertisement: {e}");
             }
         }
 
