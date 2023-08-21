@@ -76,6 +76,8 @@ impl<C: Collection> TomlConfigProvider<C> {
 
 impl<C: Collection> ConfigProviderInterface<C> for TomlConfigProvider<C> {
     fn get<S: lightning_interfaces::config::ConfigConsumer>(&self) -> S::Config {
+        println!("Getting the config for {}", std::any::type_name::<S>());
+
         let mut table = self.table.lock().expect("failed to acquire lock");
 
         // Parse the table value into S::Config, or use the default in the event it doesn't exist.

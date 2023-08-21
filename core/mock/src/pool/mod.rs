@@ -327,6 +327,7 @@ mod tests {
             },
             query_runner.clone(),
         )?;
+
         let mut pool_b = ConnectionPool::<TestBinding>::init(Config {}, &signer_b, query_runner);
         pool_b.with_transport(global_transport.clone());
         pool_b.start().await;

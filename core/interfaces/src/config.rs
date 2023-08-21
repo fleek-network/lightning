@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -24,5 +26,5 @@ pub trait ConfigConsumer {
     const KEY: &'static str = "BLANK";
 
     /// The type which is expected for this configuration object.
-    type Config: Serialize + DeserializeOwned + Default = ();
+    type Config: Serialize + DeserializeOwned + Default = HashMap<String, String>;
 }
