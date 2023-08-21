@@ -46,7 +46,8 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
 
             syn::TraitItem::Fn(item) if mode == utils::Mode::BlankOnly => {
                 if item.default.is_none() {
-                    let impl_ = utils::impl_trait_fn(&item, default_blank_block());
+                    let impl_ =
+                        utils::impl_trait_fn(&item, default_blank_block(&name, &item.sig.ident));
                     blank_body.push(syn::ImplItem::Fn(impl_));
                 }
                 trait_body.push(syn::TraitItem::Fn(item));
@@ -75,7 +76,10 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
                         trait_body.push(syn::TraitItem::Fn(item));
                     },
                     _name => {
-                        let impl_ = utils::impl_trait_fn(&item, default_blank_block());
+                        let impl_ = utils::impl_trait_fn(
+                            &item,
+                            default_blank_block(&trait_.ident, &item.sig.ident),
+                        );
                         trait_body.push(syn::TraitItem::Fn(item));
                         blank_body.push(syn::ImplItem::Fn(impl_));
                     },
@@ -285,10 +289,14 @@ fn impl_post(base: &syn::Ident, item: syn::TraitItemFn) -> Result<syn::TraitItem
 }
 
 /// The code block for a blank method implementation.
-fn default_blank_block() -> syn::Block {
+fn default_blank_block(trait_name: &syn::Ident, method_name: &syn::Ident) -> syn::Block {
     parse_quote! {
         {
-            panic!("BLANK METHOD CALLED");
+            panic!(
+                "BLANK METHOD '{}(..) @ {}' CALLED",
+                stringify!(#method_name),
+                stringify!(#trait_name)
+            );
         }
     }
 }
