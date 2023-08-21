@@ -88,7 +88,7 @@ pub fn generate_macros(set: IdentSet) -> TokenStream {
     quote! {
         #[macro_export]
         macro_rules! partial {
-            ($struct:ident { $($name:ident = $y:ty;)* }) => {
+            ($struct:ident { $($name:ident = $ty:ty;)* }) => {
                 #[derive(Clone)]
                 struct $struct;
                 impl Collection for $struct {
