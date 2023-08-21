@@ -2,9 +2,9 @@ use syn::parse_macro_input;
 
 use crate::parse::Item;
 
+mod helpers;
 mod on_trait;
 mod parse;
-mod partial;
 mod sig;
 mod utils;
 
@@ -36,12 +36,18 @@ pub fn service(
 // for each item in the first set that is not in the second set.
 #[proc_macro]
 pub fn __blank_helper(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let pair = parse_macro_input!(input as partial::IdentSetPair);
-    partial::generate_partial_blank(pair).into()
+    let pair = parse_macro_input!(input as helpers::IdentSetPair);
+    helpers::generate_partial_blank(pair).into()
 }
 
 #[proc_macro]
 pub fn __modifier_helper(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let pair = parse_macro_input!(input as partial::IdentSet);
-    partial::generate_partial_modifier(pair).into()
+    let set = parse_macro_input!(input as helpers::IdentSet);
+    helpers::generate_partial_modifier(set).into()
+}
+
+#[proc_macro]
+pub fn __gen_macros_helper(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let set = parse_macro_input!(input as helpers::IdentSet);
+    helpers::generate_macros(set).into()
 }

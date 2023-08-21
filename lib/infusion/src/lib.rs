@@ -1,5 +1,3 @@
-#![feature(macro_metavar_expr)]
-
 //! Infusion is a dependency injection library to help with top-down approach to
 //! software development by leveraging traits and generics.
 //!
@@ -31,15 +29,6 @@
 //! | [`c`]    | This can be used to help with accessing the type on a collection. |
 //! | [`tag`]  | This can be used to help generate a [`Tag`](vtable::Tag). |
 //! | [`ok`]  | Can be used to create an infallible `Ok`. |
-//!
-//! # Rust features
-//!
-//! In order for the [`collection`] macro to work you need to enable the `macro_metavar_expr`
-//! feature.
-//!
-//! ```no_run
-//! #![feature(macro_metavar_expr)]
-//! ```
 //!
 //! # Example
 //!
@@ -73,7 +62,7 @@ pub use container::Container;
 pub use error::InitializationError;
 pub use graph::DependencyGraph;
 #[doc(hidden)]
-pub use infusion_proc::{__blank_helper, __modifier_helper};
+pub use infusion_proc::{__blank_helper, __gen_macros_helper, __modifier_helper};
 pub use infusion_proc::{blank, service};
 #[doc(hidden)]
 pub use paste::paste;

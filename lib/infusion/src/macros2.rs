@@ -201,86 +201,6 @@ macro_rules! collection {
             }
         }
 
-        #[macro_export]
-        macro_rules! partial {
-            ($$struct:ident { $$($$name:ident = $$ty:ty;)* }) => {
-                #[derive(Clone)]
-                struct $$struct;
-                impl Collection for $$struct {
-                    $$(type $$name = $$ty;)*
-                    $crate::__blank_helper!({$($service),*}, {$$($$name),*});
-                }
-            };
-        }
-
-        #[macro_export]
-        macro_rules! forward {
-            (fn $$name:ident(
-                $$value:ident
-                $$(, $$($$arg:ident : $$ty:ty),*)?
-            ) on [$$($$service:ident),* $$(,)?] $$block:block) => {
-                fn $$name<C: Collection>(
-                    container: &infusion::Container
-                    $$(, $$($$arg: $$ty),*)?
-                ) {
-                $$(
-                    {
-                        let $$value = container.get::<C::$$service>(infusion::tag!(C :: $$service));
-                        $$block
-                    };
-                )*
-                }
-            };
-
-            (fn $$name:ident($$value:ident $$(, $$($$arg:ident : $$ty:ty),*)? ) $$block:block) => {
-                fn $$name<C: Collection>(
-                    container: &infusion::Container
-                    $$(, $$($$arg: $$ty),*)?
-                ) {
-                $(
-                    {
-                        let $$value = container.get::<C::$service>(infusion::tag!(C :: $service));
-                        $$block
-                    };
-                )*
-                }
-            };
-
-            (async fn $$name:ident(
-                $$value:ident
-                $$(, $$($$arg:ident : $$ty:ty),*)?
-            ) on [$$($$service:ident),* $$(,)?] $$block:block) => {
-                async fn $$name<C: Collection>(
-                    container: &infusion::Container
-                    $$(, $$($$arg: $$ty),*)?
-                ) {
-                $$(
-                    {
-                        let $$value = container.get::<C::$$service>(infusion::tag!(C :: $$service));
-                        $$block
-                    };
-                )*
-                }
-            };
-
-            (async fn $$name:ident(
-                $$value:ident
-                $$(, $$($$arg:ident : $$ty:ty),*)?
-            ) $$block:block) => {
-                async fn $$name<C: Collection>(
-                    container: &infusion::Container
-                    $$(, $$($$arg: $$ty),*)?
-                ) {
-                $(
-                    {
-                        let $$value = container.get::<C::$service>(infusion::tag!(C :: $service));
-                        $$block
-                    };
-                )*
-                }
-            };
-        }
-
         #[derive(Clone)]
         pub struct BlankBinding;
 
@@ -289,6 +209,8 @@ macro_rules! collection {
             type $service<C: Collection> = $crate::Blank<C>;
          )*
         }
+
+        infusion::__gen_macros_helper!({$($service),*});
     };
 
 }
