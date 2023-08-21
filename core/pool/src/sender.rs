@@ -38,15 +38,17 @@ where
     }
 
     async fn send(&self, msg: T) -> bool {
+        // See comment in sender about why we use locks.
         let mut send = self.send.lock().unwrap().take().unwrap();
         let mut writer = Vec::new();
-        match msg.encode::<Vec<_>>(writer.as_mut()) {
+        let result = match msg.encode::<Vec<_>>(writer.as_mut()) {
             Ok(_) => {
                 let write_result = send.write(&writer).await.is_err();
-                self.send.lock().unwrap().replace(send);
-                write_result
+                !write_result
             },
             Err(_) => false,
-        }
+        };
+        self.send.lock().unwrap().replace(send);
+        result
     }
 }
