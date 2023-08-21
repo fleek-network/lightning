@@ -15,7 +15,7 @@ use lightning_rep_collector::ReputationAggregator;
 use lightning_rpc::server::Rpc;
 use lightning_signer::Signer;
 use lightning_topology::Topology;
-use mock::consensus::MockConsensus;
+use mock::{consensus::MockConsensus, pool::ConnectionPool};
 
 use crate::config::TomlConfigProvider;
 
@@ -28,7 +28,7 @@ impl CollectionBase for FinalTypes {
     type ApplicationInterface<C: Collection> = Application<C>;
     type BlockStoreInterface<C: Collection> = MemoryBlockStore<C>;
     type BroadcastInterface<C: Collection> = Broadcast<C>;
-    type ConnectionPoolInterface<C: Collection> = infusion::Blank<C>;
+    type ConnectionPoolInterface<C: Collection> = ConnectionPool<C>;
     type TopologyInterface<C: Collection> = Topology<C>;
     type ConsensusInterface<C: Collection> = Consensus<C>;
     type HandshakeInterface<C: Collection> = TcpHandshakeServer<C>;
