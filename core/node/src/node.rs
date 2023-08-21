@@ -11,12 +11,12 @@ use lightning_interfaces::infu_collection::{
     ConsensusInterfaceModifier,
 };
 use lightning_notifier::Notifier;
+use lightning_pool::pool::ConnectionPool;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_rpc::server::Rpc;
 use lightning_signer::Signer;
 use lightning_topology::Topology;
 use mock::consensus::MockConsensus;
-use mock::pool::ConnectionPool;
 
 use crate::config::TomlConfigProvider;
 

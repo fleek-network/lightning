@@ -126,6 +126,7 @@ fn get_socket_address(multi_address: Multiaddr) -> Option<SocketAddr> {
             _ => {},
         };
     }
+    port = Some(port.unwrap_or(4200));
     if host.is_none() || port.is_none() {
         tracing::error!("failed to get address from {multi_address:?}");
         return None;

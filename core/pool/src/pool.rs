@@ -69,7 +69,7 @@ impl<C: Collection> ConnectionPool<C> {
 
 #[derive(Deserialize, Serialize)]
 pub struct PoolConfig {
-    address: SocketAddr,
+    pub address: SocketAddr,
 }
 
 impl PoolConfig {
@@ -81,13 +81,13 @@ impl PoolConfig {
 impl Default for PoolConfig {
     fn default() -> Self {
         Self {
-            address: "0.0.0.0:0".parse().unwrap(),
+            address: "0.0.0.0:4200".parse().unwrap(),
         }
     }
 }
 
 impl<C: Collection> ConfigConsumer for ConnectionPool<C> {
-    const KEY: &'static str = "";
+    const KEY: &'static str = "pool";
     type Config = PoolConfig;
 }
 

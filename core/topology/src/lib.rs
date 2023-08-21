@@ -62,7 +62,10 @@ impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
         latencies
             .values()
             .for_each(|latency| latency_sum += *latency);
-        let mean_latency = latency_sum / latencies.len() as u32; // why do we have to cast to u32?
+
+        let mean_latency = latency_sum
+            .checked_div(latencies.len() as u32)
+            .unwrap_or_default();
         let mean_latency: i32 = mean_latency.as_micros().try_into().unwrap_or(i32::MAX);
 
         let mut matrix = Array::zeros((valid_pubkeys.len(), valid_pubkeys.len()));

@@ -28,6 +28,7 @@ use lightning_interfaces::types::{NodeInfo, Staking, Worker};
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::node::FinalTypes;
+use lightning_pool::pool::{ConnectionPool, PoolConfig};
 use lightning_rpc::config::Config as RpcConfig;
 use lightning_rpc::server::Rpc;
 use lightning_signer::{utils, Config as SignerConfig, Signer};
@@ -278,6 +279,12 @@ where
             .join("keys/consensus.pem")
             .try_into()
             .expect("Failed to resolve path"),
+    });
+
+    config.inject::<ConnectionPool<FinalTypes>>(PoolConfig {
+        address: format!("0.0.0.0:{}", get_port(Transport::Udp))
+            .parse()
+            .unwrap(),
     });
 
     config

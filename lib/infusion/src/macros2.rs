@@ -77,7 +77,7 @@ macro_rules! infu {
         fn post($($dep_name:ident: $dep_ty:tt),* $(,)?) $block:block
     }) => {
         #[doc(hidden)]
-        fn infu_post_initialize(&mut self, container: &$crate::Container) {
+        fn infu_post_initialize(&mut self, __container: &$crate::Container) {
         $(
             let $dep_name: <$collection_name as Collection>::$dep_ty = __container.get(
                 $crate::tag!($collection_name :: $dep_ty)

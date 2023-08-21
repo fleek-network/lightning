@@ -4,7 +4,7 @@ use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
 use crate::consensus::MempoolSocket;
 use crate::infu_collection::Collection;
-use crate::{ApplicationInterface, ConfigProviderInterface, ConsensusInterface};
+use crate::{ApplicationInterface, ConfigProviderInterface, ConsensusInterface, DhtInterface};
 
 /// The interface for the *RPC* server. Which is supposed to be opening a public
 /// port (possibly an HTTP server) and accepts queries or updates from the user.
@@ -18,6 +18,14 @@ pub trait RpcInterface<C: Collection>:
         app: ::ApplicationInterface,
     ) {
         Self::init(config.get::<Self>(), consensus.mempool(), app.sync_query())
+    }
+
+    fn _post(&mut self, dht: ::DhtInterface) {
+        #[cfg(feature = "e2e-test")]
+        {
+            let socket = dht.get_socket();
+            self.provide_dht_socket(socket);
+        }
     }
 
     /// Initialize the RPC-server, with the given parameters.

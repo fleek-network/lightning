@@ -16,6 +16,7 @@ lightning-handshake = { path = "../handshake" }
 lightning-topology = { path = "../topology" }
 lightning-signer = { path = "../signer" }
 lightning-dht = { path = "../dht" }
+lightning-pool = { path = "../pool" }
 mock = { path = "../mock" }
 tokio.workspace = true
 anyhow.workspace = true
