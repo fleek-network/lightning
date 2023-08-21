@@ -74,7 +74,7 @@ and process as objects that communicate with each other by message passing.
 # Rust Version
 
 To get the best of the ecosystem by default the nightly version of Rust is set in the `rust-toolchain`
-file, the version in use is `nightly-2023-01-24`, which is the version used by the `rustfmt` project
+file, the version in use is `nightly-2023-07-01`, which is the version used by the `rustfmt` project
 itself which is a good sign of reliability.
 
 This is set so that the default that the IDEs will pick and default invocation of `cargo fmt` is consistent
