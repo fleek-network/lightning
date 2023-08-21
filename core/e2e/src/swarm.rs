@@ -243,13 +243,13 @@ where
     });
 
     config.inject::<Consensus<FinalTypes>>(ConsensusConfig {
-        address: format!("/ip4/0.0.0.0/udp/{}", get_port(Transport::Udp))
+        address: format!("/ip4/127.0.0.1/udp/{}", get_port(Transport::Udp))
             .parse()
             .unwrap(),
-        worker_address: format!("/ip4/0.0.0.0/udp/{}", get_port(Transport::Udp))
+        worker_address: format!("/ip4/127.0.0.1/udp/{}/http", get_port(Transport::Udp))
             .parse()
             .unwrap(),
-        mempool_address: format!("/ip4/0.0.0.0/tcp/{}", get_port(Transport::Tcp))
+        mempool_address: format!("/ip4/127.0.0.1/tcp/{}/http", get_port(Transport::Tcp))
             .parse()
             .unwrap(),
         store_path: root
@@ -259,14 +259,14 @@ where
     });
 
     config.inject::<Dht<FinalTypes>>(DhtConfig {
-        address: format!("0.0.0.0:{}", get_port(Transport::Udp))
+        address: format!("127.0.0.1:{}", get_port(Transport::Udp))
             .parse()
             .unwrap(),
         bootstrappers,
     });
 
     config.inject::<TcpHandshakeServer<FinalTypes>>(HandshakeServerConfig {
-        listen_addr: SocketAddr::from_str(&format!("0.0.0.0:{}", get_port(Transport::Tcp)))
+        listen_addr: SocketAddr::from_str(&format!("127.0.0.1:{}", get_port(Transport::Tcp)))
             .unwrap(),
     });
 
@@ -282,7 +282,7 @@ where
     });
 
     config.inject::<ConnectionPool<FinalTypes>>(PoolConfig {
-        address: format!("0.0.0.0:{}", get_port(Transport::Udp))
+        address: format!("127.0.0.1:{}", get_port(Transport::Udp))
             .parse()
             .unwrap(),
     });
