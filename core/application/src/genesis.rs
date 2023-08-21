@@ -1,7 +1,14 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use anyhow::{Context, Result};
-use fleek_crypto::{AccountOwnerPublicKey, ConsensusPublicKey, NodePublicKey, PublicKey};
+use fleek_crypto::{
+    AccountOwnerPublicKey,
+    ConsensusPublicKey,
+    EthAddress,
+    NodePublicKey,
+    PublicKey,
+};
 use lightning_interfaces::types::{
     CommodityTypes,
     Epoch,
@@ -98,7 +105,13 @@ fn test() {
 
 impl From<&GenesisCommittee> for NodeInfo {
     fn from(value: &GenesisCommittee) -> Self {
-        let owner = AccountOwnerPublicKey::from_base64(&value.owner).unwrap();
+        // TODO: Owner should be an EthAddress.
+        let owner = EthAddress::from_str(&value.owner).unwrap_or_else(|_| {
+            AccountOwnerPublicKey::from_base64(&value.owner)
+                .unwrap()
+                .into()
+        });
+
         let public_key = NodePublicKey::from_base64(&value.primary_public_key).unwrap();
         let consensus_key = ConsensusPublicKey::from_base64(&value.consensus_public_key).unwrap();
 
@@ -111,7 +124,7 @@ impl From<&GenesisCommittee> for NodeInfo {
         };
 
         NodeInfo {
-            owner: owner.into(),
+            owner,
             public_key,
             consensus_key,
             domain,
