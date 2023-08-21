@@ -157,7 +157,7 @@ impl SwarmBuilder {
         let mut tmp_nodes = Vec::with_capacity(num_nodes);
 
         for index in 0..num_nodes {
-            let root = directory.join("node-{index}");
+            let root = directory.join(format!("node-{index}"));
             fs::create_dir_all(&root).expect("Failed to create node directory");
 
             let config = build_config(
