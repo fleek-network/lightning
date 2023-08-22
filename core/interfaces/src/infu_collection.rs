@@ -40,8 +40,7 @@ impl<C: Collection> Node<C> {
 
         let container = infusion::Container::default()
             .with(infusion::tag!(C::ConfigProviderInterface), config)
-            .initialize(graph)
-            .unwrap();
+            .initialize(graph)?;
 
         Ok(Self {
             container,

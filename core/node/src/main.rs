@@ -4,8 +4,8 @@ pub mod node;
 pub mod shutdown;
 
 use std::fs::File;
+use std::process::exit;
 
-use anyhow::Result;
 use chrono::Local;
 use clap::Parser;
 use cli::Cli;
@@ -23,7 +23,7 @@ use crate::cli::CliArgs;
 use crate::node::{FinalTypes, WithMockConsensus};
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
     let args = CliArgs::parse();
 
     let log_level = args.verbose;
@@ -68,10 +68,16 @@ async fn main() -> Result<()> {
     ])
     .unwrap();
 
-    if args.with_mock_consensus {
+    let result = if args.with_mock_consensus {
         log::info!("Using MockConsensus");
         Cli::<WithMockConsensus>::new(args).exec().await
     } else {
         Cli::<FinalTypes>::new(args).exec().await
+    };
+
+    if let Err(err) = result {
+        eprintln!("Command Failed.");
+        eprintln!("Error: {err}");
+        exit(-1);
     }
 }
