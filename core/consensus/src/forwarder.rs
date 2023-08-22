@@ -140,25 +140,11 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
         while self.active_connections.len() < self.min_connections {
             // Only try to make a connection with this worker if we dont already have one
             if let Entry::Vacant(e) = self.active_connections.entry(self.cursor) {
-                let mempool = &self.committee[self.cursor].workers[0].mempool;
-                let address = mempool
-                    .iter()
-                    .find_map(|proto| match proto {
-                        multiaddr::Protocol::Ip4(ip) => Some(ip.to_string()),
-                        multiaddr::Protocol::Ip6(ip) => Some(ip.to_string()),
-                        _ => None,
-                    })
-                    .unwrap_or("".to_string());
+                let mempool_port = &self.committee[self.cursor].ports.mempool;
+                let address = &self.committee[self.cursor].worker_domain;
 
-                let port = mempool
-                    .iter()
-                    .find_map(|proto| match proto {
-                        multiaddr::Protocol::Tcp(port) => Some(port),
-                        _ => None,
-                    })
-                    .unwrap_or(1);
                 if let Ok(client) =
-                    TransactionsClient::connect(format!("http://{address}:{port}")).await
+                    TransactionsClient::connect(format!("http://{address}:{mempool_port}")).await
                 {
                     e.insert(client);
                 }

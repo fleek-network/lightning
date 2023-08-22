@@ -169,7 +169,11 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             // TODO(dalton) This check should be done at application before adding it to state. So
             // it should never not be Ok so even an unwrap should be safe here
             if let (Ok(address), Ok(consensus_key), Ok(public_key)) = (
-                Multiaddr::try_from(node.domain.to_string()),
+                Multiaddr::try_from(format!(
+                    "{}:{}",
+                    node.domain.to_string(),
+                    node.ports.primary
+                )),
                 PublicKey::from_bytes(&node.consensus_key.0),
                 NetworkPublicKey::from_bytes(&node.public_key.0),
             ) {
@@ -184,30 +188,29 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             workers: committee
                 .iter()
                 .filter_map(|node| {
-                    if let Ok(public_key) = PublicKey::from_bytes(&node.consensus_key.0) {
-                        let mut worker_index = BTreeMap::new();
-                        node.workers
-                            .iter()
-                            .filter_map(|worker| {
-                                if let (Ok(name), Ok(address), Ok(mempool)) = (
-                                    NetworkPublicKey::from_bytes(&worker.public_key.0),
-                                    Multiaddr::try_from(worker.address.to_string()),
-                                    Multiaddr::try_from(worker.mempool.to_string()),
-                                ) {
-                                    Some(WorkerInfo {
-                                        name,
-                                        transactions: mempool,
-                                        worker_address: address,
-                                    })
-                                } else {
-                                    None
-                                }
-                            })
-                            .enumerate()
-                            .for_each(|(index, worker)| {
-                                worker_index.insert(index as u32, worker);
-                            });
-                        Some((public_key, WorkerIndex(worker_index)))
+                    let mut worker_index = BTreeMap::new();
+
+                    if let (Ok(node_key), Ok(key), Ok(address), Ok(mempool)) = (
+                        PublicKey::from_bytes(&node.consensus_key.0),
+                        NetworkPublicKey::from_bytes(&node.worker_public_key.0),
+                        Multiaddr::try_from(format!(
+                            "{}:{}",
+                            node.worker_domain, node.ports.worker
+                        )),
+                        Multiaddr::try_from(format!(
+                            "{}:{}",
+                            node.worker_domain, node.ports.mempool
+                        )),
+                    ) {
+                        worker_index.insert(
+                            0 as u32,
+                            WorkerInfo {
+                                name: key,
+                                transactions: mempool,
+                                worker_address: address,
+                            },
+                        );
+                        Some((node_key, WorkerIndex(worker_index)))
                     } else {
                         None
                     }
