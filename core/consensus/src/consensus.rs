@@ -168,7 +168,6 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         for node in &committee {
             // TODO(dalton) This check should be done at application before adding it to state. So
             // it should never not be Ok so even an unwrap should be safe here
-            println!("THE NODE: {node:?}");
             if let (Ok(address), Ok(consensus_key), Ok(public_key)) = (
                 Multiaddr::try_from(format!(
                     "/ip4/{}/udp/{}",
@@ -180,8 +179,6 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             ) {
                 committee_builder =
                     committee_builder.add_authority(consensus_key, 1, address, public_key);
-            } else {
-                println!("WE FAILED");
             }
         }
         let narwhal_committee = committee_builder.build();

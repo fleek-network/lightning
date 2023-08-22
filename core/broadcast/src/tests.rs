@@ -48,10 +48,7 @@ async fn pubsub_send_recv() -> Result<()> {
 
     let signer_config_a = lightning_signer::Config::test();
     let (consensus_key_a, node_key_a) = signer_config_a.load_test_keys();
-    // let (consensus_key_a, node_key_a) = (
-    //     consensus_key_a.to_pk().to_base64(),
-    //     node_key_a.to_pk().to_base64(),
-    // );
+
     let signer_config_b = lightning_signer::Config::test2();
     let (consensus_key_b, node_key_b) = signer_config_b.load_test_keys();
 
