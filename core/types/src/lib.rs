@@ -13,6 +13,7 @@ mod reputation;
 mod response;
 mod state;
 mod transaction;
+pub mod metrics;
 
 pub use application::*;
 pub use bridge::*;
@@ -27,6 +28,7 @@ pub use reputation::*;
 pub use response::*;
 pub use state::*;
 pub use transaction::*;
+pub use metrics::*;
 
 /// The physical address of a node where it can be reached, the port numbers are
 /// omitted since each node is responsible to open the standard port numbers for

@@ -1,9 +1,11 @@
 use std::fs;
 use std::sync::Arc;
 
-use axum::{Extension, Json};
+use autometrics::autometrics;
+use axum::{http, Extension, Json};
 use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
+use http::StatusCode;
 use jsonrpc_v2::{Data, Error, MapRouter, Params, RequestObject, ResponseObjects, Server};
 #[cfg(feature = "e2e-test")]
 use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
@@ -31,6 +33,14 @@ pub async fn rpc_handler(
 ) -> Json<ResponseObjects> {
     let res = rpc.0.handle(req).await;
     Json(res)
+}
+
+/// Export metrics for Prometheus to scrape
+pub async fn get_metrics() -> (StatusCode, String) {
+    match autometrics::prometheus_exporter::encode_to_string() {
+        Ok(metrics) => (StatusCode::OK, metrics),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{err:?}")),
+    }
 }
 
 #[derive(Clone)]
@@ -100,6 +110,8 @@ pub async fn discovery_handler<Q: SyncQueryRunnerInterface>() -> Result<String> 
         Err(e) => Err(Error::internal(e)),
     }
 }
+
+#[autometrics]
 pub async fn ping_handler<Q: SyncQueryRunnerInterface>() -> Result<String> {
     Ok("pong".to_string())
 }

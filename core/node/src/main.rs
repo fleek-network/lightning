@@ -6,6 +6,8 @@ pub mod shutdown;
 use std::fs::File;
 use std::process::exit;
 
+use anyhow::Result;
+use autometrics::{self, settings::AutometricsSettingsBuilder};
 use chrono::Local;
 use clap::Parser;
 use cli::Cli;
@@ -18,6 +20,7 @@ use simplelog::{
     TerminalMode,
     WriteLogger,
 };
+use lightning_types::metrics::METRICS_SERVICE_NAME;
 
 use crate::cli::CliArgs;
 use crate::node::{FinalTypes, WithMockConsensus};
@@ -33,6 +36,10 @@ async fn main() {
         2 => LevelFilter::Debug,
         _3_or_more => LevelFilter::Trace,
     };
+    // init metrics exporter
+    AutometricsSettingsBuilder::default()
+        .service_name(METRICS_SERVICE_NAME)
+        .init();
 
     // Add ignore for process subdag because Narwhal prints it as an err everytime it successfully
     // processes a new sub_dag

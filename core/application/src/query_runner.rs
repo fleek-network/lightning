@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use atomo::{Atomo, QueryPerm, ResolvedTableReference};
+use autometrics::autometrics;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::application::SyncQueryRunnerInterface;
@@ -213,7 +214,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn get_epoch_randomness_seed(&self) -> &[u8; 32] {
         todo!()
     }
-
+    #[autometrics]
     fn get_committee_members(&self) -> Vec<NodePublicKey> {
         self.inner.run(|ctx| {
             // get current epoch first

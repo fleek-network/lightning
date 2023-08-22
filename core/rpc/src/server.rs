@@ -22,7 +22,7 @@ use tokio::sync::Notify;
 use tokio::task;
 
 use super::config::Config;
-use crate::handlers::{rpc_handler, RpcServer};
+use crate::handlers::{get_metrics, rpc_handler, RpcServer};
 
 pub struct Rpc<C: Collection> {
     /// Data available to the rpc handler during a request
@@ -59,6 +59,7 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
 
         let app = Router::new()
             .route("/health", get(|| async { "OK" }))
+            .route("/metrics", get(get_metrics))
             .route("/rpc/v0", post(rpc_handler))
             .layer(Extension(server));
 

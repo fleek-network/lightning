@@ -16,6 +16,8 @@ serde_json.workspace = true
 bincode.workspace = true
 tokio.workspace = true
 infusion.workspace = true
+autometrics.workspace = true
+metrics.workspace = true
 
 affair.workspace = true
 fleek-crypto.workspace = true

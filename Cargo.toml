@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["core/*", "lib/*", "services/*"]
+members = ["core/*", "lib/*", "services/*", "metrics/"]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,6 +9,7 @@ edition = "2021"
 [workspace.dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
+autometrics = { version = "0.6.0", features =["prometheus-exporter"] }
 axum = "0.6.18"
 bincode = "1.3.3"
 cid = "0.10.1"
@@ -38,6 +39,7 @@ num-derive = "0.3.3"
 dirs = "5.0.1"
 log = "0.4"
 lazy_static = "1.4.0"
+metrics = "0.21.1"
 
 # Our libraries
 lightning-types = { path = "core/types" }
