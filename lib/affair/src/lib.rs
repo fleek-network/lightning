@@ -35,7 +35,7 @@ use crossbeam::sync::ShardedLock;
 use futures::Future;
 use tokio::sync::{mpsc, oneshot};
 
-pub type Observer<Res> = fn(&Res);
+pub type Observer<Res> = Box<dyn Fn(&Res) + Send + Sync>;
 type Observers<Res> = ShardedLock<Vec<Observer<Res>>>;
 
 /// A non-awaiting worker that processes requests and returns a response.
@@ -348,9 +348,12 @@ impl<Req, Res> Socket<Req, Res> {
     }
 
     /// Inject an observer that can view the responses and on them.
-    pub fn inject(&self, observer: Observer<Res>) {
+    pub fn inject<F>(&self, observer: F)
+    where
+        F: Fn(&Res) + Send + Sync + 'static,
+    {
         let mut guard = self.observers.write().expect("Unexpected posioned lock.");
-        guard.push(observer);
+        guard.push(Box::new(observer));
     }
 }
 

@@ -158,7 +158,7 @@ async fn test_query() {
     signer.start().await;
     consensus.start().await;
 
-    let notifier = Notifier::<TestBinding>::init(query_runner.clone());
+    let notifier = Notifier::<TestBinding>::init(&app);
     let config = Config {
         reporter_buffer_size: 1,
     };
@@ -305,7 +305,7 @@ async fn test_submit_measurements() {
     signer.start().await;
     consensus.start().await;
 
-    let notifier = Notifier::<TestBinding>::init(query_runner.clone());
+    let notifier = Notifier::<TestBinding>::init(&app);
     let config = Config {
         reporter_buffer_size: 1,
     };
@@ -495,9 +495,9 @@ async fn test_reputation_calculation_and_query() {
 
     consensus2.start().await;
 
-    let notifier1 = Notifier::<TestBinding>::init(query_runner.clone());
+    let notifier1 = Notifier::<TestBinding>::init(&app);
 
-    let notifier2 = Notifier::<TestBinding>::init(query_runner.clone());
+    let notifier2 = Notifier::<TestBinding>::init(&app);
     let config = Config {
         reporter_buffer_size: 1,
     };

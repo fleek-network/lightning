@@ -140,7 +140,7 @@ async fn pubsub_send_recv() -> Result<()> {
     pool_a.with_transport(global_transport.clone());
     pool_a.start().await;
     let listener_connector = pool_a.bind::<BroadcastFrame>(ServiceScope::Broadcast);
-    let notifier = Notifier::<TestBinding>::init(query_runner.clone());
+    let notifier = Notifier::<TestBinding>::init(&application);
     let broadcast_a = Broadcast::<TestBinding>::init(
         config::Config::default(),
         listener_connector,
@@ -155,7 +155,7 @@ async fn pubsub_send_recv() -> Result<()> {
     pool_b.with_transport(global_transport.clone());
     pool_b.start().await;
     let listener_connector = pool_b.bind::<BroadcastFrame>(ServiceScope::Broadcast);
-    let notifier = Notifier::init(query_runner.clone());
+    let notifier = Notifier::init(&application);
     let broadcast_b = Broadcast::<TestBinding>::init(
         config::Config::default(),
         listener_connector,

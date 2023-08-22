@@ -15,10 +15,10 @@ pub enum Notification {
 #[infusion::service]
 pub trait NotifierInterface<C: Collection>: Sync + Send + Clone {
     fn _init(app: ::ApplicationInterface) {
-        ok!(Self::init(app.sync_query()))
+        ok!(Self::init(app))
     }
 
-    fn init(query_runner: c!(C::ApplicationInterface::SyncExecutor)) -> Self;
+    fn init(app: &c!(C::ApplicationInterface)) -> Self;
 
     fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>);
 
