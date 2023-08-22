@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::net::IpAddr;
 
 use anyhow::{Context, Result};
 use fleek_crypto::{ConsensusPublicKey, EthAddress, NodePublicKey};
@@ -59,14 +60,14 @@ pub struct GenesisNode {
     owner: EthAddress,
     pub primary_public_key: NodePublicKey,
     consensus_public_key: ConsensusPublicKey,
-    primary_domain: String,
-    worker_domain: String,
+    primary_domain: IpAddr,
+    worker_domain: IpAddr,
     worker_public_key: NodePublicKey,
     ports: NodePorts,
     stake: Staking,
-    reputation: Option<u8>,
-    current_epoch_served: Option<NodeServed>,
-    genesis_committee: bool,
+    pub reputation: Option<u8>,
+    pub current_epoch_served: Option<NodeServed>,
+    pub genesis_committee: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -77,8 +78,8 @@ pub struct GenesisPrices {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenesisLatency {
-    pub node_public_key_lhs: String,
-    pub node_public_key_rhs: String,
+    pub node_public_key_lhs: NodePublicKey,
+    pub node_public_key_rhs: NodePublicKey,
     pub latency_in_microseconds: u64,
 }
 
@@ -101,8 +102,8 @@ impl From<&GenesisNode> for NodeInfo {
             owner: value.owner,
             public_key: value.primary_public_key,
             consensus_key: value.consensus_public_key,
-            domain: value.primary_domain.clone(),
-            worker_domain: value.worker_domain.clone(),
+            domain: value.primary_domain,
+            worker_domain: value.worker_domain,
             worker_public_key: value.worker_public_key,
             staked_since: 0,
             stake: value.stake.clone(),
@@ -126,6 +127,35 @@ impl From<NodeInfo> for GenesisNode {
             reputation: None,
             current_epoch_served: None,
             genesis_committee: false,
+        }
+    }
+}
+
+impl GenesisNode {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        owner: EthAddress,
+        primary_public_key: NodePublicKey,
+        primary_domain: IpAddr,
+        consensus_public_key: ConsensusPublicKey,
+        worker_domain: IpAddr,
+        worker_public_key: NodePublicKey,
+        ports: NodePorts,
+        stake: Option<Staking>,
+        is_committee: bool,
+    ) -> Self {
+        Self {
+            owner,
+            primary_public_key,
+            primary_domain,
+            consensus_public_key,
+            worker_domain,
+            worker_public_key,
+            ports,
+            stake: stake.unwrap_or_default(),
+            reputation: None,
+            current_epoch_served: None,
+            genesis_committee: is_committee,
         }
     }
 }

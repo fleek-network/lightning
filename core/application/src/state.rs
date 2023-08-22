@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
+use std::net::IpAddr;
 use std::time::Duration;
 
 use fleek_blake3::Hasher;
@@ -23,6 +24,7 @@ use lightning_interfaces::types::{
     Metadata,
     NodeIndex,
     NodeInfo,
+    NodePorts,
     NodeServed,
     ProofOfConsensus,
     ProofOfMisbehavior,
@@ -39,12 +41,10 @@ use lightning_interfaces::types::{
     UpdateMethod,
     UpdateRequest,
     Value,
-    Worker,
 };
 use lightning_interfaces::ToDigest;
 use lightning_reputation::statistics;
 use lightning_reputation::types::WeightedReputationMeasurements;
-use multiaddr::Multiaddr;
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
@@ -154,7 +154,7 @@ impl<B: Backend> State<B> {
                 node_domain,
                 worker_public_key,
                 worker_domain,
-                worker_mempool_address,
+                ports,
             } => self.stake(
                 txn.sender,
                 amount,
@@ -163,7 +163,7 @@ impl<B: Backend> State<B> {
                 node_domain,
                 worker_public_key,
                 worker_domain,
-                worker_mempool_address,
+                ports,
             ),
             UpdateMethod::StakeLock { node, locked_for } => {
                 self.stake_lock(txn.sender, node, locked_for)
@@ -340,10 +340,10 @@ impl<B: Backend> State<B> {
         amount: HpUfixed<18>,
         node_public_key: NodePublicKey,
         node_consensus_key: Option<ConsensusPublicKey>,
-        node_domain: Option<String>,
+        node_domain: Option<IpAddr>,
         worker_public_key: Option<NodePublicKey>,
-        worker_domain: Option<String>,
-        worker_mempool_address: Option<String>,
+        worker_domain: Option<IpAddr>,
+        ports: Option<NodePorts>,
     ) -> TransactionResponse {
         // This transaction is only callable by AccountOwners and not nodes
         // So revert if the sender is a node public key
@@ -363,39 +363,6 @@ impl<B: Backend> State<B> {
         if owner.flk_balance < amount {
             return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
         }
-
-        let node_domain = match node_domain {
-            Some(address) => {
-                let address = address.parse::<Multiaddr>();
-                if address.is_err() {
-                    return TransactionResponse::Revert(ExecutionError::InvalidInternetAddress);
-                }
-                Some(address.unwrap())
-            },
-            None => None,
-        };
-
-        let worker_domain = match worker_domain {
-            Some(address) => {
-                let address = address.parse::<Multiaddr>();
-                if address.is_err() {
-                    return TransactionResponse::Revert(ExecutionError::InvalidInternetAddress);
-                }
-                Some(address.unwrap())
-            },
-            None => None,
-        };
-
-        let worker_mempool_address = match worker_mempool_address {
-            Some(address) => {
-                let address = address.parse::<Multiaddr>();
-                if address.is_err() {
-                    return TransactionResponse::Revert(ExecutionError::InvalidInternetAddress);
-                }
-                Some(address.unwrap())
-            },
-            None => None,
-        };
 
         let node_index = self.pub_key_to_index.get(&node_public_key);
         // Make sure the networking index and bls are the same
@@ -420,13 +387,13 @@ impl<B: Backend> State<B> {
                     node.domain = primary_domain;
                 }
                 if let Some(worker_key) = worker_public_key {
-                    node.workers[0].public_key = worker_key;
+                    node.worker_public_key = worker_key;
                 }
                 if let Some(worker_domain) = worker_domain {
-                    node.workers[0].address = worker_domain
+                    node.worker_domain = worker_domain;
                 }
-                if let Some(mempool_address) = worker_mempool_address {
-                    node.workers[0].mempool = mempool_address
+                if let Some(port) = ports {
+                    node.ports = port;
                 }
 
                 // Increase the nodes stake by the amount being staked
@@ -438,33 +405,30 @@ impl<B: Backend> State<B> {
                 // options for a new node
                 if let (
                     Some(consensus_key),
-                    Some(primary_domain),
-                    Some(worker_key),
+                    Some(domain),
+                    Some(worker_public_key),
                     Some(worker_domain),
-                    Some(mempool_domain),
+                    Some(ports),
                 ) = (
                     node_consensus_key,
                     node_domain,
                     worker_public_key,
                     worker_domain,
-                    worker_mempool_address,
+                    ports,
                 ) {
                     let node = NodeInfo {
                         owner: sender,
                         public_key: node_public_key,
                         consensus_key,
+                        worker_public_key,
                         staked_since: current_epoch,
                         stake: Staking {
                             staked: amount.clone(),
                             ..Default::default()
                         },
-                        domain: primary_domain,
-                        workers: [Worker {
-                            public_key: worker_key,
-                            address: worker_domain,
-                            mempool: mempool_domain,
-                        }]
-                        .into(),
+                        domain,
+                        worker_domain,
+                        ports,
                         nonce: 0,
                     };
                     self.create_node(node);

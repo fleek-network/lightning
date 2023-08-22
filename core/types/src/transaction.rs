@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::net::IpAddr;
 
 use fleek_crypto::{
     ConsensusPublicKey,
@@ -23,7 +24,7 @@ use super::{
     ServiceId,
     Tokens,
 };
-use crate::NodeIndex;
+use crate::{NodeIndex, NodePorts};
 
 // TODO: Change this to capital and non-abrv version.
 const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";
@@ -102,13 +103,13 @@ pub enum UpdateMethod {
         /// Consensus Public Key
         consensus_key: Option<ConsensusPublicKey>,
         /// Nodes primary internet address
-        node_domain: Option<String>,
+        node_domain: Option<IpAddr>,
         /// Worker public Key
         worker_public_key: Option<NodePublicKey>,
         /// internet address for the worker
-        worker_domain: Option<String>,
+        worker_domain: Option<IpAddr>,
         /// internet address for workers mempool
-        worker_mempool_address: Option<String>,
+        ports: Option<NodePorts>,
     },
     /// Lock the current stakes to get boosted inflation rewards
     /// this is different than unstake and withdrawl lock
@@ -225,7 +226,7 @@ impl ToDigest for UpdatePayload {
                 node_domain,
                 worker_public_key,
                 worker_domain,
-                worker_mempool_address,
+                ports,
             } => {
                 transcript_builder = transcript_builder
                     .with("transaction_name", &"stake")
@@ -236,13 +237,18 @@ impl ToDigest for UpdatePayload {
                         "node_network_key",
                         &consensus_key.map_or([0u8; 96], |key| key.0),
                     )
-                    .with("node_domain", node_domain)
+                    .with("node_domain", &node_domain.map(|d| d.to_string()))
                     .with(
                         "worker_public_key",
                         &worker_public_key.map_or([0u8; 32], |key| key.0),
                     )
-                    .with("worker_domain", worker_domain)
-                    .with("worker_mempool_address", worker_mempool_address);
+                    .with("worker_domain", &worker_domain.map(|d| d.to_string()))
+                    .with("primary_port", &ports.as_ref().map(|p| p.primary))
+                    .with("worker_port", &ports.as_ref().map(|p| p.worker))
+                    .with("mempool_port", &ports.as_ref().map(|p| p.mempool))
+                    .with("rpc_port", &ports.as_ref().map(|p| p.rpc))
+                    .with("pool_port", &ports.as_ref().map(|p| p.pool))
+                    .with("dht_port", &ports.as_ref().map(|p| p.dht))
             },
             UpdateMethod::StakeLock { node, locked_for } => {
                 transcript_builder = transcript_builder

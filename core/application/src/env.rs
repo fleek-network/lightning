@@ -3,12 +3,10 @@ use std::time::{Duration, SystemTime};
 use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use fleek_crypto::{
-    AccountOwnerPublicKey,
     ClientPublicKey,
     ConsensusPublicKey,
     EthAddress,
     NodePublicKey,
-    PublicKey,
 };
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
@@ -96,14 +94,14 @@ impl Env<UpdatePerm> {
                 node_registry_delta: Vec::new(),
                 txn_receipts: Vec::with_capacity(block.transactions.len()),
             };
-
+          
             // Execute each transaction and add the results to the block response
             for txn in &block.transactions {
                 let receipt = match app.verify_transaction(txn) {
                     Ok(_) => app.execute_txn(txn.clone()),
                     Err(err) => TransactionResponse::Revert(err),
                 };
-
+              
                 // If the transaction moved the epoch forward, aknowledge that in the block response
                 if let TransactionResponse::Success(ExecutionData::EpochChange) = receipt {
                     response.change_epoch = true;
@@ -168,25 +166,20 @@ impl Env<UpdatePerm> {
             let mut consensus_key_to_index_table = ctx.get_table::<ConsensusPublicKey, NodeIndex>("consensus_key_to_index");
             let mut pub_key_to_index_table = ctx.get_table::<NodePublicKey, NodeIndex>("pub_key_to_index");
 
-            let protocol_fund_address =
-                AccountOwnerPublicKey::from_base64(&genesis.protocol_fund_address).unwrap();
             metadata_table.insert(
                 Metadata::ProtocolFundAddress,
-                Value::AccountPublicKey(protocol_fund_address.into()),
+                Value::AccountPublicKey(genesis.protocol_fund_address),
             );
 
-            let governance_address = AccountOwnerPublicKey::from_base64(&genesis.governance_address)
-                .expect("Invalid governance address in genesis, must be a Secp256k1 public key.");
-            let governance_address: EthAddress = governance_address.into();
             metadata_table.insert(Metadata::GovernanceAddress,
-                Value::AccountPublicKey(governance_address));
+                Value::AccountPublicKey(genesis.governance_address));
             let governance_account = AccountInfo {
                 flk_balance: 0u64.into(),
                 stables_balance: 0u64.into(),
                 bandwidth_balance: 0u64.into(),
                 nonce: 0,
             };
-            account_table.insert(governance_address,  governance_account);
+            account_table.insert(genesis.governance_address,  governance_account);
 
             let supply_at_genesis: HpUfixed<18> = HpUfixed::from(genesis.supply_at_genesis);
             metadata_table.insert(
@@ -222,26 +215,41 @@ impl Env<UpdatePerm> {
             );
 
             let epoch_end: u64 = genesis.epoch_time + genesis.epoch_start;
-            let mut committee_members = Vec::with_capacity(genesis.committee.len());
+           let mut committee_members = Vec::with_capacity(4);
 
-            for node in &genesis.committee {
-                let mut node_info: NodeInfo = node.into();
-                node_info.stake.staked = HpUfixed::<18>::from(genesis.min_stake);
-
-                let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
-                    Some(Value::NextNodeIndex(index)) => index,
-                    _ => 0,
-                };
-                committee_members.push(node_index);
-
-                consensus_key_to_index_table.insert(node_info.consensus_key, node_index);
-                pub_key_to_index_table.insert(node_info.public_key, node_index);
-                node_table.insert(node_index, node_info);
-                metadata_table.insert(
-                    Metadata::NextNodeIndex,
-                    Value::NextNodeIndex(node_index + 1),
-                );
+           // add node info
+           for node in genesis.node_info {
+            let mut node_info = NodeInfo::from(&node);
+            node_info.stake.staked = genesis.min_stake.into();
+            let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
+                Some(Value::NextNodeIndex(index)) => index,
+                _ => 0,
+            };
+            consensus_key_to_index_table.insert(node_info.consensus_key, node_index);
+            pub_key_to_index_table.insert(node_info.public_key, node_index);
+            node_table.insert(node_index, node_info);
+            metadata_table.insert(
+                Metadata::NextNodeIndex,
+                Value::NextNodeIndex(node_index + 1),
+            );
+            // add genesis current epoch served if there
+            if let Some(served) = node.current_epoch_served {
+                current_epoch_served_table.insert(node_index, served);
             }
+            // add genesis reputation if there
+            if let Some(rep) = node.reputation {
+                assert!(
+                    (0..=100).contains(&rep),
+                    "Reputation scores must be in range [0, 100]."
+                );
+                rep_scores_table.insert(node_index, rep);
+            }
+            // if there a committee member push them to the committee vec and set after loop
+            if node.genesis_committee{
+                committee_members.push(node_index);
+            }
+            
+        }
             committee_table.insert(
                 0,
                 Committee {
@@ -252,11 +260,10 @@ impl Env<UpdatePerm> {
             );
 
             for service in &genesis.service {
-                let owner_public_key = AccountOwnerPublicKey::from_base64(&service.owner).unwrap();
                 service_table.insert(
                     service.id,
                     Service {
-                        owner: owner_public_key.into(),
+                        owner: service.owner,
                         commodity_type: service.commodity_type,
                         slashing: (),
                     },
@@ -264,14 +271,13 @@ impl Env<UpdatePerm> {
             }
 
             for account in genesis.account {
-                let public_key = AccountOwnerPublicKey::from_base64(&account.public_key).unwrap();
                 let info = AccountInfo {
                     flk_balance: account.flk_balance.into(),
                     stables_balance: account.stables_balance.into(),
                     bandwidth_balance: account.bandwidth_balance.into(),
                     nonce: 0,
                 };
-                account_table.insert(EthAddress::from(public_key), info);
+                account_table.insert(account.public_key, info);
             }
 
             // add commodity prices
@@ -281,59 +287,20 @@ impl Env<UpdatePerm> {
                 commodity_prices_table.insert(commodity, big_price);
             }
 
-            // add reputation scores
-            for (node_public_key_b64, rep_score) in genesis.rep_scores {
-                // Todo(dalton): We should rework this to use NodeIndex instead of nodePublic key
-                let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
-                    .expect("Failed to parse node public key from genesis.");
-                assert!(
-                    (0..=100).contains(&rep_score),
-                    "Reputation scores must be in range [0, 100]."
-                );
-                let index = pub_key_to_index_table.get(node_public_key).unwrap();
-                rep_scores_table.insert(index, rep_score);
-            }
-
-            // add node info
-            for (_, node_info) in genesis.node_info {
-                let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
-                    Some(Value::NextNodeIndex(index)) => index,
-                    _ => 0,
-                };
-                consensus_key_to_index_table.insert(node_info.consensus_key, node_index);
-                pub_key_to_index_table.insert(node_info.public_key, node_index);
-                node_table.insert(node_index, node_info);
-                metadata_table.insert(
-                    Metadata::NextNodeIndex,
-                    Value::NextNodeIndex(node_index + 1),
-                );
-            }
-
             // add total served
             for (epoch, total_served) in genesis.total_served {
                 total_served_table.insert(epoch, total_served);
             }
 
-            // add current epoch served
-            for (node_public_key_b64, commodity_served) in genesis.current_epoch_served {
-                let node_public_key = NodePublicKey::from_base64(&node_public_key_b64)
-                    .expect("Failed to parse node public key from genesis.");
-                let index = pub_key_to_index_table.get(node_public_key).expect("Node added to genesis epoch served without node info");
-                current_epoch_served_table.insert(index, commodity_served);
-            }
 
             // add latencies
             if let Some(latencies) = genesis.latencies {
                 for lat in latencies {
-                    let node_public_key_lhs = NodePublicKey::from_base64(&lat.node_public_key_lhs)
-                        .expect("Failed to parse node public key from genesis.");
-                    let node_public_key_rhs = NodePublicKey::from_base64(&lat.node_public_key_rhs)
-                        .expect("Failed to parse node public key from genesis.");
-                    assert!(node_public_key_lhs < node_public_key_rhs,
+                    assert!(lat.node_public_key_lhs < lat.node_public_key_rhs,
                         "Invalid latency entry, node_public_key_lhs must be smaller than node_public_key_rhs");
-                    let index_lhs = pub_key_to_index_table.get(node_public_key_lhs)
+                    let index_lhs = pub_key_to_index_table.get(lat.node_public_key_lhs)
                         .expect("Invalid latency entry, node doesn't have an index.");
-                    let index_rhs = pub_key_to_index_table.get(node_public_key_rhs)
+                    let index_rhs = pub_key_to_index_table.get(lat.node_public_key_rhs)
                         .expect("Invalid latency entry, node doesn't have an index.");
                     latencies_table.insert(
                         (index_lhs, index_rhs),

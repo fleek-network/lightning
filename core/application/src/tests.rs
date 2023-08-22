@@ -10,7 +10,6 @@ use fleek_crypto::{
     ConsensusSecretKey,
     NodePublicKey,
     NodeSecretKey,
-    PublicKey,
     SecretKey,
 };
 use hp_fixed::unsigned::HpUfixed;
@@ -22,7 +21,7 @@ use lightning_interfaces::types::{
     DeliveryAcknowledgment,
     Epoch,
     ExecutionError,
-    NodeInfo,
+    NodePorts,
     ProofOfConsensus,
     ProtocolParams,
     Tokens,
@@ -38,7 +37,7 @@ use tokio::test;
 
 use crate::app::Application;
 use crate::config::{Config, Mode};
-use crate::genesis::{Genesis, GenesisCommittee};
+use crate::genesis::{Genesis, GenesisNode};
 use crate::query_runner::QueryRunner;
 
 partial!(TestBinding {
@@ -63,9 +62,7 @@ struct GenesisCommitteeKeystore {
     _worker_secret_key: NodeSecretKey,
 }
 
-fn get_genesis_committee(
-    num_members: usize,
-) -> (Vec<GenesisCommittee>, Vec<GenesisCommitteeKeystore>) {
+fn get_genesis_committee(num_members: usize) -> (Vec<GenesisNode>, Vec<GenesisCommitteeKeystore>) {
     let mut keystore = Vec::new();
     let mut committee = Vec::new();
     (0..num_members).for_each(|i| {
@@ -85,7 +82,7 @@ fn get_genesis_committee(
 }
 
 fn add_to_committee(
-    committee: &mut Vec<GenesisCommittee>,
+    committee: &mut Vec<GenesisNode>,
     keystore: &mut Vec<GenesisCommitteeKeystore>,
     node_secret_key: NodeSecretKey,
     consensus_secret_key: ConsensusSecretKey,
@@ -95,15 +92,23 @@ fn add_to_committee(
     let node_public_key = node_secret_key.to_pk();
     let consensus_public_key = consensus_secret_key.to_pk();
     let owner_public_key = owner_secret_key.to_pk();
-    committee.push(GenesisCommittee::new(
-        owner_public_key.to_base64(),
-        node_public_key.to_base64(),
-        format!("/ip4/127.0.0.1/udp/800{index}"),
-        consensus_public_key.to_base64(),
-        format!("/ip4/127.0.0.1/udp/810{index}/http"),
-        node_public_key.to_base64(),
-        format!("/ip4/127.0.0.1/tcp/810{index}/http"),
+    committee.push(GenesisNode::new(
+        owner_public_key.into(),
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 8000 + index as u16,
+            worker: 9000 + index as u16,
+            mempool: 7000 + index as u16,
+            rpc: 6000 + index as u16,
+            pool: 5000 + index as u16,
+            dht: 4000 + index as u16,
+        },
         None,
+        true,
     ));
     keystore.push(GenesisCommitteeKeystore {
         _owner_secret_key: owner_secret_key,
@@ -115,9 +120,9 @@ fn add_to_committee(
 
 fn get_new_committee(
     query_runner: &QueryRunner,
-    committee: &[GenesisCommittee],
+    committee: &[GenesisNode],
     keystore: &[GenesisCommitteeKeystore],
-) -> (Vec<GenesisCommittee>, Vec<GenesisCommitteeKeystore>) {
+) -> (Vec<GenesisNode>, Vec<GenesisCommitteeKeystore>) {
     let mut new_committee = Vec::new();
     let mut new_keystore = Vec::new();
     let committee_members = query_runner.get_committee_members();
@@ -126,7 +131,7 @@ fn get_new_committee(
             .iter()
             .enumerate()
             .find_map(|(index, c)| {
-                if c.primary_public_key == node.to_base64() {
+                if c.primary_public_key == node {
                     Some(index)
                 } else {
                     None
@@ -150,12 +155,12 @@ fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
 
 fn init_app_with_params(
     params: Params,
-    committee: Option<Vec<GenesisCommittee>>,
+    committee: Option<Vec<GenesisNode>>,
 ) -> (ExecutionEngineSocket, QueryRunner) {
     let mut genesis = Genesis::load().expect("Failed to load genesis from file.");
 
     if let Some(committee) = committee {
-        genesis.committee = committee;
+        genesis.node_info = committee;
     }
 
     genesis.epoch_start = SystemTime::now()
@@ -259,13 +264,10 @@ fn get_update_request_account(
     }
 }
 
-fn get_genesis() -> (Genesis, Vec<NodeInfo>) {
+fn get_genesis() -> (Genesis, Vec<GenesisNode>) {
     let genesis = Genesis::load().unwrap();
 
-    (
-        genesis.clone(),
-        genesis.committee.iter().map(|node| node.into()).collect(),
-    )
+    (genesis.clone(), genesis.node_info)
 }
 // Helper methods for tests
 // Passing the private key around like this should only be done for
@@ -350,10 +352,10 @@ async fn stake(
             amount,
             node_public_key,
             consensus_key: Some(consensus_key),
-            node_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
+            node_domain: Some("127.0.0.1".parse().unwrap()),
             worker_public_key: Some([0; 32].into()),
-            worker_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
-            worker_mempool_address: Some("/ip4/127.0.0.1/udp/38000".to_string()),
+            worker_domain: Some("127.0.0.1".parse().unwrap()),
+            ports: Some(NodePorts::default()),
         },
         secret_key,
         nonce,
@@ -377,7 +379,7 @@ async fn test_genesis() {
     // For every member of the genesis committee they should have an initial stake of the min stake
     // Query to make sure that holds true
     for node in genesis_committee {
-        let balance = query_runner.get_staked(&node.public_key);
+        let balance = query_runner.get_staked(&node.primary_public_key);
         assert_eq!(HpUfixed::<18>::from(genesis.min_stake), balance);
     }
 }
@@ -387,7 +389,7 @@ async fn test_epoch_change() {
     let (committee, keystore) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
     let committee_size = committee.len();
-    genesis.committee = committee;
+    genesis.node_info = committee;
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
@@ -473,7 +475,7 @@ async fn test_stake() {
             node_domain: None,
             worker_public_key: None,
             worker_domain: None,
-            worker_mempool_address: None,
+            ports: None,
         },
         &owner_secret_key,
         3,
@@ -491,14 +493,15 @@ async fn test_stake() {
             amount: 1_000_u64.into(),
             node_public_key: node_secret_key.to_pk(),
             consensus_key: Some([0; 96].into()),
-            node_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
+            node_domain: Some("127.0.0.1".parse().unwrap()),
             worker_public_key: Some([0; 32].into()),
-            worker_domain: Some("/ip4/127.0.0.1/udp/38000".to_string()),
-            worker_mempool_address: Some("/ip4/127.0.0.1/udp/38000".to_string()),
+            worker_domain: Some("127.0.0.1".parse().unwrap()),
+            ports: Some(NodePorts::default()),
         },
         &owner_secret_key,
         4,
     );
+
     if let TransactionResponse::Revert(error) = run_transaction(vec![update], &update_socket)
         .await
         .unwrap()
@@ -524,7 +527,7 @@ async fn test_stake() {
             node_domain: None,
             worker_public_key: None,
             worker_domain: None,
-            worker_mempool_address: None,
+            ports: None,
         },
         &owner_secret_key,
         5,
@@ -670,7 +673,7 @@ async fn test_stake_lock() {
 async fn test_pod_without_proof() {
     let (committee, keystore) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
-    genesis.committee = committee;
+    genesis.node_info = committee;
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
@@ -870,7 +873,7 @@ async fn test_distribute_rewards() {
 async fn test_submit_rep_measurements() {
     let (committee, keystore) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
-    genesis.committee = committee;
+    genesis.node_info = committee;
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
@@ -916,7 +919,7 @@ async fn test_rep_scores() {
     let (committee, keystore) = get_genesis_committee(4);
     let committee_len = committee.len();
     let mut genesis = Genesis::load().unwrap();
-    genesis.committee = committee;
+    genesis.node_info = committee;
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
@@ -1087,7 +1090,7 @@ async fn test_supply_across_epoch() {
 async fn test_validate_txn() {
     let (committee, keystore) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
-    genesis.committee = committee;
+    genesis.node_info = committee;
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
@@ -1186,7 +1189,7 @@ async fn test_is_valid_node() {
 async fn test_get_node_registry() {
     let (committee, keystore) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
-    genesis.committee = committee;
+    genesis.node_info = committee;
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
@@ -1288,7 +1291,7 @@ async fn test_change_protocol_params() {
     let governance_public_key = governance_secret_key.to_pk();
 
     let mut genesis = Genesis::load().unwrap();
-    genesis.governance_address = governance_public_key.to_base64();
+    genesis.governance_address = governance_public_key.into();
 
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),

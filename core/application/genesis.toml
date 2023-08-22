@@ -12,8 +12,8 @@ consumer_rebate = 0
 max_boost = 4
 max_lock_time = 1460                                                 # 1460 days(epoch) meaning 4 years
 supply_at_genesis = 1000000                                          # set to 1 million for testing, to be determined when initial allocations are set
-protocol_fund_address = "0x959807B8D94B324A74117956731F09E2893aCd72"
-governance_address = "0x959807B8D94B324A74117956731F09E2893aCd72"
+protocol_fund_address = "0x2D7cC25A9e1bAEc63a422F702628865092ce1eED"
+governance_address = "0x2aA4C90C2F9D8A699A0C87B573411Db0d34BE61B"
 
 [[node_info]]
 owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
@@ -93,12 +93,12 @@ genesis_committee = true
 
 [[service]]
 id = 0
-owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
+owner = "0xDC0A31F9eeb151f82BF1eE6831095284fC215Ee7"
 commodity_type = "Bandwidth"
 
 [[service]]
 id = 1
-owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
+owner = "0x684166BDbf530a256d7c92Fa0a4128669aFd9B9F"
 commodity_type = "Compute"
 
 

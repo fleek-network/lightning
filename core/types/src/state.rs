@@ -1,5 +1,7 @@
 //! The data types used in the application state.
 
+use std::net::IpAddr;
+
 use fleek_crypto::{ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use ink_quill::TranscriptBuilderInput;
@@ -119,13 +121,28 @@ pub struct NodeInfo {
     pub staked_since: Epoch,
     /// The amount of stake by the node.
     pub stake: Staking,
-    /// The nodes primary internet address
-    pub domain: Multiaddr,
-    /// A vec of all of this nodes Narwhal workers
-    pub workers: Vec<Worker>,
+    /// The nodes primary domain
+    pub domain: IpAddr,
+    /// The node workers domain
+    pub worker_domain: IpAddr,
+    /// Open ports for this node
+    pub ports: NodePorts,
+    /// The public key of the nodes narwhal worker
+    pub worker_public_key: NodePublicKey,
     /// The nonce of the node. Added to each transaction before signed to prevent replays and
     /// enforce ordering
     pub nonce: u64,
+}
+
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
+/// The ports a node has open for its proccesses
+pub struct NodePorts {
+    pub primary: u16,
+    pub worker: u16,
+    pub mempool: u16,
+    pub rpc: u16,
+    pub pool: u16,
+    pub dht: u16,
 }
 
 /// Struct that stores the information about the stake of amount of a node.
