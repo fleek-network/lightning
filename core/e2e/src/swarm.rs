@@ -144,11 +144,6 @@ impl SwarmBuilder {
         genesis.epoch_time = self.epoch_time.unwrap_or(genesis.epoch_time);
         genesis.committee_size = self.committee_size.unwrap_or(genesis.committee_size);
 
-        assert!(
-            genesis.committee_size >= num_nodes as u64,
-            "Committee size can not be smaller than number of nodes."
-        );
-
         // Make sure the test directory exists by recursively creating it.
         fs::create_dir_all(&directory).expect("Failed to create swarm directory");
 

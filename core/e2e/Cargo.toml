@@ -28,6 +28,7 @@ reqwest = { workspace = true, features = ["json"] }
 serde.workspace = true
 rand.workspace = true
 hp-fixed.workspace = true
+env_logger = "0.10.0"
 
 toml = "0.7"
 resolve-path = "0.1.0"

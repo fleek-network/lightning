@@ -3476,6 +3476,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap 4.3.17",
+ "env_logger 0.10.0",
  "fleek-crypto",
  "futures",
  "hp-fixed",

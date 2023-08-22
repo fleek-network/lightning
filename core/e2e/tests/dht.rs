@@ -69,8 +69,8 @@ async fn e2e_dht() -> Result<()> {
     let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/dht").unwrap();
     let swarm = Swarm::builder()
         .with_directory(path)
-        .with_min_port(11001)
-        .with_max_port(12000)
+        .with_min_port(10201)
+        .with_max_port(10300)
         .with_num_nodes(4)
         .with_epoch_start(epoch_start)
         .with_bootstrappers(vec![Bootstrapper {
