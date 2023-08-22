@@ -26,6 +26,7 @@ reqwest = "0.11.18"
 serde = { version = "1.0", features = ["derive"] }
 serde-big-array = "0.5.1"
 serde_json = "1.0.96"
+stdext = "0.3.1"
 thiserror = "1.0"
 tempdir = "0.3"
 parking_lot = "0.12.1"
@@ -39,7 +40,6 @@ num-derive = "0.3.3"
 dirs = "5.0.1"
 log = "0.4"
 lazy_static = "1.4.0"
-metrics = "0.21.1"
 
 # Our libraries
 lightning-types = { path = "core/types" }
@@ -51,6 +51,7 @@ blake3-tree = { path = "lib/blake3-tree" }
 ink-quill = { path = "lib/ink-quill" }
 resolved-pathbuf = { path = "lib/resolved-pathbuf" }
 infusion = { path = "lib/infusion" }
+metrics = { path = "metrics" }
 
 # Since MystenLabs uses Hakari in the sui repository, and we bring narwhal in from there, this
 # results into all of their dependencies and packages to be listed in their workspace-hack crate.

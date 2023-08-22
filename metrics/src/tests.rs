@@ -1,9 +1,9 @@
 #[cfg(test)]
 use autometrics::settings::AutometricsSettingsBuilder;
-use lightning_types::{metrics::METRICS_SERVICE_NAME, DEFAULT_HISTOGRAM_BUCKETS};
-use stdext::function_name;
+use lightning_types::metrics::METRICS_SERVICE_NAME;
+use lightning_types::DEFAULT_HISTOGRAM_BUCKETS;
 
-use crate::{counter::Counter, histogram, histogram::Histogram, increment_counter, labels::Labels};
+use crate::{histogram, increment_counter};
 
 fn init() {
     let _ = AutometricsSettingsBuilder::default()

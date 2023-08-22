@@ -6,7 +6,8 @@ pub mod shutdown;
 use std::fs::File;
 use std::process::exit;
 
-use autometrics::{self, settings::AutometricsSettingsBuilder};
+use autometrics::settings::AutometricsSettingsBuilder;
+use autometrics::{self};
 use chrono::Local;
 use clap::Parser;
 use cli::Cli;

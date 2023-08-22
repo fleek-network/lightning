@@ -1,7 +1,8 @@
 use dashmap::DashMap;
 use log::error;
 use once_cell::sync::Lazy;
-use prometheus::{core::Collector, register_int_counter_vec, IntCounterVec};
+use prometheus::core::Collector;
+use prometheus::{register_int_counter_vec, IntCounterVec};
 
 use crate::labels::Labels;
 
@@ -56,8 +57,8 @@ impl Counter for Labels {
 macro_rules! increment_counter {
     ($family:expr, $description:expr, $($label:expr => $value:expr),*) => {
         {
-            let function = Labels::extract_fn_name(function_name!());
-            let default_labels = Labels::new(function, module_path!());
+            let function = $crate::labels::Labels::extract_fn_name(stdext::function_name!());
+            let default_labels = $crate::labels::Labels::new(function, module_path!());
             let default_labels = default_labels.to_vec();
 
             let additional_labels = vec![$($label),*];
@@ -68,7 +69,9 @@ macro_rules! increment_counter {
             let all_values: Vec<_> = default_labels
                 .iter().map(|a| a.1).chain(additional_values).collect();
 
-            Labels::increment($family, $description, &all_labels, &all_values);
+            <$crate::labels::Labels as $crate::counter::Counter>::increment(
+                $family, $description, &all_labels, &all_values
+            );
         }
     };
 }

@@ -43,6 +43,13 @@ impl Labels {
     }
 
     pub fn extract_fn_name(full_name: &str) -> &str {
-        full_name.split("::").last().unwrap_or(full_name)
+        let components: Vec<_> = full_name.split("::").collect();
+        if full_name.contains("{{closure}}") {
+            components
+                .get(components.len().saturating_sub(2))
+                .unwrap_or(&full_name)
+        } else {
+            components.last().unwrap_or(&full_name)
+        }
     }
 }

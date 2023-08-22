@@ -2,7 +2,8 @@ use dashmap::DashMap;
 use lightning_types::DEFAULT_HISTOGRAM_BUCKETS;
 use log::error;
 use once_cell::sync::Lazy;
-use prometheus::{core::Collector, register_histogram_vec, HistogramVec};
+use prometheus::core::Collector;
+use prometheus::{register_histogram_vec, HistogramVec};
 
 use crate::labels::Labels;
 
@@ -72,30 +73,30 @@ macro_rules! histogram {
     ($family:expr, $description:expr, $value:expr, $($bucket:expr),+ ) => {
         {
             let buckets = vec![$($bucket),+];
-            let function = Labels::extract_fn_name(function_name!());
-            let default_labels = Labels::new(function, module_path!());
+            let function = $crate::labels::Labels::extract_fn_name(::stdext::function_name!());
+            let default_labels = $crate::labels::Labels::new(function, module_path!());
             let default_labels = default_labels.to_vec();
 
             let all_labels: Vec<_> = default_labels
                 .iter().map(|a| a.0).collect();
             let all_values: Vec<_> = default_labels
                 .iter().map(|a| a.1).collect();
-            Labels::observe(
+            <$crate::labels::Labels as $crate::histogram::Histogram>::observe(
                 $family, $description, &all_labels, &all_values, $value, Some(buckets)
             );
         }
     };
     ($family:expr, $description:expr, $value:expr ) => {
     {
-        let function = Labels::extract_fn_name(function_name!());
-        let default_labels = Labels::new(function, module_path!());
+        let function = $crate::labels::Labels::extract_fn_name(stdext::function_name!());
+        let default_labels = $crate::labels::Labels::new(function, module_path!());
         let default_labels = default_labels.to_vec();
 
         let all_labels: Vec<_> = default_labels
             .iter().map(|a| a.0).collect();
         let all_values: Vec<_> = default_labels
             .iter().map(|a| a.1).collect();
-        Labels::observe(
+        <$crate::labels::Labels as $crate::histogram::Histogram>::observe(
             $family, $description, &all_labels, &all_values, $value, None
         );
     }

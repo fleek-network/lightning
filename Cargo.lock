@@ -3788,10 +3788,11 @@ dependencies = [
  "jsonrpc-v2",
  "lightning-application",
  "lightning-interfaces",
- "metrics 0.21.1",
+ "metrics 0.1.0",
  "reqwest",
  "serde",
  "serde_json",
+ "stdext",
  "tokio",
 ]
 
