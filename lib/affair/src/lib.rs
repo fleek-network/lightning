@@ -28,9 +28,15 @@
 //! ```
 
 use std::fmt::Display;
+use std::sync::{Arc, Weak};
 
 use async_trait::async_trait;
+use crossbeam::sync::ShardedLock;
+use futures::Future;
 use tokio::sync::{mpsc, oneshot};
+
+pub type Observer<Res> = fn(&Res);
+type Observers<Res> = ShardedLock<Vec<Observer<Res>>>;
 
 /// A non-awaiting worker that processes requests and returns a response.
 pub trait Worker: Send + 'static {
@@ -62,6 +68,7 @@ pub trait AsyncWorker: Send + 'static {
 /// requests to a worker and wait for the response.
 pub struct Socket<Req, Res> {
     sender: mpsc::Sender<Task<Req, Res>>,
+    observers: Arc<Observers<Res>>,
 }
 
 /// Implementing [`Clone`] by hand because `#[derive(Clone)]` sucks for generics.
@@ -69,6 +76,7 @@ impl<Req, Res> Clone for Socket<Req, Res> {
     fn clone(&self) -> Self {
         Self {
             sender: self.sender.clone(),
+            observers: self.observers.clone(),
         }
     }
 }
@@ -76,6 +84,7 @@ impl<Req, Res> Clone for Socket<Req, Res> {
 /// A weak reference to a [`Socket`] that does not keep the worker alive.
 pub struct WeakSocket<Req, Res> {
     sender: mpsc::WeakSender<Task<Req, Res>>,
+    observers: Weak<Observers<Res>>,
 }
 
 /// Implementing [`Clone`] by hand because `#[derive(Clone)]` sucks for generics.
@@ -83,6 +92,7 @@ impl<Req, Res> Clone for WeakSocket<Req, Res> {
     fn clone(&self) -> Self {
         Self {
             sender: self.sender.clone(),
+            observers: self.observers.clone(),
         }
     }
 }
@@ -128,16 +138,54 @@ pub trait Executor {
 }
 
 pub struct Task<Req, Res> {
+    /// The raw request. Please consider using one of the `handle` functions instead.
+    /// Access to this field will be deprecated.
     pub request: Req,
     respond: Option<oneshot::Sender<Res>>,
+    observers: Option<Arc<Observers<Res>>>,
 }
 
 impl<Req, Res> Task<Req, Res> {
+    /// Take any field related to the response and return a new task that has the unit type as a
+    /// request parameter.
+    #[inline(always)]
+    fn split_to_responder(&mut self) -> Task<(), Res> {
+        Task {
+            request: (),
+            respond: self.respond.take(),
+            observers: self.observers.take()
+        }
+    }
+
     /// Respond to this task with the provided response.
+    #[inline(always)]
     pub fn respond(self, response: Res) {
+        if let Some(observers) = self.observers {
+            let guard = observers.read().expect("Unexpected poisioned lock.");
+            for cb in guard.iter() {
+                (*cb)(&response);
+            }
+        }
+
         if let Some(tx) = self.respond {
             let _ = tx.send(response);
         }
+    }
+
+    /// Handle the task from within the provided closure.
+    #[inline(always)]
+    pub fn handle<F>(mut self, handler: F) where F: FnOnce(Req) -> Res {
+        let responder = self.split_to_responder();
+        let response = handler(self.request);
+        responder.respond(response);
+    }
+
+    /// Handle the task from within the provided async closure.
+    #[inline(always)]
+    pub async fn handle_async<F, Fut>(mut self, handler: F) where F: FnOnce(Req) -> Fut, Fut: Future<Output = Res> {
+        let responder = self.split_to_responder();
+        let response = handler(self.request).await;
+        responder.respond(response);
     }
 }
 
@@ -153,13 +201,19 @@ impl Executor for DedicatedThread {
     fn spawn<H: Worker>(handler: H) -> Socket<H::Request, H::Response> {
         let (tx, rx) = mpsc::channel(64);
         std::thread::spawn(|| run_blocking(rx, handler));
-        Socket { sender: tx }
+        Socket {
+            sender: tx,
+            observers: Default::default(),
+        }
     }
 
     fn spawn_async<H: AsyncWorker>(handler: H) -> Socket<H::Request, H::Response> {
         let (tx, rx) = mpsc::channel(64);
         std::thread::spawn(|| run_blocking_async(rx, handler));
-        Socket { sender: tx }
+        Socket {
+            sender: tx,
+            observers: Default::default(),
+        }
     }
 }
 
@@ -167,13 +221,19 @@ impl Executor for TokioSpawn {
     fn spawn<H: Worker>(handler: H) -> Socket<H::Request, H::Response> {
         let (tx, rx) = mpsc::channel(64);
         tokio::spawn(run_non_blocking(rx, handler));
-        Socket { sender: tx }
+        Socket {
+            sender: tx,
+            observers: Default::default(),
+        }
     }
 
     fn spawn_async<H: AsyncWorker>(handler: H) -> Socket<H::Request, H::Response> {
         let (tx, rx) = mpsc::channel(64);
         tokio::spawn(run_non_blocking_async(rx, handler));
-        Socket { sender: tx }
+        Socket {
+            sender: tx,
+            observers: Default::default(),
+        }
     }
 }
 
@@ -182,10 +242,7 @@ fn run_blocking<Req, Res, H: Worker<Request = Req, Response = Res>>(
     mut handler: H,
 ) {
     while let Some(event) = rx.blocking_recv() {
-        let res = handler.handle(event.request);
-        if let Some(tx) = event.respond {
-            let _ = tx.send(res);
-        }
+        event.handle(|req| handler.handle(req));
     }
 }
 
@@ -194,10 +251,7 @@ fn run_blocking_async<Req, Res, H: AsyncWorker<Request = Req, Response = Res>>(
     mut handler: H,
 ) {
     while let Some(event) = rx.blocking_recv() {
-        let res = futures::executor::block_on(handler.handle(event.request));
-        if let Some(tx) = event.respond {
-            let _ = tx.send(res);
-        }
+        event.handle(|req| futures::executor::block_on(handler.handle(req)));
     }
 }
 
@@ -206,10 +260,7 @@ async fn run_non_blocking<Req, Res, H: Worker<Request = Req, Response = Res>>(
     mut handler: H,
 ) {
     while let Some(event) = rx.recv().await {
-        let result = handler.handle(event.request);
-        if let Some(tx) = event.respond {
-            let _ = tx.send(result);
-        }
+        event.handle(|req| handler.handle(req));
     }
 }
 
@@ -218,10 +269,7 @@ async fn run_non_blocking_async<Req, Res, H: AsyncWorker<Request = Req, Response
     mut handler: H,
 ) {
     while let Some(event) = rx.recv().await {
-        let result = handler.handle(event.request).await;
-        if let Some(tx) = event.respond {
-            let _ = tx.send(result);
-        }
+        event.handle_async(|req| handler.handle(req)).await;
     }
 }
 
@@ -234,7 +282,10 @@ impl<Req, Res> Socket<Req, Res> {
     /// caller.
     pub fn raw_bounded(bound: usize) -> (Self, mpsc::Receiver<Task<Req, Res>>) {
         let (tx, rx) = mpsc::channel(bound);
-        let socket = Socket { sender: tx };
+        let socket = Socket {
+            sender: tx,
+            observers: Default::default(),
+        };
         (socket, rx)
     }
 
@@ -243,6 +294,7 @@ impl<Req, Res> Socket<Req, Res> {
     pub fn downgrade(&self) -> WeakSocket<Req, Res> {
         WeakSocket {
             sender: self.sender.downgrade(),
+            observers: Arc::downgrade(&self.observers),
         }
     }
 
@@ -251,6 +303,9 @@ impl<Req, Res> Socket<Req, Res> {
         let event = Task {
             request,
             respond: None,
+            // Since we do not want to wait for the response delegate the making calls to
+            // observers to the worker thread.
+            observers: Some(self.observers.clone()),
         };
 
         self.sender
@@ -266,6 +321,7 @@ impl<Req, Res> Socket<Req, Res> {
         let event = Task {
             request,
             respond: Some(tx),
+            observers: None,
         };
 
         self.sender
@@ -275,7 +331,19 @@ impl<Req, Res> Socket<Req, Res> {
 
         let result = rx.await.map_err(|_| RunError::FailedToGetResponse)?;
 
+        // TODO(qti3e): Optimize this hot path.
+        let guard = self.observers.read().expect("Unexpected poisioned lock.");
+        for cb in guard.iter() {
+            (*cb)(&result);
+        }
+
         Ok(result)
+    }
+
+    /// Inject an observer that can view the responses and on them.
+    pub fn inject(&self, observer: Observer<Res>) {
+        let mut guard = self.observers.write().expect("Unexpected posioned lock.");
+        guard.push(observer);
     }
 }
 
@@ -283,7 +351,10 @@ impl<Req, Res> WeakSocket<Req, Res> {
     /// Upgrade this weak socket into a [`Socket`], returns [`None`] if the socket is already
     /// dropped.
     pub fn upgrade(&self) -> Option<Socket<Req, Res>> {
-        self.sender.upgrade().map(|sender| Socket { sender })
+        self.sender
+            .upgrade()
+            .zip(self.observers.upgrade())
+            .map(|(sender, observers)| Socket { sender, observers })
     }
 }
 
@@ -292,6 +363,8 @@ impl<Req, Res> Unpin for WeakSocket<Req, Res> {}
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
     use super::*;
 
     #[derive(Default)]
@@ -340,5 +413,29 @@ mod tests {
         let socket = DedicatedThread::spawn_async(CounterWorker::default());
         assert_eq!(socket.run(10).await.unwrap(), 10);
         assert_eq!(socket.run(3).await.unwrap(), 13);
+    }
+
+    #[tokio::test]
+    async fn inject_should_work() {
+        static TAPE: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+
+        fn observer(value: &u64) {
+            TAPE.lock().unwrap().push(*value);
+        }
+
+        let socket = TokioSpawn::spawn(CounterWorker::default());
+        let socket2 = socket.downgrade().upgrade().unwrap();
+        socket2.inject(observer);
+
+        assert_eq!(socket.run(10).await.unwrap(), 10);
+        assert_eq!(TAPE.lock().unwrap().as_ref(), vec![10]);
+
+        assert_eq!(socket.run(3).await.unwrap(), 13);
+        assert_eq!(TAPE.lock().unwrap().as_ref(), vec![10, 13]);
+
+        socket.enqueue(5).await.unwrap();
+
+        assert_eq!(socket.run(2).await.unwrap(), 20);
+        assert_eq!(TAPE.lock().unwrap().as_ref(), vec![10, 13, 18, 20]);
     }
 }
