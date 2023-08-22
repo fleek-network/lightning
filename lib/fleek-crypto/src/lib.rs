@@ -98,7 +98,7 @@ impl PublicKey for ConsensusPublicKey {
 
 impl Display for ConsensusPublicKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", hex::encode(self.0))
+        write!(f, "{}", self.to_base64())
     }
 }
 
@@ -107,26 +107,17 @@ impl Serialize for ConsensusPublicKey {
     where
         S: serde::ser::Serializer,
     {
-        serializer.serialize_str(&self.to_string())
+        serializer.serialize_str(&self.to_base64())
     }
 }
 
 impl FromStr for ConsensusPublicKey {
     type Err = std::io::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let bytes = hex::decode(s)
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
-
-        if bytes.len() != 96 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Expected 96 bytes",
-            ));
-        }
-
-        let mut address = [0u8; 96];
-        address.copy_from_slice(&bytes);
-        Ok(ConsensusPublicKey(address))
+        ConsensusPublicKey::from_base64(s).ok_or(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Public Key not in base64 format",
+        ))
     }
 }
 
@@ -274,26 +265,17 @@ impl Serialize for NodePublicKey {
     where
         S: serde::ser::Serializer,
     {
-        serializer.serialize_str(&self.to_string())
+        serializer.serialize_str(&self.to_base64())
     }
 }
 
 impl FromStr for NodePublicKey {
     type Err = std::io::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let bytes = hex::decode(s)
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
-
-        if bytes.len() != 32 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Expected 32 bytes",
-            ));
-        }
-
-        let mut address = [0u8; 32];
-        address.copy_from_slice(&bytes);
-        Ok(NodePublicKey(address))
+        NodePublicKey::from_base64(s).ok_or(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Public key not in base64 format",
+        ))
     }
 }
 
