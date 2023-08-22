@@ -2,12 +2,7 @@ use std::time::{Duration, SystemTime};
 
 use affair::Worker as WorkerTrait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
-use fleek_crypto::{
-    ClientPublicKey,
-    ConsensusPublicKey,
-    EthAddress,
-    NodePublicKey,
-};
+use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
     AccountInfo,
@@ -94,14 +89,14 @@ impl Env<UpdatePerm> {
                 node_registry_delta: Vec::new(),
                 txn_receipts: Vec::with_capacity(block.transactions.len()),
             };
-          
+
             // Execute each transaction and add the results to the block response
             for txn in &block.transactions {
                 let receipt = match app.verify_transaction(txn) {
                     Ok(_) => app.execute_txn(txn.clone()),
                     Err(err) => TransactionResponse::Revert(err),
                 };
-              
+
                 // If the transaction moved the epoch forward, aknowledge that in the block response
                 if let TransactionResponse::Success(ExecutionData::EpochChange) = receipt {
                     response.change_epoch = true;
@@ -248,7 +243,7 @@ impl Env<UpdatePerm> {
             if node.genesis_committee{
                 committee_members.push(node_index);
             }
-            
+
         }
             committee_table.insert(
                 0,
