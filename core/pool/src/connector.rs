@@ -95,7 +95,11 @@ where
             tracing::warn!("failed to get node info for {to:?}");
             None
         })?;
-        let address = get_socket_address(node_info.domain)?;
+
+        let address = format!("{}:{}", node_info.domain, node_info.ports.pool)
+            .parse()
+            .ok()?;
+
         self.connection_event_tx
             .send(ConnectEvent {
                 scope: self.scope,
@@ -110,6 +114,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 fn get_socket_address(multi_address: Multiaddr) -> Option<SocketAddr> {
     let (mut host, mut port) = (None, None);
     for addr in multi_address.into_iter() {

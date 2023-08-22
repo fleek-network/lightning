@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use fastcrypto::traits::KeyPair as _;
-use multiaddr::Multiaddr;
 use mysten_metrics::RegistryService;
 use narwhal_config::{Committee, Parameters, WorkerCache};
 use narwhal_crypto::{KeyPair, NetworkKeyPair};
@@ -41,9 +40,6 @@ pub struct NarwhalArgs {
     pub primary_keypair: KeyPair,
     pub primary_network_keypair: NetworkKeyPair,
     pub worker_keypair: NetworkKeyPair,
-    pub primary_address: Multiaddr,
-    pub worker_address: Multiaddr,
-    pub worker_mempool: Multiaddr,
     pub registry_service: RegistryService,
 }
 
@@ -222,9 +218,6 @@ impl Clone for NarwhalArgs {
             primary_keypair: self.primary_keypair.copy(),
             primary_network_keypair: self.primary_network_keypair.copy(),
             worker_keypair: self.worker_keypair.copy(),
-            primary_address: self.primary_address.clone(),
-            worker_address: self.worker_address.clone(),
-            worker_mempool: self.worker_mempool.clone(),
             registry_service: self.registry_service.clone(),
         }
     }

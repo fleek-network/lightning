@@ -106,6 +106,7 @@ fn add_to_committee(
             rpc: 6000 + index as u16,
             pool: 5000 + index as u16,
             dht: 4000 + index as u16,
+            handshake: 3000 + index as u16,
         },
         None,
         true,

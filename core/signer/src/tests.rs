@@ -11,13 +11,13 @@ use fleek_crypto::{
 };
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode};
-use lightning_application::genesis::{Genesis, GenesisCommittee};
+use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_interfaces::application::ApplicationInterface;
 use lightning_interfaces::common::WithStartAndShutdown;
 use lightning_interfaces::consensus::ConsensusInterface;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::signer::SignerInterface;
-use lightning_interfaces::types::UpdateMethod;
+use lightning_interfaces::types::{NodePorts, UpdateMethod};
 use lightning_interfaces::{partial, SyncQueryRunnerInterface};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use resolved_pathbuf::ResolvedPathBuf;
@@ -42,15 +42,24 @@ async fn test_send_two_txs_in_a_row() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
-    genesis.committee.push(GenesisCommittee::new(
-        owner_public_key.to_base64(),
-        node_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/48000".to_owned(),
-        consensus_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        node_public_key.to_base64(),
-        "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
+    genesis.node_info.push(GenesisNode::new(
+        owner_public_key.into(),
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            dht: 48105,
+            handshake: 48106,
+        },
         None,
+        true,
     ));
 
     let app = Application::<TestBinding>::init(AppConfig {
@@ -117,15 +126,24 @@ async fn test_retry_send() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
-    genesis.committee.push(GenesisCommittee::new(
-        owner_public_key.to_base64(),
-        node_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/48000".to_owned(),
-        consensus_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        node_public_key.to_base64(),
-        "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
+    genesis.node_info.push(GenesisNode::new(
+        owner_public_key.into(),
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            dht: 48105,
+            handshake: 48106,
+        },
         None,
+        true,
     ));
 
     let app = Application::<TestBinding>::init(AppConfig {

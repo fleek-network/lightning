@@ -5,13 +5,13 @@ use fleek_crypto::{
     ConsensusSecretKey,
     NodePublicKey,
     NodeSecretKey,
-    PublicKey,
     SecretKey,
 };
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode};
-use lightning_application::genesis::{Genesis, GenesisCommittee, GenesisLatency};
+use lightning_application::genesis::{Genesis, GenesisLatency, GenesisNode};
 use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::types::NodePorts;
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
@@ -52,44 +52,71 @@ async fn test_build_latency_matrix() {
 
     // Init application service and store node info in application state.
     let mut genesis = Genesis::load().unwrap();
-    genesis.committee = vec![
-        GenesisCommittee::new(
-            our_owner_public_key.to_base64(),
-            our_public_key.to_base64(),
-            "/ip4/127.0.0.1/udp/48000".to_owned(),
-            our_consensus_public_key.to_base64(),
-            "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-            our_public_key.to_base64(),
-            "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
+    genesis.node_info = vec![
+        GenesisNode::new(
+            our_owner_public_key.into(),
+            our_public_key,
+            "127.0.0.1".parse().unwrap(),
+            our_consensus_public_key,
+            "127.0.0.1".parse().unwrap(),
+            our_public_key,
+            NodePorts {
+                primary: 48000,
+                worker: 48101,
+                mempool: 48102,
+                rpc: 48103,
+                pool: 48104,
+                dht: 48105,
+                handshake: 48106,
+            },
             None,
+            true,
         ),
-        GenesisCommittee::new(
-            node_owner_public_key1.to_base64(),
-            node_public_key1.to_base64(),
-            "/ip4/127.0.0.1/udp/38000".to_owned(),
-            node_consensus_public_key1.to_base64(),
-            "/ip4/127.0.0.1/udp/38101/http".to_owned(),
-            node_public_key1.to_base64(),
-            "/ip4/127.0.0.1/tcp/38102/http".to_owned(),
+        GenesisNode::new(
+            node_owner_public_key1.into(),
+            node_public_key1,
+            "127.0.0.1".parse().unwrap(),
+            node_consensus_public_key1,
+            "127.0.0.1".parse().unwrap(),
+            node_public_key1,
+            NodePorts {
+                primary: 38000,
+                worker: 38101,
+                mempool: 38102,
+                rpc: 38103,
+                pool: 38104,
+                dht: 38105,
+                handshake: 38106,
+            },
             None,
+            true,
         ),
-        GenesisCommittee::new(
-            node_owner_public_key2.to_base64(),
-            node_public_key2.to_base64(),
-            "/ip4/127.0.0.1/udp/28000".to_owned(),
-            node_consensus_public_key2.to_base64(),
-            "/ip4/127.0.0.1/udp/28101/http".to_owned(),
-            node_public_key2.to_base64(),
-            "/ip4/127.0.0.1/tcp/28102/http".to_owned(),
+        GenesisNode::new(
+            node_owner_public_key2.into(),
+            node_public_key2,
+            "127.0.0.1".parse().unwrap(),
+            node_consensus_public_key2,
+            "127.0.0.1".parse().unwrap(),
+            node_public_key2,
+            NodePorts {
+                primary: 38000,
+                worker: 38101,
+                mempool: 38102,
+                rpc: 38103,
+                pool: 38104,
+                dht: 38105,
+                handshake: 38106,
+            },
             None,
+            true,
         ),
     ];
 
     let mut latencies = Vec::new();
     let (node_lhs, node_rhs) = if our_public_key < node_public_key1 {
-        (our_public_key.to_base64(), node_public_key1.to_base64())
+        (our_public_key, node_public_key1)
     } else {
-        (node_public_key1.to_base64(), our_public_key.to_base64())
+        (node_public_key1, our_public_key)
     };
     latencies.push(GenesisLatency {
         node_public_key_lhs: node_lhs,
@@ -98,9 +125,9 @@ async fn test_build_latency_matrix() {
     });
 
     let (node_lhs, node_rhs) = if our_public_key < node_public_key2 {
-        (our_public_key.to_base64(), node_public_key2.to_base64())
+        (our_public_key, node_public_key2)
     } else {
-        (node_public_key2.to_base64(), our_public_key.to_base64())
+        (node_public_key2, our_public_key)
     };
     latencies.push(GenesisLatency {
         node_public_key_lhs: node_lhs,
@@ -109,9 +136,9 @@ async fn test_build_latency_matrix() {
     });
 
     let (node_lhs, node_rhs) = if node_public_key1 < node_public_key2 {
-        (node_public_key1.to_base64(), node_public_key2.to_base64())
+        (node_public_key1, node_public_key2)
     } else {
-        (node_public_key2.to_base64(), node_public_key1.to_base64())
+        (node_public_key2, node_public_key1)
     };
     latencies.push(GenesisLatency {
         node_public_key_lhs: node_lhs,

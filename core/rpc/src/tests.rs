@@ -9,23 +9,22 @@ use fleek_crypto::{
     EthAddress,
     NodePublicKey,
     NodeSecretKey,
-    PublicKey,
     SecretKey,
 };
 use hp_fixed::unsigned::HpUfixed;
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode};
-use lightning_application::genesis::{Genesis, GenesisAccount, GenesisCommittee};
+use lightning_application::genesis::{Genesis, GenesisAccount, GenesisNode};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     EpochInfo,
     NodeInfo,
+    NodePorts,
     NodeServed,
     ProtocolParams,
     Staking,
     TotalServed,
     UpdateRequest,
-    Worker as NodeWorker,
 };
 use lightning_interfaces::{
     partial,
@@ -163,7 +162,7 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
     // Init application service
     let mut genesis = Genesis::load().unwrap();
     genesis.account.push(GenesisAccount {
-        public_key: owner_public_key.to_base64(),
+        public_key: owner_public_key.into(),
         flk_balance: 1000,
         stables_balance: 0,
         bandwidth_balance: 0,
@@ -226,19 +225,28 @@ async fn test_rpc_get_reputation() -> Result<()> {
 
     let mut genesis = Genesis::load().unwrap();
 
-    genesis.committee.push(GenesisCommittee::new(
-        owner_public_key.to_base64(),
-        node_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/48000".to_owned(),
-        consensus_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        node_public_key.to_base64(),
-        "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
+    let mut genesis_node = GenesisNode::new(
+        owner_public_key.into(),
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            dht: 48105,
+            handshake: 48106,
+        },
         None,
-    ));
-
+        true,
+    );
     // Init application service and store reputation score in application state.
-    genesis.rep_scores.insert(node_public_key.to_base64(), 46);
+    genesis_node.reputation = Some(46);
+    genesis.node_info.push(genesis_node);
 
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
@@ -305,24 +313,28 @@ async fn test_rpc_get_staked() -> Result<()> {
         locked: 0_u32.into(),
         locked_until: 0,
     };
-    let node_info = NodeInfo {
-        owner: eth_address,
-        public_key: node_public_key,
-        consensus_key: consensus_public_key,
-        staked_since: 1,
-        stake: staking,
-        domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
-        workers: vec![NodeWorker {
-            public_key: node_public_key,
-            address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
-            mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
-        }],
-        nonce: 0,
-    };
 
-    genesis
-        .node_info
-        .insert(node_public_key.to_base64(), node_info);
+    let node_info = GenesisNode::new(
+        eth_address,
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 38000,
+            worker: 38101,
+            mempool: 38102,
+            rpc: 38103,
+            pool: 38104,
+            dht: 38105,
+            handshake: 38106,
+        },
+        Some(staking),
+        false,
+    );
+
+    genesis.node_info.push(node_info);
 
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
@@ -378,7 +390,7 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
     // Init application service
     let mut genesis = Genesis::load().unwrap();
     genesis.account.push(GenesisAccount {
-        public_key: owner_public_key.to_base64(),
+        public_key: owner_public_key.into(),
         flk_balance: 0,
         stables_balance: 200,
         bandwidth_balance: 0,
@@ -449,24 +461,27 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
         locked: 0_u32.into(),
         locked_until: 0,
     };
-    let node_info = NodeInfo {
-        owner: eth_address,
-        public_key: node_public_key,
-        consensus_key: consensus_public_key,
-        staked_since: 1,
-        stake: staking,
-        domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
-        workers: vec![NodeWorker {
-            public_key: node_public_key,
-            address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
-            mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
-        }],
-        nonce: 0,
-    };
+    let node_info = GenesisNode::new(
+        eth_address,
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            dht: 48105,
+            handshake: 48106,
+        },
+        Some(staking),
+        false,
+    );
 
-    genesis
-        .node_info
-        .insert(node_public_key.to_base64(), node_info);
+    genesis.node_info.push(node_info);
 
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
@@ -533,24 +548,27 @@ async fn test_rpc_get_locked_time() -> Result<()> {
         locked: 0_u32.into(),
         locked_until: 2,
     };
-    let node_info = NodeInfo {
-        owner: eth_address,
-        public_key: node_public_key,
-        consensus_key: consensus_public_key,
-        staked_since: 1,
-        stake: staking,
-        domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
-        workers: vec![NodeWorker {
-            public_key: node_public_key,
-            address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
-            mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
-        }],
-        nonce: 0,
-    };
+    let node_info = GenesisNode::new(
+        eth_address,
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            dht: 48105,
+            handshake: 48106,
+        },
+        Some(staking),
+        false,
+    );
 
-    genesis
-        .node_info
-        .insert(node_public_key.to_base64(), node_info);
+    genesis.node_info.push(node_info);
 
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
@@ -617,24 +635,27 @@ async fn test_rpc_get_locked() -> Result<()> {
         locked: 500_u32.into(),
         locked_until: 2,
     };
-    let node_info = NodeInfo {
-        owner: eth_address,
-        public_key: node_public_key,
-        consensus_key: consensus_public_key,
-        staked_since: 1,
-        stake: staking,
-        domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
-        workers: vec![NodeWorker {
-            public_key: node_public_key,
-            address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
-            mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
-        }],
-        nonce: 0,
-    };
+    let node_info = GenesisNode::new(
+        eth_address,
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            dht: 48105,
+            handshake: 48106,
+        },
+        Some(staking),
+        false,
+    );
 
-    genesis
-        .node_info
-        .insert(node_public_key.to_base64(), node_info);
+    genesis.node_info.push(node_info);
 
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
@@ -692,7 +713,7 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
     // Init application service
     let mut genesis = Genesis::load().unwrap();
     genesis.account.push(GenesisAccount {
-        public_key: owner_public_key.to_base64(),
+        public_key: owner_public_key.into(),
         flk_balance: 0,
         stables_balance: 0,
         bandwidth_balance: 10_000,
@@ -763,24 +784,27 @@ async fn test_rpc_get_node_info() -> Result<()> {
         locked: 500_u32.into(),
         locked_until: 2,
     };
-    let node_info = NodeInfo {
-        owner: eth_address,
-        public_key: node_public_key,
-        consensus_key: consensus_public_key,
-        staked_since: 1,
-        stake: staking,
-        domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
-        workers: vec![NodeWorker {
-            public_key: node_public_key,
-            address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
-            mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
-        }],
-        nonce: 0,
-    };
+    let node_info = GenesisNode::new(
+        eth_address,
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            dht: 48105,
+            handshake: 48106,
+        },
+        Some(staking),
+        false,
+    );
 
-    genesis
-        .node_info
-        .insert(node_public_key.to_base64(), node_info.clone());
+    genesis.node_info.push(node_info.clone());
 
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
@@ -819,7 +843,7 @@ async fn test_rpc_get_node_info() -> Result<()> {
             // Parse the response as a successful response
             let success_response: RpcSuccessResponse<Option<NodeInfo>> =
                 serde_json::from_value(value)?;
-            assert_eq!(Some(node_info), success_response.result);
+            assert_eq!(Some(NodeInfo::from(&node_info)), success_response.result);
         } else {
             panic!("Rpc Error: {value}")
         }
@@ -1272,24 +1296,31 @@ async fn test_rpc_get_node_served() -> Result<()> {
 
     // Init application service and store total served in application state.
     let mut genesis = Genesis::load().unwrap();
-    genesis.committee.push(GenesisCommittee::new(
-        owner_public_key.to_base64(),
-        node_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/48000".to_owned(),
-        consensus_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        node_public_key.to_base64(),
-        "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
-        None,
-    ));
-
-    genesis.current_epoch_served.insert(
-        node_public_key.to_base64(),
-        NodeServed {
-            served: vec![1000],
-            ..Default::default()
+    let mut genesis_node = GenesisNode::new(
+        owner_public_key.into(),
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            dht: 48105,
+            handshake: 48106,
         },
+        None,
+        true,
     );
+
+    genesis_node.current_epoch_served = Some(NodeServed {
+        served: vec![1000],
+        ..Default::default()
+    });
+    genesis.node_info.push(genesis_node);
 
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
@@ -1356,24 +1387,27 @@ async fn test_rpc_is_valid_node() -> Result<()> {
         locked: 0_u32.into(),
         locked_until: 0,
     };
-    let node_info = NodeInfo {
-        owner: eth_address,
-        public_key: node_public_key,
-        consensus_key: consensus_public_key,
-        staked_since: 1,
-        stake: staking,
-        domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
-        workers: vec![NodeWorker {
-            public_key: node_public_key,
-            address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
-            mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
-        }],
-        nonce: 0,
-    };
+    let node_info = GenesisNode::new(
+        eth_address,
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            dht: 48105,
+            handshake: 48106,
+        },
+        Some(staking),
+        false,
+    );
 
-    genesis
-        .node_info
-        .insert(node_public_key.to_base64(), node_info);
+    genesis.node_info.push(node_info);
 
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
@@ -1440,26 +1474,35 @@ async fn test_rpc_get_node_registry() -> Result<()> {
         locked: 0_u32.into(),
         locked_until: 0,
     };
-    let node_info = NodeInfo {
-        owner: eth_address,
-        public_key: node_public_key,
-        consensus_key: consensus_public_key,
-        staked_since: 1,
-        stake: staking,
-        domain: "/ip4/127.0.0.1/udp/38000".parse().unwrap(),
-        workers: vec![NodeWorker {
-            public_key: node_public_key,
-            address: "/ip4/127.0.0.1/udp/38101/http".parse().unwrap(),
-            mempool: "/ip4/127.0.0.1/tcp/38102/http".parse().unwrap(),
-        }],
-        nonce: 0,
-    };
+    let node_info = GenesisNode::new(
+        eth_address,
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            dht: 48105,
+            handshake: 48106,
+        },
+        Some(staking),
+        false,
+    );
 
-    genesis
-        .node_info
-        .insert(node_public_key.to_base64(), node_info.clone());
+    genesis.node_info.push(node_info.clone());
 
-    let committee_size = genesis.committee.len();
+    let committee_size =
+        genesis.node_info.iter().fold(
+            0,
+            |acc, node| {
+                if node.genesis_committee { acc + 1 } else { acc }
+            },
+        );
 
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
@@ -1499,7 +1542,11 @@ async fn test_rpc_get_node_registry() -> Result<()> {
             let success_response: RpcSuccessResponse<Vec<NodeInfo>> =
                 serde_json::from_value(value)?;
             assert_eq!(success_response.result.len(), committee_size + 1);
-            assert!(success_response.result.contains(&node_info));
+            assert!(
+                success_response
+                    .result
+                    .contains(&NodeInfo::from(&node_info))
+            );
         } else {
             panic!("Rpc Error: {value}")
         }

@@ -6,12 +6,11 @@ use fleek_crypto::{
     ConsensusSecretKey,
     NodePublicKey,
     NodeSecretKey,
-    PublicKey,
     SecretKey,
 };
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode};
-use lightning_application::genesis::{Genesis, GenesisCommittee};
+use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_interfaces::application::ApplicationInterface;
 use lightning_interfaces::common::WithStartAndShutdown;
 use lightning_interfaces::consensus::ConsensusInterface;
@@ -22,7 +21,7 @@ use lightning_interfaces::reputation::{
     ReputationReporterInterface,
 };
 use lightning_interfaces::signer::SignerInterface;
-use lightning_interfaces::types::{Block, UpdateMethod, UpdatePayload, UpdateRequest};
+use lightning_interfaces::types::{Block, NodePorts, UpdateMethod, UpdatePayload, UpdateRequest};
 use lightning_interfaces::{
     partial,
     ReputationQueryInteface,
@@ -56,9 +55,7 @@ struct GenesisCommitteeKeystore {
     _worker_secret_key: NodeSecretKey,
 }
 
-fn get_genesis_committee(
-    num_members: usize,
-) -> (Vec<GenesisCommittee>, Vec<GenesisCommitteeKeystore>) {
+fn get_genesis_committee(num_members: usize) -> (Vec<GenesisNode>, Vec<GenesisCommitteeKeystore>) {
     let mut keystore = Vec::new();
     let mut committee = Vec::new();
     (0..num_members).for_each(|i| {
@@ -68,15 +65,25 @@ fn get_genesis_committee(
         let consensus_public_key = consensus_secret_key.to_pk();
         let owner_secret_key = AccountOwnerSecretKey::generate();
         let owner_public_key = owner_secret_key.to_pk();
-        committee.push(GenesisCommittee::new(
-            owner_public_key.to_base64(),
-            node_public_key.to_base64(),
-            format!("/ip4/127.0.0.1/udp/800{i}"),
-            consensus_public_key.to_base64(),
-            format!("/ip4/127.0.0.1/udp/810{i}/http"),
-            node_public_key.to_base64(),
-            format!("/ip4/127.0.0.1/tcp/810{i}/http"),
+
+        committee.push(GenesisNode::new(
+            owner_public_key.into(),
+            node_public_key,
+            "127.0.0.1".parse().unwrap(),
+            consensus_public_key,
+            "127.0.0.1".parse().unwrap(),
+            node_public_key,
+            NodePorts {
+                primary: 8000 + i as u16,
+                worker: 8100 + i as u16,
+                mempool: 8200 + i as u16,
+                rpc: 8300 + i as u16,
+                pool: 8400 + i as u16,
+                dht: 8500 + i as u16,
+                handshake: 8600 + i as u16,
+            },
             None,
+            true,
         ));
         keystore.push(GenesisCommitteeKeystore {
             _owner_secret_key: owner_secret_key,
@@ -99,15 +106,24 @@ async fn test_query() {
 
     let mut genesis = Genesis::load().unwrap();
 
-    genesis.committee.push(GenesisCommittee::new(
-        owner_public_key.to_base64(),
-        node_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/48000".to_owned(),
-        consensus_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        node_public_key.to_base64(),
-        "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
+    genesis.node_info.push(GenesisNode::new(
+        owner_public_key.into(),
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 48000_u16,
+            worker: 48101_u16,
+            mempool: 48202_u16,
+            rpc: 48300_u16,
+            pool: 48400_u16,
+            dht: 48500_u16,
+            handshake: 48600_u16,
+        },
         None,
+        true,
     ));
 
     let app = Application::<TestBinding>::init(AppConfig {
@@ -210,26 +226,44 @@ async fn test_submit_measurements() {
 
     let mut genesis = Genesis::load().unwrap();
 
-    genesis.committee.push(GenesisCommittee::new(
-        owner_public_key.to_base64(),
-        node_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/48000".to_owned(),
-        consensus_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        node_public_key.to_base64(),
-        "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
+    genesis.node_info.push(GenesisNode::new(
+        owner_public_key.into(),
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            dht: 48105,
+            handshake: 48106,
+        },
         None,
+        true,
     ));
 
-    genesis.committee.push(GenesisCommittee::new(
-        peer_owner_public_key.to_pk().to_base64(),
-        peer_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/38000".to_owned(),
-        peer_consensus_public_key.to_base64(),
-        "/ip4/127.0.0.1/udp/38101/http".to_owned(),
-        peer_public_key.to_base64(),
-        "/ip4/127.0.0.1/tcp/38102/http".to_owned(),
+    genesis.node_info.push(GenesisNode::new(
+        peer_owner_public_key.to_pk().into(),
+        peer_public_key,
+        "127.0.0.1".parse().unwrap(),
+        peer_consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        peer_public_key,
+        NodePorts {
+            primary: 38000,
+            worker: 38101,
+            mempool: 38102,
+            rpc: 38103,
+            pool: 38104,
+            dht: 38105,
+            handshake: 38106,
+        },
         None,
+        true,
     ));
 
     let epoch_start = SystemTime::now()
@@ -342,22 +376,31 @@ async fn test_reputation_calculation_and_query() {
 
     let (committee, mut keystore) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
-    genesis.committee = committee;
+    genesis.node_info = committee;
 
     let node_public_key1 = node_secret_key1.to_pk();
     let consensus_public_key1 = consensus_secret_key1.to_pk();
     let owner_secret_key1 = AccountOwnerSecretKey::generate();
     let owner_public_key1 = owner_secret_key1.to_pk();
 
-    genesis.committee.push(GenesisCommittee::new(
-        owner_public_key1.to_base64(),
-        node_public_key1.to_base64(),
-        "/ip4/127.0.0.1/udp/48000".to_owned(),
-        consensus_public_key1.to_base64(),
-        "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-        node_public_key1.to_base64(),
-        "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
+    genesis.node_info.push(GenesisNode::new(
+        owner_public_key1.into(),
+        node_public_key1,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key1,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key1,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            dht: 48105,
+            handshake: 48106,
+        },
         None,
+        true,
     ));
     keystore.push(GenesisCommitteeKeystore {
         _owner_secret_key: owner_secret_key1,
@@ -371,15 +414,24 @@ async fn test_reputation_calculation_and_query() {
     let owner_secret_key2 = AccountOwnerSecretKey::generate();
     let owner_public_key2 = owner_secret_key2.to_pk();
 
-    genesis.committee.push(GenesisCommittee::new(
-        owner_public_key2.to_base64(),
-        node_public_key2.to_base64(),
-        "/ip4/127.0.0.1/udp/48001".to_owned(),
-        consensus_public_key2.to_base64(),
-        "/ip4/127.0.0.1/udp/48102/http".to_owned(),
-        node_public_key2.to_base64(),
-        "/ip4/127.0.0.1/tcp/48103/http".to_owned(),
+    genesis.node_info.push(GenesisNode::new(
+        owner_public_key2.into(),
+        node_public_key2,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key2,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key2,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            dht: 48105,
+            handshake: 48106,
+        },
         None,
+        true,
     ));
     keystore.push(GenesisCommitteeKeystore {
         _owner_secret_key: owner_secret_key2,

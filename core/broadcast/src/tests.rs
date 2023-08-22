@@ -1,14 +1,14 @@
 use std::time::SystemTime;
 
 use anyhow::Result;
-use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, PublicKey, SecretKey};
+use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::Mode;
-use lightning_application::genesis::{Genesis, GenesisCommittee, GenesisLatency};
+use lightning_application::genesis::{Genesis, GenesisLatency, GenesisNode};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::schema::broadcast::BroadcastFrame;
 use lightning_interfaces::schema::AutoImplSerde;
-use lightning_interfaces::types::{ServiceScope, Topic};
+use lightning_interfaces::types::{NodePorts, ServiceScope, Staking, Topic};
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
@@ -48,39 +48,64 @@ async fn pubsub_send_recv() -> Result<()> {
 
     let signer_config_a = lightning_signer::Config::test();
     let (consensus_key_a, node_key_a) = signer_config_a.load_test_keys();
-    let (consensus_key_a, node_key_a) = (
-        consensus_key_a.to_pk().to_base64(),
-        node_key_a.to_pk().to_base64(),
-    );
+    // let (consensus_key_a, node_key_a) = (
+    //     consensus_key_a.to_pk().to_base64(),
+    //     node_key_a.to_pk().to_base64(),
+    // );
     let signer_config_b = lightning_signer::Config::test2();
     let (consensus_key_b, node_key_b) = signer_config_b.load_test_keys();
-    let (consensus_key_b, node_key_b) = (
-        consensus_key_b.to_pk().to_base64(),
-        node_key_b.to_pk().to_base64(),
-    );
+
+    let consensus_key_a = consensus_key_a.to_pk();
+    let consensus_key_b = consensus_key_b.to_pk();
+    let node_key_a = node_key_a.to_pk();
+    let node_key_b = node_key_b.to_pk();
 
     // Setup genesis
     let mut genesis = Genesis::load()?;
-    genesis.committee = vec![
-        GenesisCommittee::new(
-            AccountOwnerSecretKey::generate().to_pk().to_base64(),
-            node_key_a.clone(),
-            "/ip4/127.0.0.1/udp/48100".to_owned(),
-            consensus_key_a.clone(),
-            "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-            node_key_a.clone(),
-            "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
-            Some(10000),
+    genesis.node_info = vec![
+        GenesisNode::new(
+            AccountOwnerSecretKey::generate().to_pk().into(),
+            node_key_a,
+            "127.0.0.1".parse().unwrap(),
+            consensus_key_a,
+            "127.0.0.1".parse().unwrap(),
+            node_key_a,
+            NodePorts {
+                primary: 48100,
+                worker: 48101,
+                mempool: 48102,
+                rpc: 48103,
+                pool: 48104,
+                dht: 48105,
+                handshake: 48106,
+            },
+            Some(Staking {
+                staked: 10000_u32.into(),
+                ..Default::default()
+            }),
+            true,
         ),
-        GenesisCommittee::new(
-            AccountOwnerSecretKey::generate().to_pk().to_base64(),
-            node_key_b.clone(),
-            "/ip4/127.0.0.1/udp/48100".to_owned(),
-            consensus_key_b.clone(),
-            "/ip4/127.0.0.1/udp/48101/http".to_owned(),
-            node_key_b.clone(),
-            "/ip4/127.0.0.1/tcp/48102/http".to_owned(),
-            Some(10000),
+        GenesisNode::new(
+            AccountOwnerSecretKey::generate().to_pk().into(),
+            node_key_b,
+            "127.0.0.1".parse().unwrap(),
+            consensus_key_b,
+            "127.0.0.1".parse().unwrap(),
+            node_key_b,
+            NodePorts {
+                primary: 48100,
+                worker: 48101,
+                mempool: 48102,
+                rpc: 48103,
+                pool: 48104,
+                dht: 48105,
+                handshake: 48106,
+            },
+            Some(Staking {
+                staked: 10000_u32.into(),
+                ..Default::default()
+            }),
+            true,
         ),
     ];
     genesis.latencies = Some(vec![GenesisLatency {

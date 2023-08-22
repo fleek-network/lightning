@@ -249,6 +249,7 @@ impl ToDigest for UpdatePayload {
                     .with("rpc_port", &ports.as_ref().map(|p| p.rpc))
                     .with("pool_port", &ports.as_ref().map(|p| p.pool))
                     .with("dht_port", &ports.as_ref().map(|p| p.dht))
+                    .with("handshake_port", &ports.as_ref().map(|p| p.handshake))
             },
             UpdateMethod::StakeLock { node, locked_for } => {
                 transcript_builder = transcript_builder

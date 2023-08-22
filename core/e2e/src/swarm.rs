@@ -11,20 +11,19 @@ use fleek_crypto::{
     EthAddress,
     NodePublicKey,
     NodeSecretKey,
-    PublicKey,
     SecretKey,
 };
 use futures::future::try_join_all;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode};
-use lightning_application::genesis::Genesis;
+use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
 use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
 use lightning_dht::dht::Dht;
 use lightning_handshake::server::{HandshakeServerConfig, TcpHandshakeServer};
-use lightning_interfaces::types::{NodeInfo, Staking, Worker};
+use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::node::FinalTypes;
@@ -138,8 +137,8 @@ impl SwarmBuilder {
         // Load the default genesis. Clear the committee and node info and overwrite
         // the provided values from config.
         let mut genesis = Genesis::load().unwrap();
-        genesis.committee = Vec::new();
-        genesis.node_info = HashMap::new();
+
+        genesis.node_info = Vec::with_capacity(num_nodes);
         genesis.epoch_start = self.epoch_start.unwrap_or(genesis.epoch_start);
         genesis.epoch_time = self.epoch_time.unwrap_or(genesis.epoch_time);
         genesis.committee_size = self.committee_size.unwrap_or(genesis.committee_size);
@@ -155,15 +154,30 @@ impl SwarmBuilder {
             let root = directory.join(format!("node-{index}"));
             fs::create_dir_all(&root).expect("Failed to create node directory");
 
-            let config = build_config(
-                &root,
-                |t| {
-                    port_assigner
-                        .get_port(min_port, max_port, t)
-                        .expect("Could not get the port.")
-                },
-                bootstrappers.clone(),
-            );
+            let ports = NodePorts {
+                primary: port_assigner
+                    .get_port(min_port, max_port, Transport::Udp)
+                    .expect("Could not get port"),
+                worker: port_assigner
+                    .get_port(min_port, max_port, Transport::Udp)
+                    .expect("Could not get port"),
+                mempool: port_assigner
+                    .get_port(min_port, max_port, Transport::Tcp)
+                    .expect("Could not get port"),
+                rpc: port_assigner
+                    .get_port(min_port, max_port, Transport::Tcp)
+                    .expect("Could not get port"),
+                pool: port_assigner
+                    .get_port(min_port, max_port, Transport::Udp)
+                    .expect("Could not get port"),
+                dht: port_assigner
+                    .get_port(min_port, max_port, Transport::Udp)
+                    .expect("Could not get port"),
+                handshake: port_assigner
+                    .get_port(min_port, max_port, Transport::Tcp)
+                    .expect("Could not get port"),
+            };
+            let config = build_config(&root, ports.clone(), bootstrappers.clone());
 
             // Generate and store the node public key.
             let (node_pk, consensus_pk) = generate_and_store_node_secret(&config);
@@ -171,34 +185,23 @@ impl SwarmBuilder {
             let owner_pk = owner_sk.to_pk();
             let owner_eth: EthAddress = owner_pk.into();
 
-            // Make the node info using the generated config.
-            let consensus_config = config.get::<Consensus<FinalTypes>>();
+            let is_committee = (index as u64) < genesis.committee_size;
 
-            let worker = Worker {
-                public_key: node_pk,
-                address: consensus_config.worker_address.clone(),
-                mempool: consensus_config.mempool_address.clone(),
-            };
-
-            let node_info = NodeInfo {
-                owner: owner_eth,
-                public_key: node_pk,
-                consensus_key: consensus_pk,
-                staked_since: 0,
-                stake: Staking {
+            let node_info = GenesisNode::new(
+                owner_eth,
+                node_pk,
+                "127.0.0.1".parse().unwrap(),
+                consensus_pk,
+                "127.0.0.1".parse().unwrap(),
+                node_pk,
+                ports,
+                Some(Staking {
                     staked: HpUfixed::<18>::from(genesis.min_stake),
                     ..Default::default()
-                },
-                domain: consensus_config.address.clone(),
-                workers: vec![worker],
-                nonce: 0,
-            };
-
-            if (index as u64) < genesis.committee_size {
-                genesis.committee.push(node_info.into());
-            } else {
-                genesis.node_info.insert(node_pk.to_base64(), node_info);
-            }
+                }),
+                is_committee,
+            );
+            genesis.node_info.push(node_info);
 
             tmp_nodes.push((owner_sk, node_pk, config));
         }
@@ -222,31 +225,19 @@ impl SwarmBuilder {
 }
 
 /// Build the configuration object for a
-fn build_config<P>(
+fn build_config(
     root: &Path,
-    mut get_port: P,
+    ports: NodePorts,
     bootstrappers: Vec<Bootstrapper>,
-) -> TomlConfigProvider<FinalTypes>
-where
-    P: FnMut(Transport) -> u16,
-{
+) -> TomlConfigProvider<FinalTypes> {
     let config = TomlConfigProvider::<FinalTypes>::default();
 
     config.inject::<Rpc<FinalTypes>>(RpcConfig {
-        port: get_port(Transport::Tcp),
+        port: ports.rpc,
         ..Default::default()
     });
 
     config.inject::<Consensus<FinalTypes>>(ConsensusConfig {
-        address: format!("/ip4/127.0.0.1/udp/{}", get_port(Transport::Udp))
-            .parse()
-            .unwrap(),
-        worker_address: format!("/ip4/127.0.0.1/udp/{}/http", get_port(Transport::Udp))
-            .parse()
-            .unwrap(),
-        mempool_address: format!("/ip4/127.0.0.1/tcp/{}/http", get_port(Transport::Tcp))
-            .parse()
-            .unwrap(),
         store_path: root
             .join("data/narwhal_store")
             .try_into()
@@ -254,15 +245,12 @@ where
     });
 
     config.inject::<Dht<FinalTypes>>(DhtConfig {
-        address: format!("127.0.0.1:{}", get_port(Transport::Udp))
-            .parse()
-            .unwrap(),
+        address: format!("127.0.0.1:{}", ports.dht).parse().unwrap(),
         bootstrappers,
     });
 
     config.inject::<TcpHandshakeServer<FinalTypes>>(HandshakeServerConfig {
-        listen_addr: SocketAddr::from_str(&format!("127.0.0.1:{}", get_port(Transport::Tcp)))
-            .unwrap(),
+        listen_addr: SocketAddr::from_str(&format!("127.0.0.1:{}", ports.handshake)).unwrap(),
     });
 
     config.inject::<Signer<FinalTypes>>(SignerConfig {
@@ -277,9 +265,7 @@ where
     });
 
     config.inject::<ConnectionPool<FinalTypes>>(PoolConfig {
-        address: format!("127.0.0.1:{}", get_port(Transport::Udp))
-            .parse()
-            .unwrap(),
+        address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
     });
 
     config

@@ -168,9 +168,10 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         for node in &committee {
             // TODO(dalton) This check should be done at application before adding it to state. So
             // it should never not be Ok so even an unwrap should be safe here
+            println!("THE NODE: {node:?}");
             if let (Ok(address), Ok(consensus_key), Ok(public_key)) = (
                 Multiaddr::try_from(format!(
-                    "{}:{}",
+                    "/ip4/{}/udp/{}",
                     node.domain.to_string(),
                     node.ports.primary
                 )),
@@ -179,10 +180,13 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             ) {
                 committee_builder =
                     committee_builder.add_authority(consensus_key, 1, address, public_key);
+            } else {
+                println!("WE FAILED");
             }
         }
         let narwhal_committee = committee_builder.build();
 
+        // TODO(dalton): We need to handle an ip6 scenario when parsing these multiaddrs
         let worker_cache = WorkerCache {
             epoch,
             workers: committee
@@ -194,16 +198,16 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
                         PublicKey::from_bytes(&node.consensus_key.0),
                         NetworkPublicKey::from_bytes(&node.worker_public_key.0),
                         Multiaddr::try_from(format!(
-                            "{}:{}",
+                            "/ip4/{}/udp/{}/http",
                             node.worker_domain, node.ports.worker
                         )),
                         Multiaddr::try_from(format!(
-                            "{}:{}",
+                            "/ip4/{}/tcp/{}/http",
                             node.worker_domain, node.ports.mempool
                         )),
                     ) {
                         worker_index.insert(
-                            0 as u32,
+                            0u32,
                             WorkerInfo {
                                 name: key,
                                 transactions: mempool,
@@ -384,9 +388,6 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             primary_keypair,
             primary_network_keypair: networking_keypair.copy(),
             worker_keypair: networking_keypair,
-            primary_address: config.address,
-            worker_address: config.worker_address,
-            worker_mempool: config.mempool_address,
             registry_service: RegistryService::new(registry),
         };
         let execution_state = Arc::new(Execution::new(
