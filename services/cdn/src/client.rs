@@ -122,7 +122,7 @@ impl<'a, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> ResponseIterator<'a, R, W>
                         // Send delivery acknowledgement
                         self.conn
                             .write_frame(CdnFrame::DeliveryAcknowledgement {
-                                signature: ClientSignature,
+                                signature: ClientSignature([0; 48]),
                             })
                             .await?;
                     },

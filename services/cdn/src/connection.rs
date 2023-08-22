@@ -428,7 +428,7 @@ where
 
                 // TODO: get concrete type for client signature in fleek-crypto
                 Ok(Some(CdnFrame::DeliveryAcknowledgement {
-                    signature: ClientSignature,
+                    signature: ClientSignature([0; 48]),
                 }))
             },
             FrameTag::DecryptionKey => {
@@ -531,7 +531,7 @@ mod tests {
     #[tokio::test]
     async fn delivery_ack() -> TResult {
         encode_decode(CdnFrame::DeliveryAcknowledgement {
-            signature: ClientSignature,
+            signature: ClientSignature([0; 48]),
         })
         .await
     }

@@ -2420,12 +2420,15 @@ name = "fleek-crypto"
 version = "0.0.0"
 dependencies = [
  "arrayref",
+ "bincode",
+ "derive_more",
  "fastcrypto",
  "hex",
  "rand 0.8.5",
  "sec1",
  "serde",
  "serde-big-array",
+ "serde_json",
  "zeroize",
 ]
 

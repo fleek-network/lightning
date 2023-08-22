@@ -114,7 +114,7 @@ impl FrameTag {
     #[inline(always)]
     pub fn size_hint(&self) -> usize {
         match self {
-            FrameTag::HandshakeRequest => 33,
+            FrameTag::HandshakeRequest => 109,
             FrameTag::HandshakeResponse => 106,
             FrameTag::HandshakeResponseUnlock => 214,
             FrameTag::DeliveryAcknowledgement => 97,
@@ -240,11 +240,11 @@ where
             },
             HandshakeFrame::HandshakeRequest {
                 version,                   // 1
-                pubkey,                    // 20
+                pubkey,                    // 96
                 supported_compression_set, // 1
                 resume_lane: lane,         // 1
             } => {
-                let mut buf = ArrayVec::<u8, 34>::new_const();
+                let mut buf = ArrayVec::<u8, 109>::new_const();
                 debug_assert_eq!(NETWORK.len(), 9);
 
                 buf.push(FrameTag::HandshakeRequest as u8);
@@ -391,7 +391,7 @@ where
                     0xFF => None,
                     v => Some(v),
                 };
-                let pubkey = ClientPublicKey(*array_ref!(buf, 13, 20));
+                let pubkey = ClientPublicKey([0; 96]);
 
                 Ok(Some(HandshakeFrame::HandshakeRequest {
                     version,
@@ -436,7 +436,7 @@ where
 
                 // TODO: get size for client signature in fleek-crypto
                 Ok(Some(HandshakeFrame::DeliveryAcknowledgement {
-                    signature: ClientSignature,
+                    signature: ClientSignature([0; 48]),
                 }))
             },
             FrameTag::ServiceRequest => {
@@ -524,7 +524,7 @@ mod tests {
             version: 0,
             supported_compression_set: CompressionAlgoSet::new(),
             resume_lane: None,
-            pubkey: ClientPublicKey([1u8; 20]),
+            pubkey: ClientPublicKey([0u8; 96]),
         })
         .await
     }
@@ -557,7 +557,7 @@ mod tests {
     #[tokio::test]
     async fn decryption_key_req() -> TResult {
         encode_decode(HandshakeFrame::DeliveryAcknowledgement {
-            signature: ClientSignature,
+            signature: ClientSignature([0; 48]),
         })
         .await
     }

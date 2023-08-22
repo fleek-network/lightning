@@ -76,7 +76,7 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> HandshakeClient<R, W> {
         self.conn
             .write_frame(HandshakeFrame::DeliveryAcknowledgement {
                 // TODO: Figure out size in fleek_crypto
-                signature: ClientSignature,
+                signature: ClientSignature([0; 48]),
             })
             .await?;
 

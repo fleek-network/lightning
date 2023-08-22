@@ -11,7 +11,7 @@ oSQDIgADbn0owIbD5+gHfyMLRqhrni5fryqoUsVdKwh2FZjWxLc=
 
     assert_eq!(
         pubkey.to_string(),
-        "0x2d79dc4842e5c156a8b4387217d0c44ab3559548"
+        "A259KMCGw+foB38jC0aoa54uX68qqFLFXSsIdhWY1sS3"
     );
 }
 
@@ -64,5 +64,168 @@ mod pem {
         let decoded =
             AccountOwnerSecretKey::decode_pem(&pem).expect("failed to decode secp256k1 pem");
         assert_eq!(key, decoded);
+    }
+}
+
+mod from_display {
+    use std::any::type_name;
+    use std::fmt::{Debug, Display};
+    use std::str::FromStr;
+
+    use crate::{
+        AccountOwnerSecretKey,
+        ConsensusSecretKey,
+        EthAddress,
+        NodeSecretKey,
+        PublicKey,
+        SecretKey,
+    };
+
+    fn from_display_should_work<T>(data: T)
+    where
+        T: Display + FromStr + Eq,
+        T::Err: Debug,
+    {
+        let string = format!("{}", data);
+        let decoded = T::from_str(&string)
+            .unwrap_or_else(|e| panic!("{}::from_str failed. err: {e:?}", type_name::<T>()));
+        if decoded != data {
+            panic!(
+                "{}::FromDisplay failed.\n expected='{data}' actual='{decoded}'",
+                type_name::<T>()
+            );
+        }
+    }
+
+    fn run_test<T: SecretKey>()
+    where
+        T::PublicKey: FromStr + Display + Eq,
+        <T::PublicKey as PublicKey>::Signature: FromStr + Display + Eq,
+        <<T::PublicKey as PublicKey>::Signature as FromStr>::Err: Debug,
+        <T::PublicKey as FromStr>::Err: Debug,
+    {
+        let sk = T::generate();
+        let pk = sk.to_pk();
+        from_display_should_work(pk);
+        let sig = sk.sign(&[0; 32]);
+        from_display_should_work(sig);
+    }
+
+    #[test]
+    fn account_owner() {
+        run_test::<AccountOwnerSecretKey>();
+        let addr: EthAddress = AccountOwnerSecretKey::generate().to_pk().into();
+        from_display_should_work(addr);
+    }
+
+    #[test]
+    fn node() {
+        run_test::<NodeSecretKey>();
+    }
+
+    #[test]
+    fn consensus() {
+        run_test::<ConsensusSecretKey>();
+    }
+}
+
+mod test_serde {
+    use std::any::type_name;
+    use std::fmt::Display;
+
+    use serde::de::DeserializeOwned;
+    use serde::Serialize;
+
+    use crate::{
+        AccountOwnerSecretKey,
+        ConsensusSecretKey,
+        EthAddress,
+        NodeSecretKey,
+        PublicKey,
+        SecretKey,
+    };
+
+    fn json_should_work<T>(data: &T)
+    where
+        T: Display + Eq + Serialize + DeserializeOwned,
+    {
+        let encoded = serde_json::to_string(data).expect("Failed to serialize with json.");
+
+        // We use a human readable format for json/toml so we should not have serialized
+        // the data as an array of numbers. So no `[...]` should exists in the serialization.
+        assert!(
+            !encoded.contains('['),
+            "Json serailization must not contain an array: {}",
+            encoded
+        );
+
+        let decoded = serde_json::from_str::<T>(&encoded).expect("Failed to deserialize with json");
+
+        if decoded != *data {
+            panic!(
+                "{} failed. expected='{data}' actual='{decoded}'",
+                type_name::<T>()
+            );
+        }
+    }
+
+    fn bincode_should_work<T>(data: &T)
+    where
+        T: Display + Eq + Serialize + DeserializeOwned,
+    {
+        let encoded = bincode::serialize(data).expect("Failed to serialize with bincode.");
+
+        // smaller-or-equal because of memory alignment of a raw `T`.
+        assert!(
+            encoded.len() <= std::mem::size_of::<T>(),
+            "Bincode serialization must use binary format."
+        );
+
+        let decoded =
+            bincode::deserialize::<T>(&encoded).expect("Failed to deserialize with bincode");
+
+        if decoded != *data {
+            panic!(
+                "{} failed. expected='{data}' actual='{decoded}'",
+                type_name::<T>()
+            );
+        }
+    }
+
+    fn serde_should_work<T>(data: T)
+    where
+        T: Display + Eq + Serialize + DeserializeOwned,
+    {
+        json_should_work(&data);
+        bincode_should_work(&data);
+    }
+
+    fn run_test<T: SecretKey>()
+    where
+        T::PublicKey: Serialize + DeserializeOwned + Display + Eq,
+        <T::PublicKey as PublicKey>::Signature: Serialize + DeserializeOwned + Display + Eq,
+    {
+        let sk = T::generate();
+        let pk = sk.to_pk();
+        serde_should_work(pk);
+        let sig = sk.sign(&[0; 32]);
+        serde_should_work(sig);
+    }
+
+    #[test]
+    fn account_owner() {
+        run_test::<AccountOwnerSecretKey>();
+        let addr: EthAddress = AccountOwnerSecretKey::generate().to_pk().into();
+        serde_should_work(addr);
+    }
+
+    #[test]
+    fn node() {
+        run_test::<NodeSecretKey>();
+    }
+
+    #[test]
+    fn consensus() {
+        run_test::<ConsensusSecretKey>();
     }
 }

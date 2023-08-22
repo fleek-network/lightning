@@ -113,7 +113,7 @@ fn bench_codec_group(c: &mut Criterion) {
     let frame = HandshakeFrame::HandshakeRequest {
         version: 0,
         supported_compression_set: CompressionAlgoSet::new(),
-        pubkey: ClientPublicKey([0u8; 20]),
+        pubkey: ClientPublicKey([0u8; 96]),
         resume_lane: None,
     };
     bench_frame(&mut g, frame, "handshake_request");
@@ -140,7 +140,7 @@ fn bench_codec_group(c: &mut Criterion) {
 
     let frame = HandshakeFrame::DeliveryAcknowledgement {
         // TODO: get size for client signature in fleek_crypto
-        signature: ClientSignature,
+        signature: ClientSignature([0; 48]),
     };
     bench_frame(&mut g, frame, "delivery_acknowledgement");
 

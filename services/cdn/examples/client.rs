@@ -15,8 +15,8 @@ const HASH: [u8; 32] = [
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let server_addr: SocketAddr = ([0; 4], 6969).into();
-    let mut pubkey = [0u8; 20];
-    ThreadRng::default().fill(&mut pubkey);
+    let mut pubkey = [0u8; 96];
+    ThreadRng::default().fill(pubkey.as_mut_slice());
     let pubkey = ClientPublicKey(pubkey);
     println!("using pubkey: {pubkey}");
 
