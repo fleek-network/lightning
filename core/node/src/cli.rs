@@ -49,6 +49,14 @@ pub enum Command {
         #[arg(long)]
         default: bool,
     },
+    /// Initialize the node without starting it.
+    DevInitOnly,
+    /// Dump the infusion graph of the node instance.
+    DevDumpGraph {
+        /// Only show the initialization order.
+        #[arg(long)]
+        show_order: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -85,6 +93,32 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
             Command::Keys(Keys::Show) => Self::show_keys(config_path).await,
             Command::PrintConfig { default } if default => Self::print_default_config().await,
             Command::PrintConfig { .. } => Self::print_config(config_path).await,
+            Command::DevInitOnly => {
+                let config = Self::load_or_write_config(config_path).await?;
+                Node::<C>::init(config)
+                    .map_err(|e| anyhow::anyhow!("Could not start the node: {e}"))?;
+                Ok(())
+            },
+            Command::DevDumpGraph { show_order } if show_order => {
+                let graph = C::build_graph();
+                let sorted = graph.sort()?;
+                for (i, tag) in sorted.iter().enumerate() {
+                    println!(
+                        "{:0width$}  {tag}\n      = {ty}",
+                        i + 1,
+                        width = 2,
+                        tag = tag.trait_name(),
+                        ty = tag.type_name()
+                    );
+                }
+                Ok(())
+            },
+            Command::DevDumpGraph { .. } => {
+                let graph = C::build_graph();
+                let mermaid = graph.mermaid("Lightning Dependency Graph");
+                println!("{mermaid}");
+                Ok(())
+            },
         }
     }
 
