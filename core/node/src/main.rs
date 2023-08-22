@@ -6,11 +6,11 @@ pub mod shutdown;
 use std::fs::File;
 use std::process::exit;
 
-use anyhow::Result;
 use autometrics::{self, settings::AutometricsSettingsBuilder};
 use chrono::Local;
 use clap::Parser;
 use cli::Cli;
+use lightning_types::metrics::{DEFAULT_HISTOGRAM_BUCKETS, METRICS_SERVICE_NAME};
 use log::LevelFilter;
 use simplelog::{
     ColorChoice,
@@ -20,7 +20,6 @@ use simplelog::{
     TerminalMode,
     WriteLogger,
 };
-use lightning_types::metrics::METRICS_SERVICE_NAME;
 
 use crate::cli::CliArgs;
 use crate::node::{FinalTypes, WithMockConsensus};
@@ -39,6 +38,7 @@ async fn main() {
     // init metrics exporter
     AutometricsSettingsBuilder::default()
         .service_name(METRICS_SERVICE_NAME)
+        .histogram_buckets(DEFAULT_HISTOGRAM_BUCKETS)
         .init();
 
     // Add ignore for process subdag because Narwhal prints it as an err everytime it successfully

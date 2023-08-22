@@ -1,3 +1,5 @@
+use lightning_types::METRICS_SERVICE_NAME;
+
 // const and labels from autometrics-rs
 // https://github.com/autometrics-dev/autometrics-rs/blob/main/autometrics/src/labels.rs
 // Contants
@@ -6,7 +8,6 @@ pub const MODULE_KEY: &str = "module";
 pub const CALLER_FUNCTION_KEY: &str = "caller_function";
 pub const CALLER_MODULE_KEY: &str = "caller_module";
 pub const SERVICE_NAME_KEY: &str = "service_name";
-pub const METRICS_SERVICE_NAME: &str = "lightning_metrics";
 
 pub struct Labels {
     function: &'static str,
@@ -39,5 +40,9 @@ impl Labels {
         ];
 
         labels
+    }
+
+    pub fn extract_fn_name(full_name: &str) -> &str {
+        full_name.split("::").last().unwrap_or(full_name)
     }
 }
