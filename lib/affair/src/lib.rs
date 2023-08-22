@@ -153,7 +153,7 @@ impl<Req, Res> Task<Req, Res> {
         Task {
             request: (),
             respond: self.respond.take(),
-            observers: self.observers.take()
+            observers: self.observers.take(),
         }
     }
 
@@ -174,7 +174,10 @@ impl<Req, Res> Task<Req, Res> {
 
     /// Handle the task from within the provided closure.
     #[inline(always)]
-    pub fn handle<F>(mut self, handler: F) where F: FnOnce(Req) -> Res {
+    pub fn handle<F>(mut self, handler: F)
+    where
+        F: FnOnce(Req) -> Res,
+    {
         let responder = self.split_to_responder();
         let response = handler(self.request);
         responder.respond(response);
@@ -182,7 +185,11 @@ impl<Req, Res> Task<Req, Res> {
 
     /// Handle the task from within the provided async closure.
     #[inline(always)]
-    pub async fn handle_async<F, Fut>(mut self, handler: F) where F: FnOnce(Req) -> Fut, Fut: Future<Output = Res> {
+    pub async fn handle_async<F, Fut>(mut self, handler: F)
+    where
+        F: FnOnce(Req) -> Fut,
+        Fut: Future<Output = Res>,
+    {
         let responder = self.split_to_responder();
         let response = handler(self.request).await;
         responder.respond(response);
