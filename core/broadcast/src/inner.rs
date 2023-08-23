@@ -123,11 +123,11 @@ impl<C: Collection> BroadcastInner<C> {
         }
 
         // connect to any new peers without an existing connection
-        for peer in new_set {
-            if !self.connections.contains_key(&peer) && self.node_secret_key.to_pk() != peer {
-                if let Some((sender, receiver)) = self.connector.connect(&peer).await {
-                    let inner = self.clone();
-                    tokio::spawn(async move { inner.handle_connection(receiver, sender).await });
+        let our_pk = self.node_secret_key.to_pk();
+        for peer in new_set.iter().filter(|pk| *pk != &our_pk) {
+            if !self.connections.contains_key(peer) {
+                if let Some((sender, receiver)) = self.connector.connect(peer).await {
+                    self.handle_connection_task(receiver, sender);
                 } else {
                     error!("failed to connect to {peer}");
                 }
@@ -138,61 +138,74 @@ impl<C: Collection> BroadcastInner<C> {
         *peers = new_peers;
     }
 
-    /// broadcast a new message to all active connections
-    pub async fn broadcast(&self, topic: Topic, payload: Vec<u8>) -> anyhow::Result<()> {
-        // construct message
-        let message = BroadcastMessage {
-            topic,
-            payload,
-            originator: self.node_secret_key.to_pk(),
-        };
+    /// Spawn a task to broadcast a new message to all active connections
+    pub fn broadcast_task(&self, topic: Topic, payload: Vec<u8>) {
+        let inner = self.clone();
+        tokio::spawn(async move {
+            // construct the message
+            let message = BroadcastMessage {
+                topic,
+                payload,
+                originator: inner.node_secret_key.to_pk(),
+            };
 
-        // compute the digest and sign it with the networking key
-        let digest = message.to_digest();
-        let signature = self.node_secret_key.sign(&digest);
+            // compute the digest and sign it with the networking key
+            let digest = message.to_digest();
+            let signature = inner.node_secret_key.sign(&digest);
 
-        // insert the message into the map
-        self.message_cache
-            .insert(digest, Some((message, signature)));
+            // insert the message into the message cache for future wants
+            inner
+                .message_cache
+                .insert(digest, Some((message, signature)));
 
-        // construct an advertisement are there any helpers and send it to all current connection
-        for mut conn in self.connections.iter_mut() {
-            if let Err(e) = conn.send(BroadcastFrame::Advertise { digest }).await {
-                // gracefully error when sending to multiple connections
-                error!("failed to send broadcast message: {e}");
+            // Send an advertisement to all current connections
+            for mut conn in inner.connections.iter_mut() {
+                if let Err(e) = conn.send(BroadcastFrame::Advertise { digest }).await {
+                    // gracefully error when sending to multiple connections
+                    error!("failed to send broadcast message: {e}");
+                }
             }
-        }
-
-        Ok(())
+        });
     }
 
-    pub async fn handle_connection(
+    /// Spawn a task to handle a new connection
+    pub fn handle_connection_task(
         &self,
         mut receiver: PoolReceiver<C, c![C::ConnectionPoolInterface], BroadcastFrame>,
         sender: PoolSender<C, c![C::ConnectionPoolInterface], BroadcastFrame>,
-    ) -> anyhow::Result<()> {
-        let pubkey = *receiver.pk();
+    ) {
+        let inner = self.clone();
+        tokio::spawn(async move {
+            let pubkey = *receiver.pk();
 
-        // insert sender to connections
-        self.connections
-            .insert(pubkey, BroadcastSender::new(sender));
+            // insert sender to connections
+            inner
+                .connections
+                .insert(pubkey, BroadcastSender::new(sender));
 
-        // read loop
-        while let Some(message) = receiver.recv().await {
-            match message {
-                BroadcastFrame::Advertise { digest } => {
-                    self.handle_advertise(&pubkey, &digest).await?
-                },
-                BroadcastFrame::Want { digest } => self.handle_want(&pubkey, &digest).await?,
-                BroadcastFrame::Message { message, signature } => {
-                    self.handle_message(&pubkey, message, signature).await?
-                },
+            // read loop
+            while let Some(message) = receiver.recv().await {
+                match message {
+                    BroadcastFrame::Advertise { digest } => {
+                        if let Err(e) = inner.handle_advertise(&pubkey, &digest).await {
+                            error!("failed to handle advertisement: {e}");
+                        };
+                    },
+                    BroadcastFrame::Want { digest } => {
+                        if let Err(e) = inner.handle_want(&pubkey, &digest).await {
+                            error!("failed to handle want: {e}");
+                        }
+                    },
+                    BroadcastFrame::Message { message, signature } => {
+                        if let Err(e) = inner.handle_message(&pubkey, message, signature).await {
+                            error!("failed to handle message: {e}");
+                        }
+                    },
+                }
             }
-        }
 
-        self.connections.remove(&pubkey);
-
-        Ok(())
+            inner.connections.remove(&pubkey);
+        });
     }
 
     pub async fn handle_advertise(
@@ -205,15 +218,16 @@ impl<C: Collection> BroadcastInner<C> {
             return Ok(());
         }
 
-        // if not, send a want, and mark the digest as wanted
-        self.message_cache.insert(*digest, None);
+        // send the message
         self.connections
             .get_mut(pubkey)
-            // TODO: Implement a fallback here. We should probably retain a queue to attempt to
-            //       find new nodes to get the message from.
             .ok_or(anyhow!("connection not found while sending want"))?
             .send(BroadcastFrame::Want { digest: *digest })
-            .await
+            .await?;
+
+        // mark the digest as wanted
+        self.message_cache.insert(*digest, None);
+        Ok(())
     }
 
     pub async fn handle_want(
