@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     /// Time to live for the message cache, in minutes
-    time_to_live_mins: usize,
+    pub time_to_live_mins: u64,
     /// Time to idle for the message cache, in minutes
-    time_to_idle_mins: usize,
+    pub time_to_idle_mins: u64,
 }
 
 impl Default for Config {

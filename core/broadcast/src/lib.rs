@@ -32,9 +32,11 @@ use tracing::error;
 
 #[allow(clippy::type_complexity)]
 pub struct Broadcast<C: Collection> {
+    collection: PhantomData<C>,
     notifier: c![C::NotifierInterface],
     inner: BroadcastInner<C>,
     shutdown_signal: Arc<std::sync::RwLock<Option<tokio::sync::oneshot::Sender<()>>>>,
+    /// Listener for incoming connections
     listener: Arc<tokio::sync::Mutex<c![C::ConnectionPoolInterface::Listener<BroadcastFrame>]>>,
     /// Map of topic channel senders for incoming payloads
     channels: Arc<DashMap<Topic, tokio::sync::broadcast::Sender<Vec<u8>>>>,
@@ -42,7 +44,6 @@ pub struct Broadcast<C: Collection> {
     sender: tokio::sync::mpsc::Sender<(Topic, Vec<u8>)>,
     /// Receiver for outgoing payloads
     receiver: Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<(Topic, Vec<u8>)>>>,
-    collection: PhantomData<C>,
 }
 
 impl<C: Collection> ConfigConsumer for Broadcast<C> {
@@ -143,14 +144,14 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
     type Message = BroadcastFrame;
 
     fn init(
-        _config: Self::Config,
+        config: Self::Config,
         (listener, connector): ListenerConnector<C, c![C::ConnectionPoolInterface], Self::Message>,
         topology: c!(C::TopologyInterface),
         signer: &c!(C::SignerInterface),
         notifier: c!(C::NotifierInterface),
     ) -> Result<Self> {
         let channels = Arc::new(DashMap::new());
-        let inner = BroadcastInner::new(topology, signer, connector, channels.clone());
+        let inner = BroadcastInner::new(config, topology, signer, connector, channels.clone());
         let (sender, receiver) = tokio::sync::mpsc::channel(256);
         Ok(Self {
             inner,

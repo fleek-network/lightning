@@ -25,7 +25,7 @@ use lightning_interfaces::{
 use mini_moka::sync::Cache;
 use tracing::error;
 
-const MAX_MESSAGE_CACHE_LEN: u64 = 65535;
+use crate::config;
 
 pub struct BroadcastSender<S> {
     writer: S,
@@ -85,6 +85,7 @@ impl<C: Collection> Clone for BroadcastInner<C> {
 
 impl<C: Collection> BroadcastInner<C> {
     pub fn new<Signer: SignerInterface<C>>(
+        config: config::Config,
         topology: c![C::TopologyInterface],
         signer: &Signer,
         connector: c![C::ConnectionPoolInterface::Connector<BroadcastFrame>],
@@ -100,8 +101,8 @@ impl<C: Collection> BroadcastInner<C> {
             connector: connector.into(),
             connections: DashMap::new().into(),
             message_cache: Cache::builder()
-                .time_to_live(Duration::from_secs(60 * 60))
-                .time_to_idle(Duration::from_secs(5 * 60))
+                .time_to_live(Duration::from_secs(config.time_to_live_mins * 60))
+                .time_to_idle(Duration::from_secs(config.time_to_idle_mins * 60))
                 .build(),
         }
     }
@@ -269,6 +270,7 @@ impl<C: Collection> BroadcastInner<C> {
             .map(|mut c| c.seen.insert(digest));
 
         // send the content to the corresponding pubsub broadcast channel
+        // TODO: validate the payload can be decoded, somehow
         if let Some(channel) = self.channels.get(&message.topic) {
             channel.send(message.payload.clone())?;
         }
