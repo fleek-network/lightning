@@ -58,9 +58,6 @@ pub struct Object {
 /// The interned id of an object that is trait aware.
 #[derive(Copy, Clone)]
 pub struct Tag {
-    /// The unique identifier for the object, which is the pointer to the `dependencies` function
-    /// casted to a usize.
-    id: usize,
     /// The rust type id.
     type_id: TypeId,
     /// Name of the trait. Used as a debug label. Does not effect on equality checks and the hash.
@@ -92,10 +89,7 @@ impl VTable {
 
     /// Returns the tag of the object for this vtable.
     pub fn tag(&self) -> Tag {
-        let id = (self.dependencies as *const u8) as usize;
-
         Tag {
-            id,
             type_id: self.tid,
             trait_name: self.trait_name,
             type_name: self.type_name,
@@ -144,13 +138,13 @@ impl Tag {
     ///
     /// You can also use the [`tag`](crate::tag) macro in order to generate
     /// a tag.
-    pub fn new<T: 'static>(trait_name: &'static str, cb: fn(&mut DependencyGraphVisitor)) -> Self {
-        let id = (cb as *const u8) as usize;
+    pub fn new<T: 'static>(trait_name: &'static str, _cb: fn(&mut DependencyGraphVisitor)) -> Self {
+        // The call back above is only a marker input to avoid misuse of a tag.
+
         let type_id = TypeId::of::<T>();
         let type_name = type_name::<T>();
 
         Self {
-            id,
             type_id,
             trait_name,
             type_name,
@@ -232,11 +226,11 @@ impl Debug for Tag {
 }
 
 #[derive(Hash, Eq, PartialEq, Ord, PartialOrd)]
-struct TagCmpHack(usize, TypeId, &'static str);
+struct TagCmpHack(TypeId, &'static str);
 
 impl From<&Tag> for TagCmpHack {
     fn from(value: &Tag) -> Self {
-        Self(value.id, value.type_id, value.trait_name)
+        Self(value.type_id, value.trait_name)
     }
 }
 
