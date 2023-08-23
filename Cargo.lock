@@ -244,6 +244,7 @@ name = "affair"
 version = "0.1.2"
 dependencies = [
  "async-trait",
+ "criterion 0.5.1",
  "crossbeam",
  "futures",
  "tokio",
@@ -1629,6 +1630,7 @@ dependencies = [
  "ciborium",
  "clap 4.3.17",
  "criterion-plot",
+ "futures",
  "is-terminal",
  "itertools",
  "num-traits",
@@ -1641,6 +1643,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "tinytemplate",
+ "tokio",
  "walkdir",
 ]
 

@@ -338,7 +338,7 @@ impl<Req, Res> Socket<Req, Res> {
 
         let result = rx.await.map_err(|_| RunError::FailedToGetResponse)?;
 
-        // TODO(qti3e): Optimize this hot path.
+        // TODO(qti3e): Optimize this hot path. Currently it has a 3% performance degradation.
         let guard = self.observers.read().expect("Unexpected poisioned lock.");
         for cb in guard.iter() {
             (*cb)(&result);
