@@ -35,13 +35,14 @@ pub struct Broadcast<C: Collection> {
     notifier: c![C::NotifierInterface],
     inner: BroadcastInner<C>,
     shutdown_signal: Arc<std::sync::RwLock<Option<tokio::sync::oneshot::Sender<()>>>>,
-    listener: Arc<tokio::sync::Mutex<c![C::ConnectionPoolInterface::Listener<BroadcastFrame>]>>,
+    listener:
+        Arc<std::sync::Mutex<Option<c![C::ConnectionPoolInterface::Listener<BroadcastFrame>]>>>,
     /// Map of topic channel senders for incoming payloads
     channels: Arc<DashMap<Topic, tokio::sync::broadcast::Sender<Vec<u8>>>>,
     /// Sender for outgoing payloads, cloned and given to pubsub instances.
     sender: tokio::sync::mpsc::Sender<(Topic, Vec<u8>)>,
     /// Receiver for outgoing payloads
-    receiver: Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<(Topic, Vec<u8>)>>>,
+    receiver: Arc<std::sync::Mutex<Option<tokio::sync::mpsc::Receiver<(Topic, Vec<u8>)>>>>,
     collection: PhantomData<C>,
 }
 
@@ -82,13 +83,11 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
             .expect("failed to aquire shutdown lock") = Some(shutdown_tx);
 
         let inner = self.inner.clone();
-        let listener = self.listener.clone();
-        let outgoing = self.receiver.clone();
+        let mut listener = self.listener.lock().unwrap().take().unwrap();
+        let mut outgoing = self.receiver.lock().unwrap().take().unwrap();
 
         // Spawn the main loop
         tokio::spawn(async move {
-            let mut listener = listener.lock().await;
-            let mut outgoing = outgoing.lock().await;
             loop {
                 select! {
                     // Incoming connection
@@ -102,12 +101,13 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
                         }
                     }
                     // Outgoing messages
-                    Some((topic, payload)) = outgoing.recv() => {
-                        if let Err(e) = inner.broadcast(topic, payload).await {
-                            error!("Failed to broadcast message: {e}");
+                    message = outgoing.recv() => {
+                        if let Some((topic, payload)) = message {
+                            if let Err(e) = inner.broadcast(topic, payload).await {
+                                error!("Failed to broadcast message: {e}");
+                            }
                         }
                     }
-                    // Epoch change
                     _ = epoch_rx.recv() => {
                         // renew sender for next epoch
                         notifier.notify_on_new_epoch(epoch_tx.clone());
@@ -151,10 +151,10 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
             inner,
             notifier,
             shutdown_signal: std::sync::RwLock::new(None).into(),
-            listener: tokio::sync::Mutex::new(listener).into(),
+            listener: std::sync::Mutex::new(Some(listener)).into(),
             channels,
             sender,
-            receiver: tokio::sync::Mutex::new(receiver).into(),
+            receiver: Arc::new(std::sync::Mutex::new(Some(receiver))),
             collection: PhantomData,
         })
     }

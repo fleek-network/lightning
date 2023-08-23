@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -15,7 +16,7 @@ use lightning_interfaces::{
     ConnectionPoolInterface,
     WithStartAndShutdown,
 };
-use quinn::{Endpoint, RecvStream, SendStream, ServerConfig};
+use quinn::{Endpoint, RecvStream, SendStream, ServerConfig, TransportConfig};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
@@ -99,7 +100,11 @@ impl<C: Collection> WithStartAndShutdown for ConnectionPool<C> {
 
     async fn start(&self) {
         let tls_config = tls::server_config();
-        let server_config = ServerConfig::with_crypto(Arc::new(tls_config));
+        let mut server_config = ServerConfig::with_crypto(Arc::new(tls_config));
+        let mut transport_config = TransportConfig::default();
+        transport_config.max_idle_timeout(Duration::from_secs(30).try_into().ok());
+        transport_config.keep_alive_interval(Some(Duration::from_secs(10)));
+        server_config.transport_config(Arc::new(transport_config));
         let endpoint = Endpoint::server(server_config, self.config.address).unwrap();
         self.endpoint.lock().unwrap().replace(endpoint.clone());
 

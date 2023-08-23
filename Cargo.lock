@@ -3727,8 +3727,10 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
+ "bytes",
  "dashmap",
  "fleek-crypto",
+ "futures-util",
  "infusion",
  "lightning-interfaces",
  "multiaddr",
@@ -3737,6 +3739,7 @@ dependencies = [
  "rustls 0.21.5",
  "serde",
  "tokio",
+ "tokio-util 0.7.8",
  "tracing",
 ]
 

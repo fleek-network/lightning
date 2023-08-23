@@ -1,12 +1,13 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
 use dashmap::DashMap;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::schema::{AutoImplSerde, LightningMessage};
 use lightning_interfaces::types::ServiceScope;
-use quinn::{ClientConfig, Connection, Endpoint};
+use quinn::{ClientConfig, Connection, Endpoint, TransportConfig};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Receiver;
 
@@ -18,6 +19,7 @@ use crate::tls;
 ///
 /// Sends new QUIC streams to pool listener.
 pub async fn start_listener_driver(driver: ListenerDriver) {
+    let mut connections = Vec::new();
     while let Some(connecting) = driver.endpoint.accept().await {
         let remote_address = connecting.remote_address();
         let connection = match connecting.await {
@@ -29,6 +31,7 @@ pub async fn start_listener_driver(driver: ListenerDriver) {
         };
 
         tracing::info!("connection established {}", connection.remote_address());
+        connections.push(connection.clone());
 
         let handles = driver.handles.clone();
         tokio::spawn(async move {
@@ -36,6 +39,8 @@ pub async fn start_listener_driver(driver: ListenerDriver) {
                 tracing::error!("failed to handle incoming connection: {e:?}");
             }
         });
+
+        connections.retain(|conn| conn.close_reason().is_none());
     }
 }
 
@@ -44,7 +49,9 @@ async fn handle_incoming_connection(
     connection: Connection,
 ) -> Result<()> {
     let (tx, mut rx) = connection.accept_bi().await?;
-    let data = rx.read_to_end(1024).await?;
+
+    let mut data = vec![0; 75];
+    rx.read_exact(&mut data).await?;
     let message: StreamRequest = StreamRequest::decode(&data)?;
     if let Some(handle) = handles.get(&message.scope) {
         if handle
@@ -64,25 +71,13 @@ async fn handle_incoming_connection(
 /// Sends new QUIC streams to pool connector.
 pub async fn start_connector_driver(mut driver: ConnectorDriver) {
     while let Some(event) = driver.connect_rx.recv().await {
-        match driver.pool.get(&(event.peer, event.address)) {
-            None => {
-                let endpoint = driver.endpoint.clone();
-                let pool = driver.pool.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = handle_new_outgoing_connection(endpoint, event, pool).await {
-                        tracing::error!("failed to handle outgoing connection: {e:?}")
-                    }
-                });
-            },
-            Some(connection) => {
-                let connection = connection.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = handle_existing_outgoing_connection(connection, event).await {
-                        tracing::error!("failed to handle outgoing connection: {e:?}")
-                    }
-                });
-            },
-        };
+        let endpoint = driver.endpoint.clone();
+        let pool = driver.pool.clone();
+        tokio::spawn(async move {
+            if let Err(e) = handle_new_outgoing_connection(endpoint, event, pool).await {
+                tracing::error!("failed to handle outgoing connection: {e:?}")
+            }
+        });
     }
 }
 
@@ -92,7 +87,12 @@ async fn handle_new_outgoing_connection(
     pool: Arc<DashMap<(NodePublicKey, SocketAddr), Connection>>,
 ) -> Result<()> {
     let config = tls::client_config();
-    let client_config = ClientConfig::new(Arc::new(config));
+    let mut client_config = ClientConfig::new(Arc::new(config));
+    let mut transport_config = TransportConfig::default();
+    transport_config.max_idle_timeout(Duration::from_secs(30).try_into().ok());
+    transport_config.keep_alive_interval(Some(Duration::from_secs(10)));
+    client_config.transport_config(Arc::new(transport_config));
+
     let connection = endpoint
         .connect_with(client_config, event.address, "localhost")?
         .await?;
@@ -107,7 +107,8 @@ async fn handle_existing_outgoing_connection(
 ) -> Result<()> {
     let (mut tx, rx) = connection.open_bi().await?;
 
-    let mut writer = Vec::with_capacity(1024);
+    // size of the stream request struct
+    let mut writer = Vec::with_capacity(75);
     LightningMessage::encode::<Vec<_>>(
         &StreamRequest {
             source_peer: event.peer,

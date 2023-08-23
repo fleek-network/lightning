@@ -69,7 +69,7 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
 }
 
 //#[tokio::test]
-//async fn e2e_epoch_change() -> Result<()> {
+//async fn e2e_epoch_change_x() -> Result<()> {
 //    env_logger::init();
 //    // Start epoch now and let it end in 20 seconds.
 //    let epoch_start = SystemTime::now()
@@ -82,7 +82,7 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
 //        .with_directory(path)
 //        .with_min_port(10101)
 //        .with_max_port(10200)
-//        .with_num_nodes(8)
+//        .with_num_nodes(5)
 //        .with_committee_size(4)
 //        .with_epoch_time(40000)
 //        .with_epoch_start(epoch_start)
@@ -119,7 +119,8 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
 //        "params":[],
 //        "id":1,
 //    });
-//    for (_, address) in swarm.get_rpc_addresses() {
+//    let mut count = 0;
+//    for (key, address) in swarm.get_rpc_addresses() {
 //        let response = rpc::rpc_request(address, request.to_string())
 //            .await
 //            .unwrap();
@@ -127,7 +128,13 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
 //        let epoch = rpc::parse_response::<u64>(response)
 //            .await
 //            .expect("Failed to parse response.");
-//        assert_eq!(epoch, 1);
+//        // TODO(matthias): add assert statement back
+//        //assert_eq!(epoch, 1);
+//        if epoch == 1 {
+//            count += 1;
+//        }
+//        println!("key: {}, epoch: {epoch}", key.to_base64());
 //    }
+//    assert_eq!(count, swarm.get_rpc_addresses().len());
 //    Ok(())
 //}
