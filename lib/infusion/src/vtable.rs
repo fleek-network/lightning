@@ -231,9 +231,18 @@ impl Debug for Tag {
     }
 }
 
+#[derive(Hash, Eq, PartialEq, Ord, PartialOrd)]
+struct TagCmpHack(usize, TypeId, &'static str);
+
+impl From<&Tag> for TagCmpHack {
+    fn from(value: &Tag) -> Self {
+        Self(value.id, value.type_id, value.trait_name)
+    }
+}
+
 impl Hash for Tag {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
+        TagCmpHack::from(self).hash(state)
     }
 }
 
@@ -241,19 +250,19 @@ impl Eq for Tag {}
 
 impl PartialEq for Tag {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+        TagCmpHack::from(self).eq(&TagCmpHack::from(other))
     }
 }
 
 impl Ord for Tag {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.id.cmp(&other.id)
+        TagCmpHack::from(self).cmp(&TagCmpHack::from(other))
     }
 }
 
 impl PartialOrd for Tag {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.id.partial_cmp(&other.id)
+        TagCmpHack::from(self).partial_cmp(&TagCmpHack::from(other))
     }
 }
 
@@ -364,15 +373,18 @@ mod tests {
 
         // The equality should hold regardless of the label.
 
-        assert_eq!(
-            Tag::new::<A>("Trait1", <A as Trait1>::dependencies),
-            Tag::new::<A>("lib::Trait1", <A as Trait1>::dependencies),
-        );
-
-        assert_eq!(
-            Tag::new::<A>("Trait2", <A as Trait2>::dependencies),
-            Tag::new::<A>("lib::Trait2", <A as Trait2>::dependencies),
-        );
+        // Maybe one day we can have this back. Until then we have to enforce tags
+        // to use the same human readable name.
+        //
+        // assert_eq!(
+        //     Tag::new::<A>("Trait1", <A as Trait1>::dependencies),
+        //     Tag::new::<A>("lib::Trait1", <A as Trait1>::dependencies),
+        // );
+        //
+        // assert_eq!(
+        //     Tag::new::<A>("Trait2", <A as Trait2>::dependencies),
+        //     Tag::new::<A>("lib::Trait2", <A as Trait2>::dependencies),
+        // );
 
         assert_eq!(
             Tag::new::<B>("Trait1", <B as Trait1>::dependencies),

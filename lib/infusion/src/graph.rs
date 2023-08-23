@@ -23,12 +23,17 @@ impl DependencyGraph {
     /// dependencies of each collection member and will construct the raw graph. At this step
     /// cycles are *not* reported.
     pub fn new(collection_vtables: Vec<VTable>) -> Self {
-        {
+        // Make sure inputs are unique objects.
+        let allowed = {
             let mut seen = HashSet::<Tag>::with_capacity(collection_vtables.len());
             for table in collection_vtables.iter() {
-                assert!(seen.insert(table.tag()), "Duplicate item.");
+                assert!(
+                    seen.insert(table.tag()),
+                    "unexpected duplicate vtable item."
+                );
             }
-        }
+            seen
+        };
 
         let len = collection_vtables.len();
         let mut vtables = HashMap::with_capacity(len);
@@ -37,6 +42,7 @@ impl DependencyGraph {
         let inputs = HashSet::new();
 
         let mut visitor = DependencyGraphVisitor {
+            allowed,
             current: None,
             insertion_order,
             dependency_graph,
@@ -176,6 +182,7 @@ impl Debug for DependencyGraph {
 /// dependencies. Additionally, a node can decide to mark itself as an `input` node.
 #[derive(Default)]
 pub struct DependencyGraphVisitor {
+    allowed: HashSet<Tag>,
     current: Option<Tag>,
     insertion_order: Vec<Tag>,
     pub(crate) dependency_graph: HashMap<Tag, HashSet<Tag>>,
@@ -210,6 +217,10 @@ impl DependencyGraphVisitor {
     /// If the current node has already been specified as an input node via a prior call to the
     /// [mark_input](Self::mark_input) method.
     pub fn add_dependency(&mut self, tag: Tag) {
+        if !self.allowed.contains(&tag) {
+            panic!("Attempted to add a dependency from outside of the collection: {tag:?}");
+        }
+
         let current = self.current.unwrap();
         self.dependency_graph
             .get_mut(&current)
