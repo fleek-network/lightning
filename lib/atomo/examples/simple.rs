@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use atomo::{AtomoBuilder, DefaultSerdeBackend};
+use atomo::{AtomoBuilder, DefaultSerdeBackend, InMemoryStorage};
 
 fn main() {
     type Key = u64;
@@ -18,7 +18,7 @@ fn main() {
     // open the database.
     //
     // This ensure that only one update is happening at any given time.
-    let mut db = AtomoBuilder::<DefaultSerdeBackend>::new()
+    let mut db = AtomoBuilder::<InMemoryStorage, DefaultSerdeBackend>::default()
         .with_table::<Key, Value>("name-of-table")
         .build();
 
@@ -41,13 +41,20 @@ fn main() {
     let table_res = db.resolve::<Key, Value>("name-of-table");
 
     // Insert `(0, 17)` to the table.
-    db.run(|ctx: &mut atomo::TableSelector<atomo::BincodeSerde>| {
-        let mut table_ref = table_res.get(ctx);
-        // Or if we didn't have a `ResolvedTableReference`.
-        // let mut table_ref = ctx.get_table::<Key, Value>("name-of-table");
+    //
+    // For the sake of example we are manually writing the type of the closures callback.
+    // However this is not recommended to hard code your logic to a certain backend or encoding
+    // therefore you should always instead prefer to use `ctx: _` as shown in the next call to
+    // this function.
+    db.run(
+        |ctx: &mut atomo::TableSelector<InMemoryStorage, atomo::BincodeSerde>| {
+            let mut table_ref = table_res.get(ctx);
+            // Or if we didn't have a `ResolvedTableReference`.
+            // let mut table_ref = ctx.get_table::<Key, Value>("name-of-table");
 
-        table_ref.insert(0, 17);
-    });
+            table_ref.insert(0, 17);
+        },
+    );
 
     // Here we demonstrate the consistent views that Atomo provides:
     //

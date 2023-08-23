@@ -15,7 +15,7 @@ use crate::inner::AtomoInner;
 use crate::keys::VerticalKeys;
 use crate::serder::SerdeBackend;
 use crate::snapshot::Snapshot;
-use crate::KeyIterator;
+use crate::{KeyIterator, StorageBackend};
 
 pub struct TableMeta {
     pub _name: String,
@@ -50,9 +50,9 @@ pub struct ResolvedTableReference<K, V> {
 ///
 /// And at that point you can use that table reference instance to operate on a table or retrieve
 /// values from it.
-pub struct TableSelector<S: SerdeBackend> {
+pub struct TableSelector<B: StorageBackend, S: SerdeBackend> {
     /// The [`Atomo`] instance.
-    atomo: Arc<AtomoInner<S>>,
+    atomo: Arc<AtomoInner<B, S>>,
     /// The current version of the data.
     snapshot: Snapshot<VerticalBatch, VerticalKeys>,
     /// A set of already claimed tables.
@@ -70,11 +70,12 @@ pub struct TableRef<
     'selector,
     K: Hash + Eq + Serialize + DeserializeOwned + Any,
     V: Serialize + DeserializeOwned + Any,
+    B: StorageBackend,
     S: SerdeBackend,
 > {
     tid: TableId,
     batch: BatchReference,
-    selector: &'selector TableSelector<S>,
+    selector: &'selector TableSelector<B, S>,
     kv: PhantomData<(K, V)>,
 }
 
@@ -88,7 +89,7 @@ impl TableMeta {
 }
 
 // When a table ref is dropped make it available to be claimed again.
-impl<'selector, K, V, S: SerdeBackend> Drop for TableRef<'selector, K, V, S>
+impl<'selector, K, V, B: StorageBackend, S: SerdeBackend> Drop for TableRef<'selector, K, V, B, S>
 where
     K: Hash + Eq + Serialize + DeserializeOwned + Any,
     V: Serialize + DeserializeOwned + Any,
@@ -98,10 +99,10 @@ where
     }
 }
 
-impl<S: SerdeBackend> TableSelector<S> {
+impl<B: StorageBackend, S: SerdeBackend> TableSelector<B, S> {
     /// Create a new table selector for the head of an Atomo instance.
     #[inline]
-    pub fn new(atomo: Arc<AtomoInner<S>>) -> Self {
+    pub fn new(atomo: Arc<AtomoInner<B, S>>) -> Self {
         let num_tables = atomo.tables.len();
         let batch = VerticalBatch::new(num_tables);
         let snapshot = atomo.snapshot_list.current();
@@ -126,7 +127,7 @@ impl<S: SerdeBackend> TableSelector<S> {
     /// # Panics
     ///
     /// If the information provided are not correct and such a table does not exists.
-    pub fn get_table<K, V>(&self, name: impl AsRef<str>) -> TableRef<K, V, S>
+    pub fn get_table<K, V>(&self, name: impl AsRef<str>) -> TableRef<K, V, B, S>
     where
         K: Hash + Eq + Serialize + DeserializeOwned + Any,
         V: Serialize + DeserializeOwned + Any,
@@ -149,10 +150,10 @@ impl<K, V> ResolvedTableReference<K, V> {
     /// # Panics
     ///
     /// If the table is already claimed.
-    pub fn get<'selector, S: SerdeBackend>(
+    pub fn get<'selector, B: StorageBackend, S: SerdeBackend>(
         &self,
-        selector: &'selector TableSelector<S>,
-    ) -> TableRef<'selector, K, V, S>
+        selector: &'selector TableSelector<B, S>,
+    ) -> TableRef<'selector, K, V, B, S>
     where
         K: Hash + Eq + Serialize + DeserializeOwned + Any,
         V: Serialize + DeserializeOwned + Any,
@@ -186,7 +187,7 @@ impl<K, V> ResolvedTableReference<K, V> {
     }
 }
 
-impl<'selector, K, V, S: SerdeBackend> TableRef<'selector, K, V, S>
+impl<'selector, K, V, B: StorageBackend, S: SerdeBackend> TableRef<'selector, K, V, B, S>
 where
     K: Hash + Eq + Serialize + DeserializeOwned + Any,
     V: Serialize + DeserializeOwned + Any,

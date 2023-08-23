@@ -20,13 +20,14 @@ enum Op {
 }
 
 fn fuzz(input: Input) {
-    let mut db = atomo::AtomoBuilder::<atomo::DefaultSerdeBackend>::default()
-        .with_table::<u8, u64>("TABLE_1")
-        .with_table::<u8, u64>("TABLE_2")
-        .with_table::<u8, u64>("TABLE_3")
-        .with_table::<u8, u64>("TABLE_4")
-        .with_table::<u8, u64>("TABLE_5")
-        .build();
+    let mut db =
+        atomo::AtomoBuilder::<atomo::InMemoryStorage, atomo::DefaultSerdeBackend>::default()
+            .with_table::<u8, u64>("TABLE_1")
+            .with_table::<u8, u64>("TABLE_2")
+            .with_table::<u8, u64>("TABLE_3")
+            .with_table::<u8, u64>("TABLE_4")
+            .with_table::<u8, u64>("TABLE_5")
+            .build();
 
     let tables = (1..=5)
         .map(|i| db.resolve::<u8, u64>(&format!("TABLE_{i}")))

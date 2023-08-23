@@ -3,7 +3,6 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
 
-use dashmap::DashMap;
 use fxhash::FxHashMap;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -13,17 +12,16 @@ use crate::db::TableId;
 use crate::keys::VerticalKeys;
 use crate::serder::SerdeBackend;
 use crate::snapshot::SnapshotList;
+use crate::storage::StorageBackend;
 use crate::table::{ResolvedTableReference, TableMeta};
 
 static INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-type MockPersistance = DashMap<Box<[u8]>, Box<[u8]>, fxhash::FxBuildHasher>;
-
-pub struct AtomoInner<S: SerdeBackend> {
+pub struct AtomoInner<B, S: SerdeBackend> {
     /// The unique id of this instance in the entire program.
     pub id: usize,
-    /// The mock persistence layer
-    pub persistence: Vec<MockPersistance>,
+    /// The persistence layer
+    pub persistence: B,
     /// The tables and dynamic runtime types.
     pub tables: Vec<TableMeta>,
     /// Map each table name to its index.
@@ -33,12 +31,12 @@ pub struct AtomoInner<S: SerdeBackend> {
     serde: PhantomData<S>,
 }
 
-impl<S: SerdeBackend> AtomoInner<S> {
+impl<S: SerdeBackend> AtomoInner<(), S> {
     pub fn empty() -> Self {
         let id = INSTANCE_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         AtomoInner {
             id,
-            persistence: Vec::new(),
+            persistence: (),
             tables: Vec::new(),
             table_name_to_id: FxHashMap::default(),
             snapshot_list: SnapshotList::default(),
@@ -46,20 +44,22 @@ impl<S: SerdeBackend> AtomoInner<S> {
         }
     }
 
+    pub fn swap_persistance<P: StorageBackend>(self, persistence: P) -> AtomoInner<P, S> {
+        AtomoInner {
+            id: self.id,
+            persistence,
+            tables: self.tables,
+            table_name_to_id: self.table_name_to_id,
+            snapshot_list: self.snapshot_list,
+            serde: PhantomData,
+        }
+    }
+}
+
+impl<B: StorageBackend, S: SerdeBackend> AtomoInner<B, S> {
     /// Performs a batch of operations on the persistence layer.
     pub fn perform_batch(&self, batch: VerticalBatch) {
-        for (table, batch) in self.persistence.iter().zip(batch.into_raw().into_iter()) {
-            for (key, operation) in batch.into_iter() {
-                match operation {
-                    Operation::Remove => {
-                        table.remove(&key);
-                    },
-                    Operation::Insert(value) => {
-                        table.insert(key, value);
-                    },
-                }
-            }
-        }
+        self.persistence.commit(batch);
     }
 
     /// Given the name of a table as an input string returns a [`ResolvedTableReference`].
@@ -144,10 +144,10 @@ impl<S: SerdeBackend> AtomoInner<S> {
     }
 }
 
-impl<S: SerdeBackend> AtomoInner<S> {
+impl<B: StorageBackend, S: SerdeBackend> AtomoInner<B, S> {
     /// Return the raw byte representation of a value for a raw key.
     pub fn get_raw(&self, tid: TableId, key: &[u8]) -> Option<Vec<u8>> {
-        self.persistence[tid as usize].get(key).map(|v| v.to_vec())
+        self.persistence.get(tid, key)
     }
 
     /// Returns the deserialized value associated with a key.
@@ -160,18 +160,19 @@ impl<S: SerdeBackend> AtomoInner<S> {
 
     /// Returns true if the key exists.
     pub fn contains_key(&self, tid: TableId, key: &[u8]) -> bool {
-        self.persistence[tid as usize].contains_key(key)
+        self.persistence.contains(tid, key)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::batch::{Operation, VerticalBatch};
+    use crate::storage::InMemoryStorage;
     use crate::{AtomoBuilder, BincodeSerde};
 
     #[test]
     fn resolve_valid_should_work() {
-        let inner = AtomoBuilder::<BincodeSerde>::new()
+        let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<String, usize>("TABLE")
             .build_inner();
 
@@ -181,7 +182,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn resolve_key_type_mismatch_should_panic() {
-        let inner = AtomoBuilder::<BincodeSerde>::new()
+        let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<String, usize>("TABLE")
             .build_inner();
 
@@ -191,7 +192,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn resolve_value_type_mismatch_should_panic() {
-        let inner = AtomoBuilder::<BincodeSerde>::new()
+        let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<String, usize>("TABLE")
             .build_inner();
 
@@ -201,7 +202,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn resolve_undefined_table_should_panic() {
-        let inner = AtomoBuilder::<BincodeSerde>::new()
+        let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<String, usize>("TABLE")
             .build_inner();
 
@@ -210,7 +211,7 @@ mod tests {
 
     #[test]
     fn perform_batch() {
-        let inner = AtomoBuilder::<BincodeSerde>::new()
+        let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<Vec<u8>, usize>("TABLE")
             .build_inner();
 
@@ -247,7 +248,7 @@ mod tests {
             Operation::Insert(vec![4].into_boxed_slice()),
         );
         map.insert(vec![1].into_boxed_slice(), Operation::Remove);
-        // new insert
+        // default insert
         map.insert(
             vec![3].into_boxed_slice(),
             Operation::Insert(vec![5].into_boxed_slice()),
@@ -266,7 +267,7 @@ mod tests {
 
     #[test]
     fn compute_inverse() {
-        let inner = AtomoBuilder::<BincodeSerde>::new()
+        let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<Vec<u8>, usize>("TABLE")
             .build_inner();
 
@@ -296,7 +297,7 @@ mod tests {
         // remove key
         map.insert(vec![1].into_boxed_slice(), Operation::Remove);
         // for key=2 preserve it.
-        // and insert a new key.
+        // and insert a default key.
         map.insert(
             vec![3].into_boxed_slice(),
             Operation::Insert(vec![5].into_boxed_slice()),
@@ -320,7 +321,7 @@ mod tests {
 
     #[test]
     fn compute_inverse_on_empty_db() {
-        let inner = AtomoBuilder::<BincodeSerde>::new()
+        let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<Vec<u8>, usize>("TABLE")
             .build_inner();
 

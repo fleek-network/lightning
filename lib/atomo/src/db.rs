@@ -8,6 +8,7 @@ use serde::Serialize;
 
 use crate::inner::AtomoInner;
 use crate::serder::SerdeBackend;
+use crate::storage::{InMemoryStorage, StorageBackend};
 use crate::table::{ResolvedTableReference, TableSelector};
 use crate::DefaultSerdeBackend;
 
@@ -35,21 +36,21 @@ pub struct UpdatePerm;
 ///
 /// An important note here is that the [`Atomo<QueryPerm>`] implements [`Clone`] so that
 /// you can clone it anytime (and the clone implementation is rather cheap.)
-pub struct Atomo<O, S: SerdeBackend = DefaultSerdeBackend> {
-    inner: Arc<AtomoInner<S>>,
+pub struct Atomo<O, B: StorageBackend = InMemoryStorage, S: SerdeBackend = DefaultSerdeBackend> {
+    inner: Arc<AtomoInner<B, S>>,
     ownership: PhantomData<O>,
 }
 
 // only implement the clone for the query permission.
-impl<S: SerdeBackend> Clone for Atomo<QueryPerm, S> {
+impl<B: StorageBackend, S: SerdeBackend> Clone for Atomo<QueryPerm, B, S> {
     fn clone(&self) -> Self {
         Self::new(self.inner.clone())
     }
 }
 
-impl<O, S: SerdeBackend> Atomo<O, S> {
+impl<O, B: StorageBackend, S: SerdeBackend> Atomo<O, B, S> {
     #[inline]
-    pub(crate) fn new(inner: Arc<AtomoInner<S>>) -> Self {
+    pub(crate) fn new(inner: Arc<AtomoInner<B, S>>) -> Self {
         Self {
             inner,
             ownership: PhantomData,
@@ -57,7 +58,7 @@ impl<O, S: SerdeBackend> Atomo<O, S> {
     }
 
     /// Returns a query end for this table.
-    pub fn query(&self) -> Atomo<QueryPerm, S> {
+    pub fn query(&self) -> Atomo<QueryPerm, B, S> {
         Atomo::new(self.inner.clone())
     }
 
@@ -77,22 +78,22 @@ impl<O, S: SerdeBackend> Atomo<O, S> {
     }
 }
 
-impl<S: SerdeBackend> Atomo<QueryPerm, S> {
+impl<B: StorageBackend, S: SerdeBackend> Atomo<QueryPerm, B, S> {
     /// Run a query on the database.
     pub fn run<F, R>(&self, query: F) -> R
     where
-        F: FnOnce(&mut TableSelector<S>) -> R,
+        F: FnOnce(&mut TableSelector<B, S>) -> R,
     {
         let mut selector = TableSelector::new(self.inner.clone());
         query(&mut selector)
     }
 }
 
-impl<S: SerdeBackend> Atomo<UpdatePerm, S> {
+impl<B: StorageBackend, S: SerdeBackend> Atomo<UpdatePerm, B, S> {
     /// Run an update on the database.
     pub fn run<F, R>(&mut self, mutation: F) -> R
     where
-        F: FnOnce(&mut TableSelector<S>) -> R,
+        F: FnOnce(&mut TableSelector<B, S>) -> R,
     {
         let mut selector = TableSelector::new(self.inner.clone());
         let response = mutation(&mut selector);
@@ -116,8 +117,8 @@ mod doc_tests {
     ///
     /// fn is_clone<T: Clone>() {}
     ///
-    /// fn ensure_atomo_is_clone<S: SerdeBackend>() {
-    ///     is_clone::<Atomo<QueryPerm, S>>()
+    /// fn ensure_atomo_is_clone<B: StorageBackend, S: SerdeBackend>() {
+    ///     is_clone::<Atomo<QueryPerm, B, S>>()
     /// }
     /// ```
     ///
@@ -128,8 +129,8 @@ mod doc_tests {
     ///
     /// fn is_clone<T: Clone>() {}
     ///
-    /// fn ensure_atomo_is_clone<S: SerdeBackend>() {
-    ///     is_clone::<Atomo<UpdatePerm, S>>()
+    /// fn ensure_atomo_is_clone<B: StorageBackend, S: SerdeBackend>() {
+    ///     is_clone::<Atomo<UpdatePerm, B, S>>()
     /// }
     /// ```
     fn _ensure_update_perm_not_clone() {}

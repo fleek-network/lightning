@@ -2,26 +2,31 @@ use std::any::Any;
 use std::hash::Hash;
 use std::sync::Arc;
 
-use dashmap::DashMap;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::db::{Atomo, TableId, UpdatePerm};
 use crate::inner::AtomoInner;
 use crate::serder::SerdeBackend;
+use crate::storage::{InMemoryStorage, StorageBackendConstructor};
 use crate::table::TableMeta;
 use crate::DefaultSerdeBackend;
 
 /// The builder API to use for opening an [`Atomo`] database.
-pub struct AtomoBuilder<S: SerdeBackend = DefaultSerdeBackend> {
-    atomo: AtomoInner<S>,
+pub struct AtomoBuilder<
+    B: StorageBackendConstructor = InMemoryStorage,
+    S: SerdeBackend = DefaultSerdeBackend,
+> {
+    constructor: B,
+    atomo: AtomoInner<(), S>,
 }
 
-impl<S: SerdeBackend> AtomoBuilder<S> {
+impl<B: StorageBackendConstructor, S: SerdeBackend> AtomoBuilder<B, S> {
     /// Create an empty builder.
     #[must_use = "Creating a builder does not perform anything."]
-    pub fn new() -> Self {
+    pub fn new(constructor: B) -> Self {
         Self {
+            constructor,
             atomo: AtomoInner::empty(),
         }
     }
@@ -62,7 +67,7 @@ impl<S: SerdeBackend> AtomoBuilder<S> {
             panic!("Table {name} is already defined.");
         }
 
-        self.atomo.persistence.push(DashMap::default());
+        self.constructor.open_table(name);
     }
 
     /// Enable the iterator functionality on the provided table. In Atomo by default
@@ -91,20 +96,24 @@ impl<S: SerdeBackend> AtomoBuilder<S> {
 
     /// Finish the construction and returns an [`Atomo`] with [`UpdatePerm`] permission.
     #[must_use = "Creating a Atomo without using it is probably a mistake."]
-    pub fn build(self) -> Atomo<UpdatePerm, S> {
-        Atomo::new(Arc::new(self.atomo))
+    pub fn build(self) -> Atomo<UpdatePerm, B::Storage, S> {
+        Atomo::new(Arc::new(self.build_inner()))
     }
 
     /// Build and return the internal [`AtomoInner`]. Used for testing purposes.
-    #[cfg(test)]
-    pub(crate) fn build_inner(self) -> AtomoInner<S> {
-        self.atomo
+    pub(crate) fn build_inner(self) -> AtomoInner<B::Storage, S> {
+        // TODO(qti3e): Do not unwrap and return the error.
+        let storage = self.constructor.build().unwrap();
+        self.atomo.swap_persistance(storage)
     }
 }
 
-impl<S: SerdeBackend> Default for AtomoBuilder<S> {
+impl<B: StorageBackendConstructor, S: SerdeBackend> Default for AtomoBuilder<B, S>
+where
+    B: Default,
+{
     #[must_use = "Creating a builder does not perform anything."]
     fn default() -> Self {
-        Self::new()
+        Self::new(B::default())
     }
 }

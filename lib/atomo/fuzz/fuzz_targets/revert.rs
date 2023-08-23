@@ -9,9 +9,10 @@ fuzz_target!(|data: usize| {
 fn fuzz(n: usize) {
     let n = n % 10_000;
 
-    let mut db = atomo::AtomoBuilder::<atomo::DefaultSerdeBackend>::default()
-        .with_table::<u8, u64>("TABLE_1")
-        .build();
+    let mut db =
+        atomo::AtomoBuilder::<atomo::InMemoryStorage, atomo::DefaultSerdeBackend>::default()
+            .with_table::<u8, u64>("TABLE_1")
+            .build();
 
     let table = db.resolve::<u8, u64>("TABLE_1");
     let query_runner = db.query();

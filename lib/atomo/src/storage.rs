@@ -70,6 +70,7 @@ impl StorageBackend for InMemoryStorage {
         }
     }
 
+    #[inline]
     fn keys(&self, tid: u8) -> Vec<BoxedVec> {
         let mut collection = Vec::new();
         for item in self.0[tid as usize].iter() {

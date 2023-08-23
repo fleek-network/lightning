@@ -1,7 +1,7 @@
 #![no_main]
 
 use arbitrary::{Arbitrary, Unstructured};
-use atomo::{AtomoBuilder, DefaultSerdeBackend};
+use atomo::{AtomoBuilder, DefaultSerdeBackend, InMemoryStorage};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: Input| {
@@ -21,7 +21,7 @@ fn fuzz(input: Input) {
     let num_run_queries = input.num_run_queries as u64;
     let num_run_updates = input.num_run_updates as usize;
 
-    let mut db = AtomoBuilder::<DefaultSerdeBackend>::new()
+    let mut db = AtomoBuilder::<InMemoryStorage, DefaultSerdeBackend>::default()
         .with_table::<u8, usize>("TABLE")
         .build();
 
