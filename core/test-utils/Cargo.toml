@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lightning-interfaces = {path="../interfaces"}
+lightning-interfaces = { path = "../interfaces" }
 async-trait.workspace = true
 fleek-crypto.workspace = true
 affair.workspace = true
@@ -19,5 +19,4 @@ scc.workspace = true
 hp-fixed.workspace = true
 
 lightning-handshake = { path = "../handshake" }
-lightning-application = { path = "../application" }
 lightning-blockstore = { path = "../blockstore" }

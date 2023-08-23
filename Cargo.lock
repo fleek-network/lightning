@@ -3842,7 +3842,6 @@ dependencies = [
  "axum",
  "fleek-crypto",
  "hp-fixed",
- "lightning-application",
  "lightning-blockstore",
  "lightning-handshake",
  "lightning-interfaces",
