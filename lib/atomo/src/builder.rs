@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::hash::Hash;
+use std::iter::Extend;
 use std::sync::Arc;
 
 use serde::de::DeserializeOwned;
@@ -10,7 +11,7 @@ use crate::inner::AtomoInner;
 use crate::serder::SerdeBackend;
 use crate::storage::{InMemoryStorage, StorageBackendConstructor};
 use crate::table::TableMeta;
-use crate::DefaultSerdeBackend;
+use crate::{DefaultSerdeBackend, StorageBackend};
 
 /// The builder API to use for opening an [`Atomo`] database.
 pub struct AtomoBuilder<
@@ -101,9 +102,32 @@ impl<B: StorageBackendConstructor, S: SerdeBackend> AtomoBuilder<B, S> {
     }
 
     /// Build and return the internal [`AtomoInner`]. Used for testing purposes.
-    pub(crate) fn build_inner(self) -> AtomoInner<B::Storage, S> {
+    pub(crate) fn build_inner(mut self) -> AtomoInner<B::Storage, S> {
         // TODO(qti3e): Do not unwrap and return the error.
         let storage = self.constructor.build().unwrap();
+
+        // Upon opening read every key for the tables that have enabled the
+        // iterator.
+        //
+        // The `vertical_keys.update` method only runs the closure if the table
+        // has already seen a prior `enable_iter` call.
+        //
+        // So we just iterate through every table and attempt to *update* the
+        // list of keys if present.
+
+        let vertical_keys = self.atomo.snapshot_list.get_metadata_mut();
+
+        let count = self.atomo.tables.len() as u8;
+
+        for tid in 0..count {
+            vertical_keys.update(tid, |value| {
+                // TODO(qti3e): The extend method here does not do anything smart and just does
+                // several inserts and each insert is O(log n). And we know this is the initial
+                // change and nothing is referring to this im instance. So.. we can do better.
+                value.extend(storage.keys(tid).into_iter())
+            });
+        }
+
         self.atomo.swap_persistance(storage)
     }
 }
