@@ -194,12 +194,8 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     fn is_valid_node(&self, id: &NodePublicKey) -> bool {
-        // TODO(matthias): we can use `is_some_and` once we update the rust version to 1.70
-        if let Some(node_info) = self.get_node_info(id) {
-            node_info.stake.staked >= self.get_staking_amount().into()
-        } else {
-            false
-        }
+        self.get_node_info(id)
+            .is_some_and(|node_info| node_info.stake.staked >= self.get_staking_amount().into())
     }
 
     fn get_staking_amount(&self) -> u128 {
