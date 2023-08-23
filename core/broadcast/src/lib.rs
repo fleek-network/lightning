@@ -97,15 +97,21 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
                             // The listener should only return none here if it shuts down
                             break
                         };
-                        if let Err(e) = inner.handle_connection(conn.1, conn.0).await {
-                            error!("Error handling broadcast connection: {e}");
-                        }
+                        let inner = inner.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = inner.handle_connection(conn.1, conn.0).await {
+                                error!("Error handling broadcast connection: {e}");
+                            }
+                        });
                     }
                     // Outgoing messages
                     Some((topic, payload)) = outgoing.recv() => {
-                        if let Err(e) = inner.broadcast(topic, payload).await {
-                            error!("Failed to broadcast message: {e}");
-                        }
+                        let inner = inner.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = inner.broadcast(topic, payload).await {
+                                error!("Failed to broadcast message: {e}");
+                            }
+                        });
                     }
                     _ = epoch_rx.recv() => {
                         // renew sender for next epoch
