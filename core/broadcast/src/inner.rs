@@ -214,7 +214,7 @@ impl<C: Collection> BroadcastInner<C> {
         digest: &Blake3Hash,
     ) -> anyhow::Result<()> {
         // check if we have the message already
-        if self.message_cache.contains_key(digest) {
+        if self.message_cache.get(digest).is_none() {
             return Ok(());
         }
 
