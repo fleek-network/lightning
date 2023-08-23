@@ -34,7 +34,7 @@ impl ContainerizedNode {
     pub async fn start(&self) -> anyhow::Result<()> {
         // This function has to return a result in order to use try_join_all in swarm.rs
         *self.container.lock().unwrap() =
-            Some(Container::spawn(self.config.clone(), self.runtime_type).await);
+            Some(Container::spawn(self.index, self.config.clone(), self.runtime_type).await);
         Ok(())
     }
 
