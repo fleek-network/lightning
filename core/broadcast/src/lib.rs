@@ -117,7 +117,10 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
                     _ = epoch_rx.recv() => {
                         // renew sender for next epoch
                         notifier.notify_on_new_epoch(epoch_tx.clone());
-                        inner.apply_topology().await;
+                        let inner = inner.clone();
+                        tokio::spawn(async move {
+                            inner.apply_topology().await;
+                        });
                     }
                     // Shutdown signal
                     _ = &mut shutdown_rx => break,
