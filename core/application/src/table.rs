@@ -2,7 +2,7 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::hash::Hash;
 
-use atomo::{KeyIterator, SerdeBackend, TableRef as AtomoTableRef, TableSelector};
+use atomo::{KeyIterator, SerdeBackend, StorageBackend, TableRef as AtomoTableRef, TableSelector};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -26,15 +26,15 @@ pub trait TableRef<K, V> {
     fn remove(&self, key: &K);
 }
 
-pub struct StateTables<'selector, S: SerdeBackend> {
-    pub table_selector: &'selector TableSelector<S>,
+pub struct StateTables<'selector, B: StorageBackend, S: SerdeBackend> {
+    pub table_selector: &'selector TableSelector<B, S>,
 }
 
-impl<'selector, S: SerdeBackend> Backend for StateTables<'selector, S> {
+impl<'selector, B: StorageBackend, S: SerdeBackend> Backend for StateTables<'selector, B, S> {
     type Ref<
         K: Eq + Hash + Send + Serialize + DeserializeOwned + 'static,
         V: Clone + Send + Serialize + DeserializeOwned + 'static,
-    > = AtomoTable<'selector, K, V, S>;
+    > = AtomoTable<'selector, K, V, B, S>;
 
     fn get_table_reference<
         K: Eq + Hash + Send + Serialize + DeserializeOwned,
@@ -51,15 +51,17 @@ pub struct AtomoTable<
     'selector,
     K: Hash + Eq + Serialize + DeserializeOwned + 'static,
     V: Serialize + DeserializeOwned + 'static,
+    B: StorageBackend,
     S: SerdeBackend,
->(RefCell<AtomoTableRef<'selector, K, V, S>>);
+>(RefCell<AtomoTableRef<'selector, K, V, B, S>>);
 
 impl<
     'selector,
     K: Hash + Eq + Serialize + DeserializeOwned + Any,
     V: Serialize + DeserializeOwned + Any + Clone,
+    B: StorageBackend,
     S: SerdeBackend,
-> TableRef<K, V> for AtomoTable<'selector, K, V, S>
+> TableRef<K, V> for AtomoTable<'selector, K, V, B, S>
 {
     fn set(&self, key: K, value: V) {
         self.0.borrow_mut().insert(key, value);

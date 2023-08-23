@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime};
 
 use affair::Worker as WorkerTrait;
-use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
+use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, InMemoryStorage, QueryPerm, UpdatePerm};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
@@ -38,7 +38,7 @@ pub struct Env<P> {
 
 impl Env<UpdatePerm> {
     pub fn new() -> Self {
-        let mut atomo = AtomoBuilder::<DefaultSerdeBackend>::new()
+        let mut atomo = AtomoBuilder::<InMemoryStorage, DefaultSerdeBackend>::default()
             .with_table::<Metadata, Value>("metadata")
             .with_table::<EthAddress, AccountInfo>("account")
             .with_table::<ClientPublicKey, EthAddress>("client_keys")
