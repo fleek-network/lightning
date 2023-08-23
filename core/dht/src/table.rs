@@ -1,4 +1,5 @@
-use std::collections::{BTreeMap, HashSet};
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -59,6 +60,57 @@ pub async fn start_worker(
                         TableRequest::UpdateNodeTimestamp { node_key, timestamp } => {
                             table.update_node_timestamp(node_key, timestamp);
                         }
+                        TableRequest::ProposeBucketNodes { bucket_index, nodes } => {
+                            let mut actual_buckets = HashMap::new();
+                            for node in nodes {
+                                let index = distance::leading_zero_bits(&local_key.0, &node.key.0);
+                                actual_buckets.entry(index).or_insert(Vec::new()).push(node);
+                            }
+                            if let Some(nodes) = table.get_bucket_nodes(bucket_index) {
+                                for node in nodes {
+                                    let index = distance::leading_zero_bits(
+                                        &local_key.0,
+                                        &node.key.0
+                                    );
+                                    actual_buckets.entry(index).or_insert(Vec::new()).push(node);
+                                }
+                            }
+                            for bucket in actual_buckets.values_mut() {
+                                bucket.sort_by(|a, b| {
+                                    // sort it such that the most desirable nodes are at the end of
+                                    // the vec
+                                    match (a.last_responded, b.last_responded) {
+                                        (Some(a), Some(b)) => a.cmp(&b),
+                                        (Some(_), None) => Ordering::Greater,
+                                        (None, Some(_)) => Ordering::Less,
+                                        (None, None) => Ordering::Equal,
+                                    }
+                                });
+                            }
+                            let mut fresh_nodes = Vec::new();
+                            'outer: loop {
+                                let mut all_empty = true;
+                                for nodes in actual_buckets.values_mut() {
+                                    if let Some(node) = nodes.pop() {
+                                        fresh_nodes.push(node);
+                                    }
+                                    if !nodes.is_empty() {
+                                        all_empty = false;
+                                    }
+                                    if fresh_nodes.len() == MAX_BUCKET_SIZE {
+                                        break 'outer;
+                                    }
+                                }
+                                if all_empty {
+                                    break;
+                                }
+                            }
+                            table.set_bucket_nodes(bucket_index, fresh_nodes);
+                        }
+                        #[cfg(test)]
+                        TableRequest::GetBucketNodes { bucket_index, respond } => {
+                            respond.send(table.get_bucket_nodes(bucket_index)).unwrap();
+                        }
                     }
                 }
             }
@@ -90,6 +142,16 @@ pub enum TableRequest {
     UpdateNodeTimestamp {
         node_key: NodePublicKey,
         timestamp: u64,
+    },
+    #[allow(unused)]
+    ProposeBucketNodes {
+        bucket_index: usize,
+        nodes: Vec<NodeInfo>,
+    },
+    #[cfg(test)]
+    GetBucketNodes {
+        bucket_index: usize,
+        respond: oneshot::Sender<Option<Vec<NodeInfo>>>,
     },
 }
 
@@ -154,6 +216,20 @@ impl Table {
         closest.into_values().collect()
     }
 
+    fn get_bucket_nodes(&self, bucket_index: usize) -> Option<Vec<NodeInfo>> {
+        if bucket_index < self.buckets.len() {
+            Some(self.buckets[bucket_index].nodes().cloned().collect())
+        } else {
+            None
+        }
+    }
+
+    fn set_bucket_nodes(&mut self, bucket_index: usize, nodes: Vec<NodeInfo>) {
+        if bucket_index < self.buckets.len() {
+            self.buckets[bucket_index].set_nodes(nodes);
+        }
+    }
+
     fn add_node(&mut self, node: NodeInfo) -> Result<()> {
         if node.key == self.local_node_key {
             // We don't add ourselves to the routing table.
@@ -213,9 +289,13 @@ fn calculate_bucket_index(bucket_count: usize, possible_index: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use rand::Rng;
+    use tokio::sync::mpsc;
 
     use super::*;
+    use crate::bucket;
 
     fn get_random_key() -> TableKey {
         let mut rng = rand::thread_rng();
@@ -281,5 +361,165 @@ mod tests {
             actual_count += bucket.nodes().count();
         }
         assert_eq!(actual_count, num_nodes);
+    }
+
+    #[tokio::test]
+    async fn test_propose_nodes() {
+        let public_key = get_random_key();
+        let (table_tx, table_rx) = mpsc::channel(10);
+        let shutdown_notify = Arc::new(tokio::sync::Notify::new());
+
+        let worker_fut = start_worker(table_rx, public_key.into(), shutdown_notify.clone());
+
+        let request_fut = async move {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            let node1 = NodeInfo {
+                address: "127.0.0.1:8000".parse().unwrap(),
+                key: bucket::random_key_in_bucket(0, &public_key).into(),
+                last_responded: Some(100),
+            };
+            let node2 = NodeInfo {
+                address: "127.0.0.1:8001".parse().unwrap(),
+                key: bucket::random_key_in_bucket(0, &public_key).into(),
+                last_responded: Some(200),
+            };
+            let node3 = NodeInfo {
+                address: "127.0.0.1:8002".parse().unwrap(),
+                key: bucket::random_key_in_bucket(0, &public_key).into(),
+                last_responded: None,
+            };
+            let req = TableRequest::ProposeBucketNodes {
+                bucket_index: 0,
+                nodes: vec![node1.clone(), node2.clone(), node3],
+            };
+            table_tx.send(req).await.unwrap();
+
+            let node4 = NodeInfo {
+                address: "127.0.0.1:8003".parse().unwrap(),
+                key: bucket::random_key_in_bucket(0, &public_key).into(),
+                last_responded: Some(500),
+            };
+            let node5 = NodeInfo {
+                address: "127.0.0.1:8004".parse().unwrap(),
+                key: bucket::random_key_in_bucket(0, &public_key).into(),
+                last_responded: None,
+            };
+            let node6 = NodeInfo {
+                address: "127.0.0.1:8005".parse().unwrap(),
+                key: bucket::random_key_in_bucket(0, &public_key).into(),
+                last_responded: Some(50),
+            };
+            let req = TableRequest::ProposeBucketNodes {
+                bucket_index: 0,
+                nodes: vec![node4.clone(), node5, node6],
+            };
+            table_tx.send(req).await.unwrap();
+
+            let (tx, rx) = oneshot::channel();
+            let req = TableRequest::GetBucketNodes {
+                bucket_index: 0,
+                respond: tx,
+            };
+            table_tx.send(req).await.unwrap();
+
+            let nodes = rx.await.unwrap();
+            let nodes: HashMap<NodePublicKey, NodeInfo> = nodes
+                .unwrap()
+                .into_iter()
+                .map(|node| (node.key, node))
+                .collect();
+
+            assert_eq!(nodes.len(), 3);
+            assert!(nodes.contains_key(&node1.key));
+            assert!(nodes.contains_key(&node2.key));
+            assert!(nodes.contains_key(&node4.key));
+
+            shutdown_notify.notify_one();
+        };
+
+        tokio::select! {
+            _ = worker_fut => {}
+            _ = request_fut => {}
+        }
+    }
+
+    #[tokio::test]
+    async fn test_propose_nodes_different_indices() {
+        let public_key = get_random_key();
+        let (table_tx, table_rx) = mpsc::channel(10);
+        let shutdown_notify = Arc::new(tokio::sync::Notify::new());
+
+        let worker_fut = start_worker(table_rx, public_key.into(), shutdown_notify.clone());
+
+        let request_fut = async move {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            let node1 = NodeInfo {
+                address: "127.0.0.1:8000".parse().unwrap(),
+                key: bucket::random_key_in_bucket(0, &public_key).into(),
+                last_responded: Some(100),
+            };
+            let node2 = NodeInfo {
+                address: "127.0.0.1:8001".parse().unwrap(),
+                key: bucket::random_key_in_bucket(1, &public_key).into(),
+                last_responded: Some(200),
+            };
+            let node3 = NodeInfo {
+                address: "127.0.0.1:8002".parse().unwrap(),
+                key: bucket::random_key_in_bucket(2, &public_key).into(),
+                last_responded: None,
+            };
+            let req = TableRequest::ProposeBucketNodes {
+                bucket_index: 0,
+                nodes: vec![node1, node2.clone(), node3],
+            };
+            table_tx.send(req).await.unwrap();
+
+            let node4 = NodeInfo {
+                address: "127.0.0.1:8003".parse().unwrap(),
+                key: bucket::random_key_in_bucket(0, &public_key).into(),
+                last_responded: Some(500),
+            };
+            let node5 = NodeInfo {
+                address: "127.0.0.1:8004".parse().unwrap(),
+                key: bucket::random_key_in_bucket(1, &public_key).into(),
+                last_responded: None,
+            };
+            let node6 = NodeInfo {
+                address: "127.0.0.1:8005".parse().unwrap(),
+                key: bucket::random_key_in_bucket(2, &public_key).into(),
+                last_responded: Some(50),
+            };
+            let req = TableRequest::ProposeBucketNodes {
+                bucket_index: 0,
+                nodes: vec![node4.clone(), node5, node6.clone()],
+            };
+            table_tx.send(req).await.unwrap();
+
+            let (tx, rx) = oneshot::channel();
+            let req = TableRequest::GetBucketNodes {
+                bucket_index: 0,
+                respond: tx,
+            };
+            table_tx.send(req).await.unwrap();
+
+            let nodes = rx.await.unwrap();
+            let nodes: HashMap<NodePublicKey, NodeInfo> = nodes
+                .unwrap()
+                .into_iter()
+                .map(|node| (node.key, node))
+                .collect();
+
+            assert_eq!(nodes.len(), 3);
+            assert!(nodes.contains_key(&node6.key));
+            assert!(nodes.contains_key(&node2.key));
+            assert!(nodes.contains_key(&node4.key));
+
+            shutdown_notify.notify_one();
+        };
+
+        tokio::select! {
+            _ = worker_fut => {}
+            _ = request_fut => {}
+        }
     }
 }

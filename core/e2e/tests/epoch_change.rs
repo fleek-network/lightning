@@ -8,7 +8,7 @@ use serde_json::json;
 
 #[tokio::test]
 async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
-    // Start epoch now and let it end in 20 seconds.
+    // Start epoch now and let it end in 40 seconds.
     let epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
@@ -45,7 +45,7 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
         assert_eq!(epoch, 0);
     }
 
-    // The epoch will change after 20 seconds, and we already waited 5 seconds.
+    // The epoch will change after 40 seconds, and we already waited 5 seconds.
     // To give some time for the epoch change, we will wait another 30 seconds here.
     tokio::time::sleep(Duration::from_secs(40)).await;
 
@@ -71,7 +71,7 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
 //#[tokio::test]
 //async fn e2e_epoch_change_x() -> Result<()> {
 //    env_logger::init();
-//    // Start epoch now and let it end in 20 seconds.
+//    // Start epoch now and let it end in 40 seconds.
 //    let epoch_start = SystemTime::now()
 //        .duration_since(SystemTime::UNIX_EPOCH)
 //        .unwrap()
@@ -109,7 +109,7 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
 //        assert_eq!(epoch, 0);
 //    }
 //
-//    // The epoch will change after 20 seconds, and we already waited 5 seconds.
+//    // The epoch will change after 40 seconds, and we already waited 5 seconds.
 //    // To give some time for the epoch change, we will wait another 30 seconds here.
 //    tokio::time::sleep(Duration::from_secs(40)).await;
 //
