@@ -1155,6 +1155,8 @@ impl<B: Backend> State<B> {
                     } else {
                         return Err(ExecutionError::NodeDoesNotExist);
                     }
+                } else {
+                    return Err(ExecutionError::NodeDoesNotExist);
                 }
             },
             TransactionSender::NodeConsensus(node) => {
