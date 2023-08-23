@@ -23,6 +23,13 @@ impl DependencyGraph {
     /// dependencies of each collection member and will construct the raw graph. At this step
     /// cycles are *not* reported.
     pub fn new(collection_vtables: Vec<VTable>) -> Self {
+        {
+            let mut seen = HashSet::<Tag>::with_capacity(collection_vtables.len());
+            for table in collection_vtables.iter() {
+                assert!(seen.insert(table.tag()), "Duplicate item.");
+            }
+        }
+
         let len = collection_vtables.len();
         let mut vtables = HashMap::with_capacity(len);
         let insertion_order = Vec::with_capacity(len);

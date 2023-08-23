@@ -66,3 +66,6 @@
 //!
 //! The [vtable](crate::vtable) module provides the implementation of building blocks of this
 //! strategy.
+//!
+//! The next issue here is that `--release` can aggressively inline methods so they sometimes
+//! can be the same number for different things.
