@@ -151,10 +151,12 @@ impl<C: Collection> WithStartAndShutdown for Dht<C> {
     async fn start(&self) {
         let public_key = self.network_secret_key.to_pk();
         let (table_tx, table_rx) = mpsc::channel(self.buffer_size);
+        let (task_tx, task_rx) = mpsc::channel(self.buffer_size);
 
         tokio::spawn(table::start_worker(
             table_rx,
             public_key,
+            task_tx.clone(),
             self.shutdown_notify.clone(),
         ));
 
@@ -167,8 +169,6 @@ impl<C: Collection> WithStartAndShutdown for Dht<C> {
             .expect("Binding to socket failed");
         tracing::info!("UDP socket bound to {:?}", socket.local_addr().unwrap());
 
-        let (task_tx, task_rx) = mpsc::channel(self.buffer_size);
-
         tokio::spawn(api::start_worker(
             self.socket_rx.lock().unwrap().take().unwrap(),
             task_tx.clone(),
@@ -179,7 +179,7 @@ impl<C: Collection> WithStartAndShutdown for Dht<C> {
         ));
 
         let bootstrapper = Bootstrapper::new(
-            task_tx,
+            task_tx.clone(),
             table_tx.clone(),
             public_key.0,
             self.nodes.lock().unwrap().take().unwrap_or_default(),
@@ -198,6 +198,7 @@ impl<C: Collection> WithStartAndShutdown for Dht<C> {
 
         tokio::spawn(task::start_worker(
             task_rx,
+            task_tx,
             network_event_rx,
             table_tx.clone(),
             self.shutdown_notify.clone(),

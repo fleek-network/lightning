@@ -6,6 +6,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Error;
 use fleek_crypto::NodePublicKey;
@@ -15,18 +16,21 @@ use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinSet;
 use tokio_util::time::DelayQueue;
 
+use crate::bucket::BUCKET_REFRESH_INTERVAL;
 use crate::network::{Message, MessageType, Request, Response};
 use crate::node::NodeInfo;
-use crate::socket;
 use crate::table::{TableKey, TableRequest};
 use crate::task::bootstrap::{Bootstrapper, BOOTSTRAP_TASK_ID};
 use crate::task::lookup::LookupTask;
+use crate::{bucket, socket};
 
 type TaskResult = Result<u64, TaskFailed>;
 
 /// Task worker executes tasks.
+#[allow(clippy::too_many_arguments)]
 pub async fn start_worker(
     mut task_rx: Receiver<Task>,
+    task_tx: Sender<Task>,
     mut network_event_rx: Receiver<ResponseEvent>,
     table_tx: Sender<TableRequest>,
     shutdown_notify: Arc<Notify>,
@@ -40,6 +44,7 @@ pub async fn start_worker(
         task_results: JoinSet::new(),
         local_key,
         table_tx: table_tx.clone(),
+        task_tx,
         socket,
         bootstrapper,
     };
@@ -94,6 +99,11 @@ pub enum Task {
         address: SocketAddr,
         respond: oneshot::Sender<()>,
     },
+    /// Refresh a bucket.
+    RefreshBucket {
+        bucket_index: usize,
+        delay: Duration,
+    },
 }
 
 /// Responses from tasks.
@@ -112,6 +122,7 @@ struct TaskManager {
     task_results: JoinSet<TaskResult>,
     local_key: NodePublicKey,
     table_tx: Sender<TableRequest>,
+    task_tx: Sender<Task>,
     socket: Arc<UdpSocket>,
     bootstrapper: Bootstrapper,
 }
@@ -272,6 +283,59 @@ impl TaskManager {
                         }),
                         Some(_) => Ok(id),
                     }
+                });
+            },
+            Task::RefreshBucket {
+                bucket_index,
+                delay,
+            } => {
+                let random_key = bucket::random_key_in_bucket(bucket_index, &self.local_key.0);
+                let (task_tx, task_rx) = mpsc::channel(20);
+                self.ongoing.insert(
+                    id,
+                    OngoingTask {
+                        network_event_tx: task_tx,
+                    },
+                );
+                let lookup = LookupTask::new(
+                    id,
+                    false,
+                    self.local_key,
+                    TableKey::try_from(random_key.as_slice()).unwrap(),
+                    self.table_tx.clone(),
+                    task_rx,
+                    self.socket.clone(),
+                );
+                let task_tx = self.task_tx.clone();
+                let table_tx = self.table_tx.clone();
+                self.task_results.spawn(async move {
+                    tokio::time::sleep(delay).await;
+                    let response = match lookup::lookup(lookup).await {
+                        Ok(response) => response,
+                        Err(error) => {
+                            return Err(TaskFailed { id, error });
+                        },
+                    };
+                    if !response.nodes.is_empty() {
+                        let req = TableRequest::ProposeBucketNodes {
+                            bucket_index: 0,
+                            nodes: response.nodes,
+                        };
+                        if let Err(e) = table_tx.send(req).await {
+                            tracing::trace!("failed to send new nodes to bucket: {e:?}");
+                        }
+                    }
+                    // Schedule the next bucket refresh. For buckets with higher indices, we will
+                    // wait longer to refresh.
+                    let task = Task::RefreshBucket {
+                        bucket_index,
+                        delay: BUCKET_REFRESH_INTERVAL
+                            + Duration::from_secs(60 * bucket_index as u64),
+                    };
+                    if let Err(e) = task_tx.send(task).await {
+                        tracing::trace!("failed to send bucket refresh task: {e:?}");
+                    }
+                    Ok(id)
                 });
             },
         }

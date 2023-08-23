@@ -5,21 +5,32 @@ use std::sync::Arc;
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
 use thiserror::Error;
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::{self, Receiver};
 use tokio::sync::{oneshot, Notify};
 
-use crate::bucket::{Bucket, MAX_BUCKETS, MAX_BUCKET_SIZE};
+use crate::bucket::{Bucket, BUCKET_REFRESH_INTERVAL, MAX_BUCKETS, MAX_BUCKET_SIZE};
 use crate::distance;
 use crate::node::NodeInfo;
+use crate::task::Task;
 
 pub type TableKey = [u8; 32];
 
 pub async fn start_worker(
     mut rx: Receiver<TableRequest>,
     local_key: NodePublicKey,
+    task_tx: mpsc::Sender<Task>,
     shutdown_notify: Arc<Notify>,
 ) {
     let mut table = Table::new(local_key);
+
+    // We always start with one bucket, so kick off the refresh task for this bucket.
+    let task = Task::RefreshBucket {
+        bucket_index: table.buckets.len() - 1,
+        delay: BUCKET_REFRESH_INTERVAL,
+    };
+    if let Err(e) = task_tx.send(task).await {
+        tracing::trace!("failed to send bucket refresh task: {e:?}");
+    }
     loop {
         tokio::select! {
             request = rx.recv() => {
@@ -31,9 +42,21 @@ pub async fn start_worker(
                                 .expect("internal table client not to drop the channel");
                         },
                         TableRequest::AddNode { node, respond } => {
+                            let num_buckets = table.buckets.len();
                             let result = table
                                 .add_node(node)
                                 .map_err(|e| QueryError(e.to_string()));
+
+                            if num_buckets < table.buckets.len() {
+                                // A new bucket was created.
+                                let task = Task::RefreshBucket {
+                                    bucket_index: table.buckets.len() - 1,
+                                    delay: BUCKET_REFRESH_INTERVAL,
+                                };
+                                if let Err(e) = task_tx.send(task).await {
+                                    tracing::trace!("failed to send bucket refresh task: {e:?}");
+                                }
+                            }
                             if let Some(respond) = respond {
                                 respond.send(result)
                                     .expect("internal table client not to drop the channel");
@@ -77,8 +100,8 @@ pub async fn start_worker(
                             }
                             for bucket in actual_buckets.values_mut() {
                                 bucket.sort_by(|a, b| {
-                                    // sort it such that the most desirable nodes are at the end of
-                                    // the vec
+                                    // Sort the bucket such that the most desirable nodes are at the end of
+                                    // the vec.
                                     match (a.last_responded, b.last_responded) {
                                         (Some(a), Some(b)) => a.cmp(&b),
                                         (Some(_), None) => Ordering::Greater,
@@ -87,6 +110,9 @@ pub async fn start_worker(
                                     }
                                 });
                             }
+                            // Pick the most desirable nodes from each bucket.
+                            // Make sure that we pick approximately the same amount of nodes from
+                            // each bucket.
                             let mut fresh_nodes = Vec::new();
                             'outer: loop {
                                 let mut all_empty = true;
@@ -267,7 +293,6 @@ impl Table {
         if index == MAX_BUCKETS - 1 || index != self.buckets.len() - 1 {
             return false;
         }
-
         let bucket = self.buckets.pop().expect("there to be at least one bucket");
         self.buckets.push(Bucket::new());
         self.buckets.push(Bucket::new());
@@ -369,7 +394,8 @@ mod tests {
         let (table_tx, table_rx) = mpsc::channel(10);
         let shutdown_notify = Arc::new(tokio::sync::Notify::new());
 
-        let worker_fut = start_worker(table_rx, public_key.into(), shutdown_notify.clone());
+        let (tx, _) = mpsc::channel(10);
+        let worker_fut = start_worker(table_rx, public_key.into(), tx, shutdown_notify.clone());
 
         let request_fut = async move {
             tokio::time::sleep(Duration::from_secs(2)).await;
@@ -449,7 +475,8 @@ mod tests {
         let (table_tx, table_rx) = mpsc::channel(10);
         let shutdown_notify = Arc::new(tokio::sync::Notify::new());
 
-        let worker_fut = start_worker(table_rx, public_key.into(), shutdown_notify.clone());
+        let (tx, _) = mpsc::channel(10);
+        let worker_fut = start_worker(table_rx, public_key.into(), tx, shutdown_notify.clone());
 
         let request_fut = async move {
             tokio::time::sleep(Duration::from_secs(2)).await;

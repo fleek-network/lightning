@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::node::NodeInfo;
 use crate::table::TableKey;
 
@@ -7,6 +9,7 @@ pub const MAX_BUCKET_SIZE: usize = 6;
 pub const MAX_BUCKET_SIZE: usize = 3;
 pub const MAX_BUCKETS: usize = HASH_LEN * 8;
 pub const HASH_LEN: usize = 32;
+pub const BUCKET_REFRESH_INTERVAL: Duration = Duration::from_secs(900); // 15 minutes
 
 #[derive(Default)]
 pub struct Bucket {
@@ -41,7 +44,7 @@ impl Bucket {
         }
 
         if let Some(index) = self.inner.iter().position(|member| member.key == node.key) {
-            self.inner.insert(index, node);
+            self.inner[index] = node;
             return true;
         }
 
