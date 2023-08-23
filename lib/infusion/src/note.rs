@@ -69,3 +69,15 @@
 //!
 //! The next issue here is that `--release` can aggressively inline methods so they sometimes
 //! can be the same number for different things.
+//!
+//! Also it is not guaranteed by LLVM that the same function will always have the same pointer.
+//!
+//! This debunks our idea of using the same method as `(type,trait)`-identifier. So what we
+//! currently do is to use the [TypeId](std::any::TypeId) as well as a user provided
+//! `&'static str` in place of the trait name.
+//!
+//! The [tag](crate::tag) macro obscures the way a tag is meant to be generated so that a user
+//! would not easily construct a tag on their own.
+//!
+//! In future we can mark this external API as unsafe and make using the macro as the *safe* way
+//! to construct an object.
