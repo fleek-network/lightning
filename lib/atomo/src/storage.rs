@@ -1,13 +1,27 @@
+use std::error::Error;
+
 use dashmap::DashMap;
 
 use crate::batch::{BoxedVec, Operation, VerticalBatch};
 
-/// The persistence backend in Atomo provides the binding layer with any persistence layer
-/// of you choice and allows custom implementations of the underlying data storage.
-pub trait StorageBackend {
+pub trait StorageBackendConstructor {
+    /// The storage API.
+    type Storage: StorageBackend;
+
+    /// The error that can be produced while opening the database.
+    type Error: Error;
+
     /// Called during the initialization
     fn open_table(&mut self, name: String);
 
+    /// Build the storage object and return it. If there is any error
+    /// should return the error.
+    fn build(self) -> Result<Self::Storage, Self::Error>;
+}
+
+/// The persistence backend in Atomo provides the binding layer with any persistence layer
+/// of you choice and allows custom implementations of the underlying data storage.
+pub trait StorageBackend {
     /// Write the changes to the disk.
     fn commit(&self, batch: VerticalBatch);
 
@@ -24,12 +38,22 @@ pub trait StorageBackend {
 #[derive(Default)]
 pub struct InMemoryStorage(Vec<DashMap<BoxedVec, BoxedVec, fxhash::FxBuildHasher>>);
 
-impl StorageBackend for InMemoryStorage {
+// For the in memory database the constructor can be as same as the actual object.
+impl StorageBackendConstructor for InMemoryStorage {
+    type Storage = Self;
+    type Error = std::convert::Infallible;
+
     #[inline]
     fn open_table(&mut self, _name: String) {
         self.0.push(DashMap::default())
     }
 
+    fn build(self) -> Result<Self::Storage, Self::Error> {
+        Ok(self)
+    }
+}
+
+impl StorageBackend for InMemoryStorage {
     #[inline]
     fn commit(&self, batch: VerticalBatch) {
         for (table, batch) in self.0.iter().zip(batch.into_raw().into_iter()) {
