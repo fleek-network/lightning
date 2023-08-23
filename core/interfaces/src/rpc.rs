@@ -20,10 +20,10 @@ pub trait RpcInterface<C: Collection>:
         Self::init(config.get::<Self>(), consensus.mempool(), app.sync_query())
     }
 
-    fn _post(&mut self, dht: ::DhtInterface) {
+    fn _post(&mut self, _dht: ::DhtInterface) {
         #[cfg(feature = "e2e-test")]
         {
-            let socket = dht.get_socket();
+            let socket = _dht.get_socket();
             self.provide_dht_socket(socket);
         }
     }
