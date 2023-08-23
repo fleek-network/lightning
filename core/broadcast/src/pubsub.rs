@@ -51,7 +51,6 @@ impl<M: LightningMessage> Clone for PubSubTopic<M> {
     }
 }
 
-// TODO: adjust interface so the outputs are wrapped in a result, and can be infallible.
 #[async_trait]
 impl<M> PubSub<M> for PubSubTopic<M>
 where
@@ -63,14 +62,16 @@ where
         self.sender
             .send((self.topic, payload))
             .await
-            .expect("failed to broadcast message");
+            .expect("failed to send outgoing broadcast payload over the channel");
     }
 
     async fn recv(&mut self) -> Option<M> {
-        self.receiver
-            .recv()
-            .await
-            .ok()
-            .map(|bytes| M::decode(&bytes).expect("failed to decode pubsub message"))
+        // loop until we get a valid message, ignoring decoding errors
+        loop {
+            let bytes = self.receiver.recv().await.ok()?;
+            if let Ok(msg) = M::decode(&bytes) {
+                break Some(msg);
+            }
+        }
     }
 }
