@@ -214,7 +214,8 @@ impl<C: Collection> BroadcastInner<C> {
         digest: &Blake3Hash,
     ) -> anyhow::Result<()> {
         // check if we have the message already
-        if self.message_cache.get(digest).is_none() {
+        // TODO: Properly track pending messages
+        if self.message_cache.get(digest).is_some() {
             return Ok(());
         }
 
