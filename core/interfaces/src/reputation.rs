@@ -57,7 +57,7 @@ pub trait ReputationAggregatorInterface<C: Collection>: ConfigConsumer + Sized {
 /// be as real-time as possible, meaning that the most recent data captured by the reporter
 /// should be taken into account at this layer.
 #[infusion::blank]
-pub trait ReputationQueryInteface: Clone {
+pub trait ReputationQueryInteface: Clone + Send + Sync {
     /// Returns the reputation of the provided node locally.
     fn get_reputation_of(&self, peer: &NodePublicKey) -> Option<u8>;
 }
@@ -67,7 +67,7 @@ pub trait ReputationQueryInteface: Clone {
 /// reporters which can use any method to report the data they capture to their aggregator so
 /// that it can send it to the application layer.
 #[infusion::blank]
-pub trait ReputationReporterInterface: Clone {
+pub trait ReputationReporterInterface: Clone + Send + Sync {
     /// Report a satisfactory (happy) interaction with the given peer. Used for up time.
     fn report_sat(&self, peer: &NodePublicKey, weight: Weight);
 

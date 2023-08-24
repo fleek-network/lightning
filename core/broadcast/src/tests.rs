@@ -135,8 +135,12 @@ async fn pubsub_send_recv() -> Result<()> {
     )?;
 
     // Node A
-    let mut pool_a =
-        ConnectionPool::<TestBinding>::init(Config {}, &signer_a, query_runner.clone());
+    let mut pool_a = ConnectionPool::<TestBinding>::init(
+        Config {},
+        &signer_a,
+        query_runner.clone(),
+        Default::default(),
+    );
     pool_a.with_transport(global_transport.clone());
     pool_a.start().await;
     let listener_connector = pool_a.bind::<BroadcastFrame>(ServiceScope::Broadcast);
@@ -151,7 +155,12 @@ async fn pubsub_send_recv() -> Result<()> {
     let pubsub_a = broadcast_a.get_pubsub::<DebugMessage>(Topic::Debug);
 
     // Node B
-    let mut pool_b = ConnectionPool::init(Config {}, &signer_b, query_runner.clone());
+    let mut pool_b = ConnectionPool::init(
+        Config {},
+        &signer_b,
+        query_runner.clone(),
+        Default::default(),
+    );
     pool_b.with_transport(global_transport.clone());
     pool_b.start().await;
     let listener_connector = pool_b.bind::<BroadcastFrame>(ServiceScope::Broadcast);

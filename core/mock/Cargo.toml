@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 lightning-interfaces = {path="../interfaces"}
+lightning-rep-collector = { path = "../rep-collector" }
 async-trait.workspace = true
 fleek-crypto.workspace = true
 affair.workspace = true

@@ -22,6 +22,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
     ConnectionPoolInterface,
+    ReputationAggregatorInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
@@ -46,6 +47,7 @@ pub struct ConnectionPool<C: Collection> {
     senders: Arc<DashMap<NodePublicKey, tokio::sync::mpsc::Sender<ScopedFrame>>>,
     /// Senders for communicating with [`connection::Receiver`]s for incoming messages
     receivers: Arc<DashMap<(NodePublicKey, ServiceScope), tokio::sync::mpsc::Sender<Vec<u8>>>>,
+    _rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
@@ -181,6 +183,7 @@ impl<C: Collection> ConnectionPoolInterface<C> for ConnectionPool<C> {
         _config: Self::Config,
         signer: &c!(C::SignerInterface),
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     ) -> Self {
         let pubkey = signer.get_ed25519_pk();
         Self {
@@ -191,6 +194,7 @@ impl<C: Collection> ConnectionPoolInterface<C> for ConnectionPool<C> {
             shutdown_signal: Mutex::new(None).into(),
             senders: DashMap::new().into(),
             receivers: DashMap::new().into(),
+            _rep_reporter: rep_reporter,
         }
     }
 
@@ -273,6 +277,7 @@ mod tests {
         let global_transport = GlobalMemoryTransport::default();
 
         // we dont actually use query runner, so it doesn't really matter
+
         let application =
             Application::<TestBinding>::init(lightning_application::config::Config {
                 mode: Mode::Test,
@@ -293,8 +298,14 @@ mod tests {
             query_runner.clone(),
         )
         .map_err(|e| anyhow!("{e:?}"))?;
-        let mut pool_a =
-            ConnectionPool::<TestBinding>::init(Config {}, &signer_a, query_runner.clone());
+
+        let mut pool_a = ConnectionPool::<TestBinding>::init(
+            Config {},
+            &signer_a,
+            query_runner.clone(),
+            Default::default(),
+        );
+
         pool_a.with_transport(global_transport.clone());
         pool_a.start().await;
         let (mut listener_a, _) = pool_a.bind::<TestFrame>(ServiceScope::Debug);
@@ -328,7 +339,12 @@ mod tests {
             query_runner.clone(),
         )?;
 
-        let mut pool_b = ConnectionPool::<TestBinding>::init(Config {}, &signer_b, query_runner);
+        let mut pool_b = ConnectionPool::<TestBinding>::init(
+            Config {},
+            &signer_b,
+            query_runner,
+            Default::default(),
+        );
         pool_b.with_transport(global_transport.clone());
         pool_b.start().await;
         let (_, connector_b) = pool_b.bind::<TestFrame>(ServiceScope::Debug);

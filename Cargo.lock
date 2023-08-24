@@ -4227,6 +4227,7 @@ dependencies = [
  "infusion",
  "lightning-application",
  "lightning-interfaces",
+ "lightning-rep-collector",
  "lightning-schema",
  "lightning-signer",
  "log",

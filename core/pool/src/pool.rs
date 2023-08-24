@@ -14,6 +14,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
     ConnectionPoolInterface,
+    ReputationAggregatorInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
@@ -145,6 +146,7 @@ impl<C: Collection> ConnectionPoolInterface<C> for ConnectionPool<C> {
         config: Self::Config,
         signer: &c!(C::SignerInterface),
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        _rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     ) -> Self {
         let (_, secret_key) = signer.get_sk();
         ConnectionPool::new(config, query_runner, secret_key)

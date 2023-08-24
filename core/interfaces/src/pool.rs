@@ -9,6 +9,7 @@ use crate::{
     ApplicationInterface,
     ConfigConsumer,
     ConfigProviderInterface,
+    ReputationAggregatorInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
@@ -41,8 +42,14 @@ pub trait ConnectionPoolInterface<C: Collection>:
         config: ::ConfigProviderInterface,
         signer: ::SignerInterface,
         app: ::ApplicationInterface,
+        rep_aggregator: ::ReputationAggregatorInterface,
     ) {
-        ok!(Self::init(config.get::<Self>(), signer, app.sync_query()))
+        ok!(Self::init(
+            config.get::<Self>(),
+            signer,
+            app.sync_query(),
+            rep_aggregator.get_reporter()
+        ))
     }
 
     /// Listener object implemented by this connection pool. The bounds here ensure
@@ -61,6 +68,7 @@ pub trait ConnectionPoolInterface<C: Collection>:
         config: Self::Config,
         signer: &c!(C::SignerInterface),
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     ) -> Self;
 
     /// Provide ownership to an scope in the connection pool.
