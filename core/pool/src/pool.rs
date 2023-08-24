@@ -48,6 +48,8 @@ pub struct ConnectionPool<C: Collection> {
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     /// Signer provider.
     node_secret_key: NodeSecretKey,
+    /// Reputation reporter.
+    _rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     _marker: PhantomData<C>,
 }
 
@@ -56,6 +58,7 @@ impl<C: Collection> ConnectionPool<C> {
         config: PoolConfig,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         node_secret_key: NodeSecretKey,
+        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     ) -> Self {
         let (connector_tx, connector_rx) = mpsc::channel(256);
 
@@ -69,6 +72,7 @@ impl<C: Collection> ConnectionPool<C> {
             drivers: Mutex::new(JoinSet::new()),
             query_runner,
             node_secret_key,
+            _rep_reporter: rep_reporter,
             _marker: PhantomData,
         }
     }
@@ -146,10 +150,10 @@ impl<C: Collection> ConnectionPoolInterface<C> for ConnectionPool<C> {
         config: Self::Config,
         signer: &c!(C::SignerInterface),
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        _rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
+        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     ) -> Self {
         let (_, secret_key) = signer.get_sk();
-        ConnectionPool::new(config, query_runner, secret_key)
+        ConnectionPool::new(config, query_runner, secret_key, rep_reporter)
     }
 
     fn bind<T>(&self, scope: ServiceScope) -> (Self::Listener<T>, Self::Connector<T>)
