@@ -1,13 +1,12 @@
 [package]
 name = "atomo-rocks"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-authors = ["Parsa Ghadimi <parsa@fleek.xyz>"]
-description = "reserved for atomic snapshots"
+authors = ["Ossian Mapes <oz@fleek.xyz>, Parsa Ghadimi <parsa@fleek.xyz>"]
+description = "A RocksDB persistent storage backend for Atomo"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/fleek-network/lightning"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+atomo.workspace = true
 rocksdb = "0.21"
