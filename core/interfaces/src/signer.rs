@@ -55,7 +55,7 @@ pub trait SignerInterface<C: Collection>:
 
     // Provide the signer service with a block notifier to get notified when a block of
     // transactions has been processed at the application.
-    fn provide_new_block_notify(&self, block_notify: Arc<Notify>);
+    fn provide_new_block_notify(&mut self, block_notify: Arc<Notify>);
 
     /// Returns the `BLS` public key of the current node.
     fn get_bls_pk(&self) -> ConsensusPublicKey;

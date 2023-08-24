@@ -51,15 +51,9 @@ pub struct Signer<C: Collection> {
     // when it is moved into the SignerInner. The only reason it is behind a Arc<Mutex<>> is to
     // ensure that `Signer` is Send and Sync.
     rx: Arc<Mutex<Option<mpsc::Receiver<Task<UpdateMethod, u64>>>>>,
-    // `mempool_socket` is only parked here for the time from the call to `provide_mempool` to the
-    // call to `start`, when it is moved into SignerInner.
-    mempool_socket: Arc<Mutex<Option<MempoolSocket>>>,
-    // `mempool_socket` is only parked here for the time from the call to `provide_query_runner` to
-    // the call to `start`, when it is moved into SignerInner.
-    query_runner: Arc<Mutex<Option<c![C::ApplicationInterface::SyncExecutor]>>>,
-    // `new_block_notify` is only parked here for the time from the call to
-    // `provide_new_block_notify` to the call to `start`, when it is moved into SignerInner.
-    new_block_notify: Arc<Mutex<Option<Arc<Notify>>>>,
+    mempool_socket: Option<MempoolSocket>,
+    query_runner: c![C::ApplicationInterface::SyncExecutor],
+    new_block_notify: Option<Arc<Notify>>,
     shutdown_notify: Arc<Notify>,
 }
 
@@ -76,9 +70,9 @@ impl<C: Collection> WithStartAndShutdown for Signer<C> {
         if !*self.is_running.lock().unwrap() {
             let inner = self.inner.clone();
             let rx = self.rx.lock().unwrap().take().unwrap();
-            let mempool_socket = self.get_mempool_socket();
-            let query_runner = self.get_query_runner();
-            let new_block_notify = self.get_new_block_notify();
+            let mempool_socket = self.mempool_socket.clone().unwrap();
+            let query_runner = self.query_runner.clone();
+            let new_block_notify = self.new_block_notify.clone().unwrap();
             let shutdown_notify = self.shutdown_notify.clone();
             tokio::spawn(async move {
                 inner
@@ -116,9 +110,9 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
             socket,
             is_running: Arc::new(Mutex::new(false)),
             rx: Arc::new(Mutex::new(Some(rx))),
-            mempool_socket: Arc::new(Mutex::new(None)),
-            query_runner: Arc::new(Mutex::new(Some(query_runner))),
-            new_block_notify: Arc::new(Mutex::new(None)),
+            mempool_socket: None,
+            query_runner,
+            new_block_notify: None,
             shutdown_notify: Arc::new(Notify::new()),
         })
     }
@@ -127,13 +121,13 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
     /// should only be called once.
     fn provide_mempool(&mut self, mempool: MempoolSocket) {
         // TODO(matthias): I think the receiver can be &self here.
-        *self.mempool_socket.lock().unwrap() = Some(mempool);
+        self.mempool_socket = Some(mempool);
     }
 
     // Provide the signer service with a block notifier to get notified when a block of
     // transactions has been processed at the application.
-    fn provide_new_block_notify(&self, new_block_notify: Arc<Notify>) {
-        *self.new_block_notify.lock().unwrap() = Some(new_block_notify);
+    fn provide_new_block_notify(&mut self, new_block_notify: Arc<Notify>) {
+        self.new_block_notify = Some(new_block_notify);
     }
 
     /// Returns the `BLS` public key of the current node.
@@ -209,36 +203,6 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
             utils::save(path, consensus_secret_key.encode_pem())?;
         }
         Ok(())
-    }
-}
-
-impl<C: Collection> Signer<C> {
-    fn get_mempool_socket(&self) -> MempoolSocket {
-        self.mempool_socket
-            .lock()
-            .unwrap()
-            .take()
-            .expect("Mempool socket must be provided before starting the signer service.")
-    }
-
-    // TODO(qti3e): Why are we locking the query runner? It's both `Clone`
-    // and only takes `&self` on every single method.
-    //
-    // We can simply clone here and return.
-    fn get_query_runner(&self) -> c![C::ApplicationInterface::SyncExecutor] {
-        self.query_runner
-            .lock()
-            .unwrap()
-            .take()
-            .expect("Query runner must be provided before starting the signer serivce.")
-    }
-
-    fn get_new_block_notify(&self) -> Arc<Notify> {
-        self.new_block_notify
-            .lock()
-            .unwrap()
-            .take()
-            .expect("New block notify must be provided before starting the signer serivce.")
     }
 }
 
