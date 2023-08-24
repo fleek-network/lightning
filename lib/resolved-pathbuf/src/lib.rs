@@ -1,9 +1,10 @@
-use std::fmt::Debug;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use derive_more::{AsRef, Deref};
 use resolve_path::PathResolveExt;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+mod std_impl;
 
 /// This type is a wrapper around a normal [`PathBuf`] that is resolved upon construction. This
 /// happens through the [`resolve_path`] crate.
@@ -43,18 +44,6 @@ impl TryFrom<&str> for ResolvedPathBuf {
         let resolved = original.try_resolve()?.to_path_buf();
         let original = (resolved != original).then_some(original);
         Ok(Self { resolved, original })
-    }
-}
-
-impl AsRef<Path> for ResolvedPathBuf {
-    fn as_ref(&self) -> &Path {
-        self.resolved.as_path()
-    }
-}
-
-impl Debug for ResolvedPathBuf {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.resolved.fmt(f)
     }
 }
 
