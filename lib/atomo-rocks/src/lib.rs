@@ -1,12 +1,13 @@
 //! A [`rocksdb`] storage backend implementation for [`atomo`].
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use atomo::batch::Operation;
 use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackend, StorageBackendConstructor};
 /// Re-export of [`rocksdb::Options`].
 pub use rocksdb::Options;
-use rocksdb::WriteBatch;
+use rocksdb::{ColumnFamilyDescriptor, WriteBatch};
 
 /// Helper alias for an [`atomo::AtomoBuilder`] using a [`RocksBackendBuilder`].
 pub type AtomoBuilderWithRocks<S = DefaultSerdeBackend> = AtomoBuilder<RocksBackendBuilder, S>;
@@ -36,8 +37,9 @@ pub type AtomoBuilderWithRocks<S = DefaultSerdeBackend> = AtomoBuilder<RocksBack
 /// ```
 pub struct RocksBackendBuilder {
     path: PathBuf,
+    options: Options,
     columns: Vec<String>,
-    options: rocksdb::Options,
+    column_options: HashMap<String, Options>,
 }
 
 impl RocksBackendBuilder {
@@ -46,15 +48,24 @@ impl RocksBackendBuilder {
     pub fn new<P: Into<PathBuf>>(path: P) -> Self {
         Self {
             path: path.into(),
-            columns: Default::default(),
             options: Default::default(),
+            columns: Default::default(),
+            column_options: HashMap::new(),
         }
     }
 
-    /// Provide a [`rocksdb::Options`] object to the builder.
+    /// Provide an [`Options`] object for the overall database.
     #[inline(always)]
-    pub fn with_options(mut self, opts: rocksdb::Options) -> Self {
+    pub fn with_options(mut self, opts: Options) -> Self {
         self.options = opts;
+        self
+    }
+
+    /// Provide an [`Options`] object for a specific table to the builder. All missing table options
+    /// are always set to the default.
+    #[inline(always)]
+    pub fn with_table_option(mut self, name: &str, opts: Options) -> Self {
+        self.column_options.insert(name.into(), opts);
         self
     }
 }
@@ -68,10 +79,21 @@ impl StorageBackendConstructor for RocksBackendBuilder {
         self.columns.push(name)
     }
 
-    fn build(self) -> Result<Self::Storage, Self::Error> {
+    fn build(mut self) -> Result<Self::Storage, Self::Error> {
+        let cf_iter: Vec<_> = self
+            .columns
+            .iter()
+            .map(|name| {
+                ColumnFamilyDescriptor::new(
+                    name,
+                    self.column_options.remove(name).unwrap_or_default(),
+                )
+            })
+            .collect();
+        let db = rocksdb::DB::open_cf_descriptors(&self.options, self.path, cf_iter)?;
         Ok(RocksBackend {
-            columns: self.columns.clone(),
-            db: rocksdb::DB::open_cf(&self.options, self.path, self.columns)?,
+            columns: self.columns,
+            db,
         })
     }
 }
