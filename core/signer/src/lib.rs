@@ -3,6 +3,7 @@ pub mod utils;
 use std::collections::VecDeque;
 use std::fs::read_to_string;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 #[cfg(test)]
@@ -42,15 +43,10 @@ const TIMEOUT: Duration = Duration::from_secs(300);
 #[cfg(test)]
 const TIMEOUT: Duration = Duration::from_secs(3);
 
-#[allow(clippy::type_complexity)]
 pub struct Signer<C: Collection> {
     inner: Arc<SignerInner>,
     socket: Socket<UpdateMethod, u64>,
-    is_running: Arc<Mutex<bool>>,
-    // `rx` is only parked here for the time from the call to `ìnit` to the call to `start`,
-    // when it is moved into the SignerInner. The only reason it is behind a Arc<Mutex<>> is to
-    // ensure that `Signer` is Send and Sync.
-    rx: Arc<Mutex<Option<mpsc::Receiver<Task<UpdateMethod, u64>>>>>,
+    is_running: AtomicBool,
     mempool_socket: Option<MempoolSocket>,
     query_runner: c![C::ApplicationInterface::SyncExecutor],
     new_block_notify: Option<Arc<Notify>>,
@@ -61,15 +57,15 @@ pub struct Signer<C: Collection> {
 impl<C: Collection> WithStartAndShutdown for Signer<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
-        *self.is_running.lock().unwrap()
+        self.is_running.load(Ordering::Relaxed)
     }
 
     /// Start the system, should not do anything if the system is already
     /// started.
     async fn start(&self) {
-        if !*self.is_running.lock().unwrap() {
+        if !self.is_running.load(Ordering::Relaxed) {
             let inner = self.inner.clone();
-            let rx = self.rx.lock().unwrap().take().unwrap();
+            //let rx = self.rx.lock().unwrap().take().unwrap();
             let mempool_socket = self.mempool_socket.clone().unwrap();
             let query_runner = self.query_runner.clone();
             let new_block_notify = self.new_block_notify.clone().unwrap();
@@ -77,7 +73,7 @@ impl<C: Collection> WithStartAndShutdown for Signer<C> {
             tokio::spawn(async move {
                 inner
                     .handle(
-                        rx,
+                        //rx,
                         shutdown_notify,
                         mempool_socket,
                         query_runner,
@@ -85,14 +81,14 @@ impl<C: Collection> WithStartAndShutdown for Signer<C> {
                     )
                     .await
             });
-            *self.is_running.lock().unwrap() = true;
+            self.is_running.store(true, Ordering::Relaxed);
         }
     }
 
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
         self.shutdown_notify.notify_one();
-        *self.is_running.lock().unwrap() = false;
+        self.is_running.store(false, Ordering::Relaxed);
     }
 }
 
@@ -103,13 +99,12 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
         config: Config,
         query_runner: c![C::ApplicationInterface::SyncExecutor],
     ) -> anyhow::Result<Self> {
-        let inner = SignerInner::init(config)?;
         let (socket, rx) = Socket::raw_bounded(2048);
+        let inner = SignerInner::init(config, rx)?;
         Ok(Self {
             inner: Arc::new(inner),
             socket,
-            is_running: Arc::new(Mutex::new(false)),
-            rx: Arc::new(Mutex::new(Some(rx))),
+            is_running: AtomicBool::new(false),
             mempool_socket: None,
             query_runner,
             new_block_notify: None,
@@ -206,15 +201,17 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 struct SignerInner {
     node_secret_key: NodeSecretKey,
     node_public_key: NodePublicKey,
     consensus_secret_key: ConsensusSecretKey,
     consensus_public_key: ConsensusPublicKey,
+    rx: Arc<Mutex<Option<mpsc::Receiver<Task<UpdateMethod, u64>>>>>,
 }
 
 impl SignerInner {
-    fn init(config: Config) -> anyhow::Result<Self> {
+    fn init(config: Config, rx: mpsc::Receiver<Task<UpdateMethod, u64>>) -> anyhow::Result<Self> {
         let node_secret_key = if config.node_key_path.exists() {
             // read pem file, if we cant read the pem file we should panic
             let encoded =
@@ -250,12 +247,12 @@ impl SignerInner {
             node_public_key,
             consensus_secret_key,
             consensus_public_key,
+            rx: Arc::new(Mutex::new(Some(rx))),
         })
     }
 
     async fn handle<Q: SyncQueryRunnerInterface>(
         self: Arc<Self>,
-        mut rx: mpsc::Receiver<Task<UpdateMethod, u64>>,
         shutdown_notify: Arc<Notify>,
         mempool_socket: MempoolSocket,
         query_runner: Q,
@@ -271,6 +268,8 @@ impl SignerInner {
             };
         let mut base_nonce = application_nonce;
         let mut next_nonce = application_nonce + 1;
+
+        let mut rx = self.rx.lock().unwrap().take().unwrap();
         loop {
             tokio::select! {
                 task = rx.recv() => {
@@ -316,6 +315,7 @@ impl SignerInner {
                 _ = shutdown_notify.notified() => break,
             }
         }
+        *self.rx.lock().unwrap() = Some(rx);
     }
 
     async fn sync_with_application<Q: SyncQueryRunnerInterface>(

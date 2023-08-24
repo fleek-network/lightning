@@ -232,6 +232,34 @@ async fn test_shutdown() {
 }
 
 #[tokio::test]
+async fn test_shutdown_and_start_again() {
+    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
+    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
+    let consensus = MockConsensus::<TestBinding>::init(
+        ConsensusConfig::default(),
+        &signer,
+        update_socket.clone(),
+        query_runner.clone(),
+        infusion::Blank::default(),
+    )
+    .unwrap();
+    signer.provide_mempool(consensus.mempool());
+    signer.provide_new_block_notify(consensus.new_block_notifier());
+
+    assert!(!signer.is_running());
+    signer.start().await;
+    assert!(signer.is_running());
+    signer.shutdown().await;
+    assert!(!signer.is_running());
+
+    signer.start().await;
+    assert!(signer.is_running());
+    signer.shutdown().await;
+    assert!(!signer.is_running());
+}
+
+#[tokio::test]
 async fn test_sign_raw_digest() {
     let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
