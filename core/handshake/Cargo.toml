@@ -14,6 +14,7 @@ async-trait = "0.1"
 bytes = "1.4"
 tokio.workspace = true
 futures = "0.3"
+infusion.workspace = true
 
 fleek-crypto = { path = "../../lib/fleek-crypto" }
 

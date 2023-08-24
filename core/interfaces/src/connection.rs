@@ -1,34 +1,17 @@
-use fleek_crypto::ClientPublicKey;
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-
-use crate::types::CompressionAlgoSet;
+use lightning_types::ConnectionMetadata;
 
 /// The connection type that is offered by the (HandshakeInterface)[crate::HandshakeInterface].
+///
+/// This is a connection provided by the handshake to the service executor, a connection is always
+/// under a service. Once a service is done with the connection they will naturally drop the
+/// connection that is when the custom implementation of this connection object should put the
+/// connection back to the handshake so that the user is able to reuse the connection for the next
+/// request they may have.
 #[infusion::blank]
 pub trait ConnectionInterface: Send + Sync {
-    /// The writer half of this connection.
-    type Writer: AsyncWrite + Unpin + Send + Sync = OwnedWriteHalf;
+    fn get_metadata(&self) -> ConnectionMetadata;
 
-    /// The reader half of this connection.
-    type Reader: AsyncRead + Unpin + Send + Sync = OwnedReadHalf;
-
-    /// Split the connection to the `writer` and `reader` half and returns a mutable reference to
-    /// both sides.
-    fn split(&mut self) -> (&mut Self::Writer, &mut Self::Reader);
-
-    /// Returns a mutable reference to the writer half of this connection.
-    fn writer(&mut self) -> &mut Self::Writer;
-
-    /// Returns a mutable reference to the reader half of this connection.
-    fn reader(&mut self) -> &mut Self::Reader;
-
-    /// Returns the lane number associated with this connection.
-    fn get_lane(&self) -> u8;
-
-    /// Returns the ID of the client that has established this connection.
-    fn get_client(&self) -> &ClientPublicKey;
-
-    /// The compression algorithms the client does support.
-    fn get_compression_set(&self) -> CompressionAlgoSet;
+    // TODO: Reader and writer.
+    // Assume we have a framed reader/write with length-prefixed bytes over
+    // the stream.
 }

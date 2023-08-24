@@ -3606,6 +3606,7 @@ dependencies = [
  "dashmap",
  "fleek-crypto",
  "futures",
+ "infusion",
  "lightning-interfaces",
  "serde",
  "tokio",

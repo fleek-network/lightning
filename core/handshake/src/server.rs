@@ -7,10 +7,11 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use fleek_crypto::{ClientPublicKey, NodePublicKey};
+use infusion::Blank;
 use lightning_interfaces::handshake::HandshakeInterface;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::CompressionAlgoSet;
-use lightning_interfaces::{ConfigConsumer, ConnectionInterface, WithStartAndShutdown};
+use lightning_interfaces::{ConfigConsumer, ServiceExecutorInterface, WithStartAndShutdown};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
@@ -143,9 +144,12 @@ impl<
     L: StreamProvider + 'static,
 > HandshakeInterface<C> for HandshakeServer<C, L>
 {
-    type Connection = RawLaneConnection<L::Reader, L::Writer>;
+    type Connection = Blank<()>;
 
-    fn init(config: Self::Config) -> anyhow::Result<Self> {
+    fn init(
+        config: Self::Config,
+        _connector: c![C::ServiceExecutorInterface::Connector],
+    ) -> anyhow::Result<Self> {
         // TODO: Do not consume resources on initialization.
         let listener = futures::executor::block_on(L::new(config.listen_addr))?.into();
 
@@ -277,56 +281,50 @@ impl HandshakeServerInner {
 }
 
 pub struct RawLaneConnection<R: AsyncRead + Send + Sync, W: AsyncWrite + Send + Sync> {
-    reader: R,
-    writer: W,
-    lane: u8,
-    client_id: ClientPublicKey,
-    compression_set: CompressionAlgoSet,
+    r: PhantomData<R>,
+    w: PhantomData<W>,
 }
 
 impl<R: AsyncRead + Send + Sync, W: AsyncWrite + Send + Sync> RawLaneConnection<R, W> {
     pub fn new(
-        reader: R,
-        writer: W,
-        lane: u8,
-        client_id: ClientPublicKey,
-        compression_set: CompressionAlgoSet,
+        _reader: R,
+        _writer: W,
+        _lane: u8,
+        _client_id: ClientPublicKey,
+        _compression_set: CompressionAlgoSet,
     ) -> Self {
         Self {
-            reader,
-            writer,
-            lane,
-            client_id,
-            compression_set,
+            r: PhantomData,
+            w: PhantomData,
         }
     }
 }
 
-impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> ConnectionInterface
-    for RawLaneConnection<R, W>
-{
-    type Writer = W;
-    type Reader = R;
-
-    fn split(&mut self) -> (&mut Self::Writer, &mut Self::Reader) {
-        (&mut self.writer, &mut self.reader)
-    }
-    fn writer(&mut self) -> &mut Self::Writer {
-        &mut self.writer
-    }
-    fn reader(&mut self) -> &mut Self::Reader {
-        &mut self.reader
-    }
-    fn get_lane(&self) -> u8 {
-        self.lane
-    }
-    fn get_client(&self) -> &ClientPublicKey {
-        &self.client_id
-    }
-    fn get_compression_set(&self) -> CompressionAlgoSet {
-        self.compression_set
-    }
-}
+// impl<R: AsyncRead + Unpin + Send + Sync, W: AsyncWrite + Unpin + Send + Sync> ConnectionInterface
+//     for RawLaneConnection<R, W>
+// {
+//     type Writer = W;
+//     type Reader = R;
+//
+//     fn split(&mut self) -> (&mut Self::Writer, &mut Self::Reader) {
+//         (&mut self.writer, &mut self.reader)
+//     }
+//     fn writer(&mut self) -> &mut Self::Writer {
+//         &mut self.writer
+//     }
+//     fn reader(&mut self) -> &mut Self::Reader {
+//         &mut self.reader
+//     }
+//     fn get_lane(&self) -> u8 {
+//         self.lane
+//     }
+//     fn get_client(&self) -> &ClientPublicKey {
+//         &self.client_id
+//     }
+//     fn get_compression_set(&self) -> CompressionAlgoSet {
+//         self.compression_set
+//     }
+// }
 
 // TODO(qti3e): Bring these tests back to life after we have more things in the mock crate.
 //

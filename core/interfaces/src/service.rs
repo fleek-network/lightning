@@ -1,6 +1,14 @@
+use infusion::{c, Blank};
+
 use crate::infu_collection::Collection;
 use crate::types::ServiceId;
-use crate::{ConfigConsumer, ConfigProviderInterface, ConnectionInterface, WithStartAndShutdown};
+use crate::{
+    ConfigConsumer,
+    ConfigProviderInterface,
+    ConnectionInterface,
+    HandshakeInterface,
+    WithStartAndShutdown,
+};
 
 #[infusion::service]
 pub trait ServiceExecutorInterface<C: Collection>:
@@ -11,7 +19,8 @@ pub trait ServiceExecutorInterface<C: Collection>:
     }
 
     /// The connector object that this service executor provides.
-    type Connector: ServiceConnectorInterface;
+    type Connector: ServiceConnectorInterface<c![C::HandshakeInterface::Connection]> =
+        Blank<c![C::HandshakeInterface::Connection]>;
 
     fn init(config: Self::Config) -> anyhow::Result<Self>;
 
@@ -23,10 +32,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
 }
 
 #[infusion::blank]
-pub trait ServiceConnectorInterface: Clone {
-    /// The connection specified.
-    type Connection: ConnectionInterface;
-
+pub trait ServiceConnectorInterface<Connection: ConnectionInterface>: Clone {
     /// Handle the connection to the service specified by the name.
-    fn handle(&self, service: ServiceId, connection: Self::Connection);
+    fn handle(&self, service: ServiceId, connection: Connection);
 }

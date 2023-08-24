@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 #[derive(Hash, Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
 pub enum CompressionAlgorithm {
@@ -11,7 +13,9 @@ pub enum CompressionAlgorithm {
 
 /// A set of [`CompressionAlgorithm`] values. The [`CompressionAlgorithm::Uncompressed`]
 /// is a special case
-#[derive(Hash, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(
+    Hash, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize,
+)]
 pub struct CompressionAlgoSet(u8);
 
 impl CompressionAlgoSet {
