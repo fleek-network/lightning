@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
-use std::path::{Path, PathBuf};
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::path::{Path, PathBuf};
 
 use crate::ResolvedPathBuf;
 
@@ -48,4 +48,3 @@ impl Borrow<PathBuf> for ResolvedPathBuf {
         &self.resolved
     }
 }
-
