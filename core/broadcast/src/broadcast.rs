@@ -12,6 +12,7 @@ use lightning_interfaces::{
 };
 
 use crate::config::Config;
+use crate::frame::Frame;
 use crate::pubsub::PubSubI;
 
 pub struct Broadcast<C: Collection> {
@@ -35,7 +36,7 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
 }
 
 impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
-    type Message = ();
+    type Message = Frame;
 
     type PubSub<T: LightningMessage + Clone> = PubSubI<T>;
 
