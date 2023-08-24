@@ -1,77 +1,28 @@
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use async_trait::async_trait;
-use dashmap::DashMap;
 use lightning_interfaces::schema::LightningMessage;
-use lightning_interfaces::types::Topic;
 use lightning_interfaces::PubSub;
 
-pub struct PubSubTopic<M: LightningMessage> {
-    _m: PhantomData<M>,
-    topic: Topic,
-    /// sender for outgoing messages
-    sender: tokio::sync::mpsc::Sender<(Topic, Vec<u8>)>,
-    /// receiver for incoming messages
-    receiver: tokio::sync::broadcast::Receiver<Vec<u8>>,
-    /// map of broadcast senders. Needed to implement Clone.
-    channels: Arc<DashMap<Topic, tokio::sync::broadcast::Sender<Vec<u8>>>>,
+pub struct PubSubI<T: LightningMessage + Clone> {
+    message: PhantomData<T>,
 }
 
-impl<M: LightningMessage> PubSubTopic<M> {
-    pub(crate) fn new(
-        topic: Topic,
-        sender: tokio::sync::mpsc::Sender<(Topic, Vec<u8>)>,
-        receiver: tokio::sync::broadcast::Receiver<Vec<u8>>,
-        channels: Arc<DashMap<Topic, tokio::sync::broadcast::Sender<Vec<u8>>>>,
-    ) -> Self {
-        Self {
-            _m: PhantomData,
-            topic,
-            sender,
-            receiver,
-            channels,
-        }
-    }
-}
-
-impl<M: LightningMessage> Clone for PubSubTopic<M> {
+impl<T: LightningMessage + Clone> Clone for PubSubI<T> {
     fn clone(&self) -> Self {
         Self {
-            _m: self._m,
-            topic: self.topic,
-            sender: self.sender.clone(),
-            receiver: self
-                .channels
-                .get(&self.topic)
-                .expect("failed to find topic broadcast sender")
-                .subscribe(),
-            channels: self.channels.clone(),
+            message: PhantomData,
         }
     }
 }
 
 #[async_trait]
-impl<M> PubSub<M> for PubSubTopic<M>
-where
-    M: LightningMessage + Clone,
-{
-    async fn send(&self, msg: &M) {
-        let mut payload = Vec::new();
-        msg.encode(&mut payload).expect("failed to encode content");
-        self.sender
-            .send((self.topic, payload))
-            .await
-            .expect("failed to send outgoing broadcast payload over the channel");
+impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
+    async fn send(&self, msg: &T) {
+        todo!()
     }
 
-    async fn recv(&mut self) -> Option<M> {
-        // loop until we get a valid message, ignoring decoding errors
-        loop {
-            let bytes = self.receiver.recv().await.ok()?;
-            if let Ok(msg) = M::decode(&bytes) {
-                break Some(msg);
-            }
-        }
+    async fn recv(&mut self) -> Option<T> {
+        todo!()
     }
 }
