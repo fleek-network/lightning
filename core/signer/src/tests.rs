@@ -228,6 +228,9 @@ async fn test_shutdown() {
     signer.start().await;
     assert!(signer.is_running());
     signer.shutdown().await;
+    // Since shutdown is no longer doing async operations we need to wait a millisecond for it to
+    // finish shutting down
+    tokio::time::sleep(Duration::from_millis(1)).await;
     assert!(!signer.is_running());
 }
 
@@ -251,11 +254,15 @@ async fn test_shutdown_and_start_again() {
     signer.start().await;
     assert!(signer.is_running());
     signer.shutdown().await;
+    // Since shutdown is no longer doing async operations we need to wait a millisecond for it to
+    // finish shutting down
+    tokio::time::sleep(Duration::from_millis(1)).await;
     assert!(!signer.is_running());
 
     signer.start().await;
     assert!(signer.is_running());
     signer.shutdown().await;
+    tokio::time::sleep(Duration::from_millis(1)).await;
     assert!(!signer.is_running());
 }
 

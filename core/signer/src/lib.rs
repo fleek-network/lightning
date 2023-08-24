@@ -46,7 +46,7 @@ const TIMEOUT: Duration = Duration::from_secs(3);
 pub struct Signer<C: Collection> {
     inner: Arc<SignerInner>,
     socket: Socket<UpdateMethod, u64>,
-    is_running: AtomicBool,
+    is_running: Arc<AtomicBool>,
     mempool_socket: Option<MempoolSocket>,
     query_runner: c![C::ApplicationInterface::SyncExecutor],
     new_block_notify: Option<Arc<Notify>>,
@@ -70,16 +70,18 @@ impl<C: Collection> WithStartAndShutdown for Signer<C> {
             let query_runner = self.query_runner.clone();
             let new_block_notify = self.new_block_notify.clone().unwrap();
             let shutdown_notify = self.shutdown_notify.clone();
+
+            let is_running = self.is_running.clone();
             tokio::spawn(async move {
                 inner
                     .handle(
-                        //rx,
                         shutdown_notify,
                         mempool_socket,
                         query_runner,
                         new_block_notify,
                     )
-                    .await
+                    .await;
+                is_running.store(false, Ordering::Relaxed);
             });
             self.is_running.store(true, Ordering::Relaxed);
         }
@@ -88,7 +90,6 @@ impl<C: Collection> WithStartAndShutdown for Signer<C> {
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
         self.shutdown_notify.notify_one();
-        self.is_running.store(false, Ordering::Relaxed);
     }
 }
 
@@ -104,7 +105,7 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
         Ok(Self {
             inner: Arc::new(inner),
             socket,
-            is_running: AtomicBool::new(false),
+            is_running: Arc::new(AtomicBool::new(false)),
             mempool_socket: None,
             query_runner,
             new_block_notify: None,
