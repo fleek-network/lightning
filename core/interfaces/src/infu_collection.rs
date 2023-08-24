@@ -93,8 +93,14 @@ forward!(async fn start_or_shutdown_node(this, start: bool) on [
     RpcInterface,
 ] {
     if start {
+        println!("starting {}", get_name(&this));
         this.start().await;
     } else {
+        println!("shutting down {}", get_name(&this));
         this.shutdown().await;
     }
 });
+
+fn get_name<T>(val: &T) -> &str {
+    std::any::type_name::<T>()
+}
