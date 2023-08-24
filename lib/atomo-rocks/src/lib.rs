@@ -1,10 +1,10 @@
 //! A [`rocksdb`] storage backend implementation for [`atomo`].
 
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 use atomo::batch::Operation;
 use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackend, StorageBackendConstructor};
+use fxhash::FxHashMap;
 /// Re-export of [`rocksdb::Options`].
 pub use rocksdb::Options;
 use rocksdb::{ColumnFamilyDescriptor, WriteBatch};
@@ -39,7 +39,7 @@ pub struct RocksBackendBuilder {
     path: PathBuf,
     options: Options,
     columns: Vec<String>,
-    column_options: HashMap<String, Options>,
+    column_options: FxHashMap<String, Options>,
 }
 
 impl RocksBackendBuilder {
@@ -50,7 +50,7 @@ impl RocksBackendBuilder {
             path: path.into(),
             options: Default::default(),
             columns: Default::default(),
-            column_options: HashMap::new(),
+            column_options: Default::default(),
         }
     }
 

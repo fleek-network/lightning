@@ -687,6 +687,7 @@ name = "atomo-rocks"
 version = "0.2.0"
 dependencies = [
  "atomo",
+ "fxhash",
  "rocksdb",
 ]
 
