@@ -7,6 +7,7 @@ use dashmap::DashMap;
 use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use lightning_interfaces::schema::{AutoImplSerde, LightningMessage};
 use lightning_interfaces::types::ServiceScope;
+use lightning_interfaces::ReputationReporterInterface;
 use quinn::{ClientConfig, Connection, Endpoint, TransportConfig};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Receiver;
@@ -18,7 +19,10 @@ use crate::tls;
 /// Task that listens for QUIC connections.
 ///
 /// Sends new QUIC streams to pool listener.
-pub async fn start_listener_driver(driver: ListenerDriver) {
+pub async fn start_listener_driver<R>(driver: ListenerDriver<R>)
+where
+    R: ReputationReporterInterface + 'static,
+{
     let mut connections = Vec::new();
     while let Some(connecting) = driver.endpoint.accept().await {
         let remote_address = connecting.remote_address();
@@ -34,8 +38,9 @@ pub async fn start_listener_driver(driver: ListenerDriver) {
         connections.push(connection.clone());
 
         let handles = driver.handles.clone();
+        let reporter = driver.reporter.clone();
         tokio::spawn(async move {
-            if let Err(e) = handle_incoming_connection(handles, connection).await {
+            if let Err(e) = handle_incoming_connection(handles, connection, reporter).await {
                 tracing::error!("failed to handle incoming connection: {e:?}");
             }
         });
@@ -44,15 +49,20 @@ pub async fn start_listener_driver(driver: ListenerDriver) {
     }
 }
 
-async fn handle_incoming_connection(
+async fn handle_incoming_connection<R: ReputationReporterInterface>(
     handles: Arc<DashMap<ServiceScope, ScopeHandle>>,
     connection: Connection,
+    reporter: R,
 ) -> Result<()> {
     let (tx, mut rx) = connection.accept_bi().await?;
 
     let mut data = vec![0; 75];
     rx.read_exact(&mut data).await?;
     let message: StreamRequest = StreamRequest::decode(&data)?;
+
+    // Report RTT observed during connection establishment.
+    reporter.report_latency(&message.source_peer, connection.rtt());
+
     if let Some(handle) = handles.get(&message.scope) {
         if handle
             .listener_tx
@@ -69,13 +79,18 @@ async fn handle_incoming_connection(
 /// Task that listens for connect events and creates QUIC connections.
 ///
 /// Sends new QUIC streams to pool connector.
-pub async fn start_connector_driver(mut driver: ConnectorDriver) {
+pub async fn start_connector_driver<R>(mut driver: ConnectorDriver<R>)
+where
+    R: ReputationReporterInterface + 'static,
+{
     while let Some(event) = driver.connect_rx.recv().await {
         let endpoint = driver.endpoint.clone();
         let pool = driver.pool.clone();
         let secret_key = driver.node_secret_key.clone();
+        let reporter = driver.reporter.clone();
         tokio::spawn(async move {
-            if let Err(e) = handle_new_outgoing_connection(endpoint, event, pool, &secret_key).await
+            if let Err(e) =
+                handle_new_outgoing_connection(endpoint, event, pool, &secret_key, reporter).await
             {
                 tracing::error!("failed to handle outgoing connection: {e:?}")
             }
@@ -83,11 +98,12 @@ pub async fn start_connector_driver(mut driver: ConnectorDriver) {
     }
 }
 
-async fn handle_new_outgoing_connection(
+async fn handle_new_outgoing_connection<R: ReputationReporterInterface>(
     endpoint: Endpoint,
     event: ConnectEvent,
     pool: Arc<DashMap<(NodePublicKey, SocketAddr), Connection>>,
     secret_key: &NodeSecretKey,
+    reporter: R,
 ) -> Result<()> {
     let config = tls::make_client_config(secret_key, Some(event.peer))?;
     let mut client_config = ClientConfig::new(Arc::new(config));
@@ -99,7 +115,11 @@ async fn handle_new_outgoing_connection(
     let connection = endpoint
         .connect_with(client_config, event.address, "localhost")?
         .await?;
+
     pool.insert((event.peer, event.address), connection.clone());
+
+    // Report RTT observed during connection establishment.
+    reporter.report_latency(&event.peer, connection.rtt());
 
     handle_existing_outgoing_connection(connection, event).await
 }
@@ -128,21 +148,31 @@ async fn handle_existing_outgoing_connection(
 }
 
 /// Driver for listening to incoming QUIC connections.
-pub struct ListenerDriver {
+pub struct ListenerDriver<R: ReputationReporterInterface> {
     /// Current active connections.
     handles: Arc<DashMap<ServiceScope, ScopeHandle>>,
     /// QUIC endpoint.
     endpoint: Endpoint,
+    /// Reputation reporter.
+    reporter: R,
 }
 
-impl ListenerDriver {
-    pub fn new(handles: Arc<DashMap<ServiceScope, ScopeHandle>>, endpoint: Endpoint) -> Self {
-        Self { handles, endpoint }
+impl<R: ReputationReporterInterface> ListenerDriver<R> {
+    pub fn new(
+        handles: Arc<DashMap<ServiceScope, ScopeHandle>>,
+        endpoint: Endpoint,
+        reporter: R,
+    ) -> Self {
+        Self {
+            handles,
+            endpoint,
+            reporter,
+        }
     }
 }
 
 /// Driver for making QUIC connections.
-pub struct ConnectorDriver {
+pub struct ConnectorDriver<R> {
     /// Listens for scoped service registration.
     connect_rx: Receiver<ConnectEvent>,
     /// QUIC connection pool.
@@ -151,19 +181,23 @@ pub struct ConnectorDriver {
     endpoint: Endpoint,
     /// Node's secret key.
     node_secret_key: NodeSecretKey,
+    /// Reputation reporter.
+    reporter: R,
 }
 
-impl ConnectorDriver {
+impl<R: ReputationReporterInterface> ConnectorDriver<R> {
     pub fn new(
         connect_rx: Receiver<ConnectEvent>,
         endpoint: Endpoint,
         node_secret_key: NodeSecretKey,
+        reporter: R,
     ) -> Self {
         Self {
             connect_rx,
             pool: Arc::new(DashMap::new()),
             endpoint,
             node_secret_key,
+            reporter,
         }
     }
 }

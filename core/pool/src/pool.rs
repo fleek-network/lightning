@@ -49,7 +49,7 @@ pub struct ConnectionPool<C: Collection> {
     /// Signer provider.
     node_secret_key: NodeSecretKey,
     /// Reputation reporter.
-    _rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     _marker: PhantomData<C>,
 }
 
@@ -72,7 +72,7 @@ impl<C: Collection> ConnectionPool<C> {
             drivers: Mutex::new(JoinSet::new()),
             query_runner,
             node_secret_key,
-            _rep_reporter: rep_reporter,
+            rep_reporter,
             _marker: PhantomData,
         }
     }
@@ -119,15 +119,23 @@ impl<C: Collection> WithStartAndShutdown for ConnectionPool<C> {
         let endpoint = Endpoint::server(server_config, self.config.address).unwrap();
         self.endpoint.lock().unwrap().replace(endpoint.clone());
 
-        let listener_driver = ListenerDriver::new(self.active_scopes.clone(), endpoint.clone());
+        let listener_driver = ListenerDriver::new(
+            self.active_scopes.clone(),
+            endpoint.clone(),
+            self.rep_reporter.clone(),
+        );
         self.drivers
             .lock()
             .unwrap()
             .spawn(driver::start_listener_driver(listener_driver));
 
         let connector_rx = self.connector_rx.lock().unwrap().take().unwrap();
-        let listener_driver =
-            ConnectorDriver::new(connector_rx, endpoint, self.node_secret_key.clone());
+        let listener_driver = ConnectorDriver::new(
+            connector_rx,
+            endpoint,
+            self.node_secret_key.clone(),
+            self.rep_reporter.clone(),
+        );
         self.drivers
             .lock()
             .unwrap()
