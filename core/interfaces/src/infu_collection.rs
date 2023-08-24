@@ -101,6 +101,6 @@ forward!(async fn start_or_shutdown_node(this, start: bool) on [
     }
 });
 
-fn get_name<T>(val: &T) -> &str {
+fn get_name<T>(_: &T) -> &str {
     std::any::type_name::<T>()
 }
