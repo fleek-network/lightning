@@ -19,11 +19,16 @@ pub type AtomoBuilderWithRocks<S = DefaultSerdeBackend> = AtomoBuilder<RocksBack
 /// use atomo::DefaultSerdeBackend;
 /// use atomo_rocks::{AtomoBuilderWithRocks, Options, RocksBackendBuilder};
 ///
-/// let path = "test-rocksdb";
+/// let path = "example-rocksdb";
 /// let mut options = Options::default();
 /// options.create_if_missing(true);
+/// options.create_missing_column_families(true);
 /// let rocksdb = RocksBackendBuilder::new(path).with_options(options);
-/// let atomo = AtomoBuilderWithRocks::<DefaultSerdeBackend>::new(rocksdb).build();
+///
+/// let atomo = AtomoBuilderWithRocks::<DefaultSerdeBackend>::new(rocksdb)
+///     .with_table::<u64, u64>("example")
+///     .build();
+/// let table_res = atomo.resolve::<u64, u64>("example");
 ///
 /// // cleanup
 /// drop(atomo);
@@ -111,12 +116,21 @@ impl StorageBackend for RocksBackend {
 
     fn get(&self, tid: u8, key: &[u8]) -> Option<Vec<u8>> {
         let cf = self.db.cf_handle(&self.columns[tid as usize]).unwrap();
-        self.db.get_cf(&cf, key).ok().flatten()
+        self.db
+            .get_cf(&cf, key)
+            .expect("failed to get value from rocksdb")
     }
 
     fn contains(&self, tid: u8, key: &[u8]) -> bool {
         let cf = self.db.cf_handle(&self.columns[tid as usize]).unwrap();
-        self.db.key_may_exist_cf(&cf, key)
+        if self.db.key_may_exist_cf(&cf, key) {
+            self.db
+                .get_cf(&cf, key)
+                .expect("failed to get value from rocksdb")
+                .is_some()
+        } else {
+            false
+        }
     }
 }
 
@@ -146,11 +160,11 @@ mod tests {
 
         // setup atomo db
         let mut db = AtomoBuilderWithRocks::new(rocksdb)
-            .with_table::<u64, u64>("name-of-table")
+            .with_table::<u64, u64>("test")
             .build();
 
         let query_runner = db.query();
-        let table_res = db.resolve::<u64, u64>("name-of-table");
+        let table_res = db.resolve::<u64, u64>("test");
 
         // insert something to the table
         db.run(
@@ -197,6 +211,7 @@ mod tests {
         // Wait for the query thread to finish executing.
         let _ = handle.join();
 
+        // cleanup
         std::fs::remove_dir_all(path).expect("failed to remove old rocksdb");
     }
 }
