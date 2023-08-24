@@ -1,6 +1,8 @@
 use std::any::TypeId;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::fmt::Debug;
+
+use indexmap::IndexMap;
 
 use crate::error::CycleFound;
 use crate::vtable::{self, Object, Tag, VTable};
@@ -9,7 +11,7 @@ use crate::{DependencyGraph, InitializationError};
 /// The container contains an instance of every `<Type as Trait>`s.
 #[derive(Default)]
 pub struct Container {
-    objects: HashMap<Tag, Object>,
+    objects: IndexMap<Tag, Object>,
 }
 
 impl Container {
