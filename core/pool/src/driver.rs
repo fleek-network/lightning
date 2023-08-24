@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use dashmap::DashMap;
-use fleek_crypto::NodePublicKey;
+use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use lightning_interfaces::schema::{AutoImplSerde, LightningMessage};
 use lightning_interfaces::types::ServiceScope;
 use quinn::{ClientConfig, Connection, Endpoint, TransportConfig};
@@ -73,8 +73,10 @@ pub async fn start_connector_driver(mut driver: ConnectorDriver) {
     while let Some(event) = driver.connect_rx.recv().await {
         let endpoint = driver.endpoint.clone();
         let pool = driver.pool.clone();
+        let secret_key = driver.node_secret_key.clone();
         tokio::spawn(async move {
-            if let Err(e) = handle_new_outgoing_connection(endpoint, event, pool).await {
+            if let Err(e) = handle_new_outgoing_connection(endpoint, event, pool, &secret_key).await
+            {
                 tracing::error!("failed to handle outgoing connection: {e:?}")
             }
         });
@@ -85,8 +87,9 @@ async fn handle_new_outgoing_connection(
     endpoint: Endpoint,
     event: ConnectEvent,
     pool: Arc<DashMap<(NodePublicKey, SocketAddr), Connection>>,
+    secret_key: &NodeSecretKey,
 ) -> Result<()> {
-    let config = tls::dangerous_configs::client_config();
+    let config = tls::make_client_config(secret_key, Some(event.peer))?;
     let mut client_config = ClientConfig::new(Arc::new(config));
     let mut transport_config = TransportConfig::default();
     transport_config.max_idle_timeout(Duration::from_secs(30).try_into().ok());
@@ -146,14 +149,21 @@ pub struct ConnectorDriver {
     pool: Arc<DashMap<(NodePublicKey, SocketAddr), Connection>>,
     /// QUIC endpoint.
     endpoint: Endpoint,
+    /// Node's secret key.
+    node_secret_key: NodeSecretKey,
 }
 
 impl ConnectorDriver {
-    pub fn new(connect_rx: Receiver<ConnectEvent>, endpoint: Endpoint) -> Self {
+    pub fn new(
+        connect_rx: Receiver<ConnectEvent>,
+        endpoint: Endpoint,
+        node_secret_key: NodeSecretKey,
+    ) -> Self {
         Self {
             connect_rx,
             pool: Arc::new(DashMap::new()),
             endpoint,
+            node_secret_key,
         }
     }
 }

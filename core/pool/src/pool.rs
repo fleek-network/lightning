@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use fleek_crypto::NodePublicKey;
+use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::schema::LightningMessage;
@@ -14,6 +14,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
     ConnectionPoolInterface,
+    SignerInterface,
     WithStartAndShutdown,
 };
 use quinn::{Endpoint, RecvStream, SendStream, ServerConfig, TransportConfig};
@@ -44,6 +45,8 @@ pub struct ConnectionPool<C: Collection> {
     drivers: Mutex<JoinSet<()>>,
     /// Query runner.
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    /// Signer provider.
+    node_secret_key: NodeSecretKey,
     _marker: PhantomData<C>,
 }
 
@@ -51,6 +54,7 @@ impl<C: Collection> ConnectionPool<C> {
     pub fn new(
         config: PoolConfig,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        node_secret_key: NodeSecretKey,
     ) -> Self {
         let (connector_tx, connector_rx) = mpsc::channel(256);
 
@@ -63,6 +67,7 @@ impl<C: Collection> ConnectionPool<C> {
             config,
             drivers: Mutex::new(JoinSet::new()),
             query_runner,
+            node_secret_key,
             _marker: PhantomData,
         }
     }
@@ -99,7 +104,8 @@ impl<C: Collection> WithStartAndShutdown for ConnectionPool<C> {
     }
 
     async fn start(&self) {
-        let tls_config = tls::dangerous_configs::server_config();
+        let tls_config =
+            tls::make_server_config(&self.node_secret_key).expect("Secret key to be valid");
         let mut server_config = ServerConfig::with_crypto(Arc::new(tls_config));
         let mut transport_config = TransportConfig::default();
         transport_config.max_idle_timeout(Duration::from_secs(30).try_into().ok());
@@ -115,7 +121,8 @@ impl<C: Collection> WithStartAndShutdown for ConnectionPool<C> {
             .spawn(driver::start_listener_driver(listener_driver));
 
         let connector_rx = self.connector_rx.lock().unwrap().take().unwrap();
-        let listener_driver = ConnectorDriver::new(connector_rx, endpoint);
+        let listener_driver =
+            ConnectorDriver::new(connector_rx, endpoint, self.node_secret_key.clone());
         self.drivers
             .lock()
             .unwrap()
@@ -136,10 +143,11 @@ impl<C: Collection> ConnectionPoolInterface<C> for ConnectionPool<C> {
 
     fn init(
         config: Self::Config,
-        _signer: &c!(C::SignerInterface),
+        signer: &c!(C::SignerInterface),
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> Self {
-        ConnectionPool::new(config, query_runner)
+        let (_, secret_key) = signer.get_sk();
+        ConnectionPool::new(config, query_runner, secret_key)
     }
 
     fn bind<T>(&self, scope: ServiceScope) -> (Self::Listener<T>, Self::Connector<T>)
