@@ -45,9 +45,9 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
             },
 
             syn::TraitItem::Fn(item) if mode == utils::Mode::BlankOnly => {
-                if item.default.is_none() {
-                    let impl_ =
-                        utils::impl_trait_fn(&item, default_blank_block(&name, &item.sig.ident));
+                let (item, expr) = extract_default_attribute(item);
+                if item.default.is_none() || expr.is_some() {
+                    let impl_ = implement_blank_method(&trait_.ident, &item, expr);
                     blank_body.push(syn::ImplItem::Fn(impl_));
                 }
                 trait_body.push(syn::TraitItem::Fn(item));
@@ -76,10 +76,8 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
                         trait_body.push(syn::TraitItem::Fn(item));
                     },
                     _name => {
-                        let impl_ = utils::impl_trait_fn(
-                            &item,
-                            default_blank_block(&trait_.ident, &item.sig.ident),
-                        );
+                        let (item, expr) = extract_default_attribute(item);
+                        let impl_ = implement_blank_method(&trait_.ident, &item, expr);
                         trait_body.push(syn::TraitItem::Fn(item));
                         blank_body.push(syn::ImplItem::Fn(impl_));
                     },
@@ -288,15 +286,62 @@ fn impl_post(base: &syn::Ident, item: syn::TraitItemFn) -> Result<syn::TraitItem
     })
 }
 
-/// The code block for a blank method implementation.
-fn default_blank_block(trait_name: &syn::Ident, method_name: &syn::Ident) -> syn::Block {
-    parse_quote! {
-        {
-            panic!(
-                "BLANK METHOD '{}(..) @ {}' CALLED",
-                stringify!(#method_name),
-                stringify!(#trait_name)
-            );
-        }
+fn extract_default_attribute(mut item: syn::TraitItemFn) -> (syn::TraitItemFn, Option<syn::Expr>) {
+    let maybe_index = item.attrs.iter().position(|attr| {
+        let syn::Meta::NameValue(name_value) = &attr.meta else {
+            return false;
+        };
+
+        name_value
+            .path
+            .get_ident()
+            .map(|ident| ident == "blank")
+            .unwrap_or(false)
+    });
+
+    if let Some(index) = maybe_index {
+        let syn::Meta::NameValue(attr) = item.attrs.remove(index).meta else {
+            unreachable!()
+        };
+
+        (item, Some(attr.value))
+    } else {
+        (item, None)
     }
+}
+
+fn implement_blank_method(
+    trait_name: &syn::Ident,
+    item: &syn::TraitItemFn,
+    expr: Option<syn::Expr>,
+) -> syn::ImplItemFn {
+    let method_name = &item.sig.ident;
+
+    let expr = expr.map(|e| quote! { #e }).unwrap_or_else(|| {
+        if item.sig.output == syn::ReturnType::Default {
+            quote! {
+                eprintln!(
+                    "BLANK METHOD '{}(..) @ {}' CALLED",
+                    stringify!(#method_name),
+                    stringify!(#trait_name)
+                );
+            }
+        } else {
+            quote! {
+                panic!(
+                    "BLANK METHOD '{}(..) @ {}' CALLED",
+                    stringify!(#method_name),
+                    stringify!(#trait_name)
+                );
+            }
+        }
+    });
+
+    let block = parse_quote! {
+        {
+            #expr
+        }
+    };
+
+    utils::impl_trait_fn(item, block)
 }

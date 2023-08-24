@@ -25,6 +25,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
     fn init(config: Self::Config) -> anyhow::Result<Self>;
 
     /// Return the connector for this service executor.
+    #[blank = Default::default()]
     fn get_connector(&self) -> Self::Connector;
 
     /// Register a core service, a core service is any service that we ship with this binary.
