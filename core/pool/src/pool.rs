@@ -99,7 +99,7 @@ impl<C: Collection> WithStartAndShutdown for ConnectionPool<C> {
     }
 
     async fn start(&self) {
-        let tls_config = tls::server_config();
+        let tls_config = tls::dangerous_configs::server_config();
         let mut server_config = ServerConfig::with_crypto(Arc::new(tls_config));
         let mut transport_config = TransportConfig::default();
         transport_config.max_idle_timeout(Duration::from_secs(30).try_into().ok());

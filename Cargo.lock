@@ -350,7 +350,7 @@ dependencies = [
  "tower",
  "tracing",
  "webpki",
- "x509-parser",
+ "x509-parser 0.14.0",
 ]
 
 [[package]]
@@ -1943,6 +1943,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c7ed52955ce76b1554f509074bb357d3fb8ac9b51288a65a3fd480d1dfba946"
 dependencies = [
  "const-oid",
+ "der_derive",
  "pem-rfc7468 0.7.0",
  "zeroize",
 ]
@@ -1959,6 +1960,17 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "rusticata-macros",
+]
+
+[[package]]
+name = "der_derive"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fe87ce4529967e0ba1dcf8450bab64d97dfd5010a6256187ffe2e43e6f0e049"
+dependencies = [
+ "proc-macro2 1.0.66",
+ "quote 1.0.31",
+ "syn 2.0.26",
 ]
 
 [[package]]
@@ -3732,6 +3744,8 @@ dependencies = [
  "bincode",
  "bytes",
  "dashmap",
+ "der 0.7.7",
+ "fleek-blake3",
  "fleek-crypto",
  "futures-util",
  "infusion",
@@ -3739,11 +3753,15 @@ dependencies = [
  "multiaddr",
  "quinn",
  "rcgen 0.11.1",
+ "ring",
  "rustls 0.21.5",
  "serde",
+ "thiserror",
  "tokio",
  "tokio-util 0.7.8",
  "tracing",
+ "webpki",
+ "x509-parser 0.15.1",
 ]
 
 [[package]]
@@ -8326,6 +8344,23 @@ checksum = "e0ecbeb7b67ce215e40e3cc7f2ff902f94a223acf44995934763467e7b1febc8"
 dependencies = [
  "asn1-rs",
  "base64 0.13.1",
+ "data-encoding",
+ "der-parser",
+ "lazy_static",
+ "nom",
+ "oid-registry",
+ "rusticata-macros",
+ "thiserror",
+ "time 0.3.23",
+]
+
+[[package]]
+name = "x509-parser"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7069fba5b66b9193bd2c5d3d4ff12b839118f6bcbef5328efafafb5395cf63da"
+dependencies = [
+ "asn1-rs",
  "data-encoding",
  "der-parser",
  "lazy_static",

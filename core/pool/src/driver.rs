@@ -86,7 +86,7 @@ async fn handle_new_outgoing_connection(
     event: ConnectEvent,
     pool: Arc<DashMap<(NodePublicKey, SocketAddr), Connection>>,
 ) -> Result<()> {
-    let config = tls::client_config();
+    let config = tls::dangerous_configs::client_config();
     let mut client_config = ClientConfig::new(Arc::new(config));
     let mut transport_config = TransportConfig::default();
     transport_config.max_idle_timeout(Duration::from_secs(30).try_into().ok());
