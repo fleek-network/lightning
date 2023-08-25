@@ -36,7 +36,7 @@ use typed_store::DBMetrics;
 
 use crate::config::Config;
 use crate::edge_node::EdgeService;
-use crate::execution::Execution;
+use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Execution};
 use crate::forwarder::Forwarder;
 use crate::narwhal::{NarwhalArgs, NarwhalService};
 
@@ -379,6 +379,10 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         let reconfigure_notify = Arc::new(Notify::new());
         let new_block_notify = Arc::new(Notify::new());
         let networking_keypair = NetworkKeyPair::from(primary_sk);
+        // Todo(dalton): Is clone neccasarry here
+        let node_index = query_runner
+            .pubkey_to_index(networking_keypair.public().clone().into())
+            .unwrap_or_default();
         let primary_keypair = KeyPair::from(consensus_sk);
         let forwarder = Forwarder::new(query_runner.clone(), primary_keypair.public().clone());
         let narwhal_args = NarwhalArgs {
@@ -387,11 +391,13 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             worker_keypair: networking_keypair,
             registry_service: RegistryService::new(registry),
         };
+
         let execution_state = Arc::new(Execution::new(
             executor,
             reconfigure_notify.clone(),
             new_block_notify.clone(),
             pubsub.clone(),
+            node_index,
         ));
         let epoch_state = EpochState::new(
             query_runner,
@@ -425,7 +431,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
 
 #[derive(Debug, Serialize, Deserialize, Clone, IsVariant, From, TryInto)]
 pub enum PubSubMsg {
-    Certificate(narwhal_types::Certificate),
-    Batch(narwhal_types::Batch),
+    Transactions(AuthenticStampedParcel),
+    Attestation(CommitteeAttestation),
 }
 impl AutoImplSerde for PubSubMsg {}

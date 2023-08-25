@@ -162,21 +162,16 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>>(
 ) {
     let handle = |msg: PubSubMsg| async {
         match msg {
-            PubSubMsg::Batch(batch) => {
+            PubSubMsg::Transactions(batch) => {
                 // TODO(qti3e): The gossip recv should return the originator of the message
                 // so we can verify that it is a committee member here.
 
                 // Store the batch. This will wake the interested getters up.
-                pool.store(batch);
+
+                //pool.store(batch);
+                todo!()
             },
-            PubSubMsg::Certificate(certificate)
-                if certificate.verify(&committee, &worker_cache).is_ok() =>
-            {
-                tx_new_certificates
-                    .send(certificate)
-                    .await
-                    .expect("Failed to send new certificated through the channel.");
-            },
+            PubSubMsg::Attestation(certificate) => todo!(),
             _ => {},
         }
     };
