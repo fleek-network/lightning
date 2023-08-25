@@ -41,7 +41,6 @@ pub struct Env<P> {
 }
 
 impl Env<UpdatePerm> {
-    #[allow(unused_variables)]
     pub fn new(db_path: &Option<ResolvedPathBuf>, db_options: &Option<ResolvedPathBuf>) -> Self {
         let storage = match db_path {
             Some(db_path) => {
