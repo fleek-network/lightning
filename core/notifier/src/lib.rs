@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
@@ -11,7 +11,7 @@ use tokio::time::sleep;
 
 pub struct Notifier<C: Collection> {
     query_runner: c![C::ApplicationInterface::SyncExecutor],
-    notify: Arc<Notify>,
+    notify: Weak<Notify>,
 }
 
 impl<C: Collection> Clone for Notifier<C> {
@@ -42,7 +42,7 @@ impl<C: Collection> Notifier<C> {
 impl<C: Collection> NotifierInterface<C> for Notifier<C> {
     fn init(app: &c![C::ApplicationInterface]) -> Self {
         let notifier: Arc<Notify> = Default::default();
-        let notify = notifier.clone();
+        let notify = Arc::downgrade(&notifier);
         app.transaction_executor().inject(move |res| {
             if res.change_epoch {
                 notifier.notify_waiters();
@@ -56,11 +56,20 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
     }
 
     fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>) {
-        let notify = self.notify.clone();
+        let weak_notify = self.notify.clone();
+
         tokio::spawn(async move {
             loop {
-                notify.notified().await;
+                if let Some(notify) = weak_notify.upgrade() {
+                    notify.notified().await;
+                } else {
+                    // The transaction executor sockets have dropped. There
+                    // is nothing coming anymore.
+                    return;
+                }
+
                 if tx.send(Notification::NewEpoch).await.is_err() {
+                    // There is no receiver anymore.
                     return;
                 }
             }
