@@ -18,6 +18,7 @@ lightning-signer = { path = "../signer" }
 lightning-dht = { path = "../dht" }
 lightning-pool = { path = "../pool" }
 mock = { path = "../mock" }
+infusion.workspace = true
 tokio.workspace = true
 anyhow.workspace = true
 futures.workspace = true

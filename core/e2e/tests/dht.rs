@@ -4,17 +4,25 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
 use fleek_crypto::{NodeSecretKey, SecretKey};
+use lightning_application::app::Application;
 use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
-use lightning_dht::dht::Builder as DhtBuilder;
+use lightning_dht::dht::{Builder as DhtBuilder, Dht};
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::networking::{PortAssigner, Transport};
 use lightning_e2e::utils::rpc;
+use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::TableEntry;
-use lightning_interfaces::{Blake3Hash, WithStartAndShutdown};
-use lightning_node::node::FinalTypes;
+use lightning_interfaces::{partial, Blake3Hash, WithStartAndShutdown};
+use lightning_topology::Topology;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
 use tokio::sync::Notify;
+
+partial!(PartialBinding {
+    ApplicationInterface = Application<Self>;
+    TopologyInterface = Topology<Self>;
+    DhtInterface = Dht<Self>;
+});
 
 #[tokio::test]
 async fn e2e_dht() -> Result<()> {
@@ -53,8 +61,12 @@ async fn e2e_dht() -> Result<()> {
             .expect("Failed to build tokio runtime for node container.");
 
         runtime.block_on(async move {
-            let builder = DhtBuilder::new(key_cloned, bootstrapper_config);
-            let dht = builder.build::<FinalTypes>().unwrap();
+            let builder = DhtBuilder::<PartialBinding>::new(
+                key_cloned,
+                bootstrapper_config,
+                Default::default(),
+            );
+            let dht = builder.build().unwrap();
             dht.start().await;
             bootstrap_ready_rx.notify_one();
 

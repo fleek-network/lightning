@@ -9,7 +9,12 @@ use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
 use lightning_interfaces::dht::{DhtInterface, DhtSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
-use lightning_interfaces::{ConfigConsumer, SignerInterface, WithStartAndShutdown};
+use lightning_interfaces::{
+    ConfigConsumer,
+    ReputationAggregatorInterface,
+    SignerInterface,
+    WithStartAndShutdown,
+};
 use tokio::net::UdpSocket;
 use tokio::sync::{mpsc, Notify};
 
@@ -19,16 +24,22 @@ use crate::task::bootstrap::Bootstrapper;
 use crate::{api, network, store, table, task};
 
 /// Builds the DHT.
-pub struct Builder {
+pub struct Builder<C: Collection> {
     config: Config,
     nodes: Vec<NodeInfo>,
     network_secret_key: NodeSecretKey,
     buffer_size: Option<usize>,
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+    _marker: PhantomData<C>,
 }
 
-impl Builder {
+impl<C: Collection> Builder<C> {
     /// Returns a new [`Builder`].
-    pub fn new(network_secret_key: NodeSecretKey, config: Config) -> Self {
+    pub fn new(
+        network_secret_key: NodeSecretKey,
+        config: Config,
+        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+    ) -> Self {
         let nodes: Vec<NodeInfo> = config
             .bootstrappers
             .iter()
@@ -43,6 +54,8 @@ impl Builder {
             nodes,
             network_secret_key,
             buffer_size: None,
+            rep_reporter,
+            _marker: PhantomData,
         }
     }
 
@@ -61,7 +74,7 @@ impl Builder {
     }
 
     /// Build and initiates the DHT.
-    pub fn build<C: Collection>(self) -> Result<Dht<C>> {
+    pub fn build(self) -> Result<Dht<C>> {
         let buffer_size = self.buffer_size.unwrap_or(10_000);
 
         let (socket, rx) = Socket::raw_bounded(2048);
@@ -79,6 +92,7 @@ impl Builder {
             bootstrap_rx: Arc::new(Mutex::new(Some(bootstrap_rx))),
             is_running: Arc::new(Mutex::new(false)),
             shutdown_notify: Arc::new(Notify::new()),
+            _rep_reporter: self.rep_reporter,
             collection: PhantomData,
         })
     }
@@ -97,6 +111,7 @@ pub struct Dht<C: Collection> {
     nodes: Arc<Mutex<Option<Vec<NodeInfo>>>>,
     is_running: Arc<Mutex<bool>>,
     shutdown_notify: Arc<Notify>,
+    _rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     collection: PhantomData<C>,
 }
 
@@ -225,10 +240,11 @@ impl<C: Collection> DhtInterface<C> for Dht<C> {
     fn init(
         signer: &c![C::SignerInterface],
         _: c![C::TopologyInterface],
+        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
         config: Self::Config,
     ) -> Result<Self> {
         let (_, node_public_key) = signer.get_sk();
-        Builder::new(node_public_key, config).build()
+        Builder::new(node_public_key, config, rep_reporter).build()
     }
 
     fn get_socket(&self) -> DhtSocket {

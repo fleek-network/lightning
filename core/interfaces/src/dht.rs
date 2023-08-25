@@ -6,6 +6,7 @@ use crate::types::{DhtRequest, DhtResponse};
 use crate::{
     ConfigConsumer,
     ConfigProviderInterface,
+    ReputationAggregatorInterface,
     SignerInterface,
     TopologyInterface,
     WithStartAndShutdown,
@@ -21,13 +22,20 @@ pub trait DhtInterface<C: Collection>:
         signer: ::SignerInterface,
         topology: ::TopologyInterface,
         config: ::ConfigProviderInterface,
+        rep_aggregator: ::ReputationAggregatorInterface,
     ) {
-        Self::init(signer, topology.clone(), config.get::<Self>())
+        Self::init(
+            signer,
+            topology.clone(),
+            rep_aggregator.get_reporter(),
+            config.get::<Self>(),
+        )
     }
 
     fn init(
         signer: &c!(C::SignerInterface),
         topology: c!(C::TopologyInterface),
+        rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
         config: Self::Config,
     ) -> anyhow::Result<Self>;
 

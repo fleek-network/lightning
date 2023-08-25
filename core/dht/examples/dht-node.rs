@@ -4,12 +4,13 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 use fleek_crypto::{NodePublicKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_application::app::Application;
+use lightning_application::config::{Mode, StorageConfig};
 use lightning_dht::config::Config;
 use lightning_dht::dht::{Builder, Dht};
 use lightning_interfaces::dht::{DhtInterface, DhtSocket};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix};
-use lightning_interfaces::{partial, Blake3Hash, WithStartAndShutdown};
+use lightning_interfaces::{partial, ApplicationInterface, Blake3Hash, WithStartAndShutdown};
 use lightning_topology::Topology;
 
 #[derive(Parser)]
@@ -62,8 +63,7 @@ async fn main() {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
             let secret_key = NodeSecretKey::generate();
             tracing::info!("public key: {:?}", secret_key.to_pk());
-            let dht_socket =
-                start_node::<PartialBinding>(secret_key, Some((address, bootstrap_key))).await;
+            let dht_socket = start_node(secret_key, Some((address, bootstrap_key))).await;
 
             tracing::info!("GET {key:?}");
 
@@ -85,8 +85,7 @@ async fn main() {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
             let secret_key = NodeSecretKey::generate();
             tracing::info!("public key: {:?}", secret_key.to_pk());
-            let dht_socket =
-                start_node::<PartialBinding>(secret_key, Some((address, bootstrap_key))).await;
+            let dht_socket = start_node(secret_key, Some((address, bootstrap_key))).await;
 
             // Todo: get actual hash.
             let key: Blake3Hash = rand::random();
@@ -113,13 +112,13 @@ async fn main() {
             let address: SocketAddr = cli.bootstrapper.unwrap().parse().unwrap();
             let secret_key = NodeSecretKey::generate();
             tracing::info!("public key: {:?}", secret_key.to_pk());
-            let _ = start_node::<PartialBinding>(secret_key, Some((address, bootstrap_key))).await;
+            let _ = start_node(secret_key, Some((address, bootstrap_key))).await;
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
         },
         Commands::Bootstrapper => {
-            let _socket = start_node::<PartialBinding>(bootstrap_secret_key, None).await;
+            let _socket = start_node(bootstrap_secret_key, None).await;
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
@@ -129,18 +128,28 @@ async fn main() {
     tracing::info!("shutting down dht-node");
 }
 
-async fn start_node<C: Collection>(
+async fn start_node(
     secret_key: NodeSecretKey,
     bootstrapper: Option<(SocketAddr, NodePublicKey)>,
 ) -> DhtSocket {
-    let mut builder = Builder::new(secret_key, Config::default());
+    let application = Application::<PartialBinding>::init(lightning_application::config::Config {
+        mode: Mode::Test,
+        genesis: None,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
+    })
+    .unwrap();
+    let _query_runner = application.sync_query();
+    let mut builder =
+        Builder::<PartialBinding>::new(secret_key, Config::default(), Default::default());
 
     if let Some((address, key)) = bootstrapper {
         tracing::info!("bootstrapping to {address:?} {key:?}");
         builder.add_node(key, address);
     }
 
-    let dht = builder.build::<C>().unwrap();
+    let dht = builder.build().unwrap();
     let socket = dht.get_socket();
     dht.start().await;
 
