@@ -22,7 +22,7 @@ use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
 use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
 use lightning_dht::dht::Dht;
-use lightning_handshake::server::{HandshakeServerConfig, TcpHandshakeServer};
+use lightning_handshake::server::{HandshakeServer, HandshakeServerConfig};
 use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
@@ -253,8 +253,8 @@ fn build_config(
         bootstrappers,
     });
 
-    config.inject::<TcpHandshakeServer<FinalTypes>>(HandshakeServerConfig {
-        listen_addr: SocketAddr::from_str(&format!("127.0.0.1:{}", ports.handshake)).unwrap(),
+    config.inject::<HandshakeServer<FinalTypes>>(HandshakeServerConfig {
+        websocket_address: SocketAddr::from_str(&format!("127.0.0.1:{}", ports.handshake)).unwrap(),
     });
 
     config.inject::<Signer<FinalTypes>>(SignerConfig {

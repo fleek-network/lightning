@@ -3666,6 +3666,7 @@ dependencies = [
  "lightning-interfaces",
  "serde",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

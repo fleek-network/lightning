@@ -45,7 +45,11 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> HandshakeClient<R, W> {
                 // TODO: Verification?
             },
             Some(_) => unreachable!(),
-            None => return Err(anyhow!("connection disconnected")),
+            None => {
+                return Err(anyhow!(
+                    "connection disconnected reading handshake response"
+                ));
+            },
         }
 
         Ok(())
@@ -63,16 +67,20 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite + Unpin> HandshakeClient<R, W> {
             })
             .await?;
 
-        // Recieve response
+        // Receive response
         match self.conn.read_frame(Some(HANDSHAKE_RES_UNLOCK_TAG)).await? {
             Some(HandshakeFrame::HandshakeResponseUnlock { .. }) => {
                 // TODO: Verification?
             },
             Some(_) => unreachable!(),
-            None => return Err(anyhow!("connection disconnected")),
+            None => {
+                return Err(anyhow!(
+                    "connection disconnected reading handshake response"
+                ));
+            },
         }
 
-        // Send delivery acknowledgement
+        // Send delivery acknowledgment
         self.conn
             .write_frame(HandshakeFrame::DeliveryAcknowledgement {
                 // TODO: Figure out size in fleek_crypto
