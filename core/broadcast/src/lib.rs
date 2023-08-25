@@ -8,6 +8,7 @@ mod frame;
 mod interner;
 mod peers;
 mod pubsub;
+mod receivers;
 
 pub use broadcast::Broadcast;
 pub use frame::*;

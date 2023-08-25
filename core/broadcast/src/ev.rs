@@ -17,6 +17,7 @@ use lightning_interfaces::{
     ListenerConnector,
     ListenerInterface,
     NotifierInterface,
+    PoolReceiver,
     PoolSender,
     SenderInterface,
     SenderReceiver,
@@ -31,10 +32,14 @@ use crate::peers::Peers;
 // TODO(qti3e): Move this to somewhere else.
 pub type Topology = Arc<Vec<Vec<NodePublicKey>>>;
 
+// The connection pool sender and receiver types.
+type S<C> = PoolSender<C, c![C::ConnectionPoolInterface], Frame>;
+type R<C> = PoolReceiver<C, c![C::ConnectionPoolInterface], Frame>;
+
 struct State<C: Collection> {
     db: Database,
     interner: Interner,
-    peers: Peers<PoolSender<C, c![C::ConnectionPoolInterface], Frame>>,
+    peers: Peers<S<C>, R<C>>,
 }
 
 impl<C: Collection> State<C> {

@@ -125,7 +125,7 @@ where
 /// object anymore.
 #[async_trait]
 #[infusion::blank]
-pub trait SenderInterface<T>: Send + Sync
+pub trait SenderInterface<T>: Send + Sync + 'static
 where
     T: LightningMessage,
 {
@@ -150,7 +150,7 @@ where
 /// object anymore.
 #[async_trait]
 #[infusion::blank]
-pub trait ReceiverInterface<T>: Send + Sync
+pub trait ReceiverInterface<T>: Send + Sync + 'static
 where
     T: LightningMessage,
 {

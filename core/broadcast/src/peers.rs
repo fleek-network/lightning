@@ -1,17 +1,28 @@
+use std::pin::Pin;
+
 use fleek_crypto::NodePublicKey;
+use futures::stream::FuturesUnordered;
+use futures::Future;
 use fxhash::{FxHashMap, FxHashSet};
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::SenderInterface;
+use lightning_interfaces::{ReceiverInterface, SenderInterface};
 
 use crate::ev::Topology;
 use crate::frame::{Digest, Frame};
+use crate::receivers::Receivers;
 use crate::MessageInternedId;
 
 /// This struct is responsible for holding the state of the current peers
 /// that we are connected to.
-pub struct Peers<S: SenderInterface<Frame>> {
-    map: FxHashMap<NodePublicKey, Peer<S>>,
+pub struct Peers<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> {
+    /// Map each public key to the info we have about that peer.
+    peers: FxHashMap<NodePublicKey, Peer<S>>,
+    /// The message queue from all the connections we have.
+    incoming_messages: Receivers<R>,
 }
+
+/// An interned id. But not from our interned table.
+type RemoteInternedId = MessageInternedId;
 
 struct Peer<S> {
     /// The index of the node.
@@ -26,7 +37,10 @@ struct Peer<S> {
     /// The stats we have from this connection to the peer.
     stats: ConnectionStats,
     // We know this peer has these messages. They have advertised them to us before.
-    has: FxHashSet<MessageInternedId>,
+    //
+    // Here we are storing the mapping from the interned id of a message in our table,
+    // to the interned id of the message known to the client.
+    has: FxHashMap<MessageInternedId, RemoteInternedId>,
 }
 
 enum ConnectionOrigin {
@@ -73,7 +87,7 @@ pub struct ConnectionStats {
     invalid_messages_received_from_peer: usize,
 }
 
-impl<S: SenderInterface<Frame>> Peers<S> {
+impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
     /// Apply a new topology and update the connection graph.
     pub fn apply_topology(&mut self, new_topology: Topology) {}
 
@@ -82,12 +96,18 @@ impl<S: SenderInterface<Frame>> Peers<S> {
     ///
     /// That is when they have previously advertised the same digest to us.
     pub fn advertise(&self, _digest: Digest) {}
+
+    pub async fn handle_new_incoming_connection(&mut self, (sender, receiver): (S, R)) {
+        // let mut set = FuturesUnordered::new();
+        // set.push(receiver.recv());
+    }
 }
 
-impl<S: SenderInterface<Frame>> Default for Peers<S> {
+impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Default for Peers<S, R> {
     fn default() -> Self {
         Self {
-            map: Default::default(),
+            peers: Default::default(),
+            incoming_messages: Default::default(),
         }
     }
 }
