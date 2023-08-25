@@ -1,6 +1,6 @@
-use fleek_crypto::{NodePublicKey, NodeSignature};
+use fleek_crypto::{NodeSignature};
 use ink_quill::{ToDigest, TranscriptBuilder};
-use lightning_interfaces::schema::{AutoImplSerde, LightningMessage};
+use lightning_interfaces::schema::{AutoImplSerde};
 use lightning_interfaces::types::{NodeIndex, Topic};
 use serde::{Deserialize, Serialize};
 

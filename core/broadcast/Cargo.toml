@@ -16,6 +16,9 @@ lightning-interfaces = { path = "../interfaces" }
 dashmap = "5.5.0"
 mini-moka = "0.10.2"
 tracing = "0.1.37"
+fxhash = "0.2"
+affair.workspace = true
+infusion.workspace = true
 
 [dev-dependencies]
 lightning-application = { path = "../application" }
@@ -23,4 +26,3 @@ lightning-signer = { path = "../signer" }
 lightning-topology = { path = "../topology" }
 lightning-notifier = { path = "../notifier" }
 mock = { path = "../mock" }
-infusion.workspace = true

@@ -41,16 +41,16 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
     type PubSub<T: LightningMessage + Clone> = PubSubI<T>;
 
     fn init(
-        config: Self::Config,
-        listener_connector: ListenerConnector<C, c![C::ConnectionPoolInterface], Self::Message>,
-        topology: c!(C::TopologyInterface),
-        signer: &c!(C::SignerInterface),
-        notifier: c!(C::NotifierInterface),
+        _config: Self::Config,
+        _listener_connector: ListenerConnector<C, c![C::ConnectionPoolInterface], Self::Message>,
+        _topology: c!(C::TopologyInterface),
+        _signer: &c!(C::SignerInterface),
+        _notifier: c!(C::NotifierInterface),
     ) -> anyhow::Result<Self> {
         todo!()
     }
 
-    fn get_pubsub<T: LightningMessage + Clone>(&self, topic: Topic) -> Self::PubSub<T> {
+    fn get_pubsub<T: LightningMessage + Clone>(&self, _topic: Topic) -> Self::PubSub<T> {
         todo!()
     }
 }

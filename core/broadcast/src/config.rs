@@ -1,10 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
+#[derive(Default)]
 pub struct Config {}
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {}
-    }
-}
+

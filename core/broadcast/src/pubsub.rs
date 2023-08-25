@@ -18,7 +18,7 @@ impl<T: LightningMessage + Clone> Clone for PubSubI<T> {
 
 #[async_trait]
 impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
-    async fn send(&self, msg: &T) {
+    async fn send(&self, _msg: &T) {
         todo!()
     }
 

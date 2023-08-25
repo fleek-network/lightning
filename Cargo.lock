@@ -3528,12 +3528,14 @@ dependencies = [
 name = "lightning-broadcast"
 version = "0.1.0"
 dependencies = [
+ "affair",
  "anyhow",
  "arrayref",
  "async-trait",
  "bytes",
  "dashmap",
  "fleek-crypto",
+ "fxhash",
  "infusion",
  "ink-quill",
  "lightning-application",
