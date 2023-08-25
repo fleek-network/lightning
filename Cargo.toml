@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["core/*", "lib/*", "services/*", "metrics/"]
+members = ["core/*", "lib/*", "services/*", "metrics/", "global-metrics/"]
 
 [workspace.package]
 version = "0.1.0"

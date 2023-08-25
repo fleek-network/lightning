@@ -54,7 +54,7 @@ impl RpcServer {
         #[allow(unused_mut)]
         let mut server = Server::new()
             .with_data(Data::new(interface))
-            .with_method("rpc.discover", discovery_handler::<Q>)
+            .with_method("rpc.discover", rpc_discovery_handler::<Q>)
             .with_method("flk_ping", ping_handler::<Q>)
             .with_method("flk_get_flk_balance", get_flk_balance_handler::<Q>)
             .with_method(
@@ -96,15 +96,16 @@ impl RpcServer {
 
         #[cfg(feature = "e2e-test")]
         {
-            server = server.with_method("flk_dht_put", dht_put::<Q>);
-            server = server.with_method("flk_dht_get", dht_get::<Q>);
+            server = server
+                .with_method("flk_dht_put", dht_put::<Q>)
+                .with_method("flk_dht_get", dht_get::<Q>);
         }
 
         RpcServer(server.finish())
     }
 }
 
-pub async fn discovery_handler<Q: SyncQueryRunnerInterface>() -> Result<String> {
+pub async fn rpc_discovery_handler<Q: SyncQueryRunnerInterface>() -> Result<String> {
     match fs::read_to_string(OPEN_RPC_DOCS) {
         Ok(contents) => Ok(contents),
         Err(e) => Err(Error::internal(e)),
@@ -267,9 +268,6 @@ pub async fn send_txn<Q: SyncQueryRunnerInterface>(
         .run(param)
         .await
         .map_err(Error::internal)
-
-    // println!("{:?}", param);
-    //Ok(())
 }
 
 #[cfg(feature = "e2e-test")]
