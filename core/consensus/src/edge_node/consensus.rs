@@ -72,7 +72,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>>(
 
                     transaction_store.store_parcel(parcel);
 
-                    transaction_store.try_execute(parcel_digest, quorom_threshold, &execution).await;
+                    transaction_store.try_execute(parcel_digest,quorom_threshold,&execution).await;
 
                     // Check if this ready to be committed
                 },
