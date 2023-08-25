@@ -43,7 +43,7 @@ pub struct Env<P> {
 impl Env<UpdatePerm> {
     #[allow(unused_variables)]
     pub fn new(db_path: &Option<ResolvedPathBuf>, db_options: &Option<ResolvedPathBuf>) -> Self {
-        let mut atomo = match db_path {
+        let storage = match db_path {
             Some(db_path) => {
                 let mut db_options = if let Some(db_options) = &db_options {
                     let (options, _) = Options::load_latest(
@@ -60,16 +60,11 @@ impl Env<UpdatePerm> {
                 };
                 db_options.create_if_missing(true);
                 db_options.create_missing_column_families(true);
-                let storage =
-                    AtomoStorageBuilder::new(Some(db_path.as_path())).with_options(db_options);
-                AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(storage)
+                AtomoStorageBuilder::new(Some(db_path.as_path())).with_options(db_options)
             },
-            None => {
-                let storage = AtomoStorageBuilder::new::<&Path>(None);
-                AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(storage)
-            },
+            None => AtomoStorageBuilder::new::<&Path>(None),
         };
-
+        let mut atomo = AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(storage);
         atomo = atomo
             .with_table::<Metadata, Value>("metadata")
             .with_table::<EthAddress, AccountInfo>("account")
