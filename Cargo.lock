@@ -3559,6 +3559,7 @@ dependencies = [
  "dashmap",
  "derive_more",
  "fastcrypto",
+ "fleek-blake3",
  "fleek-crypto",
  "futures",
  "futures-util",

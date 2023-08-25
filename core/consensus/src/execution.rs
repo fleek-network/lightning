@@ -2,11 +2,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use fastcrypto::hash::Hash;
+use fleek_blake3 as blake3;
 use lightning_interfaces::types::{Block, UpdateRequest};
-use lightning_interfaces::{ExecutionEngineSocket, PubSub};
+use lightning_interfaces::{ExecutionEngineSocket, PubSub, ToDigest, TranscriptBuilder};
 use log::info;
 use narwhal_executor::ExecutionState;
-use narwhal_types::{Batch, BatchAPI, ConsensusOutput};
+use narwhal_types::{Batch, BatchAPI, BatchDigest, ConsensusOutput};
 use tokio::sync::Notify;
 
 use crate::consensus::PubSubMsg;
@@ -18,10 +20,23 @@ pub struct AuthenticStampedParcel {
     batches: Vec<Batch>,
     last_executed: Digest,
 }
-#[allow(unused)]
-impl AuthenticStampedParcel {
-    fn to_digest() -> Digest {
-        todo!();
+
+impl ToDigest for AuthenticStampedParcel {
+    fn transcript(&self) -> TranscriptBuilder {
+        panic!("We don't need this here");
+    }
+
+    fn to_digest(&self) -> Digest {
+        let mut batch_digests: Vec<BatchDigest> =
+            self.batches.iter().map(|batch| batch.digest()).collect();
+        batch_digests.sort();
+        let mut bytes = Vec::new();
+        batch_digests
+            .iter()
+            .for_each(|digest| bytes.extend_from_slice(&digest.0));
+        bytes.extend_from_slice(&self.last_executed);
+        bytes.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
+        blake3::hash(&bytes).into()
     }
 }
 
