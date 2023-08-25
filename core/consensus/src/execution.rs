@@ -16,6 +16,7 @@ use crate::consensus::PubSubMsg;
 type Digest = [u8; 32];
 
 #[allow(unused)]
+#[derive(Clone, Debug)]
 pub struct AuthenticStampedParcel {
     batches: Vec<Batch>,
     last_executed: Digest,
@@ -125,5 +126,70 @@ impl<P: PubSub<PubSubMsg>> ExecutionState for Execution<P> {
 
     async fn last_executed_sub_dag_index(&self) -> u64 {
         0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lightning_interfaces::ToDigest;
+    use narwhal_types::{Batch, Transaction};
+    use rand::Rng;
+    use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
+
+    use super::{AuthenticStampedParcel, Digest};
+
+    fn generate_random_tx(length: usize) -> Transaction {
+        let mut rng = rand::thread_rng();
+        (0..length).map(|_| rng.gen_range(0..255)).collect()
+    }
+
+    fn generate_random_batch(num_txns: usize, tx_length: usize) -> Batch {
+        let config =
+            ProtocolConfig::get_for_version_if_supported(ProtocolVersion::new(12), Chain::Unknown)
+                .unwrap();
+        let txns = (0..num_txns)
+            .map(|_| generate_random_tx(tx_length))
+            .collect();
+        Batch::new(txns, &config)
+    }
+
+    fn generate_random_parcel(
+        num_batches: usize,
+        num_txns: usize,
+        tx_length: usize,
+        last_executed: Option<Digest>,
+    ) -> AuthenticStampedParcel {
+        let batches = (0..num_batches)
+            .map(|_| generate_random_batch(num_txns, tx_length))
+            .collect();
+        AuthenticStampedParcel {
+            batches,
+            last_executed: last_executed.unwrap_or([0; 32]),
+        }
+    }
+
+    #[test]
+    fn test_to_digest_eq() {
+        let parcel = generate_random_parcel(5, 4, 10, None);
+        assert_eq!(parcel.to_digest(), parcel.to_digest());
+    }
+
+    #[test]
+    fn test_to_digest_ne() {
+        let parcel1 = generate_random_parcel(5, 4, 10, None);
+        let parcel2 = generate_random_parcel(5, 6, 10, None);
+        let digest1 = parcel1.to_digest();
+        let digest2 = parcel2.to_digest();
+        assert_ne!(digest1, digest2);
+    }
+
+    #[test]
+    fn test_to_digest_reorder_batches() {
+        let parcel1 = generate_random_parcel(5, 4, 10, None);
+        let mut parcel2 = parcel1.clone();
+        let temp_batch = parcel2.batches[1].clone();
+        parcel2.batches[1] = parcel2.batches[0].clone();
+        parcel2.batches[0] = temp_batch;
+        assert_eq!(parcel1.to_digest(), parcel2.to_digest());
     }
 }
