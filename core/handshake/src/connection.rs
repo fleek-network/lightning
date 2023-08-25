@@ -4,7 +4,7 @@ use std::io::{Error, ErrorKind, Write};
 
 use arrayref::array_ref;
 use arrayvec::ArrayVec;
-use bytes::BytesMut;
+use bytes::{Buf, Bytes, BytesMut};
 use consts::*;
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
 use futures::executor::block_on;
@@ -16,7 +16,9 @@ use crate::types::{BlsSignature, Nonce};
 /// Constant values for the codec.
 pub mod consts {
     /// Network byte prefix in [`super::UrsaFrame::HandshakeRequest`]
-    pub const NETWORK: [u8; 9] = *b"LIGHTNING";
+    pub const NETWORK: [u8; 5] = *b"FLEEK";
+    /// Handshake protocol version identifier
+    pub const VERSION: u8 = 0;
     /// Maximum size for a frame
     pub const MAX_FRAME_SIZE: usize = 1024;
     /// Maximum number of lanes for a single client
@@ -32,6 +34,8 @@ pub mod consts {
     pub const DELIVERY_ACK_TAG: u8 = 0x01 << 3;
     /// [`super::HandshakeFrame::ServiceRequest`]
     pub const SERVICE_REQ_TAG: u8 = 0x01 << 4;
+    /// [`super::HandshakeFrame::DelimitedBuffer`]
+    pub const DELIMITED_BUFFER_TAG: u8 = 0x01 << 5;
 
     /// The bit flag used for termination signals, to gracefully end a connection with a reason.
     pub const TERMINATION_FLAG: u8 = 0b10000000;
@@ -56,6 +60,7 @@ pub enum Reason {
     OutOfLanes,
     ServiceNotFound,
     InsufficientBalance,
+    UnsupportedVersion,
     Unknown = 0xFF,
 }
 
@@ -91,6 +96,7 @@ pub enum FrameTag {
     HandshakeResponseUnlock = HANDSHAKE_RES_UNLOCK_TAG,
     DeliveryAcknowledgement = DELIVERY_ACK_TAG,
     ServiceRequest = SERVICE_REQ_TAG,
+    DelimitedBuffer = DELIMITED_BUFFER_TAG,
     TerminationSignal = TERMINATION_FLAG,
 }
 
@@ -114,11 +120,12 @@ impl FrameTag {
     #[inline(always)]
     pub fn size_hint(&self) -> usize {
         match self {
-            FrameTag::HandshakeRequest => 109,
-            FrameTag::HandshakeResponse => 106,
-            FrameTag::HandshakeResponseUnlock => 214,
+            FrameTag::HandshakeRequest => 105,
+            FrameTag::HandshakeResponse => 42,
+            FrameTag::HandshakeResponseUnlock => 150,
             FrameTag::DeliveryAcknowledgement => 97,
             FrameTag::ServiceRequest => 5,
+            FrameTag::DelimitedBuffer => 8,
             FrameTag::TerminationSignal => 1,
         }
     }
@@ -158,6 +165,8 @@ pub enum HandshakeFrame {
     DeliveryAcknowledgement { signature: ClientSignature },
     /// Client request to start a service subprotocol
     ServiceRequest { service_id: ServiceId },
+    /// Length delimited buffer of bytes, for a service connection.
+    DelimitedBuffer { bytes: Bytes },
     /// Signal from the node the connection was terminated, with a reason.
     TerminationSignal(Reason),
 }
@@ -172,6 +181,7 @@ impl HandshakeFrame {
             Self::HandshakeResponseUnlock { .. } => FrameTag::HandshakeResponseUnlock,
             Self::DeliveryAcknowledgement { .. } => FrameTag::DeliveryAcknowledgement,
             Self::ServiceRequest { .. } => FrameTag::ServiceRequest,
+            Self::DelimitedBuffer { .. } => FrameTag::DelimitedBuffer,
             Self::TerminationSignal(_) => FrameTag::TerminationSignal,
         }
     }
@@ -244,8 +254,8 @@ where
                 supported_compression_set, // 1
                 resume_lane: lane,         // 1
             } => {
-                let mut buf = ArrayVec::<u8, 109>::new_const();
-                debug_assert_eq!(NETWORK.len(), 9);
+                let mut buf = ArrayVec::<u8, 105>::new_const();
+                debug_assert_eq!(NETWORK.len(), 5);
 
                 buf.push(FrameTag::HandshakeRequest as u8);
                 buf.write_all(&NETWORK).unwrap();
@@ -257,11 +267,11 @@ where
                 self.writer.write_all(&buf).await?;
             },
             HandshakeFrame::HandshakeResponse {
-                pubkey, // 96
+                pubkey, // 32
                 nonce,  // 8
                 lane,   // 1
             } => {
-                let mut buf = ArrayVec::<u8, 106>::new_const();
+                let mut buf = ArrayVec::<u8, 42>::new_const();
 
                 buf.push(FrameTag::HandshakeResponse as u8);
                 buf.push(lane);
@@ -271,14 +281,14 @@ where
                 self.writer.write_all(&buf).await?;
             },
             HandshakeFrame::HandshakeResponseUnlock {
-                pubkey,          // 96
+                pubkey,          // 32
                 nonce,           // 8
                 lane,            // 1
                 last_service_id, // 4
                 last_bytes,      // 8
                 last_signature,  // 96
             } => {
-                let mut buf = ArrayVec::<u8, 214>::new_const();
+                let mut buf = ArrayVec::<u8, 150>::new_const();
 
                 buf.push(FrameTag::HandshakeResponseUnlock as u8);
                 buf.push(lane);
@@ -298,6 +308,10 @@ where
                 buf.write_all(&[0u8; 96]).unwrap();
 
                 self.writer.write_all(&buf).await?;
+            },
+            HandshakeFrame::DelimitedBuffer { bytes } => {
+                self.writer.write_u64(bytes.len() as u64).await?;
+                self.writer.write_all(&bytes).await?;
             },
             HandshakeFrame::ServiceRequest { service_id } => {
                 let mut buf = ArrayVec::<u8, 5>::new_const();
@@ -380,14 +394,14 @@ where
         match tag {
             FrameTag::HandshakeRequest => {
                 let buf = self.buffer.split_to(size_hint);
-                let network = &buf[1..10];
+                let network = &buf[1..6];
                 if network != NETWORK {
                     return Err(HandshakeCodecError::InvalidNetwork.into());
                 }
 
-                let version = buf[10];
-                let supported_compression_set = buf[11].into();
-                let lane = match buf[12] {
+                let version = buf[6];
+                let supported_compression_set = buf[7].into();
+                let lane = match buf[8] {
                     0xFF => None,
                     v => Some(v),
                 };
@@ -404,7 +418,7 @@ where
                 let buf = self.buffer.split_to(size_hint);
                 let lane = buf[1];
                 let pubkey = NodePublicKey(*array_ref!(buf, 2, 32));
-                let nonce = u64::from_be_bytes(*array_ref!(buf, 98, 8));
+                let nonce = u64::from_be_bytes(*array_ref!(buf, 32, 8));
 
                 Ok(Some(HandshakeFrame::HandshakeResponse {
                     pubkey,
@@ -416,10 +430,10 @@ where
                 let buf = self.buffer.split_to(size_hint);
                 let lane = buf[1];
                 let pubkey = NodePublicKey(*array_ref!(buf, 2, 32));
-                let nonce = u64::from_be_bytes(*array_ref!(buf, 98, 8));
-                let last_service_id = u32::from_be_bytes(*array_ref!(buf, 106, 4));
-                let last_bytes = u64::from_be_bytes(*array_ref!(buf, 110, 8));
-                let last_signature = *array_ref!(buf, 118, 96);
+                let nonce = u64::from_be_bytes(*array_ref!(buf, 32, 8));
+                let last_service_id = u32::from_be_bytes(*array_ref!(buf, 40, 4));
+                let last_bytes = u64::from_be_bytes(*array_ref!(buf, 44, 8));
+                let last_signature = *array_ref!(buf, 52, 96);
 
                 Ok(Some(HandshakeFrame::HandshakeResponseUnlock {
                     pubkey,
@@ -444,6 +458,18 @@ where
                 let service_id = u32::from_be_bytes(*array_ref!(buf, 1, 4));
 
                 Ok(Some(HandshakeFrame::ServiceRequest { service_id }))
+            },
+            FrameTag::DelimitedBuffer => {
+                let len = u64::from_be_bytes(*array_ref!(self.buffer, 0, 8)) as usize;
+                if self.buffer.len() - 8 < len {
+                    // not enough bytes have been read
+                    return Ok(None);
+                }
+
+                // discard the length delimiter
+                self.buffer.advance(8);
+                let bytes = self.buffer.split_to(len).into();
+                Ok(Some(HandshakeFrame::DelimitedBuffer { bytes }))
             },
             FrameTag::TerminationSignal => {
                 let buf = self.buffer.split_to(size_hint);
