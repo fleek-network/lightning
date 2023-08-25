@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use anyhow::Result;
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::Mode;
+use lightning_application::config::{Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisLatency, GenesisNode};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::schema::broadcast::BroadcastFrame;
@@ -119,6 +119,9 @@ async fn pubsub_send_recv() -> Result<()> {
         lightning_application::config::Config {
             mode: Mode::Test,
             genesis: Some(genesis),
+            storage: StorageConfig::InMemory,
+            db_path: None,
+            db_options: None,
         },
     )?;
     let query_runner = application.sync_query();

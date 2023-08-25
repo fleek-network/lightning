@@ -81,7 +81,7 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
 #[cfg(test)]
 mod tests {
     use lightning_application::app::Application;
-    use lightning_application::config::{Config, Mode};
+    use lightning_application::config::{Config, Mode, StorageConfig};
     use lightning_application::genesis::Genesis;
     use lightning_interfaces::application::{ApplicationInterface, ExecutionEngineSocket};
     use lightning_interfaces::infu_collection::Collection;
@@ -107,6 +107,9 @@ mod tests {
         let config = Config {
             genesis: Some(genesis),
             mode: Mode::Test,
+            storage: StorageConfig::InMemory,
+            db_path: None,
+            db_options: None,
         };
 
         let app = Application::<TestBinding>::init(config).unwrap();

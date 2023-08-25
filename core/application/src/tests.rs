@@ -36,7 +36,7 @@ use lightning_test_utils::{random, reputation};
 use tokio::test;
 
 use crate::app::Application;
-use crate::config::{Config, Mode};
+use crate::config::{Config, Mode, StorageConfig};
 use crate::genesis::{Genesis, GenesisNode};
 use crate::query_runner::QueryRunner;
 
@@ -148,7 +148,13 @@ fn get_new_committee(
 // Init the app and return the execution engine socket that would go to narwhal and the query socket
 // that could go to anyone
 fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
-    let config = config.or_else(|| Some(Config::default()));
+    let config = config.or(Some(Config {
+        genesis: None,
+        mode: Mode::Dev,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
+    }));
     let app = Application::<TestBinding>::init(config.unwrap()).unwrap();
 
     (app.transaction_executor(), app.sync_query())
@@ -198,6 +204,9 @@ fn init_app_with_params(
     let config = Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     };
 
     init_app(Some(config))
@@ -394,6 +403,9 @@ async fn test_epoch_change() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     }));
 
     let required_signals = 2 * committee_size / 3 + 1;
@@ -678,6 +690,9 @@ async fn test_pod_without_proof() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     }));
 
     let bandwidth_pod = pod_request(&keystore[0].node_secret_key, 1000, 0, 1);
@@ -878,6 +893,9 @@ async fn test_submit_rep_measurements() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     }));
 
     let mut map = BTreeMap::new();
@@ -924,6 +942,9 @@ async fn test_rep_scores() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     }));
     let required_signals = 2 * committee_len / 3 + 1;
 
@@ -1095,6 +1116,9 @@ async fn test_validate_txn() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     }));
 
     // Submit a ChangeEpoch transaction that will revert (EpochHasNotStarted) and ensure that the
@@ -1194,6 +1218,9 @@ async fn test_get_node_registry() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     }));
 
     let owner_secret_key1 = AccountOwnerSecretKey::generate();
@@ -1297,6 +1324,9 @@ async fn test_change_protocol_params() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     }));
 
     let update_method = UpdateMethod::ChangeProtocolParam {

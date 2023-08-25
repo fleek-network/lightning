@@ -13,7 +13,7 @@ use fleek_crypto::{
 };
 use hp_fixed::unsigned::HpUfixed;
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode};
+use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisAccount, GenesisNode};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
@@ -72,7 +72,7 @@ partial!(TestBinding {
 });
 
 fn init_rpc_without_consensus() -> Result<Rpc<TestBinding>> {
-    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
 
     let rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
@@ -171,6 +171,9 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     let query_runner = app.sync_query();
@@ -251,6 +254,9 @@ async fn test_rpc_get_reputation() -> Result<()> {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     let query_runner = app.sync_query();
@@ -339,6 +345,9 @@ async fn test_rpc_get_staked() -> Result<()> {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     let query_runner = app.sync_query();
@@ -399,6 +408,9 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     let query_runner = app.sync_query();
@@ -486,6 +498,9 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     let query_runner = app.sync_query();
@@ -573,6 +588,9 @@ async fn test_rpc_get_locked_time() -> Result<()> {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     let query_runner = app.sync_query();
@@ -660,6 +678,9 @@ async fn test_rpc_get_locked() -> Result<()> {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     let query_runner = app.sync_query();
@@ -722,6 +743,9 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     let query_runner = app.sync_query();
@@ -809,6 +833,9 @@ async fn test_rpc_get_node_info() -> Result<()> {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     let query_runner = app.sync_query();
@@ -855,7 +882,7 @@ async fn test_rpc_get_node_info() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_staking_amount() -> Result<()> {
-    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -900,7 +927,7 @@ async fn test_rpc_get_staking_amount() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_committee_members() -> Result<()> {
-    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -949,7 +976,7 @@ async fn test_rpc_get_committee_members() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_epoch() -> Result<()> {
-    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -994,7 +1021,7 @@ async fn test_rpc_get_epoch() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_epoch_info() -> Result<()> {
-    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -1039,7 +1066,7 @@ async fn test_rpc_get_epoch_info() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_total_supply() -> Result<()> {
-    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -1084,7 +1111,7 @@ async fn test_rpc_get_total_supply() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_year_start_supply() -> Result<()> {
-    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -1132,7 +1159,7 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_protocol_fund_address() -> Result<()> {
-    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -1180,7 +1207,7 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
 
 #[test]
 async fn test_rpc_get_protocol_params() -> Result<()> {
-    let app = Application::<TestBinding>::init(AppConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
@@ -1242,6 +1269,9 @@ async fn test_rpc_get_total_served() -> Result<()> {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     let query_runner = app.sync_query();
@@ -1325,6 +1355,9 @@ async fn test_rpc_get_node_served() -> Result<()> {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     let query_runner = app.sync_query();
@@ -1412,6 +1445,9 @@ async fn test_rpc_is_valid_node() -> Result<()> {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     let query_runner = app.sync_query();
@@ -1507,6 +1543,9 @@ async fn test_rpc_get_node_registry() -> Result<()> {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     let query_runner = app.sync_query();

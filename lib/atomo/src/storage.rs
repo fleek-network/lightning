@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::fmt::Debug;
 
 use dashmap::DashMap;
 
@@ -9,7 +9,7 @@ pub trait StorageBackendConstructor {
     type Storage: StorageBackend;
 
     /// The error that can be produced while opening the database.
-    type Error: Error;
+    type Error: Debug;
 
     /// Called during the initialization
     fn open_table(&mut self, name: String);

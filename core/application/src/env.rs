@@ -1,7 +1,9 @@
+use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use affair::Worker as WorkerTrait;
-use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, InMemoryStorage, QueryPerm, UpdatePerm};
+use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
+use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
@@ -25,20 +27,50 @@ use lightning_interfaces::types::{
     TransactionResponse,
     Value,
 };
+use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::config::{Config, Mode};
 use crate::genesis::{Genesis, GenesisPrices};
 use crate::query_runner::QueryRunner;
 use crate::state::State;
+use crate::storage::{AtomoStorage, AtomoStorageBuilder};
 use crate::table::StateTables;
 
 pub struct Env<P> {
-    inner: Atomo<P>,
+    inner: Atomo<P, AtomoStorage>,
 }
 
 impl Env<UpdatePerm> {
-    pub fn new() -> Self {
-        let mut atomo = AtomoBuilder::<InMemoryStorage, DefaultSerdeBackend>::default()
+    #[allow(unused_variables)]
+    pub fn new(db_path: &Option<ResolvedPathBuf>, db_options: &Option<ResolvedPathBuf>) -> Self {
+        let mut atomo = match db_path {
+            Some(db_path) => {
+                let mut db_options = if let Some(db_options) = &db_options {
+                    let (options, _) = Options::load_latest(
+                        db_options,
+                        RocksEnv::new().expect("Failed to create rocks db env."),
+                        false,
+                        // TODO(matthias): I set this lru cache size arbitrarily
+                        RocksCache::new_lru_cache(100),
+                    )
+                    .expect("Failed to create rocks db options.");
+                    options
+                } else {
+                    Options::default()
+                };
+                db_options.create_if_missing(true);
+                db_options.create_missing_column_families(true);
+                let storage =
+                    AtomoStorageBuilder::new(Some(db_path.as_path())).with_options(db_options);
+                AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(storage)
+            },
+            None => {
+                let storage = AtomoStorageBuilder::new::<&Path>(None);
+                AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(storage)
+            },
+        };
+
+        atomo = atomo
             .with_table::<Metadata, Value>("metadata")
             .with_table::<EthAddress, AccountInfo>("account")
             .with_table::<ClientPublicKey, EthAddress>("client_keys")
@@ -74,6 +106,7 @@ impl Env<UpdatePerm> {
             inner: atomo.build(),
         }
     }
+
     fn run(&mut self, block: Block) -> BlockExecutionResponse {
         self.inner.run(move |ctx| {
             // Create the app/execution enviroment
@@ -309,7 +342,7 @@ impl Env<UpdatePerm> {
 
 impl Default for Env<UpdatePerm> {
     fn default() -> Self {
-        Self::new()
+        Self::new(&Some("~/.lightning/data/app_db".try_into().unwrap()), &None)
     }
 }
 

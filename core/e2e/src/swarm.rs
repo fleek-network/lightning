@@ -16,7 +16,7 @@ use fleek_crypto::{
 use futures::future::try_join_all;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode};
+use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
@@ -211,9 +211,13 @@ impl SwarmBuilder {
 
         let mut nodes = HashMap::new();
         for (index, (owner_sk, node_pk, config)) in tmp_nodes.into_iter().enumerate() {
+            let root = directory.join(format!("node-{index}"));
             config.inject::<Application<FinalTypes>>(AppConfig {
                 mode: Mode::Test,
                 genesis: Some(genesis.clone()),
+                storage: StorageConfig::RocksDb,
+                db_path: Some(root.join("data/app_db").try_into().unwrap()),
+                db_options: None,
             });
 
             let node = ContainerizedNode::new(config, owner_sk, index);

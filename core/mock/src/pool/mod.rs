@@ -239,7 +239,7 @@ mod tests {
 
     use anyhow::anyhow;
     use lightning_application::app::Application;
-    use lightning_application::config::Mode;
+    use lightning_application::config::{Mode, StorageConfig};
     use lightning_interfaces::infu_collection::Collection;
     use lightning_interfaces::types::ServiceScope;
     use lightning_interfaces::{
@@ -282,6 +282,9 @@ mod tests {
             Application::<TestBinding>::init(lightning_application::config::Config {
                 mode: Mode::Test,
                 genesis: None,
+                storage: StorageConfig::InMemory,
+                db_path: None,
+                db_options: None,
             })?;
         let query_runner = application.sync_query();
 

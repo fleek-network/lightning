@@ -9,7 +9,7 @@ use fleek_crypto::{
     SecretKey,
 };
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode};
+use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_interfaces::application::ApplicationInterface;
 use lightning_interfaces::common::WithStartAndShutdown;
@@ -129,6 +129,9 @@ async fn test_query() {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     app.start().await;
@@ -276,6 +279,9 @@ async fn test_submit_measurements() {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     app.start().await;
@@ -450,6 +456,9 @@ async fn test_reputation_calculation_and_query() {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
     app.start().await;

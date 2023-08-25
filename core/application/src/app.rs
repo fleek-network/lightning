@@ -3,15 +3,17 @@ use std::marker::PhantomData;
 use affair::{Executor, TokioSpawn};
 use anyhow::Result;
 use async_trait::async_trait;
-use lightning_interfaces::application::{ApplicationInterface, ExecutionEngineSocket};
-use lightning_interfaces::common::WithStartAndShutdown;
-use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::{
+    ApplicationInterface,
+    ConfigConsumer,
+    ExecutionEngineSocket,
+    WithStartAndShutdown,
+};
 
-use crate::config::Config;
+use crate::config::{Config, StorageConfig};
 use crate::env::{Env, UpdateWorker};
 use crate::query_runner::QueryRunner;
-
 pub struct Application<C: Collection> {
     update_socket: ExecutionEngineSocket,
     query_runner: QueryRunner,
@@ -48,7 +50,14 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
 
     /// Create a new instance of the application layer using the provided configuration.
     fn init(config: Self::Config) -> Result<Self> {
-        let mut env = Env::new();
+        if let StorageConfig::RocksDb = &config.storage {
+            assert!(
+                config.db_path.is_some(),
+                "db_path must be specified for RocksDb backend"
+            );
+        }
+
+        let mut env = Env::new(&config.db_path, &config.db_options);
         env.genesis(config);
         Ok(Self {
             query_runner: env.query_runner(),

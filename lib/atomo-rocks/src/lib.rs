@@ -7,6 +7,7 @@ use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackend, StorageBackendCon
 use fxhash::FxHashMap;
 /// Re-export of [`rocksdb::Options`].
 pub use rocksdb::Options;
+pub use rocksdb::{Cache, Env};
 use rocksdb::{ColumnFamilyDescriptor, WriteBatch};
 
 /// Helper alias for an [`atomo::AtomoBuilder`] using a [`RocksBackendBuilder`].

@@ -8,7 +8,7 @@ use fleek_crypto::{
     SecretKey,
 };
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode};
+use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisLatency, GenesisNode};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodePorts;
@@ -150,6 +150,9 @@ async fn test_build_latency_matrix() {
     let app = Application::<TestBinding>::init(AppConfig {
         genesis: Some(genesis),
         mode: Mode::Test,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
     })
     .unwrap();
 

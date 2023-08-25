@@ -28,11 +28,12 @@ use lightning_interfaces::types::{
 };
 
 use crate::state::State;
+use crate::storage::AtomoStorage;
 use crate::table::StateTables;
 
 #[derive(Clone)]
 pub struct QueryRunner {
-    inner: Atomo<QueryPerm>,
+    inner: Atomo<QueryPerm, AtomoStorage>,
     metadata_table: ResolvedTableReference<Metadata, Value>,
     account_table: ResolvedTableReference<EthAddress, AccountInfo>,
     client_table: ResolvedTableReference<ClientPublicKey, EthAddress>,
@@ -52,7 +53,7 @@ pub struct QueryRunner {
 }
 
 impl QueryRunner {
-    pub fn init(atomo: Atomo<QueryPerm>) -> Self {
+    pub fn init(atomo: Atomo<QueryPerm, AtomoStorage>) -> Self {
         Self {
             metadata_table: atomo.resolve::<Metadata, Value>("metadata"),
             account_table: atomo.resolve::<EthAddress, AccountInfo>("account"),

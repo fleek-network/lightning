@@ -46,6 +46,7 @@ lazy_static = "1.4.0"
 lightning-types = { path = "core/types" }
 affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
+atomo-rocks = { path = "lib/atomo-rocks" }
 fleek-crypto = { path = "lib/fleek-crypto" }
 hp-fixed = { path = "lib/hp-fixed" }
 blake3-tree = { path = "lib/blake3-tree" }
