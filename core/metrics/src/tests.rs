@@ -1,7 +1,6 @@
 #[cfg(test)]
 use autometrics::settings::AutometricsSettingsBuilder;
-use lightning_types::metrics::METRICS_SERVICE_NAME;
-use lightning_types::DEFAULT_HISTOGRAM_BUCKETS;
+use lightning_types::{DEFAULT_HISTOGRAM_BUCKETS, METRICS_SERVICE_NAME};
 
 use crate::{histogram, increment_counter};
 

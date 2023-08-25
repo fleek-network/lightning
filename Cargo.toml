@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["core/*", "lib/*", "services/*", "metrics/", "global-metrics/"]
+members = ["core/*", "lib/*", "services/*", "global-metrics/"]
 
 [workspace.package]
 version = "0.1.0"
@@ -53,7 +53,6 @@ blake3-tree = { path = "lib/blake3-tree" }
 ink-quill = { path = "lib/ink-quill" }
 resolved-pathbuf = { path = "lib/resolved-pathbuf" }
 infusion = { path = "lib/infusion" }
-metrics = { path = "metrics" }
 
 # Since MystenLabs uses Hakari in the sui repository, and we bring narwhal in from there, this
 # results into all of their dependencies and packages to be listed in their workspace-hack crate.

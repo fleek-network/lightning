@@ -17,7 +17,6 @@ bincode.workspace = true
 tokio.workspace = true
 infusion.workspace = true
 autometrics.workspace = true
-metrics.workspace = true
 stdext.workspace = true
 
 affair.workspace = true

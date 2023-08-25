@@ -7,7 +7,7 @@ mod compression;
 mod connection;
 mod content;
 mod dht;
-pub mod metrics;
+mod metrics;
 mod misbehavior;
 mod pod;
 mod pool;

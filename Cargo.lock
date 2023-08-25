@@ -3689,6 +3689,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-metrics"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "autometrics",
+ "axum",
+ "dashmap",
+ "lightning-types",
+ "log",
+ "once_cell",
+ "prometheus",
+ "stdext",
+ "tokio",
+]
+
+[[package]]
 name = "lightning-node"
 version = "0.1.0"
 dependencies = [
@@ -3867,7 +3883,6 @@ dependencies = [
  "jsonrpc-v2",
  "lightning-application",
  "lightning-interfaces",
- "metrics 0.1.0",
  "reqwest",
  "serde",
  "serde_json",
@@ -4153,22 +4168,6 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "autometrics",
- "axum",
- "dashmap",
- "lightning-types",
- "log",
- "once_cell",
- "prometheus",
- "stdext",
- "tokio",
-]
-
-[[package]]
-name = "metrics"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde3af1a009ed76a778cb84fdef9e7dbbdf5775ae3e4cc1f434a6a307f6f76c5"
@@ -4186,7 +4185,7 @@ checksum = "8a4964177ddfdab1e3a2b37aec7cf320e14169abb0ed73999f558136409178d5"
 dependencies = [
  "base64 0.21.2",
  "indexmap 1.9.3",
- "metrics 0.21.1",
+ "metrics",
  "metrics-util",
  "quanta 0.11.1",
  "thiserror",
@@ -4212,7 +4211,7 @@ dependencies = [
  "crossbeam-epoch",
  "crossbeam-utils",
  "hashbrown 0.13.2",
- "metrics 0.21.1",
+ "metrics",
  "num_cpus",
  "quanta 0.11.1",
  "sketches-ddsketch",

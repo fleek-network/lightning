@@ -11,7 +11,7 @@ use autometrics::{self};
 use chrono::Local;
 use clap::Parser;
 use cli::Cli;
-use lightning_types::metrics::{DEFAULT_HISTOGRAM_BUCKETS, METRICS_SERVICE_NAME};
+use lightning_types::{DEFAULT_HISTOGRAM_BUCKETS, METRICS_SERVICE_NAME};
 use log::LevelFilter;
 use simplelog::{
     ColorChoice,
