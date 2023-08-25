@@ -1,18 +1,40 @@
 use fleek_crypto::NodePublicKey;
-use fxhash::FxHashMap;
+use fxhash::{FxHashMap, FxHashSet};
+use lightning_interfaces::types::NodeIndex;
+use lightning_interfaces::SenderInterface;
 
-use lightning_interfaces::{SenderInterface};
-
+use crate::ev::Topology;
 use crate::frame::{Digest, Frame};
+use crate::MessageInternedId;
 
 /// This struct is responsible for holding the state of the current peers
 /// that we are connected to.
 pub struct Peers<S: SenderInterface<Frame>> {
-    map: FxHashMap<NodePublicKey, Peer<S>>
+    map: FxHashMap<NodePublicKey, Peer<S>>,
 }
 
 struct Peer<S> {
+    /// The index of the node.
+    index: NodeIndex,
+    /// The sender that we can use to send messages to this peer.
     sender: S,
+    /// The origin of this connection can tell us if we started this connection or if
+    /// the remote has dialed us.
+    origin: ConnectionOrigin,
+    /// The status of our connection with this peer.
+    status: ConnectionStatus,
+    /// The stats we have from this connection to the peer.
+    stats: ConnectionStats,
+    // We know this peer has these messages. They have advertised them to us before.
+    has: FxHashSet<MessageInternedId>,
+}
+
+enum ConnectionOrigin {
+    // We have established the connection.
+    Us,
+    /// The remote has dialed us and we have this connection because we got
+    /// a connection from the listener.
+    Remote,
 }
 
 pub enum ConnectionStatus {
@@ -34,7 +56,27 @@ pub enum ConnectionStatus {
     Closed,
 }
 
+/// A bunch of statistics that we gather from a peer throughout the life of the gossip.
+pub struct ConnectionStats {
+    /// How many things have we advertised to this node.
+    advertisements_received_from_us: usize,
+    /// How many things has this peer advertised to us.
+    advertisements_received_from_peer: usize,
+    /// How many `WANT`s have we sent to this node.
+    wants_received_from_us: usize,
+    /// How many `WANT`s has this peer sent our way.
+    wants_received_from_peer: usize,
+    /// Valid messages sent by this node to us.
+    messages_received_from_peer: usize,
+    /// Number of messages we have received from this peer that
+    /// we did not continue propagating.
+    invalid_messages_received_from_peer: usize,
+}
+
 impl<S: SenderInterface<Frame>> Peers<S> {
+    /// Apply a new topology and update the connection graph.
+    pub fn apply_topology(&mut self, new_topology: Topology) {}
+
     /// Advertise the given digest to every peer. This method does not perform
     /// the advertisements with the peers if we know they already have the digest.
     ///
@@ -44,6 +86,8 @@ impl<S: SenderInterface<Frame>> Peers<S> {
 
 impl<S: SenderInterface<Frame>> Default for Peers<S> {
     fn default() -> Self {
-        Self { map: Default::default() }
+        Self {
+            map: Default::default(),
+        }
     }
 }
