@@ -10,6 +10,7 @@ use lightning_interfaces::{
     ExecutionEngineSocket,
     WithStartAndShutdown,
 };
+use log::info;
 
 use crate::config::{Config, StorageConfig};
 use crate::env::{Env, UpdateWorker};
@@ -58,7 +59,11 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
         }
 
         let mut env = Env::new(&config.db_path, &config.db_options);
-        env.genesis(config);
+
+        if !env.genesis(config) {
+            info!("State already exists. Not loading genesis");
+        }
+
         Ok(Self {
             query_runner: env.query_runner(),
             update_socket: TokioSpawn::spawn(UpdateWorker::new(env)),

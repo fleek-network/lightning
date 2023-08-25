@@ -151,10 +151,17 @@ impl Env<UpdatePerm> {
         QueryRunner::init(self.inner.query())
     }
 
-    /// Seeds the application state with the genesis block
+    /// Tries to seeds the application state with the genesis block
     /// This function will panic if the genesis file cannot be decoded into the correct types
-    pub fn genesis(&mut self, config: Config) {
+    /// Will return true if database was empty and genesis needed to be loaded or false if there was
+    /// already state loaded and it didnt load genesis
+    pub fn genesis(&mut self, config: Config) -> bool {
         self.inner.run(|ctx| {
+            let mut metadata_table = ctx.get_table::<Metadata, Value>("metadata");
+
+            if metadata_table.get(Metadata::Epoch).is_some() {
+                return false;
+            }
             let mut genesis = Genesis::load().unwrap();
 
             match &config.mode {
@@ -177,7 +184,6 @@ impl Env<UpdatePerm> {
             let mut service_table = ctx.get_table::<ServiceId, Service>("service");
             let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
             let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
-            let mut metadata_table = ctx.get_table::<Metadata, Value>("metadata");
             let mut commodity_prices_table =
                 ctx.get_table::<CommodityTypes, HpUfixed<6>>("commodity_prices");
             let mut rep_scores_table = ctx.get_table::<NodeIndex, u8>("rep_scores");
@@ -331,6 +337,9 @@ impl Env<UpdatePerm> {
                     );
                 }
             }
+
+        metadata_table.insert(Metadata::Epoch, Value::Epoch(0));
+        true
         })
     }
 }
