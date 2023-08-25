@@ -163,6 +163,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn pubkey_to_index(&self, node: NodePublicKey) -> Option<u32>;
 
     fn index_to_pubkey(&self, node_index: u32) -> Option<NodePublicKey>;
+
+    /// takes NodeInfo and returns if they are a current committee member or not
+    fn is_committee(&self, node_index: u32) -> bool;
 }
 
 #[derive(Clone, Debug)]

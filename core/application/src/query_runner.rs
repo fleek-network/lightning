@@ -389,4 +389,19 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 .map(|info| info.public_key)
         })
     }
+    fn is_committee(&self, node_index: u32) -> bool {
+        self.inner.run(|ctx| {
+            // get current epoch
+            let epoch = match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
+                Some(Value::Epoch(epoch)) => epoch,
+                _ => 0,
+            };
+
+            self.committee_table
+                .get(ctx)
+                .get(epoch)
+                .map(|c| c.members.contains(&node_index))
+                .unwrap_or(false)
+        })
+    }
 }

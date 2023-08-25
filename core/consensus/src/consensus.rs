@@ -144,7 +144,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             self.run_narwhal(store, epoch_end, epoch, committee, worker_cache)
                 .await
         } else {
-            self.run_edge_node(store, committee, worker_cache).await
+            self.run_edge_node(committee).await
         }
     }
 
@@ -241,24 +241,13 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         });
     }
 
-    async fn run_edge_node(
-        &mut self,
-        store: NodeStorage,
-        committee: Committee,
-        worker_cache: WorkerCache,
-    ) {
+    async fn run_edge_node(&mut self, committee: Committee) {
         info!("Not on narwhal committee running edge node service");
 
         // Let the execution state know you are not on committee
         self.execution_state.set_committee_status(false);
 
-        let mut edge_service = EdgeService::new(
-            store,
-            committee,
-            worker_cache,
-            self.pub_sub.clone(),
-            self.narwhal_args.registry_service.clone(),
-        );
+        let mut edge_service = EdgeService::new(committee, self.pub_sub.clone());
 
         edge_service.start(self.execution_state.clone()).await;
 

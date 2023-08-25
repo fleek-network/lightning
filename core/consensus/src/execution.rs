@@ -14,12 +14,12 @@ use tokio::sync::Notify;
 
 use crate::consensus::PubSubMsg;
 
-type Digest = [u8; 32];
+pub type Digest = [u8; 32];
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AuthenticStampedParcel {
-    batches: Vec<Batch>,
-    last_executed: Digest,
+    pub batches: Vec<Batch>,
+    pub last_executed: Digest,
 }
 
 impl ToDigest for AuthenticStampedParcel {
@@ -46,10 +46,10 @@ impl ToDigest for AuthenticStampedParcel {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CommitteeAttestation {
     /// The digest we are attesting is correct
-    digest: Digest,
+    pub digest: Digest,
     /// We send random bytes with this messsage so it gives it a unique hash and differentiates it
     /// from the other committee members attestation broadcasts
-    node_index: NodeIndex,
+    pub node_index: NodeIndex,
 }
 
 pub struct Execution<P: PubSub<PubSubMsg>> {
@@ -100,7 +100,8 @@ impl<P: PubSub<PubSubMsg>> Execution<P> {
         }
     }
 
-    async fn submit_batch(&self, batch: Vec<Batch>) {
+    /// This should only EVER be called in handle_consensus_output or
+    pub(crate) async fn submit_batch(&self, batch: Vec<Batch>) {
         let mut change_epoch = false;
         // todo(dalton)
         let mut transactions = Vec::new();
@@ -141,13 +142,14 @@ impl<P: PubSub<PubSubMsg>> ExecutionState for Execution<P> {
             Vec::with_capacity(consensus_output.sub_dag.num_batches());
 
         for (_, batches) in consensus_output.batches {
-            // If we are in this loop it means this ConsensusOutput has batches(transactions) on it
-            // that we should add to our payload that we are sending out through broadcast
-
-            batch_payload.extend(batches.clone());
-            self.submit_batch(batches).await
+            // Put all the batches in this Consensus output into one vec of batches.
+            batch_payload.extend(batches);
+            //  self.submit_batch(batches).await
         }
-        if batch_payload.len() > 0 {
+        if !batch_payload.is_empty() {
+            // Submit the batches to application layer
+            self.submit_batch(batch_payload.clone()).await;
+
             // We have batches in the payload send them over broadcast along with an attestion of
             // them
             let last_digest = self.inner.lock().unwrap().last_executed.unwrap_or([0; 32]);
@@ -166,8 +168,9 @@ impl<P: PubSub<PubSubMsg>> ExecutionState for Execution<P> {
                 node_index: self.node_index,
             };
             // Send out that attestation that this payload is correct
-            self.pub_sub.send(&attestation.into());
+            self.pub_sub.send(&attestation.into()).await;
 
+            // Update our last digest proccesed
             self.inner.lock().unwrap().last_executed = Some(parcel_digest);
         }
     }
