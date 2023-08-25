@@ -33,7 +33,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
 }
 
 #[infusion::blank]
-pub trait ServiceConnectorInterface<Connection: ConnectionInterface>: Clone {
+pub trait ServiceConnectorInterface<Connection: ConnectionInterface>: Send + Sync + Clone {
     /// Handle the connection to the service specified by the name.
     fn handle(&self, service: ServiceId, connection: Connection);
 }
