@@ -39,7 +39,9 @@ impl<C: Collection> Clone for Topology<C> {
 struct TopologyInner<Q: SyncQueryRunnerInterface + 'static> {
     query: Q,
     our_public_key: NodePublicKey,
+    // TODO(qti3e): Use ArcSwap instead.
     current_peers: Mutex<Arc<Vec<Vec<NodePublicKey>>>>,
+    // TODO(qti3e): Use a single AtomicU64 instead.
     current_epoch: Mutex<u64>,
     target_k: usize,
     min_nodes: usize,
@@ -98,6 +100,13 @@ impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
         let epoch = self.query.get_epoch();
         let mut current = self.current_peers.lock().expect("failed to acquire lock");
         let mut current_epoch = self.current_epoch.lock().expect("failed to acquire lock");
+
+        // TODO(qti3e): This computation can be heavy. Right now only broadcast is calling this
+        // function and we can put the call to `suggest_connections` in a blocking thread on the
+        // caller side. But I regret having the topology poll based. It was a mistake.
+        //
+        // We should have the topology as a reactive source of data so we can put this heavy
+        // computation on a different thread here from within the origin of the computation.
 
         // if the epoch has changed, or the object has been newly initialized
         if *current_epoch < epoch || *current_epoch == u64::MAX {
