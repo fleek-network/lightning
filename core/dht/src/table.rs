@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::ReputationAggregatorInterface;
 use thiserror::Error;
 use tokio::sync::mpsc::{self, Receiver};
 use tokio::sync::{oneshot, Notify};
@@ -15,10 +17,11 @@ use crate::task::Task;
 
 pub type TableKey = [u8; 32];
 
-pub async fn start_worker(
+pub async fn start_worker<C: Collection>(
     mut rx: Receiver<TableRequest>,
     local_key: NodePublicKey,
     task_tx: mpsc::Sender<Task>,
+    _local_rep_query: c![C::ReputationAggregatorInterface::ReputationQuery],
     shutdown_notify: Arc<Notify>,
 ) {
     let mut table = Table::new(local_key);
@@ -316,11 +319,20 @@ fn calculate_bucket_index(bucket_count: usize, possible_index: usize) -> usize {
 mod tests {
     use std::time::Duration;
 
+    use lightning_application::app::Application;
+    use lightning_application::config::{Mode, StorageConfig};
+    use lightning_interfaces::{partial, ApplicationInterface};
+    use lightning_topology::Topology;
     use rand::Rng;
     use tokio::sync::mpsc;
 
     use super::*;
     use crate::bucket;
+
+    partial!(PartialBinding {
+        ApplicationInterface = Application<Self>;
+        TopologyInterface = Topology<Self>;
+    });
 
     fn get_random_key() -> TableKey {
         let mut rng = rand::thread_rng();
@@ -394,8 +406,25 @@ mod tests {
         let (table_tx, table_rx) = mpsc::channel(10);
         let shutdown_notify = Arc::new(tokio::sync::Notify::new());
 
+        let application =
+            Application::<PartialBinding>::init(lightning_application::config::Config {
+                mode: Mode::Test,
+                genesis: None,
+                storage: StorageConfig::InMemory,
+                db_path: None,
+                db_options: None,
+            })
+            .unwrap();
+        let _query_runner = application.sync_query();
+
         let (tx, _) = mpsc::channel(10);
-        let worker_fut = start_worker(table_rx, public_key.into(), tx, shutdown_notify.clone());
+        let worker_fut = start_worker::<PartialBinding>(
+            table_rx,
+            public_key.into(),
+            tx,
+            Default::default(),
+            shutdown_notify.clone(),
+        );
 
         let request_fut = async move {
             tokio::time::sleep(Duration::from_secs(2)).await;
@@ -476,7 +505,13 @@ mod tests {
         let shutdown_notify = Arc::new(tokio::sync::Notify::new());
 
         let (tx, _) = mpsc::channel(10);
-        let worker_fut = start_worker(table_rx, public_key.into(), tx, shutdown_notify.clone());
+        let worker_fut = start_worker::<PartialBinding>(
+            table_rx,
+            public_key.into(),
+            tx,
+            Default::default(),
+            shutdown_notify.clone(),
+        );
 
         let request_fut = async move {
             tokio::time::sleep(Duration::from_secs(2)).await;

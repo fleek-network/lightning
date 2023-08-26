@@ -30,6 +30,7 @@ pub struct Builder<C: Collection> {
     network_secret_key: NodeSecretKey,
     buffer_size: Option<usize>,
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+    local_rep_query: c![C::ReputationAggregatorInterface::ReputationQuery],
     _marker: PhantomData<C>,
 }
 
@@ -39,6 +40,7 @@ impl<C: Collection> Builder<C> {
         network_secret_key: NodeSecretKey,
         config: Config,
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+        local_rep_query: c![C::ReputationAggregatorInterface::ReputationQuery],
     ) -> Self {
         let nodes: Vec<NodeInfo> = config
             .bootstrappers
@@ -55,6 +57,7 @@ impl<C: Collection> Builder<C> {
             network_secret_key,
             buffer_size: None,
             rep_reporter,
+            local_rep_query,
             _marker: PhantomData,
         }
     }
@@ -93,6 +96,7 @@ impl<C: Collection> Builder<C> {
             is_running: Arc::new(Mutex::new(false)),
             shutdown_notify: Arc::new(Notify::new()),
             rep_reporter: self.rep_reporter,
+            local_rep_query: self.local_rep_query,
             collection: PhantomData,
         })
     }
@@ -112,6 +116,7 @@ pub struct Dht<C: Collection> {
     is_running: Arc<Mutex<bool>>,
     shutdown_notify: Arc<Notify>,
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+    local_rep_query: c![C::ReputationAggregatorInterface::ReputationQuery],
     collection: PhantomData<C>,
 }
 
@@ -168,10 +173,11 @@ impl<C: Collection> WithStartAndShutdown for Dht<C> {
         let (table_tx, table_rx) = mpsc::channel(self.buffer_size);
         let (task_tx, task_rx) = mpsc::channel(self.buffer_size);
 
-        tokio::spawn(table::start_worker(
+        tokio::spawn(table::start_worker::<C>(
             table_rx,
             public_key,
             task_tx.clone(),
+            self.local_rep_query.clone(),
             self.shutdown_notify.clone(),
         ));
 
@@ -242,10 +248,11 @@ impl<C: Collection> DhtInterface<C> for Dht<C> {
         signer: &c![C::SignerInterface],
         _: c![C::TopologyInterface],
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+        local_rep_query: c![C::ReputationAggregatorInterface::ReputationQuery],
         config: Self::Config,
     ) -> Result<Self> {
         let (_, node_public_key) = signer.get_sk();
-        Builder::new(node_public_key, config, rep_reporter).build()
+        Builder::new(node_public_key, config, rep_reporter, local_rep_query).build()
     }
 
     fn get_socket(&self) -> DhtSocket {

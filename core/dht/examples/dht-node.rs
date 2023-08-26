@@ -141,8 +141,12 @@ async fn start_node(
     })
     .unwrap();
     let _query_runner = application.sync_query();
-    let mut builder =
-        Builder::<PartialBinding>::new(secret_key, Config::default(), Default::default());
+    let mut builder = Builder::<PartialBinding>::new(
+        secret_key,
+        Config::default(),
+        Default::default(),
+        Default::default(),
+    );
 
     if let Some((address, key)) = bootstrapper {
         tracing::info!("bootstrapping to {address:?} {key:?}");

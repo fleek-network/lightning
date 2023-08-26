@@ -67,6 +67,7 @@ async fn e2e_dht() -> Result<()> {
                 key_cloned,
                 bootstrapper_config,
                 Default::default(),
+                Default::default(),
             );
             let dht = builder.build().unwrap();
             dht.start().await;
