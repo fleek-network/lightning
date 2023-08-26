@@ -21,8 +21,10 @@ use lightning_interfaces::{
     PoolSender,
     SenderInterface,
     SenderReceiver,
+    SyncQueryRunnerInterface,
     TopologyInterface,
 };
+use tokio::sync::mpsc;
 
 use crate::db::Database;
 use crate::frame::Frame;
@@ -36,34 +38,42 @@ pub type Topology = Arc<Vec<Vec<NodePublicKey>>>;
 type S<C> = PoolSender<C, c![C::ConnectionPoolInterface], Frame>;
 type R<C> = PoolReceiver<C, c![C::ConnectionPoolInterface], Frame>;
 
-struct State<C: Collection> {
+struct Context<C: Collection> {
+    /// Our database where we store what we have seen.
     db: Database,
+    /// Our digest interner.
     interner: Interner,
+    /// The state related to the connected peers that we have right now.
     peers: Peers<S<C>, R<C>>,
+    /// What we use to establish new connections with others.
+    connector: c![C::ConnectionPoolInterface::Connector<Frame>],
+    /// We use this socket to let the main event loop know that we have established
+    /// a connection with another node.
+    new_outgoing_connection_tx: mpsc::UnboundedSender<(S<C>, R<C>)>,
 }
 
-impl<C: Collection> State<C> {
+impl<C: Collection> Context<C> {
     fn apply_topology(&mut self, _new_topology: Topology) {}
 
-    fn handle_new_incoming_connection(
-        &mut self,
-        (_sender, _receiver): SenderReceiver<C, c![C::ConnectionPoolInterface], Frame>,
-    ) {
-    }
+    fn handle_message(&mut self, sender: NodePublicKey, frame: Frame) {}
 }
 
+/// Runs the main loop of the broadcast algorithm. This is our main central worker.
 pub async fn main_loop<C: Collection>(
     mut shutdown: tokio::sync::oneshot::Receiver<()>,
     db: Database,
-    _sqr: c![C::ApplicationInterface::SyncExecutor],
+    sqr: c![C::ApplicationInterface::SyncExecutor],
     notifier: c![C::NotifierInterface],
     topology: c![C::TopologyInterface],
-    (mut listener, _connector): ListenerConnector<C, c![C::ConnectionPoolInterface], Frame>,
+    (mut listener, connector): ListenerConnector<C, c![C::ConnectionPoolInterface], Frame>,
 ) -> c![C::ConnectionPoolInterface::Listener<Frame>] {
-    let mut state = State::<C> {
+    let (new_outgoing_connection_tx, mut new_outgoing_connection_rx) = mpsc::unbounded_channel();
+    let mut ctx = Context::<C> {
         db,
         interner: Interner::new(1024),
         peers: Peers::default(),
+        connector,
+        new_outgoing_connection_tx,
     };
 
     // Subscribe to the changes from the topology.
@@ -84,13 +94,27 @@ pub async fn main_loop<C: Collection>(
             // application execution socket is dropped. At that point we're also shutting
             // down anyway.
             Some(new_topology) = topology_subscriber.recv() => {
-                state.apply_topology(new_topology);
+                ctx.apply_topology(new_topology);
             },
 
             // Handle the case when another node is dialing us.
             Some(conn) = listener.accept() => {
-                state.handle_new_incoming_connection(conn);
+                let Some(index) = sqr.pubkey_to_index(*conn.0.pk()) else {
+                    continue;
+                };
+                ctx.peers.handle_new_incoming_connection(index, conn);
             },
+
+            Some(conn) = new_outgoing_connection_rx.recv() => {
+                let Some(index) = sqr.pubkey_to_index(*conn.0.pk()) else {
+                    continue;
+                };
+                ctx.peers.handle_new_outgoing_connection(index, conn);
+            },
+
+            Some((sender, frame)) = ctx.peers.recv() => {
+                ctx.handle_message(sender, frame);
+            }
         }
     }
 
