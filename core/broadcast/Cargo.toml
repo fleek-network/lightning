@@ -20,6 +20,8 @@ fxhash = "0.2"
 futures = "0.3"
 affair.workspace = true
 infusion.workspace = true
+derive_more = "0.99"
+im = "15.1"
 
 [dev-dependencies]
 lightning-application = { path = "../application" }

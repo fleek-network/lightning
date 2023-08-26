@@ -1,23 +1,31 @@
+use std::cell::RefCell;
 use std::pin::Pin;
+use std::sync::Arc;
 
+use dashmap::DashMap;
+use derive_more::AddAssign;
 use fleek_crypto::NodePublicKey;
 use futures::stream::FuturesUnordered;
 use futures::Future;
-use fxhash::{FxHashMap, FxHashSet};
+use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{ReceiverInterface, SenderInterface, SyncQueryRunnerInterface};
 
 use crate::ev::Topology;
 use crate::frame::{Digest, Frame};
 use crate::receivers::Receivers;
-use crate::MessageInternedId;
+use crate::{Advr, MessageInternedId};
 
 /// This struct is responsible for holding the state of the current peers
 /// that we are connected to.
-pub struct Peers<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> {
-    stats: FxHashMap<NodeIndex, ConnectionStats>,
+pub struct Peers<S, R>
+where
+    S: SenderInterface<Frame>,
+    R: ReceiverInterface<Frame>,
+{
+    stats: Arc<DashMap<NodeIndex, ConnectionStats, FxBuildHasher>>,
     /// Map each public key to the info we have about that peer.
-    peers: FxHashMap<NodePublicKey, Peer<S>>,
+    peers: im::HashMap<NodePublicKey, Peer<S>>,
     /// The message queue from all the connections we have.
     incoming_messages: Receivers<R>,
 }
@@ -29,7 +37,7 @@ struct Peer<S> {
     /// The index of the node.
     index: NodeIndex,
     /// The sender that we can use to send messages to this peer.
-    sender: S,
+    sender: Arc<S>,
     /// The origin of this connection can tell us if we started this connection or if
     /// the remote has dialed us.
     origin: ConnectionOrigin,
@@ -39,9 +47,22 @@ struct Peer<S> {
     //
     // Here we are storing the mapping from the interned id of a message in our table,
     // to the interned id of the message known to the client.
-    has: FxHashMap<MessageInternedId, RemoteInternedId>,
+    has: im::HashMap<MessageInternedId, RemoteInternedId>,
 }
 
+impl<S> Clone for Peer<S> {
+    fn clone(&self) -> Self {
+        Self {
+            index: self.index,
+            sender: self.sender.clone(),
+            origin: self.origin,
+            status: self.status,
+            has: self.has.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
 enum ConnectionOrigin {
     // We have established the connection.
     Us,
@@ -71,7 +92,7 @@ pub enum ConnectionStatus {
 }
 
 /// A bunch of statistics that we gather from a peer throughout the life of the gossip.
-#[derive(Default)]
+#[derive(Default, AddAssign)]
 pub struct ConnectionStats {
     /// How many things have we advertised to this node.
     pub advertisements_received_from_us: usize,
@@ -89,6 +110,34 @@ pub struct ConnectionStats {
 }
 
 impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
+    pub fn advertise(&self, id: MessageInternedId, digest: Digest) {
+        // Take a snapshot of the state. This is O(1).
+        let state = self.peers.clone();
+        let stats = self.stats.clone();
+
+        tokio::spawn(async move {
+            let msg = Advr {
+                interned_id: id,
+                digest,
+            };
+
+            for (_pk, info) in state {
+                if info.has.contains_key(&id) {
+                    continue;
+                }
+
+                *stats.entry(info.index).or_default() += ConnectionStats {
+                    advertisements_received_from_us: 1,
+                    ..Default::default()
+                };
+
+                tokio::spawn(async move {
+                    info.sender.send(Frame::Advr(msg)).await;
+                });
+            }
+        });
+    }
+
     /// Handle a new incoming connection. Should be provided along the index of the node until
     /// we have refactored everything to use the node index.
     pub async fn handle_new_incoming_connection(
@@ -105,10 +154,10 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
 
         let info = Peer {
             index,
-            sender,
+            sender: Arc::new(sender),
             origin: ConnectionOrigin::Remote,
             status: ConnectionStatus::Open,
-            has: FxHashMap::default(),
+            has: Default::default(),
         };
 
         self.stats.entry(index).or_default();
@@ -131,10 +180,10 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
 
         let info = Peer {
             index,
-            sender,
+            sender: Arc::new(sender),
             origin: ConnectionOrigin::Us,
             status: ConnectionStatus::Open,
-            has: FxHashMap::default(),
+            has: Default::default(),
         };
 
         self.stats.entry(index).or_default();

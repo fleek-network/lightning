@@ -97,24 +97,16 @@ pub async fn main_loop<C: Collection>(
                 break;
             },
 
-            // The `topology_subscriber` recv can potentially return `None` when the
-            // application execution socket is dropped. At that point we're also shutting
-            // down anyway.
-            Some(new_topology) = topology_subscriber.recv() => {
-                ctx.apply_topology(new_topology);
-            },
-
             // A command has been sent from the mainland. Process it.
             Some(command) = command_receiver.recv() => {
                 ctx.handle_command(command);
             },
 
-            // Handle the case when another node is dialing us.
-            Some(conn) = listener.accept() => {
-                let Some(index) = sqr.pubkey_to_index(*conn.0.pk()) else {
-                    continue;
-                };
-                ctx.peers.handle_new_incoming_connection(index, conn);
+            // The `topology_subscriber` recv can potentially return `None` when the
+            // application execution socket is dropped. At that point we're also shutting
+            // down anyway.
+            Some(new_topology) = topology_subscriber.recv() => {
+                ctx.apply_topology(new_topology);
             },
 
             Some(conn) = new_outgoing_connection_rx.recv() => {
@@ -126,7 +118,16 @@ pub async fn main_loop<C: Collection>(
 
             Some((sender, frame)) = ctx.peers.recv() => {
                 ctx.handle_message(sender, frame);
-            }
+            },
+
+            // Handle the case when another node is dialing us.
+            // TODO(qti3e): Is this cancel safe?
+            Some(conn) = listener.accept() => {
+                let Some(index) = sqr.pubkey_to_index(*conn.0.pk()) else {
+                    continue;
+                };
+                ctx.peers.handle_new_incoming_connection(index, conn);
+            },
         }
     }
 

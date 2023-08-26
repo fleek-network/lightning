@@ -13,7 +13,7 @@ pub struct Want {
     pub interned_id: MessageInternedId,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub struct Advr {
     pub interned_id: MessageInternedId,
     pub digest: Digest,
