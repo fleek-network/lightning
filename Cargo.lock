@@ -3606,6 +3606,7 @@ dependencies = [
  "lightning-application",
  "lightning-interfaces",
  "lightning-rep-collector",
+ "lightning-signer",
  "lightning-topology",
  "rand 0.8.5",
  "serde",

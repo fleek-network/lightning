@@ -1,11 +1,12 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::ReputationAggregatorInterface;
+use lightning_interfaces::{ReputationAggregatorInterface, ReputationQueryInteface};
 use thiserror::Error;
 use tokio::sync::mpsc::{self, Receiver};
 use tokio::sync::{oneshot, Notify};
@@ -15,13 +16,15 @@ use crate::distance;
 use crate::node::NodeInfo;
 use crate::task::Task;
 
+const DELTA: u64 = Duration::from_secs(600).as_millis() as u64; // 10 minutes
+
 pub type TableKey = [u8; 32];
 
 pub async fn start_worker<C: Collection>(
     mut rx: Receiver<TableRequest>,
     local_key: NodePublicKey,
     task_tx: mpsc::Sender<Task>,
-    _local_rep_query: c![C::ReputationAggregatorInterface::ReputationQuery],
+    local_rep_query: c![C::ReputationAggregatorInterface::ReputationQuery],
     shutdown_notify: Arc<Notify>,
 ) {
     let mut table = Table::new(local_key);
@@ -106,7 +109,19 @@ pub async fn start_worker<C: Collection>(
                                     // Sort the bucket such that the most desirable nodes are at the end of
                                     // the vec.
                                     match (a.last_responded, b.last_responded) {
-                                        (Some(a), Some(b)) => a.cmp(&b),
+                                        (Some(a_last_res), Some(b_last_res)) => {
+                                            let score_a = local_rep_query.get_reputation_of(&a.key);
+                                            let score_b = local_rep_query.get_reputation_of(&b.key);
+                                            if a_last_res.abs_diff(b_last_res) < DELTA
+                                                && (score_a.is_some() || score_b.is_some()) {
+                                                // If the dfference between the timestamps of the
+                                                // last responses is less than some specified delta,
+                                                // we use the local reputation as a tie breaker.
+                                                score_a.cmp(&score_b)
+                                            } else {
+                                                a_last_res.cmp(&b_last_res)
+                                            }
+                                        },
                                         (Some(_), None) => Ordering::Greater,
                                         (None, Some(_)) => Ordering::Less,
                                         (None, None) => Ordering::Equal,
@@ -317,11 +332,19 @@ fn calculate_bucket_index(bucket_count: usize, possible_index: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
     use std::time::Duration;
 
     use lightning_application::app::Application;
     use lightning_application::config::{Mode, StorageConfig};
-    use lightning_interfaces::{partial, ApplicationInterface};
+    use lightning_interfaces::{
+        partial,
+        ApplicationInterface,
+        ReputationAggregatorInterface,
+        SignerInterface,
+    };
+    use lightning_rep_collector::ReputationAggregator;
+    use lightning_signer::Signer;
     use lightning_topology::Topology;
     use rand::Rng;
     use tokio::sync::mpsc;
@@ -332,6 +355,7 @@ mod tests {
     partial!(PartialBinding {
         ApplicationInterface = Application<Self>;
         TopologyInterface = Topology<Self>;
+        ReputationAggregatorInterface = ReputationAggregator<Self>;
     });
 
     fn get_random_key() -> TableKey {
@@ -341,6 +365,41 @@ mod tests {
             *byte = rng.gen_range(0..255);
         }
         array
+    }
+
+    fn get_reputation_query() -> lightning_rep_collector::MyReputationQuery {
+        let application =
+            Application::<PartialBinding>::init(lightning_application::config::Config {
+                mode: Mode::Test,
+                genesis: None,
+                storage: StorageConfig::InMemory,
+                db_path: None,
+                db_options: None,
+            })
+            .unwrap();
+        let query_runner = application.sync_query();
+
+        let signer = Signer::<PartialBinding>::init(
+            lightning_signer::Config {
+                node_key_path: PathBuf::from("../test-utils/keys/test_node2.pem")
+                    .try_into()
+                    .expect("Failed to resolve path"),
+                consensus_key_path: PathBuf::from("../test-utils/keys/test_consensus2.pem")
+                    .try_into()
+                    .expect("Failed to resolve path"),
+            },
+            query_runner.clone(),
+        )
+        .unwrap();
+
+        let rep_aggregator = ReputationAggregator::<PartialBinding>::init(
+            lightning_rep_collector::config::Config::default(),
+            signer.get_socket(),
+            Default::default(),
+            query_runner,
+        )
+        .unwrap();
+        rep_aggregator.get_query()
     }
 
     #[test]
@@ -406,23 +465,13 @@ mod tests {
         let (table_tx, table_rx) = mpsc::channel(10);
         let shutdown_notify = Arc::new(tokio::sync::Notify::new());
 
-        let application =
-            Application::<PartialBinding>::init(lightning_application::config::Config {
-                mode: Mode::Test,
-                genesis: None,
-                storage: StorageConfig::InMemory,
-                db_path: None,
-                db_options: None,
-            })
-            .unwrap();
-        let _query_runner = application.sync_query();
-
         let (tx, _) = mpsc::channel(10);
         let worker_fut = start_worker::<PartialBinding>(
             table_rx,
             public_key.into(),
             tx,
-            Default::default(),
+            //rep_aggregator.get_query(),
+            get_reputation_query(),
             shutdown_notify.clone(),
         );
 
@@ -509,7 +558,7 @@ mod tests {
             table_rx,
             public_key.into(),
             tx,
-            Default::default(),
+            get_reputation_query(),
             shutdown_notify.clone(),
         );
 
