@@ -4,6 +4,8 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::{ReputationAggregatorInterface, ReputationReporterInterface, Weight};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
@@ -18,7 +20,7 @@ use crate::table::{TableKey, TableRequest};
 use crate::task::{ResponseEvent, TaskResponse};
 
 /// Kademlia's lookup procedure.
-pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
+pub async fn lookup<C: Collection>(mut lookup: LookupTask<C>) -> Result<TaskResponse> {
     // Get initial K closest nodes from our local table.
     let (tx, rx) = oneshot::channel();
     let table_query = TableRequest::ClosestNodes {
@@ -135,11 +137,17 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
                         node_key: sender_key,
                         timestamp
                     };
+
                     lookup
                         .table_tx
                         .send(table_query)
                         .await
                         .expect("failed to update node timestamp");
+
+
+                    // Report a satisfactory interaction for the node that responded to our
+                    // request.
+                    lookup.rep_reporter.report_sat(&sender_key, Weight::Weak);
 
                     // If this is look up is a find a value, we check if the value is in the response.
                     if lookup.find_value_lookup && response.value.is_some() {
@@ -211,7 +219,7 @@ pub async fn lookup(mut lookup: LookupTask) -> Result<TaskResponse> {
     }
 }
 
-pub struct LookupTask {
+pub struct LookupTask<C: Collection> {
     // Task identifier.
     id: u64,
     // True if this is a `find value` look up.
@@ -228,9 +236,12 @@ pub struct LookupTask {
     main_rx: Receiver<ResponseEvent>,
     // Socket to send queries over the network.
     socket: Arc<UdpSocket>,
+    // Socket for reporting reputation measurements.
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
 }
 
-impl LookupTask {
+impl<C: Collection> LookupTask<C> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         task_id: u64,
         find_value_lookup: bool,
@@ -239,6 +250,7 @@ impl LookupTask {
         table_tx: Sender<TableRequest>,
         main_rx: Receiver<ResponseEvent>,
         socket: Arc<UdpSocket>,
+        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     ) -> Self {
         Self {
             id: task_id,
@@ -249,6 +261,7 @@ impl LookupTask {
             table_tx,
             main_rx,
             socket,
+            rep_reporter,
         }
     }
 }

@@ -10,6 +10,8 @@ use std::time::Duration;
 
 use anyhow::Error;
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::ReputationAggregatorInterface;
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, Notify};
@@ -28,7 +30,7 @@ type TaskResult = Result<u64, TaskFailed>;
 
 /// Task worker executes tasks.
 #[allow(clippy::too_many_arguments)]
-pub async fn start_worker(
+pub async fn start_worker<C: Collection>(
     mut task_rx: Receiver<Task>,
     task_tx: Sender<Task>,
     mut network_event_rx: Receiver<ResponseEvent>,
@@ -37,8 +39,9 @@ pub async fn start_worker(
     socket: Arc<UdpSocket>,
     local_key: NodePublicKey,
     bootstrapper: Bootstrapper,
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
 ) {
-    let mut task_set = TaskManager {
+    let mut task_set = TaskManager::<C> {
         task_queue: DelayQueue::new(),
         ongoing: HashMap::new(),
         task_results: JoinSet::new(),
@@ -47,6 +50,7 @@ pub async fn start_worker(
         task_tx,
         socket,
         bootstrapper,
+        rep_reporter,
     };
     loop {
         tokio::select! {
@@ -116,7 +120,7 @@ pub struct TaskResponse {
 }
 
 /// Manages tasks.
-struct TaskManager {
+struct TaskManager<C: Collection> {
     task_queue: DelayQueue<Task>,
     ongoing: HashMap<u64, OngoingTask>,
     task_results: JoinSet<TaskResult>,
@@ -125,9 +129,10 @@ struct TaskManager {
     task_tx: Sender<Task>,
     socket: Arc<UdpSocket>,
     bootstrapper: Bootstrapper,
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
 }
 
-impl TaskManager {
+impl<C: Collection> TaskManager<C> {
     /// Routes responses received from the network to running tasks.
     fn handle_response(&mut self, event: ResponseEvent) {
         match self.ongoing.get(&event.id) {
@@ -168,7 +173,7 @@ impl TaskManager {
                         network_event_tx: task_tx,
                     },
                 );
-                let lookup = LookupTask::new(
+                let lookup = LookupTask::<C>::new(
                     id,
                     is_value,
                     self.local_key,
@@ -176,10 +181,11 @@ impl TaskManager {
                     self.table_tx.clone(),
                     task_rx,
                     self.socket.clone(),
+                    self.rep_reporter.clone(),
                 );
                 let table_tx = self.table_tx.clone();
                 self.task_results.spawn(async move {
-                    let response = match lookup::lookup(lookup).await {
+                    let response = match lookup::lookup::<C>(lookup).await {
                         Ok(response) => response,
                         Err(error) => {
                             return Err(TaskFailed { id, error });
@@ -297,7 +303,7 @@ impl TaskManager {
                         network_event_tx: task_tx,
                     },
                 );
-                let lookup = LookupTask::new(
+                let lookup = LookupTask::<C>::new(
                     id,
                     false,
                     self.local_key,
@@ -305,12 +311,13 @@ impl TaskManager {
                     self.table_tx.clone(),
                     task_rx,
                     self.socket.clone(),
+                    self.rep_reporter.clone(),
                 );
                 let task_tx = self.task_tx.clone();
                 let table_tx = self.table_tx.clone();
                 self.task_results.spawn(async move {
                     tokio::time::sleep(delay).await;
-                    let response = match lookup::lookup(lookup).await {
+                    let response = match lookup::lookup::<C>(lookup).await {
                         Ok(response) => response,
                         Err(error) => {
                             return Err(TaskFailed { id, error });

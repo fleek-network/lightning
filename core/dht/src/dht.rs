@@ -92,7 +92,7 @@ impl<C: Collection> Builder<C> {
             bootstrap_rx: Arc::new(Mutex::new(Some(bootstrap_rx))),
             is_running: Arc::new(Mutex::new(false)),
             shutdown_notify: Arc::new(Notify::new()),
-            _rep_reporter: self.rep_reporter,
+            rep_reporter: self.rep_reporter,
             collection: PhantomData,
         })
     }
@@ -111,7 +111,7 @@ pub struct Dht<C: Collection> {
     nodes: Arc<Mutex<Option<Vec<NodeInfo>>>>,
     is_running: Arc<Mutex<bool>>,
     shutdown_notify: Arc<Notify>,
-    _rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     collection: PhantomData<C>,
 }
 
@@ -211,7 +211,7 @@ impl<C: Collection> WithStartAndShutdown for Dht<C> {
             self.shutdown_notify.clone(),
         ));
 
-        tokio::spawn(task::start_worker(
+        tokio::spawn(task::start_worker::<C>(
             task_rx,
             task_tx,
             network_event_rx,
@@ -220,6 +220,7 @@ impl<C: Collection> WithStartAndShutdown for Dht<C> {
             socket.clone(),
             public_key,
             bootstrapper,
+            self.rep_reporter.clone(),
         ));
 
         if let Err(e) = self.bootstrap().await {
