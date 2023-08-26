@@ -23,6 +23,7 @@ where
     S: SenderInterface<Frame>,
     R: ReceiverInterface<Frame>,
 {
+    /// The stats we have have about different peers.
     stats: Arc<DashMap<NodeIndex, ConnectionStats, FxBuildHasher>>,
     /// Map each public key to the info we have about that peer.
     peers: im::HashMap<NodePublicKey, Peer<S>>,

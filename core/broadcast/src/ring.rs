@@ -30,7 +30,7 @@ impl<T> MessageRing<T> {
     }
 
     /// Push a message to the back of this list.
-    pub fn push(&mut self, message: T) {
+    pub fn push(&mut self, message: T) -> usize {
         let index = self.next_index;
         self.next_index += 1;
 
@@ -40,6 +40,8 @@ impl<T> MessageRing<T> {
             let pos = index % self.capacity;
             self.buffer[pos] = message;
         }
+
+        index
     }
 
     /// Return the last message a receiver has to observe depending on what they have seen
@@ -97,6 +99,7 @@ mod tests {
         }
         assert_eq!(ring.recv(None), Some((7, 7)));
         assert_eq!(ring.recv(Some(0)), Some((7, 7)));
+        assert_eq!(ring.recv(Some(5)), Some((7, 7)));
         assert_eq!(ring.recv(Some(6)), Some((7, 7)));
         assert_eq!(ring.recv(Some(7)), Some((8, 8)));
         assert_eq!(ring.recv(Some(8)), Some((9, 9)));

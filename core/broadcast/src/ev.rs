@@ -11,6 +11,7 @@ use std::sync::Arc;
 use fleek_crypto::NodePublicKey;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::types::Topic;
 use lightning_interfaces::{
     ApplicationInterface,
     ConnectionPoolInterface,
@@ -31,6 +32,8 @@ use crate::db::Database;
 use crate::frame::Frame;
 use crate::interner::Interner;
 use crate::peers::Peers;
+use crate::recv_buffer::RecvBuffer;
+use crate::ring::MessageRing;
 
 // TODO(qti3e): Move this to somewhere else.
 pub type Topology = Arc<Vec<Vec<NodePublicKey>>>;
@@ -44,6 +47,8 @@ struct Context<C: Collection> {
     db: Database,
     /// Our digest interner.
     interner: Interner,
+    /// Managers of incoming message queue for each topic.
+    incoming_messages: [RecvBuffer; 3],
     /// The state related to the connected peers that we have right now.
     peers: Peers<S<C>, R<C>>,
     /// What we use to establish new connections with others.
@@ -56,7 +61,13 @@ struct Context<C: Collection> {
 impl<C: Collection> Context<C> {
     fn apply_topology(&mut self, _new_topology: Topology) {}
 
-    fn handle_message(&mut self, sender: NodePublicKey, frame: Frame) {}
+    fn handle_message(&mut self, sender: NodePublicKey, frame: Frame) {
+        match frame {
+            Frame::Advr(_) => todo!(),
+            Frame::Want(_) => todo!(),
+            Frame::Message(msg) => {},
+        }
+    }
 
     fn handle_command(&mut self, command: Command) {}
 }
@@ -77,6 +88,11 @@ pub async fn main_loop<C: Collection>(
     let (new_outgoing_connection_tx, mut new_outgoing_connection_rx) = mpsc::unbounded_channel();
     let mut ctx = Context::<C> {
         db,
+        incoming_messages: [
+            MessageRing::new(1024).into(),
+            MessageRing::new(1024).into(),
+            MessageRing::new(0).into(),
+        ],
         interner: Interner::new(1024),
         peers: Peers::default(),
         connector,
@@ -180,4 +196,14 @@ fn spawn_topology_subscriber<C: Collection>(
     });
 
     w_rx
+}
+
+/// Map each topic to a fixed size number.
+#[inline(always)]
+fn topic_to_index(topic: Topic) -> usize {
+    match topic {
+        Topic::Consensus => 0,
+        Topic::DistributedHashTable => 1,
+        Topic::Debug => 2,
+    }
 }

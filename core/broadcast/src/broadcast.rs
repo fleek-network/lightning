@@ -21,7 +21,7 @@ use crate::pubsub::PubSubI;
 pub struct Broadcast<C: Collection> {
     command_sender: CommandSender,
     // This is only used upon life-cycle events. And never during the execution
-    // of the node. A sync std mutex is sufficient.
+    // of the node. A sync std Mutex is sufficient.
     task_handle: Mutex<Option<JoinHandle<()>>>,
     collection: PhantomData<C>,
 }

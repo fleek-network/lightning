@@ -34,6 +34,7 @@ impl Interner {
     #[inline(always)]
     pub fn insert(&mut self, digest: Digest) -> MessageInternedId {
         let index = self.next;
+        // TODO: FIXME
         self.next = self.next.wrapping_add(1);
         self.data.insert(index as usize, digest);
         index
