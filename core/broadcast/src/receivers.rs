@@ -7,7 +7,7 @@ use lightning_interfaces::ReceiverInterface;
 
 use crate::Frame;
 
-type Fut<R> = Pin<Box<dyn Future<Output = (R, Option<Frame>)>>>;
+type Fut<R> = Pin<Box<dyn Future<Output = (R, Option<Frame>)> + Send>>;
 
 /// This object is a responsible for managing a large set of connection pool receivers
 /// all sending us messages.

@@ -25,9 +25,10 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
     TopologyInterface,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinHandle;
 
-use crate::command::{Command, CommandReceiver};
+use crate::command::{Command, CommandReceiver, CommandSender};
 use crate::db::Database;
 use crate::frame::Frame;
 use crate::interner::Interner;
@@ -43,7 +44,7 @@ pub type Topology = Arc<Vec<Vec<NodePublicKey>>>;
 type S<C> = PoolSender<C, c![C::ConnectionPoolInterface], Frame>;
 type R<C> = PoolReceiver<C, c![C::ConnectionPoolInterface], Frame>;
 
-struct Context<C: Collection> {
+pub struct Context<C: Collection> {
     /// Our database where we store what we have seen.
     db: Database,
     /// Our digest interner.
@@ -58,7 +59,9 @@ struct Context<C: Collection> {
     /// The receiver end of the above socket.
     new_outgoing_connection_rx: mpsc::UnboundedReceiver<(S<C>, R<C>)>,
     /// The channel which sends the commands to the event loop.
-    command_receiver: CommandReceiver,
+    command_tx: CommandSender,
+    /// Receiving end of the commands.
+    command_rx: CommandReceiver,
     sqr: c![C::ApplicationInterface::SyncExecutor],
     notifier: c![C::NotifierInterface],
     topology: c![C::TopologyInterface],
@@ -68,13 +71,44 @@ struct Context<C: Collection> {
 
 impl<C: Collection> Context<C> {
     pub fn new(
+        db: Database,
         sqr: c![C::ApplicationInterface::SyncExecutor],
         notifier: c![C::NotifierInterface],
         topology: c![C::TopologyInterface],
         listener: c![C::ConnectionPoolInterface::Listener<Frame>],
         connector: c![C::ConnectionPoolInterface::Connector<Frame>],
     ) -> Self {
-        todo!()
+        let (new_outgoing_connection_tx, new_outgoing_connection_rx) = mpsc::unbounded_channel();
+        let (command_tx, command_rx) = mpsc::unbounded_channel();
+        Self {
+            db,
+            interner: Interner::new(u16::MAX),
+            incoming_messages: [
+                MessageRing::new(2048).into(),
+                MessageRing::new(512).into(),
+                MessageRing::new(1).into(),
+            ],
+            peers: Peers::default(),
+            new_outgoing_connection_tx,
+            new_outgoing_connection_rx,
+            command_tx,
+            command_rx,
+            sqr,
+            notifier,
+            topology,
+            listener,
+            connector,
+        }
+    }
+
+    pub fn command_sender(&self) -> CommandSender {
+        self.command_tx.clone()
+    }
+
+    pub fn spawn(self) -> (oneshot::Sender<()>, JoinHandle<Self>) {
+        let (shutdown_tx, shutdown) = oneshot::channel();
+        let handle = tokio::spawn(async move { main_loop(shutdown, self).await });
+        (shutdown_tx, handle)
     }
 
     fn apply_topology(&mut self, _new_topology: Topology) {
@@ -144,7 +178,7 @@ async fn main_loop<C: Collection>(
             },
 
             // A command has been sent from the mainland. Process it.
-            Some(command) = ctx.command_receiver.recv() => {
+            Some(command) = ctx.command_rx.recv() => {
                 ctx.handle_command(command);
             },
 
