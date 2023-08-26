@@ -16,6 +16,7 @@ use lightning_interfaces::{partial, Blake3Hash, WithStartAndShutdown};
 use lightning_topology::Topology;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
+use serial_test::serial;
 use tokio::sync::Notify;
 
 partial!(PartialBinding {
@@ -25,6 +26,7 @@ partial!(PartialBinding {
 });
 
 #[tokio::test]
+#[serial]
 async fn e2e_dht() -> Result<()> {
     // Start epoch now and let it end in 20 seconds.
     let epoch_start = SystemTime::now()
