@@ -10,6 +10,7 @@ mod interner;
 mod peers;
 mod pubsub;
 mod receivers;
+mod ring;
 
 pub use broadcast::Broadcast;
 pub use frame::*;
