@@ -8,6 +8,7 @@ mod ev;
 mod frame;
 mod interner;
 mod peers;
+mod pending;
 mod pubsub;
 mod receivers;
 mod recv_buffer;

@@ -34,6 +34,7 @@ use crate::interner::Interner;
 use crate::peers::Peers;
 use crate::recv_buffer::RecvBuffer;
 use crate::ring::MessageRing;
+use crate::{Advr, Message, Want};
 
 // TODO(qti3e): Move this to somewhere else.
 pub type Topology = Arc<Vec<Vec<NodePublicKey>>>;
@@ -59,17 +60,50 @@ struct Context<C: Collection> {
 }
 
 impl<C: Collection> Context<C> {
-    fn apply_topology(&mut self, _new_topology: Topology) {}
+    fn apply_topology(&mut self, _new_topology: Topology) {
+        // TODO(qti3e)
+    }
 
+    fn handle_advr(&mut self, sender: NodePublicKey, advr: Advr) {
+        // TODO(qti3e)
+    }
+
+    fn handle_want(&mut self, sender: NodePublicKey, req: Want) {
+        // TODO(qti3e)
+    }
+
+    fn handle_message(&mut self, sender: NodePublicKey, msg: Message) {
+        // TODO(qti3e)
+    }
+
+    /// Handle a message sent from a user.
     fn handle_message(&mut self, sender: NodePublicKey, frame: Frame) {
         match frame {
-            Frame::Advr(_) => todo!(),
-            Frame::Want(_) => todo!(),
-            Frame::Message(msg) => {},
+            Frame::Advr(advr) => {
+                self.handle_advr(sender, advr);
+            },
+            Frame::Want(want) => {
+                self.handle_want(sender, want);
+            },
+            Frame::Message(msg) => {
+                self.handle_message(sender, msg);
+            },
         }
     }
 
-    fn handle_command(&mut self, command: Command) {}
+    /// Handle a command sent from the mainland. Can be the broadcast object or
+    /// a pubsub object.
+    fn handle_command(&mut self, command: Command) {
+        match command {
+            Command::Recv(cmd) => {
+                let index = topic_to_index(cmd.topic);
+                self.incoming_messages[index].response_to(cmd.last_seen, cmd.response);
+            },
+            Command::Send(_) => todo!(),
+            Command::Propagate(_) => todo!(),
+            Command::MarkInvalidSender(_) => todo!(),
+        }
+    }
 }
 
 /// Runs the main loop of the broadcast algorithm. This is our main central worker.
