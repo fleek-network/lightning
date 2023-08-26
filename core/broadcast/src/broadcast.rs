@@ -13,11 +13,13 @@ use lightning_interfaces::{
 };
 use tokio::task::JoinHandle;
 
+use crate::command::CommandSender;
 use crate::config::Config;
 use crate::frame::Frame;
 use crate::pubsub::PubSubI;
 
 pub struct Broadcast<C: Collection> {
+    command_sender: CommandSender,
     // This is only used upon life-cycle events. And never during the execution
     // of the node. A sync std mutex is sufficient.
     task_handle: Mutex<Option<JoinHandle<()>>>,
@@ -60,7 +62,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         todo!()
     }
 
-    fn get_pubsub<T: LightningMessage + Clone>(&self, _topic: Topic) -> Self::PubSub<T> {
-        todo!()
+    fn get_pubsub<T: LightningMessage + Clone>(&self, topic: Topic) -> Self::PubSub<T> {
+        PubSubI::new(topic, self.command_sender.clone())
     }
 }

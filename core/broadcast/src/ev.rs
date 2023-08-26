@@ -26,6 +26,7 @@ use lightning_interfaces::{
 };
 use tokio::sync::mpsc;
 
+use crate::command::{Command, CommandReceiver};
 use crate::db::Database;
 use crate::frame::Frame;
 use crate::interner::Interner;
@@ -56,17 +57,23 @@ impl<C: Collection> Context<C> {
     fn apply_topology(&mut self, _new_topology: Topology) {}
 
     fn handle_message(&mut self, sender: NodePublicKey, frame: Frame) {}
+
+    fn handle_command(&mut self, command: Command) {}
 }
 
 /// Runs the main loop of the broadcast algorithm. This is our main central worker.
 pub async fn main_loop<C: Collection>(
     mut shutdown: tokio::sync::oneshot::Receiver<()>,
+    mut command_receiver: CommandReceiver,
     db: Database,
     sqr: c![C::ApplicationInterface::SyncExecutor],
     notifier: c![C::NotifierInterface],
     topology: c![C::TopologyInterface],
     (mut listener, connector): ListenerConnector<C, c![C::ConnectionPoolInterface], Frame>,
-) -> c![C::ConnectionPoolInterface::Listener<Frame>] {
+) -> (
+    c![C::ConnectionPoolInterface::Listener<Frame>],
+    CommandReceiver,
+) {
     let (new_outgoing_connection_tx, mut new_outgoing_connection_rx) = mpsc::unbounded_channel();
     let mut ctx = Context::<C> {
         db,
@@ -97,6 +104,11 @@ pub async fn main_loop<C: Collection>(
                 ctx.apply_topology(new_topology);
             },
 
+            // A command has been sent from the mainland. Process it.
+            Some(command) = command_receiver.recv() => {
+                ctx.handle_command(command);
+            },
+
             // Handle the case when another node is dialing us.
             Some(conn) = listener.accept() => {
                 let Some(index) = sqr.pubkey_to_index(*conn.0.pk()) else {
@@ -119,7 +131,7 @@ pub async fn main_loop<C: Collection>(
     }
 
     // Handover the listener back once we're shutting down.
-    listener
+    (listener, command_receiver)
 }
 
 /// Spawn a task that listens for epoch changes and sends the new topology through an `mpsc`
@@ -132,13 +144,13 @@ pub async fn main_loop<C: Collection>(
 fn spawn_topology_subscriber<C: Collection>(
     notifier: c![C::NotifierInterface],
     topology: c![C::TopologyInterface],
-) -> tokio::sync::mpsc::Receiver<Topology> {
+) -> mpsc::Receiver<Topology> {
     // Create the output channel from which we send out the computed
     // topology.
-    let (w_tx, w_rx) = tokio::sync::mpsc::channel(64);
+    let (w_tx, w_rx) = mpsc::channel(64);
 
     // Subscribe to new epochs coming in.
-    let (tx, mut rx) = tokio::sync::mpsc::channel(64);
+    let (tx, mut rx) = mpsc::channel(64);
     notifier.notify_on_new_epoch(tx);
 
     tokio::spawn(async move {

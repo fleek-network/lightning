@@ -1,6 +1,7 @@
 #![allow(unused)]
 
 mod broadcast;
+mod command;
 mod config;
 mod db;
 mod ev;
