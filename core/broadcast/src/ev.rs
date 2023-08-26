@@ -52,14 +52,31 @@ struct Context<C: Collection> {
     incoming_messages: [RecvBuffer; 3],
     /// The state related to the connected peers that we have right now.
     peers: Peers<S<C>, R<C>>,
-    /// What we use to establish new connections with others.
-    connector: c![C::ConnectionPoolInterface::Connector<Frame>],
     /// We use this socket to let the main event loop know that we have established
     /// a connection with another node.
     new_outgoing_connection_tx: mpsc::UnboundedSender<(S<C>, R<C>)>,
+    /// The receiver end of the above socket.
+    new_outgoing_connection_rx: mpsc::UnboundedReceiver<(S<C>, R<C>)>,
+    /// The channel which sends the commands to the event loop.
+    command_receiver: CommandReceiver,
+    sqr: c![C::ApplicationInterface::SyncExecutor],
+    notifier: c![C::NotifierInterface],
+    topology: c![C::TopologyInterface],
+    listener: c![C::ConnectionPoolInterface::Listener<Frame>],
+    connector: c![C::ConnectionPoolInterface::Connector<Frame>],
 }
 
 impl<C: Collection> Context<C> {
+    pub fn new(
+        sqr: c![C::ApplicationInterface::SyncExecutor],
+        notifier: c![C::NotifierInterface],
+        topology: c![C::TopologyInterface],
+        listener: c![C::ConnectionPoolInterface::Listener<Frame>],
+        connector: c![C::ConnectionPoolInterface::Connector<Frame>],
+    ) -> Self {
+        todo!()
+    }
+
     fn apply_topology(&mut self, _new_topology: Topology) {
         // TODO(qti3e)
     }
@@ -77,7 +94,7 @@ impl<C: Collection> Context<C> {
     }
 
     /// Handle a message sent from a user.
-    fn handle_message(&mut self, sender: NodePublicKey, frame: Frame) {
+    fn handle_frame(&mut self, sender: NodePublicKey, frame: Frame) {
         match frame {
             Frame::Advr(advr) => {
                 self.handle_advr(sender, advr);
@@ -107,34 +124,13 @@ impl<C: Collection> Context<C> {
 }
 
 /// Runs the main loop of the broadcast algorithm. This is our main central worker.
-pub async fn main_loop<C: Collection>(
+async fn main_loop<C: Collection>(
     mut shutdown: tokio::sync::oneshot::Receiver<()>,
-    mut command_receiver: CommandReceiver,
-    db: Database,
-    sqr: c![C::ApplicationInterface::SyncExecutor],
-    notifier: c![C::NotifierInterface],
-    topology: c![C::TopologyInterface],
-    (mut listener, connector): ListenerConnector<C, c![C::ConnectionPoolInterface], Frame>,
-) -> (
-    c![C::ConnectionPoolInterface::Listener<Frame>],
-    CommandReceiver,
-) {
-    let (new_outgoing_connection_tx, mut new_outgoing_connection_rx) = mpsc::unbounded_channel();
-    let mut ctx = Context::<C> {
-        db,
-        incoming_messages: [
-            MessageRing::new(1024).into(),
-            MessageRing::new(1024).into(),
-            MessageRing::new(0).into(),
-        ],
-        interner: Interner::new(1024),
-        peers: Peers::default(),
-        connector,
-        new_outgoing_connection_tx,
-    };
-
+    mut ctx: Context<C>,
+) -> Context<C> {
     // Subscribe to the changes from the topology.
-    let mut topology_subscriber = spawn_topology_subscriber::<C>(notifier, topology);
+    let mut topology_subscriber =
+        spawn_topology_subscriber::<C>(ctx.notifier.clone(), ctx.topology.clone());
 
     loop {
         tokio::select! {
@@ -148,7 +144,7 @@ pub async fn main_loop<C: Collection>(
             },
 
             // A command has been sent from the mainland. Process it.
-            Some(command) = command_receiver.recv() => {
+            Some(command) = ctx.command_receiver.recv() => {
                 ctx.handle_command(command);
             },
 
@@ -159,21 +155,21 @@ pub async fn main_loop<C: Collection>(
                 ctx.apply_topology(new_topology);
             },
 
-            Some(conn) = new_outgoing_connection_rx.recv() => {
-                let Some(index) = sqr.pubkey_to_index(*conn.0.pk()) else {
+            Some(conn) = ctx.new_outgoing_connection_rx.recv() => {
+                let Some(index) = ctx.sqr.pubkey_to_index(*conn.0.pk()) else {
                     continue;
                 };
                 ctx.peers.handle_new_outgoing_connection(index, conn);
             },
 
             Some((sender, frame)) = ctx.peers.recv() => {
-                ctx.handle_message(sender, frame);
+                ctx.handle_frame(sender, frame);
             },
 
             // Handle the case when another node is dialing us.
             // TODO(qti3e): Is this cancel safe?
-            Some(conn) = listener.accept() => {
-                let Some(index) = sqr.pubkey_to_index(*conn.0.pk()) else {
+            Some(conn) = ctx.listener.accept() => {
+                let Some(index) = ctx.sqr.pubkey_to_index(*conn.0.pk()) else {
                     continue;
                 };
                 ctx.peers.handle_new_incoming_connection(index, conn);
@@ -181,8 +177,8 @@ pub async fn main_loop<C: Collection>(
         }
     }
 
-    // Handover the listener back once we're shutting down.
-    (listener, command_receiver)
+    // Handover over the context.
+    ctx
 }
 
 /// Spawn a task that listens for epoch changes and sends the new topology through an `mpsc`
