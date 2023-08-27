@@ -27,9 +27,8 @@ use lightning_interfaces::types::{
     TransactionResponse,
     Value,
 };
-use resolved_pathbuf::ResolvedPathBuf;
 
-use crate::config::{Config, Mode};
+use crate::config::{Config, Mode, StorageConfig};
 use crate::genesis::{Genesis, GenesisPrices};
 use crate::query_runner::QueryRunner;
 use crate::state::State;
@@ -41,10 +40,14 @@ pub struct Env<P> {
 }
 
 impl Env<UpdatePerm> {
-    pub fn new(db_path: &Option<ResolvedPathBuf>, db_options: &Option<ResolvedPathBuf>) -> Self {
-        let storage = match db_path {
-            Some(db_path) => {
-                let mut db_options = if let Some(db_options) = &db_options {
+    pub fn new(config: &Config) -> Self {
+        let storage = match config.storage {
+            StorageConfig::RocksDb => {
+                let db_path = config
+                    .db_path
+                    .as_ref()
+                    .expect("db_path must be specified for RocksDb backend");
+                let mut db_options = if let Some(db_options) = config.db_options.as_ref() {
                     let (options, _) = Options::load_latest(
                         db_options,
                         RocksEnv::new().expect("Failed to create rocks db env."),
@@ -61,8 +64,9 @@ impl Env<UpdatePerm> {
                 db_options.create_missing_column_families(true);
                 AtomoStorageBuilder::new(Some(db_path.as_path())).with_options(db_options)
             },
-            None => AtomoStorageBuilder::new::<&Path>(None),
+            StorageConfig::InMemory => AtomoStorageBuilder::new::<&Path>(None),
         };
+
         let mut atomo = AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(storage);
         atomo = atomo
             .with_table::<Metadata, Value>("metadata")
@@ -345,7 +349,7 @@ impl Env<UpdatePerm> {
 
 impl Default for Env<UpdatePerm> {
     fn default() -> Self {
-        Self::new(&Some("~/.lightning/data/app_db".try_into().unwrap()), &None)
+        Self::new(&Config::default())
     }
 }
 

@@ -70,7 +70,9 @@ impl Swarm {
 
     fn shutdown_internal(&mut self) {
         self.nodes.values().for_each(|node| node.shutdown());
-        fs::remove_dir_all(&self.directory).expect("Failed to clean up swarm directory.");
+        if self.directory.exists() {
+            fs::remove_dir_all(&self.directory).expect("Failed to clean up swarm directory.");
+        }
     }
 }
 

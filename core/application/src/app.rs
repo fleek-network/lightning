@@ -58,7 +58,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
             );
         }
 
-        let mut env = Env::new(&config.db_path, &config.db_options);
+        let mut env = Env::new(&config);
 
         if !env.genesis(config) {
             info!("State already exists. Not loading genesis");
