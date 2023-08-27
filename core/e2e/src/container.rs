@@ -20,7 +20,10 @@ impl<C: Collection> Drop for Container<C> {
         let handle = self.join_handle.take().unwrap();
         let shutdown_notify = self.shutdown_notify.take().unwrap();
         shutdown_notify.notify_one();
-        handle.join().unwrap();
+        if let Err(e) = handle.join() {
+            eprintln!("we're here with error {:?}", e);
+            std::panic::resume_unwind(e);
+        }
     }
 }
 
