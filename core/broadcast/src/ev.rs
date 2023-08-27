@@ -32,7 +32,7 @@ use crate::command::{Command, CommandReceiver, CommandSender};
 use crate::db::Database;
 use crate::frame::Frame;
 use crate::interner::Interner;
-use crate::peers::Peers;
+use crate::peers::{ConnectionOrigin, Peers};
 use crate::recv_buffer::RecvBuffer;
 use crate::ring::MessageRing;
 use crate::{Advr, Message, Want};
@@ -209,7 +209,7 @@ async fn main_loop<C: Collection>(
                 let Some(index) = ctx.sqr.pubkey_to_index(*conn.0.pk()) else {
                     continue;
                 };
-                ctx.peers.handle_new_outgoing_connection(index, conn);
+                ctx.peers.handle_new_connection(ConnectionOrigin::Us , index, conn);
             },
 
             Some((sender, frame)) = ctx.peers.recv() => {
@@ -222,7 +222,7 @@ async fn main_loop<C: Collection>(
                 let Some(index) = ctx.sqr.pubkey_to_index(*conn.0.pk()) else {
                     continue;
                 };
-                ctx.peers.handle_new_incoming_connection(index, conn);
+                ctx.peers.handle_new_connection(ConnectionOrigin::Remote , index, conn);
             },
         }
     }

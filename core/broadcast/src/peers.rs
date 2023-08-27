@@ -72,7 +72,7 @@ impl<S> Clone for Peer<S> {
 }
 
 #[derive(Clone, Copy)]
-enum ConnectionOrigin {
+pub enum ConnectionOrigin {
     // We have established the connection.
     Us,
     /// The remote has dialed us and we have this connection because we got
@@ -94,7 +94,7 @@ pub enum ConnectionStatus {
     /// At this point we do not care about their advertisements. We only care about
     /// the messages they owe us. Once the other peer does not owe us anything anymore
     /// we close the connection.
-    Closing(usize),
+    Closing,
     /// The connection with the other peer is closed and we are not communicating with
     /// the node.
     Closed,
@@ -110,6 +110,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
             interned_id: id,
             digest,
         };
+
         self.for_each(move |stats, (_pk, info)| {
             if info.has.contains_key(&id) {
                 return;
@@ -148,51 +149,21 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
         });
     }
 
-    /// Handle a new incoming connection. Should be provided along the index of the node until
-    /// we have refactored everything to use the node index.
-    pub async fn handle_new_incoming_connection(
+    pub async fn handle_new_connection(
         &mut self,
+        origin: ConnectionOrigin,
         index: NodeIndex,
         (sender, receiver): (S, R),
     ) {
         let (sender, receiver) = self.tagger.tag2(sender, receiver);
         let pk = *sender.pk();
 
-        if let Some(info) = self.peers.get(&pk) {
-            // The connection already exists.
-            // TODO(qti3e): Handle this.
-        }
+        if let Some(info) = self.peers.get(&pk) {}
 
         let info = Peer {
             index,
             sender: Arc::new(sender),
             origin: ConnectionOrigin::Remote,
-            status: ConnectionStatus::Open,
-            has: Default::default(),
-        };
-
-        self.peers.insert(pk, info);
-        self.incoming_messages.push(receiver);
-    }
-
-    // Right now this looks awfully similar to the previous function. But not for long.
-    pub async fn handle_new_outgoing_connection(
-        &mut self,
-        index: NodeIndex,
-        (sender, receiver): (S, R),
-    ) {
-        let (sender, receiver) = self.tagger.tag2(sender, receiver);
-        let pk = *sender.pk();
-
-        if let Some(info) = self.peers.get(&pk) {
-            // The connection already exists.
-            // TODO(qti3e): Handle this.
-        }
-
-        let info = Peer {
-            index,
-            sender: Arc::new(sender),
-            origin: ConnectionOrigin::Us,
             status: ConnectionStatus::Open,
             has: Default::default(),
         };
@@ -261,7 +232,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
                 Some((pk, frame))
             },
             (ConnectionStatus::Closed, _) => None,
-            (ConnectionStatus::Closing(pending), Frame::Message(msg)) => {
+            (ConnectionStatus::Closing, Frame::Message(msg)) => {
                 if self.keep_alive(&pk) {
                     self.incoming_messages.push(receiver);
                 }
@@ -270,7 +241,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
             // If we're closing the connection with this peer, we don't care about
             // anything other than the actual payloads that they are still sending
             // our way.
-            (ConnectionStatus::Closing(pending), _) => {
+            (ConnectionStatus::Closing, _) => {
                 if self.keep_alive(&pk) {
                     self.incoming_messages.push(receiver);
                 }

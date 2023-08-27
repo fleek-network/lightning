@@ -3,6 +3,7 @@
 mod broadcast;
 mod command;
 mod config;
+mod conn;
 mod db;
 mod ev;
 mod frame;
