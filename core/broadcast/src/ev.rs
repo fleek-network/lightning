@@ -176,6 +176,8 @@ async fn main_loop<C: Collection>(
 
     // Provide the peers list with the index of our current node. It will need it
     // for resolving connection ordering disputes.
+    // This could have been done during initialization, except at that point we don't
+    // know if application has started and therefore if the database is loaded yet.
     let index = ctx
         .sqr
         .pubkey_to_index(ctx.pk)

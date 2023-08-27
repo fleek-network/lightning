@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 
 use dashmap::DashMap;
 use derive_more::AddAssign;
@@ -67,7 +68,7 @@ impl<S: SenderInterface<Frame>> Clone for Peer<S> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ConnectionOrigin {
     // We have established the connection.
     Us,
@@ -124,6 +125,11 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
                 // TODO(qti3e): Explore allowing to send raw buffers from here.
                 // There is a lot of duplicated serialization going on because
                 // of this pattern.
+                //
+                // struct Envelop<T>(Vec<u8>, PhantomData<T>);
+                // let e = Envelop::new(msg);
+                // ...
+                // send_envelop(e)
                 info.sender.send(Frame::Advr(msg)).await;
             });
         });
@@ -138,11 +144,18 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
         let state = self.peers.clone();
         let stats = self.stats.clone();
 
-        tokio::spawn(async move {
+        // TODO(qti3e): Find a good spawn threshold.
+        if state.len() >= 100 {
+            tokio::spawn(async move {
+                for (pk, info) in state {
+                    closure(&stats, (pk, info));
+                }
+            });
+        } else {
             for (pk, info) in state {
                 closure(&stats, (pk, info));
             }
-        });
+        }
     }
 
     pub async fn handle_new_connection(
@@ -151,10 +164,74 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
         index: NodeIndex,
         (sender, receiver): (S, R),
     ) {
+        enum DisputeResolveResponse {
+            AcceptNewConnection,
+            RejectNewConnection,
+        }
+
+        // If a connection already exists with the peer figures our which one we should
+        // keep.
+        fn resolve_dispute(
+            prev_origin: ConnectionOrigin,
+            origin: ConnectionOrigin,
+            us: NodeIndex,
+            index: NodeIndex,
+        ) -> DisputeResolveResponse {
+            // If the direction of the call is the same as before accept it,
+            // it might be a connection refresh or something.
+            if origin == prev_origin {
+                return DisputeResolveResponse::AcceptNewConnection;
+            }
+
+            match (origin, index.cmp(&us)) {
+                // For two cases below we are the one who is making the new call. So the new
+                // connection is from us. Lower index wins, so we have to reject our own connection
+                // if the peer has lower index in order to keep the other peers connection to us
+                // alive.
+                (ConnectionOrigin::Us, std::cmp::Ordering::Less) => {
+                    DisputeResolveResponse::RejectNewConnection
+                },
+                (ConnectionOrigin::Us, _) => DisputeResolveResponse::AcceptNewConnection,
+                // The peer is calling us, the connection we currently have was one made from us ->
+                // remote. We have to accept remote's call if they have a lower index than us.
+                (ConnectionOrigin::Remote, std::cmp::Ordering::Less) => {
+                    DisputeResolveResponse::AcceptNewConnection
+                },
+                (ConnectionOrigin::Remote, _) => DisputeResolveResponse::RejectNewConnection,
+            }
+        }
+
+        assert_ne!(index, self.us); // we shouldn't be calling ourselves.
         let (sender, receiver) = create_pair(sender, receiver);
         let pk = *sender.pk();
 
-        if let Some(info) = self.peers.get(&pk) {}
+        if let Some(info) = self.peers.get(&pk) {
+            debug_assert_eq!(index, info.index);
+
+            match resolve_dispute(info.origin, origin, self.us, index) {
+                DisputeResolveResponse::AcceptNewConnection => {
+                    let info = self.peers.remove(&pk).unwrap();
+                    // Drop the sender in 5 seconds to close the connection. Since we are using
+                    // `PairedSender/Receiver` this will result in the drop of receiver as well.
+                    tokio::spawn(async move {
+                        tokio::time::sleep(Duration::from_secs(5));
+                        drop(info.sender);
+                    });
+                },
+                DisputeResolveResponse::RejectNewConnection => {
+                    // For 5 second process messages coming from this new receiver anyway because
+                    // the remote might be sending valuable information.
+                    tokio::spawn(async move {
+                        tokio::time::sleep(Duration::from_secs(5));
+                        drop(sender);
+                    });
+                    self.incoming_messages.push(receiver);
+
+                    // Exit early and don't store this new connection.
+                    return;
+                },
+            }
+        }
 
         let info = Peer {
             index,
