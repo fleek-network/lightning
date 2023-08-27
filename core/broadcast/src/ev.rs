@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use fleek_crypto::NodePublicKey;
+use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::Topic;
@@ -67,6 +67,8 @@ pub struct Context<C: Collection> {
     topology: c![C::TopologyInterface],
     listener: c![C::ConnectionPoolInterface::Listener<Frame>],
     connector: c![C::ConnectionPoolInterface::Connector<Frame>],
+    sk: NodeSecretKey,
+    pk: NodePublicKey,
 }
 
 impl<C: Collection> Context<C> {
@@ -77,9 +79,11 @@ impl<C: Collection> Context<C> {
         topology: c![C::TopologyInterface],
         listener: c![C::ConnectionPoolInterface::Listener<Frame>],
         connector: c![C::ConnectionPoolInterface::Connector<Frame>],
+        sk: NodeSecretKey,
     ) -> Self {
         let (new_outgoing_connection_tx, new_outgoing_connection_rx) = mpsc::unbounded_channel();
         let (command_tx, command_rx) = mpsc::unbounded_channel();
+        let pk = sk.to_pk();
         Self {
             db,
             interner: Interner::new(u16::MAX),
@@ -98,6 +102,8 @@ impl<C: Collection> Context<C> {
             topology,
             listener,
             connector,
+            sk,
+            pk,
         }
     }
 
@@ -165,6 +171,14 @@ async fn main_loop<C: Collection>(
     // Subscribe to the changes from the topology.
     let mut topology_subscriber =
         spawn_topology_subscriber::<C>(ctx.notifier.clone(), ctx.topology.clone());
+
+    // Provide the peers list with the index of our current node. It will need it
+    // for resolving connection ordering disputes.
+    let index = ctx
+        .sqr
+        .pubkey_to_index(ctx.pk)
+        .expect("Current node on the application state.");
+    ctx.peers.set_current_node_index(index);
 
     loop {
         tokio::select! {

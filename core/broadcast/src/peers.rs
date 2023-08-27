@@ -14,6 +14,7 @@ use lightning_interfaces::{ReceiverInterface, SenderInterface, SyncQueryRunnerIn
 use crate::ev::Topology;
 use crate::frame::{Digest, Frame};
 use crate::receivers::Receivers;
+use crate::tagged::{Tagged, Tagger};
 use crate::{Advr, MessageInternedId};
 
 /// This struct is responsible for holding the state of the current peers
@@ -23,22 +24,30 @@ where
     S: SenderInterface<Frame>,
     R: ReceiverInterface<Frame>,
 {
+    /// The id of our node.
+    us: NodeIndex,
     /// The stats we have have about different peers.
-    stats: Arc<DashMap<NodeIndex, ConnectionStats, FxBuildHasher>>,
+    stats: StatsMap,
     /// Map each public key to the info we have about that peer.
     peers: im::HashMap<NodePublicKey, Peer<S>>,
     /// The message queue from all the connections we have.
     incoming_messages: Receivers<R>,
+    /// The tagging container we use for the sender and receivers.
+    /// We use this to be able to see if a sender and a receiver
+    /// are from the same pair.
+    tagger: Tagger,
 }
 
 /// An interned id. But not from our interned table.
 type RemoteInternedId = MessageInternedId;
 
+type StatsMap = Arc<DashMap<NodeIndex, ConnectionStats, FxBuildHasher>>;
+
 struct Peer<S> {
     /// The index of the node.
     index: NodeIndex,
     /// The sender that we can use to send messages to this peer.
-    sender: Arc<S>,
+    sender: Arc<Tagged<S>>,
     /// The origin of this connection can tell us if we started this connection or if
     /// the remote has dialed us.
     origin: ConnectionOrigin,
@@ -86,7 +95,7 @@ pub enum ConnectionStatus {
     /// At this point we do not care about their advertisements. We only care about
     /// the messages they owe us. Once the other peer does not owe us anything anymore
     /// we close the connection.
-    Closing,
+    Closing(usize),
     /// The connection with the other peer is closed and we are not communicating with
     /// the node.
     Closed,
@@ -111,30 +120,46 @@ pub struct ConnectionStats {
 }
 
 impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
+    pub fn set_current_node_index(&mut self, index: NodeIndex) {
+        self.us = index;
+    }
+
     pub fn advertise(&self, id: MessageInternedId, digest: Digest) {
+        let msg = Advr {
+            interned_id: id,
+            digest,
+        };
+        self.for_each(move |stats, (_pk, info)| {
+            if info.has.contains_key(&id) {
+                return;
+            }
+
+            *stats.entry(info.index).or_default() += ConnectionStats {
+                advertisements_received_from_us: 1,
+                ..Default::default()
+            };
+
+            tokio::spawn(async move {
+                // TODO(qti3e): Explore allowing to send raw buffers from here.
+                // There is a lot of duplicated serialization going on because
+                // of this pattern.
+                info.sender.send(Frame::Advr(msg)).await;
+            });
+        });
+    }
+
+    #[inline]
+    fn for_each<F>(&self, closure: F)
+    where
+        F: Fn(&StatsMap, (NodePublicKey, Peer<S>)) + Send + 'static,
+    {
         // Take a snapshot of the state. This is O(1).
         let state = self.peers.clone();
         let stats = self.stats.clone();
 
         tokio::spawn(async move {
-            let msg = Advr {
-                interned_id: id,
-                digest,
-            };
-
-            for (_pk, info) in state {
-                if info.has.contains_key(&id) {
-                    continue;
-                }
-
-                *stats.entry(info.index).or_default() += ConnectionStats {
-                    advertisements_received_from_us: 1,
-                    ..Default::default()
-                };
-
-                tokio::spawn(async move {
-                    info.sender.send(Frame::Advr(msg)).await;
-                });
+            for (pk, info) in state {
+                closure(&stats, (pk, info));
             }
         });
     }
@@ -146,6 +171,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
         index: NodeIndex,
         (sender, receiver): (S, R),
     ) {
+        let (sender, receiver) = self.tagger.tag2(sender, receiver);
         let pk = *sender.pk();
 
         if let Some(info) = self.peers.get(&pk) {
@@ -172,6 +198,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
         index: NodeIndex,
         (sender, receiver): (S, R),
     ) {
+        let (sender, receiver) = self.tagger.tag2(sender, receiver);
         let pk = *sender.pk();
 
         if let Some(info) = self.peers.get(&pk) {
@@ -195,7 +222,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
     pub async fn recv(&mut self) -> Option<(NodePublicKey, Frame)> {
         match self.incoming_messages.recv().await {
             Some((r, None)) => {
-                self.disconnected(r.pk());
+                self.disconnected(r);
                 None
             },
             Some((receiver, Some(frame))) => self.handle_frame(receiver, frame),
@@ -204,14 +231,26 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
     }
 
     #[inline(always)]
-    fn disconnected(&mut self, pk: &NodePublicKey) {
-        if let Some(mut info) = self.peers.remove(pk) {
+    fn disconnected(&mut self, receiver: Tagged<R>) {
+        let pk = *receiver.pk();
+        if let Some(mut info) = self.peers.remove(&pk) {
+            if !info.sender.has_same_tag_as(&receiver) {
+                // We are using a different connection at this point,
+                // insert it back and return. There is nothing for us
+                // to do here.
+                self.peers.insert(pk, info);
+                return;
+            }
             info.status = ConnectionStatus::Closed;
         }
     }
 
     #[inline(always)]
-    fn handle_frame(&mut self, receiver: R, frame: Frame) -> Option<(NodePublicKey, Frame)> {
+    fn handle_frame(
+        &mut self,
+        receiver: Tagged<R>,
+        frame: Frame,
+    ) -> Option<(NodePublicKey, Frame)> {
         let pk = *receiver.pk();
         let info = self.peers.get(&pk)?;
 
@@ -229,7 +268,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
                 Some((pk, frame))
             },
             (ConnectionStatus::Closed, _) => None,
-            (ConnectionStatus::Closing, Frame::Message(msg)) => {
+            (ConnectionStatus::Closing(pending), Frame::Message(msg)) => {
                 if self.keep_alive(&pk) {
                     self.incoming_messages.push(receiver);
                 }
@@ -238,7 +277,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
             // If we're closing the connection with this peer, we don't care about
             // anything other than the actual payloads that they are still sending
             // our way.
-            (ConnectionStatus::Closing, _) => {
+            (ConnectionStatus::Closing(pending), _) => {
                 if self.keep_alive(&pk) {
                     self.incoming_messages.push(receiver);
                 }
@@ -261,9 +300,11 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
 impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Default for Peers<S, R> {
     fn default() -> Self {
         Self {
+            us: 0,
             stats: Default::default(),
             peers: Default::default(),
             incoming_messages: Default::default(),
+            tagger: Tagger::default(),
         }
     }
 }

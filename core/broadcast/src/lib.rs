@@ -13,6 +13,7 @@ mod pubsub;
 mod receivers;
 mod recv_buffer;
 mod ring;
+mod tagged;
 
 pub use broadcast::Broadcast;
 pub use frame::*;

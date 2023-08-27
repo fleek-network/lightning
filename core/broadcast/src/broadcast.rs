@@ -8,6 +8,7 @@ use lightning_interfaces::{
     BroadcastInterface,
     ConfigConsumer,
     ListenerConnector,
+    SignerInterface,
     WithStartAndShutdown,
 };
 use tokio::sync::{oneshot, Mutex};
@@ -22,6 +23,7 @@ use crate::pubsub::PubSubI;
 
 pub struct Broadcast<C: Collection> {
     command_sender: CommandSender,
+    // This is only ever `None` when the mutex is locked.
     status: Mutex<Option<Status<C>>>,
 }
 
@@ -51,7 +53,11 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
     async fn start(&self) {
         let mut guard = self.status.lock().await;
 
-        let state = guard.take().unwrap();
+        // This is an unneeded binding. But my rust-analyzer (not rustc) assumes
+        // take on `guard.take()` is Iterator::take and then complains that there
+        // is one param (i.e size) required.
+        let tmp: &mut Option<Status<C>> = &mut *guard;
+        let state = tmp.take().unwrap();
         let next_state = if let Status::NotRunning { ctx } = state {
             let (shutdown, handle) = ctx.spawn();
             Status::Running {
@@ -68,7 +74,8 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
     async fn shutdown(&self) {
         let mut guard = self.status.lock().await;
 
-        let state = guard.take().unwrap();
+        let tmp: &mut Option<Status<C>> = &mut *guard;
+        let state = tmp.take().unwrap();
         let next_state = if let Status::Running { shutdown, handle } = state {
             let _ = shutdown.unwrap().send(());
             let ctx = handle.await.expect("Failed to shutdown");
@@ -94,6 +101,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         signer: &c!(C::SignerInterface),
         notifier: c!(C::NotifierInterface),
     ) -> anyhow::Result<Self> {
+        let (_, sk) = signer.get_sk();
         let ctx = Context::<C>::new(
             Database::default(),
             sqr,
@@ -101,6 +109,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
             topology,
             listener,
             connector,
+            sk,
         );
 
         Ok(Self {
