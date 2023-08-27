@@ -84,6 +84,7 @@ pub struct SwarmBuilder {
     epoch_time: Option<u64>,
     port_assigner: Option<PortAssigner>,
     bootstrappers: Option<Vec<Bootstrapper>>,
+    use_persistence: bool,
     committee_size: Option<u64>,
 }
 
@@ -115,6 +116,11 @@ impl SwarmBuilder {
 
     pub fn with_bootstrappers(mut self, bootstrappers: Vec<Bootstrapper>) -> Self {
         self.bootstrappers = Some(bootstrappers);
+        self
+    }
+
+    pub fn use_persistence(mut self) -> Self {
+        self.use_persistence = true;
         self
     }
 
@@ -220,10 +226,15 @@ impl SwarmBuilder {
         let mut nodes = HashMap::new();
         for (index, (owner_sk, node_pk, config)) in tmp_nodes.into_iter().enumerate() {
             let root = directory.join(format!("node-{index}"));
+            let storage = if self.use_persistence {
+                StorageConfig::RocksDb
+            } else {
+                StorageConfig::InMemory
+            };
             config.inject::<Application<FinalTypes>>(AppConfig {
                 mode: Mode::Test,
                 genesis: Some(genesis.clone()),
-                storage: StorageConfig::RocksDb,
+                storage,
                 db_path: Some(root.join("data/app_db").try_into().unwrap()),
                 db_options: None,
             });
