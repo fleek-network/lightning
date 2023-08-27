@@ -17,7 +17,7 @@ use crate::ev::Topology;
 use crate::frame::{Digest, Frame};
 use crate::receivers::Receivers;
 use crate::stats::{ConnectionStats, Stats};
-use crate::{Advr, MessageInternedId};
+use crate::{Advr, Message, MessageInternedId};
 
 /// This struct is responsible for holding the state of the current peers
 /// that we are connected to.
@@ -49,10 +49,6 @@ struct Peer<S: SenderInterface<Frame>> {
     origin: ConnectionOrigin,
     /// The status of our connection with this peer.
     status: ConnectionStatus,
-    // We know this peer has these messages. They have advertised them to us before.
-    //
-    // Here we are storing the mapping from the interned id of a message in our table,
-    // to the interned id of the message known to the client.
     has: im::HashMap<MessageInternedId, RemoteInternedId>,
 }
 
@@ -68,6 +64,7 @@ impl<S: SenderInterface<Frame>> Clone for Peer<S> {
     }
 }
 
+/// The originator of a connection.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ConnectionOrigin {
     // We have established the connection.
@@ -102,6 +99,22 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
         self.us = index;
     }
 
+    /// Send a `Frame::Message` to the specific node.
+    // TODO(qti3e): Fix double serialization.
+    pub fn send_message(&self, remote: &NodePublicKey, frame: Frame) {
+        debug_assert!(matches!(frame, Frame::Message(_)));
+        let Some(info) = self.peers.get(remote) else {
+            return;
+        };
+        let sender = info.sender.clone();
+        tokio::spawn(async move {
+            sender.send(frame).await;
+        });
+    }
+
+    /// Advertise a given digest with the given assigned interned id to all the connected
+    /// peers that we have. Obviously, we don't do it for the nodes that we already know
+    /// have this message.
     pub fn advertise(&self, id: MessageInternedId, digest: Digest) {
         let msg = Advr {
             interned_id: id,
@@ -204,6 +217,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
         assert_ne!(index, self.us); // we shouldn't be calling ourselves.
         let (sender, receiver) = create_pair(sender, receiver);
         let pk = *sender.pk();
+        let mut has = None;
 
         if let Some(info) = self.peers.get(&pk) {
             debug_assert_eq!(index, info.index);
@@ -211,11 +225,14 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
             match resolve_dispute(info.origin, origin, self.us, index) {
                 DisputeResolveResponse::AcceptNewConnection => {
                     let info = self.peers.remove(&pk).unwrap();
+                    // Keep the info we have about this peer.
+                    has = Some(info.has);
                     // Drop the sender in 5 seconds to close the connection. Since we are using
                     // `PairedSender/Receiver` this will result in the drop of receiver as well.
+                    let sender = info.sender;
                     tokio::spawn(async move {
                         tokio::time::sleep(Duration::from_secs(5));
-                        drop(info.sender);
+                        drop(sender);
                     });
                 },
                 DisputeResolveResponse::RejectNewConnection => {
@@ -238,7 +255,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
             sender,
             origin: ConnectionOrigin::Remote,
             status: ConnectionStatus::Open,
-            has: Default::default(),
+            has: has.unwrap_or_default(),
         };
 
         self.peers.insert(pk, info);

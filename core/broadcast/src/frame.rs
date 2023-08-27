@@ -19,7 +19,7 @@ pub struct Advr {
     pub digest: Digest,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Message {
     pub origin: NodeIndex,
     pub signature: NodeSignature,

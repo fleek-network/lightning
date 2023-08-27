@@ -143,7 +143,9 @@ impl<C: Collection> Context<C> {
 
     fn handle_want(&mut self, sender: NodePublicKey, req: Want) {
         let id = req.interned_id;
-        // TODO(qti3e)
+        let Some(digest) = self.interner.get(id) else { return; };
+        let Some(message) = self.db.get_message(digest) else { return; };
+        self.peers.send_message(&sender, Frame::Message(message));
     }
 
     fn handle_message(&mut self, sender: NodePublicKey, msg: Message) {
