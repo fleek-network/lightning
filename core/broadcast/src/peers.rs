@@ -30,6 +30,9 @@ where
     us: NodeIndex,
     /// Our access to reporting stats.
     pub stats: Stats,
+    /// Peers that are pinned. These are connections suggested by the topology. We
+    /// do not drop these connections when performing garbage collection.
+    pinned: FxHashSet<NodePublicKey>,
     /// Map each public key to the info we have about that peer.
     peers: im::HashMap<NodePublicKey, Peer<S>>,
     /// The message queue from all the connections we have.
@@ -74,7 +77,7 @@ pub enum ConnectionOrigin {
     Remote,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConnectionStatus {
     /// The connection with the other peer is open.
     ///
@@ -102,6 +105,33 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
     pub fn set_current_node_index(&mut self, index: NodeIndex) {
         self.us = index;
     }
+
+    /// Returns the status of the connection with the given peer. If no connection exists returns
+    /// [`ConnectionStatus::Closed`].
+    pub fn get_connection_status(&self, pk: &NodePublicKey) -> ConnectionStatus {
+        self.peers
+            .get(pk)
+            .map(|e| e.status)
+            .unwrap_or(ConnectionStatus::Closed)
+    }
+
+    /// If a connection is available returns the originator of the connection, otherwise `None`.
+    pub fn get_connection_origin(&self, pk: &NodePublicKey) -> Option<ConnectionOrigin> {
+        self.peers.get(pk).map(|e| e.origin)
+    }
+
+    /// Unpin every pinned connection.
+    pub fn unpin_all(&mut self) {
+        self.pinned.clear();
+    }
+
+    /// Pin a peer to prevent garbage collector to remove the connection.
+    pub fn pin_peer(&mut self, pk: NodePublicKey) {
+        self.pinned.insert(pk);
+    }
+
+    /// Move every connection made by us that is not pinned into closing state.
+    pub fn disconnect_unpinned(&mut self) {}
 
     /// Send a `Frame::Message` to the specific node.
     // TODO(qti3e): Fix double serialization.
@@ -359,6 +389,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Default for Peers<S
     fn default() -> Self {
         Self {
             us: 0,
+            pinned: Default::default(),
             stats: Default::default(),
             peers: Default::default(),
             incoming_messages: Default::default(),

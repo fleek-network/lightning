@@ -16,6 +16,7 @@ use lightning_interfaces::types::{NodeIndex, Topic};
 use lightning_interfaces::{
     ApplicationInterface,
     ConnectionPoolInterface,
+    ConnectorInterface,
     ListenerConnector,
     ListenerInterface,
     NotifierInterface,
@@ -33,7 +34,7 @@ use crate::command::{Command, CommandReceiver, CommandSender, SharedMessage};
 use crate::db::Database;
 use crate::frame::Frame;
 use crate::interner::Interner;
-use crate::peers::{ConnectionOrigin, Peers};
+use crate::peers::{ConnectionOrigin, ConnectionStatus, Peers};
 use crate::recv_buffer::RecvBuffer;
 use crate::ring::MessageRing;
 use crate::stats::{ConnectionStats, Stats};
@@ -137,8 +138,30 @@ impl<C: Collection> Context<C> {
         self.sqr.index_to_pubkey(index)
     }
 
-    fn apply_topology(&mut self, _new_topology: Topology) {
-        // TODO(qti3e)
+    fn apply_topology(&mut self, new_topology: Topology) {
+        self.peers.unpin_all();
+
+        for pk in new_topology.iter().flatten().copied() {
+            self.peers.pin_peer(pk);
+
+            if self.peers.get_connection_status(&pk) != ConnectionStatus::Closed {
+                // TODO(qti3e): Should we maybe handle == ConnectionStatus::Open
+                // instead.
+                continue;
+            }
+
+            let tx = self.new_outgoing_connection_tx.clone();
+            let connector = self.connector.clone();
+            tokio::spawn(async move {
+                let Some((sender, receiver)) = connector.connect(&pk).await else {
+                    return;
+                };
+
+                tx.send((sender, receiver));
+            });
+        }
+
+        self.peers.disconnect_unpinned();
     }
 
     /// Handle a message sent from a user.
@@ -259,7 +282,7 @@ async fn main_loop<C: Collection>(
             },
 
             Some(conn) = ctx.new_outgoing_connection_rx.recv() => {
-                let Some(index) = ctx.sqr.pubkey_to_index(*conn.0.pk()) else {
+                let Some(index) = ctx.get_node_index(conn.0.pk()) else {
                     continue;
                 };
                 ctx.peers.handle_new_connection(ConnectionOrigin::Us , index, conn);
@@ -272,7 +295,7 @@ async fn main_loop<C: Collection>(
             // Handle the case when another node is dialing us.
             // TODO(qti3e): Is this cancel safe?
             Some(conn) = ctx.listener.accept() => {
-                let Some(index) = ctx.sqr.pubkey_to_index(*conn.0.pk()) else {
+                let Some(index) = ctx.get_node_index(conn.0.pk()) else {
                     continue;
                 };
                 ctx.peers.handle_new_connection(ConnectionOrigin::Remote , index, conn);
