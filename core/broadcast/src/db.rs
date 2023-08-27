@@ -16,6 +16,10 @@ struct Entry {
 
 impl Database {
     pub fn get_message(&self, digest: &Digest) -> Option<Message> {
-        self.data.get(digest).map(|e| e.message.clone()).flatten()
+        self.data.get(digest).and_then(|e| e.message.clone())
+    }
+
+    pub fn get_id(&self, digest: &Digest) -> Option<MessageInternedId> {
+        self.data.get(digest).map(|e| e.id)
     }
 }

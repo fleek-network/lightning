@@ -29,7 +29,7 @@ where
     /// The id of our node.
     us: NodeIndex,
     /// Our access to reporting stats.
-    stats: Stats,
+    pub stats: Stats,
     /// Map each public key to the info we have about that peer.
     peers: im::HashMap<NodePublicKey, Peer<S>>,
     /// The message queue from all the connections we have.
@@ -95,6 +95,10 @@ pub enum ConnectionStatus {
 }
 
 impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
+    pub fn get_node_index(&self, pk: &NodePublicKey) -> Option<NodeIndex> {
+        self.peers.get(pk).map(|i| i.index)
+    }
+
     pub fn set_current_node_index(&mut self, index: NodeIndex) {
         self.us = index;
     }

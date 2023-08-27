@@ -3,13 +3,13 @@ use std::sync::Arc;
 use lightning_interfaces::types::{NodeIndex, Topic};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{Message, MessageInternedId};
+use crate::{Digest, Message, MessageInternedId};
 
 /// A message that might be shared across threads. This is already validated
 /// and is what we send to the pubsub.
 #[derive(Debug, Clone)]
 pub struct SharedMessage {
-    pub id: MessageInternedId,
+    pub digest: Digest,
     pub origin: NodeIndex,
     pub payload: Arc<[u8]>,
 }
@@ -41,10 +41,10 @@ pub enum Command {
     ///
     /// The broadcast does not advertise a message unless the subscribers
     /// decides to do so.
-    Propagate(MessageInternedId),
+    Propagate(Digest),
     //// Mark that a message had an invalid sender. We are still interested
     /// in this message digest, but not from the given origin.
-    MarkInvalidSender(MessageInternedId),
+    MarkInvalidSender(Digest),
 }
 
 pub type CommandSender = mpsc::UnboundedSender<Command>;

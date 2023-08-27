@@ -8,10 +8,11 @@
 
 use std::sync::Arc;
 
-use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
+use fleek_crypto::{NodePublicKey, NodeSecretKey, PublicKey, SecretKey};
 use infusion::c;
+use ink_quill::ToDigest;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::Topic;
+use lightning_interfaces::types::{NodeIndex, Topic};
 use lightning_interfaces::{
     ApplicationInterface,
     ConnectionPoolInterface,
@@ -28,13 +29,14 @@ use lightning_interfaces::{
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
-use crate::command::{Command, CommandReceiver, CommandSender};
+use crate::command::{Command, CommandReceiver, CommandSender, SharedMessage};
 use crate::db::Database;
 use crate::frame::Frame;
 use crate::interner::Interner;
 use crate::peers::{ConnectionOrigin, Peers};
 use crate::recv_buffer::RecvBuffer;
 use crate::ring::MessageRing;
+use crate::stats::{ConnectionStats, Stats};
 use crate::{Advr, Message, Want};
 
 // TODO(qti3e): Move this to somewhere else.
@@ -54,6 +56,8 @@ pub struct Context<C: Collection> {
     incoming_messages: [RecvBuffer; 3],
     /// The state related to the connected peers that we have right now.
     peers: Peers<S<C>, R<C>>,
+    /// The instance of stats collector.
+    stats: Stats,
     /// We use this socket to let the main event loop know that we have established
     /// a connection with another node.
     new_outgoing_connection_tx: mpsc::UnboundedSender<(S<C>, R<C>)>,
@@ -85,6 +89,8 @@ impl<C: Collection> Context<C> {
         let (new_outgoing_connection_tx, new_outgoing_connection_rx) = mpsc::unbounded_channel();
         let (command_tx, command_rx) = mpsc::unbounded_channel();
         let pk = sk.to_pk();
+        let peers = Peers::default();
+        let stats = peers.stats.clone();
         Self {
             db,
             interner: Interner::new(u16::MAX),
@@ -93,7 +99,8 @@ impl<C: Collection> Context<C> {
                 MessageRing::new(512).into(),
                 MessageRing::new(1).into(),
             ],
-            peers: Peers::default(),
+            peers,
+            stats,
             new_outgoing_connection_tx,
             new_outgoing_connection_rx,
             command_tx,
@@ -116,6 +123,18 @@ impl<C: Collection> Context<C> {
         let (shutdown_tx, shutdown) = oneshot::channel();
         let handle = tokio::spawn(async move { main_loop(shutdown, self).await });
         (shutdown_tx, handle)
+    }
+
+    /// Try to lookup a node index from a private key in an efficient way by first looking up the
+    /// connected peers mappings and then resorting to the application's query runner.
+    fn get_node_index(&self, pk: &NodePublicKey) -> Option<NodeIndex> {
+        self.peers
+            .get_node_index(pk)
+            .or_else(|| self.sqr.pubkey_to_index(*pk))
+    }
+
+    fn get_node_pk(&self, index: NodeIndex) -> Option<NodePublicKey> {
+        self.sqr.index_to_pubkey(index)
     }
 
     fn apply_topology(&mut self, _new_topology: Topology) {
@@ -149,7 +168,37 @@ impl<C: Collection> Context<C> {
     }
 
     fn handle_message(&mut self, sender: NodePublicKey, msg: Message) {
-        // TODO(qti3e)
+        let Some(origin_pk) = self.get_node_pk(msg.origin) else {
+            let index = self.get_node_index(&sender).unwrap();
+            self.stats.report(index, ConnectionStats {
+                invalid_messages_received_from_peer: 1,
+                ..Default::default()
+            });
+            return;
+        };
+
+        let digest = msg.to_digest();
+        if !origin_pk.verify(&msg.signature, &digest) {
+            let index = self.get_node_index(&sender).unwrap();
+            self.stats.report(
+                index,
+                ConnectionStats {
+                    invalid_messages_received_from_peer: 1,
+                    ..Default::default()
+                },
+            );
+            return;
+        }
+
+        let topic_index = topic_to_index(msg.topic);
+
+        let shared = SharedMessage {
+            digest,
+            origin: msg.origin,
+            payload: msg.payload.into(),
+        };
+
+        self.incoming_messages[topic_index].insert(shared);
     }
 
     /// Handle a command sent from the mainland. Can be the broadcast object or

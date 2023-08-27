@@ -56,7 +56,7 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
         // This is an unneeded binding. But my rust-analyzer (not rustc) assumes
         // take on `guard.take()` is Iterator::take and then complains that there
         // is one param (i.e size) required.
-        let tmp: &mut Option<Status<C>> = &mut *guard;
+        let tmp: &mut Option<Status<C>> = &mut guard;
         let state = tmp.take().unwrap();
         let next_state = if let Status::NotRunning { ctx } = state {
             let (shutdown, handle) = ctx.spawn();
@@ -74,7 +74,7 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
     async fn shutdown(&self) {
         let mut guard = self.status.lock().await;
 
-        let tmp: &mut Option<Status<C>> = &mut *guard;
+        let tmp: &mut Option<Status<C>> = &mut guard;
         let state = tmp.take().unwrap();
         let next_state = if let Status::Running { shutdown, handle } = state {
             let _ = shutdown.unwrap().send(());

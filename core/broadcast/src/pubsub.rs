@@ -81,7 +81,7 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
             self.last_seen = Some(id);
 
             if let Ok(decoded) = T::decode(&msg.payload) {
-                self.command_sender.send(Command::Propagate(msg.id));
+                self.command_sender.send(Command::Propagate(msg.digest));
                 return Some(decoded);
             }
         }
