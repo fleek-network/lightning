@@ -23,6 +23,7 @@ infusion.workspace = true
 derive_more = "0.99"
 im = "15.1"
 smallvec = "1.11.0"
+log.workspace = true
 
 [dev-dependencies]
 lightning-application = { path = "../application" }

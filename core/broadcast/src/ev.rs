@@ -124,7 +124,12 @@ impl<C: Collection> Context<C> {
 
     pub fn spawn(self) -> (oneshot::Sender<()>, JoinHandle<Self>) {
         let (shutdown_tx, shutdown) = oneshot::channel();
-        let handle = tokio::spawn(async move { main_loop(shutdown, self).await });
+        let handle = tokio::spawn(async move {
+            log::info!("spawnning brodcast");
+            let tmp = main_loop(shutdown, self).await;
+            log::info!("broadcast shut down sucessfully");
+            tmp
+        });
         (shutdown_tx, handle)
     }
 
@@ -141,6 +146,8 @@ impl<C: Collection> Context<C> {
     }
 
     fn apply_topology(&mut self, new_topology: Topology) {
+        log::info!("applying new topology");
+
         self.peers.unpin_all();
 
         for pk in new_topology.iter().flatten().copied() {
@@ -168,6 +175,8 @@ impl<C: Collection> Context<C> {
 
     /// Handle a message sent from a user.
     fn handle_frame(&mut self, sender: NodePublicKey, frame: Frame) {
+        log::debug!("recivied frame '{frame:?}' from {sender}");
+
         match frame {
             Frame::Advr(advr) => {
                 self.handle_advr(sender, advr);
@@ -275,6 +284,8 @@ impl<C: Collection> Context<C> {
     /// Handle a command sent from the mainland. Can be the broadcast object or
     /// a pubsub object.
     fn handle_command(&mut self, command: Command) {
+        log::debug!("handling broadcast command {command:?}");
+
         match command {
             Command::Recv(cmd) => self.handle_recv_cmd(cmd),
             Command::Send(cmd) => self.handle_send_cmd(cmd),
@@ -350,6 +361,8 @@ async fn main_loop<C: Collection>(
     ctx.peers.set_current_node_index(ctx.current_node_index);
 
     loop {
+        log::debug!("waiting for next event.");
+
         tokio::select! {
             // We kind of care about the priority of these events. Or do we?
             // TODO(qti3e): Evaluate this.
@@ -357,6 +370,7 @@ async fn main_loop<C: Collection>(
 
             // Prioritize the shutdown signal over everything.
             _ = &mut shutdown => {
+                log::info!("exiting event loop");
                 break;
             },
 
@@ -373,7 +387,9 @@ async fn main_loop<C: Collection>(
             },
 
             Some(conn) = ctx.new_outgoing_connection_rx.recv() => {
+                log::info!("we dialed {}", conn.0.pk());
                 let Some(index) = ctx.get_node_index(conn.0.pk()) else {
+                    log::error!("remote node not found");
                     continue;
                 };
                 ctx.peers.handle_new_connection(ConnectionOrigin::Us , index, conn);
@@ -386,7 +402,9 @@ async fn main_loop<C: Collection>(
             // Handle the case when another node is dialing us.
             // TODO(qti3e): Is this cancel safe?
             Some(conn) = ctx.listener.accept() => {
+                log::info!("node dialed by {}", conn.0.pk());
                 let Some(index) = ctx.get_node_index(conn.0.pk()) else {
+                    log::error!("remote node not found");
                     continue;
                 };
                 ctx.peers.handle_new_connection(ConnectionOrigin::Remote , index, conn);
@@ -422,6 +440,7 @@ fn spawn_topology_subscriber<C: Collection>(
             let topology = topology.clone();
 
             // Computing the topology might be a blocking task.
+            log::debug!("computing new topology");
             let result = tokio::task::spawn_blocking(move || topology.suggest_connections());
 
             let topology = result.await.expect("Failed to compute topology.");

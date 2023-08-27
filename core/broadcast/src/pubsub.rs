@@ -45,6 +45,8 @@ impl<T: LightningMessage + Clone> Clone for PubSubI<T> {
 #[async_trait]
 impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
     async fn send(&self, msg: &T) {
+        log::debug!("sending a message on topic {:?}", self.topic);
+
         let mut payload = Vec::with_capacity(512);
         msg.encode(&mut payload)
             .expect("Unexpected failure writing to buffer.");
@@ -58,6 +60,8 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
     /// behavior of the broadcast. We may miss messages if there is a very long delay in between
     /// calls to recv.
     async fn recv(&mut self) -> Option<T> {
+        log::debug!("brodcast::recv called on topic {:?}", self.topic);
+
         if !self.is_alive {
             return None;
         }
@@ -72,6 +76,8 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
 
             // Wait for the response. If we get an error just return `None`. We're never going to
             // get anything again.
+            log::debug!("awaiting for a message in topic {:?}", self.topic);
+
             let Ok((id, msg)) = rx.await else {
                 self.is_alive = false;
                 return None;
@@ -83,6 +89,11 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
             if let Ok(decoded) = T::decode(&msg.payload) {
                 self.command_sender.send(Command::Propagate(msg.digest));
                 return Some(decoded);
+            } else {
+                log::info!(
+                    "received an invalid message which we couldnt not deserialize {:?}",
+                    msg
+                );
             }
         }
     }

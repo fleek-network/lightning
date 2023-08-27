@@ -15,6 +15,7 @@ pub struct SharedMessage {
 }
 
 /// A recv call from a pubsub.
+#[derive(Debug)]
 pub struct RecvCmd {
     /// The topic we are interested at.
     pub topic: Topic,
@@ -27,12 +28,14 @@ pub struct RecvCmd {
 }
 
 /// A send call from a pubsub.
+#[derive(Debug)]
 pub struct SendCmd {
     pub topic: Topic,
     pub payload: Vec<u8>,
 }
 
 /// A command is what is sent from the other threads to the event loop.
+#[derive(Debug)]
 pub enum Command {
     Recv(RecvCmd),
     Send(SendCmd),
