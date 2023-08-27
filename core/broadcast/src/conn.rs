@@ -65,7 +65,7 @@ enum PairedReceiverInner<R> {
 
 impl<R: ReceiverInterface<Frame>> PairedReceiver<R> {
     /// Returns true if receiver and sender are meant to be a pair.
-    pub fn is_receiver_of<S: SenderInterface<Frame>>(&self, sender: PairedSender<S>) -> bool {
+    pub fn is_receiver_of<S: SenderInterface<Frame>>(&self, sender: &PairedSender<S>) -> bool {
         self.tag == sender.inner.tag
     }
 

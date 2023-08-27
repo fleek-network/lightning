@@ -15,7 +15,6 @@ mod receivers;
 mod recv_buffer;
 mod ring;
 mod stats;
-mod tagged;
 
 pub use broadcast::Broadcast;
 pub use frame::*;

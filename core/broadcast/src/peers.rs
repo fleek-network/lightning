@@ -11,11 +11,11 @@ use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{ReceiverInterface, SenderInterface, SyncQueryRunnerInterface};
 
+use crate::conn::{create_pair, PairedReceiver, PairedSender};
 use crate::ev::Topology;
 use crate::frame::{Digest, Frame};
 use crate::receivers::Receivers;
 use crate::stats::{ConnectionStats, Stats};
-use crate::tagged::{Tagged, Tagger};
 use crate::{Advr, MessageInternedId};
 
 /// This struct is responsible for holding the state of the current peers
@@ -33,20 +33,16 @@ where
     peers: im::HashMap<NodePublicKey, Peer<S>>,
     /// The message queue from all the connections we have.
     incoming_messages: Receivers<R>,
-    /// The tagging container we use for the sender and receivers.
-    /// We use this to be able to see if a sender and a receiver
-    /// are from the same pair.
-    tagger: Tagger,
 }
 
 /// An interned id. But not from our interned table.
 pub type RemoteInternedId = MessageInternedId;
 
-struct Peer<S> {
+struct Peer<S: SenderInterface<Frame>> {
     /// The index of the node.
     index: NodeIndex,
     /// The sender that we can use to send messages to this peer.
-    sender: Arc<Tagged<S>>,
+    sender: PairedSender<S>,
     /// The origin of this connection can tell us if we started this connection or if
     /// the remote has dialed us.
     origin: ConnectionOrigin,
@@ -59,7 +55,7 @@ struct Peer<S> {
     has: im::HashMap<MessageInternedId, RemoteInternedId>,
 }
 
-impl<S> Clone for Peer<S> {
+impl<S: SenderInterface<Frame>> Clone for Peer<S> {
     fn clone(&self) -> Self {
         Self {
             index: self.index,
@@ -155,14 +151,14 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
         index: NodeIndex,
         (sender, receiver): (S, R),
     ) {
-        let (sender, receiver) = self.tagger.tag2(sender, receiver);
+        let (sender, receiver) = create_pair(sender, receiver);
         let pk = *sender.pk();
 
         if let Some(info) = self.peers.get(&pk) {}
 
         let info = Peer {
             index,
-            sender: Arc::new(sender),
+            sender,
             origin: ConnectionOrigin::Remote,
             status: ConnectionStatus::Open,
             has: Default::default(),
@@ -184,10 +180,10 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
     }
 
     #[inline(always)]
-    fn disconnected(&mut self, receiver: Tagged<R>) {
+    fn disconnected(&mut self, receiver: PairedReceiver<R>) {
         let pk = *receiver.pk();
         if let Some(mut info) = self.peers.remove(&pk) {
-            if !info.sender.has_same_tag_as(&receiver) {
+            if !receiver.is_receiver_of(&info.sender) {
                 // We are using a different connection at this point,
                 // insert it back and return. There is nothing for us
                 // to do here.
@@ -201,7 +197,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
     #[inline(always)]
     fn handle_frame(
         &mut self,
-        receiver: Tagged<R>,
+        receiver: PairedReceiver<R>,
         frame: Frame,
     ) -> Option<(NodePublicKey, Frame)> {
         let pk = *receiver.pk();
@@ -268,7 +264,6 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Default for Peers<S
             stats: Default::default(),
             peers: Default::default(),
             incoming_messages: Default::default(),
-            tagger: Tagger::default(),
         }
     }
 }

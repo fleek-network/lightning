@@ -5,10 +5,10 @@ use futures::stream::FuturesUnordered;
 use futures::{Future, StreamExt};
 use lightning_interfaces::ReceiverInterface;
 
-use crate::tagged::Tagged;
+use crate::conn::PairedReceiver;
 use crate::Frame;
 
-type Fut<R> = Pin<Box<dyn Future<Output = (Tagged<R>, Option<Frame>)> + Send>>;
+type Fut<R> = Pin<Box<dyn Future<Output = (PairedReceiver<R>, Option<Frame>)> + Send>>;
 
 /// This object is a responsible for managing a large set of connection pool receivers
 /// all sending us messages.
@@ -33,7 +33,7 @@ impl<R: ReceiverInterface<Frame>> Receivers<R> {
 
     /// Push a message receiver to the queue so we can listen for what they have to say.
     #[inline(always)]
-    pub fn push(&mut self, receiver: Tagged<R>) {
+    pub fn push(&mut self, receiver: PairedReceiver<R>) {
         let future = gen_fut(receiver);
         self.pending.push(future);
     }
@@ -44,14 +44,14 @@ impl<R: ReceiverInterface<Frame>> Receivers<R> {
     /// The caller can decide to push the receiver back to the queue depending on
     /// the connection status.
     #[inline(always)]
-    pub async fn recv(&mut self) -> Option<(Tagged<R>, Option<Frame>)> {
+    pub async fn recv(&mut self) -> Option<(PairedReceiver<R>, Option<Frame>)> {
         self.pending.next().await
     }
 }
 
 /// Given a pool receiver return a future that will resolve once `r.recv()`
 /// has resolved. Which can also return the receiver object back to us as well.
-fn gen_fut<R: ReceiverInterface<Frame>>(mut r: Tagged<R>) -> Fut<R> {
+fn gen_fut<R: ReceiverInterface<Frame>>(mut r: PairedReceiver<R>) -> Fut<R> {
     Box::pin(async {
         let out = r.recv().await;
         (r, out)
