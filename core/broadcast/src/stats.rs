@@ -26,6 +26,9 @@ pub struct ConnectionStats {
     /// Number of messages we have received from this peer that
     /// we did not continue propagating.
     pub invalid_messages_received_from_peer: usize,
+    /// Number of messages that we actually never asked from the remote but
+    /// it sent us anyway.
+    pub unwanted_messages_received_from_peer: usize,
 }
 
 impl Stats {

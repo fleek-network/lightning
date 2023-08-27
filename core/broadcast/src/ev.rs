@@ -181,7 +181,36 @@ impl<C: Collection> Context<C> {
         }
     }
 
-    fn handle_advr(&mut self, sender: NodePublicKey, advr: Advr) {}
+    fn handle_advr(&mut self, sender: NodePublicKey, advr: Advr) {
+        let digest = advr.digest;
+
+        // If we have already propagated a message we really don't care about it anymore.
+        if self.db.is_propagated(&digest) {
+            return;
+        }
+
+        // Otherwise we might be interested in the message. We assign an interned id to this
+        // digest if it already doesn't have one.
+        let mut new_digest = false;
+        let index = self.db.get_id(&digest).unwrap_or_else(|| {
+            new_digest = true;
+            let id = self.interner.insert(digest);
+            self.db.insert_id(id, digest);
+            id
+        });
+
+        // This is a new digest which we have never seen before. At this point we immediately
+        // wanna see the message and therefore we send out the want request.
+        if new_digest {
+            self.peers.send_want_request(&sender, advr.interned_id);
+        }
+
+        // Remember the mapping since we may need it.
+        self.peers
+            .insert_index_mapping(&sender, index, advr.interned_id);
+
+        // TODO: Handle the case for non-first advr.
+    }
 
     fn handle_want(&mut self, sender: NodePublicKey, req: Want) {
         let id = req.interned_id;
@@ -201,6 +230,25 @@ impl<C: Collection> Context<C> {
         };
 
         let digest = msg.to_digest();
+
+        if self.db.get_id(&digest).is_none() {
+            // We got a message without being advertised first. Although we can technically
+            // accept the message. It is against the protocol. We should report.
+            //
+            // Accepting it will also further complicate the edge cases related to assigning
+            // an interned id to the message, all of which is not supposed to be happening at
+            // this step.
+            let index = self.get_node_index(&sender).unwrap();
+            self.stats.report(
+                index,
+                ConnectionStats {
+                    unwanted_messages_received_from_peer: 1,
+                    ..Default::default()
+                },
+            );
+            return;
+        }
+
         if !origin_pk.verify(&msg.signature, &digest) {
             let index = self.get_node_index(&sender).unwrap();
             self.stats.report(
@@ -261,7 +309,20 @@ impl<C: Collection> Context<C> {
     }
 
     fn handle_propagate_cmd(&mut self, digest: Digest) {
-        todo!()
+        let Some(id) = self.db.get_id(&digest) else  {
+            debug_assert!(
+                false,
+                "We should not be trying to propagate a message we don't know the id of."
+            );
+            return;
+        };
+
+        // Mark the message as propagated. This will make us lose any interest for future
+        // advertisements of this message.
+        self.db.mark_propagated(&digest);
+
+        // Continue with advertising this message to the connected peers.
+        self.peers.advertise(id, digest);
     }
 
     fn handle_mark_invalid_sender_cmd(&mut self, digest: Digest) {

@@ -17,7 +17,7 @@ use crate::ev::Topology;
 use crate::frame::{Digest, Frame};
 use crate::receivers::Receivers;
 use crate::stats::{ConnectionStats, Stats};
-use crate::{Advr, Message, MessageInternedId};
+use crate::{Advr, Message, MessageInternedId, Want};
 
 /// This struct is responsible for holding the state of the current peers
 /// that we are connected to.
@@ -131,7 +131,36 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
     }
 
     /// Move every connection made by us that is not pinned into closing state.
-    pub fn disconnect_unpinned(&mut self) {}
+    pub fn disconnect_unpinned(&mut self) {
+        // TODO(qti3e)
+    }
+
+    /// Insert a mapping from a local interned message id we have to the remote interned id for a
+    /// given remote node.
+    pub fn insert_index_mapping(
+        &mut self,
+        remote: &NodePublicKey,
+        local_index: MessageInternedId,
+        remote_index: RemoteInternedId,
+    ) {
+        let Some(info) = self.peers.get_mut(remote) else {
+            return;
+        };
+
+        info.has.insert(local_index, remote_index);
+    }
+
+    /// Get the interned id a remote knows a message we know by our local interned id, or `None`.
+    pub fn get_index_mapping(
+        &self,
+        remote: &NodePublicKey,
+        local_index: MessageInternedId,
+    ) -> Option<RemoteInternedId> {
+        self.peers
+            .get(remote)
+            .and_then(|i| i.has.get(&local_index))
+            .copied()
+    }
 
     /// Send a `Frame::Message` to the specific node.
     // TODO(qti3e): Fix double serialization.
@@ -144,6 +173,26 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
         tokio::spawn(async move {
             sender.send(frame).await;
         });
+    }
+
+    /// Send a want request to the given node returns `None` if we don't have the node's
+    /// sender anymore.
+    pub fn send_want_request(
+        &self,
+        remote: &NodePublicKey,
+        remote_index: RemoteInternedId,
+    ) -> bool {
+        let Some(info) = self.peers.get(remote) else {
+            return false;
+        };
+        let sender = info.sender.clone();
+        let frame = Frame::Want(Want {
+            interned_id: remote_index,
+        });
+        tokio::spawn(async move {
+            sender.send(frame).await;
+        });
+        true
     }
 
     /// Advertise a given digest with the given assigned interned id to all the connected

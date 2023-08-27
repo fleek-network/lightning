@@ -12,16 +12,30 @@ pub struct Database {
 struct Entry {
     id: MessageInternedId,
     message: Option<Message>,
+    propagated: bool,
 }
 
 impl Database {
-    /// Insert a message with all the information we have about it.
+    /// Insert a message with all the information we have about it. And set propagated to true.
     pub fn insert_with_message(&mut self, id: MessageInternedId, digest: Digest, message: Message) {
         self.data.insert(
             digest,
             Entry {
                 id,
                 message: Some(message),
+                propagated: true,
+            },
+        );
+    }
+
+    /// Insert the id for a digest.
+    pub fn insert_id(&mut self, id: MessageInternedId, digest: Digest) {
+        self.data.insert(
+            digest,
+            Entry {
+                id,
+                message: None,
+                propagated: false,
             },
         );
     }
@@ -32,5 +46,20 @@ impl Database {
 
     pub fn get_id(&self, digest: &Digest) -> Option<MessageInternedId> {
         self.data.get(digest).map(|e| e.id)
+    }
+
+    /// Returns true if we have already propagated a message. Which is the final state a message
+    /// could be in. The highest level of *having seen a message*.
+    pub fn is_propagated(&self, digest: &Digest) -> bool {
+        self.data.get(digest).map(|e| e.propagated).unwrap_or(false)
+    }
+
+    /// Mark the message known with the given digest as propagated.
+    pub fn mark_propagated(&mut self, digest: &Digest) {
+        let Some(e) = self.data.get_mut(digest) else {
+            debug_assert!(false, "We should not mark a message we haven't seen as propagated.");
+            return;
+        };
+        e.propagated = true;
     }
 }
