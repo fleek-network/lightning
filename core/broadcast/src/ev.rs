@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use fleek_crypto::{NodePublicKey, NodeSecretKey, PublicKey, SecretKey};
+use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
 use infusion::c;
 use ink_quill::ToDigest;
 use lightning_interfaces::infu_collection::Collection;
@@ -30,7 +30,7 @@ use lightning_interfaces::{
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
-use crate::command::{Command, CommandReceiver, CommandSender, SharedMessage};
+use crate::command::{Command, CommandReceiver, CommandSender, RecvCmd, SendCmd, SharedMessage};
 use crate::db::Database;
 use crate::frame::Frame;
 use crate::interner::Interner;
@@ -38,7 +38,7 @@ use crate::peers::{ConnectionOrigin, ConnectionStatus, Peers};
 use crate::recv_buffer::RecvBuffer;
 use crate::ring::MessageRing;
 use crate::stats::{ConnectionStats, Stats};
-use crate::{Advr, Message, Want};
+use crate::{Advr, Digest, Message, Want};
 
 // TODO(qti3e): Move this to somewhere else.
 pub type Topology = Arc<Vec<Vec<NodePublicKey>>>;
@@ -75,6 +75,7 @@ pub struct Context<C: Collection> {
     connector: c![C::ConnectionPoolInterface::Connector<Frame>],
     sk: NodeSecretKey,
     pk: NodePublicKey,
+    current_node_index: NodeIndex,
 }
 
 impl<C: Collection> Context<C> {
@@ -113,6 +114,7 @@ impl<C: Collection> Context<C> {
             connector,
             sk,
             pk,
+            current_node_index: 0, // will be set upon spawn.
         }
     }
 
@@ -228,14 +230,44 @@ impl<C: Collection> Context<C> {
     /// a pubsub object.
     fn handle_command(&mut self, command: Command) {
         match command {
-            Command::Recv(cmd) => {
-                let index = topic_to_index(cmd.topic);
-                self.incoming_messages[index].response_to(cmd.last_seen, cmd.response);
-            },
-            Command::Send(_) => todo!(),
-            Command::Propagate(_) => todo!(),
-            Command::MarkInvalidSender(_) => todo!(),
+            Command::Recv(cmd) => self.handle_recv_cmd(cmd),
+            Command::Send(cmd) => self.handle_send_cmd(cmd),
+            Command::Propagate(digest) => self.handle_propagate_cmd(digest),
+            Command::MarkInvalidSender(digest) => self.handle_mark_invalid_sender_cmd(digest),
         }
+    }
+
+    fn handle_recv_cmd(&mut self, cmd: RecvCmd) {
+        let index = topic_to_index(cmd.topic);
+        self.incoming_messages[index].response_to(cmd.last_seen, cmd.response);
+    }
+
+    fn handle_send_cmd(&mut self, cmd: SendCmd) {
+        let (digest, message) = {
+            let mut tmp = Message {
+                origin: self.current_node_index,
+                signature: NodeSignature([0; 64]),
+                topic: cmd.topic,
+                payload: cmd.payload,
+            };
+            let digest = tmp.to_digest();
+            tmp.signature = self.sk.sign(&digest);
+            (digest, tmp)
+        };
+
+        let id = self.interner.insert(digest);
+        self.db.insert_with_message(id, digest, message);
+
+        // Start advertising the message.
+        self.peers.advertise(id, digest);
+    }
+
+    fn handle_propagate_cmd(&mut self, digest: Digest) {
+        todo!()
+    }
+
+    fn handle_mark_invalid_sender_cmd(&mut self, digest: Digest) {
+        todo!()
     }
 }
 
@@ -252,11 +284,11 @@ async fn main_loop<C: Collection>(
     // for resolving connection ordering disputes.
     // This could have been done during initialization, except at that point we don't
     // know if application has started and therefore if the database is loaded yet.
-    let index = ctx
+    ctx.current_node_index = ctx
         .sqr
         .pubkey_to_index(ctx.pk)
         .expect("Current node on the application state.");
-    ctx.peers.set_current_node_index(index);
+    ctx.peers.set_current_node_index(ctx.current_node_index);
 
     loop {
         tokio::select! {

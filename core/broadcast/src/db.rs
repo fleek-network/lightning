@@ -15,6 +15,17 @@ struct Entry {
 }
 
 impl Database {
+    /// Insert a message with all the information we have about it.
+    pub fn insert_with_message(&mut self, id: MessageInternedId, digest: Digest, message: Message) {
+        self.data.insert(
+            digest,
+            Entry {
+                id,
+                message: Some(message),
+            },
+        );
+    }
+
     pub fn get_message(&self, digest: &Digest) -> Option<Message> {
         self.data.get(digest).and_then(|e| e.message.clone())
     }
