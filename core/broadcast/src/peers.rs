@@ -14,6 +14,7 @@ use lightning_interfaces::{ReceiverInterface, SenderInterface, SyncQueryRunnerIn
 use crate::ev::Topology;
 use crate::frame::{Digest, Frame};
 use crate::receivers::Receivers;
+use crate::stats::{ConnectionStats, Stats};
 use crate::tagged::{Tagged, Tagger};
 use crate::{Advr, MessageInternedId};
 
@@ -26,8 +27,8 @@ where
 {
     /// The id of our node.
     us: NodeIndex,
-    /// The stats we have have about different peers.
-    stats: StatsMap,
+    /// Our access to reporting stats.
+    stats: Stats,
     /// Map each public key to the info we have about that peer.
     peers: im::HashMap<NodePublicKey, Peer<S>>,
     /// The message queue from all the connections we have.
@@ -39,9 +40,7 @@ where
 }
 
 /// An interned id. But not from our interned table.
-type RemoteInternedId = MessageInternedId;
-
-type StatsMap = Arc<DashMap<NodeIndex, ConnectionStats, FxBuildHasher>>;
+pub type RemoteInternedId = MessageInternedId;
 
 struct Peer<S> {
     /// The index of the node.
@@ -101,24 +100,6 @@ pub enum ConnectionStatus {
     Closed,
 }
 
-/// A bunch of statistics that we gather from a peer throughout the life of the gossip.
-#[derive(Default, AddAssign)]
-pub struct ConnectionStats {
-    /// How many things have we advertised to this node.
-    pub advertisements_received_from_us: usize,
-    /// How many things has this peer advertised to us.
-    pub advertisements_received_from_peer: usize,
-    /// How many `WANT`s have we sent to this node.
-    pub wants_received_from_us: usize,
-    /// How many `WANT`s has this peer sent our way.
-    pub wants_received_from_peer: usize,
-    /// Valid messages sent by this node to us.
-    pub messages_received_from_peer: usize,
-    /// Number of messages we have received from this peer that
-    /// we did not continue propagating.
-    pub invalid_messages_received_from_peer: usize,
-}
-
 impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
     pub fn set_current_node_index(&mut self, index: NodeIndex) {
         self.us = index;
@@ -134,10 +115,13 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
                 return;
             }
 
-            *stats.entry(info.index).or_default() += ConnectionStats {
-                advertisements_received_from_us: 1,
-                ..Default::default()
-            };
+            stats.report(
+                info.index,
+                ConnectionStats {
+                    advertisements_received_from_us: 1,
+                    ..Default::default()
+                },
+            );
 
             tokio::spawn(async move {
                 // TODO(qti3e): Explore allowing to send raw buffers from here.
@@ -151,7 +135,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
     #[inline]
     fn for_each<F>(&self, closure: F)
     where
-        F: Fn(&StatsMap, (NodePublicKey, Peer<S>)) + Send + 'static,
+        F: Fn(&Stats, (NodePublicKey, Peer<S>)) + Send + 'static,
     {
         // Take a snapshot of the state. This is O(1).
         let state = self.peers.clone();
@@ -187,7 +171,6 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
             has: Default::default(),
         };
 
-        self.stats.entry(index).or_default();
         self.peers.insert(pk, info);
         self.incoming_messages.push(receiver);
     }
@@ -214,7 +197,6 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
             has: Default::default(),
         };
 
-        self.stats.entry(index).or_default();
         self.peers.insert(pk, info);
         self.incoming_messages.push(receiver);
     }
@@ -255,12 +237,23 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
         let info = self.peers.get(&pk)?;
 
         // Update the stats on what we got.
-        let mut stats = self.stats.get_mut(&info.index).unwrap();
-        match frame {
-            Frame::Advr(_) => stats.advertisements_received_from_peer += 1,
-            Frame::Want(_) => stats.wants_received_from_peer += 1,
-            Frame::Message(_) => stats.messages_received_from_peer += 1,
-        }
+        self.stats.report(
+            info.index,
+            match frame {
+                Frame::Advr(_) => ConnectionStats {
+                    advertisements_received_from_peer: 1,
+                    ..Default::default()
+                },
+                Frame::Want(_) => ConnectionStats {
+                    wants_received_from_peer: 1,
+                    ..Default::default()
+                },
+                Frame::Message(_) => ConnectionStats {
+                    messages_received_from_peer: 1,
+                    ..Default::default()
+                },
+            },
+        );
 
         match (info.status, frame) {
             (ConnectionStatus::Open, frame) => {

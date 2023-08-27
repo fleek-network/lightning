@@ -44,6 +44,7 @@ pub type Topology = Arc<Vec<Vec<NodePublicKey>>>;
 type S<C> = PoolSender<C, c![C::ConnectionPoolInterface], Frame>;
 type R<C> = PoolReceiver<C, c![C::ConnectionPoolInterface], Frame>;
 
+/// The execution context of the broadcast.
 pub struct Context<C: Collection> {
     /// Our database where we store what we have seen.
     db: Database,
@@ -121,18 +122,6 @@ impl<C: Collection> Context<C> {
         // TODO(qti3e)
     }
 
-    fn handle_advr(&mut self, sender: NodePublicKey, advr: Advr) {
-        // TODO(qti3e)
-    }
-
-    fn handle_want(&mut self, sender: NodePublicKey, req: Want) {
-        // TODO(qti3e)
-    }
-
-    fn handle_message(&mut self, sender: NodePublicKey, msg: Message) {
-        // TODO(qti3e)
-    }
-
     /// Handle a message sent from a user.
     fn handle_frame(&mut self, sender: NodePublicKey, frame: Frame) {
         match frame {
@@ -146,6 +135,19 @@ impl<C: Collection> Context<C> {
                 self.handle_message(sender, msg);
             },
         }
+    }
+
+    fn handle_advr(&mut self, sender: NodePublicKey, advr: Advr) {
+        // TODO(qti3e)
+    }
+
+    fn handle_want(&mut self, sender: NodePublicKey, req: Want) {
+        let id = req.interned_id;
+        // TODO(qti3e)
+    }
+
+    fn handle_message(&mut self, sender: NodePublicKey, msg: Message) {
+        // TODO(qti3e)
     }
 
     /// Handle a command sent from the mainland. Can be the broadcast object or
