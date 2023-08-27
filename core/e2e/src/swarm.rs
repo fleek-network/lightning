@@ -43,7 +43,7 @@ pub struct Swarm {
 
 impl Drop for Swarm {
     fn drop(&mut self) {
-        self.shutdown();
+        self.shutdown_internal();
     }
 }
 
@@ -57,9 +57,8 @@ impl Swarm {
         Ok(())
     }
 
-    pub fn shutdown(&self) {
-        self.nodes.values().for_each(|node| node.shutdown());
-        fs::remove_dir_all(&self.directory).expect("Failed to clean up swarm directory.");
+    pub fn shutdown(mut self) {
+        self.shutdown_internal();
     }
 
     pub fn get_rpc_addresses(&self) -> HashMap<NodePublicKey, String> {
@@ -67,6 +66,11 @@ impl Swarm {
             .iter()
             .map(|(pubkey, node)| (*pubkey, node.get_rpc_address()))
             .collect()
+    }
+
+    fn shutdown_internal(&mut self) {
+        self.nodes.values().for_each(|node| node.shutdown());
+        fs::remove_dir_all(&self.directory).expect("Failed to clean up swarm directory.");
     }
 }
 
