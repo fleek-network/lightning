@@ -78,7 +78,15 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
         let state = tmp.take().unwrap();
         let next_state = if let Status::Running { shutdown, handle } = state {
             let _ = shutdown.unwrap().send(());
-            let ctx = handle.await.expect("Failed to shutdown");
+            let ctx = match handle.await {
+                Ok(ctx) => ctx,
+                Err(e) => {
+                    if e.is_panic() {
+                        std::panic::resume_unwind(e.into_panic());
+                    }
+                    panic!("Failed to shutdown.");
+                },
+            };
             Status::NotRunning { ctx }
         } else {
             state

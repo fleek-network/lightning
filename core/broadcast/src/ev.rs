@@ -181,9 +181,7 @@ impl<C: Collection> Context<C> {
         }
     }
 
-    fn handle_advr(&mut self, sender: NodePublicKey, advr: Advr) {
-        // TODO(qti3e)
-    }
+    fn handle_advr(&mut self, sender: NodePublicKey, advr: Advr) {}
 
     fn handle_want(&mut self, sender: NodePublicKey, req: Want) {
         let id = req.interned_id;
