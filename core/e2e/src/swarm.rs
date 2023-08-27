@@ -43,8 +43,7 @@ pub struct Swarm {
 
 impl Drop for Swarm {
     fn drop(&mut self) {
-        self.nodes.values_mut().for_each(|node| node.shutdown());
-        fs::remove_dir_all(&self.directory).expect("Failed to clean up swarm directory.");
+        self.shutdown();
     }
 }
 
@@ -56,6 +55,11 @@ impl Swarm {
     pub async fn launch(&self) -> anyhow::Result<()> {
         try_join_all(self.nodes.values().map(|node| node.start())).await?;
         Ok(())
+    }
+
+    pub fn shutdown(&self) {
+        self.nodes.values().for_each(|node| node.shutdown());
+        fs::remove_dir_all(&self.directory).expect("Failed to clean up swarm directory.");
     }
 
     pub fn get_rpc_addresses(&self) -> HashMap<NodePublicKey, String> {

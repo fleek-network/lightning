@@ -17,13 +17,7 @@ pub struct Container<C: Collection> {
 
 impl<C: Collection> Drop for Container<C> {
     fn drop(&mut self) {
-        let handle = self.join_handle.take().unwrap();
-        let shutdown_notify = self.shutdown_notify.take().unwrap();
-        shutdown_notify.notify_one();
-        if let Err(e) = handle.join() {
-            eprintln!("we're here with error {:?}", e);
-            std::panic::resume_unwind(e);
-        }
+        self.shutdown();
     }
 }
 
@@ -73,6 +67,14 @@ impl<C: Collection> Container<C> {
             join_handle: Some(handle),
             shutdown_notify: Some(shutdown_notify),
             collection: PhantomData,
+        }
+    }
+
+    pub fn shutdown(&mut self) {
+        if let Some(handle) = self.join_handle.take() {
+            let shutdown_notify = self.shutdown_notify.take().unwrap();
+            shutdown_notify.notify_one();
+            handle.join().expect("Failed to shutdown container.");
         }
     }
 }

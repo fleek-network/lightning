@@ -141,5 +141,6 @@ async fn e2e_dht() -> Result<()> {
         assert_eq!(value.to_vec(), entry.value);
     }
     bootstrap_shutdown_notify.notify_one();
+    swarm.shutdown();
     Ok(())
 }

@@ -39,7 +39,9 @@ impl ContainerizedNode {
     }
 
     pub fn shutdown(&self) {
-        *self.container.lock().unwrap() = None;
+        if let Some(container) = &mut self.container.lock().unwrap().take() {
+            container.shutdown();
+        }
     }
 
     pub fn is_running(&self) -> bool {

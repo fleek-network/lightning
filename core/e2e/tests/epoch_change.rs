@@ -67,6 +67,7 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
             .expect("Failed to parse response.");
         assert_eq!(epoch, 1);
     }
+    swarm.shutdown();
     Ok(())
 }
 
