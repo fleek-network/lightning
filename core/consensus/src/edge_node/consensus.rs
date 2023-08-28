@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use lightning_interfaces::{PubSub, ToDigest};
+use log::info;
 use narwhal_config::Committee;
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
@@ -58,6 +59,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>>(
     execution: Arc<Execution<P>>,
     quorom_threshold: usize,
 ) {
+    info!("Edge node message worker is running");
     loop {
         tokio::select! {
             _ = shutdown_notify.notified() => {
@@ -66,6 +68,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>>(
             Some(msg) = pub_sub.recv() => {
                 match msg {
                     PubSubMsg::Transactions(parcel) => {
+                    info!("Received transaction parcel from gossip as an edge node");
                     // TODO(qti3e): The gossip recv should return the originator of the message
                     // so we can verify that it is a committee member here.
                     let parcel_digest = parcel.to_digest();
@@ -77,6 +80,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>>(
                     // Check if this ready to be committed
                 },
                 PubSubMsg::Attestation(att) => {
+                    info!("Received parcel attestation from gossip as an edge node");
                     // todo() when gossip reciever returns originator make sure this member is a
                     // committee member
 

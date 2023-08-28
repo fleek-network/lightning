@@ -316,7 +316,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
                     // `PairedSender/Receiver` this will result in the drop of receiver as well.
                     let sender = info.sender;
                     tokio::spawn(async move {
-                        tokio::time::sleep(Duration::from_secs(5));
+                        tokio::time::sleep(Duration::from_secs(60)).await;
                         log::trace!("dropping {sender:?}");
                         drop(sender);
                     });
@@ -325,7 +325,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
                     // For 5 second process messages coming from this new receiver anyway because
                     // the remote might be sending valuable information.
                     tokio::spawn(async move {
-                        tokio::time::sleep(Duration::from_secs(5));
+                        tokio::time::sleep(Duration::from_secs(60)).await;
                         log::trace!("dropping {sender:?}");
                         drop(sender);
                     });

@@ -135,7 +135,7 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
 //            .await
 //            .expect("Failed to parse response.");
 //        // TODO(matthias): add assert statement back
-//        //assert_eq!(epoch, 1);
+//        assert_eq!(epoch, 1);
 //        if epoch == 1 {
 //            count += 1;
 //        }

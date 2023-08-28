@@ -391,6 +391,7 @@ async fn main_loop<C: Collection>(
 
             // A command has been sent from the mainland. Process it.
             Some(command) = ctx.command_rx.recv() => {
+                log::trace!("received command in event loop");
                 ctx.handle_command(command);
             },
 

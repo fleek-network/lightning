@@ -162,6 +162,7 @@ impl<P: PubSub<PubSubMsg>> ExecutionState for Execution<P> {
 
             // Send out the transaction payload to application
             self.pub_sub.send(&parcel.into()).await;
+            info!("Send transaction parcel to broadcast as a validator");
 
             let attestation = CommitteeAttestation {
                 digest: parcel_digest,
@@ -169,6 +170,7 @@ impl<P: PubSub<PubSubMsg>> ExecutionState for Execution<P> {
             };
             // Send out that attestation that this payload is correct
             self.pub_sub.send(&attestation.into()).await;
+            info!("Send parcel attestation to broadcast as a validator");
 
             // Update our last digest proccesed
             self.inner.lock().unwrap().last_executed = Some(parcel_digest);
