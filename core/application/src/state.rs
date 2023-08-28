@@ -802,7 +802,7 @@ impl<B: Backend> State<B> {
         TransactionResponse::Success(ExecutionData::None)
     }
 
-    fn get_node_registry(&self) -> HashMap<NodeIndex, NodeInfo> {
+    fn get_node_registry(&self) -> BTreeMap<NodeIndex, NodeInfo> {
         let minimum_stake = self
             .parameters
             .get(&ProtocolParams::MinimumNodeStake)
@@ -1128,12 +1128,10 @@ impl<B: Backend> State<B> {
         let result = hasher.finalize();
         let mut seed = [0u8; 32];
         seed.copy_from_slice(&result.as_bytes()[0..32]);
-
         let mut rng: StdRng = SeedableRng::from_seed(seed);
-        let mut members = committee.members;
-        members.shuffle(&mut rng);
-
-        members
+        let mut node_registry: Vec<NodeIndex> = self.get_node_registry().keys().copied().collect();
+        node_registry.shuffle(&mut rng);
+        node_registry
             .into_iter()
             .take(committee_size.try_into().unwrap())
             .collect()

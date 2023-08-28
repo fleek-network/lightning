@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
@@ -182,7 +182,7 @@ async fn e2e_committee_change() -> Result<()> {
 async fn compare_committee(
     rpc_addresses: HashMap<NodePublicKey, String>,
     committee_size: usize,
-) -> HashSet<NodePublicKey> {
+) -> BTreeSet<NodePublicKey> {
     let request = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_committee_members",
@@ -195,7 +195,7 @@ async fn compare_committee(
     let response = rpc::rpc_request(rpc_addresses[0].1.clone(), request.to_string())
         .await
         .unwrap();
-    let target_committee: HashSet<NodePublicKey> =
+    let target_committee: BTreeSet<NodePublicKey> =
         rpc::parse_response::<Vec<NodePublicKey>>(response)
             .await
             .expect("Failed to parse response.")
@@ -212,11 +212,13 @@ async fn compare_committee(
         let response = rpc::rpc_request(address.clone(), request.to_string())
             .await
             .unwrap();
-        let committee: HashSet<NodePublicKey> = rpc::parse_response::<Vec<NodePublicKey>>(response)
-            .await
-            .expect("Failed to parse response.")
-            .into_iter()
-            .collect();
+        let committee: BTreeSet<NodePublicKey> =
+            rpc::parse_response::<Vec<NodePublicKey>>(response)
+                .await
+                .expect("Failed to parse response.")
+                .into_iter()
+                .collect();
+
         // Make sure all nodes have the same committee
         assert_eq!(target_committee, committee);
     }
