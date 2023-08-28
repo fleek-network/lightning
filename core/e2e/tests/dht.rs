@@ -38,7 +38,7 @@ async fn e2e_dht() -> Result<()> {
 
     let mut port_assigner = PortAssigner::default();
     let bootstrapper_port = port_assigner
-        .get_port(11001, 12000, Transport::Udp)
+        .get_port(10301, 10400, Transport::Udp)
         .expect("Failed to assign port");
 
     // Todo: get IP from application.
@@ -86,8 +86,8 @@ async fn e2e_dht() -> Result<()> {
     let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/dht").unwrap();
     let swarm = Swarm::builder()
         .with_directory(path)
-        .with_min_port(10201)
-        .with_max_port(10300)
+        .with_min_port(10301)
+        .with_max_port(10400)
         .with_num_nodes(4)
         .with_epoch_start(epoch_start)
         .with_bootstrappers(vec![Bootstrapper {

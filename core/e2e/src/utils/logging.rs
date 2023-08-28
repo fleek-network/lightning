@@ -41,7 +41,9 @@ pub fn setup() {
         .set_thread_padding(ThreadPadding::Right(4))
         .build();
 
-    CombinedLogger::init(vec![
+    // We swollow the result here because another e2e test might have already initialized the
+    // logger.
+    let _ = CombinedLogger::init(vec![
         TermLogger::new(
             log_filter,
             config.clone(),
@@ -49,6 +51,5 @@ pub fn setup() {
             ColorChoice::Auto,
         ),
         WriteLogger::new(LevelFilter::Trace, config, File::create(log_file).unwrap()),
-    ])
-    .unwrap();
+    ]);
 }

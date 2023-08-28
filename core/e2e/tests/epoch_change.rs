@@ -1,7 +1,8 @@
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
-use fleek_crypto::PublicKey;
+use fleek_crypto::NodePublicKey;
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::{logging, rpc};
 use resolved_pathbuf::ResolvedPathBuf;
@@ -75,6 +76,7 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
 }
 
 #[tokio::test]
+#[serial]
 async fn e2e_epoch_change_with_edge_node() -> Result<()> {
     logging::setup();
 
@@ -84,7 +86,7 @@ async fn e2e_epoch_change_with_edge_node() -> Result<()> {
         .unwrap()
         .as_millis() as u64;
 
-    let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/epoch-change").unwrap();
+    let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/epoch-change-edge-node").unwrap();
     let swarm = Swarm::builder()
         .with_directory(path)
         .with_min_port(10101)
@@ -126,8 +128,7 @@ async fn e2e_epoch_change_with_edge_node() -> Result<()> {
         "params":[],
         "id":1,
     });
-    let mut count = 0;
-    for (key, address) in swarm.get_rpc_addresses() {
+    for (_key, address) in swarm.get_rpc_addresses() {
         let response = rpc::rpc_request(address, request.to_string())
             .await
             .unwrap();
@@ -135,13 +136,89 @@ async fn e2e_epoch_change_with_edge_node() -> Result<()> {
         let epoch = rpc::parse_response::<u64>(response)
             .await
             .expect("Failed to parse response.");
-        // TODO(matthias): add assert statement back
         assert_eq!(epoch, 1);
-        if epoch == 1 {
-            count += 1;
-        }
-        println!("key: {}, epoch: {epoch}", key.to_base64());
     }
-    assert_eq!(count, swarm.get_rpc_addresses().len());
     Ok(())
+}
+
+#[tokio::test]
+#[serial]
+async fn e2e_committee_change() -> Result<()> {
+    logging::setup();
+
+    // Start epoch now and let it end in 40 seconds.
+    let epoch_start = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+
+    let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/committee-change").unwrap();
+    let committee_size = 4;
+    let swarm = Swarm::builder()
+        .with_directory(path)
+        .with_min_port(10201)
+        .with_max_port(10300)
+        .with_num_nodes(5)
+        .with_committee_size(committee_size)
+        .with_epoch_time(40000)
+        .with_epoch_start(epoch_start)
+        .build();
+    swarm.launch().await.unwrap();
+
+    // Wait a bit for the nodes to start.
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
+    // Get the committee from the first node.
+    compare_committee(swarm.get_rpc_addresses(), committee_size as usize).await;
+
+    // The epoch will change after 40 seconds, and we already waited 5 seconds.
+    // To give some time for the epoch change, we will wait another 30 seconds here.
+    tokio::time::sleep(Duration::from_secs(40)).await;
+
+    compare_committee(swarm.get_rpc_addresses(), committee_size as usize).await;
+    Ok(())
+}
+
+async fn compare_committee(
+    rpc_addresses: HashMap<NodePublicKey, String>,
+    committee_size: usize,
+) -> HashSet<NodePublicKey> {
+    let request = json!({
+        "jsonrpc": "2.0",
+        "method":"flk_get_committee_members",
+        "params":[],
+        "id":1,
+    });
+
+    let rpc_addresses: Vec<(NodePublicKey, String)> = rpc_addresses.into_iter().collect();
+
+    let response = rpc::rpc_request(rpc_addresses[0].1.clone(), request.to_string())
+        .await
+        .unwrap();
+    let target_committee: HashSet<NodePublicKey> =
+        rpc::parse_response::<Vec<NodePublicKey>>(response)
+            .await
+            .expect("Failed to parse response.")
+            .into_iter()
+            .collect();
+
+    // Make sure that the committee size equals the configured size.
+    assert_eq!(target_committee.len(), committee_size);
+
+    for (_, address) in rpc_addresses.iter() {
+        if &rpc_addresses[0].1 == address {
+            continue;
+        }
+        let response = rpc::rpc_request(address.clone(), request.to_string())
+            .await
+            .unwrap();
+        let committee: HashSet<NodePublicKey> = rpc::parse_response::<Vec<NodePublicKey>>(response)
+            .await
+            .expect("Failed to parse response.")
+            .into_iter()
+            .collect();
+        // Make sure all nodes have the same committee
+        assert_eq!(target_committee, committee);
+    }
+    target_committee
 }
