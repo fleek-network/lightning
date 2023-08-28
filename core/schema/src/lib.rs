@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod broadcast;
 pub mod dht;
+pub mod envelope;
 
 /// Any networking message that can be serialized and deserialized.
 pub trait LightningMessage: Sized + Send + Sync + 'static {
