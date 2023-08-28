@@ -1048,6 +1048,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake3-wasm"
+version = "0.1.0"
+dependencies = [
+ "blake3-tree",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
