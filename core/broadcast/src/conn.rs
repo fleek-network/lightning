@@ -1,8 +1,10 @@
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
+use derive_more::IsVariant;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::{ReceiverInterface, SenderInterface};
 use tokio::sync::oneshot;
@@ -53,6 +55,7 @@ pub struct PairedReceiver<R: ReceiverInterface<Frame>> {
     inner: PairedReceiverInner<R>,
 }
 
+#[derive(IsVariant)]
 enum PairedReceiverInner<R> {
     Dropped {
         pk: NodePublicKey,
@@ -67,6 +70,10 @@ impl<R: ReceiverInterface<Frame>> PairedReceiver<R> {
     /// Returns true if receiver and sender are meant to be a pair.
     pub fn is_receiver_of<S: SenderInterface<Frame>>(&self, sender: &PairedSender<S>) -> bool {
         self.tag == sender.inner.tag
+    }
+
+    pub fn tag(&self) -> usize {
+        self.tag
     }
 
     pub fn pk(&self) -> &NodePublicKey {
@@ -84,6 +91,7 @@ impl<R: ReceiverInterface<Frame>> PairedReceiver<R> {
 
         tokio::select! {
             _ = cancel_rx => {
+                log::trace!("got canceled");
                 let pk = *receiver.pk();
                 self.inner = PairedReceiverInner::Dropped { pk };
                 None
@@ -116,5 +124,23 @@ impl<S: SenderInterface<Frame>> Deref for PairedSender<S> {
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.inner.sender
+    }
+}
+
+impl<R: ReceiverInterface<Frame>> Debug for PairedReceiver<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "PairedReceiver[pk={},tag={},is_dropped={}]",
+            self.pk(),
+            self.tag(),
+            self.inner.is_dropped()
+        )
+    }
+}
+
+impl<S: SenderInterface<Frame>> Debug for PairedSender<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PairedSender[pk={},tag={}]", self.pk(), self.inner.tag)
     }
 }

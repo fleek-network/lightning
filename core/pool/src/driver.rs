@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use dashmap::DashMap;
-use fleek_crypto::{NodePublicKey, NodeSecretKey};
+use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
 use lightning_interfaces::schema::{AutoImplSerde, LightningMessage};
 use lightning_interfaces::types::ServiceScope;
 use lightning_interfaces::ReputationReporterInterface;
@@ -47,6 +47,8 @@ where
 
         connections.retain(|conn| conn.close_reason().is_none());
     }
+
+    log::debug!("stopping the listener drivier");
 }
 
 async fn handle_incoming_connection<R: ReputationReporterInterface>(
@@ -70,7 +72,7 @@ async fn handle_incoming_connection<R: ReputationReporterInterface>(
             .await
             .is_err()
         {
-            tracing::error!("listener dropped the channel");
+            log::error!("listener dropped the channel");
         }
     }
     Ok(())
@@ -121,10 +123,12 @@ async fn handle_new_outgoing_connection<R: ReputationReporterInterface>(
     // Report RTT observed during connection establishment.
     reporter.report_latency(&event.peer, connection.rtt());
 
-    handle_existing_outgoing_connection(connection, event).await
+    let us = secret_key.to_pk();
+    handle_existing_outgoing_connection(us, connection, event).await
 }
 
 async fn handle_existing_outgoing_connection(
+    pk: NodePublicKey,
     connection: Connection,
     event: ConnectEvent,
 ) -> Result<()> {
@@ -134,7 +138,7 @@ async fn handle_existing_outgoing_connection(
     let mut writer = Vec::with_capacity(75);
     LightningMessage::encode::<Vec<_>>(
         &StreamRequest {
-            source_peer: event.peer,
+            source_peer: pk,
             scope: event.scope,
         },
         writer.as_mut(),

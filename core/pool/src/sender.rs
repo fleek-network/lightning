@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -8,6 +8,7 @@ use futures_util::SinkExt;
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::SenderInterface;
 use quinn::SendStream;
+use tokio::sync::Mutex;
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 
 /// The sender on this stream.
@@ -48,7 +49,9 @@ where
 
     async fn send(&self, msg: T) -> bool {
         // See comment in sender about why we use locks.
-        let mut send = self.send.lock().unwrap().take().unwrap();
+        let mut guard = self.send.lock().await;
+
+        let mut send = guard.take().unwrap();
         let mut writer = Vec::new();
         let result = match msg.encode::<Vec<_>>(writer.as_mut()) {
             Ok(_) => {
@@ -58,7 +61,8 @@ where
             },
             Err(_) => false,
         };
-        self.send.lock().unwrap().replace(send);
+
+        *guard = Some(send);
         result
     }
 }

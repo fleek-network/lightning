@@ -119,6 +119,8 @@ impl<C: Collection> WithStartAndShutdown for ConnectionPool<C> {
         let endpoint = Endpoint::server(server_config, self.config.address).unwrap();
         self.endpoint.lock().unwrap().replace(endpoint.clone());
 
+        log::debug!("listening on {}", self.config.address);
+
         let listener_driver = ListenerDriver::new(
             self.active_scopes.clone(),
             endpoint.clone(),

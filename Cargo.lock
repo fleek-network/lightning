@@ -3837,6 +3837,7 @@ dependencies = [
  "futures-util",
  "infusion",
  "lightning-interfaces",
+ "log",
  "multiaddr",
  "quinn",
  "rcgen 0.11.1",

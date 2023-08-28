@@ -34,6 +34,7 @@ impl<R: ReceiverInterface<Frame>> Receivers<R> {
     /// Push a message receiver to the queue so we can listen for what they have to say.
     #[inline(always)]
     pub fn push(&mut self, receiver: PairedReceiver<R>) {
+        log::trace!("pushed {receiver:?}");
         let future = gen_fut(receiver);
         self.pending.push(future);
     }
@@ -54,6 +55,7 @@ impl<R: ReceiverInterface<Frame>> Receivers<R> {
 fn gen_fut<R: ReceiverInterface<Frame>>(mut r: PairedReceiver<R>) -> Fut<R> {
     Box::pin(async {
         let out = r.recv().await;
+        log::trace!("{r:?}: {out:?}");
         (r, out)
     })
 }

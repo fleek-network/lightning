@@ -100,6 +100,8 @@ where
             .parse()
             .ok()?;
 
+        log::debug!("connecting to {to} on {address}");
+
         self.connection_event_tx
             .send(ConnectEvent {
                 scope: self.scope,

@@ -30,34 +30,25 @@ pub fn setup() {
         date.format("%Y-%m-%d-%H:%M:%S")
     ));
 
+    let config = ConfigBuilder::new()
+        .add_filter_ignore_str("narwhal_consensus::bullshark")
+        .add_filter_ignore_str("anemo")
+        // remove the line below if you want to see narwhal logs
+        .add_filter_allow("lightning".to_string())
+        .set_location_level(LevelFilter::Error)
+        .set_thread_level(LevelFilter::Error)
+        .set_thread_mode(ThreadLogMode::Names)
+        .set_thread_padding(ThreadPadding::Right(4))
+        .build();
+
     CombinedLogger::init(vec![
         TermLogger::new(
             log_filter,
-            ConfigBuilder::new()
-                .add_filter_ignore_str("narwhal_consensus::bullshark")
-                .add_filter_ignore_str("anemo")
-                // remove the line below if you want to see narwhal logs
-                .add_filter_allow("lightning".to_string())
-                .set_location_level(LevelFilter::Error)
-                .set_thread_level(log_filter)
-                .set_thread_mode(ThreadLogMode::Names)
-                .set_thread_padding(ThreadPadding::Right(4))
-                .build(),
+            config.clone(),
             TerminalMode::Mixed,
             ColorChoice::Auto,
         ),
-        WriteLogger::new(
-            LevelFilter::Trace,
-            ConfigBuilder::new()
-                .add_filter_ignore_str("narwhal_consensus::bullshark")
-                .add_filter_ignore_str("anemo")
-                .set_location_level(LevelFilter::Error)
-                .set_thread_level(log_filter)
-                .set_thread_mode(ThreadLogMode::Names)
-                .set_thread_padding(ThreadPadding::Right(4))
-                .build(),
-            File::create(log_file).unwrap(),
-        ),
+        WriteLogger::new(LevelFilter::Trace, config, File::create(log_file).unwrap()),
     ])
     .unwrap();
 }

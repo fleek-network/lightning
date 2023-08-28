@@ -165,6 +165,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
     /// Send a `Frame::Message` to the specific node.
     // TODO(qti3e): Fix double serialization.
     pub fn send_message(&self, remote: &NodePublicKey, frame: Frame) {
+        log::trace!("sending want response to {remote}");
         debug_assert!(matches!(frame, Frame::Message(_)));
         let Some(info) = self.peers.get(remote) else {
             return;
@@ -182,6 +183,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
         remote: &NodePublicKey,
         remote_index: RemoteInternedId,
     ) -> bool {
+        log::trace!("sending want request to {remote} for {remote_index}");
         let Some(info) = self.peers.get(remote) else {
             return false;
         };
@@ -254,7 +256,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
         }
     }
 
-    pub async fn handle_new_connection(
+    pub fn handle_new_connection(
         &mut self,
         origin: ConnectionOrigin,
         index: NodeIndex,
@@ -315,6 +317,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
                     let sender = info.sender;
                     tokio::spawn(async move {
                         tokio::time::sleep(Duration::from_secs(5));
+                        log::trace!("dropping {sender:?}");
                         drop(sender);
                     });
                 },
@@ -323,6 +326,7 @@ impl<S: SenderInterface<Frame>, R: ReceiverInterface<Frame>> Peers<S, R> {
                     // the remote might be sending valuable information.
                     tokio::spawn(async move {
                         tokio::time::sleep(Duration::from_secs(5));
+                        log::trace!("dropping {sender:?}");
                         drop(sender);
                     });
                     self.incoming_messages.push(receiver);

@@ -151,6 +151,11 @@ impl<C: Collection> Context<C> {
         self.peers.unpin_all();
 
         for pk in new_topology.iter().flatten().copied() {
+            if pk == self.pk {
+                log::error!("topology contained current node");
+                continue;
+            }
+
             self.peers.pin_peer(pk);
 
             if self.peers.get_connection_status(&pk) != ConnectionStatus::Closed {
@@ -162,10 +167,12 @@ impl<C: Collection> Context<C> {
             let tx = self.new_outgoing_connection_tx.clone();
             let connector = self.connector.clone();
             tokio::spawn(async move {
+                log::trace!("connecting to {pk}");
                 let Some((sender, receiver)) = connector.connect(&pk).await else {
                     return;
                 };
 
+                log::trace!("connected to {pk}");
                 tx.send((sender, receiver));
             });
         }
@@ -195,6 +202,7 @@ impl<C: Collection> Context<C> {
 
         // If we have already propagated a message we really don't care about it anymore.
         if self.db.is_propagated(&digest) {
+            log::trace!("skipping {digest:?}");
             return;
         }
 
@@ -222,9 +230,14 @@ impl<C: Collection> Context<C> {
     }
 
     fn handle_want(&mut self, sender: NodePublicKey, req: Want) {
+        log::trace!("got want from {sender} for {}", req.interned_id);
         let id = req.interned_id;
-        let Some(digest) = self.interner.get(id) else { return; };
-        let Some(message) = self.db.get_message(digest) else { return; };
+        let Some(digest) = self.interner.get(id) else {
+            log::trace!("invalid interned id {id}");
+            return; };
+        let Some(message) = self.db.get_message(digest) else {
+            log::trace!("failed to find message");
+            return; };
         self.peers.send_message(&sender, Frame::Message(message));
     }
 
@@ -349,6 +362,8 @@ async fn main_loop<C: Collection>(
     // Subscribe to the changes from the topology.
     let mut topology_subscriber =
         spawn_topology_subscriber::<C>(ctx.notifier.clone(), ctx.topology.clone());
+
+    log::info!("starting broadcast for {}", ctx.pk);
 
     // Provide the peers list with the index of our current node. It will need it
     // for resolving connection ordering disputes.

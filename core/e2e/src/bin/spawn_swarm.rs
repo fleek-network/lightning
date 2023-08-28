@@ -10,7 +10,7 @@ use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
 use lightning_dht::dht::{Builder as DhtBuilder, Dht};
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::networking::{PortAssigner, Transport};
-use lightning_e2e::utils::shutdown;
+use lightning_e2e::utils::{logging, shutdown};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{partial, WithStartAndShutdown};
 use lightning_topology::Topology;
@@ -30,6 +30,10 @@ struct Cli {
     #[arg(short, long, default_value_t = 4)]
     num_nodes: usize,
 
+    /// Number of committee members.
+    #[arg(short, long, default_value_t = 4)]
+    committee_size: usize,
+
     /// Epoch duration in millis
     #[arg(short, long, default_value_t = 60000)]
     epoch_time: u64,
@@ -37,7 +41,13 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    logging::setup();
+
     let args = Cli::parse();
+
+    if args.committee_size > args.num_nodes {
+        panic!("Committee size can not be larger than number of nodes.")
+    }
 
     // Start bootstrapper
     let mut port_assigner = PortAssigner::default();
@@ -95,6 +105,7 @@ async fn main() -> Result<()> {
         .with_min_port(12001)
         .with_max_port(13000)
         .with_num_nodes(args.num_nodes)
+        .with_committee_size(args.committee_size as u64)
         .with_epoch_time(args.epoch_time)
         .with_epoch_start(epoch_start)
         .with_bootstrappers(vec![Bootstrapper {
