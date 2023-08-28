@@ -36,6 +36,8 @@ pub fn setup() {
             ConfigBuilder::new()
                 .add_filter_ignore_str("narwhal_consensus::bullshark")
                 .add_filter_ignore_str("anemo")
+                // remove the line below if you want to see narwhal logs
+                .add_filter_allow("lightning".to_string())
                 .set_location_level(LevelFilter::Error)
                 .set_thread_level(log_filter)
                 .set_thread_mode(ThreadLogMode::Names)
