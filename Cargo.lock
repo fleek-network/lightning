@@ -3546,6 +3546,7 @@ dependencies = [
  "lightning-notifier",
  "lightning-signer",
  "lightning-topology",
+ "log",
  "mini-moka",
  "mock",
  "serde",
@@ -3627,8 +3628,8 @@ name = "lightning-e2e"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap 4.3.17",
- "env_logger 0.10.0",
  "fleek-crypto",
  "futures",
  "hp-fixed",
@@ -3644,6 +3645,7 @@ dependencies = [
  "lightning-rpc",
  "lightning-signer",
  "lightning-topology",
+ "log",
  "mock",
  "rand 0.8.5",
  "reqwest",
@@ -3652,6 +3654,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serial_test",
+ "simplelog",
  "tokio",
  "toml 0.7.6",
 ]

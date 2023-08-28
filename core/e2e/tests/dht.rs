@@ -9,7 +9,7 @@ use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
 use lightning_dht::dht::{Builder as DhtBuilder, Dht};
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::networking::{PortAssigner, Transport};
-use lightning_e2e::utils::rpc;
+use lightning_e2e::utils::{logging, rpc};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::TableEntry;
 use lightning_interfaces::{partial, Blake3Hash, WithStartAndShutdown};
@@ -28,6 +28,8 @@ partial!(PartialBinding {
 #[tokio::test]
 #[serial]
 async fn e2e_dht() -> Result<()> {
+    logging::setup();
+
     // Start epoch now and let it end in 20 seconds.
     let epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)

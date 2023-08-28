@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
 use lightning_e2e::swarm::Swarm;
-use lightning_e2e::utils::rpc;
+use lightning_e2e::utils::{logging, rpc};
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
 use serial_test::serial;
@@ -10,6 +10,8 @@ use serial_test::serial;
 #[tokio::test]
 #[serial]
 async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
+    logging::setup();
+
     // Start epoch now and let it end in 40 seconds.
     let epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -73,7 +75,8 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
 
 //#[tokio::test]
 //async fn e2e_epoch_change_x() -> Result<()> {
-//    env_logger::init();
+//    logging::setup();
+//
 //    // Start epoch now and let it end in 40 seconds.
 //    let epoch_start = SystemTime::now()
 //        .duration_since(SystemTime::UNIX_EPOCH)
