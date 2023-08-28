@@ -158,6 +158,11 @@ impl<C: Collection> Context<C> {
 
             self.peers.pin_peer(pk);
 
+            let Some(index) = self.get_node_index(&pk) else { continue };
+            if self.current_node_index > index {
+                continue;
+            }
+
             if self.peers.get_connection_status(&pk) != ConnectionStatus::Closed {
                 // TODO(qti3e): Should we maybe handle == ConnectionStatus::Open
                 // instead.
