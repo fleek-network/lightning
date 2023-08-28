@@ -4,12 +4,10 @@ use std::time::Duration;
 
 use anyhow::Result;
 use dashmap::DashMap;
-use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
-use lightning_interfaces::schema::{AutoImplSerde, LightningMessage};
+use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use lightning_interfaces::types::ServiceScope;
 use lightning_interfaces::ReputationReporterInterface;
 use quinn::{ClientConfig, Connection, Endpoint, TransportConfig};
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Receiver;
 
 use crate::connector::ConnectEvent;
@@ -58,17 +56,27 @@ async fn handle_incoming_connection<R: ReputationReporterInterface>(
 ) -> Result<()> {
     let (tx, mut rx) = connection.accept_bi().await?;
 
-    let mut data = vec![0; 75];
-    rx.read_exact(&mut data).await?;
-    let message: StreamRequest = StreamRequest::decode(&data)?;
+    let chain = connection
+        .peer_identity()
+        .expect("TLS handshake was successful")
+        .downcast::<Vec<rustls::Certificate>>()
+        .expect("TLS handshake was successful");
+    let certificate = chain.first().expect("TLS handshake was successful");
+    let source_peer = tls::parse_unverified(certificate.as_ref())
+        .expect("TLS handshake was successful")
+        .peer_pk();
+
+    let mut buf = vec![0; 4];
+    rx.read_exact(&mut buf).await?;
+    let scope: ServiceScope = bincode::deserialize(&buf)?;
 
     // Report RTT observed during connection establishment.
-    reporter.report_latency(&message.source_peer, connection.rtt());
+    reporter.report_latency(&source_peer, connection.rtt());
 
-    if let Some(handle) = handles.get(&message.scope) {
+    if let Some(handle) = handles.get(&scope) {
         if handle
             .listener_tx
-            .send((message.source_peer, tx, rx))
+            .send((source_peer, tx, rx))
             .await
             .is_err()
         {
@@ -123,27 +131,16 @@ async fn handle_new_outgoing_connection<R: ReputationReporterInterface>(
     // Report RTT observed during connection establishment.
     reporter.report_latency(&event.peer, connection.rtt());
 
-    let us = secret_key.to_pk();
-    handle_existing_outgoing_connection(us, connection, event).await
+    handle_existing_outgoing_connection(connection, event).await
 }
 
 async fn handle_existing_outgoing_connection(
-    pk: NodePublicKey,
     connection: Connection,
     event: ConnectEvent,
 ) -> Result<()> {
     let (mut tx, rx) = connection.open_bi().await?;
-
-    // size of the stream request struct
-    let mut writer = Vec::with_capacity(75);
-    LightningMessage::encode::<Vec<_>>(
-        &StreamRequest {
-            source_peer: pk,
-            scope: event.scope,
-        },
-        writer.as_mut(),
-    )?;
-    let _ = tx.write(writer.as_mut()).await?;
+    let serialized_scope = bincode::serialize(&event.scope)?;
+    let _ = tx.write(serialized_scope.as_slice()).await?;
 
     if event.respond.send((tx, rx)).is_err() {
         tracing::error!("connector dropped the channel");
@@ -205,12 +202,3 @@ impl<R: ReputationReporterInterface> ConnectorDriver<R> {
         }
     }
 }
-
-/// Request use for establishing new stream connection.
-#[derive(Deserialize, Serialize)]
-pub struct StreamRequest {
-    scope: ServiceScope,
-    source_peer: NodePublicKey,
-}
-
-impl AutoImplSerde for StreamRequest {}

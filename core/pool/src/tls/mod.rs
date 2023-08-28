@@ -8,6 +8,7 @@ mod verifier;
 
 use std::sync::Arc;
 
+pub use certificate::parse_unverified;
 use fleek_crypto::{NodePublicKey, NodeSecretKey};
 
 const LIGHTNING_ALPN: &[u8] = b"fleek/lightning";
