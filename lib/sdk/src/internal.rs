@@ -17,23 +17,27 @@ pub struct OnStartArgs {
     pub block_store_path: PathBuf,
 }
 
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct OnConnectedArgs {
     pub connection_id: u64,
     pub client: ClientPublicKey,
 }
 
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct OnDisconnectedArgs {
     pub connection_id: u64,
 }
 
+#[derive(Clone, Debug)]
 #[repr(C)]
 pub struct OnMessageArgs {
-    pub session_id: u64,
+    pub connection_id: u64,
     pub payload: Vec<u8>,
 }
 
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct OnEventResponseArgs {
     pub request_id: RequestId,
