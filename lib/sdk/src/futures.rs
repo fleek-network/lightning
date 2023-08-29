@@ -72,5 +72,3 @@ pub(crate) fn future_callback(ctx: RequestCtx, response: Response) {
 pub struct RequestCtx(*const ());
 unsafe impl Send for RequestCtx {}
 unsafe impl Sync for RequestCtx {}
-
-pub fn spawn() {}

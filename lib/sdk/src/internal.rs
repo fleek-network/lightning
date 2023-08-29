@@ -6,11 +6,11 @@ use fleek_crypto::ClientPublicKey;
 use crate::futures::RequestCtx;
 use crate::ReqRes;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 #[repr(C)]
 pub struct IpcRequest {
     /// A pointer to the request context.
-    pub request_ctx: RequestCtx,
+    pub request_ctx: Option<RequestCtx>,
     /// The request to be processed by core.
     pub request: Request,
 }
@@ -53,6 +53,15 @@ pub struct OnEventResponseArgs {
 }
 
 ReqRes! {
+    ConnectionClose {
+        connection_id: u64
+        =>
+    },
+    ConnectionSendData {
+        connection_id: u64,
+        buffer: Vec<u8>
+        =>
+    },
     /// Query a client's balance.
     QueryClientBalance {
         /// The public key of the user that we want their balance.
@@ -68,5 +77,5 @@ ReqRes! {
         =>
         /// Returns true if the fetch succeeded.
         succeeded: bool
-    }
+    },
 }
