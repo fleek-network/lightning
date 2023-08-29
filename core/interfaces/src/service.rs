@@ -1,12 +1,21 @@
+use fn_sdk::internal::{
+    OnConnectedArgs,
+    OnDisconnectedArgs,
+    OnEventResponseArgs,
+    OnMessageArgs,
+    OnStartArgs,
+};
+
 use crate::infu_collection::Collection;
 use crate::types::ServiceId;
 use crate::{ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown};
 
 pub struct Service {
-    pub on_start: Box<dyn Fn()>,
-    pub on_open: Box<dyn Fn()>,
-    pub on_close: Box<dyn Fn()>,
-    pub on_message: Box<dyn Fn()>,
+    pub start: fn(OnStartArgs),
+    pub connected: fn(OnConnectedArgs),
+    pub disconnected: fn(OnDisconnectedArgs),
+    pub message: fn(OnMessageArgs),
+    pub respond: fn(OnEventResponseArgs),
 }
 
 #[infusion::service]

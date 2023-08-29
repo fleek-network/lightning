@@ -8,11 +8,12 @@ pub struct ServiceExecutor<C: Collection> {
 
 #[test]
 fn x() {
-    unsafe {
-        let lib =
-            libloading::Library::new("../../target/release/libfleek_service_ping_example.dylib")
-                .unwrap();
-        let func: libloading::Symbol<unsafe extern "C" fn() -> u32> = lib.get(b"my_func").unwrap();
-        println!("{}", func());
-    }
+    use lightning_interfaces::Service;
+    let _x = Service {
+        start: fleek_service_ping_example::on_start,
+        connected: fleek_service_ping_example::on_connected,
+        disconnected: fleek_service_ping_example::on_disconnected,
+        message: fleek_service_ping_example::on_message,
+        respond: fleek_service_ping_example::on_event_response,
+    };
 }

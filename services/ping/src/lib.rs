@@ -1,18 +1,23 @@
 //! This is meant to turn into a *very dumb* service to experiment with service loading.
+use fn_sdk::internal::{
+    OnConnectedArgs,
+    OnDisconnectedArgs,
+    OnEventResponseArgs,
+    OnMessageArgs,
+    OnStartArgs,
+};
 
 #[no_mangle]
-pub fn on_start() {}
+pub fn on_start(_args: OnStartArgs) {}
 
 #[no_mangle]
-pub fn on_message() {}
+pub fn on_message(_args: OnMessageArgs) {}
 
 #[no_mangle]
-pub fn on_connected() {}
+pub fn on_connected(_args: OnConnectedArgs) {}
 
 #[no_mangle]
-pub fn on_disconnected() {}
+pub fn on_disconnected(_args: OnDisconnectedArgs) {}
 
 #[no_mangle]
-pub fn my_func() -> u32 {
-    17
-}
+pub fn on_event_response(_args: OnEventResponseArgs) {}

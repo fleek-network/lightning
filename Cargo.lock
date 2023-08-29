@@ -1353,7 +1353,7 @@ checksum = "c688fc74432808e3eb684cae8830a86be1d66a2bd58e1f248ed0960a590baf6f"
 dependencies = [
  "glob",
  "libc",
- "libloading 0.7.4",
+ "libloading",
 ]
 
 [[package]]
@@ -2133,7 +2133,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330c60081dcc4c72131f8eb70510f1ac07223e5d4163db481a04a0befcffa412"
 dependencies = [
- "libloading 0.7.4",
+ "libloading",
 ]
 
 [[package]]
@@ -2539,6 +2539,9 @@ dependencies = [
 [[package]]
 name = "fleek-service-ping-example"
 version = "0.1.0"
+dependencies = [
+ "fn-sdk",
+]
 
 [[package]]
 name = "flexbuffers"
@@ -2571,6 +2574,10 @@ checksum = "7bad48618fdb549078c333a7a8528acb57af271d0433bdecd523eb620628364e"
 [[package]]
 name = "fn-sdk"
 version = "0.0.0"
+dependencies = [
+ "derive_more",
+ "fleek-crypto",
+]
 
 [[package]]
 name = "fn-sdk-macros"
@@ -3459,16 +3466,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libloading"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d580318f95776505201b28cf98eb1fa5e4be3b689633ba6a3e6cd880ff22d8cb"
-dependencies = [
- "cfg-if",
- "windows-sys 0.48.0",
-]
-
-[[package]]
 name = "libm"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3715,6 +3712,7 @@ dependencies = [
  "blake3-tree",
  "bytes",
  "fleek-crypto",
+ "fn-sdk",
  "hp-fixed",
  "infusion",
  "ink-quill",
@@ -6882,7 +6880,7 @@ dependencies = [
 name = "service-executor"
 version = "0.1.0"
 dependencies = [
- "libloading 0.8.0",
+ "fleek-service-ping-example",
  "lightning-interfaces",
 ]
 

@@ -7,4 +7,6 @@ edition.workspace = true
 
 [dependencies]
 lightning-interfaces = { path = "../interfaces/" }
-libloading = "0.8.0"
+
+# Built-in services
+fleek-service-ping-example = { path = "../../services/ping" }
