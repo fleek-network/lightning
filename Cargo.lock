@@ -5428,6 +5428,7 @@ name = "netkit"
 version = "0.0.0"
 dependencies = [
  "fleek-crypto",
+ "futures",
  "quinn",
  "tokio",
 ]
