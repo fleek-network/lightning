@@ -230,6 +230,7 @@ impl<C: Collection> Context<C> {
         // wanna see the message and therefore we send out the want request.
         if new_digest {
             self.peers.send_want_request(&sender, advr.interned_id);
+            self.pending_store.insert_request(sender, index);
         }
 
         // Remember the mapping since we may need it.
@@ -237,7 +238,7 @@ impl<C: Collection> Context<C> {
             .insert_index_mapping(&sender, index, advr.interned_id);
 
         // Handle the case for non-first advr.
-        self.pending_store.insert(sender, index);
+        self.pending_store.insert_pending(sender, index);
     }
 
     fn handle_want(&mut self, sender: NodePublicKey, req: Want) {
@@ -264,7 +265,7 @@ impl<C: Collection> Context<C> {
 
         let digest = msg.to_digest();
 
-        if self.db.get_id(&digest).is_none() {
+        let Some(id) = self.db.get_id(&digest) else {
             // We got a message without being advertised first. Although we can technically
             // accept the message. It is against the protocol. We should report.
             //
@@ -280,8 +281,7 @@ impl<C: Collection> Context<C> {
                 },
             );
             return;
-        }
-        let id = self.db.get_id(&digest).unwrap();
+        };
 
         if !origin_pk.verify(&msg.signature, &digest) {
             let index = self.get_node_index(&sender).unwrap();

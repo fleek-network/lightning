@@ -34,11 +34,19 @@ pub struct PendingStore {
 }
 
 impl PendingStore {
-    pub fn insert(&mut self, node: NodePublicKey, interned_id: MessageInternedId) {
+    pub fn insert_pending(&mut self, node: NodePublicKey, interned_id: MessageInternedId) {
         self.pending_map
             .entry(interned_id)
             .or_default()
             .insert(node);
+    }
+
+    pub fn insert_request(&mut self, node: NodePublicKey, interned_id: MessageInternedId) {
+        let mut requests = self.request_map.entry(interned_id).or_default();
+        if requests.len() >= BUFFER_SIZE {
+            requests.pop_front();
+        }
+        requests.push_back(PendingRequest::new(node));
     }
 
     pub async fn tick(&mut self) -> Vec<(MessageInternedId, NodePublicKey)> {
@@ -100,13 +108,9 @@ impl PendingStore {
                 })
                 .collect();
             // Mark the messages as requested if there are any.
-            pending_req.iter().for_each(|(id, pub_key)| {
-                let mut requests = self.request_map.entry(*id).or_default();
-                if requests.len() >= BUFFER_SIZE {
-                    requests.pop_front();
-                }
-                requests.push_back(PendingRequest::new(*pub_key))
-            });
+            pending_req
+                .iter()
+                .for_each(|(id, pub_key)| self.insert_request(*pub_key, *id));
             if !pending_req.is_empty() {
                 return pending_req;
             }
