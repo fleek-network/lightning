@@ -1,4 +1,5 @@
 use std::collections::{BTreeSet, HashMap};
+use std::fs;
 use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
@@ -21,6 +22,9 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
         .as_millis() as u64;
 
     let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/epoch-change-committee").unwrap();
+    if path.exists() {
+        fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
+    }
     let swarm = Swarm::builder()
         .with_directory(path)
         .with_min_port(10000)
@@ -87,6 +91,9 @@ async fn e2e_epoch_change_with_edge_node() -> Result<()> {
         .as_millis() as u64;
 
     let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/epoch-change-edge-node").unwrap();
+    if path.exists() {
+        fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
+    }
     let swarm = Swarm::builder()
         .with_directory(path)
         .with_min_port(10101)
@@ -153,6 +160,10 @@ async fn e2e_committee_change() -> Result<()> {
         .as_millis() as u64;
 
     let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/committee-change").unwrap();
+    if path.exists() {
+        fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
+    }
+
     let committee_size = 4;
     let swarm = Swarm::builder()
         .with_directory(path)

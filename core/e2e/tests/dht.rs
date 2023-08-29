@@ -1,6 +1,6 @@
 use std::sync::Arc;
-use std::thread;
 use std::time::{Duration, SystemTime};
+use std::{fs, thread};
 
 use anyhow::Result;
 use fleek_crypto::{NodeSecretKey, SecretKey};
@@ -84,6 +84,9 @@ async fn e2e_dht() -> Result<()> {
     bootstrap_ready.notified().await;
 
     let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/dht").unwrap();
+    if path.exists() {
+        fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
+    }
     let swarm = Swarm::builder()
         .with_directory(path)
         .with_min_port(10301)
