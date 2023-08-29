@@ -5427,10 +5427,12 @@ dependencies = [
 name = "netkit"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "fleek-crypto",
  "futures",
  "quinn",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
