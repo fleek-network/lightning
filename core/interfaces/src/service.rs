@@ -43,4 +43,7 @@ pub trait ServiceHandleInterface: Clone + Send + Sync + 'static {
     fn connected(&self, args: OnConnectedArgs);
     fn disconnected(&self, args: OnDisconnectedArgs);
     fn message(&self, args: OnMessageArgs);
+
+    /// Return a pending message that should be sent out from the service.
+    fn poll(&self, waker: std::task::Waker) -> std::task::Poll<(u64, Vec<u8>)>;
 }
