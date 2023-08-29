@@ -10,3 +10,4 @@ infusion-proc = { path = "../infusion-proc/" }
 indexmap = "2.0.0"
 serde = { version = "1.0", features=["derive"]}
 paste = "1.0"
+log = "0.4"

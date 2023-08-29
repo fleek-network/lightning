@@ -36,6 +36,8 @@ impl Container {
 
     /// Initialize the container based on the provided dependency graph.
     pub fn initialize(mut self, graph: DependencyGraph) -> Result<Self, InitializationError> {
+        log::trace!("initializing container");
+
         // Step 1: Ensure that every input type has been provided.
         for tag in graph.get_inputs() {
             if !self.objects.contains_key(tag) {
@@ -48,6 +50,8 @@ impl Container {
         let sorted = graph.sort().map_err(InitializationError::CycleFound)?;
 
         for tag in &sorted {
+            log::trace!("initializing {tag:?}");
+
             if self.objects.contains_key(tag) {
                 // If the object is already initialized before skip it.
                 // This can happen if a project has several collections (unlikely,
@@ -64,6 +68,7 @@ impl Container {
         }
 
         for tag in sorted {
+            log::trace!("running post-init for {tag:?}");
             let vtable = graph.vtables.get(&tag).unwrap();
 
             // We can not hold a mutable reference to self and pass &self to the
@@ -79,8 +84,12 @@ impl Container {
             self.objects.insert(tag, object);
         }
 
+        log::trace!("post initing possible inputs");
+
         // Run the `post_initialization` for the input types.
         for tag in graph.get_inputs() {
+            log::trace!("running post-init for {tag:?}");
+
             let vtable = graph.vtables.get(tag).unwrap();
             let mut object = self.objects.remove(tag).unwrap();
             vtable.post(&mut object, &self);
