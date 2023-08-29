@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use std::net::SocketAddr;
 use std::path::Path;
-use std::str::FromStr;
 
 use fleek_crypto::{
     AccountOwnerSecretKey,
@@ -22,7 +20,6 @@ use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
 use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
 use lightning_dht::dht::Dht;
-use lightning_handshake::server::{HandshakeServer, HandshakeServerConfig};
 use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
@@ -272,10 +269,6 @@ fn build_config(
     config.inject::<Dht<FinalTypes>>(DhtConfig {
         address: format!("127.0.0.1:{}", ports.dht).parse().unwrap(),
         bootstrappers,
-    });
-
-    config.inject::<HandshakeServer<FinalTypes>>(HandshakeServerConfig {
-        websocket_address: SocketAddr::from_str(&format!("127.0.0.1:{}", ports.handshake)).unwrap(),
     });
 
     config.inject::<Signer<FinalTypes>>(SignerConfig {

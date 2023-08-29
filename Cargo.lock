@@ -2499,27 +2499,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fleek-cdn"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "arrayref",
- "arrayvec",
- "async-trait",
- "blake3-tree",
- "bytes",
- "criterion 0.4.0",
- "fleek-crypto",
- "futures",
- "lightning-handshake",
- "lightning-interfaces",
- "lightning-test-utils",
- "rand 0.8.5",
- "serde",
- "tokio",
-]
-
-[[package]]
 name = "fleek-crypto"
 version = "0.0.0"
 dependencies = [
