@@ -7,6 +7,7 @@
 //! the entire thing in a central event loop.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
 use infusion::c;
@@ -35,6 +36,7 @@ use crate::db::Database;
 use crate::frame::Frame;
 use crate::interner::Interner;
 use crate::peers::{ConnectionOrigin, ConnectionStatus, Peers};
+use crate::pending::PendingStore;
 use crate::recv_buffer::RecvBuffer;
 use crate::ring::MessageRing;
 use crate::stats::{ConnectionStats, Stats};
@@ -68,6 +70,8 @@ pub struct Context<C: Collection> {
     command_tx: CommandSender,
     /// Receiving end of the commands.
     command_rx: CommandReceiver,
+    // Pending store.
+    pending_store: PendingStore,
     sqr: c![C::ApplicationInterface::SyncExecutor],
     notifier: c![C::NotifierInterface],
     topology: c![C::TopologyInterface],
@@ -107,6 +111,7 @@ impl<C: Collection> Context<C> {
             new_outgoing_connection_rx,
             command_tx,
             command_rx,
+            pending_store: PendingStore::default(),
             sqr,
             notifier,
             topology,
@@ -231,7 +236,8 @@ impl<C: Collection> Context<C> {
         self.peers
             .insert_index_mapping(&sender, index, advr.interned_id);
 
-        // TODO: Handle the case for non-first advr.
+        // Handle the case for non-first advr.
+        self.pending_store.insert(sender, index);
     }
 
     fn handle_want(&mut self, sender: NodePublicKey, req: Want) {
@@ -275,6 +281,7 @@ impl<C: Collection> Context<C> {
             );
             return;
         }
+        let id = self.db.get_id(&digest).unwrap();
 
         if !origin_pk.verify(&msg.signature, &digest) {
             let index = self.get_node_index(&sender).unwrap();
@@ -296,6 +303,8 @@ impl<C: Collection> Context<C> {
             payload: msg.payload.into(),
         };
 
+        // Mark message as received for RTT measurements.
+        self.pending_store.received_message(sender, id);
         self.incoming_messages[topic_index].insert(shared);
     }
 
@@ -350,6 +359,9 @@ impl<C: Collection> Context<C> {
         // advertisements of this message.
         self.db.mark_propagated(&digest);
 
+        // Remove the received message from the pending store.
+        self.pending_store.remove_message(id);
+
         // Continue with advertising this message to the connected peers.
         self.peers.advertise(id, digest);
     }
@@ -386,7 +398,7 @@ async fn main_loop<C: Collection>(
         tokio::select! {
             // We kind of care about the priority of these events. Or do we?
             // TODO(qti3e): Evaluate this.
-            // biased;
+            biased;
 
             // Prioritize the shutdown signal over everything.
             _ = &mut shutdown => {
@@ -430,6 +442,15 @@ async fn main_loop<C: Collection>(
                 };
                 ctx.peers.handle_new_connection(ConnectionOrigin::Remote , index, conn);
             },
+            requests = ctx.pending_store.tick() => {
+                requests.into_iter().for_each(|(interned_id, pub_key)| {
+                    if let Some(remote_index) = ctx.peers.get_index_mapping(&pub_key, interned_id) {
+                        ctx.peers.send_want_request(&pub_key, remote_index);
+                    } else {
+                        log::warn!("Remote index not found for pending request");
+                    }
+                });
+            }
         }
     }
 

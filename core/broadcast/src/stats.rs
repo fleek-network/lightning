@@ -37,3 +37,39 @@ impl Stats {
         *self.inner.entry(peer).or_default() += stats;
     }
 }
+
+pub struct FusedTa<T, I: ta::Next<T>> {
+    current: Option<I::Output>,
+    inner: I,
+}
+
+impl<T, I: ta::Next<T>> FusedTa<T, I>
+where
+    I::Output: Copy,
+{
+    pub fn current(&self) -> Option<I::Output> {
+        self.current
+    }
+}
+
+impl<T, I: ta::Next<T>> ta::Next<T> for FusedTa<T, I>
+where
+    I::Output: Copy,
+{
+    type Output = I::Output;
+
+    fn next(&mut self, input: T) -> Self::Output {
+        let current = self.inner.next(input);
+        self.current = Some(current);
+        current
+    }
+}
+
+impl<T, I: ta::Next<T>> From<I> for FusedTa<T, I> {
+    fn from(value: I) -> Self {
+        Self {
+            current: None,
+            inner: value,
+        }
+    }
+}

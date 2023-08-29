@@ -1,18 +1,153 @@
+use std::collections::VecDeque;
+use std::time::{Duration, Instant};
+
 use fleek_crypto::NodePublicKey;
 use fxhash::{FxHashMap, FxHashSet};
+use rand::distributions::WeightedIndex;
+use rand::prelude::Distribution;
+use rand::{thread_rng, Rng};
+use ta::indicators::ExponentialMovingAverage;
+use ta::Next;
 
-use crate::Digest;
+use crate::stats::FusedTa;
+use crate::{Digest, MessageInternedId};
+
+const TICK_DURATION: Duration = Duration::from_millis(500);
+const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_millis(1000);
+const BUFFER_SIZE: usize = 1000;
 
 /// Responsible for keeping track of the pending want requests we have
 /// out there.
 ///
 /// The desired functionality is that we need to store an outgoing
 /// want request here.
+#[derive(Default)]
 pub struct PendingStore {
     /// Map each pending digest to a set of nodes that we know have this digest.
-    pending_map: FxHashMap<Digest, FxHashSet<NodePublicKey>>,
+    pending_map: FxHashMap<MessageInternedId, FxHashSet<NodePublicKey>>,
+
+    /// Map each pending digest to a list of requests we sent out.
+    request_map: FxHashMap<MessageInternedId, VecDeque<PendingRequest>>,
+
+    /// RTTs for the peers we interacted with.
+    rtt_map: FxHashMap<NodePublicKey, FusedTa<f64, ExponentialMovingAverage>>,
 }
 
 impl PendingStore {
-    pub fn insert() {}
+    pub fn insert(&mut self, node: NodePublicKey, interned_id: MessageInternedId) {
+        self.pending_map
+            .entry(interned_id)
+            .or_default()
+            .insert(node);
+    }
+
+    pub async fn tick(&mut self) -> Vec<(MessageInternedId, NodePublicKey)> {
+        loop {
+            let pending_req: Vec<(MessageInternedId, NodePublicKey)> = self
+                .pending_map
+                .iter()
+                .filter(|(id, pub_keys)| {
+                    if let Some(requests) = self.request_map.get(*id) {
+                        if let Some(req) = requests.back() {
+                            // If the most recent request for this message is too far in the past,
+                            // we send another request.
+                            // We use the EMA of the RTT for a particular node to determine the
+                            // timeout.
+                            let timeout = self
+                                .rtt_map
+                                .get(&req.node)
+                                .and_then(|ema| ema.current())
+                                .map(|ema| ema * 2.0)
+                                .unwrap_or(DEFAULT_REQUEST_TIMEOUT.as_millis() as f64)
+                                as u128;
+                            req.timestamp.elapsed().as_millis() >= timeout
+                        } else {
+                            // We haven't send a request for this digest.
+                            true
+                        }
+                    } else {
+                        // We haven't send a request for this digest.
+                        true
+                    }
+                })
+                .filter_map(|(id, pub_keys)| {
+                    let pub_keys: Vec<NodePublicKey> = pub_keys.iter().copied().collect();
+                    if pub_keys.is_empty() {
+                        None
+                    } else if pub_keys.len() == 1 {
+                        Some((*id, pub_keys[0]))
+                    } else {
+                        let mut max_val: f64 = 1.0;
+                        let weights: Vec<f64> = pub_keys
+                            .iter()
+                            .map(|pub_key| self.rtt_map.get(pub_key).and_then(|ema| ema.current()))
+                            .map(|ema| {
+                                let ema = ema.unwrap_or(0.0);
+                                max_val = max_val.max(ema);
+                                ema
+                            })
+                            .collect();
+                        // Randomly sample the node we will send the request to for a particular
+                        // message.
+                        // The sampling probability for a particular node is inversely proportional
+                        // to the measured RTT (the lower the RTT, the higher the chance of
+                        // selecting the node).
+                        let weights: Vec<f64> = weights.into_iter().map(|w| max_val - w).collect();
+                        let dist = WeightedIndex::new(weights).unwrap();
+                        let mut rng = thread_rng();
+                        Some((*id, pub_keys[dist.sample(&mut rng)]))
+                    }
+                })
+                .collect();
+            // Mark the messages as requested if there are any.
+            pending_req.iter().for_each(|(id, pub_key)| {
+                let mut requests = self.request_map.entry(*id).or_default();
+                if requests.len() >= BUFFER_SIZE {
+                    requests.pop_front();
+                }
+                requests.push_back(PendingRequest::new(*pub_key))
+            });
+            if !pending_req.is_empty() {
+                return pending_req;
+            }
+            tokio::time::sleep(TICK_DURATION).await;
+        }
+    }
+
+    pub fn received_message(&mut self, node: NodePublicKey, interned_id: MessageInternedId) {
+        if let Some(requests) = self.request_map.get(&interned_id) {}
+        self.request_map
+            .get(&interned_id)
+            .map(|requests| requests.iter().find(|req| req.node == node))
+            .map(|req| {
+                req.map(|req| {
+                    let rtt = req.timestamp.elapsed().as_millis() as f64;
+                    self.rtt_map
+                        .entry(node)
+                        .or_insert(FusedTa::from(ExponentialMovingAverage::default()))
+                        .next(rtt);
+                })
+            });
+    }
+
+    pub fn remove_message(&mut self, interned_id: MessageInternedId) {
+        let _ = self.pending_map.remove(&interned_id);
+        let _ = self.request_map.remove(&interned_id);
+    }
+}
+
+struct PendingRequest {
+    /// The node we sent the want request to
+    node: NodePublicKey,
+    /// Timestamp when we sent out the request.
+    timestamp: Instant,
+}
+
+impl PendingRequest {
+    pub fn new(node: NodePublicKey) -> Self {
+        Self {
+            node,
+            timestamp: Instant::now(),
+        }
+    }
 }

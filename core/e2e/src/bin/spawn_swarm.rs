@@ -1,6 +1,6 @@
 use std::sync::Arc;
-use std::thread;
 use std::time::SystemTime;
+use std::{fs, thread};
 
 use anyhow::Result;
 use clap::Parser;
@@ -100,6 +100,9 @@ async fn main() -> Result<()> {
         .as_millis() as u64;
 
     let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/spawn-swarm").unwrap();
+    if path.exists() {
+        fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
+    }
     let swarm = Swarm::builder()
         .with_directory(path)
         .with_min_port(12001)
