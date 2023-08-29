@@ -1,7 +1,7 @@
 use crate::batch::BoxedVec;
 use crate::db::TableId;
 
-pub type ImKeyCollection = im::HashSet<BoxedVec, fxhash::FxBuildHasher>;
+pub type ImKeyCollection = im::OrdSet<BoxedVec>;
 
 pub type MaybeImKeyCollection = Option<ImKeyCollection>;
 

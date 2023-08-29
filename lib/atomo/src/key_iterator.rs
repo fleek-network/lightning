@@ -9,7 +9,7 @@ use crate::{DefaultSerdeBackend, SerdeBackend};
 
 /// An iterator over the keys of the table.
 pub struct KeyIterator<K, S: SerdeBackend = DefaultSerdeBackend> {
-    inner: im::hashset::ConsumingIter<BoxedVec>,
+    inner: im::ordset::ConsumingIter<BoxedVec>,
     phantom: PhantomData<(K, S)>,
 }
 
