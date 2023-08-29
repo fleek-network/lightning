@@ -2541,6 +2541,7 @@ name = "fleek-service-ping-example"
 version = "0.1.0"
 dependencies = [
  "fn-sdk",
+ "lazy_static",
 ]
 
 [[package]]

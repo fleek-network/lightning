@@ -10,3 +10,4 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 fn-sdk = { path = "../../lib/sdk" }
+lazy_static = "1.4"
