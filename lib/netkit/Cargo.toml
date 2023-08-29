@@ -13,4 +13,5 @@ fleek-crypto = { path = "../../lib/fleek-crypto" }
 futures = "0.3"
 quinn = "0.10"
 tokio = "1.32"
+tokio-util = {version = "0.7.8", features = ["rt"]}
 tracing = "0.1"

@@ -1,14 +1,20 @@
 use std::collections::HashMap;
+use std::future::Future;
 use std::net::SocketAddr;
 
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
+use futures::future::BoxFuture;
+use futures::stream::FuturesUnordered;
+use futures::{FutureExt, StreamExt};
+use quinn::Connection;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
+use tokio_util::sync::CancellationToken;
 
 type Message = Vec<u8>;
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct NodeAddress {
     pub pk: NodePublicKey,
     pub socket_address: SocketAddr,
@@ -41,6 +47,10 @@ pub struct Endpoint {
     request_rx: Receiver<Request>,
     /// QUIC endpoint.
     endpoint: quinn::Endpoint,
+    /// Ongoing dialing task futures.
+    ongoing_dial: FuturesUnordered<BoxFuture<'static, (NodePublicKey, Result<Connection>)>>,
+    /// Pending dialing tasks.
+    pending_dial: HashMap<NodeAddress, CancellationToken>,
 }
 
 impl Endpoint {
@@ -50,6 +60,8 @@ impl Endpoint {
             request_rx,
             pending_send: HashMap::new(),
             driver: HashMap::new(),
+            ongoing_dial: FuturesUnordered::new(),
+            pending_dial: HashMap::new(),
         }
     }
 
@@ -61,11 +73,21 @@ impl Endpoint {
                         None => break,
                         Some(request) => request,
                     };
-
+                    self.handle_request(request);
+                }
+                Some((peer_pk, connection_result)) = self.ongoing_dial.next() => {
+                    match connection_result {
+                        Ok(connection) => self.handle_connection(peer_pk, connection),
+                        Err(e) => tracing::warn!("failed to connect to {peer_pk:?}: {e:?}"),
+                    }
                 }
             }
         }
         Ok(())
+    }
+
+    fn handle_connection(&mut self, peer: NodePublicKey, connection: Connection) {
+        todo!()
     }
 
     fn handle_request(&mut self, request: Request) {
@@ -85,9 +107,33 @@ impl Endpoint {
                     });
                 } else {
                     self.pending_send.entry(peer.pk).or_default().push(message);
+                    self.enqueue_dial_task(peer);
                 }
             },
             Request::Metrics { .. } => todo!(),
         }
+    }
+
+    fn enqueue_dial_task(&mut self, address: NodeAddress) {
+        let cancel = CancellationToken::new();
+        self.pending_dial.insert(address, cancel.clone());
+        let endpoint = self.endpoint.clone();
+        let fut = async move {
+            // Todo: Add config.
+            let connect = || async move {
+                endpoint
+                    .connect(address.socket_address, "localhost")?
+                    .await
+                    .map_err(Into::into)
+            };
+            let connection = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => Err(anyhow::anyhow!("dial was cancelled")),
+                connection = connect() => connection,
+            };
+            (address.pk, connection)
+        }
+        .boxed();
+        self.ongoing_dial.push(fut);
     }
 }

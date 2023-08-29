@@ -5432,6 +5432,7 @@ dependencies = [
  "futures",
  "quinn",
  "tokio",
+ "tokio-util 0.7.8",
  "tracing",
 ]
 
@@ -8381,6 +8382,8 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
+ "hashbrown 0.12.3",
  "pin-project-lite",
  "slab",
  "tokio",
