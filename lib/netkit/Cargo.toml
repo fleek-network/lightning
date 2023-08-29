@@ -9,9 +9,10 @@ repository = "https://github.com/fleek-network/lightning"
 
 [dependencies]
 anyhow = "1.0"
+bytes = "1.4"
 fleek-crypto = { path = "../../lib/fleek-crypto" }
 futures = "0.3"
 quinn = "0.10"
 tokio = "1.32"
-tokio-util = {version = "0.7.8", features = ["rt"]}
+tokio-util = {version = "0.7.8", features = ["rt", "codec"]}
 tracing = "0.1"

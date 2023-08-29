@@ -9,10 +9,11 @@ use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
 use quinn::Connection;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
+use crate::driver;
 
-type Message = Vec<u8>;
+pub type Message = Vec<u8>;
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct NodeAddress {
@@ -77,7 +78,7 @@ impl Endpoint {
                 }
                 Some((peer_pk, connection_result)) = self.ongoing_dial.next() => {
                     match connection_result {
-                        Ok(connection) => self.handle_connection(peer_pk, connection),
+                        Ok(connection) => self.handle_connection(peer_pk, connection, false),
                         Err(e) => tracing::warn!("failed to connect to {peer_pk:?}: {e:?}"),
                     }
                 }
@@ -86,8 +87,16 @@ impl Endpoint {
         Ok(())
     }
 
-    fn handle_connection(&mut self, peer: NodePublicKey, connection: Connection) {
-        todo!()
+    fn handle_connection(&mut self, peer: NodePublicKey, connection: Connection, accept: bool) {
+        let (event_tx, event_rx) = mpsc::channel(1024);
+        let (message_tx, message_rx) = mpsc::channel(1024);
+        self.driver.insert(peer, message_tx.clone());
+        tokio::spawn(async move {
+            if let Err(e) = driver::start_driver(connection, message_rx, event_tx, accept).await {
+                tracing::error!("driver for connection with {peer:?} shutdowned: {e:?}")
+            }
+        });
+
     }
 
     fn handle_request(&mut self, request: Request) {
