@@ -1051,6 +1051,7 @@ dependencies = [
 name = "blake3-wasm"
 version = "0.1.0"
 dependencies = [
+ "arrayref",
  "blake3-tree",
  "wasm-bindgen",
 ]
@@ -1352,7 +1353,7 @@ checksum = "c688fc74432808e3eb684cae8830a86be1d66a2bd58e1f248ed0960a590baf6f"
 dependencies = [
  "glob",
  "libc",
- "libloading",
+ "libloading 0.7.4",
 ]
 
 [[package]]
@@ -2132,7 +2133,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330c60081dcc4c72131f8eb70510f1ac07223e5d4163db481a04a0befcffa412"
 dependencies = [
- "libloading",
+ "libloading 0.7.4",
 ]
 
 [[package]]
@@ -3286,6 +3287,7 @@ version = "0.1.0"
 dependencies = [
  "indexmap 2.0.0",
  "infusion-proc",
+ "log",
  "paste",
  "serde",
 ]
@@ -3454,6 +3456,16 @@ checksum = "b67380fd3b2fbe7527a606e18729d21c6f3951633d0500574c4dc22d2d638b9f"
 dependencies = [
  "cfg-if",
  "winapi",
+]
+
+[[package]]
+name = "libloading"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d580318f95776505201b28cf98eb1fa5e4be3b689633ba6a3e6cd880ff22d8cb"
+dependencies = [
+ "cfg-if",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -6864,6 +6876,14 @@ dependencies = [
  "proc-macro2 1.0.66",
  "quote 1.0.31",
  "syn 2.0.29",
+]
+
+[[package]]
+name = "service-executor"
+version = "0.1.0"
+dependencies = [
+ "libloading 0.8.0",
+ "lightning-interfaces",
 ]
 
 [[package]]

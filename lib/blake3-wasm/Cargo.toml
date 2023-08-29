@@ -12,8 +12,3 @@ crate-type = ["cdylib"]
 wasm-bindgen = "0.2"
 blake3-tree = { path = "../blake3-tree/" }
 arrayref = "0.3"
-
-[profile.release]
-lto = true
-strip = "debuginfo"
-opt-level = 's'

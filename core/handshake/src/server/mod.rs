@@ -2,6 +2,7 @@
 
 pub mod config;
 
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -14,7 +15,6 @@ use lightning_interfaces::{
     ConfigConsumer,
     ConnectionInterface,
     HandshakeInterface,
-    ServiceConnectorInterface,
     ServiceExecutorInterface,
     WithStartAndShutdown,
 };
@@ -79,13 +79,12 @@ impl<C: Collection> ConfigConsumer for HandshakeServer<C> {
 impl<C: Collection> HandshakeInterface<C> for HandshakeServer<C> {
     type Connection = ServiceConnection;
 
-    fn init(
-        config: Self::Config,
-        connector: c![C::ServiceExecutorInterface::Connector],
-    ) -> anyhow::Result<Self> {
+    fn init(config: Self::Config) -> anyhow::Result<Self> {
         Ok(Self {
             config,
-            state: HandshakeState { connector },
+            state: HandshakeState {
+                collection: PhantomData,
+            },
             shutdown_channel: Mutex::new(None).into(),
         })
     }
@@ -94,13 +93,13 @@ impl<C: Collection> HandshakeInterface<C> for HandshakeServer<C> {
 impl<C: Collection> HandshakeServer<C> {}
 
 pub struct HandshakeState<C: Collection> {
-    connector: c![C::ServiceExecutorInterface::Connector],
+    collection: PhantomData<C>,
 }
 
 impl<C: Collection> Clone for HandshakeState<C> {
     fn clone(&self) -> Self {
         Self {
-            connector: self.connector.clone(),
+            collection: PhantomData,
         }
     }
 }
@@ -200,7 +199,7 @@ async fn handle<C: Collection>(
                     };
 
                     // Handle the service connection (background)
-                    state.connector.handle(service_id, connection);
+                    // state.connector.handle(service_id, connection);
 
                     // TODO: Wait for service connection to drop, and handle more service
                     // requests
@@ -258,7 +257,7 @@ mod tests {
         // Setup dependencies and state
         let executor = Blank::<TestBindings>::default();
         let state = HandshakeState::<TestBindings> {
-            connector: executor.get_connector(),
+            collection: PhantomData,
         };
 
         // spawn client task
