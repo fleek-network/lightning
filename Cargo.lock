@@ -6866,6 +6866,7 @@ name = "service-executor"
 version = "0.1.0"
 dependencies = [
  "fleek-service-ping-example",
+ "fn-sdk",
  "lightning-interfaces",
 ]
 
