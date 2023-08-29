@@ -64,7 +64,7 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
             .layer(Extension(server));
 
         self.is_running.store(true, Ordering::Relaxed);
-        let http_address = SocketAddr::from(([127, 0, 0, 1], self.config.port));
+        let http_address = SocketAddr::from((self.config.addr, self.config.port));
 
         let shutdown_notify = self.shutdown_notify.clone();
         let is_running = self.is_running.clone();

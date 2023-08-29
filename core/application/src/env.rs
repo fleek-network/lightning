@@ -105,6 +105,7 @@ impl Env<UpdatePerm> {
         }
     }
 
+    #[autometrics::autometrics]
     fn run(&mut self, block: Block) -> BlockExecutionResponse {
         self.inner.run(move |ctx| {
             // Create the app/execution enviroment
