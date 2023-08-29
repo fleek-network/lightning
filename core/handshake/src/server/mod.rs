@@ -13,7 +13,6 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::ConnectionMetadata;
 use lightning_interfaces::{
     ConfigConsumer,
-    ConnectionInterface,
     HandshakeInterface,
     ServiceExecutorInterface,
     WithStartAndShutdown,
@@ -77,8 +76,6 @@ impl<C: Collection> ConfigConsumer for HandshakeServer<C> {
 }
 
 impl<C: Collection> HandshakeInterface<C> for HandshakeServer<C> {
-    type Connection = ServiceConnection;
-
     fn init(config: Self::Config) -> anyhow::Result<Self> {
         Ok(Self {
             config,
@@ -119,18 +116,12 @@ pub struct ServiceConnection {
     metadata: ConnectionMetadata,
 }
 
-impl ConnectionInterface for ServiceConnection {
-    fn get_metadata(&self) -> ConnectionMetadata {
-        self.metadata
-    }
-}
-
 async fn handle<C: Collection>(
     state: HandshakeState<C>,
     reader: impl AsyncRead + Send + Sync + Unpin + 'static,
     writer: impl AsyncWrite + Send + Sync + Unpin + 'static,
 ) where
-    C::HandshakeInterface: HandshakeInterface<C, Connection = ServiceConnection>,
+    C::HandshakeInterface: HandshakeInterface<C>,
 {
     error!("handling inside");
     let mut conn = HandshakeConnection::new(reader, writer);

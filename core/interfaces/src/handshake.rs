@@ -1,7 +1,7 @@
 use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
-use crate::{ConfigProviderInterface, ConnectionInterface};
+use crate::ConfigProviderInterface;
 
 #[infusion::service]
 pub trait HandshakeInterface<C: Collection>:
@@ -10,9 +10,6 @@ pub trait HandshakeInterface<C: Collection>:
     fn _init(config: ::ConfigProviderInterface) {
         Self::init(config.get::<Self>())
     }
-
-    /// The connection type that this handshake implementation offers.
-    type Connection: ConnectionInterface;
 
     /// Initialize a new handshake server.
     fn init(config: Self::Config) -> anyhow::Result<Self>;
