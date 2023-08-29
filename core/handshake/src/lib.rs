@@ -1,8 +1,5 @@
-pub mod connection;
-pub mod types;
+#![allow(unused)]
 
-#[cfg(feature = "client")]
-pub mod client;
-
-#[cfg(feature = "server")]
-pub mod server;
+pub mod handshake;
+pub mod schema;
+pub mod transports;
