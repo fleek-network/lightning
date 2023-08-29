@@ -5426,6 +5426,11 @@ dependencies = [
 [[package]]
 name = "netkit"
 version = "0.0.0"
+dependencies = [
+ "fleek-crypto",
+ "quinn",
+ "tokio",
+]
 
 [[package]]
 name = "nix"

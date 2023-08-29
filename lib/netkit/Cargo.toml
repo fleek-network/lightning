@@ -8,4 +8,6 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/fleek-network/lightning"
 
 [dependencies]
-
+fleek-crypto = { path = "../../lib/fleek-crypto" }
+quinn = "0.10"
+tokio = "1.32"
