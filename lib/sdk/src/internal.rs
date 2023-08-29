@@ -3,11 +3,14 @@ use std::path::PathBuf;
 use derive_more::IsVariant;
 use fleek_crypto::ClientPublicKey;
 
+use crate::futures::RequestCtx;
 use crate::ReqRes;
 
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
 pub struct IpcRequest {
     /// A pointer to the request context.
-    pub request_ctx: *mut u8,
+    pub request_ctx: RequestCtx,
     /// The request to be processed by core.
     pub request: Request,
 }
@@ -16,7 +19,7 @@ pub struct IpcRequest {
 #[repr(C)]
 pub struct OnStartArgs {
     /// The function which should be used to send requests from.
-    pub request_sender: Box<dyn Fn(IpcRequest)>,
+    pub request_sender: Box<dyn Fn(IpcRequest) + Send + Sync>,
     /// The OS path to the blockstore. The service is allowed to
     /// read content from this path.
     pub block_store_path: PathBuf,
@@ -45,7 +48,7 @@ pub struct OnMessageArgs {
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct OnEventResponseArgs {
-    pub request_ctx: *mut u8,
+    pub request_ctx: RequestCtx,
     pub response: Response,
 }
 
