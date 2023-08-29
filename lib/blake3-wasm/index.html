@@ -6,7 +6,7 @@
   </head>
   <body>
     <script type="module">
-      import init, { greet, hash } from "./pkg/blake3_wasm.js";
+      import init, { hash } from "./pkg/blake3_wasm.js";
       init().then(() => {
         const buffer = new ArrayBuffer(8);
         const view = new Uint8Array(buffer);
