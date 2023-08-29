@@ -6,9 +6,17 @@
   </head>
   <body>
     <script type="module">
-      import init, { greet } from "./pkg/blake3_wasm.js";
+      import init, { greet, hash } from "./pkg/blake3_wasm.js";
       init().then(() => {
-        greet("WebAssembly");
+        const buffer = new ArrayBuffer(8);
+        const view = new Uint8Array(buffer);
+        const output = hash(view);
+
+        let hexString = "";
+        output.forEach((byte) => {
+          hexString += byte.toString(16);
+        });
+        console.log(hexString);
       });
     </script>
   </body>
