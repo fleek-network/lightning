@@ -16,7 +16,6 @@ bytes.workspace = true
 parking_lot.workspace = true
 serde.workspace = true
 thiserror.workspace = true
-tempdir.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
