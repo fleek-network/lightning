@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use dashmap::DashMap;
 use fleek_crypto::NodeSecretKey;
-use lightning_interfaces::{ExecutorProviderInterface, ServiceHandleInterface};
+use lightning_interfaces::{ConnectionWork, ExecutorProviderInterface, ServiceHandleInterface};
 use triomphe::Arc;
 
 use crate::schema;
@@ -93,6 +93,10 @@ impl<P: ExecutorProviderInterface> StateData<P> {
     }
 
     pub fn on_transport_closed(&self, _perm: TransportPermission, _connection_id: u64) {
+        todo!()
+    }
+
+    pub fn process_work(&self, _request: ConnectionWork) {
         todo!()
     }
 }
