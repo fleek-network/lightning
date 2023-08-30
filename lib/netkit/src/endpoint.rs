@@ -44,20 +44,20 @@ pub enum Request {
 }
 
 pub struct Endpoint {
-    /// Used for sending outbound messages to drivers.
-    driver: HashMap<NodePublicKey, Sender<Message>>,
-    /// Ongoing drivers
-    driver_set: JoinSet<NodePublicKey>,
-    /// Pending outgoing messages.
-    pending_send: HashMap<NodePublicKey, Vec<Message>>,
-    /// Input requests for the endpoint.
-    request_rx: Receiver<Request>,
     /// QUIC endpoint.
     endpoint: quinn::Endpoint,
-    /// Ongoing dialing task futures.
+    /// Input requests for the endpoint.
+    request_rx: Receiver<Request>,
+    /// Ongoing incoming and outgoing connection set-up tasks.
     connecting: FuturesUnordered<BoxFuture<'static, ConnectionResult>>,
     /// Pending dialing tasks.
     pending_dial: HashMap<NodePublicKey, CancellationToken>,
+    /// Pending outgoing messages.
+    pending_send: HashMap<NodePublicKey, Vec<Message>>,
+    /// Used for sending outbound messages to drivers.
+    driver: HashMap<NodePublicKey, Sender<Message>>,
+    /// Ongoing drivers.
+    driver_set: JoinSet<NodePublicKey>,
 }
 
 impl Endpoint {
@@ -104,10 +104,11 @@ impl Endpoint {
                         }
                         Err(e) => {
                             // The unwrap here is safe. See comment above.
-                            tracing::warn!("failed to dial peer {:?}: {e:?}", peer.unwrap());
+                            let peer = peer.unwrap();
+                            tracing::warn!("failed to dial peer {:?}: {e:?}", peer);
+                            self.remove_pending_dial(&peer);
                         }
                     }
-
                 }
                 Some(peer) = self.driver_set.join_next() => {
                     match peer {
@@ -232,6 +233,10 @@ impl Endpoint {
         if let Some(cancel) = self.pending_dial.remove(peer) {
             cancel.cancel();
         }
+    }
+
+    fn remove_pending_dial(&mut self, peer: &NodePublicKey) {
+        self.pending_dial.remove(peer);
     }
 }
 
