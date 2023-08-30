@@ -8,6 +8,8 @@ edition.workspace = true
 [dependencies]
 lightning-interfaces = { path = "../interfaces/" }
 fn-sdk = { path = "../../lib/sdk" }
+tokio.workspace = true
+async-channel = "1.9.0"
 
 # Built-in services
 fleek-service-ping-example = { path = "../../services/ping" }

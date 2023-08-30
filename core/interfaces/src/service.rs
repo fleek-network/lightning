@@ -56,11 +56,11 @@ pub trait ServiceHandleInterface: Clone + Send + Sync + 'static {
 /// them.
 #[infusion::blank]
 pub trait ConnectionWorkStealer: Clone + Send + Sync + 'static {
-    type AsyncFuture: Future<Output = Option<ConnectionWork>> + Send + Sync =
+    type AsyncFuture<'a>: Future<Output = Option<ConnectionWork>> + Send + Sync + 'a =
         infusion::Blank<Option<ConnectionWork>>;
 
     /// Returns a future which return a command or `None` if there we're closing.
-    fn next(&mut self) -> Self::AsyncFuture;
+    fn next(&mut self) -> Self::AsyncFuture<'_>;
 
     /// Blocking version of the next.
     fn next_blocking(&mut self) -> Option<ConnectionWork>;
