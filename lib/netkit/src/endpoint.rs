@@ -8,7 +8,7 @@ use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
-use quinn::{ClientConfig, Connecting, Connection};
+use quinn::{ClientConfig, Connecting, Connection, ServerConfig};
 use rustls::Certificate;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
@@ -52,8 +52,12 @@ pub enum Event {
 }
 
 pub struct Endpoint {
+    /// Socket address.
+    address: SocketAddr,
+    /// QUIC server config.
+    server_config: ServerConfig,
     /// QUIC endpoint.
-    endpoint: quinn::Endpoint,
+    endpoint: Option<quinn::Endpoint>,
     /// The node's key.
     sk: NodeSecretKey,
     /// Receiver for requests for the endpoint.
@@ -77,11 +81,13 @@ pub struct Endpoint {
 }
 
 impl Endpoint {
-    pub fn new(sk: NodeSecretKey, endpoint: quinn::Endpoint) -> Self {
+    pub fn new(sk: NodeSecretKey, address: SocketAddr, server_config: ServerConfig) -> Self {
         let (network_event_tx, network_event_rx) = mpsc::channel(1024);
         let (request_tx, request_rx) = mpsc::channel(1024);
         Self {
-            endpoint,
+            address,
+            endpoint: None,
+            server_config,
             sk,
             request_tx,
             request_rx,
@@ -111,6 +117,11 @@ impl Endpoint {
 
     // Todo: Return metrics.
     pub async fn start(mut self) -> Result<()> {
+        let endpoint = quinn::Endpoint::server(self.server_config.clone(), self.address)?;
+        tracing::info!("bound to {:?}", endpoint.local_addr()?);
+
+        self.endpoint.replace(endpoint.clone());
+
         loop {
             tokio::select! {
                 request = self.request_rx.recv() => {
@@ -122,7 +133,7 @@ impl Endpoint {
                         tracing::error!("failed to handle request: {e:?}");
                     }
                 }
-                connecting = self.endpoint.accept() => {
+                connecting = endpoint.accept() => {
                     match connecting {
                         None => break,
                         Some(connecting) => self.handle_incoming_connection(connecting),
@@ -258,7 +269,7 @@ impl Endpoint {
         let cancel = CancellationToken::new();
         self.pending_dial.insert(address.pk, cancel.clone());
 
-        let endpoint = self.endpoint.clone();
+        let endpoint = self.endpoint.clone().expect("There to be an endpoint");
         let tls_config = tls::make_client_config(&self.sk, Some(address.pk))?;
         let fut = async move {
             let client_config = ClientConfig::new(Arc::new(tls_config));
