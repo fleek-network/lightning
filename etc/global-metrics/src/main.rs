@@ -88,21 +88,24 @@ async fn service_discovery(
             _ => None,
         };
         if chunk.is_none() {
-            if let Ok(ip_info) = get_ip_info(&config.ipinfo_token, node.domain.to_string()).await {
-                let targets = vec![node_target];
-                let mut labels = HashMap::new();
-                labels.insert("public_key".to_string(), node.public_key.to_string());
-                labels.insert("geohash".to_string(), ip_info.geo.clone());
-                labels.insert("country_code".to_string(), ip_info.country.clone());
-                labels.insert("timezone".to_string(), ip_info.timezone.clone());
+            match get_ip_info(&config.ipinfo_token, node.domain.to_string()).await {
+                Ok(ip_info) => {
+                    let targets = vec![node_target];
+                    let mut labels = HashMap::new();
+                    labels.insert("public_key".to_string(), node.public_key.to_string());
+                    labels.insert("geohash".to_string(), ip_info.geo.clone());
+                    labels.insert("country_code".to_string(), ip_info.country.clone());
+                    labels.insert("timezone".to_string(), ip_info.timezone.clone());
 
-                let local_chunk = PrometheusDiscoveryChunk::new(targets, labels);
-                let chunk_to_bytes = bincode::serialize(&local_chunk).unwrap();
-                batch.insert(node.public_key.0.to_vec(), chunk_to_bytes);
-                chunk = Some(local_chunk)
-            } else {
-                error!("Failed to lookup ip info for {}", node.domain);
-                continue;
+                    let local_chunk = PrometheusDiscoveryChunk::new(targets, labels);
+                    let chunk_to_bytes = bincode::serialize(&local_chunk).unwrap();
+                    batch.insert(node.public_key.0.to_vec(), chunk_to_bytes);
+                    chunk = Some(local_chunk)
+                },
+                Err(e) => {
+                    error!("Lookup failed for IP: {}, due to {}", node.domain, e);
+                    continue;
+                },
             }
         }
         discovery_chunk.push(chunk.unwrap());

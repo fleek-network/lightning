@@ -21,9 +21,9 @@ impl Default for Config {
                 .unwrap_or("4000".to_string())
                 .parse()
                 .unwrap_or(4000),
-            lgtn_node_address: env::var("LGTN_ADDRESS").expect("ip info api token should be set"),
+            lgtn_node_address: env::var("LGTN_ADDRESS").expect("LGTN_ADDRESS should be set"),
             lgtn_node_port: env::var("LGTN_PORT")
-                .expect("ip info api token should be set")
+                .expect("LGTN_PORT should be set")
                 .parse()
                 .expect("LGTN_PORT should be an integer"),
         }

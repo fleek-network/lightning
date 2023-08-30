@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["core/*", "lib/*", "services/*", "etc/*"]
+members = ["core/*", "lib/*", "services/*"]
+exclude = ["etc/global-metrics"]
+
 
 [workspace.package]
 version = "0.1.0"
