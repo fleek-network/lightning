@@ -75,7 +75,7 @@ impl TransactionStore {
 
         while let Some(parcel) = self.parcels.get(&last_digest) {
             parcel_chain.push(last_digest);
-            for batch in &parcel.batches {
+            for batch in &parcel.transactions {
                 txn_chain.push_front(batch.clone());
             }
             if parcel.last_executed == self.head {

@@ -2,13 +2,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use fastcrypto::hash::Hash;
+use fastcrypto::hash::HashFunction;
 use fleek_blake3 as blake3;
 use lightning_interfaces::types::{Block, NodeIndex, UpdateRequest};
 use lightning_interfaces::{ExecutionEngineSocket, PubSub, ToDigest, TranscriptBuilder};
 use log::info;
+use narwhal_crypto::DefaultHashFunction;
 use narwhal_executor::ExecutionState;
-use narwhal_types::{Batch, BatchAPI, BatchDigest, ConsensusOutput};
+use narwhal_types::{BatchAPI, BatchDigest, ConsensusOutput, Transaction};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Notify;
 
@@ -18,7 +19,7 @@ pub type Digest = [u8; 32];
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AuthenticStampedParcel {
-    pub batches: Vec<Batch>,
+    pub transactions: Vec<Transaction>,
     pub last_executed: Digest,
 }
 
@@ -28,15 +29,14 @@ impl ToDigest for AuthenticStampedParcel {
     }
 
     fn to_digest(&self) -> Digest {
-        let mut batch_digests: Vec<BatchDigest> =
-            self.batches.iter().map(|batch| batch.digest()).collect();
-        batch_digests.sort();
+        let batch_digest =
+            BatchDigest::new(DefaultHashFunction::digest_iterator(self.transactions.iter()).into());
+
         let mut bytes = Vec::new();
-        batch_digests
-            .iter()
-            .for_each(|digest| bytes.extend_from_slice(&digest.0));
+        bytes.extend_from_slice(&(self.transactions.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&batch_digest.0);
         bytes.extend_from_slice(&self.last_executed);
-        bytes.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
+
         blake3::hash(&bytes).into()
     }
 }
@@ -101,19 +101,14 @@ impl<P: PubSub<PubSubMsg>> Execution<P> {
     }
 
     /// This should only EVER be called in handle_consensus_output or
-    pub(crate) async fn submit_batch(&self, batch: Vec<Batch>) {
+    pub(crate) async fn submit_batch(&self, payload: Vec<Transaction>) {
         let mut change_epoch = false;
-        // todo(dalton)
-        let mut transactions = Vec::new();
-        for batch in batch {
-            transactions.extend(
-                batch
-                    .transactions()
-                    .iter()
-                    .filter_map(|txn| bincode::deserialize::<UpdateRequest>(txn).ok())
-                    .collect::<Vec<_>>(),
-            )
-        }
+
+        let transactions = payload
+            .iter()
+            .filter_map(|txn| bincode::deserialize::<UpdateRequest>(txn).ok())
+            .collect::<Vec<_>>();
+
         let block = Block { transactions };
 
         // Unfailable
@@ -138,13 +133,14 @@ impl<P: PubSub<PubSubMsg>> Execution<P> {
 #[async_trait]
 impl<P: PubSub<PubSubMsg>> ExecutionState for Execution<P> {
     async fn handle_consensus_output(&self, consensus_output: ConsensusOutput) {
-        let mut batch_payload: Vec<Batch> =
+        let mut batch_payload: Vec<Transaction> =
             Vec::with_capacity(consensus_output.sub_dag.num_batches());
 
         for (_, batches) in consensus_output.batches {
             // Put all the batches in this Consensus output into one vec of batches.
-            batch_payload.extend(batches);
-            //  self.submit_batch(batches).await
+            for mut batch in batches {
+                batch_payload.extend(batch.transactions_mut().to_owned());
+            }
         }
         if !batch_payload.is_empty() {
             // Submit the batches to application layer
@@ -155,7 +151,7 @@ impl<P: PubSub<PubSubMsg>> ExecutionState for Execution<P> {
             let last_digest = self.inner.lock().unwrap().last_executed.unwrap_or([0; 32]);
 
             let parcel = AuthenticStampedParcel {
-                batches: batch_payload,
+                transactions: batch_payload,
                 last_executed: last_digest,
             };
             let parcel_digest = parcel.to_digest();
@@ -185,7 +181,7 @@ impl<P: PubSub<PubSubMsg>> ExecutionState for Execution<P> {
 #[cfg(test)]
 mod tests {
     use lightning_interfaces::ToDigest;
-    use narwhal_types::{Batch, Transaction};
+    use narwhal_types::{Batch, BatchAPI, Transaction};
     use rand::Rng;
     use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
 
@@ -212,11 +208,16 @@ mod tests {
         tx_length: usize,
         last_executed: Option<Digest>,
     ) -> AuthenticStampedParcel {
-        let batches = (0..num_batches)
-            .map(|_| generate_random_batch(num_txns, tx_length))
+        let transactions = (0..num_batches)
+            .map(|_| {
+                generate_random_batch(num_txns, tx_length)
+                    .transactions()
+                    .clone()
+            })
+            .flatten()
             .collect();
         AuthenticStampedParcel {
-            batches,
+            transactions,
             last_executed: last_executed.unwrap_or([0; 32]),
         }
     }
@@ -240,9 +241,10 @@ mod tests {
     fn test_to_digest_reorder_batches() {
         let parcel1 = generate_random_parcel(5, 4, 10, None);
         let mut parcel2 = parcel1.clone();
-        let temp_batch = parcel2.batches[1].clone();
-        parcel2.batches[1] = parcel2.batches[0].clone();
-        parcel2.batches[0] = temp_batch;
-        assert_eq!(parcel1.to_digest(), parcel2.to_digest());
+        let temp_batch = parcel2.transactions[1].clone();
+        parcel2.transactions[1] = parcel2.transactions[0].clone();
+        parcel2.transactions[0] = temp_batch;
+        // Payloads with transactions in dif order should not have the same hash
+        assert_ne!(parcel1.to_digest(), parcel2.to_digest());
     }
 }
