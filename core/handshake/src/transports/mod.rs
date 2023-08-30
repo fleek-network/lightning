@@ -50,4 +50,5 @@ pub trait TransportReceiver: Sized + Send + Sync + 'static {
 #[enum_dispatch]
 pub enum StaticSender {
     MockTransport(mock::MockTransportSender),
+    WebRtcTransport(webrtc::WebRtcSender),
 }
