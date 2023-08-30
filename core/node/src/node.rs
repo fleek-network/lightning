@@ -3,6 +3,7 @@ use lightning_blockstore::memory::MemoryBlockStore;
 use lightning_broadcast::Broadcast;
 use lightning_consensus::consensus::Consensus;
 use lightning_dht::dht::Dht;
+use lightning_handshake::handshake::Handshake;
 use lightning_interfaces::infu_collection::{
     Collection,
     CollectionBase,
@@ -31,7 +32,7 @@ impl CollectionBase for FinalTypes {
     type ConnectionPoolInterface<C: Collection> = ConnectionPool<C>;
     type TopologyInterface<C: Collection> = Topology<C>;
     type ConsensusInterface<C: Collection> = Consensus<C>;
-    type HandshakeInterface<C: Collection> = infusion::Blank<C>;
+    type HandshakeInterface<C: Collection> = Handshake<C>;
     type NotifierInterface<C: Collection> = Notifier<C>;
     type OriginProviderInterface<C: Collection> = infusion::Blank<C>;
     type DeliveryAcknowledgmentAggregatorInterface<C: Collection> = infusion::Blank<C>;

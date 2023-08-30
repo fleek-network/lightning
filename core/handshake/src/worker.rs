@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::state::StateRef;
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
+#[serde(tag = "type")]
 pub enum WorkerMode {
     AsyncWorker,
     BlockingWorker { use_tokio: bool },
