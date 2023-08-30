@@ -237,6 +237,22 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
+    fn get_committee_members_by_index(&self) -> Vec<NodeIndex> {
+        self.inner.run(|ctx| {
+            // get current epoch
+            let epoch = match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
+                Some(Value::Epoch(epoch)) => epoch,
+                _ => 0,
+            };
+
+            self.committee_table
+                .get(ctx)
+                .get(epoch)
+                .map(|c| c.members)
+                .unwrap_or_default()
+        })
+    }
+
     fn get_epoch(&self) -> Epoch {
         self.inner.run(
             |ctx| match self.metadata_table.get(ctx).get(&Metadata::Epoch) {

@@ -3,9 +3,8 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{PubSub, ToDigest};
+use lightning_interfaces::ToDigest;
 
-use crate::consensus::PubSubMsg;
 use crate::execution::{AuthenticStampedParcel, Digest, Execution};
 
 #[derive(Clone)]
@@ -39,11 +38,11 @@ impl TransactionStore {
     }
 
     // Threshold should be 2f + 1 of the committee
-    pub async fn try_execute<P: PubSub<PubSubMsg>>(
+    pub async fn try_execute(
         &mut self,
         digest: Digest,
         threshold: usize,
-        execution: &Arc<Execution<P>>,
+        execution: &Arc<Execution>,
     ) -> bool {
         if self.executed.contains(&digest) {
             // if we executed before return false
@@ -64,10 +63,10 @@ impl TransactionStore {
         }
     }
 
-    async fn try_execute_chain<P: PubSub<PubSubMsg>>(
+    async fn try_execute_chain(
         &mut self,
         digest: Digest,
-        execution: &Arc<Execution<P>>,
+        execution: &Arc<Execution>,
     ) -> Result<()> {
         let mut txn_chain = VecDeque::new();
         let mut last_digest = digest;

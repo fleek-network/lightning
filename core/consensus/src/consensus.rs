@@ -30,12 +30,12 @@ use narwhal_node::NodeStorage;
 use prometheus::Registry;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Mutex, Notify};
+use tokio::sync::{mpsc, Mutex, Notify};
 use tokio::{pin, select, task, time};
 use typed_store::DBMetrics;
 
 use crate::config::Config;
-use crate::edge_node::EdgeService;
+use crate::edge_node::consensus::EdgeConsensus;
 use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Execution};
 use crate::forwarder::Forwarder;
 use crate::narwhal::{NarwhalArgs, NarwhalService};
@@ -71,7 +71,7 @@ pub struct Consensus<C: Collection> {
 /// This struct contains mutable state only for the current epoch.
 struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     /// The Narwhal service for the current epoch.
-    consensus: Option<ConsensusService<P>>,
+    consensus: Option<NarwhalService>,
     /// Used to query the application data
     query_runner: Q,
     /// This narwhal node data
@@ -79,7 +79,7 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     /// Path to the database used by the narwhal implementation
     pub store_path: ResolvedPathBuf,
     /// Narwhal execution state.
-    execution_state: Arc<Execution<P>>,
+    execution_state: Arc<Execution>,
     /// Used to send transactions to consensus
     /// We still use this socket on consensus struct because a node is not always on the committee,
     /// so its not always sending     a transaction to its own mempool. The signer interface
@@ -87,23 +87,8 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     txn_socket: SubmitTxSocket,
     /// Interface for sending messages through the gossip layer
     pub_sub: P,
-}
-
-#[derive(From)]
-enum ConsensusService<P: PubSub<PubSubMsg> + 'static> {
-    /// A node that is on the narwhal committee
-    Narwhal(NarwhalService),
-    /// A node that is not running narwhal because its not on the committee
-    EdgeNode(EdgeService<P>),
-}
-
-impl<P: PubSub<PubSubMsg>> ConsensusService<P> {
-    async fn shutdown(&mut self) {
-        match self {
-            ConsensusService::Narwhal(narwhal) => narwhal.shutdown().await,
-            ConsensusService::EdgeNode(edge) => edge.shutdown().await,
-        }
-    }
+    /// Narhwal sends payloads ready for broadcast to this reciever
+    rx_narwhal_batches: Option<mpsc::Receiver<AuthenticStampedParcel>>,
 }
 
 impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, P> {
@@ -111,9 +96,10 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         query_runner: Q,
         narwhal_args: NarwhalArgs,
         store_path: ResolvedPathBuf,
-        execution_state: Arc<Execution<P>>,
+        execution_state: Arc<Execution>,
         txn_socket: SubmitTxSocket,
         pub_sub: P,
+        rx_narwhal_batches: mpsc::Receiver<AuthenticStampedParcel>,
     ) -> Self {
         Self {
             consensus: None,
@@ -123,7 +109,25 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             execution_state,
             txn_socket,
             pub_sub,
+            rx_narwhal_batches: Some(rx_narwhal_batches),
         }
+    }
+
+    fn spawn_edge_consensus(&mut self, reconfigure_notify: Arc<Notify>) -> EdgeConsensus {
+        EdgeConsensus::spawn(
+            self.pub_sub.clone(),
+            self.execution_state.clone(),
+            reconfigure_notify,
+            self.query_runner.clone(),
+            self.narwhal_args
+                .primary_network_keypair
+                .public()
+                .to_owned()
+                .into(),
+            self.rx_narwhal_batches
+                .take()
+                .expect("rx_narwhal_batches missing from EpochState"),
+        )
     }
 
     async fn start_current_epoch(&mut self) {
@@ -143,13 +147,11 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         {
             self.run_narwhal(store, epoch_end, epoch, committee, worker_cache)
                 .await
-        } else {
-            self.run_edge_node(committee).await
         }
     }
 
     async fn move_to_next_epoch(&mut self) {
-        if let Some(mut state) = self.consensus.take() {
+        if let Some(state) = self.consensus.take() {
             state.shutdown().await
         }
 
@@ -241,19 +243,6 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         });
     }
 
-    async fn run_edge_node(&mut self, committee: Committee) {
-        info!("Not on narwhal committee running edge node service");
-
-        // Let the execution state know you are not on committee
-        self.execution_state.set_committee_status(false);
-
-        let mut edge_service = EdgeService::new(committee, self.pub_sub.clone());
-
-        edge_service.start(self.execution_state.clone()).await;
-
-        self.consensus = Some(edge_service.into());
-    }
-
     async fn run_narwhal(
         &mut self,
         store: NodeStorage,
@@ -285,7 +274,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         self.wait_to_signal_epoch_change(time_until_epoch_change, epoch)
             .await;
 
-        self.consensus = Some(service.into())
+        self.consensus = Some(service)
     }
 }
 
@@ -308,9 +297,10 @@ impl<C: Collection> WithStartAndShutdown for Consensus<C> {
             .await
             .take()
             .expect("Consensus was tried to start before initialization");
-
         self.is_running.store(true, Ordering::Relaxed);
+
         task::spawn(async move {
+            let edge_node = epoch_state.spawn_edge_consensus(reconfigure_notify.clone());
             epoch_state.start_current_epoch().await;
             loop {
                 let reconfigure_future = reconfigure_notify.notified();
@@ -320,9 +310,10 @@ impl<C: Collection> WithStartAndShutdown for Consensus<C> {
 
                 select! {
                     _ = shutdown_future => {
-                        if let Some(mut consensus) = epoch_state.consensus.take() {
+                        if let Some(consensus) = epoch_state.consensus.take() {
                             consensus.shutdown().await;
                         }
+                        edge_node.shutdown().await;
                         break
                     }
                     _ = reconfigure_future => {
@@ -368,10 +359,6 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         let reconfigure_notify = Arc::new(Notify::new());
         let new_block_notify = Arc::new(Notify::new());
         let networking_keypair = NetworkKeyPair::from(primary_sk);
-        // Todo(dalton): Is clone neccasarry here
-        let node_index = query_runner
-            .pubkey_to_index(networking_keypair.public().clone().into())
-            .unwrap_or_default();
         let primary_keypair = KeyPair::from(consensus_sk);
         let forwarder = Forwarder::new(query_runner.clone(), primary_keypair.public().clone());
         let narwhal_args = NarwhalArgs {
@@ -381,12 +368,14 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             registry_service: RegistryService::new(registry),
         };
 
+        // Todo(dalton): Figure out better default channel size
+        let (tx_narwhal_batches, rx_narwhal_batches) = mpsc::channel(1000);
+
         let execution_state = Arc::new(Execution::new(
             executor,
             reconfigure_notify.clone(),
             new_block_notify.clone(),
-            pubsub.clone(),
-            node_index,
+            tx_narwhal_batches,
         ));
         let epoch_state = EpochState::new(
             query_runner,
@@ -395,7 +384,9 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             execution_state,
             signer.get_socket(),
             pubsub,
+            rx_narwhal_batches,
         );
+
         Ok(Self {
             epoch_state: Mutex::new(Some(epoch_state)),
             mempool_socket: TokioSpawn::spawn_async(forwarder),

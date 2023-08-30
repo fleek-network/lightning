@@ -4,6 +4,7 @@ use std::time::Duration;
 use affair::Socket;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
+use lightning_types::NodeIndex;
 
 use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
@@ -126,6 +127,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Returns the committee members of the current epoch.
     fn get_committee_members(&self) -> Vec<NodePublicKey>;
+
+    /// Returns the committee members of the current epoch by NodeIndex
+    fn get_committee_members_by_index(&self) -> Vec<NodeIndex>;
 
     /// Returns just the current epoch
     fn get_epoch(&self) -> Epoch;
