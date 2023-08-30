@@ -55,7 +55,7 @@ pub struct Endpoint {
     /// Ongoing dialing task futures.
     ongoing_dial: FuturesUnordered<BoxFuture<'static, (NodePublicKey, Result<Connection>)>>,
     /// Pending dialing tasks.
-    pending_dial: HashMap<NodeAddress, CancellationToken>,
+    pending_dial: HashMap<NodePublicKey, CancellationToken>,
 }
 
 impl Endpoint {
@@ -107,8 +107,8 @@ impl Endpoint {
         // Todo: Pass this to driver task to let us know that we need to remove this from driver
         // map.
         let (event_tx, event_rx) = mpsc::channel(1024);
-        // Todo: abort dial tasks.
         let (message_tx, message_rx) = mpsc::channel(1024);
+        self.cancel_dial(&peer);
         self.driver.insert(peer, message_tx.clone());
         self.driver_set.spawn(async move {
             if let Err(e) = driver::start_driver(connection, message_rx, event_tx, accept).await {
@@ -144,7 +144,7 @@ impl Endpoint {
 
     fn enqueue_dial_task(&mut self, address: NodeAddress) {
         let cancel = CancellationToken::new();
-        self.pending_dial.insert(address, cancel.clone());
+        self.pending_dial.insert(address.pk, cancel.clone());
         let endpoint = self.endpoint.clone();
         let fut = async move {
             // Todo: Add config.
@@ -163,5 +163,11 @@ impl Endpoint {
         }
         .boxed();
         self.ongoing_dial.push(fut);
+    }
+
+    fn cancel_dial(&mut self, peer: &NodePublicKey) {
+        if let Some(cancel) = self.pending_dial.remove(peer) {
+            cancel.cancel();
+        }
     }
 }
