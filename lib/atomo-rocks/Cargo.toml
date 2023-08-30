@@ -11,3 +11,8 @@ repository = "https://github.com/fleek-network/lightning"
 atomo.workspace = true
 rocksdb = "0.21"
 fxhash = "0.2"
+anyhow.workspace = true
+
+
+[dev-dependencies]
+rand = "0.8"

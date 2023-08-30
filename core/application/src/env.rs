@@ -6,12 +6,14 @@ use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
+use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     AccountInfo,
     Block,
     BlockExecutionResponse,
     Committee,
     CommodityTypes,
+    CompressionAlgorithm,
     Epoch,
     ExecutionData,
     Metadata,
@@ -27,6 +29,7 @@ use lightning_interfaces::types::{
     TransactionResponse,
     Value,
 };
+use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
 
 use crate::config::{Config, Mode, StorageConfig};
 use crate::genesis::{Genesis, GenesisPrices};
@@ -106,8 +109,12 @@ impl Env<UpdatePerm> {
     }
 
     #[autometrics::autometrics]
-    fn run(&mut self, block: Block) -> BlockExecutionResponse {
-        self.inner.run(move |ctx| {
+    fn run<F, P>(&mut self, block: Block, get_putter: F) -> BlockExecutionResponse
+    where
+        F: FnOnce() -> P,
+        P: IncrementalPutInterface,
+    {
+        let response = self.inner.run(move |ctx| {
             // Create the app/execution enviroment
             let backend = StateTables {
                 table_selector: ctx,
@@ -141,7 +148,28 @@ impl Env<UpdatePerm> {
 
             // Return the response
             response
-        })
+        });
+
+        if response.change_epoch {
+            let storage = self.inner.get_storage_backend_unsafe();
+            // This will return `None` only if the InMemory backend is used.
+            if let Some(checkpoint) = storage.serialize() {
+                let mut blockstore_put = get_putter();
+                blockstore_put
+                    .write(checkpoint.as_slice(), CompressionAlgorithm::Uncompressed)
+                    .unwrap();
+                let state_hash = futures::executor::block_on(blockstore_put.finalize()).unwrap();
+                self.inner.run(move |ctx| {
+                    let backend = StateTables {
+                        table_selector: ctx,
+                    };
+                    let app = State::new(backend);
+                    app.set_last_epoch_hash(state_hash);
+                })
+            }
+        }
+
+        response
     }
 
     /// Returns an identical enviroment but with query permissions
@@ -198,6 +226,9 @@ impl Env<UpdatePerm> {
                 ctx.get_table::<(NodeIndex, NodeIndex), Duration>("latencies");
             let mut consensus_key_to_index_table = ctx.get_table::<ConsensusPublicKey, NodeIndex>("consensus_key_to_index");
             let mut pub_key_to_index_table = ctx.get_table::<NodePublicKey, NodeIndex>("pub_key_to_index");
+            
+            // TODO(matthias): should we hash the genesis state instead?
+            metadata_table.insert(Metadata::LastEpochHash, Value::Hash([0; 32]));
 
             metadata_table.insert(
                 Metadata::ProtocolFundAddress,
@@ -355,20 +386,21 @@ impl Default for Env<UpdatePerm> {
 }
 
 /// The socket that recieves all update transactions
-pub struct UpdateWorker {
+pub struct UpdateWorker<C: Collection> {
     env: Env<UpdatePerm>,
+    blockstore: C::BlockStoreInterface,
 }
 
-impl UpdateWorker {
-    pub fn new(env: Env<UpdatePerm>) -> Self {
-        Self { env }
+impl<C: Collection> UpdateWorker<C> {
+    pub fn new(env: Env<UpdatePerm>, blockstore: C::BlockStoreInterface) -> Self {
+        Self { env, blockstore }
     }
 }
 
-impl WorkerTrait for UpdateWorker {
+impl<C: Collection> WorkerTrait for UpdateWorker<C> {
     type Request = Block;
     type Response = BlockExecutionResponse;
     fn handle(&mut self, req: Self::Request) -> Self::Response {
-        self.env.run(req)
+        self.env.run(req, || self.blockstore.put(None))
     }
 }

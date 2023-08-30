@@ -126,13 +126,16 @@ async fn test_query() {
         true,
     ));
 
-    let app = Application::<TestBinding>::init(AppConfig {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    })
+    let app = Application::<TestBinding>::init(
+        AppConfig {
+            genesis: Some(genesis),
+            mode: Mode::Test,
+            storage: StorageConfig::InMemory,
+            db_path: None,
+            db_options: None,
+        },
+        Default::default(),
+    )
     .unwrap();
     app.start().await;
 
@@ -276,13 +279,16 @@ async fn test_submit_measurements() {
     genesis.epoch_start = epoch_start;
     genesis.epoch_time = 4000; // millis
 
-    let app = Application::<TestBinding>::init(AppConfig {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    })
+    let app = Application::<TestBinding>::init(
+        AppConfig {
+            genesis: Some(genesis),
+            mode: Mode::Test,
+            storage: StorageConfig::InMemory,
+            db_path: None,
+            db_options: None,
+        },
+        Default::default(),
+    )
     .unwrap();
     app.start().await;
 
@@ -453,13 +459,16 @@ async fn test_reputation_calculation_and_query() {
     genesis.epoch_start = epoch_start;
     genesis.epoch_time = 4000; // millis
 
-    let app = Application::<TestBinding>::init(AppConfig {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    })
+    let app = Application::<TestBinding>::init(
+        AppConfig {
+            genesis: Some(genesis),
+            mode: Mode::Test,
+            storage: StorageConfig::InMemory,
+            db_path: None,
+            db_options: None,
+        },
+        Default::default(),
+    )
     .unwrap();
     app.start().await;
 

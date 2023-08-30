@@ -1,7 +1,9 @@
 //! A [`rocksdb`] storage backend implementation for [`atomo`].
 
+mod serialization;
 use std::path::PathBuf;
 
+use anyhow::Result;
 use atomo::batch::Operation;
 use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackend, StorageBackendConstructor};
 use fxhash::FxHashMap;
@@ -9,6 +11,7 @@ use fxhash::FxHashMap;
 pub use rocksdb::Options;
 pub use rocksdb::{Cache, Env};
 use rocksdb::{ColumnFamilyDescriptor, WriteBatch};
+use serialization::serialize_db;
 
 /// Helper alias for an [`atomo::AtomoBuilder`] using a [`RocksBackendBuilder`].
 pub type AtomoBuilderWithRocks<S = DefaultSerdeBackend> = AtomoBuilder<RocksBackendBuilder, S>;
@@ -103,6 +106,15 @@ impl StorageBackendConstructor for RocksBackendBuilder {
 pub struct RocksBackend {
     db: rocksdb::DB,
     columns: Vec<String>,
+}
+
+impl RocksBackend {
+    pub fn serialize(&self) -> Vec<u8> {
+        // We can safely unwrap here.
+        // This will only panic if the table names in `columns` are not consistent with the
+        // database.
+        serialize_db(&self.db, &self.columns).unwrap()
+    }
 }
 
 impl StorageBackend for RocksBackend {

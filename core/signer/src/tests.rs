@@ -62,13 +62,16 @@ async fn test_send_two_txs_in_a_row() {
         true,
     ));
 
-    let app = Application::<TestBinding>::init(AppConfig {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    })
+    let app = Application::<TestBinding>::init(
+        AppConfig {
+            genesis: Some(genesis),
+            mode: Mode::Test,
+            storage: StorageConfig::InMemory,
+            db_path: None,
+            db_options: None,
+        },
+        Default::default(),
+    )
     .unwrap();
     app.start().await;
 
@@ -149,13 +152,16 @@ async fn test_retry_send() {
         true,
     ));
 
-    let app = Application::<TestBinding>::init(AppConfig {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    })
+    let app = Application::<TestBinding>::init(
+        AppConfig {
+            genesis: Some(genesis),
+            mode: Mode::Test,
+            storage: StorageConfig::InMemory,
+            db_path: None,
+            db_options: None,
+        },
+        Default::default(),
+    )
     .unwrap();
     app.start().await;
 
@@ -216,7 +222,7 @@ async fn test_retry_send() {
 
 #[tokio::test]
 async fn test_shutdown() {
-    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
     let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
     let consensus = MockConsensus::<TestBinding>::init(
@@ -242,7 +248,7 @@ async fn test_shutdown() {
 
 #[tokio::test]
 async fn test_shutdown_and_start_again() {
-    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
     let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
     let consensus = MockConsensus::<TestBinding>::init(
@@ -274,7 +280,7 @@ async fn test_shutdown_and_start_again() {
 
 #[tokio::test]
 async fn test_sign_raw_digest() {
-    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
     let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
     let consensus = MockConsensus::<TestBinding>::init(
@@ -317,7 +323,7 @@ async fn test_load_keys() {
             .expect("Failed to resolve path"),
     };
 
-    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
     let (_, query_runner) = (app.transaction_executor(), app.sync_query());
     let signer = Signer::<TestBinding>::init(config, query_runner).unwrap();
 
@@ -351,7 +357,8 @@ async fn test_fail_to_encode_keys() {
 
     let result = std::panic::catch_unwind(|| {
         futures::executor::block_on(async move {
-            let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
+            let app =
+                Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
             let (_, query_runner) = (app.transaction_executor(), app.sync_query());
             Signer::<TestBinding>::init(config, query_runner).unwrap();
         })
@@ -384,7 +391,7 @@ async fn test_no_keys_exist() {
             .expect("Failed to resolve path"),
     };
 
-    let app = Application::<TestBinding>::init(AppConfig::test()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
     let (_, query_runner) = (app.transaction_executor(), app.sync_query());
     let signer = Signer::<TestBinding>::init(config, query_runner);
 

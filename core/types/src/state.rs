@@ -68,6 +68,7 @@ pub enum Metadata {
     ProtocolFundAddress,
     NextNodeIndex,
     GovernanceAddress,
+    LastEpochHash,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -78,6 +79,7 @@ pub enum Value {
     HpUfixed(HpUfixed<18>),
     AccountPublicKey(EthAddress),
     NextNodeIndex(u32),
+    Hash([u8; 32]),
 }
 
 /// Adjustable parameters that are stored in the blockchain

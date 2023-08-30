@@ -50,7 +50,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
     type SyncExecutor = QueryRunner;
 
     /// Create a new instance of the application layer using the provided configuration.
-    fn init(config: Self::Config) -> Result<Self> {
+    fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> Result<Self> {
         if let StorageConfig::RocksDb = &config.storage {
             assert!(
                 config.db_path.is_some(),
@@ -66,7 +66,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
 
         Ok(Self {
             query_runner: env.query_runner(),
-            update_socket: TokioSpawn::spawn(UpdateWorker::new(env)),
+            update_socket: TokioSpawn::spawn(UpdateWorker::<C>::new(env, blockstore)),
             collection: PhantomData,
         })
     }

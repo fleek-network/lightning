@@ -72,6 +72,15 @@ pub enum AtomoStorage {
     RocksDb(RocksBackend),
 }
 
+impl AtomoStorage {
+    pub fn serialize(&self) -> Option<Vec<u8>> {
+        match &self {
+            AtomoStorage::InMemory(_storage) => None,
+            AtomoStorage::RocksDb(storage) => Some(storage.serialize()),
+        }
+    }
+}
+
 impl StorageBackend for AtomoStorage {
     fn commit(&self, batch: atomo::batch::VerticalBatch) {
         match &self {

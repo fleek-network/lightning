@@ -811,8 +811,10 @@ dependencies = [
 name = "atomo-rocks"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "atomo",
  "fxhash",
+ "rand 0.8.5",
  "rocksdb",
 ]
 
@@ -3950,6 +3952,7 @@ dependencies = [
  "bincode",
  "fleek-blake3",
  "fleek-crypto",
+ "futures",
  "hp-fixed",
  "infusion",
  "lazy_static",

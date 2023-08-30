@@ -278,14 +278,16 @@ mod tests {
 
         // we dont actually use query runner, so it doesn't really matter
 
-        let application =
-            Application::<TestBinding>::init(lightning_application::config::Config {
+        let application = Application::<TestBinding>::init(
+            lightning_application::config::Config {
                 mode: Mode::Test,
                 genesis: None,
                 storage: StorageConfig::InMemory,
                 db_path: None,
                 db_options: None,
-            })?;
+            },
+            Default::default(),
+        )?;
         let query_runner = application.sync_query();
 
         // create pool a

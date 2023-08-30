@@ -368,15 +368,17 @@ mod tests {
     }
 
     fn get_reputation_query() -> lightning_rep_collector::MyReputationQuery {
-        let application =
-            Application::<PartialBinding>::init(lightning_application::config::Config {
+        let application = Application::<PartialBinding>::init(
+            lightning_application::config::Config {
                 mode: Mode::Test,
                 genesis: None,
                 storage: StorageConfig::InMemory,
                 db_path: None,
                 db_options: None,
-            })
-            .unwrap();
+            },
+            Default::default(),
+        )
+        .unwrap();
         let query_runner = application.sync_query();
 
         let signer = Signer::<PartialBinding>::init(

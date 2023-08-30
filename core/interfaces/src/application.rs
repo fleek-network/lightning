@@ -24,7 +24,7 @@ use crate::types::{
     TransactionResponse,
     UpdateRequest,
 };
-use crate::ConfigProviderInterface;
+use crate::{BlockStoreInterface, ConfigProviderInterface};
 
 /// The socket that is handled by the application layer and fed by consensus (or other
 /// synchronization systems in place) which executes and persists transactions that
@@ -41,16 +41,16 @@ pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
 pub trait ApplicationInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
-    fn _init(config: ::ConfigProviderInterface) {
+    fn _init(config: ::ConfigProviderInterface, blockstore: ::BlockStoreInterface) {
         let config = config.get::<Self>();
-        Self::init(config)
+        Self::init(config, blockstore.clone())
     }
 
     /// The type for the sync query executor.
     type SyncExecutor: SyncQueryRunnerInterface;
 
     /// Create a new instance of the application layer using the provided configuration.
-    fn init(config: Self::Config) -> anyhow::Result<Self>;
+    fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self>;
 
     /// Returns a socket that should be used to submit transactions to be executed
     /// by the application layer.

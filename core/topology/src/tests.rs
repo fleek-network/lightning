@@ -147,13 +147,16 @@ async fn test_build_latency_matrix() {
     });
     genesis.latencies = Some(latencies);
 
-    let app = Application::<TestBinding>::init(AppConfig {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    })
+    let app = Application::<TestBinding>::init(
+        AppConfig {
+            genesis: Some(genesis),
+            mode: Mode::Test,
+            storage: StorageConfig::InMemory,
+            db_path: None,
+            db_options: None,
+        },
+        Default::default(),
+    )
     .unwrap();
 
     let query_runner = app.sync_query();

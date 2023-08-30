@@ -635,7 +635,7 @@ impl<B: Backend> State<B> {
 
         // If more than 2/3rds of the committee have signaled, start the epoch change process
         if current_committee.ready_to_change.len() > (2 * current_committee.members.len() / 3) {
-            // Todo: Reward nodes, calculate rep?, choose new committee, increment epoch.
+            // Todo: Reward nodes, choose new committee, increment epoch.
             self.calculate_reputation_scores();
             self.distribute_rewards();
 
@@ -812,6 +812,12 @@ impl<B: Backend> State<B> {
             .filter_map(|key| self.node_info.get(&key).map(|node| (key, node)))
             .filter(|(_, node)| node.stake.staked >= minimum_stake.into())
             .collect()
+    }
+
+    // This function should only be called in the `run` method on `Env`.
+    pub fn set_last_epoch_hash(&self, state_hash: [u8; 32]) {
+        self.metadata
+            .set(Metadata::LastEpochHash, Value::Hash(state_hash));
     }
 
     fn add_service(

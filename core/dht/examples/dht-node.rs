@@ -132,13 +132,16 @@ async fn start_node(
     secret_key: NodeSecretKey,
     bootstrapper: Option<(SocketAddr, NodePublicKey)>,
 ) -> DhtSocket {
-    let application = Application::<PartialBinding>::init(lightning_application::config::Config {
-        mode: Mode::Test,
-        genesis: None,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    })
+    let application = Application::<PartialBinding>::init(
+        lightning_application::config::Config {
+            mode: Mode::Test,
+            genesis: None,
+            storage: StorageConfig::InMemory,
+            db_path: None,
+            db_options: None,
+        },
+        Default::default(),
+    )
     .unwrap();
     let _query_runner = application.sync_query();
     let mut builder = Builder::<PartialBinding>::new(
