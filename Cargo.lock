@@ -5429,7 +5429,9 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bytes",
+ "clap 4.3.17",
  "der 0.7.7",
+ "env_logger 0.10.0",
  "fleek-blake3",
  "fleek-crypto",
  "futures",

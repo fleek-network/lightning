@@ -1,0 +1,87 @@
+use std::net::SocketAddr;
+use std::str::FromStr;
+use std::time::Duration;
+
+use clap::{Parser, Subcommand};
+use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
+use netkit::builder::Builder;
+use netkit::endpoint::{Event, NodeAddress, Request};
+
+#[derive(Parser)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Pulse {
+        #[arg(short, long)]
+        peer_key: Vec<String>,
+        #[arg(short, long)]
+        peer_address: Vec<SocketAddr>,
+        message: String,
+    },
+    Listen,
+}
+
+#[tokio::main]
+async fn main() {
+    env_logger::init();
+
+    let cli = Cli::parse();
+
+    let mut endpoint = Builder::new(NodeSecretKey::generate()).build().unwrap();
+
+    match cli.command {
+        Commands::Pulse {
+            peer_key,
+            peer_address,
+            message,
+        } => {
+            if peer_key.len() != peer_address.len() {
+                panic!("must pass peer key and peer address");
+            }
+
+            let request_tx = endpoint.request_sender();
+            let mut event_rx = endpoint.network_event_receiver();
+            tokio::spawn(endpoint.start());
+            let mut interval = tokio::time::interval(Duration::from_secs(2));
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        for (pk, socket_address) in peer_key.iter().zip(peer_address.iter()) {
+                            let pk = NodePublicKey::from_str(&pk).unwrap();
+                            let address = NodeAddress {
+                                pk,
+                                socket_address: *socket_address,
+                            };
+                            request_tx.send(
+                                Request::SendMessage {
+                                    peer: address,
+                                    message: message.as_bytes().to_vec(),
+                                }
+                            ).await
+                            .unwrap();
+                        }
+                    }
+                    event = event_rx.recv() => {
+                        if event.is_none() {
+                            break;
+                        }
+                        let event = event.unwrap();
+                        match event {
+                            Event::Message { peer, message } => {
+                                tracing::info!("new message from {peer:?}: {message:?}");
+                            }
+                            Event::NewConnection { peer, rtt } => {
+                                tracing::info!("new connection from {peer:?} with {rtt:?}");
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        Commands::Listen => {},
+    }
+}

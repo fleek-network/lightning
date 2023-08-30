@@ -1,4 +1,5 @@
-mod builder;
 mod driver;
-mod endpoint;
 mod tls;
+
+pub mod builder;
+pub mod endpoint;
