@@ -1,16 +1,14 @@
-use std::any::Any;
 use std::collections::HashMap;
-use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{Error, Result};
+use anyhow::Result;
 use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
-use quinn::{ClientConfig, Connecting, Connection, ConnectionError};
+use quinn::{ClientConfig, Connecting, Connection};
 use rustls::Certificate;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
@@ -263,7 +261,7 @@ impl Endpoint {
         let endpoint = self.endpoint.clone();
         let tls_config = tls::make_client_config(&self.sk, Some(address.pk))?;
         let fut = async move {
-            let mut client_config = ClientConfig::new(Arc::new(tls_config));
+            let client_config = ClientConfig::new(Arc::new(tls_config));
             let connect = || async move {
                 endpoint
                     .connect_with(client_config, address.socket_address, "localhost")?

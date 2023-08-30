@@ -40,6 +40,8 @@ impl Builder {
             .address
             .unwrap_or_else(|| "0.0.0.0:0".parse().expect("hardcoded IP address"));
 
+        tracing::info!("binding to {address:?}");
+
         let endpoint = quinn::Endpoint::server(server_config, address)?;
 
         Ok(Endpoint::new(self.sk, endpoint))

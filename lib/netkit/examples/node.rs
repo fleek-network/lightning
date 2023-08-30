@@ -31,7 +31,14 @@ async fn main() {
 
     let cli = Cli::parse();
 
-    let mut endpoint = Builder::new(NodeSecretKey::generate()).build().unwrap();
+    let sk = NodeSecretKey::generate();
+    tracing::info!("public key {:?}", sk.to_pk());
+    let mut endpoint = Builder::new(sk).build().unwrap();
+
+    let request_tx = endpoint.request_sender();
+    let mut event_rx = endpoint.network_event_receiver();
+
+    tokio::spawn(endpoint.start());
 
     match cli.command {
         Commands::Pulse {
@@ -43,13 +50,11 @@ async fn main() {
                 panic!("must pass peer key and peer address");
             }
 
-            let request_tx = endpoint.request_sender();
-            let mut event_rx = endpoint.network_event_receiver();
-            tokio::spawn(endpoint.start());
             let mut interval = tokio::time::interval(Duration::from_secs(2));
             loop {
                 tokio::select! {
                     _ = interval.tick() => {
+                        tracing::info!("sending message");
                         for (pk, socket_address) in peer_key.iter().zip(peer_address.iter()) {
                             let pk = NodePublicKey::from_str(&pk).unwrap();
                             let address = NodeAddress {
@@ -82,6 +87,23 @@ async fn main() {
                 }
             }
         },
-        Commands::Listen => {},
+        Commands::Listen => loop {
+            tokio::select! {
+                event = event_rx.recv() => {
+                    if event.is_none() {
+                        break;
+                    }
+                    let event = event.unwrap();
+                    match event {
+                        Event::Message { peer, message } => {
+                            tracing::info!("new message from {peer:?}: {message:?}");
+                        }
+                        Event::NewConnection { peer, rtt } => {
+                            tracing::info!("new connection from {peer:?} with {rtt:?}");
+                        }
+                    }
+                }
+            }
+        },
     }
 }

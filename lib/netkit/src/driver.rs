@@ -4,9 +4,9 @@ use fleek_crypto::NodePublicKey;
 use futures::{SinkExt, StreamExt};
 use quinn::Connection;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio_util::codec::{Framed, FramedRead, FramedWrite, LengthDelimitedCodec};
+use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-use crate::endpoint::{Event, Message, NodeAddress};
+use crate::endpoint::{Event, Message};
 
 pub async fn start_driver(
     connection: Connection,
