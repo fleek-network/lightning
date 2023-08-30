@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -11,6 +12,7 @@ use lightning_interfaces::{
     ConfigConsumer,
     ContentChunk,
 };
+use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use tempdir::TempDir;
 use tokio::fs::{self, File};
@@ -22,14 +24,24 @@ use crate::{Block, BlockContent, Key};
 
 const TMP_DIR_PREFIX: &str = "tmp-store";
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize)]
 pub struct FsStoreConfig {
-    store_dir_path: String,
+    pub store_dir_path: ResolvedPathBuf,
+}
+
+impl Default for FsStoreConfig {
+    fn default() -> Self {
+        Self {
+            store_dir_path: "~/.lightning/data/blockstore"
+                .try_into()
+                .expect("Failed to resolve path"),
+        }
+    }
 }
 
 #[derive(Clone)]
 pub struct FsStore<C: Collection> {
-    store_dir_path: String,
+    store_dir_path: PathBuf,
     tmp_dir: Arc<TempDir>,
     collection: PhantomData<C>,
 }
@@ -46,7 +58,7 @@ impl<C: Collection> BlockStoreInterface<C> for FsStore<C> {
 
     fn init(config: Self::Config) -> anyhow::Result<Self> {
         Ok(Self {
-            store_dir_path: config.store_dir_path,
+            store_dir_path: config.store_dir_path.clone(),
             tmp_dir: TempDir::new(TMP_DIR_PREFIX).map(Arc::new)?,
             collection: PhantomData,
         })
@@ -99,7 +111,7 @@ where
     C: Collection,
 {
     async fn fetch(&self, key: &Key) -> Option<Block> {
-        let path = format!("{}/{:?}", self.store_dir_path, key.0);
+        let path = format!("{:?}/{:?}", self.store_dir_path, key.0);
         fs::read(path).await.ok()
     }
 
@@ -115,7 +127,7 @@ where
             if tmp_file.sync_all().await.is_err() {
                 return;
             }
-            let store_path = format!("{}/{:?}", self.store_dir_path, key.0);
+            let store_path = format!("{:?}/{:?}", self.store_dir_path, key.0);
             if fs::rename(path, store_path).await.is_err() {
                 return;
             }

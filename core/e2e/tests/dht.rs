@@ -27,7 +27,7 @@ partial!(PartialBinding {
 
 #[tokio::test]
 #[serial]
-async fn e2e_dht() -> Result<()> {
+async fn e2e_dht_put_and_get() -> Result<()> {
     logging::setup();
 
     // Start epoch now and let it end in 20 seconds.

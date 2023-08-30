@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 lightning-interfaces = { path="../interfaces" }
 bincode.workspace = true
+resolved-pathbuf.workspace = true
 blake3-tree = { path = "../../lib/blake3-tree"}
 anyhow.workspace = true
 async-trait.workspace = true
