@@ -1,4 +1,7 @@
 pub mod deque;
+pub mod handle;
+pub mod service;
+pub mod shim;
 
 // #[test]
 // fn x() {

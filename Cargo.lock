@@ -7554,11 +7554,15 @@ dependencies = [
 name = "service-executor"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-channel",
+ "async-trait",
  "fleek-service-ping-example",
  "fn-sdk",
  "lightning-interfaces",
+ "serde",
  "tokio",
+ "triomphe",
 ]
 
 [[package]]

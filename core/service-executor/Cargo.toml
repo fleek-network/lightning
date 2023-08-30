@@ -9,7 +9,11 @@ edition.workspace = true
 lightning-interfaces = { path = "../interfaces/" }
 fn-sdk = { path = "../../lib/sdk" }
 tokio.workspace = true
+async-trait.workspace = true
+anyhow.workspace = true
+serde.workspace = true
 async-channel = "1.9.0"
+triomphe = "0.1.9"
 
 # Built-in services
 fleek-service-ping-example = { path = "../../services/ping" }

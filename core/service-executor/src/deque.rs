@@ -1,3 +1,6 @@
+//! Implementation of functionality related to the connection work queue that we give
+//! to `handshake`.
+
 use std::future::Future;
 use std::pin::Pin;
 use std::task::Poll;
