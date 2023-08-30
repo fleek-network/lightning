@@ -7,13 +7,13 @@ use fleek_crypto::NodePublicKey;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
-use quinn::Connection;
+use quinn::{Connecting, Connection, ConnectionError};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 
-use crate::driver;
+use crate::{driver, tls};
 
 pub type Message = Vec<u8>;
 
@@ -56,6 +56,8 @@ pub struct Endpoint {
     ongoing_dial: FuturesUnordered<BoxFuture<'static, (NodePublicKey, Result<Connection>)>>,
     /// Pending dialing tasks.
     pending_dial: HashMap<NodePublicKey, CancellationToken>,
+    /// Connecting attempts.
+    connecting: FuturesUnordered<BoxFuture<'static, Result<(NodePublicKey, Connection)>>>,
 }
 
 impl Endpoint {
@@ -68,6 +70,7 @@ impl Endpoint {
             driver_set: JoinSet::new(),
             ongoing_dial: FuturesUnordered::new(),
             pending_dial: HashMap::new(),
+            connecting: FuturesUnordered::new(),
         }
     }
 
@@ -80,6 +83,22 @@ impl Endpoint {
                         Some(request) => request,
                     };
                     self.handle_request(request);
+                }
+                connecting = self.endpoint.accept() => {
+                    match connecting {
+                        None => break,
+                        Some(connecting) => self.handle_incoming_connection(connecting),
+                    }
+                }
+                Some(incoming) = self.connecting.next() => {
+                    let (peer_pk, connection) = match incoming {
+                        Ok(conn) => conn,
+                        Err(e) => {
+                            tracing::error!("incoming connection failed: {e:?}");
+                            continue;
+                        },
+                    };
+                    self.handle_connection(peer_pk, connection, true)
                 }
                 Some((peer_pk, connection_result)) = self.ongoing_dial.next() => {
                     match connection_result {
@@ -100,6 +119,25 @@ impl Endpoint {
             }
         }
         Ok(())
+    }
+
+    fn handle_incoming_connection(&mut self, connecting: Connecting) {
+        let fut = async move {
+            let connection = connecting.await?;
+            let peer_pk = match connection.peer_identity() {
+                None => unreachable!("failed to get peer identity from successful TLS handshake"),
+                Some(any) => {
+                    let chain = any
+                        .downcast::<Vec<rustls::Certificate>>()
+                        .map_err(|_| anyhow::anyhow!("invalid peer certificate"))?;
+                    let certificate = chain.first().expect("TLS handshake was successful");
+                    tls::parse_unverified(certificate.as_ref())?.peer_pk()
+                },
+            };
+            Ok((peer_pk, connection))
+        }
+        .boxed();
+        self.connecting.push(fut);
     }
 
     fn handle_connection(&mut self, peer: NodePublicKey, connection: Connection, accept: bool) {
