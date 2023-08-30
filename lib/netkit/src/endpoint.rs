@@ -58,10 +58,16 @@ pub struct Endpoint {
     driver: HashMap<NodePublicKey, Sender<Message>>,
     /// Ongoing drivers.
     driver_set: JoinSet<NodePublicKey>,
+    /// Receiver for network events.
+    network_event_tx: Sender<Message>,
+    /// Receiver for network events.
+    network_event_rx: Option<Receiver<Message>>,
 }
 
 impl Endpoint {
     pub fn new(endpoint: quinn::Endpoint, request_rx: Receiver<Request>) -> Self {
+        let (network_event_tx, network_event_rx) = mpsc::channel(1024);
+
         Self {
             endpoint,
             request_rx,
@@ -70,8 +76,20 @@ impl Endpoint {
             driver_set: JoinSet::new(),
             connecting: FuturesUnordered::new(),
             pending_dial: HashMap::new(),
+            network_event_tx,
+            network_event_rx: Some(network_event_rx),
         }
     }
+
+    /// Returns receiver for network events.
+    ///
+    /// Panics if called more than once.
+    pub fn network_event_receiver(&mut self) -> Receiver<Message> {
+        self.network_event_rx
+            .take()
+            .expect("To be called called once")
+    }
+
     // Todo: Return metrics.
     pub async fn start(mut self) -> Result<()> {
         loop {
@@ -164,12 +182,10 @@ impl Endpoint {
 
     fn handle_connection(&mut self, peer: NodePublicKey, connection: Connection, accept: bool) {
         // Todo: expose this to clients.
-        // Todo: Pass this to driver task to let us know that we need to remove this from driver
-        // map.
-        let (event_tx, event_rx) = mpsc::channel(1024);
         let (message_tx, message_rx) = mpsc::channel(1024);
         self.cancel_dial(&peer);
         self.driver.insert(peer, message_tx.clone());
+        let event_tx = self.network_event_tx.clone();
         self.driver_set.spawn(async move {
             if let Err(e) = driver::start_driver(connection, message_rx, event_tx, accept).await {
                 tracing::error!("driver for connection with {peer:?} shutdowned: {e:?}")
