@@ -14,11 +14,13 @@ use resolved_pathbuf::ResolvedPathBuf;
 use crate::config::TomlConfigProvider;
 use crate::shutdown::ShutdownController;
 
+const DEFAULT_CONFIG_PATH: &str = "~/.lightning/config.toml";
+
 #[derive(Parser)]
 #[command(about, version)]
 pub struct CliArgs {
     /// Path to the toml configuration file
-    #[arg(short, long, default_value = "~/.lightning/config.toml")]
+    #[arg(short, long, default_value = DEFAULT_CONFIG_PATH)]
     pub config: PathBuf,
     /// Determines that we should be using the mock consensus backend.
     #[arg(long)]
@@ -76,7 +78,12 @@ impl<C: Collection> Cli<C> {
         Self(args, PhantomData)
     }
 }
+#[test]
+fn some() {
+    let config = PathBuf::from("/config.toml");
 
+    config.parent().unwrap();
+}
 impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterface = Signer<C>>>
     Cli<C>
 {
@@ -86,6 +93,10 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
 
         let config_path =
             ResolvedPathBuf::try_from(args.config.clone()).expect("Failed to resolve config path");
+
+        if let Some(parent_dir) = config_path.parent() {
+            let _ = fs::create_dir_all(parent_dir);
+        }
 
         match args.cmd {
             Command::Run {} => Self::run(config_path).await,
