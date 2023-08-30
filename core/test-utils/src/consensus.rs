@@ -10,32 +10,11 @@ use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::SignerInterface;
 use lightning_interfaces::types::{Block, UpdateRequest};
-use lightning_interfaces::{
-    ApplicationInterface,
-    BroadcastInterface,
-    PubSub,
-    WithStartAndShutdown,
-};
+use lightning_interfaces::{ApplicationInterface, BroadcastInterface, WithStartAndShutdown};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Notify};
 use tokio::time::{interval, sleep};
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct MockPubSub {}
-
-#[async_trait]
-impl PubSub<()> for MockPubSub {
-    /// Publish a message.
-    async fn send(&self, _msg: &()) {}
-
-    /// Await the next message in the topic, should only return `None` if there are
-    /// no longer any new messages coming. (indicating that the gossip instance is
-    /// shutdown.)
-    async fn recv(&mut self) -> Option<()> {
-        None
-    }
-}
 
 // TODO(qti3e): Should we deprecate this?
 #[allow(clippy::type_complexity)]
