@@ -1,13 +1,15 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::future::Future;
 use std::net::SocketAddr;
 
-use anyhow::Result;
+use anyhow::{Error, Result};
 use fleek_crypto::NodePublicKey;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
 use quinn::{Connecting, Connection, ConnectionError};
+use rustls::Certificate;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinSet;
@@ -53,11 +55,9 @@ pub struct Endpoint {
     /// QUIC endpoint.
     endpoint: quinn::Endpoint,
     /// Ongoing dialing task futures.
-    ongoing_dial: FuturesUnordered<BoxFuture<'static, (NodePublicKey, Result<Connection>)>>,
+    connecting: FuturesUnordered<BoxFuture<'static, ConnectionResult>>,
     /// Pending dialing tasks.
     pending_dial: HashMap<NodePublicKey, CancellationToken>,
-    /// Connecting attempts.
-    connecting: FuturesUnordered<BoxFuture<'static, Result<(NodePublicKey, Connection)>>>,
 }
 
 impl Endpoint {
@@ -68,12 +68,11 @@ impl Endpoint {
             pending_send: HashMap::new(),
             driver: HashMap::new(),
             driver_set: JoinSet::new(),
-            ongoing_dial: FuturesUnordered::new(),
-            pending_dial: HashMap::new(),
             connecting: FuturesUnordered::new(),
+            pending_dial: HashMap::new(),
         }
     }
-
+    // Todo: Return metrics.
     pub async fn start(mut self) -> Result<()> {
         loop {
             tokio::select! {
@@ -90,21 +89,25 @@ impl Endpoint {
                         Some(connecting) => self.handle_incoming_connection(connecting),
                     }
                 }
-                Some(incoming) = self.connecting.next() => {
-                    let (peer_pk, connection) = match incoming {
-                        Ok(conn) => conn,
+                Some(connection_result) = self.connecting.next() => {
+                    let ConnectionResult { accept, conn, peer} = connection_result;
+                    match conn {
+                        Ok(connection) => {
+                            // The unwrap here is safe because when accepting connections,
+                            // we will fail to connect if we cannot obtain the peer's
+                            // public key from the TLS session. When dialing, we already
+                            // have the peer's public key.
+                            self.handle_connection(peer.unwrap(), connection, accept)
+                        }
+                        Err(e) if accept => {
+                            tracing::warn!("failed to connect to peer: {e:?}");
+                        }
                         Err(e) => {
-                            tracing::error!("incoming connection failed: {e:?}");
-                            continue;
-                        },
-                    };
-                    self.handle_connection(peer_pk, connection, true)
-                }
-                Some((peer_pk, connection_result)) = self.ongoing_dial.next() => {
-                    match connection_result {
-                        Ok(connection) => self.handle_connection(peer_pk, connection, false),
-                        Err(e) => tracing::warn!("failed to connect to {peer_pk:?}: {e:?}"),
+                            // The unwrap here is safe. See comment above.
+                            tracing::warn!("failed to dial peer {:?}: {e:?}", peer.unwrap());
+                        }
                     }
+
                 }
                 Some(peer) = self.driver_set.join_next() => {
                     match peer {
@@ -123,18 +126,36 @@ impl Endpoint {
 
     fn handle_incoming_connection(&mut self, connecting: Connecting) {
         let fut = async move {
-            let connection = connecting.await?;
-            let peer_pk = match connection.peer_identity() {
-                None => unreachable!("failed to get peer identity from successful TLS handshake"),
-                Some(any) => {
-                    let chain = any
-                        .downcast::<Vec<rustls::Certificate>>()
-                        .map_err(|_| anyhow::anyhow!("invalid peer certificate"))?;
-                    let certificate = chain.first().expect("TLS handshake was successful");
-                    tls::parse_unverified(certificate.as_ref())?.peer_pk()
-                },
+            let connect = || async move {
+                let connection = connecting.await?;
+                let key = match connection.peer_identity() {
+                    None => {
+                        anyhow::bail!("failed to get peer identity from successful TLS handshake")
+                    },
+                    Some(any) => {
+                        let chain = any
+                            .downcast::<Vec<Certificate>>()
+                            .map_err(|_| anyhow::anyhow!("invalid peer certificate"))?;
+                        let certificate = chain
+                            .first()
+                            .ok_or_else(|| anyhow::anyhow!("invalid certificate chain"))?;
+                        tls::parse_unverified(certificate.as_ref())?.peer_pk()
+                    },
+                };
+                Ok((key, connection))
             };
-            Ok((peer_pk, connection))
+            match connect().await {
+                Ok((key, conn)) => ConnectionResult {
+                    accept: true,
+                    conn: Ok(conn),
+                    peer: Some(key),
+                },
+                Err(e) => ConnectionResult {
+                    accept: true,
+                    conn: Err(e),
+                    peer: None,
+                },
+            }
         }
         .boxed();
         self.connecting.push(fut);
@@ -197,10 +218,14 @@ impl Endpoint {
                 _ = cancel.cancelled() => Err(anyhow::anyhow!("dial was cancelled")),
                 connection = connect() => connection,
             };
-            (address.pk, connection)
+            ConnectionResult {
+                accept: false,
+                conn: connection,
+                peer: Some(address.pk),
+            }
         }
         .boxed();
-        self.ongoing_dial.push(fut);
+        self.connecting.push(fut);
     }
 
     fn cancel_dial(&mut self, peer: &NodePublicKey) {
@@ -208,4 +233,10 @@ impl Endpoint {
             cancel.cancel();
         }
     }
+}
+
+struct ConnectionResult {
+    pub accept: bool,
+    pub conn: Result<Connection>,
+    pub peer: Option<NodePublicKey>,
 }
