@@ -17,9 +17,9 @@ struct Cli {
 enum Commands {
     Pulse {
         #[arg(short, long)]
-        peer_key: Vec<String>,
+        key: Vec<String>,
         #[arg(short, long)]
-        peer_address: Vec<SocketAddr>,
+        address: Vec<SocketAddr>,
         message: String,
     },
     Listen,
@@ -32,7 +32,7 @@ async fn main() {
     let cli = Cli::parse();
 
     let sk = NodeSecretKey::generate();
-    tracing::info!("public key {:?}", sk.to_pk());
+    tracing::info!("public key {:?}", sk.to_pk().to_string());
     let mut endpoint = Builder::new(sk).build().unwrap();
 
     let request_tx = endpoint.request_sender();
@@ -42,8 +42,8 @@ async fn main() {
 
     match cli.command {
         Commands::Pulse {
-            peer_key,
-            peer_address,
+            key: peer_key,
+            address: peer_address,
             message,
         } => {
             if peer_key.len() != peer_address.len() {
@@ -96,10 +96,10 @@ async fn main() {
                     let event = event.unwrap();
                     match event {
                         Event::Message { peer, message } => {
-                            tracing::info!("new message from {peer:?}: {message:?}");
+                            tracing::info!("new message from {:?}: {:?}", peer.to_string(), String::from_utf8(message).unwrap());
                         }
                         Event::NewConnection { peer, rtt } => {
-                            tracing::info!("new connection from {peer:?} with {rtt:?}");
+                            tracing::info!("new connection from {:?} with rtt {rtt:?}", peer.to_string());
                         }
                     }
                 }
