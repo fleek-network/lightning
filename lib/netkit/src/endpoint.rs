@@ -10,7 +10,9 @@ use futures::{FutureExt, StreamExt};
 use quinn::Connection;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
+
 use crate::driver;
 
 pub type Message = Vec<u8>;
@@ -42,6 +44,8 @@ pub enum Request {
 pub struct Endpoint {
     /// Used for sending outbound messages to drivers.
     driver: HashMap<NodePublicKey, Sender<Message>>,
+    /// Ongoing drivers
+    driver_set: JoinSet<NodePublicKey>,
     /// Pending outgoing messages.
     pending_send: HashMap<NodePublicKey, Vec<Message>>,
     /// Input requests for the endpoint.
@@ -61,6 +65,7 @@ impl Endpoint {
             request_rx,
             pending_send: HashMap::new(),
             driver: HashMap::new(),
+            driver_set: JoinSet::new(),
             ongoing_dial: FuturesUnordered::new(),
             pending_dial: HashMap::new(),
         }
@@ -82,21 +87,35 @@ impl Endpoint {
                         Err(e) => tracing::warn!("failed to connect to {peer_pk:?}: {e:?}"),
                     }
                 }
+                Some(peer) = self.driver_set.join_next() => {
+                    match peer {
+                        Ok(pk) => {
+                            self.driver.remove(&pk);
+                        }
+                        Err(e) => {
+                            tracing::warn!("unable to clean up failed driver tasks: {e:?}");
+                        }
+                    }
+                }
             }
         }
         Ok(())
     }
 
     fn handle_connection(&mut self, peer: NodePublicKey, connection: Connection, accept: bool) {
+        // Todo: expose this to clients.
+        // Todo: Pass this to driver task to let us know that we need to remove this from driver
+        // map.
         let (event_tx, event_rx) = mpsc::channel(1024);
+        // Todo: abort dial tasks.
         let (message_tx, message_rx) = mpsc::channel(1024);
         self.driver.insert(peer, message_tx.clone());
-        tokio::spawn(async move {
+        self.driver_set.spawn(async move {
             if let Err(e) = driver::start_driver(connection, message_rx, event_tx, accept).await {
                 tracing::error!("driver for connection with {peer:?} shutdowned: {e:?}")
             }
+            peer
         });
-
     }
 
     fn handle_request(&mut self, request: Request) {
