@@ -2,6 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use infusion::c;
 use lightning_schema::LightningMessage;
+use lightning_types::NodeIndex;
 
 use crate::infu_collection::Collection;
 use crate::signer::SignerInterface;
@@ -64,6 +65,8 @@ pub trait BroadcastInterface<C: Collection>:
 #[async_trait]
 #[infusion::blank]
 pub trait PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
+    type Event: BroadcastEventInterface<T> = infusion::Blank<T>;
+
     /// Publish a message.
     async fn send(&self, msg: &T);
 
@@ -71,4 +74,24 @@ pub trait PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
     /// no longer any new messages coming. (indicating that the gossip instance is
     /// shutdown.)
     async fn recv(&mut self) -> Option<T>;
+
+    /// Receive a message with advanced functionality.
+    async fn recv_event(&mut self) -> Option<Self::Event>;
+}
+
+#[infusion::blank]
+pub trait BroadcastEventInterface<T: LightningMessage>: Send + Sync {
+    /// Should return the originator of the message.
+    fn originator(&self) -> NodeIndex;
+
+    /// Take the message. This will always initially be filled with a message.
+    fn take(&mut self) -> Option<T>;
+
+    /// Propagate the message to other peers. Unless this function is called we
+    /// should not advertise the message to other peers.
+    fn propagate(self);
+
+    /// This method should be called when the body of the message would suggest
+    /// that the originator MUST have been another node.
+    fn mark_invalid_sender(self);
 }

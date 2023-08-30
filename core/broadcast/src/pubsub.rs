@@ -3,12 +3,12 @@ use std::marker::PhantomData;
 
 use async_trait::async_trait;
 use lightning_interfaces::schema::LightningMessage;
-use lightning_interfaces::types::Topic;
-use lightning_interfaces::PubSub;
+use lightning_interfaces::types::{NodeIndex, Topic};
+use lightning_interfaces::{BroadcastEventInterface, PubSub};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::command::{Command, CommandSender, RecvCmd, SendCmd, SharedMessage};
-use crate::Message;
+use crate::{Digest, Message};
 
 pub struct PubSubI<T: LightningMessage + Clone> {
     topic: Topic,
@@ -16,6 +16,13 @@ pub struct PubSubI<T: LightningMessage + Clone> {
     last_seen: Option<usize>,
     is_alive: bool,
     message: PhantomData<T>,
+}
+
+pub struct Event<T> {
+    digest: Digest,
+    message: Option<T>,
+    originator: NodeIndex,
+    command_sender: CommandSender,
 }
 
 impl<T: LightningMessage + Clone> PubSubI<T> {
@@ -44,6 +51,8 @@ impl<T: LightningMessage + Clone> Clone for PubSubI<T> {
 
 #[async_trait]
 impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
+    type Event = Event<T>;
+
     async fn send(&self, msg: &T) {
         log::debug!("sending a message on topic {:?}", self.topic);
 
@@ -96,5 +105,68 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
                 );
             }
         }
+    }
+
+    async fn recv_event(&mut self) -> Option<Self::Event> {
+        log::debug!("brodcast::recv_event called on topic {:?}", self.topic);
+
+        if !self.is_alive {
+            return None;
+        }
+
+        loop {
+            let (tx, mut rx) = oneshot::channel();
+            self.command_sender.send(Command::Recv(RecvCmd {
+                topic: self.topic,
+                last_seen: self.last_seen,
+                response: tx,
+            }));
+
+            // Wait for the response. If we get an error just return `None`. We're never going to
+            // get anything again.
+            log::debug!("awaiting for a message in topic {:?}", self.topic);
+
+            let Ok((id, msg)) = rx.await else {
+                self.is_alive = false;
+                return None;
+            };
+
+            // Store the index of the last message we saw.
+            self.last_seen = Some(id);
+
+            if let Ok(decoded) = T::decode(&msg.payload) {
+                let event = Event::<T> {
+                    digest: msg.digest,
+                    message: Some(decoded),
+                    originator: msg.origin,
+                    command_sender: self.command_sender.clone(),
+                };
+                return Some(event);
+            } else {
+                log::info!(
+                    "received an invalid message which we couldnt not deserialize {:?}",
+                    msg
+                );
+            }
+        }
+    }
+}
+
+impl<T: LightningMessage> BroadcastEventInterface<T> for Event<T> {
+    fn originator(&self) -> NodeIndex {
+        self.originator
+    }
+
+    fn take(&mut self) -> Option<T> {
+        self.message.take()
+    }
+
+    fn propagate(self) {
+        self.command_sender.send(Command::Propagate(self.digest));
+    }
+
+    fn mark_invalid_sender(self) {
+        self.command_sender
+            .send(Command::MarkInvalidSender(self.digest));
     }
 }
