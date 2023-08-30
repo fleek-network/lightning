@@ -216,7 +216,7 @@ impl Endpoint {
         self.cancel_dial(&peer);
 
         let (message_tx, message_rx) = mpsc::channel(1024);
-        self.driver.insert(peer, message_tx.clone());
+        self.driver.insert(peer, message_tx);
 
         let event_tx = self.network_event_tx.clone();
         self.driver_set.spawn(async move {
