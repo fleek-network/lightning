@@ -5429,12 +5429,20 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bytes",
+ "der 0.7.7",
+ "fleek-blake3",
  "fleek-crypto",
  "futures",
  "quinn",
+ "rcgen 0.11.1",
+ "ring",
+ "rustls 0.21.5",
+ "thiserror",
  "tokio",
  "tokio-util 0.7.8",
  "tracing",
+ "webpki",
+ "x509-parser 0.15.1",
 ]
 
 [[package]]
