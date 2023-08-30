@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use blake3_tree::blake3::Hash;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{CompressionAlgoSet, CompressionAlgorithm};
 use lightning_interfaces::{
@@ -14,15 +15,12 @@ use lightning_interfaces::{
 };
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
-use tempdir::TempDir;
 use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
 
 use crate::put::IncrementalPut;
 use crate::store::Store;
 use crate::{Block, BlockContent, Key};
-
-const TMP_DIR_PREFIX: &str = "tmp-store";
 
 #[derive(Serialize, Deserialize)]
 pub struct FsStoreConfig {
@@ -42,7 +40,6 @@ impl Default for FsStoreConfig {
 #[derive(Clone)]
 pub struct FsStore<C: Collection> {
     store_dir_path: PathBuf,
-    tmp_dir: Arc<TempDir>,
     collection: PhantomData<C>,
 }
 
@@ -57,9 +54,9 @@ impl<C: Collection> BlockStoreInterface<C> for FsStore<C> {
     type Put = IncrementalPut<Self>;
 
     fn init(config: Self::Config) -> anyhow::Result<Self> {
+        std::fs::create_dir_all(config.store_dir_path.clone())?;
         Ok(Self {
-            store_dir_path: config.store_dir_path.clone(),
-            tmp_dir: TempDir::new(TMP_DIR_PREFIX).map(Arc::new)?,
+            store_dir_path: config.store_dir_path.to_path_buf(),
             collection: PhantomData,
         })
     }
@@ -111,14 +108,14 @@ where
     C: Collection,
 {
     async fn fetch(&self, key: &Key) -> Option<Block> {
-        let path = format!("{:?}/{:?}", self.store_dir_path, key.0);
+        let path = format!("{:?}/{}", self.store_dir_path, Hash::from(key.0).to_hex());
         fs::read(path).await.ok()
     }
 
     // TODO: This should perhaps return an error.
     async fn insert(&mut self, key: Key, block: Block) {
-        let filename = format!("{:?}", key.0);
-        let path = self.tmp_dir.path().join(filename);
+        let filename = format!("{}", Hash::from(key.0).to_hex());
+        let path = self.store_dir_path.join(filename);
         if let Ok(mut tmp_file) = File::create(&path).await {
             if tmp_file.write_all(block.as_ref()).await.is_err() {
                 return;

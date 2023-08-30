@@ -41,6 +41,7 @@ mod tests {
     use tokio::test;
 
     use crate::config::Config;
+    use crate::fs::{FsStore, FsStoreConfig};
     use crate::memory::MemoryBlockStore;
     use crate::BLAKE3_CHUNK_SIZE;
 
@@ -266,6 +267,23 @@ mod tests {
             .write(&content, CompressionAlgorithm::Uncompressed)
             .unwrap();
         // Then: the putter returns the appropriate root hash and no errors.
+        let root = putter.finalize().await.unwrap();
+        assert_eq!(root, Blake3Hash::from(hash_tree.hash));
+    }
+
+    #[test]
+    async fn test_put_fs() {
+        // Given: some content.
+        let content = create_content();
+        // Given: a block store.
+        let blockstore = FsStore::<TestBinding>::init(FsStoreConfig::default()).unwrap();
+        // When: we create a putter and write some content.
+        let mut putter = blockstore.put(None);
+        putter
+            .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
+            .unwrap();
+        // Then: the putter returns the appropriate root hash.
+        let hash_tree = hash_tree(content.as_slice());
         let root = putter.finalize().await.unwrap();
         assert_eq!(root, Blake3Hash::from(hash_tree.hash));
     }
