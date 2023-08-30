@@ -1,11 +1,11 @@
-use lightning_interfaces::ServiceHandleProviderInterface;
+use lightning_interfaces::ExecutorProviderInterface;
 use tokio::task::JoinHandle;
 
 use crate::state::{StateRef, TransportPermission};
 use crate::transports::{StaticSender, Transport, TransportReceiver};
 
 /// Attach the provided transport to the state.
-pub fn attach_transport_to_state<P: ServiceHandleProviderInterface, T: Transport>(
+pub fn attach_transport_to_state<P: ExecutorProviderInterface, T: Transport>(
     state: StateRef<P>,
     mut transport: T,
 ) -> JoinHandle<()> {
@@ -28,7 +28,7 @@ pub fn attach_transport_to_state<P: ServiceHandleProviderInterface, T: Transport
 }
 
 #[inline(always)]
-async fn run_receive_loop<P: ServiceHandleProviderInterface, T: Transport>(
+async fn run_receive_loop<P: ExecutorProviderInterface, T: Transport>(
     state: StateRef<P>,
     connection_id: u64,
     perm: TransportPermission,

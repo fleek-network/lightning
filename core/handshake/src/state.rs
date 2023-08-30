@@ -2,16 +2,16 @@ use std::ops::Deref;
 
 use dashmap::DashMap;
 use fleek_crypto::NodeSecretKey;
-use lightning_interfaces::{ServiceHandleInterface, ServiceHandleProviderInterface};
+use lightning_interfaces::{ExecutorProviderInterface, ServiceHandleInterface};
 use triomphe::Arc;
 
 use crate::schema;
 use crate::transports::StaticSender;
 
 #[derive(Clone)]
-pub struct StateRef<P: ServiceHandleProviderInterface>(Arc<StateData<P>>);
+pub struct StateRef<P: ExecutorProviderInterface>(Arc<StateData<P>>);
 
-impl<P: ServiceHandleProviderInterface> Deref for StateRef<P> {
+impl<P: ExecutorProviderInterface> Deref for StateRef<P> {
     type Target = StateData<P>;
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
@@ -22,7 +22,7 @@ impl<P: ServiceHandleProviderInterface> Deref for StateRef<P> {
 /// The entire state of the handshake server. This should not be a generic over the transport
 /// but rather we attach different transports into the state using the functionality defined
 /// in transport_driver.rs file.
-pub struct StateData<P: ServiceHandleProviderInterface> {
+pub struct StateData<P: ExecutorProviderInterface> {
     sk: NodeSecretKey,
     pub provider: P,
     /// Map each access token to the info about that access token. aHash has better performance
@@ -51,7 +51,7 @@ pub enum TransportPermission {
     AccessTokenUser = 0x01,
 }
 
-impl<P: ServiceHandleProviderInterface> StateData<P> {
+impl<P: ExecutorProviderInterface> StateData<P> {
     /// Process a handshake request and returns the assigned connection id as well as a handle
     /// to the service. A transport id is also returned in order to
     pub fn process_handshake(

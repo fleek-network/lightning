@@ -56,6 +56,7 @@ pub mod container;
 /// Project graph.
 pub mod graph;
 
+use std::future::Future;
 use std::marker::PhantomData;
 
 pub use container::Container;
@@ -85,5 +86,21 @@ impl<T> Default for Blank<T> {
 impl<T> Clone for Blank<T> {
     fn clone(&self) -> Self {
         Self(PhantomData)
+    }
+}
+
+impl<T> Future for Blank<T> {
+    type Output = T;
+
+    fn poll(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        log::error!(
+            "infusion::Blank<{}> was awaited",
+            std::any::type_name::<T>()
+        );
+
+        std::task::Poll::Pending
     }
 }
