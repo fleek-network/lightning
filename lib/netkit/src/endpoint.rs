@@ -58,8 +58,10 @@ pub struct Endpoint {
     endpoint: quinn::Endpoint,
     /// The node's key.
     sk: NodeSecretKey,
-    /// Input requests for the endpoint.
+    /// Receiver for requests for the endpoint.
     request_rx: Receiver<Request>,
+    /// Sender for requests for the endpoint.
+    request_tx: Sender<Request>,
     /// Ongoing incoming and outgoing connection set-up tasks.
     connecting: FuturesUnordered<BoxFuture<'static, ConnectionResult>>,
     /// Pending dialing tasks.
@@ -77,16 +79,13 @@ pub struct Endpoint {
 }
 
 impl Endpoint {
-    pub fn new(
-        sk: NodeSecretKey,
-        endpoint: quinn::Endpoint,
-        request_rx: Receiver<Request>,
-    ) -> Self {
+    pub fn new(sk: NodeSecretKey, endpoint: quinn::Endpoint) -> Self {
         let (network_event_tx, network_event_rx) = mpsc::channel(1024);
-
+        let (request_tx, request_rx) = mpsc::channel(1024);
         Self {
             endpoint,
             sk,
+            request_tx,
             request_rx,
             pending_send: HashMap::new(),
             driver: HashMap::new(),
@@ -96,6 +95,11 @@ impl Endpoint {
             network_event_tx,
             network_event_rx: Some(network_event_rx),
         }
+    }
+
+    /// Returns sender for requests to the endpoint.
+    pub fn request_sender(&mut self) -> Sender<Request> {
+        self.request_tx.clone()
     }
 
     /// Returns receiver for network events.
