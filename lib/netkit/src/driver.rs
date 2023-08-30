@@ -1,16 +1,18 @@
 use anyhow::Result;
 use bytes::Bytes;
+use fleek_crypto::NodePublicKey;
 use futures::{SinkExt, StreamExt};
 use quinn::Connection;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio_util::codec::{Framed, FramedRead, FramedWrite, LengthDelimitedCodec};
 
-use crate::endpoint::{Message, NodeAddress};
+use crate::endpoint::{Event, Message, NodeAddress};
 
 pub async fn start_driver(
     connection: Connection,
+    peer: NodePublicKey,
     mut message_rx: Receiver<Message>,
-    event_tx: Sender<Message>,
+    event_tx: Sender<Event>,
     accept: bool,
 ) -> Result<()> {
     // Todo: If we stick with QUIC, we should use the stream more efficiently.
@@ -34,7 +36,7 @@ pub async fn start_driver(
                     None => break,
                     Some(message) => message?,
                 };
-                if event_tx.send(message.to_vec()).await.is_err() {
+                if event_tx.send(Event::Message{ peer, message: message.to_vec() }).await.is_err() {
                     anyhow::bail!("failed to send incoming network event");
                 }
             }

@@ -2,6 +2,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::future::Future;
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use anyhow::{Error, Result};
 use fleek_crypto::NodePublicKey;
@@ -31,15 +32,23 @@ pub enum Request {
         peer: NodeAddress,
         /// The outgoing message.
         message: Message,
-        /// Respond with connection information such as
-        /// negotiated parameters during handshake and peer IP.
-        conn_info_tx: Sender<()>,
     },
     Metrics {
         /// Connection peer.
         peer: NodePublicKey,
         /// Channel to respond on with metrics.
         respond: oneshot::Sender<()>,
+    },
+}
+
+pub enum Event {
+    Message {
+        peer: NodePublicKey,
+        message: Message,
+    },
+    NewConnection {
+        peer: NodePublicKey,
+        rtt: Duration,
     },
 }
 
@@ -59,9 +68,9 @@ pub struct Endpoint {
     /// Ongoing drivers.
     driver_set: JoinSet<NodePublicKey>,
     /// Receiver for network events.
-    network_event_tx: Sender<Message>,
+    network_event_tx: Sender<Event>,
     /// Receiver for network events.
-    network_event_rx: Option<Receiver<Message>>,
+    network_event_rx: Option<Receiver<Event>>,
 }
 
 impl Endpoint {
@@ -84,7 +93,7 @@ impl Endpoint {
     /// Returns receiver for network events.
     ///
     /// Panics if called more than once.
-    pub fn network_event_receiver(&mut self) -> Receiver<Message> {
+    pub fn network_event_receiver(&mut self) -> Receiver<Event> {
         self.network_event_rx
             .take()
             .expect("To be called called once")
@@ -181,13 +190,27 @@ impl Endpoint {
     }
 
     fn handle_connection(&mut self, peer: NodePublicKey, connection: Connection, accept: bool) {
-        // Todo: expose this to clients.
-        let (message_tx, message_rx) = mpsc::channel(1024);
         self.cancel_dial(&peer);
+
+        let (message_tx, message_rx) = mpsc::channel(1024);
         self.driver.insert(peer, message_tx.clone());
+
         let event_tx = self.network_event_tx.clone();
         self.driver_set.spawn(async move {
-            if let Err(e) = driver::start_driver(connection, message_rx, event_tx, accept).await {
+            if event_tx
+                .send(Event::NewConnection {
+                    peer,
+                    rtt: connection.rtt(),
+                })
+                .await
+                .is_err()
+            {
+                tracing::error!("endpoint client dropped the network event receiver");
+            }
+
+            if let Err(e) =
+                driver::start_driver(connection, peer, message_rx, event_tx, accept).await
+            {
                 tracing::error!("driver for connection with {peer:?} shutdowned: {e:?}")
             }
             peer
@@ -196,7 +219,7 @@ impl Endpoint {
 
     fn handle_request(&mut self, request: Request) {
         match request {
-            Request::SendMessage { peer, message, .. } => {
+            Request::SendMessage { peer, message } => {
                 if self
                     .driver
                     .get(&peer.pk)
