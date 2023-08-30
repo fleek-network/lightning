@@ -5,8 +5,32 @@ use bytes::{BufMut, Bytes};
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey, NodeSignature};
 use lightning_interfaces::types::ServiceId;
 
+pub const NETWORK_PREFIX: &[u8; 5] = b"FLEEK";
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct ChallengeFrame {
     pub challenge: [u8; 32],
+}
+
+impl ChallengeFrame {
+    pub fn encode(&self) -> Bytes {
+        let mut buf = Vec::with_capacity(37);
+        buf.put_slice(NETWORK_PREFIX);
+        buf.put_slice(&self.challenge);
+        buf.into()
+    }
+
+    pub fn decode(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != 37 {
+            return Err(anyhow!("wrong number of bytes"));
+        }
+        if array_ref!(bytes, 0, 5) != NETWORK_PREFIX {
+            return Err(anyhow!("invalid network prefix"));
+        }
+        Ok(Self {
+            challenge: *array_ref!(bytes, 5, 32),
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -31,15 +55,19 @@ impl HandshakeRequestFrame {
                 pk,
                 pop,
             } => {
-                // reserve capacity for the bigger variant
-                let mut buf = Vec::with_capacity(157);
-                match retry {
-                    None => buf.put_u8(0x00),
+                let mut buf = match retry {
+                    None => {
+                        let mut buf = Vec::with_capacity(149);
+                        buf.put_u8(0x00);
+                        buf
+                    },
                     Some(id) => {
+                        let mut buf = Vec::with_capacity(157);
                         buf.put_u8(0x01);
                         buf.put_u64(*id);
+                        buf
                     },
-                }
+                };
                 buf.put_u32(*service);
                 buf.put_slice(&pk.0);
                 buf.put_slice(&pop.0);
@@ -85,7 +113,7 @@ impl HandshakeRequestFrame {
                     pop,
                 })
             },
-            0x80 => {
+            0x02 => {
                 if bytes.len() != 49 {
                     return Err(anyhow!("wrong number of bytes"));
                 }
@@ -282,72 +310,100 @@ impl TerminationReason {
 mod tests {
     use super::*;
 
+    macro_rules! encode_decode {
+        ($t:ident, $($s:expr),*) => {
+            $(
+            let frame = $s;
+            assert_eq!(
+                frame,
+                $t::decode(&frame.encode()).unwrap()
+            );)*
+        };
+    }
+
     #[test]
     fn handshake_frames() {
-        let frame = HandshakeRequestFrame::Handshake {
-            retry: None,
-            service: 0,
-            pk: ClientPublicKey([1; 96]),
-            pop: ClientSignature([2; 48]),
-        };
-        assert_eq!(
-            frame,
-            HandshakeRequestFrame::decode(&frame.encode()).unwrap()
+        encode_decode!(ChallengeFrame, ChallengeFrame { challenge: [0; 32] });
+        encode_decode!(
+            HandshakeRequestFrame,
+            HandshakeRequestFrame::Handshake {
+                retry: None,
+                service: 1,
+                pk: ClientPublicKey([2; 96]),
+                pop: ClientSignature([3; 48]),
+            },
+            HandshakeRequestFrame::Handshake {
+                retry: Some(4),
+                service: 5,
+                pk: ClientPublicKey([6; 96]),
+                pop: ClientSignature([7; 48]),
+            },
+            HandshakeRequestFrame::ContinueRequest {
+                access_token: [8; 48],
+            }
         );
-
-        let frame = HandshakeRequestFrame::Handshake {
-            retry: Some(99),
-            service: 0,
-            pk: ClientPublicKey([1; 96]),
-            pop: ClientSignature([2; 48]),
-        };
-        assert_eq!(
-            frame,
-            HandshakeRequestFrame::decode(&frame.encode()).unwrap()
+        encode_decode!(
+            HandshakeResponse,
+            HandshakeResponse {
+                pk: NodePublicKey([9; 32]),
+                pop: NodeSignature([0; 64]),
+            }
         );
-
-        let frame = HandshakeResponse {
-            pk: NodePublicKey([0; 32]),
-            pop: NodeSignature([0; 64]),
-        };
-        assert_eq!(frame, HandshakeResponse::decode(&frame.encode()).unwrap());
     }
 
     #[test]
     fn request_frames() {
-        let frame = RequestFrame::ServicePayload {
-            bytes: vec![64; 64].into(),
-        };
-        assert_eq!(frame, RequestFrame::decode(&frame.encode()).unwrap());
-
-        let frame = RequestFrame::AccessToken { ttl: 0 };
-        assert_eq!(frame, RequestFrame::decode(&frame.encode()).unwrap());
-
-        let frame = RequestFrame::RefreshAccessToken {
-            access_token: [1; 48].into(),
-        };
-        assert_eq!(frame, RequestFrame::decode(&frame.encode()).unwrap());
-
-        let frame = RequestFrame::DeliveryAcknowledgment {};
-        assert_eq!(frame, RequestFrame::decode(&frame.encode()).unwrap());
+        encode_decode!(
+            RequestFrame,
+            RequestFrame::ServicePayload {
+                bytes: vec![1; 64].into(),
+            },
+            RequestFrame::AccessToken { ttl: 2 },
+            RequestFrame::RefreshAccessToken {
+                access_token: [3; 48].into(),
+            },
+            RequestFrame::DeliveryAcknowledgment {}
+        );
     }
 
     #[test]
     fn response_frames() {
-        let frame = ResponseFrame::ServicePayload {
-            bytes: vec![64; 64].into(),
-        };
-        assert_eq!(frame, ResponseFrame::decode(&frame.encode()).unwrap());
-
-        let frame = ResponseFrame::AccessToken {
-            ttl: 0,
-            access_token: [1; 48].into(),
-        };
-        assert_eq!(frame, ResponseFrame::decode(&frame.encode()).unwrap());
-
-        let frame = ResponseFrame::Termination {
-            reason: TerminationReason::Timeout,
-        };
-        assert_eq!(frame, ResponseFrame::decode(&frame.encode()).unwrap());
+        encode_decode!(
+            ResponseFrame,
+            ResponseFrame::ServicePayload {
+                bytes: vec![1; 64].into(),
+            },
+            ResponseFrame::AccessToken {
+                ttl: 2,
+                access_token: [3; 48].into(),
+            },
+            ResponseFrame::Termination {
+                reason: TerminationReason::Timeout
+            },
+            ResponseFrame::Termination {
+                reason: TerminationReason::InvalidHandshake
+            },
+            ResponseFrame::Termination {
+                reason: TerminationReason::Timeout
+            },
+            ResponseFrame::Termination {
+                reason: TerminationReason::InvalidHandshake
+            },
+            ResponseFrame::Termination {
+                reason: TerminationReason::InvalidToken
+            },
+            ResponseFrame::Termination {
+                reason: TerminationReason::InvalidDeliveryAcknowledgment
+            },
+            ResponseFrame::Termination {
+                reason: TerminationReason::InvalidService
+            },
+            ResponseFrame::Termination {
+                reason: TerminationReason::ServiceTerminated
+            },
+            ResponseFrame::Termination {
+                reason: TerminationReason::Unknown
+            }
+        );
     }
 }
