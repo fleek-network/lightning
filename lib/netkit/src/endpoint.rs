@@ -2,14 +2,15 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::future::Future;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Error, Result};
-use fleek_crypto::NodePublicKey;
+use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
-use quinn::{Connecting, Connection, ConnectionError};
+use quinn::{ClientConfig, Connecting, Connection, ConnectionError};
 use rustls::Certificate;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
@@ -55,6 +56,8 @@ pub enum Event {
 pub struct Endpoint {
     /// QUIC endpoint.
     endpoint: quinn::Endpoint,
+    /// The node's key.
+    sk: NodeSecretKey,
     /// Input requests for the endpoint.
     request_rx: Receiver<Request>,
     /// Ongoing incoming and outgoing connection set-up tasks.
@@ -74,11 +77,16 @@ pub struct Endpoint {
 }
 
 impl Endpoint {
-    pub fn new(endpoint: quinn::Endpoint, request_rx: Receiver<Request>) -> Self {
+    pub fn new(
+        sk: NodeSecretKey,
+        endpoint: quinn::Endpoint,
+        request_rx: Receiver<Request>,
+    ) -> Self {
         let (network_event_tx, network_event_rx) = mpsc::channel(1024);
 
         Self {
             endpoint,
+            sk,
             request_rx,
             pending_send: HashMap::new(),
             driver: HashMap::new(),
@@ -108,7 +116,9 @@ impl Endpoint {
                         None => break,
                         Some(request) => request,
                     };
-                    self.handle_request(request);
+                    if let Err(e) = self.handle_request(request) {
+                        tracing::error!("failed to handle request: {e:?}");
+                    }
                 }
                 connecting = self.endpoint.accept() => {
                     match connecting {
@@ -217,7 +227,7 @@ impl Endpoint {
         });
     }
 
-    fn handle_request(&mut self, request: Request) {
+    fn handle_request(&mut self, request: Request) -> Result<()> {
         match request {
             Request::SendMessage { peer, message } => {
                 if self
@@ -234,22 +244,25 @@ impl Endpoint {
                     });
                 } else {
                     self.pending_send.entry(peer.pk).or_default().push(message);
-                    self.enqueue_dial_task(peer);
+                    self.enqueue_dial_task(peer)?;
                 }
             },
             Request::Metrics { .. } => todo!(),
         }
+        Ok(())
     }
 
-    fn enqueue_dial_task(&mut self, address: NodeAddress) {
+    fn enqueue_dial_task(&mut self, address: NodeAddress) -> Result<()> {
         let cancel = CancellationToken::new();
         self.pending_dial.insert(address.pk, cancel.clone());
+
         let endpoint = self.endpoint.clone();
+        let tls_config = tls::make_client_config(&self.sk, Some(address.pk))?;
         let fut = async move {
-            // Todo: Add config.
+            let mut client_config = ClientConfig::new(Arc::new(tls_config));
             let connect = || async move {
                 endpoint
-                    .connect(address.socket_address, "localhost")?
+                    .connect_with(client_config, address.socket_address, "localhost")?
                     .await
                     .map_err(Into::into)
             };
@@ -265,7 +278,10 @@ impl Endpoint {
             }
         }
         .boxed();
+
         self.connecting.push(fut);
+
+        Ok(())
     }
 
     fn cancel_dial(&mut self, peer: &NodePublicKey) {
