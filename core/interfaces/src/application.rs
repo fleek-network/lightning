@@ -168,6 +168,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     fn index_to_pubkey(&self, node_index: u32) -> Option<NodePublicKey>;
 
+    /// Returns the hash of the last epoch.
+    fn get_last_epoch_hash(&self) -> [u8; 32];
+
     /// takes NodeInfo and returns if they are a current committee member or not
     fn is_committee(&self, node_index: u32) -> bool;
 }

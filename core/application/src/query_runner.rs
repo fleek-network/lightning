@@ -405,6 +405,16 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 .map(|info| info.public_key)
         })
     }
+
+    fn get_last_epoch_hash(&self) -> [u8; 32] {
+        self.inner.run(
+            |ctx| match self.metadata_table.get(ctx).get(&Metadata::LastEpochHash) {
+                Some(Value::Hash(hash)) => hash,
+                _ => [0; 32],
+            },
+        )
+    }
+
     fn is_committee(&self, node_index: u32) -> bool {
         self.inner.run(|ctx| {
             // get current epoch

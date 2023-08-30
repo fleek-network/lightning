@@ -92,6 +92,7 @@ impl RpcServer {
             .with_method("flk_is_valid_node", is_valid_node_handler::<Q>)
             .with_method("flk_get_node_registry", get_node_registry_handler::<Q>)
             .with_method("flk_get_reputation", get_reputation_handler::<Q>)
+            .with_method("flk_get_last_epoch_hash", get_last_epoch_hash_handler::<Q>)
             .with_method("flk_send_txn", send_txn::<Q>);
 
         #[cfg(feature = "e2e-test")]
@@ -257,6 +258,12 @@ pub async fn get_node_registry_handler<Q: SyncQueryRunnerInterface>(
     data: Data<Arc<RpcData<Q>>>,
 ) -> Result<Vec<NodeInfo>> {
     Ok(data.0.query_runner.get_node_registry())
+}
+
+pub async fn get_last_epoch_hash_handler<Q: SyncQueryRunnerInterface>(
+    data: Data<Arc<RpcData<Q>>>,
+) -> Result<[u8; 32]> {
+    Ok(data.0.query_runner.get_last_epoch_hash())
 }
 
 pub async fn send_txn<Q: SyncQueryRunnerInterface>(
