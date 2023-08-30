@@ -18,7 +18,7 @@ use crate::shutdown::ShutdownController;
 #[command(about, version)]
 pub struct CliArgs {
     /// Path to the toml configuration file
-    #[arg(short, long, default_value = "lightning.toml")]
+    #[arg(short, long, default_value = "~/.lightning/config.toml")]
     pub config: PathBuf,
     /// Determines that we should be using the mock consensus backend.
     #[arg(long)]
