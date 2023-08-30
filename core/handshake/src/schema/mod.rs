@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use arrayref::array_ref;
-use arrayvec::ArrayVec;
 use bytes::{BufMut, Bytes};
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey, NodeSignature};
 use lightning_interfaces::types::ServiceId;

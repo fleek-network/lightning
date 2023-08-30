@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+lightning-interfaces = { path = "../interfaces" }
+fn-sdk = { path = "../../lib/sdk" }
 log.workspace = true
 anyhow.workspace = true
 serde.workspace = true
@@ -17,10 +19,14 @@ tokio.workspace = true
 bytes = "1.4"
 arrayref = "0.3"
 arrayvec = "0.7"
-
-# Server
-lightning-interfaces = { path = "../interfaces" }
-dashmap = { version = "5.4", optional = true }
+dashmap = "5.5"
+ahash = "0.8"
+fxhash = "0.2"
+derive_more = "0.99"
+enum_dispatch = "0.3.12"
+triomphe = "0.1.9"
+smallvec = "1.11"
+heapless = "0.7.16"
 
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }

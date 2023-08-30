@@ -18,7 +18,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
     }
 
     /// The provider which can be used to get a handle on a service during runtime.
-    type Provider: ServiceHandleProvider;
+    type Provider: ServiceHandleProviderInterface;
 
     /// Initialize the service executor.
     fn init(config: Self::Config) -> anyhow::Result<Self>;
@@ -29,7 +29,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
 }
 
 #[infusion::blank]
-pub trait ServiceHandleProvider: Clone + Send + Sync + 'static {
+pub trait ServiceHandleProviderInterface: Clone + Send + Sync + 'static {
     type Handle: ServiceHandleInterface;
 
     /// Returns the handle to a specific service.
