@@ -1,10 +1,8 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ToDigest;
-use tokio::sync::Notify;
 
 use crate::execution::{AuthenticStampedParcel, Digest, Execution};
 
@@ -39,12 +37,12 @@ impl TransactionStore {
     }
 
     // Threshold should be 2f + 1 of the committee
+    // Returns true if the epoch has changed
     pub async fn try_execute(
         &mut self,
         digest: Digest,
         threshold: usize,
         execution: &Arc<Execution>,
-        reconfigure: Arc<Notify>,
     ) -> bool {
         if self.executed.contains(&digest) {
             // if we executed before return false
@@ -55,9 +53,7 @@ impl TransactionStore {
             if x.len() >= threshold {
                 // if we should execute we need to make sure we can connect this to our transaction
                 // chain
-                self.try_execute_chain(digest, execution, reconfigure)
-                    .await
-                    .is_ok()
+                self.try_execute_chain(digest, execution).await
             } else {
                 false
             }
@@ -67,12 +63,7 @@ impl TransactionStore {
         }
     }
 
-    async fn try_execute_chain(
-        &mut self,
-        digest: Digest,
-        execution: &Arc<Execution>,
-        reconfigure: Arc<Notify>,
-    ) -> Result<()> {
+    async fn try_execute_chain(&mut self, digest: Digest, execution: &Arc<Execution>) -> bool {
         let mut txn_chain = VecDeque::new();
         let mut last_digest = digest;
         let mut parcel_chain = Vec::new();
@@ -93,18 +84,17 @@ impl TransactionStore {
                 if epoch_changed {
                     // if epoch changed set this to genesis
                     self.head = [0; 32];
-                    reconfigure.notify_waiters();
                 } else {
                     // set head as top of chain
                     self.head = digest;
                 }
 
-                return Ok(());
+                return epoch_changed;
             } else {
                 last_digest = parcel.last_executed;
             }
         }
-        Err(anyhow!("Cannot connect chain did not execute"))
+        false
     }
 
     // This should only be called by transaction parsals sent over by narwhal on rx_narwhal_baches

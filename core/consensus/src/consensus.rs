@@ -88,7 +88,7 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     /// Interface for sending messages through the gossip layer
     pub_sub: P,
     /// Narhwal sends payloads ready for broadcast to this reciever
-    rx_narwhal_batches: Option<mpsc::Receiver<AuthenticStampedParcel>>,
+    rx_narwhal_batches: Option<mpsc::Receiver<(AuthenticStampedParcel, bool)>>,
 }
 
 impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, P> {
@@ -99,7 +99,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         execution_state: Arc<Execution>,
         txn_socket: SubmitTxSocket,
         pub_sub: P,
-        rx_narwhal_batches: mpsc::Receiver<AuthenticStampedParcel>,
+        rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
     ) -> Self {
         Self {
             consensus: None,
@@ -113,11 +113,10 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         }
     }
 
-    fn spawn_edge_consensus(&mut self, reconfigure_notify: Arc<Notify>) -> EdgeConsensus {
+    fn spawn_edge_consensus(&mut self) -> EdgeConsensus {
         EdgeConsensus::spawn(
             self.pub_sub.clone(),
             self.execution_state.clone(),
-            reconfigure_notify,
             self.query_runner.clone(),
             self.narwhal_args
                 .primary_network_keypair
@@ -300,7 +299,7 @@ impl<C: Collection> WithStartAndShutdown for Consensus<C> {
         self.is_running.store(true, Ordering::Relaxed);
 
         task::spawn(async move {
-            let edge_node = epoch_state.spawn_edge_consensus(reconfigure_notify.clone());
+            let edge_node = epoch_state.spawn_edge_consensus();
             epoch_state.start_current_epoch().await;
             loop {
                 let reconfigure_future = reconfigure_notify.notified();

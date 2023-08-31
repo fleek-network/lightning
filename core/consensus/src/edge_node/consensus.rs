@@ -20,10 +20,9 @@ impl EdgeConsensus {
     pub fn spawn<P: PubSub<PubSubMsg> + 'static, Q: SyncQueryRunnerInterface>(
         pub_sub: P,
         execution: Arc<Execution>,
-        reconfigure_notify: Arc<Notify>,
         query_runner: Q,
         node_public_key: NodePublicKey,
-        rx_narwhal_batches: mpsc::Receiver<AuthenticStampedParcel>,
+        rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
     ) -> Self {
         let shutdown_notify = Arc::new(Notify::new());
 
@@ -33,7 +32,6 @@ impl EdgeConsensus {
             execution,
             query_runner,
             node_public_key,
-            reconfigure_notify,
             rx_narwhal_batches,
         ));
 
@@ -61,8 +59,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
     execution: Arc<Execution>,
     query_runner: Q,
     node_public_key: NodePublicKey,
-    reconfigure_notify: Arc<Notify>,
-    mut rx_narwhal_batch: mpsc::Receiver<AuthenticStampedParcel>,
+    mut rx_narwhal_batch: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
 ) {
     info!("Edge node message worker is running");
     let mut committee = query_runner.get_committee_members_by_index();
@@ -75,16 +72,14 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
     let mut transaction_store = TransactionStore::new();
     loop {
         // todo(dalton): revisit pinning these and using Notify over oneshot
-        let reconfigure_future = reconfigure_notify.notified();
         let shutdown_future = shutdown_notify.notified();
         pin!(shutdown_future);
-        pin!(reconfigure_future);
 
         tokio::select! {
             _ = shutdown_future => {
                 return;
             },
-            Some(parcel) = rx_narwhal_batch.recv() => {
+            Some((parcel, epoch_changed)) = rx_narwhal_batch.recv() => {
                 if !on_committee {
                     // This should never happen if it somehow does there is critical error somewhere
                     panic!("We somehow sent ourselves a parcel from narwhal while not on committee");
@@ -94,7 +89,9 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 
                 let parcel_digest = parcel.to_digest();
 
-                transaction_store.set_head(parcel_digest);
+                let head = if epoch_changed {[0;32]} else {parcel_digest};
+
+                transaction_store.set_head(head);
 
                 let attestation = CommitteeAttestation {
                     digest: parcel_digest,
@@ -104,15 +101,16 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                 info!("Send transaction parcel to broadcast as a validator");
                 pub_sub.send(&attestation.into()).await;
                 pub_sub.send(&parcel.into()).await;
-            },
-            _ = reconfigure_future => {
-               committee = query_runner.get_committee_members_by_index();
-               quorom_threshold = (committee.len() * 2) / 3 + 1;
-               // We recheck our index incase it was non existant before and we staked during this epoch and finally got the certificate
-               our_index = query_runner
-                .pubkey_to_index(node_public_key)
-                .unwrap_or(u32::MAX);
-               on_committee = committee.contains(&our_index);
+
+                if epoch_changed {
+                    committee = query_runner.get_committee_members_by_index();
+                    quorom_threshold = (committee.len() * 2) / 3 + 1;
+                    // We recheck our index incase it was non existant before and we staked during this epoch and finally got the certificate
+                    our_index = query_runner
+                        .pubkey_to_index(node_public_key)
+                        .unwrap_or(u32::MAX);
+                    on_committee = committee.contains(&our_index);
+                }
             },
             Some(mut msg) = pub_sub.recv_event() => {
                 if on_committee {
@@ -129,9 +127,16 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 
                         transaction_store.store_parcel(parcel);
 
-                        transaction_store
-                        .try_execute(parcel_digest,quorom_threshold
-                            ,&execution, reconfigure_notify.clone()).await;
+                        if transaction_store
+                        .try_execute(parcel_digest,quorom_threshold,&execution).await {
+                            committee = query_runner.get_committee_members_by_index();
+                            quorom_threshold = (committee.len() * 2) / 3 + 1;
+                            // We recheck our index incase it was non existant before and we staked during this epoch and finally got the certificate
+                            our_index = query_runner
+                                .pubkey_to_index(node_public_key)
+                                .unwrap_or(u32::MAX);
+                            on_committee = committee.contains(&our_index);
+                        }
 
 
                     },
@@ -147,9 +152,17 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 
                         if !on_committee{
                             transaction_store.add_attestation(att.digest, att.node_index);
-                            transaction_store
-                            .try_execute(att.digest, quorom_threshold
-                                ,&execution, reconfigure_notify.clone()).await;
+
+                            if transaction_store
+                            .try_execute(att.digest, quorom_threshold, &execution).await {
+                                committee = query_runner.get_committee_members_by_index();
+                                quorom_threshold = (committee.len() * 2) / 3 + 1;
+                                // We recheck our index incase it was non existant before and we staked during this epoch and finally got the certificate
+                                our_index = query_runner
+                                    .pubkey_to_index(node_public_key)
+                                    .unwrap_or(u32::MAX);
+                                on_committee = committee.contains(&our_index);
+                            }
                         }
                         msg.propagate();
                     }

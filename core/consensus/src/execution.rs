@@ -60,7 +60,7 @@ pub struct Execution {
     /// If this node is currently on the committee
     is_committee: AtomicBool,
     /// Used to send payloads to the edge node consensus to broadcast out to other nodes
-    tx_narwhal_batches: mpsc::Sender<AuthenticStampedParcel>,
+    tx_narwhal_batches: mpsc::Sender<(AuthenticStampedParcel, bool)>,
     inner: Mutex<ExecutionInner>,
 }
 
@@ -82,7 +82,7 @@ impl Execution {
         executor: ExecutionEngineSocket,
         reconfigure_notify: Arc<Notify>,
         new_block_notify: Arc<Notify>,
-        tx_narwhal_batches: mpsc::Sender<AuthenticStampedParcel>,
+        tx_narwhal_batches: mpsc::Sender<(AuthenticStampedParcel, bool)>,
     ) -> Self {
         Self {
             executor,
@@ -146,15 +146,17 @@ impl ExecutionState for Execution {
             };
             let parcel_digest = parcel.to_digest();
 
-            if let Err(e) = self.tx_narwhal_batches.send(parcel).await {
+            let epoch_changed = self.submit_batch(batch_payload).await;
+
+            if let Err(e) = self.tx_narwhal_batches.send((parcel, epoch_changed)).await {
                 // This shouldnt ever happen. But if it does there is no critical tasks happening on
                 // the other end of this that would require a panic
                 error!("Narwhal failed to send batch payload to edge consensus: {e:?}");
             }
 
             // Submit the batches to application layer and if the epoch changed reset last executed
-            if self.submit_batch(batch_payload).await {
-                // if epoch changed reset this
+            if epoch_changed {
+                // if epoch changed reset the head
                 self.inner.lock().unwrap().last_executed = None;
                 self.reconfigure_notify.notify_waiters();
             } else {
