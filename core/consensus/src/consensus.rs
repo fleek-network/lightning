@@ -113,7 +113,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         }
     }
 
-    fn spawn_edge_consensus(&mut self) -> EdgeConsensus {
+    fn spawn_edge_consensus(&mut self, reconfigure_notify: Arc<Notify>) -> EdgeConsensus {
         EdgeConsensus::spawn(
             self.pub_sub.clone(),
             self.execution_state.clone(),
@@ -126,6 +126,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             self.rx_narwhal_batches
                 .take()
                 .expect("rx_narwhal_batches missing from EpochState"),
+            reconfigure_notify,
         )
     }
 
@@ -299,7 +300,7 @@ impl<C: Collection> WithStartAndShutdown for Consensus<C> {
         self.is_running.store(true, Ordering::Relaxed);
 
         task::spawn(async move {
-            let edge_node = epoch_state.spawn_edge_consensus();
+            let edge_node = epoch_state.spawn_edge_consensus(reconfigure_notify.clone());
             epoch_state.start_current_epoch().await;
             loop {
                 let reconfigure_future = reconfigure_notify.notified();

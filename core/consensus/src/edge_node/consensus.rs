@@ -23,6 +23,7 @@ impl EdgeConsensus {
         query_runner: Q,
         node_public_key: NodePublicKey,
         rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
+        reconfigure_notify: Arc<Notify>,
     ) -> Self {
         let shutdown_notify = Arc::new(Notify::new());
 
@@ -33,6 +34,7 @@ impl EdgeConsensus {
             query_runner,
             node_public_key,
             rx_narwhal_batches,
+            reconfigure_notify,
         ));
 
         Self {
@@ -60,6 +62,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
     query_runner: Q,
     node_public_key: NodePublicKey,
     mut rx_narwhal_batch: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
+    reconfigure_notify: Arc<Notify>,
 ) {
     info!("Edge node message worker is running");
     let mut committee = query_runner.get_committee_members_by_index();
@@ -136,6 +139,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                 .pubkey_to_index(node_public_key)
                                 .unwrap_or(u32::MAX);
                             on_committee = committee.contains(&our_index);
+                            reconfigure_notify.notify_waiters();
                         }
 
 
@@ -162,6 +166,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                     .pubkey_to_index(node_public_key)
                                     .unwrap_or(u32::MAX);
                                 on_committee = committee.contains(&our_index);
+                                reconfigure_notify.notify_waiters();
                             }
                         }
                         msg.propagate();
