@@ -129,7 +129,7 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
 /// The interface for the writer to a [`BlockStoreInterface`].
 #[async_trait]
 #[infusion::blank]
-pub trait IncrementalPutInterface {
+pub trait IncrementalPutInterface: Send {
     /// Write the proof for the buffer.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError>;
 
