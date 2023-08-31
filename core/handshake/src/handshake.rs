@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use async_trait::async_trait;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
@@ -10,6 +12,7 @@ use lightning_interfaces::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
 
 use crate::shutdown::ShutdownNotifier;
 use crate::state::StateRef;
@@ -24,6 +27,7 @@ pub struct Handshake<C: Collection> {
 struct Run<C: Collection> {
     shutdown: ShutdownNotifier,
     state: StateRef<c![C::ServiceExecutorInterface::Provider]>,
+    transports: Vec<JoinHandle<()>>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -61,7 +65,11 @@ impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
         let state = StateRef::new(shutdown.waiter(), sk, provider);
 
         Ok(Self {
-            status: Mutex::new(Some(Run { shutdown, state })),
+            status: Mutex::new(Some(Run {
+                shutdown,
+                state,
+                transports: vec![],
+            })),
             config,
         })
     }
@@ -79,22 +87,33 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
     }
 
     async fn start(&self) {
-        let guard = self.status.lock().await;
-        let run = guard.as_ref().expect("restart not implemented.");
+        let mut guard = self.status.lock().await;
+        let run = guard.as_mut().expect("restart not implemented.");
 
         for mode in &self.config.workers {
             attach_worker(run.state.clone(), *mode);
         }
 
         for config in &self.config.transports {
-            attach_transport_by_config(run.state.clone(), config.clone())
+            let handle = attach_transport_by_config(run.state.clone(), config.clone())
                 .await
                 .expect("Faild to setup transport");
+
+            run.transports.push(handle);
         }
     }
 
     async fn shutdown(&self) {
-        let state = self.status.lock().await.take().expect("already shutdown.");
-        state.shutdown.shutdown()
+        let run = self.status.lock().await.take().expect("already shutdown.");
+        run.shutdown.shutdown();
+
+        // give time to transports and then abort.
+        tokio::spawn(async {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+
+            for handle in run.transports {
+                handle.abort();
+            }
+        });
     }
 }

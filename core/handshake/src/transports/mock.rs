@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{Transport, TransportReceiver, TransportSender};
 use crate::schema;
+use crate::shutdown::ShutdownWaiter;
 
 pub struct MockTransport {}
 
@@ -20,7 +21,7 @@ impl Transport for MockTransport {
     type Sender = MockTransportSender;
     type Receiver = MockTransportReceiver;
 
-    async fn bind(_config: Self::Config) -> anyhow::Result<Self> {
+    async fn bind(_waiter: ShutdownWaiter, _config: Self::Config) -> anyhow::Result<Self> {
         Ok(Self {})
     }
 

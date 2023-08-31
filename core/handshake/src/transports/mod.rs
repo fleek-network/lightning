@@ -4,6 +4,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::schema;
+use crate::shutdown::ShutdownWaiter;
 
 pub mod mock;
 pub mod webrtc;
@@ -16,7 +17,7 @@ pub trait Transport: Sized + Send + Sync + 'static {
     type Receiver: TransportReceiver;
 
     /// Bind the transport with the provided config.
-    async fn bind(config: Self::Config) -> anyhow::Result<Self>;
+    async fn bind(shutdown: ShutdownWaiter, config: Self::Config) -> anyhow::Result<Self>;
 
     /// Accept a new connection.
     async fn accept(

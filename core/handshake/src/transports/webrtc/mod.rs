@@ -15,6 +15,7 @@ use self::signal::start_signaling_server;
 use self::worker::IncomingConnectionWorker;
 use super::{Transport, TransportReceiver, TransportSender};
 use crate::schema::{self, HandshakeRequestFrame, RequestFrame};
+use crate::shutdown::ShutdownWaiter;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct WebRtcConfig {
@@ -45,16 +46,26 @@ impl Transport for WebRtcTransport {
     type Sender = WebRtcSender;
     type Receiver = WebRtcReceiver;
 
-    async fn bind(config: Self::Config) -> anyhow::Result<Self> {
+    async fn bind(waiter: ShutdownWaiter, config: Self::Config) -> anyhow::Result<Self> {
+        log::info!("Binding WebRTC transport on {}", config.signal_address);
+
         let (drop_tx, _) = tokio::sync::oneshot::channel();
         let (conn_tx, conn_rx) = tokio::sync::mpsc::channel(16);
 
         // Spawn a worker for handling new connection setup.
+        log::error!("{}:{}", file!(), line!());
         let worker = IncomingConnectionWorker { conn_tx };
         let socket = TokioSpawn::spawn_async(worker);
+        log::error!("{}:{}", file!(), line!());
 
         // Spawn a HTTP server for accepting incoming SDP requests.
-        start_signaling_server(config, socket).await?;
+        tokio::spawn(async move {
+            start_signaling_server(waiter, config, socket)
+                .await
+                .expect("Failed to setup server");
+        });
+
+        log::error!("{}:{}", file!(), line!());
 
         Ok(Self {
             drop_tx: Some(drop_tx),
@@ -96,6 +107,8 @@ impl Transport for WebRtcTransport {
 impl Drop for WebRtcTransport {
     fn drop(&mut self) {
         let tx = self.drop_tx.take().unwrap();
+        // we immediately are dropping the rx on bind so this send will
+        // always return an error and unwrap will always panic.
         tokio::spawn(async move { tx.send(()).unwrap() });
     }
 }

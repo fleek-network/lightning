@@ -84,4 +84,11 @@ impl ShutdownWaiter {
     {
         self.fold_until_shutdown((), |_| task()).await
     }
+
+    #[inline]
+    pub async fn wait_for_shutdown(&self) {
+        if !self.is_shutdown() {
+            self.inner.notify.notified().await;
+        }
+    }
 }

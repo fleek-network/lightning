@@ -24,11 +24,17 @@ forward!(async fn start_or_shutdown_node(this, start: bool) on [
     ServiceExecutorInterface,
 ] {
     if start {
+        log::info!("starting {}", get_name(&this));
         this.start().await;
     } else {
+        log::info!("shutting down {}", get_name(&this));
         this.shutdown().await;
     }
 });
+
+fn get_name<T>(_: &T) -> &str {
+    std::any::type_name::<T>()
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

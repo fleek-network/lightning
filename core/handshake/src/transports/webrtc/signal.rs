@@ -4,18 +4,24 @@ use axum::routing::post;
 use axum::{Json, Router};
 use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
 
+use crate::shutdown::ShutdownWaiter;
+
 type WorkerSocket = affair::Socket<RTCSessionDescription, Result<RTCSessionDescription>>;
 
 pub async fn start_signaling_server(
+    waiter: ShutdownWaiter,
     config: super::WebRtcConfig,
     socket: WorkerSocket,
 ) -> Result<()> {
     let app = Router::new()
         .route("/sdp", post(handler))
         .with_state(socket);
+
     axum::Server::bind(&config.signal_address)
         .serve(app.into_make_service())
+        .with_graceful_shutdown(waiter.wait_for_shutdown())
         .await?;
+
     Ok(())
 }
 

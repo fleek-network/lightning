@@ -19,10 +19,12 @@ pub async fn attach_transport_by_config<P: ExecutorProviderInterface>(
 ) -> anyhow::Result<JoinHandle<()>> {
     let transport = match config {
         TransportConfig::WebRTC(config) => {
-            transports::webrtc::WebRtcTransport::bind(config).await?
+            log::error!("---------- HERE");
+            transports::webrtc::WebRtcTransport::bind(state.shutdown.clone(), config).await?
         },
     };
 
+    log::error!("---------- Bind successfull");
     Ok(attach_transport_to_state(state, transport))
 }
 
