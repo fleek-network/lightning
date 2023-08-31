@@ -35,7 +35,6 @@ impl Default for WebRtcConfig {
 /// A WebRTC Transport. Spawns a HTTP signaling server, and binds to ephemeral UDP ports per
 /// peer connection.
 pub struct WebRtcTransport {
-    drop_tx: Option<tokio::sync::oneshot::Sender<()>>,
     /// Receiver for incoming DataChannels from peer connections.
     conn_rx: tokio::sync::mpsc::Receiver<(HandshakeRequestFrame, Arc<RTCDataChannel>)>,
 }
@@ -49,7 +48,6 @@ impl Transport for WebRtcTransport {
     async fn bind(waiter: ShutdownWaiter, config: Self::Config) -> anyhow::Result<Self> {
         log::info!("Binding WebRTC transport on {}", config.signal_address);
 
-        let (drop_tx, _) = tokio::sync::oneshot::channel();
         let (conn_tx, conn_rx) = tokio::sync::mpsc::channel(16);
 
         // Spawn a worker for handling new connection setup.
@@ -67,10 +65,7 @@ impl Transport for WebRtcTransport {
 
         log::error!("{}:{}", file!(), line!());
 
-        Ok(Self {
-            drop_tx: Some(drop_tx),
-            conn_rx,
-        })
+        Ok(Self { conn_rx })
     }
 
     async fn accept(
@@ -101,15 +96,6 @@ impl Transport for WebRtcTransport {
         let sender = WebRtcSender(data_channel);
 
         Some((req, sender, receiver))
-    }
-}
-
-impl Drop for WebRtcTransport {
-    fn drop(&mut self) {
-        let tx = self.drop_tx.take().unwrap();
-        // we immediately are dropping the rx on bind so this send will
-        // always return an error and unwrap will always panic.
-        tokio::spawn(async move { tx.send(()).unwrap() });
     }
 }
 
