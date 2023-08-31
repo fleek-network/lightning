@@ -151,6 +151,7 @@ async fn test_build_latency_matrix() {
         AppConfig {
             genesis: Some(genesis),
             mode: Mode::Test,
+            testnet: false,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,

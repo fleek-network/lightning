@@ -15,6 +15,7 @@ pub enum Mode {
 pub struct Config {
     pub genesis: Option<Genesis>,
     pub mode: Mode,
+    pub testnet: bool,
     pub storage: StorageConfig,
     pub db_path: Option<ResolvedPathBuf>,
     pub db_options: Option<ResolvedPathBuf>,
@@ -25,6 +26,7 @@ impl Config {
         Self {
             genesis: None,
             mode: Mode::Dev,
+            testnet: false,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,
@@ -37,6 +39,7 @@ impl Default for Config {
         Self {
             genesis: None,
             mode: Mode::Dev,
+            testnet: true,
             storage: StorageConfig::RocksDb,
             db_path: Some(
                 "~/.lightning/data/app_db"

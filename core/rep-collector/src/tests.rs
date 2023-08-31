@@ -130,6 +130,7 @@ async fn test_query() {
         AppConfig {
             genesis: Some(genesis),
             mode: Mode::Test,
+            testnet: false,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,
@@ -283,6 +284,7 @@ async fn test_submit_measurements() {
         AppConfig {
             genesis: Some(genesis),
             mode: Mode::Test,
+            testnet: false,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,
@@ -463,6 +465,7 @@ async fn test_reputation_calculation_and_query() {
         AppConfig {
             genesis: Some(genesis),
             mode: Mode::Test,
+            testnet: false,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,

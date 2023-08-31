@@ -66,6 +66,7 @@ async fn test_send_two_txs_in_a_row() {
         AppConfig {
             genesis: Some(genesis),
             mode: Mode::Test,
+            testnet: false,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,
@@ -156,6 +157,7 @@ async fn test_retry_send() {
         AppConfig {
             genesis: Some(genesis),
             mode: Mode::Test,
+            testnet: false,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,

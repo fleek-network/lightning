@@ -136,6 +136,7 @@ async fn start_node(
         lightning_application::config::Config {
             mode: Mode::Test,
             genesis: None,
+            testnet: false,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,

@@ -116,6 +116,7 @@ mod tests {
         let config = Config {
             genesis: Some(genesis),
             mode: Mode::Test,
+            testnet: false,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,

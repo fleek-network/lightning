@@ -234,6 +234,7 @@ impl SwarmBuilder {
             config.inject::<Application<FinalTypes>>(AppConfig {
                 mode: Mode::Test,
                 genesis: Some(genesis.clone()),
+                testnet: false,
                 storage,
                 db_path: Some(root.join("data/app_db").try_into().unwrap()),
                 db_options: None,

@@ -80,6 +80,7 @@ async fn init_rpc_without_consensus(
             AppConfig {
                 genesis: Some(genesis),
                 mode: Mode::Test,
+                testnet: false,
                 storage: StorageConfig::InMemory,
                 db_path: None,
                 db_options: None,

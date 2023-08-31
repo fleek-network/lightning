@@ -151,6 +151,7 @@ fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
     let config = config.or(Some(Config {
         genesis: None,
         mode: Mode::Dev,
+        testnet: false,
         storage: StorageConfig::InMemory,
         db_path: None,
         db_options: None,
@@ -204,6 +205,7 @@ fn init_app_with_params(
     let config = Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        testnet: false,
         storage: StorageConfig::InMemory,
         db_path: None,
         db_options: None,
@@ -403,6 +405,7 @@ async fn test_epoch_change() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        testnet: false,
         storage: StorageConfig::InMemory,
         db_path: None,
         db_options: None,
@@ -690,6 +693,7 @@ async fn test_pod_without_proof() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        testnet: false,
         storage: StorageConfig::InMemory,
         db_path: None,
         db_options: None,
@@ -893,6 +897,7 @@ async fn test_submit_rep_measurements() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        testnet: false,
         storage: StorageConfig::InMemory,
         db_path: None,
         db_options: None,
@@ -942,6 +947,7 @@ async fn test_rep_scores() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        testnet: false,
         storage: StorageConfig::InMemory,
         db_path: None,
         db_options: None,
@@ -1116,6 +1122,7 @@ async fn test_validate_txn() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        testnet: false,
         storage: StorageConfig::InMemory,
         db_path: None,
         db_options: None,
@@ -1218,6 +1225,7 @@ async fn test_get_node_registry() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        testnet: false,
         storage: StorageConfig::InMemory,
         db_path: None,
         db_options: None,
@@ -1324,6 +1332,7 @@ async fn test_change_protocol_params() {
     let (update_socket, query_runner) = init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
+        testnet: false,
         storage: StorageConfig::InMemory,
         db_path: None,
         db_options: None,
