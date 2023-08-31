@@ -65,6 +65,7 @@ pub trait ApplicationInterface<C: Collection>:
     /// putting the entire application state in an `Arc<RwLock<T>>`, but that is not optimal
     /// and is the reason why we have `Atomo` to allow us to have the same kind of behavior
     /// without slowing down the system.
+    #[blank = Default::default()]
     fn sync_query(&self) -> Self::SyncExecutor;
 }
 

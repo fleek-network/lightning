@@ -10,14 +10,17 @@ pub struct ServiceHandle {
 }
 
 impl ServiceHandleInterface for ServiceHandle {
+    #[inline(always)]
     fn message(&self, args: OnMessageArgs) {
         (self.inner.message)(args);
     }
 
+    #[inline(always)]
     fn connected(&self, args: OnConnectedArgs) {
         (self.inner.connected)(args);
     }
 
+    #[inline(always)]
     fn disconnected(&self, args: OnDisconnectedArgs) {
         (self.inner.disconnected)(args);
     }

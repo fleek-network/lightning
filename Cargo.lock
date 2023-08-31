@@ -4066,6 +4066,9 @@ dependencies = [
  "heapless",
  "infusion",
  "lightning-interfaces",
+ "lightning-node",
+ "lightning-service-executor",
+ "lightning-signer",
  "log",
  "serde",
  "smallvec",
@@ -4313,6 +4316,23 @@ dependencies = [
  "ink-quill",
  "lightning-types",
  "serde",
+]
+
+[[package]]
+name = "lightning-service-executor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-channel",
+ "async-trait",
+ "dashmap",
+ "fleek-service-ping-example",
+ "fn-sdk",
+ "fxhash",
+ "lightning-interfaces",
+ "serde",
+ "tokio",
+ "triomphe",
 ]
 
 [[package]]
@@ -7440,23 +7460,6 @@ dependencies = [
  "proc-macro2 1.0.66",
  "quote 1.0.31",
  "syn 2.0.29",
-]
-
-[[package]]
-name = "service-executor"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-channel",
- "async-trait",
- "dashmap",
- "fleek-service-ping-example",
- "fn-sdk",
- "fxhash",
- "lightning-interfaces",
- "serde",
- "tokio",
- "triomphe",
 ]
 
 [[package]]

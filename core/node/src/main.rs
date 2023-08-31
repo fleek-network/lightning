@@ -3,24 +3,15 @@ pub mod config;
 pub mod node;
 pub mod shutdown;
 
-use std::fs::File;
+
 use std::process::exit;
 
 use autometrics::settings::AutometricsSettingsBuilder;
 use autometrics::{self};
-use chrono::Local;
+
 use clap::Parser;
 use cli::Cli;
 use lightning_types::{DEFAULT_HISTOGRAM_BUCKETS, METRICS_SERVICE_NAME};
-use log::LevelFilter;
-use simplelog::{
-    ColorChoice,
-    CombinedLogger,
-    ConfigBuilder,
-    TermLogger,
-    TerminalMode,
-    WriteLogger,
-};
 
 use crate::cli::CliArgs;
 use crate::node::{FinalTypes, WithMockConsensus};
@@ -29,52 +20,11 @@ use crate::node::{FinalTypes, WithMockConsensus};
 async fn main() {
     let args = CliArgs::parse();
 
-    let log_level = args.verbose;
-    let log_filter = match log_level {
-        0 => LevelFilter::Warn,
-        1 => LevelFilter::Info,
-        2 => LevelFilter::Debug,
-        _3_or_more => LevelFilter::Trace,
-    };
     // init metrics exporter
     AutometricsSettingsBuilder::default()
         .service_name(METRICS_SERVICE_NAME)
         .histogram_buckets(DEFAULT_HISTOGRAM_BUCKETS)
         .init();
-
-    // Add ignore for process subdag because Narwhal prints it as an err everytime it successfully
-    // processes a new sub_dag
-    let logger_config = ConfigBuilder::new()
-        .add_filter_ignore_str("narwhal_consensus::bullshark")
-        .add_filter_ignore_str("anemo")
-        .set_target_level(LevelFilter::Error)
-        .set_location_level(if args.log_location {
-            LevelFilter::Error
-        } else {
-            LevelFilter::Trace
-        })
-        .build();
-
-    let date = Local::now();
-    let log_file = std::env::temp_dir().join(format!(
-        "lightning-{}.log",
-        date.format("%Y-%m-%d-%H:%M:%S")
-    ));
-
-    CombinedLogger::init(vec![
-        TermLogger::new(
-            log_filter,
-            logger_config,
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
-        ),
-        WriteLogger::new(
-            LevelFilter::Trace,
-            simplelog::Config::default(),
-            File::create(log_file).unwrap(),
-        ),
-    ])
-    .unwrap();
 
     let result = if args.with_mock_consensus {
         log::info!("Using MockConsensus");

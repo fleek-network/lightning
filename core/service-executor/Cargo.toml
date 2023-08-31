@@ -1,5 +1,5 @@
 [package]
-name = "service-executor"
+name = "lightning-service-executor"
 version.workspace = true
 edition.workspace = true
 
