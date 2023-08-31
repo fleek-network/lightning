@@ -108,7 +108,11 @@ where
     C: Collection,
 {
     async fn fetch(&self, key: &Key) -> Option<Block> {
-        let path = format!("{:?}/{}", self.store_dir_path, Hash::from(key.0).to_hex());
+        let path = format!(
+            "{}/{}",
+            self.store_dir_path.to_string_lossy(),
+            Hash::from(key.0).to_hex()
+        );
         fs::read(path).await.ok()
     }
 

@@ -56,7 +56,7 @@ async fn main() {
                     _ = interval.tick() => {
                         tracing::info!("sending message");
                         for (pk, socket_address) in peer_key.iter().zip(peer_address.iter()) {
-                            let pk = NodePublicKey::from_str(pk).unwrap();
+                            let pk = NodePublicKey::from_str( pk).unwrap();
                             let address = NodeAddress {
                                 pk,
                                 socket_address: *socket_address,
