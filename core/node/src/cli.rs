@@ -200,7 +200,7 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
     /// Run the node with the provided configuration path.
     async fn run(self, config_path: ResolvedPathBuf) -> Result<()> {
         let shutdown_controller = ShutdownController::default();
-        shutdown_controller.install_ctrl_c_handler();
+        shutdown_controller.install_handlers();
 
         let config = Self::load_or_write_config(config_path).await?;
         let node = Node::<C>::init(config)

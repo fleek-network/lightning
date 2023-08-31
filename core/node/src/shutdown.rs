@@ -16,8 +16,8 @@ pub struct ShutdownController {
 
 impl ShutdownController {
     /// Install the handler for control c to submit trigger this shutdown handler.
-    pub fn install_ctrl_c_handler(&self) {
-        tracing::debug!("install_ctrl_c_handler");
+    pub fn install_handlers(&self) {
+        tracing::debug!("Registering shutdown signals");
 
         let notify = self.notify.clone();
         tokio::task::spawn(async move {
@@ -28,7 +28,7 @@ impl ShutdownController {
 
     /// Wait for the shutdown signal to be sent.
     pub async fn wait_for_shutdown(self) {
-        tracing::info!("waiting for shutdown...");
+        tracing::info!("Waiting for shutdown signal");
         let future = self.notify.notified();
         tokio::pin!(future);
         future.as_mut().await;
