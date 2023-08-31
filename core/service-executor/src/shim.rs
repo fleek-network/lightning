@@ -2,21 +2,27 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
+use fxhash::FxHashSet;
 use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::types::ServiceId;
 use lightning_interfaces::{
     ConfigConsumer,
     ExecutorProviderInterface,
     ServiceExecutorInterface,
+    ServiceHandleInterface,
     WithStartAndShutdown,
 };
 use serde::{Deserialize, Serialize};
 use triomphe::Arc;
 
+use crate::callback::make_callback;
 use crate::collection::ServiceCollection;
 use crate::deque::{CommandSender, CommandStealer};
+use crate::handle;
 use crate::handle::ServiceHandle;
 
 pub struct ServiceExecutor<C: Collection> {
+    config: ServiceExecutorConfig,
     is_running: Arc<AtomicBool>,
     collection: ServiceCollection,
     sender: CommandSender,
@@ -25,7 +31,9 @@ pub struct ServiceExecutor<C: Collection> {
 }
 
 #[derive(Default, Serialize, Deserialize)]
-pub struct ServiceExecutorConfig {}
+pub struct ServiceExecutorConfig {
+    services: FxHashSet<ServiceId>,
+}
 
 #[derive(Clone)]
 pub struct Provider {
@@ -36,9 +44,10 @@ pub struct Provider {
 impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     type Provider = Provider;
 
-    fn init(_config: Self::Config) -> anyhow::Result<Self> {
+    fn init(config: Self::Config) -> anyhow::Result<Self> {
         let (sender, stealer) = crate::deque::chan();
         Ok(ServiceExecutor {
+            config,
             is_running: Arc::new(AtomicBool::new(false)),
             collection: ServiceCollection::default(),
             sender,
@@ -62,7 +71,24 @@ impl<C: Collection> WithStartAndShutdown for ServiceExecutor<C> {
     }
 
     async fn start(&self) {
-        self.is_running.store(true, Ordering::Relaxed)
+        self.is_running.store(true, Ordering::Relaxed);
+
+        if !self.config.services.is_empty() {
+            let request_sender = make_callback(self.sender.clone(), fn_sdk::api::on_event_response);
+
+            fn_sdk::api::setup(fn_sdk::internal::OnStartArgs {
+                request_sender,
+                block_store_path: "".into(),
+            });
+        }
+
+        for handle in get_all_services() {
+            let id = handle.get_service_id();
+            if self.config.services.contains(&id) {
+                log::info!("Enabling service {id}");
+                self.collection.insert(handle);
+            }
+        }
     }
 
     async fn shutdown(&self) {
@@ -91,4 +117,8 @@ impl ExecutorProviderInterface for Provider {
     ) -> Option<Self::Handle> {
         self.collection.get_handle(service_id)
     }
+}
+
+fn get_all_services() -> Vec<ServiceHandle> {
+    vec![handle!(0, fleek_service_ping_example)]
 }

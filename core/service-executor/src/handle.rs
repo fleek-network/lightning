@@ -30,3 +30,25 @@ impl ServiceHandleInterface for ServiceHandle {
         (self.inner.disconnected)(args);
     }
 }
+
+impl From<Service> for ServiceHandle {
+    fn from(value: Service) -> Self {
+        Self {
+            inner: Arc::new(value),
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! handle {
+    ($id:expr, $module:tt) => {
+        $crate::handle::ServiceHandle::from($crate::service::Service {
+            id: $id,
+            start: $module::on_start,
+            connected: $module::on_connected,
+            disconnected: $module::on_disconnected,
+            message: $module::on_message,
+            respond: $module::on_event_response,
+        })
+    };
+}

@@ -1,3 +1,5 @@
+// cargo run --example server -- --config ./examples/config.toml -vvvv run
+
 use lightning_handshake::handshake::Handshake;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{

@@ -1,0 +1,27 @@
+[BLANK]
+
+[handshake]
+
+[[handshake.worker]]
+type = "AsyncWorker"
+
+[[handshake.worker]]
+type = "AsyncWorker"
+
+[[handshake.worker]]
+type = "AsyncWorker"
+
+[[handshake.worker]]
+type = "AsyncWorker"
+
+[[handshake.transport]]
+type = "WebRTC"
+signal_address = "0.0.0.0:4210"
+
+[service-executor]
+services = [0]
+
+[signer]
+consensus_key_path = "~/.lightning/keystore/consensus.pem"
+node_key_path = "~/.lightning/keystore/node.pem"
+
