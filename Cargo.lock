@@ -3907,6 +3907,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-blockstore-server"
+version = "0.1.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "async-trait",
+ "blake3-stream",
+ "blake3-tree",
+ "fleek-crypto",
+ "futures",
+ "infusion",
+ "lightning-interfaces",
+ "log",
+ "serde",
+ "tokio",
+ "triomphe",
+]
+
+[[package]]
 name = "lightning-broadcast"
 version = "0.1.0"
 dependencies = [
