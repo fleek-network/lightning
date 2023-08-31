@@ -1,13 +1,15 @@
 use std::ops::Deref;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use dashmap::DashMap;
-use fleek_crypto::NodeSecretKey;
+use fleek_crypto::{ClientPublicKey, NodeSecretKey};
 use lightning_interfaces::{ConnectionWork, ExecutorProviderInterface, ServiceHandleInterface};
 use triomphe::Arc;
 
 use crate::schema;
 use crate::shutdown::ShutdownWaiter;
-use crate::transports::StaticSender;
+use crate::transports::{StaticSender, TransportSender};
 
 #[derive(Clone)]
 pub struct StateRef<P: ExecutorProviderInterface>(Arc<StateData<P>>);
@@ -24,6 +26,7 @@ impl<P: ExecutorProviderInterface> StateRef<P> {
     pub fn new(waiter: ShutdownWaiter, sk: NodeSecretKey, provider: P) -> Self {
         Self(Arc::new(StateData {
             sk,
+            next_connection_id: AtomicU64::new(0),
             shutdown: waiter,
             provider,
             access_tokens: Default::default(),
@@ -37,16 +40,24 @@ impl<P: ExecutorProviderInterface> StateRef<P> {
 /// in transport_driver.rs file.
 pub struct StateData<P: ExecutorProviderInterface> {
     sk: NodeSecretKey,
+    next_connection_id: AtomicU64,
     pub shutdown: ShutdownWaiter,
     pub provider: P,
     /// Map each access token to the info about that access token. aHash has better performance
     /// on arrays than fxHash.
-    pub access_tokens: DashMap<[u8; 48], (), ahash::RandomState>,
+    pub access_tokens: DashMap<[u8; 48], AccessTokenInfo, ahash::RandomState>,
     /// Map each connection to the information we have about it.
     pub connections: DashMap<u64, Connection<P::Handle>, fxhash::FxBuildHasher>,
 }
 
+pub struct AccessTokenInfo {
+    pub connection_id: u64,
+    pub expiry_time: u64,
+}
+
 pub struct Connection<H: ServiceHandleInterface> {
+    /// Public key of the client who made the first connection.
+    pk: ClientPublicKey,
     /// The two possible senders attached to this connection. The index
     /// is for permission. Look at [`TransportPermission`].
     senders: [Option<StaticSender>; 2],
@@ -61,19 +72,150 @@ pub struct ProcessHandshakeResult {
 
 #[derive(Clone, Copy, Debug)]
 pub enum TransportPermission {
-    ClientKeyOwner = 0x00,
-    AccessTokenUser = 0x01,
+    Primary = 0x00,
+    Secondary = 0x01,
 }
 
 impl<P: ExecutorProviderInterface> StateData<P> {
+    /// Handle a handshake request that is signed by a client key, and has an empty `retry`
+    /// field. Suggesting that we need to create a new connection for the given public key.
+    fn create_new_connection(
+        &self,
+        sender: StaticSender,
+        pk: ClientPublicKey,
+        service: u32,
+    ) -> Option<ProcessHandshakeResult> {
+        let Some(handle) = self.provider.get_service_handle(service) else {
+            sender.terminate(schema::TerminationReason::InvalidService);
+            return None;
+        };
+
+        // Get the next available connection id.
+        let connection_id = self.next_connection_id.fetch_add(1, Ordering::Relaxed);
+
+        let connection = Connection {
+            pk,
+            senders: [Some(sender), None],
+            handle: handle.clone(),
+        };
+
+        self.connections.insert(connection_id, connection);
+
+        // Let the service know we got the connection.
+        handle.connected(fn_sdk::internal::OnConnectedArgs {
+            connection_id,
+            client: pk,
+        });
+
+        Some(ProcessHandshakeResult {
+            connection_id,
+            perm: TransportPermission::Primary,
+        })
+    }
+
+    /// Instead of creating a connection, join a connection as primary. This is initiated by
+    /// a client key holder that performs a handshake with a `retry` filed that is provided.
+    ///
+    /// The service id is only used as sanity check over the connection retry request, and must
+    /// be equal to the service id that we already have for the connection. It does not modify
+    /// the service a connection is attached to. That data is immutable.
+    fn join_connection_primary(
+        &self,
+        sender: StaticSender,
+        pk: ClientPublicKey,
+        connection_id: u64,
+        service_id: u32,
+    ) -> Option<ProcessHandshakeResult> {
+        let Some(mut connection) = self.connections.get_mut(&connection_id) else {
+            sender.terminate(schema::TerminationReason::InvalidHandshake);
+            return None;
+        };
+
+        if connection.pk != pk {
+            sender.terminate(schema::TerminationReason::InvalidHandshake);
+            return None;
+        }
+
+        if connection.handle.get_service_id() != service_id {
+            sender.terminate(schema::TerminationReason::InvalidService);
+            return None;
+        }
+
+        if connection.senders[0].is_some() {
+            // The previous connection is still connected.
+            sender.terminate(schema::TerminationReason::ConnectionInUse);
+            return None;
+        }
+
+        connection.senders[0] = Some(sender);
+
+        Some(ProcessHandshakeResult {
+            connection_id,
+            perm: TransportPermission::Primary,
+        })
+    }
+
+    /// Join a connection using a access token.
+    fn join_connection_secondary(
+        &self,
+        sender: StaticSender,
+        access_token: [u8; 48],
+    ) -> Option<ProcessHandshakeResult> {
+        let Some(info) = self.access_tokens.get(&access_token) else {
+            sender.terminate(schema::TerminationReason::InvalidToken);
+            return None;
+        };
+
+        if info.expiry_time <= now() {
+            sender.terminate(schema::TerminationReason::InvalidToken);
+            return None;
+        }
+
+        let connection_id = info.connection_id;
+
+        let Some(mut connection) = self.connections.get_mut(&connection_id) else {
+            sender.terminate(schema::TerminationReason::InvalidToken);
+            return None;
+        };
+
+        if connection.senders[1].is_some() {
+            // The previous connection is still connected.
+            sender.terminate(schema::TerminationReason::ConnectionInUse);
+            return None;
+        }
+
+        connection.senders[1] = Some(sender);
+
+        Some(ProcessHandshakeResult {
+            connection_id,
+            perm: TransportPermission::Secondary,
+        })
+    }
+
     /// Process a handshake request and returns the assigned connection id as well as a handle
-    /// to the service. A transport id is also returned in order to
+    /// to the service.
+    ///
+    /// This function does not verify proof of possession sent. Right now the transport should to
+    /// that.
     pub fn process_handshake(
         &self,
-        _frame: schema::HandshakeRequestFrame,
-        _sender: StaticSender,
+        frame: schema::HandshakeRequestFrame,
+        sender: StaticSender,
     ) -> Option<ProcessHandshakeResult> {
-        todo!()
+        match frame {
+            schema::HandshakeRequestFrame::Handshake {
+                retry: Some(conn_id),
+                service,
+                pk,
+                ..
+            } => self.join_connection_primary(sender, pk, conn_id, service),
+            schema::HandshakeRequestFrame::Handshake { pk, service, .. } => {
+                self.create_new_connection(sender, pk, service)
+            },
+            schema::HandshakeRequestFrame::JoinRequest { access_token } => {
+                self.join_connection_secondary(sender, access_token)
+            },
+        }
     }
 
     /// Called by any of the transports connected to a trance
@@ -113,4 +255,12 @@ impl<P: ExecutorProviderInterface> StateData<P> {
     pub fn process_work(&self, _request: ConnectionWork) {
         todo!()
     }
+}
+
+#[inline(always)]
+fn now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
 }

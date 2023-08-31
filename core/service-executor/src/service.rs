@@ -7,6 +7,7 @@ use fn_sdk::internal::{
 };
 
 pub struct Service {
+    pub id: u32,
     pub start: fn(OnStartArgs),
     pub connected: fn(OnConnectedArgs),
     pub disconnected: fn(OnDisconnectedArgs),

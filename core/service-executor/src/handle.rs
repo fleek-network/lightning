@@ -11,6 +11,11 @@ pub struct ServiceHandle {
 
 impl ServiceHandleInterface for ServiceHandle {
     #[inline(always)]
+    fn get_service_id(&self) -> u32 {
+        self.inner.id
+    }
+
+    #[inline(always)]
     fn message(&self, args: OnMessageArgs) {
         (self.inner.message)(args);
     }

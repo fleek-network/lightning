@@ -40,7 +40,7 @@ pub enum HandshakeRequestFrame {
         pk: ClientPublicKey,
         pop: ClientSignature,
     },
-    ContinueRequest {
+    JoinRequest {
         access_token: [u8; 48],
     },
 }
@@ -72,7 +72,7 @@ impl HandshakeRequestFrame {
                 buf.put_slice(&pop.0);
                 buf.into()
             },
-            HandshakeRequestFrame::ContinueRequest { access_token } => {
+            HandshakeRequestFrame::JoinRequest { access_token } => {
                 let mut buf = Vec::with_capacity(49);
                 buf.put_u8(0x02);
                 buf.put_slice(access_token);
@@ -117,7 +117,7 @@ impl HandshakeRequestFrame {
                     return Err(anyhow!("wrong number of bytes"));
                 }
                 let access_token = *array_ref!(bytes, 1, 48);
-                Ok(Self::ContinueRequest { access_token })
+                Ok(Self::JoinRequest { access_token })
             },
             _ => Err(anyhow!("invalid frame tag")),
         }
@@ -288,6 +288,7 @@ pub enum TerminationReason {
     InvalidDeliveryAcknowledgment,
     InvalidService,
     ServiceTerminated,
+    ConnectionInUse,
     Unknown = 0xFF,
 }
 
@@ -337,7 +338,7 @@ mod tests {
                 pk: ClientPublicKey([6; 96]),
                 pop: ClientSignature([7; 48]),
             },
-            HandshakeRequestFrame::ContinueRequest {
+            HandshakeRequestFrame::JoinRequest {
                 access_token: [8; 48],
             }
         );

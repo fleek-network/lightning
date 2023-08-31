@@ -46,6 +46,7 @@ pub trait ExecutorProviderInterface: Clone + Send + Sync + 'static {
 /// service that is running.
 #[infusion::blank]
 pub trait ServiceHandleInterface: Clone + Send + Sync + 'static {
+    fn get_service_id(&self) -> u32;
     fn connected(&self, args: OnConnectedArgs);
     fn disconnected(&self, args: OnDisconnectedArgs);
     fn message(&self, args: OnMessageArgs);
