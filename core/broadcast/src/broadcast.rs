@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use async_trait::async_trait;
 use derive_more::IsVariant;
 use lightning_interfaces::infu_collection::{c, Collection};
@@ -10,8 +12,11 @@ use lightning_interfaces::{
     SignerInterface,
     WithStartAndShutdown,
 };
+use netkit::builder::Builder;
+use netkit::endpoint::Endpoint;
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 use crate::command::CommandSender;
 use crate::config::Config;
@@ -22,6 +27,7 @@ use crate::pubsub::PubSubI;
 
 pub struct Broadcast<C: Collection> {
     command_sender: CommandSender,
+    endpoint: Mutex<Option<Endpoint>>,
     // This is only ever `None` when the mutex is locked.
     status: Mutex<Option<Status<C>>>,
 }
@@ -30,6 +36,7 @@ pub struct Broadcast<C: Collection> {
 enum Status<C: Collection> {
     Running {
         shutdown: Option<oneshot::Sender<()>>,
+        shutdown_endpoint: Option<CancellationToken>,
         handle: JoinHandle<Context<C>>,
     },
     NotRunning {
@@ -57,10 +64,12 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
         // is one param (i.e size) required.
         let tmp: &mut Option<Status<C>> = &mut guard;
         let state = tmp.take().unwrap();
+        let shutdown_endpoint_token = CancellationToken::new();
         let next_state = if let Status::NotRunning { ctx } = state {
             let (shutdown, handle) = ctx.spawn();
             Status::Running {
                 shutdown: Some(shutdown),
+                shutdown_endpoint: Some(shutdown_endpoint_token.clone()),
                 handle,
             }
         } else {
@@ -68,6 +77,25 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
         };
 
         *guard = Some(next_state);
+
+        let mut endpoint = self
+            .endpoint
+            .lock()
+            .await
+            .take()
+            .expect("There to be a netkit endpoint");
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = shutdown_endpoint_token.cancelled() => {
+                        break;
+                    }
+                    _ = endpoint.start() => {
+                        break
+                    }
+                }
+            }
+        });
     }
 
     async fn shutdown(&self) {
@@ -75,7 +103,13 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
 
         let tmp: &mut Option<Status<C>> = &mut guard;
         let state = tmp.take().unwrap();
-        let next_state = if let Status::Running { shutdown, handle } = state {
+        let next_state = if let Status::Running {
+            shutdown,
+            shutdown_endpoint,
+            handle,
+        } = state
+        {
+            let _ = shutdown_endpoint.unwrap().cancel();
             let _ = shutdown.unwrap().send(());
             let ctx = match handle.await {
                 Ok(ctx) => ctx,
@@ -107,20 +141,29 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         signer: &c!(C::SignerInterface),
         notifier: c!(C::NotifierInterface),
     ) -> anyhow::Result<Self> {
-        let (_, listener_tx) = mpsc::channel(1024);
         let (_, sk) = signer.get_sk();
+        // Todo: Move this to config.
+        let address: SocketAddr = "0.0.0.0:4200".parse().expect("Hardcoded socket address");
+        let mut builder = Builder::new(sk.clone());
+        builder.socket_address(address);
+        let mut endpoint = builder.build()?;
+        let network_event_rx = endpoint.network_event_receiver();
+        let endpoint_tx = endpoint.request_sender();
+
         let ctx = Context::<C>::new(
             Database::default(),
             sqr,
             notifier,
             topology,
-            listener_tx,
+            network_event_rx,
+            endpoint_tx,
             sk,
         );
 
         Ok(Self {
             command_sender: ctx.command_sender(),
             status: Some(Status::NotRunning { ctx }).into(),
+            endpoint: Some(endpoint).into(),
         })
     }
 

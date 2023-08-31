@@ -3980,11 +3980,13 @@ dependencies = [
  "log",
  "mini-moka",
  "mock",
+ "netkit",
  "rand 0.8.5",
  "serde",
  "smallvec",
  "ta",
  "tokio",
+ "tokio-util 0.7.8",
  "tracing",
 ]
 
