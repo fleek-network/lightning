@@ -51,68 +51,19 @@ impl PendingStore {
 
     pub async fn tick(&mut self) -> Vec<(MessageInternedId, NodePublicKey)> {
         loop {
-            let pending_req: Vec<(MessageInternedId, NodePublicKey)> = self
-                .pending_map
-                .iter()
-                .filter(|(id, pub_keys)| {
-                    if let Some(requests) = self.request_map.get(*id) {
-                        if let Some(req) = requests.back() {
-                            // If the most recent request for this message is too far in the past,
-                            // we send another request.
-                            // We use the EMA of the RTT for a particular node to determine the
-                            // timeout.
-                            let timeout = self
-                                .rtt_map
-                                .get(&req.node)
-                                .and_then(|ema| ema.current())
-                                .map(|ema| ema * 2.0)
-                                .unwrap_or(DEFAULT_REQUEST_TIMEOUT.as_millis() as f64)
-                                as u128;
-                            req.timestamp.elapsed().as_millis() >= timeout
-                        } else {
-                            // We haven't send a request for this digest.
-                            true
-                        }
-                    } else {
-                        // We haven't send a request for this digest.
-                        true
-                    }
-                })
-                .filter_map(|(id, pub_keys)| {
-                    let pub_keys: Vec<NodePublicKey> = pub_keys.iter().copied().collect();
-                    if pub_keys.is_empty() {
-                        None
-                    } else if pub_keys.len() == 1 {
-                        Some((*id, pub_keys[0]))
-                    } else {
-                        let mut max_val: f64 = 1.0;
-                        let weights: Vec<f64> = pub_keys
-                            .iter()
-                            .map(|pub_key| self.rtt_map.get(pub_key).and_then(|ema| ema.current()))
-                            .map(|ema| {
-                                let ema = ema.unwrap_or(0.0);
-                                max_val = max_val.max(ema);
-                                ema
-                            })
-                            .collect();
-                        // Randomly sample the node we will send the request to for a particular
-                        // message.
-                        // The sampling probability for a particular node is inversely proportional
-                        // to the measured RTT (the lower the RTT, the higher the chance of
-                        // selecting the node).
-                        let weights: Vec<f64> = weights.into_iter().map(|w| max_val - w).collect();
-                        let dist = WeightedIndex::new(weights).unwrap();
-                        let mut rng = thread_rng();
-                        Some((*id, pub_keys[dist.sample(&mut rng)]))
-                    }
-                })
-                .collect();
+            let pending_requests = self.get_pending_requests();
+            let pending_requests = self.select_request_receivers(pending_requests);
             // Mark the messages as requested if there are any.
-            pending_req
-                .iter()
-                .for_each(|(id, pub_key)| self.insert_request(*pub_key, *id));
-            if !pending_req.is_empty() {
-                return pending_req;
+            pending_requests.iter().for_each(|(id, pub_key)| {
+                self.insert_request(*pub_key, *id);
+                // Remove node from pending map to avoid sending the same request twice to the same
+                // node for the same digest.
+                if let Some(node_set) = self.pending_map.get_mut(id) {
+                    node_set.remove(pub_key);
+                }
+            });
+            if !pending_requests.is_empty() {
+                return pending_requests;
             }
             tokio::time::sleep(TICK_DURATION).await;
         }
@@ -137,6 +88,76 @@ impl PendingStore {
     pub fn remove_message(&mut self, interned_id: MessageInternedId) {
         let _ = self.pending_map.remove(&interned_id);
         let _ = self.request_map.remove(&interned_id);
+    }
+
+    fn select_request_receivers(
+        &self,
+        requests: Vec<(MessageInternedId, FxHashSet<NodePublicKey>)>,
+    ) -> Vec<(MessageInternedId, NodePublicKey)> {
+        requests
+            .into_iter()
+            .filter_map(|(id, pub_keys)| {
+                let pub_keys: Vec<NodePublicKey> = pub_keys.iter().copied().collect();
+                if pub_keys.is_empty() {
+                    None
+                } else if pub_keys.len() == 1 {
+                    Some((id, pub_keys[0]))
+                } else {
+                    let mut max_val: f64 = 1.0;
+                    let weights: Vec<f64> = pub_keys
+                        .iter()
+                        .map(|pub_key| self.rtt_map.get(pub_key).and_then(|ema| ema.current()))
+                        .map(|ema| {
+                            let ema = ema.unwrap_or(0.0);
+                            max_val = max_val.max(ema);
+                            ema
+                        })
+                        .collect();
+                    // Randomly sample the node we will send the request to for a particular
+                    // message.
+                    // The sampling probability for a particular node is inversely proportional
+                    // to the measured RTT (the lower the RTT, the higher the chance of
+                    // selecting the node).
+                    let weights: Vec<f64> = weights.into_iter().map(|w| max_val - w).collect();
+                    let dist = WeightedIndex::new(weights).unwrap();
+                    let mut rng = thread_rng();
+                    let peer = pub_keys[dist.sample(&mut rng)];
+
+                    Some((id, peer))
+                }
+            })
+            .collect()
+    }
+
+    fn get_pending_requests(&self) -> Vec<(MessageInternedId, FxHashSet<NodePublicKey>)> {
+        self.pending_map
+            .iter()
+            .filter(|(id, pub_keys)| {
+                if let Some(requests) = self.request_map.get(id) {
+                    if let Some(req) = requests.back() {
+                        // If the most recent request for this message is too far in the past,
+                        // we send another request.
+                        // We use the EMA of the RTT for a particular node to determine the
+                        // timeout.
+                        let timeout = self
+                            .rtt_map
+                            .get(&req.node)
+                            .and_then(|ema| ema.current())
+                            .map(|ema| ema * 2.0)
+                            .unwrap_or(DEFAULT_REQUEST_TIMEOUT.as_millis() as f64)
+                            as u128;
+                        req.timestamp.elapsed().as_millis() >= timeout
+                    } else {
+                        // We haven't send a request for this digest.
+                        true
+                    }
+                } else {
+                    // We haven't send a request for this digest.
+                    true
+                }
+            })
+            .map(|(id, pub_keys)| (*id, pub_keys.clone()))
+            .collect()
     }
 }
 
