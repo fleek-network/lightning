@@ -60,7 +60,7 @@ impl<C: Collection> WithStartAndShutdown for BlockStoreServer<C> {
     /// started.
     async fn start(&self) {
         let mut shutdown_entry = self.shutdown_tx.write().unwrap();
-        if shutdown_entry.is_none() {
+        if shutdown_entry.is_some() {
             return;
         }
         let (tx, mut rx) = tokio::sync::mpsc::channel(1);
@@ -77,10 +77,11 @@ impl<C: Collection> WithStartAndShutdown for BlockStoreServer<C> {
 
             loop {
                 select! {
-                    Ok((socket, _)) = listener.accept() =>
+                    Ok((socket, _)) = listener.accept() => {
                         if let Err(e) = handle_connection::<C>(blockstore.clone(), socket).await {
                             error!("error handling blockstore connection: {e}");
-                        },
+                        }
+                    },
                     _ = rx.recv() => break,
                 }
             }
