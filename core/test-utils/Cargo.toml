@@ -17,6 +17,4 @@ serde.workspace = true
 tokio.workspace = true
 scc.workspace = true
 hp-fixed.workspace = true
-
-lightning-handshake = { path = "../handshake" }
-lightning-blockstore = { path = "../blockstore" }
+serde_json = "1.0"

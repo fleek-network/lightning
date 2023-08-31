@@ -11,21 +11,25 @@ use crate::transports::{self, Transport, TransportReceiver};
 #[serde(tag = "type")]
 pub enum TransportConfig {
     WebRTC(transports::webrtc::WebRtcConfig),
+    Mock(transports::mock::MockTransportConfig),
 }
 
 pub async fn attach_transport_by_config<P: ExecutorProviderInterface>(
     state: StateRef<P>,
     config: TransportConfig,
 ) -> anyhow::Result<JoinHandle<()>> {
-    let transport = match config {
+    match config {
         TransportConfig::WebRTC(config) => {
-            log::error!("---------- HERE");
-            transports::webrtc::WebRtcTransport::bind(state.shutdown.clone(), config).await?
+            let transport =
+                transports::webrtc::WebRtcTransport::bind(state.shutdown.clone(), config).await?;
+            Ok(attach_transport_to_state(state, transport))
         },
-    };
-
-    log::error!("---------- Bind successfull");
-    Ok(attach_transport_to_state(state, transport))
+        TransportConfig::Mock(config) => {
+            let transport =
+                transports::mock::MockTransport::bind(state.shutdown.clone(), config).await?;
+            Ok(attach_transport_to_state(state, transport))
+        },
+    }
 }
 
 pub fn attach_transport_to_state<P: ExecutorProviderInterface, T: Transport>(

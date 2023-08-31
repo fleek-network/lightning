@@ -38,7 +38,7 @@ pub struct MockTransport {
     conn_rx: tokio::sync::mpsc::Receiver<(MockTransportSender, MockTransportReceiver)>,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, Clone)]
 pub struct MockTransportConfig {
     port: u16,
 }

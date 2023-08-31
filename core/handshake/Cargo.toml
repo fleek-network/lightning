@@ -37,3 +37,5 @@ affair.workspace = true
 lightning-node = { path = "../node" } # for TomlConfigProvider
 lightning-service-executor = { path = "../service-executor" }
 lightning-signer = { path = "../signer" }
+serde_json.workspace = true
+lightning-test-utils = { path = "../test-utils" }
