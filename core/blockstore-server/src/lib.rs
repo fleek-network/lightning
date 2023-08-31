@@ -2,6 +2,7 @@ pub mod config;
 
 use std::io::{Read, Write};
 use std::marker::PhantomData;
+use std::net::SocketAddr;
 use std::sync::RwLock;
 
 use anyhow::{anyhow, Result};
@@ -9,12 +10,10 @@ use async_trait::async_trait;
 use blake3_stream::{Encoder, VerifiedDecoder};
 use blake3_tree::blake3::tree::HashTree;
 use config::Config;
-use infusion::c;
 use lightning_interfaces::blockstore_server::BlockStoreServerInterface;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{CompressionAlgoSet, CompressionAlgorithm, NodeIndex};
 use lightning_interfaces::{
-    ApplicationInterface,
     Blake3Hash,
     BlockStoreInterface,
     ConfigConsumer,
@@ -31,7 +30,6 @@ use triomphe::Arc;
 struct BlockStoreServer<C: Collection> {
     phantom: PhantomData<C>,
     config: Arc<Config>,
-    query_runner: c![C::ApplicationInterface::SyncExecutor],
     blockstore: C::BlockStoreInterface,
     shutdown_tx: Arc<RwLock<Option<tokio::sync::mpsc::Sender<()>>>>,
 }
@@ -41,7 +39,6 @@ impl<C: Collection> Clone for BlockStoreServer<C> {
         Self {
             phantom: self.phantom,
             config: self.config.clone(),
-            query_runner: self.query_runner.clone(),
             blockstore: self.blockstore.clone(),
             shutdown_tx: self.shutdown_tx.clone(),
         }
@@ -158,34 +155,30 @@ async fn handle_connection<C: Collection>(
 
 #[async_trait]
 impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
-    fn init(
-        config: Self::Config,
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        blockstore: C::BlockStoreInterface,
-    ) -> anyhow::Result<Self> {
+    fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
         Ok(Self {
             phantom: PhantomData,
             config: config.into(),
-            query_runner,
             blockstore,
             shutdown_tx: Arc::new(RwLock::new(None)),
         })
     }
 
-    async fn request_download(&self, block_hash: Blake3Hash, target: NodeIndex) -> Result<()> {
+    fn extract_address<Q: SyncQueryRunnerInterface>(
+        query_runner: Q,
+        target: NodeIndex,
+    ) -> Option<SocketAddr> {
         // Get node pk, info, and finally the address
-        let pk = self
-            .query_runner
-            .index_to_pubkey(target)
-            .ok_or(anyhow!("failed to get target public key"))?;
-        let info = self
-            .query_runner
-            .get_node_info(&pk)
-            .ok_or(anyhow!("failed to get target info"))?;
+        query_runner.index_to_pubkey(target).and_then(|pk| {
+            query_runner
+                .get_node_info(&pk)
+                .map(|info| (info.domain, info.ports.blockstore).into())
+        })
+    }
 
+    async fn request_download(&self, block_hash: Blake3Hash, target: SocketAddr) -> Result<()> {
         // Connect to the destination
-        let mut socket =
-            TcpStream::connect(format!("{}:{}", info.domain, info.ports.blockstore)).await?;
+        let mut socket = TcpStream::connect(target).await?;
 
         // Send request
         socket.write_all(&block_hash).await?;

@@ -1,15 +1,16 @@
+use std::net::SocketAddr;
+
 use anyhow::Result;
 use async_trait::async_trait;
-use infusion::c;
 use lightning_types::NodeIndex;
 
 use crate::infu_collection::Collection;
 use crate::{
-    ApplicationInterface,
     Blake3Hash,
     BlockStoreInterface,
     ConfigConsumer,
     ConfigProviderInterface,
+    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 
@@ -18,19 +19,16 @@ use crate::{
 pub trait BlockStoreServerInterface<C: Collection>:
     Clone + Send + Sync + ConfigConsumer + WithStartAndShutdown
 {
-    fn _init(
-        config: ::ConfigProviderInterface,
-        app: ::ApplicationInterface,
-        blockstre: ::BlockStoreInterface,
-    ) {
-        Self::init(config.get::<Self>(), app.sync_query(), blockstre.clone())
+    fn _init(config: ::ConfigProviderInterface, blockstre: ::BlockStoreInterface) {
+        Self::init(config.get::<Self>(), blockstre.clone())
     }
 
-    fn init(
-        config: Self::Config,
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        blockstore: C::BlockStoreInterface,
-    ) -> anyhow::Result<Self>;
+    fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self>;
 
-    async fn request_download(&self, block_hash: Blake3Hash, target: NodeIndex) -> Result<()>;
+    fn extract_address<Q: SyncQueryRunnerInterface>(
+        query_runner: Q,
+        target: NodeIndex,
+    ) -> Option<SocketAddr>;
+
+    async fn request_download(&self, block_hash: Blake3Hash, target: SocketAddr) -> Result<()>;
 }
