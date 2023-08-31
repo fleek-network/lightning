@@ -28,7 +28,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::select;
 use triomphe::Arc;
 
-struct BlockServer<C: Collection> {
+struct BlockStoreServer<C: Collection> {
     phantom: PhantomData<C>,
     config: Arc<Config>,
     query_runner: c![C::ApplicationInterface::SyncExecutor],
@@ -36,7 +36,7 @@ struct BlockServer<C: Collection> {
     shutdown_tx: Arc<RwLock<Option<tokio::sync::mpsc::Sender<()>>>>,
 }
 
-impl<C: Collection> Clone for BlockServer<C> {
+impl<C: Collection> Clone for BlockStoreServer<C> {
     fn clone(&self) -> Self {
         Self {
             phantom: self.phantom,
@@ -48,13 +48,13 @@ impl<C: Collection> Clone for BlockServer<C> {
     }
 }
 
-impl<C: Collection> ConfigConsumer for BlockServer<C> {
+impl<C: Collection> ConfigConsumer for BlockStoreServer<C> {
     const KEY: &'static str = "blockserver";
     type Config = Config;
 }
 
 #[async_trait]
-impl<C: Collection> WithStartAndShutdown for BlockServer<C> {
+impl<C: Collection> WithStartAndShutdown for BlockStoreServer<C> {
     fn is_running(&self) -> bool {
         self.shutdown_tx.read().unwrap().is_some()
     }
@@ -157,7 +157,7 @@ async fn handle_connection<C: Collection>(
 }
 
 #[async_trait]
-impl<C: Collection> BlockStoreServerInterface<C> for BlockServer<C> {
+impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
     fn init(
         config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
