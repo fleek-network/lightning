@@ -10,18 +10,24 @@ use lightning_interfaces::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::collection::ServiceCollection;
 use crate::deque::CommandStealer;
 use crate::handle::ServiceHandle;
 
 pub struct ServiceExecutor<C: Collection> {
-    collection: PhantomData<C>,
+    collection: ServiceCollection,
+    stealer: CommandStealer,
+    p: PhantomData<C>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct ServiceExecutorConfig {}
 
 #[derive(Clone)]
-pub struct Provider {}
+pub struct Provider {
+    collection: ServiceCollection,
+    stealer: CommandStealer,
+}
 
 impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     type Provider = Provider;
@@ -31,7 +37,10 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     }
 
     fn get_provider(&self) -> Self::Provider {
-        todo!()
+        Provider {
+            collection: self.collection.clone(),
+            stealer: self.stealer.clone(),
+        }
     }
 }
 
@@ -59,14 +68,16 @@ impl ExecutorProviderInterface for Provider {
     type Handle = ServiceHandle;
     type Stealer = CommandStealer;
 
+    #[inline(always)]
     fn get_work_stealer(&self) -> Self::Stealer {
-        todo!()
+        self.stealer.clone()
     }
 
+    #[inline(always)]
     fn get_service_handle(
         &self,
-        _service_id: lightning_interfaces::types::ServiceId,
+        service_id: lightning_interfaces::types::ServiceId,
     ) -> Option<Self::Handle> {
-        todo!()
+        self.collection.get_handle(service_id)
     }
 }

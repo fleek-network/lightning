@@ -1,15 +1,9 @@
+// it's not dead, it's just not born yet.
+#![allow(dead_code)]
+
+mod callback;
+pub mod collection;
 pub mod deque;
 pub mod handle;
 pub mod service;
 pub mod shim;
-
-// #[test]
-// fn x() {
-//     let _x = Service {
-//         start: fleek_service_ping_example::on_start,
-//         connected: fleek_service_ping_example::on_connected,
-//         disconnected: fleek_service_ping_example::on_disconnected,
-//         message: fleek_service_ping_example::on_message,
-//         respond: fleek_service_ping_example::on_event_response,
-//     };
-// }

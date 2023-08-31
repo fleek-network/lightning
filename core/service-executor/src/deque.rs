@@ -30,12 +30,14 @@ impl WorkScheduler {
 impl ConnectionWorkStealer for CommandStealer {
     type AsyncFuture<'a> = StealerFuture<'a>;
 
+    #[inline(always)]
     fn next(&mut self) -> Self::AsyncFuture<'_> {
         StealerFuture {
             fut: self.receiver.recv(),
         }
     }
 
+    #[inline(always)]
     fn next_blocking(&mut self) -> Option<ConnectionWork> {
         self.receiver.recv_blocking().ok()
     }
@@ -48,6 +50,7 @@ pub struct StealerFuture<'a> {
 impl<'a> Future for StealerFuture<'a> {
     type Output = Option<ConnectionWork>;
 
+    #[inline(always)]
     fn poll(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let fut = &mut self.fut;
         pin!(fut);
