@@ -60,6 +60,7 @@ impl<C: Collection> Node<C> {
     /// Fill the configuration provider with the default configuration without performing any
     /// initialization.
     pub fn fill_configuration<T: Collection>(provider: &impl ConfigProviderInterface<T>) {
+        provider.get::<C::BlockStoreServerInterface>();
         provider.get::<C::SignerInterface>();
         provider.get::<C::ApplicationInterface>();
         provider.get::<C::BlockStoreInterface>();
@@ -80,11 +81,11 @@ impl<C: Collection> Node<C> {
 }
 
 forward!(async fn start_or_shutdown_node(this, start: bool) on [
+    BlockStoreServerInterface,
     SignerInterface,
     ApplicationInterface,
     ConnectionPoolInterface,
     BroadcastInterface,
-    BlockStoreServerInterface,
     HandshakeInterface,
     ConsensusInterface,
     DhtInterface,

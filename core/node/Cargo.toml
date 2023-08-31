@@ -11,6 +11,7 @@ autometrics.workspace = true
 lightning-application = { path = "../application" }
 lightning-broadcast = { path = "../broadcast" }
 lightning-blockstore = { path = "../blockstore" }
+lightning-blockstore-server = { path = "../blockstore-server" }
 lightning-handshake = { path = "../handshake" }
 lightning-interfaces = { path = "../interfaces" }
 lightning-types = { path = "../types" }

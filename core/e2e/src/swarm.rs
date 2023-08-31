@@ -17,6 +17,8 @@ use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::fs::{FsStore, FsStoreConfig};
+use lightning_blockstore_server::config::Config as BlockStoreServerConfig;
+use lightning_blockstore_server::BlockStoreServer;
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
 use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
@@ -296,6 +298,10 @@ fn build_config(
             .join("data/blockstore")
             .try_into()
             .expect("Failed to resolve path"),
+    });
+
+    config.inject::<BlockStoreServer<FinalTypes>>(BlockStoreServerConfig {
+        address: ([127, 0, 0, 1], ports.blockstore).into(),
     });
 
     config

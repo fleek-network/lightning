@@ -27,7 +27,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::select;
 use triomphe::Arc;
 
-struct BlockStoreServer<C: Collection> {
+pub struct BlockStoreServer<C: Collection> {
     phantom: PhantomData<C>,
     config: Arc<Config>,
     blockstore: C::BlockStoreInterface,

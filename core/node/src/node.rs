@@ -1,5 +1,6 @@
 use lightning_application::app::Application;
 use lightning_blockstore::fs::FsStore;
+use lightning_blockstore_server::BlockStoreServer;
 use lightning_broadcast::Broadcast;
 use lightning_consensus::consensus::Consensus;
 use lightning_dht::dht::Dht;
@@ -27,7 +28,7 @@ impl CollectionBase for FinalTypes {
     type ConfigProviderInterface<C: Collection> = TomlConfigProvider<C>;
     type ApplicationInterface<C: Collection> = Application<C>;
     type BlockStoreInterface<C: Collection> = FsStore<C>;
-    type BlockStoreServerInterface<C: Collection> = infusion::Blank<C>;
+    type BlockStoreServerInterface<C: Collection> = BlockStoreServer<C>;
     type BroadcastInterface<C: Collection> = Broadcast<C>;
     type ConnectionPoolInterface<C: Collection> = ConnectionPool<C>;
     type TopologyInterface<C: Collection> = Topology<C>;

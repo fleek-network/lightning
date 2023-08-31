@@ -18,6 +18,7 @@ lightning-signer = { path = "../signer" }
 lightning-dht = { path = "../dht" }
 lightning-pool = { path = "../pool" }
 lightning-blockstore = { path = "../blockstore" }
+lightning-blockstore-server = { path = "../blockstore-server" }
 mock = { path = "../mock" }
 infusion.workspace = true
 tokio.workspace = true
