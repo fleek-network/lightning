@@ -275,16 +275,31 @@ mod tests {
     async fn test_put_fs() {
         // Given: some content.
         let content = create_content();
-        // Given: a block store.
-        let blockstore = FsStore::<TestBinding>::init(FsStoreConfig::default()).unwrap();
-        // When: we create a putter and write some content.
-        let mut putter = blockstore.put(None);
-        putter
-            .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
-            .unwrap();
-        // Then: the putter returns the appropriate root hash.
+        let path = std::env::temp_dir().join("lightning-blockstore-test");
+        let test = || async {
+            // Given: a block store.
+            let blockstore = FsStore::<TestBinding>::init(FsStoreConfig {
+                store_dir_path: path.clone().try_into().unwrap(),
+            })
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+            // When: we create a putter and write some content.
+            let mut putter = blockstore.put(None);
+            putter
+                .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
+                .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+            // Then: the putter returns the appropriate root hash.
+            putter
+                .finalize()
+                .await
+                .map_err(|e| anyhow::anyhow!("{e:?}"))
+        };
+        let root = test().await;
+
+        if path.exists() {
+            std::fs::remove_dir_all(path).unwrap();
+        }
+
         let hash_tree = hash_tree(content.as_slice());
-        let root = putter.finalize().await.unwrap();
-        assert_eq!(root, Blake3Hash::from(hash_tree.hash));
+        assert_eq!(root.unwrap(), Blake3Hash::from(hash_tree.hash));
     }
 }
