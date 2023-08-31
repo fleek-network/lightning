@@ -1,3 +1,5 @@
+use std::ops::ControlFlow;
+
 use lightning_interfaces::{ConnectionWorkStealer, ExecutorProviderInterface};
 use serde::{Deserialize, Serialize};
 
@@ -28,15 +30,26 @@ pub fn attach_worker<P: ExecutorProviderInterface>(state: StateRef<P>, mode: Wor
 
 fn blocking_worker<P: ExecutorProviderInterface>(mut stealer: P::Stealer, state: StateRef<P>) {
     while let Some(work) = stealer.next_blocking() {
+        if state.shutdown.is_shutdown() {
+            return;
+        }
+
         state.process_work(work);
     }
 }
 
 async fn non_blocking_worker<P: ExecutorProviderInterface>(
-    mut stealer: P::Stealer,
+    stealer: P::Stealer,
     state: StateRef<P>,
 ) {
-    while let Some(work) = stealer.next().await {
-        state.process_work(work);
-    }
+    state
+        .shutdown
+        .fold_until_shutdown(stealer, |mut stealer| async {
+            let Some(job) = stealer.next().await else { return ControlFlow::Break(()); };
+
+            state.process_work(job);
+
+            ControlFlow::Continue(stealer)
+        })
+        .await;
 }

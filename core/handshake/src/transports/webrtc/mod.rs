@@ -16,7 +16,7 @@ use self::worker::IncomingConnectionWorker;
 use super::{Transport, TransportReceiver, TransportSender};
 use crate::schema::{self, HandshakeRequestFrame, RequestFrame};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct WebRtcConfig {
     /// Address to listen on for the signaling server. This is used to receive and respond to
     /// incoming RTC Session Descriptions, to negotiate a new SRTP connection.

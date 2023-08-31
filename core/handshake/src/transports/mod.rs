@@ -52,3 +52,8 @@ pub enum StaticSender {
     MockTransport(mock::MockTransportSender),
     WebRtcTransport(webrtc::WebRtcSender),
 }
+
+pub enum TransportConfigs {
+    MockTransport(mock::MockTransportSender),
+    WebRtcTransport(webrtc::WebRtcSender),
+}

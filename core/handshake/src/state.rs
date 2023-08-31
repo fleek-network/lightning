@@ -6,6 +6,7 @@ use lightning_interfaces::{ConnectionWork, ExecutorProviderInterface, ServiceHan
 use triomphe::Arc;
 
 use crate::schema;
+use crate::shutdown::ShutdownWaiter;
 use crate::transports::StaticSender;
 
 #[derive(Clone)]
@@ -19,11 +20,24 @@ impl<P: ExecutorProviderInterface> Deref for StateRef<P> {
     }
 }
 
+impl<P: ExecutorProviderInterface> StateRef<P> {
+    pub fn new(waiter: ShutdownWaiter, sk: NodeSecretKey, provider: P) -> Self {
+        Self(Arc::new(StateData {
+            sk,
+            shutdown: waiter,
+            provider,
+            access_tokens: Default::default(),
+            connections: Default::default(),
+        }))
+    }
+}
+
 /// The entire state of the handshake server. This should not be a generic over the transport
 /// but rather we attach different transports into the state using the functionality defined
 /// in transport_driver.rs file.
 pub struct StateData<P: ExecutorProviderInterface> {
     sk: NodeSecretKey,
+    pub shutdown: ShutdownWaiter,
     pub provider: P,
     /// Map each access token to the info about that access token. aHash has better performance
     /// on arrays than fxHash.

@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
 use lightning_interfaces::infu_collection::Collection;
@@ -9,12 +10,14 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use serde::{Deserialize, Serialize};
+use triomphe::Arc;
 
 use crate::collection::ServiceCollection;
 use crate::deque::{CommandSender, CommandStealer};
 use crate::handle::ServiceHandle;
 
 pub struct ServiceExecutor<C: Collection> {
+    is_running: Arc<AtomicBool>,
     collection: ServiceCollection,
     sender: CommandSender,
     stealer: CommandStealer,
@@ -36,6 +39,7 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     fn init(_config: Self::Config) -> anyhow::Result<Self> {
         let (sender, stealer) = crate::deque::chan();
         Ok(ServiceExecutor {
+            is_running: Arc::new(AtomicBool::new(false)),
             collection: ServiceCollection::default(),
             sender,
             stealer,
@@ -53,17 +57,17 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
 
 #[async_trait]
 impl<C: Collection> WithStartAndShutdown for ServiceExecutor<C> {
-    /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
-        true
+        self.is_running.load(Ordering::Relaxed)
     }
 
-    /// Start the system, should not do anything if the system is already
-    /// started.
-    async fn start(&self) {}
+    async fn start(&self) {
+        self.is_running.store(true, Ordering::Relaxed)
+    }
 
-    /// Send the shutdown signal to the system.
-    async fn shutdown(&self) {}
+    async fn shutdown(&self) {
+        self.is_running.store(false, Ordering::Relaxed)
+    }
 }
 
 impl<C: Collection> ConfigConsumer for ServiceExecutor<C> {
