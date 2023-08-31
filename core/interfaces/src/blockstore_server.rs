@@ -4,13 +4,28 @@ use infusion::c;
 use lightning_types::NodeIndex;
 
 use crate::infu_collection::Collection;
-use crate::{Blake3Hash, ConfigConsumer, WithStartAndShutdown};
+use crate::{
+    ApplicationInterface,
+    Blake3Hash,
+    BlockStoreInterface,
+    ConfigConsumer,
+    ConfigProviderInterface,
+    WithStartAndShutdown,
+};
 
 #[async_trait]
 #[infusion::service]
 pub trait BlockStoreServerInterface<C: Collection>:
     Clone + Send + Sync + ConfigConsumer + WithStartAndShutdown
 {
+    fn _init(
+        config: ::ConfigProviderInterface,
+        app: ::ApplicationInterface,
+        blockstre: ::BlockStoreInterface,
+    ) {
+        Self::init(config.get::<Self>(), app.sync_query(), blockstre.clone())
+    }
+
     fn init(
         config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),

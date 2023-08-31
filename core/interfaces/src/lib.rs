@@ -22,6 +22,7 @@ pub mod types;
 
 pub use application::*;
 pub use blockstore::*;
+pub use blockstore_server::*;
 pub use broadcast::*;
 pub use common::*;
 pub use config::*;
