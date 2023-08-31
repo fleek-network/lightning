@@ -51,10 +51,8 @@ impl Transport for WebRtcTransport {
         let (conn_tx, conn_rx) = tokio::sync::mpsc::channel(16);
 
         // Spawn a worker for handling new connection setup.
-        log::error!("{}:{}", file!(), line!());
         let worker = IncomingConnectionWorker { conn_tx };
         let socket = TokioSpawn::spawn_async(worker);
-        log::error!("{}:{}", file!(), line!());
 
         // Spawn a HTTP server for accepting incoming SDP requests.
         tokio::spawn(async move {
@@ -62,8 +60,6 @@ impl Transport for WebRtcTransport {
                 .await
                 .expect("Failed to setup server");
         });
-
-        log::error!("{}:{}", file!(), line!());
 
         Ok(Self { conn_rx })
     }
@@ -99,7 +95,7 @@ impl Transport for WebRtcTransport {
     }
 }
 
-/// An individual connection object, providing the interface for sending and receiving things.
+/// Sender for a webrtc connection.
 pub struct WebRtcSender(Arc<RTCDataChannel>);
 
 macro_rules! webrtc_send {
@@ -124,6 +120,7 @@ impl TransportSender for WebRtcSender {
     }
 }
 
+/// Receiver for a webrtc connection.
 pub struct WebRtcReceiver(tokio::sync::mpsc::Receiver<schema::RequestFrame>);
 
 #[async_trait]
