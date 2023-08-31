@@ -53,8 +53,10 @@ pub trait ConsensusInterface<C: Collection>:
     /// Returns a socket that can be used to submit transactions to the consensus,
     /// this can be used by any other systems that are interested in posting some
     /// transaction to the consensus.
+    #[blank = Socket::raw_bounded(64).0]
     fn mempool(&self) -> MempoolSocket;
 
     /// Returns a tokio Notifier that notifies everytime a new block is finished being processed
+    #[blank = Default::default()]
     fn new_block_notifier(&self) -> Arc<Notify>;
 }

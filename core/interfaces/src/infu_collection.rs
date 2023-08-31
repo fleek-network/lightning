@@ -28,7 +28,7 @@ collection!([
 
 /// The Fleek Network node.
 pub struct Node<C: Collection> {
-    container: infusion::Container,
+    pub container: infusion::Container,
     collection: PhantomData<C>,
 }
 

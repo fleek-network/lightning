@@ -1,6 +1,7 @@
 use std::fs::{self, File};
-use std::marker::PhantomData;
+use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
@@ -81,11 +82,21 @@ pub enum Keys {
 }
 
 /// Create a new command line application.
-pub struct Cli<C: Collection>(CliArgs, PhantomData<C>);
+pub struct Cli<C: Collection>(CliArgs, Option<CustomStartShutdown<C>>);
+pub type CustomStartShutdown<C> = Box<dyn for<'a> Fn(&'a Node<C>, bool) -> Fut<'a>>;
+pub type Fut<'a> = Pin<Box<dyn Future<Output = ()> + 'a>>;
 
 impl<C: Collection> Cli<C> {
     pub fn new(args: CliArgs) -> Self {
-        Self(args, PhantomData)
+        Self(args, None)
+    }
+
+    pub fn parse() -> Self {
+        Self::new(CliArgs::parse())
+    }
+
+    pub fn with_custom_start_shutdown(self, cb: CustomStartShutdown<C>) -> Self {
+        Self(self.0, Some(cb))
     }
 
     fn setup(&self) {
@@ -138,16 +149,11 @@ impl<C: Collection> Cli<C> {
 impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterface = Signer<C>>>
     Cli<C>
 {
-    pub async fn parse_and_exec() -> Result<()> {
-        let args = CliArgs::parse();
-        Self::new(args).exec().await
-    }
-
     /// Execute the application based on the provided command.
     pub async fn exec(self) -> Result<()> {
         self.setup();
 
-        let args = self.0;
+        let args = &self.0;
 
         let config_path =
             ResolvedPathBuf::try_from(args.config.clone()).expect("Failed to resolve config path");
@@ -157,7 +163,7 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
         }
 
         match args.cmd {
-            Command::Run {} => Self::run(config_path).await,
+            Command::Run {} => self.run(config_path).await,
             Command::Keys(Keys::Generate) => Self::generate_keys(config_path).await,
             Command::Keys(Keys::Show) => Self::show_keys(config_path).await,
             Command::PrintConfig { default } if default => Self::print_default_config().await,
@@ -192,7 +198,7 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
     }
 
     /// Run the node with the provided configuration path.
-    async fn run(config_path: ResolvedPathBuf) -> Result<()> {
+    async fn run(self, config_path: ResolvedPathBuf) -> Result<()> {
         let shutdown_controller = ShutdownController::default();
         shutdown_controller.install_ctrl_c_handler();
 
@@ -200,10 +206,19 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
         let node = Node::<C>::init(config)
             .map_err(|e| anyhow::anyhow!("Could not start the node: {e}"))?;
 
-        node.start().await;
+        if let Some(cb) = &self.1 {
+            ((cb)(&node, true)).await;
+        } else {
+            node.start().await;
+        }
 
         shutdown_controller.wait_for_shutdown().await;
-        node.shutdown().await;
+
+        if let Some(cb) = &self.1 {
+            ((cb)(&node, false)).await;
+        } else {
+            node.shutdown().await;
+        }
 
         Ok(())
     }
