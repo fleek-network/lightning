@@ -1,5 +1,6 @@
 pub mod application;
 pub mod blockstore;
+pub mod blockstore_server;
 pub mod broadcast;
 pub mod common;
 pub mod config;
