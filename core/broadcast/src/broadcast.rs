@@ -7,11 +7,10 @@ use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     ConfigConsumer,
-    ListenerConnector,
     SignerInterface,
     WithStartAndShutdown,
 };
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::task::JoinHandle;
 
 use crate::command::CommandSender;
@@ -104,19 +103,18 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
     fn init(
         _config: Self::Config,
         sqr: c!(C::ApplicationInterface::SyncExecutor),
-        (listener, connector): ListenerConnector<C, c![C::ConnectionPoolInterface], Self::Message>,
         topology: c!(C::TopologyInterface),
         signer: &c!(C::SignerInterface),
         notifier: c!(C::NotifierInterface),
     ) -> anyhow::Result<Self> {
+        let (_, listener_tx) = mpsc::channel(1024);
         let (_, sk) = signer.get_sk();
         let ctx = Context::<C>::new(
             Database::default(),
             sqr,
             notifier,
             topology,
-            listener,
-            connector,
+            listener_tx,
             sk,
         );
 

@@ -17,19 +17,12 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{NodeIndex, Topic};
 use lightning_interfaces::{
     ApplicationInterface,
-    ConnectionPoolInterface,
-    ConnectorInterface,
-    ListenerConnector,
-    ListenerInterface,
     NotifierInterface,
-    PoolReceiver,
-    PoolSender,
-    SenderInterface,
-    SenderReceiver,
     SyncQueryRunnerInterface,
     TopologyInterface,
 };
 use lightning_metrics::{counter, histogram, increment_counter};
+use tokio::sync::mpsc::Receiver;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
@@ -47,10 +40,6 @@ use crate::{Advr, Digest, Message, Want};
 // TODO(qti3e): Move this to somewhere else.
 pub type Topology = Arc<Vec<Vec<NodePublicKey>>>;
 
-// The connection pool sender and receiver types.
-type S<C> = PoolSender<C, c![C::ConnectionPoolInterface], Frame>;
-type R<C> = PoolReceiver<C, c![C::ConnectionPoolInterface], Frame>;
-
 /// The execution context of the broadcast.
 pub struct Context<C: Collection> {
     /// Our database where we store what we have seen.
@@ -60,14 +49,9 @@ pub struct Context<C: Collection> {
     /// Managers of incoming message queue for each topic.
     incoming_messages: [RecvBuffer; 4],
     /// The state related to the connected peers that we have right now.
-    peers: Peers<S<C>, R<C>>,
+    peers: Peers,
     /// The instance of stats collector.
     stats: Stats,
-    /// We use this socket to let the main event loop know that we have established
-    /// a connection with another node.
-    new_outgoing_connection_tx: mpsc::UnboundedSender<(S<C>, R<C>)>,
-    /// The receiver end of the above socket.
-    new_outgoing_connection_rx: mpsc::UnboundedReceiver<(S<C>, R<C>)>,
     /// The channel which sends the commands to the event loop.
     command_tx: CommandSender,
     /// Receiving end of the commands.
@@ -77,8 +61,7 @@ pub struct Context<C: Collection> {
     sqr: c![C::ApplicationInterface::SyncExecutor],
     notifier: c![C::NotifierInterface],
     topology: c![C::TopologyInterface],
-    listener: c![C::ConnectionPoolInterface::Listener<Frame>],
-    connector: c![C::ConnectionPoolInterface::Connector<Frame>],
+    listener: Receiver<()>,
     sk: NodeSecretKey,
     pk: NodePublicKey,
     current_node_index: OnceCell<NodeIndex>,
@@ -90,11 +73,9 @@ impl<C: Collection> Context<C> {
         sqr: c![C::ApplicationInterface::SyncExecutor],
         notifier: c![C::NotifierInterface],
         topology: c![C::TopologyInterface],
-        listener: c![C::ConnectionPoolInterface::Listener<Frame>],
-        connector: c![C::ConnectionPoolInterface::Connector<Frame>],
+        listener: Receiver<()>,
         sk: NodeSecretKey,
     ) -> Self {
-        let (new_outgoing_connection_tx, new_outgoing_connection_rx) = mpsc::unbounded_channel();
         let (command_tx, command_rx) = mpsc::unbounded_channel();
         let pk = sk.to_pk();
         let peers = Peers::default();
@@ -110,8 +91,6 @@ impl<C: Collection> Context<C> {
             ],
             peers,
             stats,
-            new_outgoing_connection_tx,
-            new_outgoing_connection_rx,
             command_tx,
             command_rx,
             pending_store: PendingStore::default(),
@@ -119,7 +98,6 @@ impl<C: Collection> Context<C> {
             notifier,
             topology,
             listener,
-            connector,
             sk,
             pk,
             current_node_index: OnceCell::new(), // will be set upon spawn.
@@ -184,17 +162,17 @@ impl<C: Collection> Context<C> {
                 continue;
             }
 
-            let tx = self.new_outgoing_connection_tx.clone();
-            let connector = self.connector.clone();
-            tokio::spawn(async move {
-                log::trace!("connecting to {pk}");
-                let Some((sender, receiver)) = connector.connect(&pk).await else {
-                    return;
-                };
-
-                log::trace!("connected to {pk}");
-                tx.send((sender, receiver));
-            });
+            // let tx = self.new_outgoing_connection_tx.clone();
+            // let connector = self.connector.clone();
+            // tokio::spawn(async move {
+            //     log::trace!("connecting to {pk}");
+            //     let Some((sender, receiver)) = connector.connect(&pk).await else {
+            //         return;
+            //     };
+            //
+            //     log::trace!("connected to {pk}");
+            //     tx.send((sender, receiver));
+            // });
         }
 
         self.peers.disconnect_unpinned();
@@ -454,14 +432,14 @@ async fn main_loop<C: Collection>(
                 ctx.apply_topology(new_topology);
             },
 
-            Some(conn) = ctx.new_outgoing_connection_rx.recv() => {
-                log::info!("we dialed {}", conn.0.pk());
-                let Some(index) = ctx.get_node_index(conn.0.pk()) else {
-                    log::error!("remote node not found");
-                    continue;
-                };
-                ctx.peers.handle_new_connection(ConnectionOrigin::Us , index, conn);
-            },
+            // Some(conn) = ctx.new_outgoing_connection_rx.recv() => {
+            //     log::info!("we dialed {}", conn.0.pk());
+            //     let Some(index) = ctx.get_node_index(conn.0.pk()) else {
+            //         log::error!("remote node not found");
+            //         continue;
+            //     };
+            //     ctx.peers.handle_new_connection(ConnectionOrigin::Us , index, conn);
+            // },
 
             Some((sender, frame)) = ctx.peers.recv() => {
                 ctx.handle_frame(sender, frame);
@@ -469,13 +447,13 @@ async fn main_loop<C: Collection>(
 
             // Handle the case when another node is dialing us.
             // TODO(qti3e): Is this cancel safe?
-            Some(conn) = ctx.listener.accept() => {
-                log::info!("node dialed by {}", conn.0.pk());
-                let Some(index) = ctx.get_node_index(conn.0.pk()) else {
-                    log::error!("remote node not found");
-                    continue;
-                };
-                ctx.peers.handle_new_connection(ConnectionOrigin::Remote , index, conn);
+            Some(conn) = ctx.listener.recv() => {
+                // log::info!("node dialed by {}", conn.0.pk());
+                // let Some(index) = ctx.get_node_index(conn.0.pk()) else {
+                //     log::error!("remote node not found");
+                //     continue;
+                // };
+                // ctx.peers.handle_new_connection(ConnectionOrigin::Remote , index, conn);
             },
             requests = ctx.pending_store.tick() => {
                 requests.into_iter().for_each(|(interned_id, pub_key)| {

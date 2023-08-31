@@ -12,8 +12,6 @@ use crate::{
     ApplicationInterface,
     ConfigConsumer,
     ConfigProviderInterface,
-    ConnectionPoolInterface,
-    ListenerConnector,
     NotifierInterface,
     WithStartAndShutdown,
 };
@@ -27,7 +25,6 @@ pub trait BroadcastInterface<C: Collection>:
     fn _init(
         config: ::ConfigProviderInterface,
         app: ::ApplicationInterface,
-        pool: ::ConnectionPoolInterface,
         topology: ::TopologyInterface,
         signer: ::SignerInterface,
         notifier: ::NotifierInterface,
@@ -35,7 +32,6 @@ pub trait BroadcastInterface<C: Collection>:
         Self::init(
             config.get::<Self>(),
             app.sync_query(),
-            pool.bind(crate::types::ServiceScope::Broadcast),
             topology.clone(),
             signer,
             notifier.clone(),
@@ -52,7 +48,6 @@ pub trait BroadcastInterface<C: Collection>:
     fn init(
         config: Self::Config,
         sqr: c!(C::ApplicationInterface::SyncExecutor),
-        listener_connector: ListenerConnector<C, c![C::ConnectionPoolInterface], Self::Message>,
         topology: c!(C::TopologyInterface),
         signer: &c!(C::SignerInterface),
         notifier: c!(C::NotifierInterface),
