@@ -12,7 +12,6 @@ collection!([
     BlockStoreInterface,
     BlockStoreServerInterface,
     BroadcastInterface,
-    ConnectionPoolInterface,
     TopologyInterface,
     ConsensusInterface,
     HandshakeInterface,
@@ -65,7 +64,6 @@ impl<C: Collection> Node<C> {
         provider.get::<C::ApplicationInterface>();
         provider.get::<C::BlockStoreInterface>();
         provider.get::<C::BroadcastInterface>();
-        provider.get::<C::ConnectionPoolInterface>();
         provider.get::<C::TopologyInterface>();
         provider.get::<C::ConsensusInterface>();
         provider.get::<C::HandshakeInterface>();
@@ -84,7 +82,6 @@ forward!(async fn start_or_shutdown_node(this, start: bool) on [
     BlockStoreServerInterface,
     SignerInterface,
     ApplicationInterface,
-    ConnectionPoolInterface,
     BroadcastInterface,
     HandshakeInterface,
     ConsensusInterface,
