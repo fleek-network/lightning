@@ -190,6 +190,9 @@ impl SwarmBuilder {
                 handshake: port_assigner
                     .get_port(min_port, max_port, Transport::Tcp)
                     .expect("Could not get port"),
+                blockstore: port_assigner
+                    .get_port(min_port, max_port, Transport::Tcp)
+                    .expect("Could not get port"),
             };
             let config = build_config(&root, ports.clone(), bootstrappers.clone());
 

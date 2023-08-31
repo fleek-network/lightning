@@ -107,6 +107,7 @@ fn add_to_committee(
             pool: 5000 + index as u16,
             dht: 4000 + index as u16,
             handshake: 3000 + index as u16,
+            blockstore: 2000 + index as u16,
         },
         None,
         true,

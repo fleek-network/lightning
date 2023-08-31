@@ -146,6 +146,7 @@ pub struct NodePorts {
     pub pool: u16,
     pub dht: u16,
     pub handshake: u16,
+    pub blockstore: u16,
 }
 
 /// Struct that stores the information about the stake of amount of a node.
