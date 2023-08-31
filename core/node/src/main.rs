@@ -3,12 +3,10 @@ pub mod config;
 pub mod node;
 pub mod shutdown;
 
-
 use std::process::exit;
 
 use autometrics::settings::AutometricsSettingsBuilder;
 use autometrics::{self};
-
 use clap::Parser;
 use cli::Cli;
 use lightning_types::{DEFAULT_HISTOGRAM_BUCKETS, METRICS_SERVICE_NAME};
