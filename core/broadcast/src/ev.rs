@@ -22,7 +22,8 @@ use lightning_interfaces::{
     TopologyInterface,
 };
 use lightning_metrics::{counter, histogram, increment_counter};
-use tokio::sync::mpsc::Receiver;
+use netkit::endpoint::{Event, Request};
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
@@ -61,7 +62,8 @@ pub struct Context<C: Collection> {
     sqr: c![C::ApplicationInterface::SyncExecutor],
     notifier: c![C::NotifierInterface],
     topology: c![C::TopologyInterface],
-    listener: Receiver<()>,
+    network_event_rx: Receiver<Event>,
+    endpoint_tx: Sender<Request>,
     sk: NodeSecretKey,
     pk: NodePublicKey,
     current_node_index: OnceCell<NodeIndex>,
@@ -73,7 +75,8 @@ impl<C: Collection> Context<C> {
         sqr: c![C::ApplicationInterface::SyncExecutor],
         notifier: c![C::NotifierInterface],
         topology: c![C::TopologyInterface],
-        listener: Receiver<()>,
+        network_event_rx: Receiver<Event>,
+        endpoint_tx: Sender<Request>,
         sk: NodeSecretKey,
     ) -> Self {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
@@ -97,7 +100,8 @@ impl<C: Collection> Context<C> {
             sqr,
             notifier,
             topology,
-            listener,
+            network_event_rx,
+            endpoint_tx,
             sk,
             pk,
             current_node_index: OnceCell::new(), // will be set upon spawn.
@@ -447,7 +451,7 @@ async fn main_loop<C: Collection>(
 
             // Handle the case when another node is dialing us.
             // TODO(qti3e): Is this cancel safe?
-            Some(conn) = ctx.listener.recv() => {
+            Some(conn) = ctx.network_event_rx.recv() => {
                 // log::info!("node dialed by {}", conn.0.pk());
                 // let Some(index) = ctx.get_node_index(conn.0.pk()) else {
                 //     log::error!("remote node not found");
