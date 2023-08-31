@@ -4,6 +4,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ToDigest;
+use tokio::sync::Notify;
 
 use crate::execution::{AuthenticStampedParcel, Digest, Execution};
 
@@ -43,6 +44,7 @@ impl TransactionStore {
         digest: Digest,
         threshold: usize,
         execution: &Arc<Execution>,
+        reconfigure: Arc<Notify>,
     ) -> bool {
         if self.executed.contains(&digest) {
             // if we executed before return false
@@ -53,7 +55,9 @@ impl TransactionStore {
             if x.len() >= threshold {
                 // if we should execute we need to make sure we can connect this to our transaction
                 // chain
-                self.try_execute_chain(digest, execution).await.is_ok()
+                self.try_execute_chain(digest, execution, reconfigure)
+                    .await
+                    .is_ok()
             } else {
                 false
             }
@@ -67,6 +71,7 @@ impl TransactionStore {
         &mut self,
         digest: Digest,
         execution: &Arc<Execution>,
+        reconfigure: Arc<Notify>,
     ) -> Result<()> {
         let mut txn_chain = VecDeque::new();
         let mut last_digest = digest;
@@ -87,7 +92,8 @@ impl TransactionStore {
                 }
                 if epoch_changed {
                     // if epoch changed set this to genesis
-                    self.head = [0; 32]
+                    self.head = [0; 32];
+                    reconfigure.notify_waiters();
                 } else {
                     // set head as top of chain
                     self.head = digest;

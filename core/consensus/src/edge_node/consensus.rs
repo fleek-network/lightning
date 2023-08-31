@@ -130,7 +130,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         transaction_store.store_parcel(parcel);
 
                         transaction_store
-                        .try_execute(parcel_digest,quorom_threshold,&execution).await;
+                        .try_execute(parcel_digest,quorom_threshold,&execution, reconfigure_notify.clone()).await;
 
 
                     },
@@ -147,7 +147,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         if !on_committee{
                             transaction_store.add_attestation(att.digest, att.node_index);
                             transaction_store
-                            .try_execute(att.digest, quorom_threshold, &execution).await;
+                            .try_execute(att.digest, quorom_threshold, &execution, reconfigure_notify.clone()).await;
                         }
                         msg.propagate();
                     }
