@@ -84,6 +84,27 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
             _ = shutdown_future => {
                 return;
             },
+            Some(parcel) = rx_narwhal_batch.recv() => {
+                if !on_committee {
+                    // This should never happen if it somehow does there is critical error somewhere
+                    panic!("We somehow sent ourselves a parcel from narwhal while not on committee");
+                }
+                transaction_store.store_parcel(parcel.clone());
+                // No need to store the attestation we have already executed it
+
+                let parcel_digest = parcel.to_digest();
+
+                transaction_store.set_head(parcel_digest);
+
+                let attestation = CommitteeAttestation {
+                    digest: parcel_digest,
+                    node_index: our_index
+                };
+
+                info!("Send transaction parcel to broadcast as a validator");
+                pub_sub.send(&attestation.into()).await;
+                pub_sub.send(&parcel.into()).await;
+            },
             _ = reconfigure_future => {
                committee = query_runner.get_committee_members_by_index();
                quorom_threshold = (committee.len() * 2) / 3 + 1;
@@ -111,9 +132,10 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         transaction_store
                         .try_execute(parcel_digest,quorom_threshold,&execution).await;
 
-                        msg.propagate();
+
                     },
                     PubSubMsg::Attestation(att) => {
+
                         info!("Received parcel attestation from gossip as an edge node");
                         let originator = msg.originator();
 
@@ -121,34 +143,18 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                             msg.mark_invalid_sender();
                             continue;
                         }
-                        transaction_store.add_attestation(att.digest, att.node_index);
-                        transaction_store
-                        .try_execute(att.digest, quorom_threshold, &execution).await;
+
+                        if !on_committee{
+                            transaction_store.add_attestation(att.digest, att.node_index);
+                            transaction_store
+                            .try_execute(att.digest, quorom_threshold, &execution).await;
+                        }
                         msg.propagate();
                     }
                 }
                 }
 
             },
-            Some(parcel) = rx_narwhal_batch.recv() => {
-                if !on_committee {
-                    // This should never happen if it somehow does there is critical error somewhere
-                    panic!("We somehow sent ourselves a parcel from narwhal while not on committee");
-                }
-                transaction_store.store_parcel(parcel.clone());
-                // No need to store the attestation we have already executed it
-
-                let parcel_digest = parcel.to_digest();
-
-                let attestation = CommitteeAttestation {
-                    digest: parcel_digest,
-                    node_index: our_index
-                };
-
-                info!("Send transaction parcel to broadcast as a validator");
-                pub_sub.send(&attestation.into()).await;
-                pub_sub.send(&parcel.into()).await;
-            }
 
         }
     }

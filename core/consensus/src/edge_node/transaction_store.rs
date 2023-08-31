@@ -79,14 +79,19 @@ impl TransactionStore {
             }
             if parcel.last_executed == self.head {
                 // We connected the chain now execute all the transactions
-                execution.submit_batch(txn_chain.into()).await;
+                let epoch_changed = execution.submit_batch(txn_chain.into()).await;
 
                 // mark all parcels in chain as executed
                 for digest in parcel_chain {
                     self.executed.insert(digest);
                 }
-                // set head as top of chain
-                self.head = digest;
+                if epoch_changed {
+                    // if epoch changed set this to genesis
+                    self.head = [0; 32]
+                } else {
+                    // set head as top of chain
+                    self.head = digest;
+                }
 
                 return Ok(());
             } else {
@@ -94,5 +99,10 @@ impl TransactionStore {
             }
         }
         Err(anyhow!("Cannot connect chain did not execute"))
+    }
+
+    // This should only be called by transaction parsals sent over by narwhal on rx_narwhal_baches
+    pub(crate) fn set_head(&mut self, digest: Digest) {
+        self.head = digest;
     }
 }

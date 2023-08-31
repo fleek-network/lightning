@@ -94,8 +94,8 @@ impl Execution {
         }
     }
 
-    /// This should only EVER be called in handle_consensus_output or
-    pub(crate) async fn submit_batch(&self, payload: Vec<Transaction>) {
+    // Returns true if the epoch changed
+    pub(crate) async fn submit_batch(&self, payload: Vec<Transaction>) -> bool {
         let mut change_epoch = false;
 
         let transactions = payload
@@ -114,9 +114,8 @@ impl Execution {
         }
 
         self.new_block_notify.notify_waiters();
-        if change_epoch {
-            self.reconfigure_notify.notify_waiters();
-        }
+
+        change_epoch
     }
 
     pub fn set_committee_status(&self, on_committee: bool) {
@@ -137,15 +136,12 @@ impl ExecutionState for Execution {
             }
         }
         if !batch_payload.is_empty() {
-            // Submit the batches to application layer
-            self.submit_batch(batch_payload.clone()).await;
-
             // We have batches in the payload send them over broadcast along with an attestion of
             // them
             let last_digest = self.inner.lock().unwrap().last_executed.unwrap_or([0; 32]);
 
             let parcel = AuthenticStampedParcel {
-                transactions: batch_payload,
+                transactions: batch_payload.clone(),
                 last_executed: last_digest,
             };
             let parcel_digest = parcel.to_digest();
@@ -156,8 +152,15 @@ impl ExecutionState for Execution {
                 error!("Narwhal failed to send batch payload to edge consensus: {e:?}");
             }
 
-            // Update our last digest proccesed
-            self.inner.lock().unwrap().last_executed = Some(parcel_digest);
+            // Submit the batches to application layer and if the epoch changed reset last executed
+            if self.submit_batch(batch_payload).await {
+                // if epoch changed reset this
+                self.inner.lock().unwrap().last_executed = None;
+                self.reconfigure_notify.notify_waiters();
+            } else {
+                // Update our last digest proccesed
+                self.inner.lock().unwrap().last_executed = Some(parcel_digest);
+            }
         }
     }
 
