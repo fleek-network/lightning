@@ -11,11 +11,12 @@ use lightning_interfaces::{
 use serde::{Deserialize, Serialize};
 
 use crate::collection::ServiceCollection;
-use crate::deque::CommandStealer;
+use crate::deque::{CommandSender, CommandStealer};
 use crate::handle::ServiceHandle;
 
 pub struct ServiceExecutor<C: Collection> {
     collection: ServiceCollection,
+    sender: CommandSender,
     stealer: CommandStealer,
     p: PhantomData<C>,
 }
@@ -33,7 +34,13 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     type Provider = Provider;
 
     fn init(_config: Self::Config) -> anyhow::Result<Self> {
-        todo!()
+        let (sender, stealer) = crate::deque::chan();
+        Ok(ServiceExecutor {
+            collection: ServiceCollection::default(),
+            sender,
+            stealer,
+            p: PhantomData,
+        })
     }
 
     fn get_provider(&self) -> Self::Provider {

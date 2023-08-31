@@ -8,8 +8,13 @@ use std::task::Poll;
 use lightning_interfaces::{ConnectionWork, ConnectionWorkStealer};
 use tokio::pin;
 
+pub fn chan() -> (CommandSender, CommandStealer) {
+    let (sender, receiver) = async_channel::unbounded();
+    (CommandSender { sender }, CommandStealer { receiver })
+}
+
 #[derive(Clone)]
-pub struct WorkScheduler {
+pub struct CommandSender {
     sender: async_channel::Sender<ConnectionWork>,
 }
 
@@ -18,7 +23,7 @@ pub struct CommandStealer {
     receiver: async_channel::Receiver<ConnectionWork>,
 }
 
-impl WorkScheduler {
+impl CommandSender {
     pub async fn put(&self, work: ConnectionWork) {
         self.sender
             .send(work)

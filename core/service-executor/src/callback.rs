@@ -1,11 +1,11 @@
 use fn_sdk::internal::{IpcRequest, OnEventResponseArgs};
 use lightning_interfaces::ConnectionWork;
 
-use crate::deque::WorkScheduler;
+use crate::deque::CommandSender;
 
 /// Create a callback for us to pass to the setup function of the service.
 pub fn make_callback(
-    scheduler: WorkScheduler,
+    scheduler: CommandSender,
     cb: fn(OnEventResponseArgs),
 ) -> Box<dyn Fn(IpcRequest) + Send + Sync> {
     Box::new(move |request: IpcRequest| {
@@ -17,7 +17,7 @@ pub fn make_callback(
 #[inline(always)]
 async fn handle_request(
     _cb: fn(OnEventResponseArgs),
-    scheduler: WorkScheduler,
+    scheduler: CommandSender,
     IpcRequest {
         request_ctx,
         request,
