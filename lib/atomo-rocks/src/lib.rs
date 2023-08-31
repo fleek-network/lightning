@@ -2,6 +2,7 @@
 
 mod serialization;
 use std::path::PathBuf;
+use std::{env, fs};
 
 use anyhow::Result;
 use atomo::batch::Operation;
@@ -9,9 +10,9 @@ use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackend, StorageBackendCon
 use fxhash::FxHashMap;
 /// Re-export of [`rocksdb::Options`].
 pub use rocksdb::Options;
-pub use rocksdb::{Cache, Env};
+pub use rocksdb::{Cache, Env, DB};
 use rocksdb::{ColumnFamilyDescriptor, WriteBatch};
-use serialization::serialize_db;
+use serialization::{build_db_from_checkpoint, serialize_db};
 
 /// Helper alias for an [`atomo::AtomoBuilder`] using a [`RocksBackendBuilder`].
 pub type AtomoBuilderWithRocks<S = DefaultSerdeBackend> = AtomoBuilder<RocksBackendBuilder, S>;
@@ -44,6 +45,7 @@ pub struct RocksBackendBuilder {
     options: Options,
     columns: Vec<String>,
     column_options: FxHashMap<String, Options>,
+    checkpoint: Option<([u8; 32], Vec<u8>)>,
 }
 
 impl RocksBackendBuilder {
@@ -55,6 +57,7 @@ impl RocksBackendBuilder {
             options: Default::default(),
             columns: Default::default(),
             column_options: Default::default(),
+            checkpoint: Default::default(),
         }
     }
 
@@ -72,12 +75,21 @@ impl RocksBackendBuilder {
         self.column_options.insert(name.into(), opts);
         self
     }
+
+    /// Provide a checkpoint from which the database will be built.
+    /// Warning: providing a checkpoint will overwrite the existing database at the specified path,
+    /// if there is one.
+    #[inline(always)]
+    pub fn from_checkpoint(mut self, hash: [u8; 32], checkpoint: Vec<u8>) -> Self {
+        self.checkpoint = Some((hash, checkpoint));
+        self
+    }
 }
 
 impl StorageBackendConstructor for RocksBackendBuilder {
     type Storage = RocksBackend;
 
-    type Error = rocksdb::Error;
+    type Error = anyhow::Error;
 
     fn open_table(&mut self, name: String) {
         self.columns.push(name)
@@ -94,7 +106,45 @@ impl StorageBackendConstructor for RocksBackendBuilder {
                 )
             })
             .collect();
-        let db = rocksdb::DB::open_cf_descriptors(&self.options, self.path, cf_iter)?;
+        let db = match self.checkpoint {
+            Some((hash, checkpoint)) => {
+                // We try to build the db from a checkpoint in a temporary dir.
+                let tmp_path = env::temp_dir().join("lightning_checkpoint_tmp");
+                if tmp_path.exists() {
+                    fs::remove_dir_all(&tmp_path)?;
+                }
+                let (_db, column_names) = build_db_from_checkpoint(
+                    &tmp_path,
+                    hash,
+                    checkpoint,
+                    self.options.clone(),
+                    self.column_options.clone(),
+                )?;
+                // If the build was successful, we move the db over to the actual directory.
+                if self.path.exists() {
+                    fs::remove_dir_all(&self.path)?;
+                }
+                fs::rename(&tmp_path, &self.path)?;
+                if tmp_path.exists() {
+                    fs::remove_dir_all(&tmp_path)?;
+                }
+                let cf_iter: Vec<_> = column_names
+                    .iter()
+                    .map(|name| {
+                        ColumnFamilyDescriptor::new(
+                            name,
+                            self.column_options.remove(name).unwrap_or_default(),
+                        )
+                    })
+                    .collect();
+                let mut options = self.options;
+                // The database should exist at this point.
+                options.create_if_missing(false);
+                DB::open_cf_descriptors(&options, &self.path, cf_iter)?
+            },
+            None => DB::open_cf_descriptors(&self.options, self.path, cf_iter)?,
+        };
+
         Ok(RocksBackend {
             columns: self.columns,
             db,

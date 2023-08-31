@@ -1,9 +1,50 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 
-use anyhow::{anyhow, Result};
-use rocksdb::{IteratorMode, DB};
+use anyhow::{anyhow, Context, Result};
+use fleek_blake3 as blake3;
+use fxhash::FxHashMap;
+use rocksdb::{ColumnFamilyDescriptor, IteratorMode, Options, DB};
 
 type Entry = (Box<[u8]>, Box<[u8]>);
+
+#[allow(dead_code)]
+pub fn build_db_from_checkpoint(
+    path: &Path,
+    hash: [u8; 32],
+    checkpoint: Vec<u8>,
+    options: Options,
+    mut column_options: FxHashMap<String, Options>,
+) -> Result<(DB, Vec<String>)> {
+    let table_map = deserialize_db(&checkpoint)?;
+    let columns: Vec<String> = table_map.keys().cloned().collect();
+    let cf_iter: Vec<_> = columns
+        .iter()
+        .map(|name| {
+            ColumnFamilyDescriptor::new(name, column_options.remove(name).unwrap_or_default())
+        })
+        .collect();
+    let db = DB::open_cf_descriptors(&options, path, cf_iter)?;
+    let mut table_names = Vec::new();
+    for (table_name, entries) in table_map {
+        let cf = db.cf_handle(&table_name).context("Unknown table name")?;
+        table_names.push(table_name);
+        for (key, value) in entries {
+            db.put_cf(&cf, key, value)?;
+        }
+    }
+    // Check that the serialized db matches the checkpoint.
+    let bytes = serialize_db(&db, &table_names)?;
+    if checkpoint != bytes {
+        return Err(anyhow!("Failed to deserialize database"));
+    }
+    // Verify that the calculated hash matches the hash of the checkpoint.
+    let calc_hash = blake3::hash(&bytes);
+    if &hash != calc_hash.as_bytes() {
+        return Err(anyhow!("Failed to verify hash"));
+    }
+    Ok((db, table_names))
+}
 
 /// Serializes a RocksDb database into a stream of bytes.
 /// The serialization format is:
@@ -31,7 +72,6 @@ pub fn serialize_db(db: &DB, table_names: &Vec<String>) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-#[allow(dead_code)]
 /// Deserializes a RocksDb database from a stream of bytes.
 pub fn deserialize_db(bytes: &[u8]) -> Result<BTreeMap<String, Vec<Entry>>> {
     let num_tables = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
@@ -94,10 +134,19 @@ mod tests {
     use std::collections::BTreeMap;
     use std::ops::Range;
 
+    use fleek_blake3 as blake3;
+    use fxhash::FxHashMap;
     use rand::Rng;
-    use rocksdb::{ColumnFamilyDescriptor, Options};
+    use rocksdb::{ColumnFamilyDescriptor, Options, DB};
 
-    use super::{deserialize_db, deserialize_table, serialize_db, serialize_table, Entry};
+    use super::{
+        build_db_from_checkpoint,
+        deserialize_db,
+        deserialize_table,
+        serialize_db,
+        serialize_table,
+        Entry,
+    };
 
     fn generate_random_bytes(length: usize) -> Box<[u8]> {
         let mut rng = rand::thread_rng();
@@ -148,7 +197,7 @@ mod tests {
             .iter()
             .map(|name| ColumnFamilyDescriptor::new(name.to_owned(), options.clone()))
             .collect();
-        let db = rocksdb::DB::open_cf_descriptors(&options, &db_path, cf_iter).unwrap();
+        let db = DB::open_cf_descriptors(&options, &db_path, cf_iter).unwrap();
         let mut target_tables: BTreeMap<String, Vec<Entry>> = BTreeMap::new();
         for col in &columns {
             let cf = db.cf_handle(col).expect("Unknown table name");
@@ -175,5 +224,69 @@ mod tests {
         if db_path.exists() {
             std::fs::remove_dir_all(&db_path).unwrap();
         }
+    }
+
+    #[test]
+    fn test_build_db_from_checkpoint() {
+        let path = std::env::temp_dir().join("lightning_test_rocksdb_1");
+        if path.exists() {
+            std::fs::remove_dir_all(&path).expect("failed to remove old rocksdb for test");
+        }
+        let mut options = Options::default();
+        options.create_if_missing(true);
+        options.create_missing_column_families(true);
+
+        let columns = vec![
+            "table1".to_owned(),
+            "table2".to_owned(),
+            "table3".to_owned(),
+            "table4".to_owned(),
+        ];
+        let cf_iter: Vec<_> = columns
+            .iter()
+            .map(|name| ColumnFamilyDescriptor::new(name.to_owned(), options.clone()))
+            .collect();
+        let mut table_names = Vec::new();
+
+        // Build a database and fill it with some data
+        let db = DB::open_cf_descriptors(&options, &path, cf_iter).unwrap();
+        for col in &columns {
+            let cf = db.cf_handle(col).expect("Unknown table name");
+            let num_entries = rand::thread_rng().gen_range(100..1000);
+            table_names.push(col.clone());
+            for _ in 0..num_entries {
+                let key_length = rand::thread_rng().gen_range(4..16);
+                let key = generate_random_bytes(key_length);
+                let value_length = rand::thread_rng().gen_range(4..32);
+                let value = generate_random_bytes(value_length);
+
+                db.put_cf(&cf, key, value).unwrap();
+            }
+        }
+
+        // Compute checkpoint for the database
+        let checkpoint = serialize_db(&db, &table_names).expect("Failed to serialize db");
+        let hash = blake3::hash(&checkpoint);
+        let new_path = std::env::temp_dir().join("lightning_test_rocksdb_2");
+        if new_path.exists() {
+            std::fs::remove_dir_all(&new_path).expect("failed to remove old rocksdb for test");
+        }
+
+        // Build a new database from the checkpoint
+        let (new_db, _) = build_db_from_checkpoint(
+            &new_path,
+            *hash.as_bytes(),
+            checkpoint.clone(),
+            options,
+            FxHashMap::default(),
+        )
+        .expect("Failed to build db from checkpoint");
+
+        // Make sure that the checkpoints match
+        let new_checkpoint = serialize_db(&new_db, &table_names).expect("Failed to serialize db");
+        assert_eq!(checkpoint, new_checkpoint);
+
+        std::fs::remove_dir_all(path).expect("failed to remove old rocksdb");
+        std::fs::remove_dir_all(new_path).expect("failed to remove old rocksdb");
     }
 }

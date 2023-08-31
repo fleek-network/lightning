@@ -804,6 +804,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "atomo",
+ "fleek-blake3",
  "fxhash",
  "rand 0.8.5",
  "rocksdb",
