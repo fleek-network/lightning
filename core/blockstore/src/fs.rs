@@ -15,12 +15,15 @@ use lightning_interfaces::{
 };
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
+use tempdir::TempDir;
 use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
 
 use crate::put::IncrementalPut;
 use crate::store::Store;
 use crate::{Block, BlockContent, Key};
+
+const TMP_DIR_PREFIX: &str = "tmp-store";
 
 #[derive(Serialize, Deserialize)]
 pub struct FsStoreConfig {
@@ -40,6 +43,7 @@ impl Default for FsStoreConfig {
 #[derive(Clone)]
 pub struct FsStore<C: Collection> {
     store_dir_path: PathBuf,
+    tmp_dir: Arc<TempDir>,
     collection: PhantomData<C>,
 }
 
@@ -57,6 +61,7 @@ impl<C: Collection> BlockStoreInterface<C> for FsStore<C> {
         std::fs::create_dir_all(config.store_dir_path.clone())?;
         Ok(Self {
             store_dir_path: config.store_dir_path.to_path_buf(),
+            tmp_dir: TempDir::new(TMP_DIR_PREFIX).map(Arc::new)?,
             collection: PhantomData,
         })
     }
@@ -119,16 +124,23 @@ where
     // TODO: This should perhaps return an error.
     async fn insert(&mut self, key: Key, block: Block) {
         let filename = format!("{}", Hash::from(key.0).to_hex());
-        let path = self.store_dir_path.join(filename);
+        let path = self.tmp_dir.path().join(filename);
         if let Ok(mut tmp_file) = File::create(&path).await {
             if tmp_file.write_all(block.as_ref()).await.is_err() {
                 return;
             }
+
             // TODO: Is this needed before calling rename?
             if tmp_file.sync_all().await.is_err() {
                 return;
             }
-            let store_path = format!("{:?}/{:?}", self.store_dir_path, key.0);
+
+            let store_path = format!(
+                "{}/{}",
+                self.store_dir_path.to_string_lossy(),
+                Hash::from(key.0).to_hex()
+            );
+
             if fs::rename(path, store_path).await.is_err() {
                 return;
             }

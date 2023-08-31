@@ -272,34 +272,70 @@ mod tests {
     }
 
     #[test]
-    async fn test_put_fs() {
+    async fn test_put_get_fs() {
         // Given: some content.
         let content = create_content();
         let path = std::env::temp_dir().join("lightning-blockstore-test");
+        // Given: a block store.
+        let blockstore = FsStore::<TestBinding>::init(FsStoreConfig {
+            store_dir_path: path.clone().try_into().unwrap(),
+        })
+        .unwrap();
+
         let test = || async {
-            // Given: a block store.
-            let blockstore = FsStore::<TestBinding>::init(FsStoreConfig {
-                store_dir_path: path.clone().try_into().unwrap(),
-            })
-            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
             // When: we create a putter and write some content.
             let mut putter = blockstore.put(None);
             putter
                 .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
                 .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+
             // Then: the putter returns the appropriate root hash.
-            putter
+            let root = putter
                 .finalize()
                 .await
-                .map_err(|e| anyhow::anyhow!("{e:?}"))
+                .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+            let tree = hash_tree(content.as_slice());
+            if root != Blake3Hash::from(tree.hash) {
+                anyhow::bail!("invalid root hash");
+            }
+
+            // When: we query the block store for our blocks using their hashes.
+            for (count, chunk) in content.chunks(BLAKE3_CHUNK_SIZE).enumerate() {
+                let mut block = BlockHasher::new();
+                block.set_block(count);
+                block.update(chunk);
+                let hash = block.finalize(false);
+                let content_from_store = blockstore
+                    .get(count as u32, &hash, CompressionAlgoSet::new())
+                    .await
+                    .ok_or_else(|| anyhow::anyhow!("failed to get chunk"))?;
+
+                // Then: we get our content as expected.
+                if content_from_store.content != chunk {
+                    anyhow::bail!("chunk is invalid");
+                }
+            }
+
+            // Then: our tree is stored as expected.
+            let tree = hash_tree(content.as_slice());
+            if tree.tree
+                != blockstore
+                    .get_tree(&Blake3Hash::from(tree.hash))
+                    .await
+                    .ok_or_else(|| anyhow::anyhow!("failed to get tree"))?
+                    .0
+            {
+                anyhow::bail!("tree is invalid");
+            }
+            Ok(())
         };
+
         let root = test().await;
 
         if path.exists() {
             std::fs::remove_dir_all(path).unwrap();
         }
 
-        let hash_tree = hash_tree(content.as_slice());
-        assert_eq!(root.unwrap(), Blake3Hash::from(hash_tree.hash));
+        root.unwrap();
     }
 }
