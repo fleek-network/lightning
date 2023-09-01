@@ -1,10 +1,13 @@
 #![allow(unused)]
 
+use std::io;
+use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use blake3_tree::blake3::tree::{BlockHasher, HashTreeBuilder};
+use blake3_tree::blake3::Hash;
 use blake3_tree::IncrementalVerifier;
 use bytes::{BufMut, BytesMut};
 use lightning_interfaces::infu_collection::Collection;
@@ -20,58 +23,136 @@ use lightning_interfaces::{
     PutFinalizeError,
     PutWriteError,
 };
+use resolved_pathbuf::ResolvedPathBuf;
+use serde::{Deserialize, Serialize};
+use tempdir::TempDir;
+use tokio::fs;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::task::JoinSet;
 
 use crate::config::Config;
+use crate::put::Putter;
+use crate::store::Store;
+use crate::{Block, BlockContent};
 
-const BLOCK_SIZE: usize = 256 << 10;
+// #[derive(Clone)]
+// pub struct BlockStore {}
+//
+// #[async_trait]
+// impl<C: Collection> BlockStoreInterface<C> for BlockStore {
+//     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
+//
+//     type Put = Putter<Self>;
+//
+//     fn init(config: Self::Config) -> anyhow::Result<Self> {
+//         todo!()
+//     }
+//
+//     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
+//         todo!()
+//     }
+//
+//     async fn get(
+//         &self,
+//         block_counter: u32,
+//         block_hash: &Blake3Hash,
+//         compression: CompressionAlgoSet,
+//     ) -> Option<Self::SharedPointer<ContentChunk>> { todo!()
+//     }
+//
+//     fn put(&self, cid: Option<Blake3Hash>) -> Self::Put {
+//         todo!()
+//     }
+//
+//     fn get_root_dir(&self) -> PathBuf {
+//         todo!()
+//     }
+// }
+//
+// impl ConfigConsumer for BlockStore {
+//     const KEY: &'static str = "blockstore";
+//     type Config = Config;
+// }
 
-#[derive(Clone)]
-pub struct BlockStore {}
+const TMP_DIR_PREFIX: &str = "tmp-store";
 
-pub struct Putter {
-    invalidated: bool,
-    buffer: BytesMut,
-    mode: PutterMode,
-    write_tasks: JoinSet<()>,
+#[derive(Serialize, Deserialize)]
+pub struct FsStoreConfig {
+    pub store_dir_path: ResolvedPathBuf,
 }
 
-enum PutterMode {
-    WithIncrementalVerification {
-        root_hash: [u8; 32],
-        verifier: IncrementalVerifier,
-    },
-    Trusted {
-        counter: usize,
-        hasher: Box<HashTreeBuilder>,
-    },
+impl Default for FsStoreConfig {
+    fn default() -> Self {
+        Self {
+            store_dir_path: "~/.lightning/data/blockstore"
+                .try_into()
+                .expect("Failed to resolve path"),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Blockstore<C: Collection> {
+    store_dir_path: PathBuf,
+    tmp_dir: Arc<TempDir>,
+    collection: PhantomData<C>,
+}
+
+impl<C: Collection> ConfigConsumer for Blockstore<C> {
+    const KEY: &'static str = "fsstore";
+    type Config = FsStoreConfig;
 }
 
 #[async_trait]
-impl<C: Collection> BlockStoreInterface<C> for BlockStore {
+impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
-
-    type Put = Putter;
+    type Put = Putter<Self>;
 
     fn init(config: Self::Config) -> anyhow::Result<Self> {
-        todo!()
+        std::fs::create_dir_all(config.store_dir_path.clone())?;
+        Ok(Self {
+            store_dir_path: config.store_dir_path.to_path_buf(),
+            tmp_dir: TempDir::new(TMP_DIR_PREFIX).map(Arc::new)?,
+            collection: PhantomData,
+        })
     }
 
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
-        todo!()
+        match bincode::deserialize::<BlockContent>(self.fetch(cid, None).await?.as_slice())
+            .expect("Stored content to be serialized properly")
+        {
+            BlockContent::Tree(tree) => Some(Arc::new(Blake3Tree(tree))),
+            _ => None,
+        }
     }
 
     async fn get(
         &self,
         block_counter: u32,
         block_hash: &Blake3Hash,
-        compression: CompressionAlgoSet,
+        _compression: CompressionAlgoSet,
     ) -> Option<Self::SharedPointer<ContentChunk>> {
-        todo!()
+        match bincode::deserialize::<BlockContent>(
+            self.fetch(block_hash, Some(block_counter as usize))
+                .await?
+                .as_slice(),
+        )
+        .expect("Stored content to be serialized properly")
+        {
+            BlockContent::Chunk(content) => Some(Arc::new(ContentChunk {
+                compression: CompressionAlgorithm::Uncompressed,
+                content,
+            })),
+            _ => None,
+        }
     }
 
-    fn put(&self, cid: Option<Blake3Hash>) -> Self::Put {
-        todo!()
+    fn put(&self, root: Option<Blake3Hash>) -> Self::Put {
+        match root {
+            Some(root) => Putter::verifier(self.clone(), root),
+            None => Putter::trust(self.clone()),
+        }
     }
 
     fn get_root_dir(&self) -> PathBuf {
@@ -79,140 +160,44 @@ impl<C: Collection> BlockStoreInterface<C> for BlockStore {
     }
 }
 
-impl ConfigConsumer for BlockStore {
-    const KEY: &'static str = "blockstore";
-    type Config = Config;
-}
-
-impl Putter {
-    fn flush(&mut self, finalized: bool) -> Result<(), PutWriteError> {
-        let block = self.buffer.split_to(BLOCK_SIZE);
-        let mut block_hash: [u8; 32];
-
-        match &mut self.mode {
-            PutterMode::WithIncrementalVerification { verifier, .. } => {
-                if verifier.is_done() {
-                    return Err(PutWriteError::InvalidContent);
-                }
-
-                let mut hasher = BlockHasher::new();
-                hasher.set_block(verifier.get_current_block_counter());
-                block_hash = hasher.finalize(verifier.is_root());
-
-                verifier
-                    .verify_hash(&block_hash)
-                    .map_err(|_| PutWriteError::InvalidContent)?;
-            },
-            PutterMode::Trusted { hasher, counter } => {
-                hasher.update(&block);
-
-                // TODO(qti3e): we can do better than this. hasher.update
-                // already does this duplicate task.
-                let mut hasher = BlockHasher::new();
-                hasher.set_block(*counter);
-                block_hash = hasher.finalize(finalized);
-
-                *counter += 1;
-            },
-        }
-
-        let _ = block_hash;
-
-        self.write_tasks.spawn(async {
-            // write the block to file
-        });
-
-        Ok(())
-    }
-}
-
+// TODO: Add logging.
 #[async_trait]
-impl IncrementalPutInterface for Putter {
-    fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError> {
-        let PutterMode::WithIncrementalVerification {
-            root_hash,
-            verifier,
-        } = &mut self.mode else {
-            return Err(PutFeedProofError::UnexpectedCall);
-        };
-
-        verifier
-            .feed_proof(proof)
-            .map_err(|_| PutFeedProofError::InvalidProof)?;
-
-        Ok(())
+impl<C> Store for Blockstore<C>
+where
+    C: Collection,
+{
+    async fn fetch(&self, key: &Blake3Hash, tag: Option<usize>) -> Option<Block> {
+        let path = format!(
+            "{}/{}",
+            self.store_dir_path.to_string_lossy(),
+            Hash::from(*key).to_hex()
+        );
+        fs::read(path).await.ok()
     }
 
-    fn write(
+    // TODO: This should perhaps return an error.
+    async fn insert(
         &mut self,
-        content: &[u8],
-        compression: CompressionAlgorithm,
-    ) -> Result<(), PutWriteError> {
-        self.buffer.put(content);
+        key: Blake3Hash,
+        block: Block,
+        tag: Option<usize>,
+    ) -> io::Result<()> {
+        let filename = format!("{}", Hash::from(key).to_hex());
+        let path = self.tmp_dir.path().join(filename);
+        if let Ok(mut tmp_file) = File::create(&path).await {
+            tmp_file.write_all(block.as_ref()).await?;
 
-        // as long as we have more data flush. always keep something for
-        // the next caller.
-        while self.buffer.len() > BLOCK_SIZE {
-            if let Err(e) = self.flush(false) {
-                self.invalidated = true;
-                self.write_tasks.abort_all();
-                return Err(e);
-            }
+            // TODO: Is this needed before calling rename?
+            tmp_file.sync_all().await?;
+
+            let store_path = format!(
+                "{}/{}",
+                self.store_dir_path.to_string_lossy(),
+                Hash::from(key).to_hex()
+            );
+
+            fs::rename(path, store_path).await?;
         }
-
         Ok(())
-    }
-
-    fn is_finished(&self) -> bool {
-        // !(are we expecting more data?)
-        match &self.mode {
-            PutterMode::WithIncrementalVerification { verifier, .. } => {
-                verifier.is_done() || self.invalidated
-            },
-            PutterMode::Trusted { .. } => false,
-        }
-    }
-
-    async fn finalize(mut self) -> Result<Blake3Hash, PutFinalizeError> {
-        if self.invalidated {
-            return Err(PutFinalizeError::PartialContent);
-        }
-
-        // at finalization we should always have some bytes.
-        if self.buffer.is_empty() {
-            self.write_tasks.abort_all();
-            return Err(PutFinalizeError::PartialContent);
-        }
-
-        self.flush(true)
-            .map_err(|_| PutFinalizeError::PartialContent)?;
-
-        if let PutterMode::WithIncrementalVerification { verifier, .. } = &self.mode {
-            if !verifier.is_done() {
-                self.write_tasks.abort_all();
-                return Err(PutFinalizeError::PartialContent);
-            }
-        }
-
-        while let Some(res) = self.write_tasks.join_next().await {
-            if let Err(e) = res {
-                return Err(PutFinalizeError::WriteFailed);
-            }
-        }
-
-        let (_hash, _tree) = match self.mode {
-            PutterMode::WithIncrementalVerification {
-                root_hash,
-                mut verifier,
-            } => (root_hash, verifier.take_tree()),
-            PutterMode::Trusted { counter, hasher } => {
-                let tmp = hasher.finalize();
-                (tmp.hash.into(), tmp.tree)
-            },
-        };
-
-        //
-
-        todo!()
     }
 }

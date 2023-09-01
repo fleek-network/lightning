@@ -3898,6 +3898,7 @@ dependencies = [
  "bytes",
  "infusion",
  "lightning-interfaces",
+ "log",
  "parking_lot",
  "resolved-pathbuf",
  "serde",

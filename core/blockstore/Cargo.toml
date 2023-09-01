@@ -13,6 +13,7 @@ blake3-tree = { path = "../../lib/blake3-tree"}
 anyhow.workspace = true
 async-trait.workspace = true
 bytes.workspace = true
+log.workspace = true
 parking_lot.workspace = true
 serde.workspace = true
 thiserror.workspace = true
