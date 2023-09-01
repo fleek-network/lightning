@@ -33,8 +33,10 @@ use tokio::task::JoinSet;
 
 use crate::config::Config;
 use crate::put::Putter;
-use crate::store::Store;
-use crate::{Block, BlockContent};
+use crate::store::{Block, Store};
+use crate::BlockContent;
+
+pub const BLOCK_SIZE: usize = 256 << 10;
 
 // #[derive(Clone)]
 // pub struct BlockStore {}

@@ -1,29 +1,10 @@
 pub mod blockstore;
 pub mod config;
-pub mod fs;
-pub mod memory;
 pub mod put;
 mod store;
 
 use lightning_interfaces::Blake3Hash;
 use serde::{Deserialize, Serialize};
-
-const BLAKE3_CHUNK_SIZE: usize = 256 * 1024;
-
-type Block = Vec<u8>;
-
-#[derive(Hash, Eq, PartialEq, Debug)]
-pub struct Key(Blake3Hash, Option<u32>);
-
-impl Key {
-    pub fn chunk_key(hash: Blake3Hash, counter: u32) -> Self {
-        Self(hash, Some(counter))
-    }
-
-    pub fn tree_key(hash: Blake3Hash) -> Self {
-        Self(hash, None)
-    }
-}
 
 // TODO: Should we derive serialize/deserialize for ContentChunk and Blake3Tree?
 #[derive(Serialize, Deserialize)]
@@ -41,10 +22,10 @@ mod tests {
     use lightning_interfaces::{partial, Blake3Hash, BlockStoreInterface, IncrementalPutInterface};
     use tokio::test;
 
+    use crate::blockstore::BLOCK_SIZE;
     use crate::config::Config;
     use crate::fs::{FsStore, FsStoreConfig};
     use crate::memory::MemoryBlockStore;
-    use crate::BLAKE3_CHUNK_SIZE;
 
     partial!(TestBinding {
         BlockStoreInterface = MemoryBlockStore<Self>;
@@ -52,7 +33,7 @@ mod tests {
 
     fn create_content() -> Vec<u8> {
         (0..4)
-            .map(|i| Vec::from([i; BLAKE3_CHUNK_SIZE]))
+            .map(|i| Vec::from([i; BLOCK_SIZE]))
             .flat_map(|a| a.into_iter())
             .collect()
     }
@@ -104,7 +85,7 @@ mod tests {
         let hash_tree = hash_tree(content.as_slice());
         // When: we put the content by block and feed the proof to verify it.
         let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
-        for (i, block) in content.chunks(BLAKE3_CHUNK_SIZE).enumerate() {
+        for (i, block) in content.chunks(BLOCK_SIZE).enumerate() {
             let proof = new_proof(&hash_tree.tree, i);
             putter.feed_proof(proof.as_slice()).unwrap();
             putter
@@ -134,7 +115,7 @@ mod tests {
         content[10] = 69;
         // When: we put a block with modified content and feed the proof to verify it.
         let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
-        let mut blocks = content.chunks(BLAKE3_CHUNK_SIZE);
+        let mut blocks = content.chunks(BLOCK_SIZE);
         let proof = ProofBuf::new(&hash_tree.tree, 0);
         putter.feed_proof(proof.as_slice()).unwrap();
         let write_result = putter.write(blocks.next().unwrap(), CompressionAlgorithm::Uncompressed);
@@ -155,7 +136,7 @@ mod tests {
             .unwrap();
         putter.finalize().await.unwrap();
         // When: we query the block store for our blocks using their hashes.
-        for (count, chunk) in content.chunks(BLAKE3_CHUNK_SIZE).enumerate() {
+        for (count, chunk) in content.chunks(BLOCK_SIZE).enumerate() {
             let mut block = BlockHasher::new();
             block.set_block(count);
             block.update(chunk);
@@ -182,7 +163,7 @@ mod tests {
     #[test]
     async fn test_put_verify_one_chunk() {
         // Given: some content.
-        let content = [0; BLAKE3_CHUNK_SIZE];
+        let content = [0; BLOCK_SIZE];
         // Given: a block store.
         let blockstore = MemoryBlockStore::<TestBinding>::init(Config::default()).unwrap();
         // Given: we put the content in the block store.
@@ -249,7 +230,7 @@ mod tests {
         // Given: the full tree.
         let hash_tree = hash_tree(&content);
         // When: we put the content by block and feed the proof to verify it.
-        for (count, chunk) in content.chunks(BLAKE3_CHUNK_SIZE).enumerate() {
+        for (count, chunk) in content.chunks(BLOCK_SIZE).enumerate() {
             let mut block = BlockHasher::new();
             block.set_block(count);
             block.update(chunk);
@@ -301,7 +282,7 @@ mod tests {
             }
 
             // When: we query the block store for our blocks using their hashes.
-            for (count, chunk) in content.chunks(BLAKE3_CHUNK_SIZE).enumerate() {
+            for (count, chunk) in content.chunks(BLOCK_SIZE).enumerate() {
                 let mut block = BlockHasher::new();
                 block.set_block(count);
                 block.update(chunk);

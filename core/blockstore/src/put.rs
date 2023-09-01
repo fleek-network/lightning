@@ -13,10 +13,9 @@ use lightning_interfaces::{
 };
 use tokio::task::JoinSet;
 
+use crate::blockstore::BLOCK_SIZE;
 use crate::store::Store;
-use crate::{BlockContent, Key, BLAKE3_CHUNK_SIZE};
-
-const BLOCK_SIZE: usize = 256 << 10;
+use crate::BlockContent;
 
 pub struct Putter<S> {
     invalidated: bool,
