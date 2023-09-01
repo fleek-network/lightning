@@ -17,9 +17,15 @@ thread_local! {
 
 /// An incremental verifier that can consume a stream of proofs and content
 /// and verify the integrity of the content using a blake3 root hash.
+// TODO(qti3e): Using an arena might improve performance here.
 pub struct IncrementalVerifier {
     /// The configuration the Blake3.
     iv: blake3::tree::IV,
+    /// An optional tree keeper which we feed information to that will construct
+    /// and keep the full internal blake3 tree. This should be able to construct
+    /// the tree that [HashTreeBuilder](blake3::tree::HashTreeBuilder) produces,
+    /// only usable when we start the incremental verifier at block 0.
+    keeper: Option<TreeKeeper>,
     /// The pointer to the current tree node we want to verify.
     ///
     /// # Guarantees
@@ -64,6 +70,11 @@ struct IncrementalVerifierTreeNode {
 
 unsafe impl Send for IncrementalVerifier {}
 
+#[derive(Default)]
+struct TreeKeeper {
+    tree: Vec<[u8; 32]>,
+}
+
 impl IncrementalVerifier {
     /// Create a new incremental verifier that verifies an stream of proofs and
     /// content against the provided root hash.
@@ -72,11 +83,42 @@ impl IncrementalVerifier {
     pub fn new(root_hash: [u8; 32], starting_block: usize) -> Self {
         Self {
             iv: blake3::tree::IV::new(),
+            keeper: None,
             cursor: IncrementalVerifierTreeNode::leaf(root_hash),
             block_counter: starting_block,
             stack: ArrayVec::new(),
             next_head: ptr::null_mut(),
         }
+    }
+
+    /// Enable preserving the full tree.
+    ///
+    /// # Panics
+    ///
+    /// 1. If we are already past initialization.
+    /// 2. If we haven't started verifier at `starting_block = 0`.
+    pub fn preserve_tree(&mut self) {
+        assert!(
+            (self.block_counter == 0) && self.stack.is_empty(),
+            "preserve_tree can only work when starting at block 0"
+        );
+
+        self.keeper = Some(TreeKeeper::default());
+    }
+
+    /// Returns the tree that we kept.
+    ///
+    /// # Panics
+    ///
+    /// 1. If called before finalization.
+    /// 2. If called more than once.
+    /// 3. If we haven't made a call to `preserve_tree` on init.
+    pub fn take_tree(&mut self) -> Vec<[u8; 32]> {
+        assert!(self.is_done());
+        self.keeper
+            .take()
+            .expect("A prior call to `preserve_tree` was expected.")
+            .tree
     }
 
     /// Returns true if the stream is complete.
@@ -143,6 +185,21 @@ impl IncrementalVerifier {
         self.verify_hash(&hash)
     }
 
+    #[inline(always)]
+    fn maybe_push_to_keeper(&mut self) {
+        if let Some(keeper) = self.keeper.as_mut() {
+            // Copy paste of self.current_hash() because rust somehow doesn't
+            // detect that in that function we are not taking reference to self.keeper
+            // and complains.
+            let current_hash = {
+                debug_assert!(!self.cursor.is_null(), "cursor is null");
+                // SAFETY: Dereferencing cursor is safe since we never set it a null value.
+                unsafe { &(*self.cursor).hash }
+            };
+            keeper.push(*current_hash);
+        }
+    }
+
     /// Go to the next element in the tree.
     fn move_to_next(&mut self) {
         debug_assert!(!self.cursor.is_null());
@@ -155,6 +212,48 @@ impl IncrementalVerifier {
         // 5. Move to the leftmost child.
         // At any step if going to parent results in a null cursor, avoid it.
 
+        // Keeper logic:
+        // If a keeper does exists, we are interested in preserving the tree and the
+        // tree that [HashTreeBuilder](blake3::tree::HashTreeBuilder) produces, which
+        // is a post-order traversal of the blake3 internal tree.
+        //
+        // We try to reproduce the same tree, we should remember that every time this
+        // function is being called the `self.cursor` is *always* a leaf node that we
+        // visited. Also, this function is always moving the cursor to the right sibling
+        // of the current node.
+        //
+        // To perform a post-order capture, we need to push `LEFT-RIGHT-PARENT` and do
+        // this until the end (of time, duh..), we are already visiting the nodes in the
+        // left to right order so the first call to `self.maybe_push_to_keeper` will already
+        // give us
+        //
+        // ```
+        // LEFT RIGHT LEFT RIGHT LEFT RIGHT ...
+        // ```
+        //
+        // The next part will be about figuring out at which point should we push the missing
+        // parents to get our desired outcome.
+        //
+        // And that happens every time we traverse the tree up, when we are a right child.
+        //
+        // ```
+        // LEFT PARENT
+        // ```
+        //
+        // This is an invalid sequence that we never want. So obviously the insertion
+        // of the parent should always happen after a `RIGHT`, which means after every
+        // time we are the right node, we push parent.
+        //
+        // Another valid sequence in a post-order traversal (as regex) is:
+        //
+        // ```
+        // RIGHT [PARENT]+
+        // ```
+        //
+        // So we keep pushing parents after parents.
+
+        self.maybe_push_to_keeper();
+
         // Step 1: Moving up the tree as long as we're the right child.
         unsafe {
             loop {
@@ -163,10 +262,13 @@ impl IncrementalVerifier {
                 }
 
                 if (*(*self.cursor).parent).right != self.cursor {
+                    // we are the left child so break.
                     break;
                 }
 
                 self.cursor = (*self.cursor).parent;
+
+                self.maybe_push_to_keeper();
             }
         }
 
@@ -511,6 +613,13 @@ impl IncrementalVerifierTreeNode {
         });
 
         drop(Box::from_raw(ptr))
+    }
+}
+
+impl TreeKeeper {
+    #[inline(always)]
+    pub fn push(&mut self, hash: [u8; 32]) {
+        self.tree.push(hash)
     }
 }
 

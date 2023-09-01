@@ -26,3 +26,9 @@ name = "fuzz_target_tree"
 path = "fuzz_targets/fuzz_target_tree.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "keeper"
+path = "fuzz_targets/keeper.rs"
+test = false
+doc = false
