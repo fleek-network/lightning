@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::schema;
@@ -57,6 +59,8 @@ async fn demo() -> anyhow::Result<()> {
             .encode(),
         )
         .await?;
+
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     node.shutdown().await;
 
