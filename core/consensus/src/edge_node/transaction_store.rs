@@ -11,7 +11,7 @@ pub struct TransactionStore {
     parcels: HashMap<Digest, AuthenticStampedParcel>,
     attestations: HashMap<Digest, Vec<NodeIndex>>,
     executed: HashSet<Digest>,
-    head: Digest,
+    pub head: Digest,
 }
 
 impl TransactionStore {

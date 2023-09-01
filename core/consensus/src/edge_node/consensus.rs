@@ -82,19 +82,21 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
             _ = shutdown_future => {
                 return;
             },
-            Some((parcel, epoch_changed)) = rx_narwhal_batch.recv() => {
+            Some((mut parcel, epoch_changed)) = rx_narwhal_batch.recv() => {
                 if !on_committee {
                     // This should never happen if it somehow does there is critical error somewhere
                     panic!("We somehow sent ourselves a parcel from narwhal while not on committee");
                 }
-                transaction_store.store_parcel(parcel.clone());
-                // No need to store the attestation we have already executed it
+                // Set the head of the parcel to our last executed of the parcel to the last transaction we executed
+                parcel.last_executed = transaction_store.head;
 
                 let parcel_digest = parcel.to_digest();
 
-                let head = if epoch_changed {[0;32]} else {parcel_digest};
+                transaction_store.store_parcel(parcel.clone());
+                // No need to store the attestation we have already executed it
 
-                transaction_store.set_head(head);
+                // Set our head to this since narwhal already executed it
+                transaction_store.set_head(parcel_digest);
 
                 let attestation = CommitteeAttestation {
                     digest: parcel_digest,

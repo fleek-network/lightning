@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use fastcrypto::hash::HashFunction;
@@ -61,20 +61,6 @@ pub struct Execution {
     is_committee: AtomicBool,
     /// Used to send payloads to the edge node consensus to broadcast out to other nodes
     tx_narwhal_batches: mpsc::Sender<(AuthenticStampedParcel, bool)>,
-    inner: Mutex<ExecutionInner>,
-}
-
-struct ExecutionInner {
-    /// The digest of the last set of transactions we have executed
-    last_executed: Option<Digest>,
-}
-
-impl ExecutionInner {
-    fn new() -> Self {
-        Self {
-            last_executed: None,
-        }
-    }
 }
 
 impl Execution {
@@ -89,7 +75,6 @@ impl Execution {
             reconfigure_notify,
             new_block_notify,
             is_committee: AtomicBool::new(false),
-            inner: Mutex::new(ExecutionInner::new()),
             tx_narwhal_batches,
         }
     }
@@ -138,13 +123,11 @@ impl ExecutionState for Execution {
         if !batch_payload.is_empty() {
             // We have batches in the payload send them over broadcast along with an attestion of
             // them
-            let last_digest = self.inner.lock().unwrap().last_executed.unwrap_or([0; 32]);
 
             let parcel = AuthenticStampedParcel {
                 transactions: batch_payload.clone(),
-                last_executed: last_digest,
+                last_executed: [0; 32],
             };
-            let parcel_digest = parcel.to_digest();
 
             let epoch_changed = self.submit_batch(batch_payload).await;
 
@@ -156,12 +139,7 @@ impl ExecutionState for Execution {
 
             // Submit the batches to application layer and if the epoch changed reset last executed
             if epoch_changed {
-                // if epoch changed reset the head
-                self.inner.lock().unwrap().last_executed = None;
                 self.reconfigure_notify.notify_waiters();
-            } else {
-                // Update our last digest proccesed
-                self.inner.lock().unwrap().last_executed = Some(parcel_digest);
             }
         }
     }
