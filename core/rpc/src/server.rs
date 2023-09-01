@@ -9,8 +9,6 @@ use axum::routing::{get, post};
 use axum::{Extension, Router};
 use lightning_interfaces::common::WithStartAndShutdown;
 use lightning_interfaces::config::ConfigConsumer;
-#[cfg(feature = "e2e-test")]
-use lightning_interfaces::dht::DhtSocket;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::{
     ApplicationInterface,
@@ -18,6 +16,8 @@ use lightning_interfaces::{
     RpcInterface,
     SyncQueryRunnerInterface,
 };
+#[cfg(feature = "e2e-test")]
+use lightning_interfaces::{DhtInterface, DhtSocket};
 use tokio::sync::Notify;
 use tokio::task;
 
@@ -91,6 +91,14 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
 
 #[async_trait]
 impl<C: Collection> RpcInterface<C> for Rpc<C> {
+    infusion::infu!(impl<C> {
+        #[cfg(feature = "e2e-test")]
+        fn post(this, dht: DhtInterface) {
+            let dht_socket = dht.get_socket();
+            *this.data.dht_socket.lock().unwrap() = Some(dht_socket);
+        }
+    });
+
     /// Initialize the *RPC* server, with the given parameters.
     fn init(
         config: Self::Config,
@@ -119,11 +127,6 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
             shutdown_notify: Arc::new(Notify::new()),
         });
         rpc
-    }
-
-    #[cfg(feature = "e2e-test")]
-    fn provide_dht_socket(&self, dht_socket: DhtSocket) {
-        *self.data.dht_socket.lock().unwrap() = Some(dht_socket);
     }
 }
 

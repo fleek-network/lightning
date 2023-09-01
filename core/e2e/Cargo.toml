@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lightning-interfaces = { path = "../interfaces", features = ["e2e-test"] }
+lightning-interfaces = { path = "../interfaces" }
 lightning-node = { path = "../node" }
 lightning-rpc = { path = "../rpc", features = ["e2e-test"] }
 lightning-application = { path = "../application" }

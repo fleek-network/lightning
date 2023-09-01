@@ -57,7 +57,7 @@ macro_rules! infu {
         ) -> ::std::result::Result<
             Self, ::std::boxed::Box<dyn std::error::Error>> where Self: Sized {
         $(
-            let $dep_name: <$collection_name as Collection>::$dep_ty = __container.get(
+            let $dep_name: &<$collection_name as Collection>::$dep_ty = __container.get(
                 $crate::tag!($collection_name :: $dep_ty)
             );
          )*
@@ -74,18 +74,21 @@ macro_rules! infu {
     };
 
     (impl<$collection_name:tt> {
-        fn post($($dep_name:ident: $dep_ty:tt),* $(,)?) $block:block
+        $(#[$attr:meta])*
+        fn post($this:ident, $($dep_name:ident: $dep_ty:tt),* $(,)?) $block:block
     }) => {
+        $(#[$attr])*
         #[doc(hidden)]
         fn infu_post_initialize(&mut self, __container: &$crate::Container) {
         $(
-            let $dep_name: <$collection_name as Collection>::$dep_ty = __container.get(
+            let $dep_name: &<$collection_name as Collection>::$dep_ty = __container.get(
                 $crate::tag!($collection_name :: $dep_ty)
             );
          )*
 
             // Make the container inaccessible to the block.
             let __container = ();
+            let mut $this = self;
 
             {
                 $block

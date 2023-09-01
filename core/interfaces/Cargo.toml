@@ -30,6 +30,3 @@ blake3-tree = { path = "../../lib/blake3-tree"}
 
 # Currently we need the SDK because of the FFI types.
 fn-sdk = { path = "../../lib/sdk" }
-
-[features]
-e2e-test = []
