@@ -20,6 +20,7 @@ serde.workspace = true
 thiserror.workspace = true
 tempdir.workspace = true
 tokio.workspace = true
+derive_more = "0.99"
 
 [dev-dependencies]
 infusion.workspace = true

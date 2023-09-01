@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use blake3_tree::blake3::tree::{BlockHasher, HashTreeBuilder};
 use blake3_tree::IncrementalVerifier;
 use bytes::{BufMut, BytesMut};
+use derive_more::IsVariant;
 use lightning_interfaces::types::CompressionAlgorithm;
 use lightning_interfaces::{
     Blake3Hash,
@@ -24,6 +25,7 @@ pub struct Putter<S> {
     store: S,
 }
 
+#[derive(IsVariant)]
 enum PutterMode {
     WithIncrementalVerification {
         root_hash: [u8; 32],
@@ -70,7 +72,12 @@ where
     }
 
     fn flush(&mut self, finalized: bool) -> Result<(), PutWriteError> {
-        let block = self.buffer.split_to(BLOCK_SIZE);
+        let block = if finalized {
+            self.buffer.split()
+        } else {
+            self.buffer.split_to(BLOCK_SIZE)
+        };
+
         let block_hash: [u8; 32];
         let block_counter;
 
@@ -140,9 +147,15 @@ where
     fn write(&mut self, content: &[u8], _: CompressionAlgorithm) -> Result<(), PutWriteError> {
         self.buffer.put(content);
 
+        let threshold = if self.mode.is_trusted() {
+            BLOCK_SIZE
+        } else {
+            BLOCK_SIZE - 1
+        };
+
         // As long as we have more data flush. always keep something for
         // the next caller.
-        while self.buffer.len() > BLOCK_SIZE {
+        while self.buffer.len() > threshold {
             if let Err(e) = self.flush(false) {
                 self.invalidated = true;
                 self.write_tasks.abort_all();
@@ -168,14 +181,16 @@ where
             return Err(PutFinalizeError::PartialContent);
         }
 
-        // At finalization we should always have some bytes.
-        if self.buffer.is_empty() {
-            self.write_tasks.abort_all();
-            return Err(PutFinalizeError::PartialContent);
-        }
+        if self.mode.is_trusted() {
+            // At finalization we should always have some bytes.
+            if self.buffer.is_empty() {
+                self.write_tasks.abort_all();
+                return Err(PutFinalizeError::PartialContent);
+            }
 
-        self.flush(true)
-            .map_err(|_| PutFinalizeError::PartialContent)?;
+            self.flush(true)
+                .map_err(|_| PutFinalizeError::PartialContent)?;
+        }
 
         if let PutterMode::WithIncrementalVerification { verifier, .. } = &self.mode {
             if !verifier.is_done() {

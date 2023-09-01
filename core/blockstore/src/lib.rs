@@ -59,11 +59,8 @@ mod tests {
             let mut putter = blockstore.put(None);
             putter
                 .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
-                .map_err(|e| anyhow::anyhow!("{e:?}"))?;
-            putter
-                .finalize()
-                .await
-                .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+                .unwrap();
+            putter.finalize().await.unwrap();
 
             // Given: the full tree.
             let hash_tree = hash_tree(content.as_slice());
@@ -72,12 +69,11 @@ mod tests {
             let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
             for (i, block) in content.chunks(BLOCK_SIZE).enumerate() {
                 let proof = new_proof(&hash_tree.tree, i);
-                putter
-                    .feed_proof(proof.as_slice())
-                    .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+                println!("block {i}");
+                putter.feed_proof(proof.as_slice()).unwrap();
                 putter
                     .write(block, CompressionAlgorithm::Uncompressed)
-                    .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+                    .unwrap();
             }
 
             // Then: the putter returns the appropriate root hash and no errors.
