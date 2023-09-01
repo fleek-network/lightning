@@ -233,8 +233,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn request_download() -> Result<()> {
         // Setup two servers
-        let blockstore_a =
-            MemoryBlockStore::<TestBindings>::init(lightning_blockstore::config::Config {})?;
+        let blockstore_a = MemoryBlockStore::<TestBindings>::init(
+            lightning_blockstore::config::Config::default(),
+        )?;
         let address = "0.0.0.0:17000".parse().unwrap();
         let server_a =
             BlockStoreServer::<TestBindings>::init(Config { address }, blockstore_a.clone())?;
@@ -247,8 +248,9 @@ mod tests {
         putter.write(&[0u8; 2 * 256 * 1024], CompressionAlgorithm::Uncompressed)?;
         let hash = putter.finalize().await?;
 
-        let blockstore_b =
-            MemoryBlockStore::<TestBindings>::init(lightning_blockstore::config::Config {})?;
+        let blockstore_b = MemoryBlockStore::<TestBindings>::init(
+            lightning_blockstore::config::Config::default(),
+        )?;
         let server_b = BlockStoreServer::<TestBindings>::init(
             Config {
                 address: "127.0.0.1:17001".parse().unwrap(),

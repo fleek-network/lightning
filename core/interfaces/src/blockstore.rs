@@ -129,11 +129,9 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
     /// Returns the path to the root directory of the blockstore. The directory layout of
     /// the blockstore is simple.
     ///
-    /// ```
     /// ./root
-    ///     ./internal
-    ///     ./block
-    /// ```
+    /// ./internal
+    /// ./block
     ///
     /// The `internal` directory will map each `root-hash` to a [`Blake3Tree`], the serialization
     /// should not include the leading length of the vec. In other words the content length should
