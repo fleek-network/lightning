@@ -34,7 +34,6 @@ use tokio::task::JoinSet;
 use crate::config::{Config, BLOCK_DIR, INTERNAL_DIR, TMP_DIR};
 use crate::put::Putter;
 use crate::store::{Block, Store};
-use crate::BlockContent;
 
 pub const BLOCK_SIZE: usize = 256 << 10;
 

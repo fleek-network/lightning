@@ -1,11 +1,10 @@
 use async_trait::async_trait;
 use blake3_tree::blake3::tree::{BlockHasher, HashTreeBuilder};
 use blake3_tree::IncrementalVerifier;
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 use lightning_interfaces::types::CompressionAlgorithm;
 use lightning_interfaces::{
     Blake3Hash,
-    ContentChunk,
     IncrementalPutInterface,
     PutFeedProofError,
     PutFinalizeError,
@@ -16,7 +15,6 @@ use tokio::task::JoinSet;
 use crate::blockstore::BLOCK_SIZE;
 use crate::config::{BLOCK_DIR, INTERNAL_DIR};
 use crate::store::Store;
-use crate::BlockContent;
 
 pub struct Putter<S> {
     invalidated: bool,
@@ -73,7 +71,7 @@ where
 
     fn flush(&mut self, finalized: bool) -> Result<(), PutWriteError> {
         let block = self.buffer.split_to(BLOCK_SIZE);
-        let mut block_hash: [u8; 32];
+        let block_hash: [u8; 32];
         let block_counter;
 
         match &mut self.mode {
@@ -108,7 +106,7 @@ where
 
         let mut store = self.store.clone();
         self.write_tasks.spawn(async move {
-            store.insert(BLOCK_DIR, block_hash, block.to_vec(), Some(block_counter));
+            let _ = store.insert(BLOCK_DIR, block_hash, block.to_vec(), Some(block_counter)).await;
         });
 
         Ok(())
@@ -194,7 +192,7 @@ where
                 root_hash,
                 mut verifier,
             } => (root_hash, verifier.take_tree()),
-            PutterMode::Trusted { counter, hasher } => {
+            PutterMode::Trusted { hasher, .. } => {
                 let tmp = hasher.finalize();
                 (tmp.hash.into(), tmp.tree)
             },
