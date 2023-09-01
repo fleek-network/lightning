@@ -33,7 +33,8 @@ pub type AtomoBuilderWithRocks<S = DefaultSerdeBackend> = AtomoBuilder<RocksBack
 ///
 /// let atomo = AtomoBuilderWithRocks::<DefaultSerdeBackend>::new(rocksdb)
 ///     .with_table::<u64, u64>("example")
-///     .build();
+///     .build()
+///     .unwrap();
 /// let table_res = atomo.resolve::<u64, u64>("example");
 ///
 /// // cleanup
