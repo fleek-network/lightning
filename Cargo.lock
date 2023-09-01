@@ -3918,6 +3918,7 @@ dependencies = [
  "fleek-crypto",
  "futures",
  "infusion",
+ "lightning-blockstore",
  "lightning-interfaces",
  "log",
  "serde",

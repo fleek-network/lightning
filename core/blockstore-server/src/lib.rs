@@ -2,7 +2,7 @@ pub mod config;
 
 use std::io::{Read, Write};
 use std::marker::PhantomData;
-use std::net::SocketAddr;
+use std::net::{SocketAddr, TcpStream};
 use std::sync::RwLock;
 
 use anyhow::{anyhow, Result};
@@ -22,8 +22,7 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use log::error;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
 use tokio::select;
 use triomphe::Arc;
 
@@ -80,6 +79,7 @@ impl<C: Collection> WithStartAndShutdown for BlockStoreServer<C> {
                     Ok((socket, _)) = listener.accept() => {
                         let blockstore = blockstore.clone();
                         tokio::spawn(async move {
+                            let socket = socket.into_std().unwrap();
                             if let Err(e) = handle_connection::<C>(blockstore, socket).await {
                                 error!("error handling blockstore connection: {e}");
                             }
@@ -103,11 +103,11 @@ async fn handle_connection<C: Collection>(
     mut socket: TcpStream,
 ) -> anyhow::Result<()> {
     let mut hash = [0u8; 32];
-    socket.read_exact(&mut hash).await?;
+    socket.read_exact(&mut hash)?;
 
     // fetch from the blockstore
     let Some(proof) = blockstore.get_tree(&hash).await else {
-        return Err(anyhow!("failed to find block"));
+        return Err(anyhow!("failed to get proof"));
     };
 
     // find out total content size
@@ -121,22 +121,19 @@ async fn handle_connection<C: Collection>(
         last_hash = proof.0[ii];
         total += 1;
     }
+
     let content_len = blockstore
         .get(total - 1, &last_hash, CompressionAlgoSet::default())
         .await
         .expect("last block not available")
         .content
         .len()
-        // TODO: verify this is correct
         + (total as usize - 1) * 256 * 1024;
 
-    let mut block_counter = 0u32;
-    let mut block_hash = proof.0[0];
-
     // Setup stream encoder
-    let std_socket = socket.into_std()?; // for now use std which supports io::Write
+
     let mut encoder = Encoder::new(
-        std_socket,
+        socket,
         content_len,
         HashTree {
             hash: hash.into(),
@@ -145,13 +142,20 @@ async fn handle_connection<C: Collection>(
     )?;
 
     // Feed blocks to the stream
-    while let Some(block) = blockstore
-        .get(block_counter, &block_hash, CompressionAlgoSet::default())
-        .await
-    {
+    let mut block_counter = 0u32;
+    loop {
+        let idx = (block_counter * 2 - block_counter.count_ones()) as usize;
+        if idx >= proof.0.len() {
+            break;
+        }
+
+        let block = blockstore
+            .get(block_counter, &proof.0[idx], CompressionAlgoSet::default())
+            .await
+            .ok_or(anyhow!("failed to get block"))?;
         encoder.write_all(&block.content)?;
+
         block_counter += 1;
-        block_hash = proof.0[(block_counter * 2 - block_counter.count_ones()) as usize];
     }
 
     Ok(())
@@ -182,14 +186,13 @@ impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
 
     async fn request_download(&self, block_hash: Blake3Hash, target: SocketAddr) -> Result<()> {
         // Connect to the destination
-        let mut socket = TcpStream::connect(target).await?;
+        let mut socket = TcpStream::connect(target)?;
 
         // Send request
-        socket.write_all(&block_hash).await?;
+        socket.write_all(&block_hash)?;
 
         // Setup the decoder
-        let std_socket = socket.into_std()?;
-        let mut decoder = VerifiedDecoder::new(std_socket, block_hash);
+        let mut decoder = VerifiedDecoder::new(socket, block_hash);
 
         // TODO: Add a non-verified decoder to blake3-stream that yields proofs and chunks directly
         // without verification. We can let the blockstore verify for us, and avoid recomputing the
@@ -209,6 +212,59 @@ impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
         let hash = putter.finalize().await?;
         debug_assert_eq!(hash, block_hash);
 
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lightning_blockstore::memory::MemoryBlockStore;
+    use lightning_interfaces::infu_collection::Collection;
+    use lightning_interfaces::partial;
+
+    use super::*;
+
+    partial!(TestBindings {
+        BlockStoreInterface = MemoryBlockStore<Self>;
+        BlockStoreServerInterface = BlockStoreServer<Self>;
+    });
+
+    // tests need to be run with multi threaded, otherwise the server spawn is never polled.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn request_download() -> Result<()> {
+        // Setup two servers
+        let blockstore_a =
+            MemoryBlockStore::<TestBindings>::init(lightning_blockstore::config::Config {})?;
+        let address = "0.0.0.0:17000".parse().unwrap();
+        let server_a =
+            BlockStoreServer::<TestBindings>::init(Config { address }, blockstore_a.clone())?;
+        server_a.start().await;
+
+        // load some content into the first blockstore
+        let mut putter = blockstore_a.put(None);
+        // TODO: test different content sizes once blockstore is debugged (failing for any odd
+        // number of blocks)
+        putter.write(&[0u8; 2 * 256 * 1024], CompressionAlgorithm::Uncompressed)?;
+        let hash = putter.finalize().await?;
+
+        let blockstore_b =
+            MemoryBlockStore::<TestBindings>::init(lightning_blockstore::config::Config {})?;
+        let server_b = BlockStoreServer::<TestBindings>::init(
+            Config {
+                address: "127.0.0.1:17001".parse().unwrap(),
+            },
+            blockstore_b.clone(),
+        )?;
+
+        // Request download from server a, loading the content into b
+        server_b
+            .request_download(hash, "127.0.0.1:17000".parse().unwrap())
+            .await?;
+
+        // Verify blockstore b has the fetched content
+        assert!(blockstore_b.get_tree(&hash).await.is_some());
+
+        server_a.shutdown().await;
         Ok(())
     }
 }
