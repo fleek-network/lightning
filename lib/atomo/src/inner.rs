@@ -174,7 +174,8 @@ mod tests {
     fn resolve_valid_should_work() {
         let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<String, usize>("TABLE")
-            .build_inner();
+            .build_inner()
+            .unwrap();
 
         inner.resolve::<String, usize>("TABLE");
     }
@@ -184,7 +185,8 @@ mod tests {
     fn resolve_key_type_mismatch_should_panic() {
         let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<String, usize>("TABLE")
-            .build_inner();
+            .build_inner()
+            .unwrap();
 
         inner.resolve::<Vec<u8>, usize>("TABLE");
     }
@@ -194,7 +196,8 @@ mod tests {
     fn resolve_value_type_mismatch_should_panic() {
         let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<String, usize>("TABLE")
-            .build_inner();
+            .build_inner()
+            .unwrap();
 
         inner.resolve::<String, u8>("TABLE");
     }
@@ -204,7 +207,8 @@ mod tests {
     fn resolve_undefined_table_should_panic() {
         let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<String, usize>("TABLE")
-            .build_inner();
+            .build_inner()
+            .unwrap();
 
         inner.resolve::<String, usize>("TABLE-X");
     }
@@ -213,7 +217,8 @@ mod tests {
     fn perform_batch() {
         let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<Vec<u8>, usize>("TABLE")
-            .build_inner();
+            .build_inner()
+            .unwrap();
 
         let mut batch = VerticalBatch::new(1);
         let map = batch.get_mut(0);
@@ -269,7 +274,8 @@ mod tests {
     fn compute_inverse() {
         let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<Vec<u8>, usize>("TABLE")
-            .build_inner();
+            .build_inner()
+            .unwrap();
 
         let mut batch = VerticalBatch::new(1);
         let map = batch.get_mut(0);
@@ -323,7 +329,8 @@ mod tests {
     fn compute_inverse_on_empty_db() {
         let inner = AtomoBuilder::<InMemoryStorage, BincodeSerde>::default()
             .with_table::<Vec<u8>, usize>("TABLE")
-            .build_inner();
+            .build_inner()
+            .unwrap();
 
         let mut batch = VerticalBatch::new(1);
         let map = batch.get_mut(0);

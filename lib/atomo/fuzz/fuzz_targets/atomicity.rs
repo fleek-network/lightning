@@ -23,7 +23,8 @@ fn fuzz(input: Input) {
 
     let mut db = AtomoBuilder::<InMemoryStorage, DefaultSerdeBackend>::default()
         .with_table::<u8, usize>("TABLE")
-        .build();
+        .build()
+        .unwrap();
 
     let handles: Vec<_> = std::iter::repeat(db.query())
         .enumerate()

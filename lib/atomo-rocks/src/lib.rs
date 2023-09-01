@@ -246,7 +246,8 @@ mod tests {
         // setup atomo db
         let mut db = AtomoBuilderWithRocks::new(rocksdb)
             .with_table::<u64, u64>("test")
-            .build();
+            .build()
+            .unwrap();
 
         let query_runner = db.query();
         let table_res = db.resolve::<u64, u64>("test");

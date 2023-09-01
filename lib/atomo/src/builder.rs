@@ -97,14 +97,13 @@ impl<B: StorageBackendConstructor, S: SerdeBackend> AtomoBuilder<B, S> {
 
     /// Finish the construction and returns an [`Atomo`] with [`UpdatePerm`] permission.
     #[must_use = "Creating a Atomo without using it is probably a mistake."]
-    pub fn build(self) -> Atomo<UpdatePerm, B::Storage, S> {
-        Atomo::new(Arc::new(self.build_inner()))
+    pub fn build(self) -> Result<Atomo<UpdatePerm, B::Storage, S>, B::Error> {
+        Ok(Atomo::new(Arc::new(self.build_inner()?)))
     }
 
     /// Build and return the internal [`AtomoInner`]. Used for testing purposes.
-    pub(crate) fn build_inner(mut self) -> AtomoInner<B::Storage, S> {
-        // TODO(qti3e): Do not unwrap and return the error.
-        let storage = self.constructor.build().unwrap();
+    pub(crate) fn build_inner(mut self) -> Result<AtomoInner<B::Storage, S>, B::Error> {
+        let storage = self.constructor.build()?;
 
         // Upon opening read every key for the tables that have enabled the
         // iterator.
@@ -128,7 +127,7 @@ impl<B: StorageBackendConstructor, S: SerdeBackend> AtomoBuilder<B, S> {
             });
         }
 
-        self.atomo.swap_persistance(storage)
+        Ok(self.atomo.swap_persistance(storage))
     }
 }
 

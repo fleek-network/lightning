@@ -12,7 +12,8 @@ fn fuzz(n: usize) {
     let mut db =
         atomo::AtomoBuilder::<atomo::InMemoryStorage, atomo::DefaultSerdeBackend>::default()
             .with_table::<u8, u64>("TABLE_1")
-            .build();
+            .build()
+            .unwrap();
 
     let table = db.resolve::<u8, u64>("TABLE_1");
     let query_runner = db.query();

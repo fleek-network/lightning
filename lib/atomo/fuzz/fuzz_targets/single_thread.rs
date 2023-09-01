@@ -27,7 +27,8 @@ fn fuzz(input: Input) {
             .with_table::<u8, u64>("TABLE_3")
             .with_table::<u8, u64>("TABLE_4")
             .with_table::<u8, u64>("TABLE_5")
-            .build();
+            .build()
+            .unwrap();
 
     let tables = (1..=5)
         .map(|i| db.resolve::<u8, u64>(&format!("TABLE_{i}")))

@@ -20,7 +20,8 @@ fn main() {
     // This ensure that only one update is happening at any given time.
     let mut db = AtomoBuilder::<InMemoryStorage, DefaultSerdeBackend>::default()
         .with_table::<Key, Value>("name-of-table")
-        .build();
+        .build()
+        .unwrap();
 
     // Build returns an `Atomo<UpdatePerm, _>` which allows us to mutate the data
     // there can only ever be one Atomo instance with update permission.

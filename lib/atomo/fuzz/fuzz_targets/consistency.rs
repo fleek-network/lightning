@@ -25,7 +25,8 @@ fn fuzz(input: Input) {
             .with_table::<(), u64>("RUN")
             .with_table::<u64, u64>("TABLE_1")
             .with_table::<u64, u64>("TABLE_2")
-            .build();
+            .build()
+            .unwrap();
 
     let num_run_query_threads = input.num_query_threads as usize;
     let num_run_queries = input.num_run_queries as u64;

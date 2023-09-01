@@ -104,7 +104,7 @@ impl Env<UpdatePerm> {
         }
 
         Self {
-            inner: atomo.build(),
+            inner: atomo.build().unwrap(),
         }
     }
 
