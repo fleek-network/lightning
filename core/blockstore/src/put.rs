@@ -84,6 +84,7 @@ where
 
                 let mut hasher = BlockHasher::new();
                 hasher.set_block(block_counter);
+                hasher.update(&block);
                 block_hash = hasher.finalize(verifier.is_root());
 
                 verifier
@@ -97,6 +98,7 @@ where
                 // already does this duplicate task.
                 let mut hasher = BlockHasher::new();
                 hasher.set_block(*counter);
+                hasher.update(&block);
                 block_hash = hasher.finalize(finalized);
 
                 block_counter = *counter;
@@ -106,7 +108,9 @@ where
 
         let mut store = self.store.clone();
         self.write_tasks.spawn(async move {
-            let _ = store.insert(BLOCK_DIR, block_hash, block.to_vec(), Some(block_counter)).await;
+            let _ = store
+                .insert(BLOCK_DIR, block_hash, block.to_vec(), Some(block_counter))
+                .await;
         });
 
         Ok(())

@@ -110,11 +110,12 @@ where
     C: Collection,
 {
     async fn fetch(&self, location: &str, key: &Blake3Hash, tag: Option<usize>) -> Option<Block> {
-        let path = self
-            .root
-            .to_path_buf()
-            .join(location)
-            .join(Hash::from(*key).to_hex().as_ref());
+        let filename = match tag {
+            Some(tag) => format!("{tag}-{}", Hash::from(*key).to_hex()),
+            None => format!("{}", Hash::from(*key).to_hex()),
+        };
+        let path = self.root.to_path_buf().join(location).join(filename);
+        log::trace!("Fetch {path:?}");
         fs::read(path).await.ok()
     }
 
@@ -138,6 +139,8 @@ where
             tmp_file.sync_all().await?;
 
             let store_path = self.root.to_path_buf().join(location).join(filename);
+
+            log::trace!("Inserting {store_path:?}");
 
             fs::rename(tmp_file_path, store_path).await?;
         }
