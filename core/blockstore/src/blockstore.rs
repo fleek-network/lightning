@@ -31,19 +31,16 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::task::JoinSet;
 
-use crate::config::{Config, BLOCK_DIR, INTERNAL_DIR};
+use crate::config::{Config, BLOCK_DIR, INTERNAL_DIR, TMP_DIR};
 use crate::put::Putter;
 use crate::store::{Block, Store};
 use crate::BlockContent;
 
 pub const BLOCK_SIZE: usize = 256 << 10;
 
-const TMP_DIR_PREFIX: &str = "tmp-store";
-
 #[derive(Clone)]
 pub struct Blockstore<C: Collection> {
     root: PathBuf,
-    tmp_dir: Arc<TempDir>,
     collection: PhantomData<C>,
 }
 
@@ -58,10 +55,18 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     type Put = Putter<Self>;
 
     fn init(config: Self::Config) -> anyhow::Result<Self> {
-        std::fs::create_dir_all(config.root.clone())?;
+        let root = config.root.to_path_buf();
+        let internal_dir = root.join(INTERNAL_DIR);
+        let block_dir = root.join(BLOCK_DIR);
+        let tmp_dir = root.join(TMP_DIR);
+
+        std::fs::create_dir_all(&root)?;
+        std::fs::create_dir_all(internal_dir)?;
+        std::fs::create_dir_all(block_dir)?;
+        std::fs::create_dir_all(tmp_dir)?;
+
         Ok(Self {
-            root: config.root.to_path_buf(),
-            tmp_dir: TempDir::new(TMP_DIR_PREFIX).map(Arc::new)?,
+            root,
             collection: PhantomData,
         })
     }
@@ -100,18 +105,17 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     }
 }
 
-// TODO: Add logging.
 #[async_trait]
 impl<C> Store for Blockstore<C>
 where
     C: Collection,
 {
     async fn fetch(&self, location: &str, key: &Blake3Hash, tag: Option<usize>) -> Option<Block> {
-        let path = format!(
-            "{}/{}",
-            self.root.to_string_lossy(),
-            Hash::from(*key).to_hex()
-        );
+        let path = self
+            .root
+            .to_path_buf()
+            .join(location)
+            .join(Hash::from(*key).to_hex().as_ref());
         fs::read(path).await.ok()
     }
 
@@ -122,21 +126,20 @@ where
         block: Block,
         tag: Option<usize>,
     ) -> io::Result<()> {
-        let filename = format!("{}", Hash::from(key).to_hex());
-        let path = self.tmp_dir.path().join(filename);
-        if let Ok(mut tmp_file) = File::create(&path).await {
+        let filename = match tag {
+            Some(tag) => format!("{tag}-{}", Hash::from(key).to_hex()),
+            None => format!("{}", Hash::from(key).to_hex()),
+        };
+        let tmp_file_path = self.root.to_path_buf().join(TMP_DIR).join(&filename);
+        if let Ok(mut tmp_file) = File::create(&tmp_file_path).await {
             tmp_file.write_all(block.as_ref()).await?;
 
             // TODO: Is this needed before calling rename?
             tmp_file.sync_all().await?;
 
-            let store_path = format!(
-                "{}/{}",
-                self.root.to_string_lossy(),
-                Hash::from(key).to_hex()
-            );
+            let store_path = self.root.to_path_buf().join(location).join(filename);
 
-            fs::rename(path, store_path).await?;
+            fs::rename(tmp_file_path, store_path).await?;
         }
         Ok(())
     }
