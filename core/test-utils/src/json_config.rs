@@ -7,6 +7,7 @@ use lightning_interfaces::{ConfigConsumer, ConfigProviderInterface};
 use serde::Deserialize;
 use serde_json::{to_value, Value};
 
+#[derive(Default)]
 pub struct JsonConfigProvider {
     value: Mutex<HashMap<String, Value>>,
 }

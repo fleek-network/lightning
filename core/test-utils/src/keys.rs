@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -25,16 +24,15 @@ use lightning_interfaces::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::Notify;
 
-pub struct KeyOnlySigner<C: Collection> {
+pub struct KeyOnlySigner {
     node_sk: NodeSecretKey,
     consensus_sk: ConsensusSecretKey,
-    c: PhantomData<C>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct KeyOnlySignerConfig {}
 
-impl<C: Collection> SignerInterface<C> for KeyOnlySigner<C> {
+impl<C: Collection> SignerInterface<C> for KeyOnlySigner {
     fn init(
         _config: Self::Config,
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
@@ -42,7 +40,6 @@ impl<C: Collection> SignerInterface<C> for KeyOnlySigner<C> {
         Ok(Self {
             node_sk: SecretKey::generate(),
             consensus_sk: SecretKey::generate(),
-            c: PhantomData,
         })
     }
 
@@ -91,7 +88,7 @@ impl<C: Collection> SignerInterface<C> for KeyOnlySigner<C> {
 }
 
 #[async_trait]
-impl<C: Collection> WithStartAndShutdown for KeyOnlySigner<C> {
+impl WithStartAndShutdown for KeyOnlySigner {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         true
@@ -105,7 +102,7 @@ impl<C: Collection> WithStartAndShutdown for KeyOnlySigner<C> {
     async fn shutdown(&self) {}
 }
 
-impl<C: Collection> ConfigConsumer for KeyOnlySigner<C> {
+impl ConfigConsumer for KeyOnlySigner {
     const KEY: &'static str = "signer";
     type Config = KeyOnlySignerConfig;
 }

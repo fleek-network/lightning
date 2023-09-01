@@ -16,9 +16,9 @@ use lightning_signer::Signer;
 
 partial!(ExampleBinding {
     ConfigProviderInterface = TomlConfigProvider<Self>;
+    SignerInterface = Signer<Self>;
     HandshakeInterface = Handshake<Self>;
     ServiceExecutorInterface = ServiceExecutor<Self>;
-    SignerInterface = Signer<Self>;
 });
 
 forward!(async fn start_or_shutdown_node(this, start: bool) on [
