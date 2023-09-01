@@ -126,6 +126,9 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                             msg.mark_invalid_sender();
                             continue;
                         }
+                        // propagate here now that we know its good and before we do async work
+                        msg.propagate();
+
                         let parcel_digest = parcel.to_digest();
 
                         transaction_store.store_parcel(parcel);
@@ -153,6 +156,8 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                             msg.mark_invalid_sender();
                             continue;
                         }
+                        // propagate msg as soon as we know its good
+                        msg.propagate();
 
                         if !on_committee{
                             transaction_store.add_attestation(att.digest, att.node_index);
@@ -169,7 +174,6 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                 reconfigure_notify.notify_waiters();
                             }
                         }
-                        msg.propagate();
                     }
                 }
                 }
