@@ -67,12 +67,10 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     }
 
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
-        match bincode::deserialize::<BlockContent>(self.fetch(cid, None).await?.as_slice())
-            .expect("Stored content to be serialized properly")
-        {
-            BlockContent::Tree(tree) => Some(Arc::new(Blake3Tree(tree))),
-            _ => None,
-        }
+        let encoded_tree: Vec<Blake3Hash> =
+            bincode::deserialize(self.fetch(cid, None).await?.as_slice())
+                .expect("Tree to be properly serialized");
+        Some(Arc::new(Blake3Tree(encoded_tree)))
     }
 
     async fn get(
@@ -81,19 +79,11 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
         block_hash: &Blake3Hash,
         _compression: CompressionAlgoSet,
     ) -> Option<Self::SharedPointer<ContentChunk>> {
-        match bincode::deserialize::<BlockContent>(
-            self.fetch(block_hash, Some(block_counter as usize))
-                .await?
-                .as_slice(),
-        )
-        .expect("Stored content to be serialized properly")
-        {
-            BlockContent::Chunk(content) => Some(Arc::new(ContentChunk {
-                compression: CompressionAlgorithm::Uncompressed,
-                content,
-            })),
-            _ => None,
-        }
+        let block = self.fetch(block_hash, Some(block_counter as usize)).await?;
+        Some(Arc::new(ContentChunk {
+            compression: CompressionAlgorithm::Uncompressed,
+            content: block,
+        }))
     }
 
     fn put(&self, root: Option<Blake3Hash>) -> Self::Put {
@@ -104,7 +94,7 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     }
 
     fn get_root_dir(&self) -> PathBuf {
-        todo!()
+        self.store_dir_path.to_path_buf()
     }
 }
 
@@ -123,7 +113,6 @@ where
         fs::read(path).await.ok()
     }
 
-    // TODO: This should perhaps return an error.
     async fn insert(
         &mut self,
         key: Blake3Hash,
