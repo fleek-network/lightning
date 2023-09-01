@@ -38,11 +38,6 @@ pub type RemoteInternedId = MessageInternedId;
 struct Peer {
     /// The index of the node.
     index: NodeIndex,
-    /// The origin of this connection can tell us if we started this connection or if
-    /// the remote has dialed us.
-    origin: ConnectionOrigin,
-    /// The status of our connection with this peer.
-    status: ConnectionStatus,
     has: im::HashMap<MessageInternedId, RemoteInternedId>,
 }
 
@@ -50,8 +45,6 @@ impl Clone for Peer {
     fn clone(&self) -> Self {
         Self {
             index: self.index,
-            origin: self.origin,
-            status: self.status,
             has: self.has.clone(),
         }
     }
@@ -96,19 +89,14 @@ impl Peers {
         self.us = index;
     }
 
-    /// Returns the status of the connection with the given peer. If no connection exists returns
-    /// [`ConnectionStatus::Closed`].
-    pub fn get_connection_status(&self, pk: &NodePublicKey) -> ConnectionStatus {
-        self.peers
-            .get(pk)
-            .map(|e| e.status)
-            .unwrap_or(ConnectionStatus::Closed)
-    }
-
-    /// If a connection is available returns the originator of the connection, otherwise `None`.
-    pub fn get_connection_origin(&self, pk: &NodePublicKey) -> Option<ConnectionOrigin> {
-        self.peers.get(pk).map(|e| e.origin)
-    }
+    // /// Returns the status of the connection with the given peer. If no connection exists returns
+    // /// [`ConnectionStatus::Closed`].
+    // pub fn get_connection_status(&self, pk: &NodePublicKey) -> ConnectionStatus {
+    //     self.peers
+    //         .get(pk)
+    //         .map(|e| e.status)
+    //         .unwrap_or(ConnectionStatus::Closed)
+    // }
 
     /// Unpin every pinned connection.
     pub fn unpin_all(&mut self) {
@@ -248,91 +236,20 @@ impl Peers {
         }
     }
 
-    pub fn handle_new_connection(
-        &mut self,
-        origin: ConnectionOrigin,
-        index: NodeIndex,
-        peer: NodePublicKey,
-    ) {
-        enum DisputeResolveResponse {
-            AcceptNewConnection,
-            RejectNewConnection,
-        }
-
-        // If a connection already exists with the peer figures our which one we should
-        // keep.
-        fn resolve_dispute(
-            prev_origin: ConnectionOrigin,
-            origin: ConnectionOrigin,
-            us: NodeIndex,
-            index: NodeIndex,
-        ) -> DisputeResolveResponse {
-            // If the direction of the call is the same as before accept it,
-            // it might be a connection refresh or something.
-            if origin == prev_origin {
-                return DisputeResolveResponse::AcceptNewConnection;
-            }
-
-            match (origin, index.cmp(&us)) {
-                // For two cases below we are the one who is making the new call. So the new
-                // connection is from us. Lower index wins, so we have to reject our own connection
-                // if the peer has lower index in order to keep the other peers connection to us
-                // alive.
-                (ConnectionOrigin::Us, std::cmp::Ordering::Less) => {
-                    DisputeResolveResponse::RejectNewConnection
-                },
-                (ConnectionOrigin::Us, _) => DisputeResolveResponse::AcceptNewConnection,
-                // The peer is calling us, the connection we currently have was one made from us ->
-                // remote. We have to accept remote's call if they have a lower index than us.
-                (ConnectionOrigin::Remote, std::cmp::Ordering::Less) => {
-                    DisputeResolveResponse::AcceptNewConnection
-                },
-                (ConnectionOrigin::Remote, _) => DisputeResolveResponse::RejectNewConnection,
-            }
-        }
-
+    pub fn handle_new_connection(&mut self, index: NodeIndex, peer_pk: NodePublicKey) {
         assert_ne!(index, self.us); // we shouldn't be calling ourselves.
-        let pk = peer;
-        let mut has = None;
 
-        if let Some(info) = self.peers.get(&pk) {
+        if let Some(info) = self.peers.get(&peer_pk) {
             debug_assert_eq!(index, info.index);
-
-            match resolve_dispute(info.origin, origin, self.us, index) {
-                DisputeResolveResponse::AcceptNewConnection => {
-                    let info = self.peers.remove(&pk).unwrap();
-                    // Keep the info we have about this peer.
-                    has = Some(info.has);
-                },
-                DisputeResolveResponse::RejectNewConnection => {
-                    // Exit early and don't store this new connection.
-                    return;
-                },
-            }
+            return;
         }
 
         let info = Peer {
             index,
-            origin: ConnectionOrigin::Remote,
-            status: ConnectionStatus::Open,
-            has: has.unwrap_or_default(),
+            has: Default::default(),
         };
 
-        self.peers.insert(pk, info);
-    }
-
-    pub async fn recv(&mut self) -> Option<(NodePublicKey, Frame)> {
-        todo!()
-        // match self.incoming_messages.recv().await {
-        //     // Some((r, None)) => {
-        //     //     self.disconnected(r);
-        //     //     None
-        //     // },
-        //     // Some((receiver, Some(frame))) => self.handle_frame(receiver, frame),
-        //     // None => None,
-        //     None => {todo!()}
-        //     Some(_) => {todo!()}
-        // }
+        self.peers.insert(peer_pk, info);
     }
 
     // #[inline(always)]
@@ -351,41 +268,26 @@ impl Peers {
     // }
 
     #[inline(always)]
-    fn handle_frame(
-        &mut self,
-        receiver: NodePublicKey,
-        frame: Frame,
-    ) -> Option<(NodePublicKey, Frame)> {
-        let pk = receiver;
-        let info = self.peers.get(&pk)?;
-
-        // Update the stats on what we got.
-        self.stats.report(
-            info.index,
-            match frame {
-                Frame::Advr(_) => ConnectionStats {
-                    advertisements_received_from_peer: 1,
-                    ..Default::default()
+    pub fn report_stats(&mut self, peer: NodePublicKey, frame: &Frame) {
+        if let Some(info) = self.peers.get(&peer) {
+            // Update the stats on what we got.
+            self.stats.report(
+                info.index,
+                match frame {
+                    Frame::Advr(_) => ConnectionStats {
+                        advertisements_received_from_peer: 1,
+                        ..Default::default()
+                    },
+                    Frame::Want(_) => ConnectionStats {
+                        wants_received_from_peer: 1,
+                        ..Default::default()
+                    },
+                    Frame::Message(_) => ConnectionStats {
+                        messages_received_from_peer: 1,
+                        ..Default::default()
+                    },
                 },
-                Frame::Want(_) => ConnectionStats {
-                    wants_received_from_peer: 1,
-                    ..Default::default()
-                },
-                Frame::Message(_) => ConnectionStats {
-                    messages_received_from_peer: 1,
-                    ..Default::default()
-                },
-            },
-        );
-
-        match (info.status, frame) {
-            (ConnectionStatus::Open, frame) => Some((pk, frame)),
-            (ConnectionStatus::Closed, _) => None,
-            (ConnectionStatus::Closing, Frame::Message(msg)) => Some((pk, Frame::Message(msg))),
-            // If we're closing the connection with this peer, we don't care about
-            // anything other than the actual payloads that they are still sending
-            // our way.
-            (ConnectionStatus::Closing, _) => None,
+            );
         }
     }
 

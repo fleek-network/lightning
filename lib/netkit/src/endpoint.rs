@@ -44,6 +44,7 @@ pub enum Request {
     },
 }
 
+#[derive(Debug)]
 pub enum Event {
     Message {
         peer: NodePublicKey,

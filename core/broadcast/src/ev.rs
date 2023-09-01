@@ -14,6 +14,7 @@ use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, Secre
 use infusion::c;
 use ink_quill::ToDigest;
 use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{NodeIndex, Topic};
 use lightning_interfaces::{
     ApplicationInterface,
@@ -160,11 +161,11 @@ impl<C: Collection> Context<C> {
                 continue;
             }
 
-            if self.peers.get_connection_status(&pk) != ConnectionStatus::Closed {
-                // TODO(qti3e): Should we maybe handle == ConnectionStatus::Open
-                // instead.
-                continue;
-            }
+            // if self.peers.get_connection_status(&pk) != ConnectionStatus::Closed {
+            //     // TODO(qti3e): Should we maybe handle == ConnectionStatus::Open
+            //     // instead.
+            //     continue;
+            // }
 
             // let tx = self.new_outgoing_connection_tx.clone();
             // let connector = self.connector.clone();
@@ -436,28 +437,28 @@ async fn main_loop<C: Collection>(
                 ctx.apply_topology(new_topology);
             },
 
-            // Some(conn) = ctx.new_outgoing_connection_rx.recv() => {
-            //     log::info!("we dialed {}", conn.0.pk());
-            //     let Some(index) = ctx.get_node_index(conn.0.pk()) else {
-            //         log::error!("remote node not found");
-            //         continue;
-            //     };
-            //     ctx.peers.handle_new_connection(ConnectionOrigin::Us , index, conn);
-            // },
+            Some(event) = ctx.network_event_rx.recv() => {
+                log::info!("Incoming event {:?}", event);
+                match event {
+                    // Todo: We need a disconnect event.
+                    Event::NewConnection {peer, rtt} => {
+                        let Some(index) = ctx.get_node_index(&peer) else {
+                            log::error!("remote node not found");
+                            continue;
+                        };
+                        ctx.peers.handle_new_connection(index, peer);
+                    }
+                    Event::Message { peer, message } => {
+                        match Frame::decode(&message) {
+                            Ok(frame) => {
+                                ctx.peers.report_stats(peer, &frame);
+                                ctx.handle_frame(peer, frame);
+                            }
+                            Err(e) => log::error!("invalid frame: {e:?}"),
+                        }
+                    }
+                }
 
-            Some((sender, frame)) = ctx.peers.recv() => {
-                ctx.handle_frame(sender, frame);
-            },
-
-            // Handle the case when another node is dialing us.
-            // TODO(qti3e): Is this cancel safe?
-            Some(conn) = ctx.network_event_rx.recv() => {
-                // log::info!("node dialed by {}", conn.0.pk());
-                // let Some(index) = ctx.get_node_index(conn.0.pk()) else {
-                //     log::error!("remote node not found");
-                //     continue;
-                // };
-                // ctx.peers.handle_new_connection(ConnectionOrigin::Remote , index, conn);
             },
             requests = ctx.pending_store.tick() => {
                 requests.into_iter().for_each(|(interned_id, pub_key)| {
