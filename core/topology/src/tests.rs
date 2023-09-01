@@ -160,6 +160,7 @@ async fn test_build_latency_matrix() {
             db_options: None,
         },
         Default::default(),
+        Default::default(),
     )
     .unwrap();
 

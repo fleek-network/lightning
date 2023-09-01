@@ -378,6 +378,7 @@ mod tests {
                 db_options: None,
             },
             Default::default(),
+            Default::default(),
         )
         .unwrap();
         let query_runner = application.sync_query();

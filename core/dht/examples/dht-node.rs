@@ -142,6 +142,7 @@ async fn start_node(
             db_options: None,
         },
         Default::default(),
+        Default::default(),
     )
     .unwrap();
     let _query_runner = application.sync_query();

@@ -86,9 +86,15 @@ async fn init_rpc_without_consensus(
                 db_options: None,
             },
             Default::default(),
+            Default::default(),
         )
         .unwrap(),
-        None => Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap(),
+        None => Application::<TestBinding>::init(
+            AppConfig::test(),
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap(),
     };
 
     let query_runner = app.sync_query();
@@ -104,7 +110,9 @@ async fn init_rpc_without_consensus(
 }
 
 async fn init_rpc_app_test() -> Result<(Rpc<TestBinding>, QueryRunner)> {
-    let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
+    let app =
+        Application::<TestBinding>::init(AppConfig::test(), Default::default(), Default::default())
+            .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 

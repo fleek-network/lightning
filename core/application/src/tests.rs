@@ -157,7 +157,9 @@ fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
         db_path: None,
         db_options: None,
     }));
-    let app = Application::<TestBinding>::init(config.unwrap(), Default::default()).unwrap();
+    let app =
+        Application::<TestBinding>::init(config.unwrap(), Default::default(), Default::default())
+            .unwrap();
 
     (app.transaction_executor(), app.sync_query())
 }
