@@ -14,6 +14,7 @@ use lightning_interfaces::{
 use tokio::task::JoinSet;
 
 use crate::blockstore::BLOCK_SIZE;
+use crate::config::{BLOCK_DIR, INTERNAL_DIR};
 use crate::store::Store;
 use crate::BlockContent;
 
@@ -107,7 +108,7 @@ where
 
         let mut store = self.store.clone();
         self.write_tasks.spawn(async move {
-            store.insert(block_hash, block.to_vec(), Some(block_counter));
+            store.insert(BLOCK_DIR, block_hash, block.to_vec(), Some(block_counter));
         });
 
         Ok(())
@@ -205,7 +206,7 @@ where
         })?;
 
         self.store
-            .insert(hash, encoded_tree, None)
+            .insert(INTERNAL_DIR, hash, encoded_tree, None)
             .await
             .map_err(|e| {
                 log::error!("failed to write tree to store: {e:?}");

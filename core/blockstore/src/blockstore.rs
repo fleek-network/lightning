@@ -31,7 +31,7 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::task::JoinSet;
 
-use crate::config::Config;
+use crate::config::{Config, BLOCK_DIR, INTERNAL_DIR};
 use crate::put::Putter;
 use crate::store::{Block, Store};
 use crate::BlockContent;
@@ -42,7 +42,7 @@ const TMP_DIR_PREFIX: &str = "tmp-store";
 
 #[derive(Clone)]
 pub struct Blockstore<C: Collection> {
-    store_dir_path: PathBuf,
+    root: PathBuf,
     tmp_dir: Arc<TempDir>,
     collection: PhantomData<C>,
 }
@@ -60,7 +60,7 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     fn init(config: Self::Config) -> anyhow::Result<Self> {
         std::fs::create_dir_all(config.root.clone())?;
         Ok(Self {
-            store_dir_path: config.root.to_path_buf(),
+            root: config.root.to_path_buf(),
             tmp_dir: TempDir::new(TMP_DIR_PREFIX).map(Arc::new)?,
             collection: PhantomData,
         })
@@ -68,7 +68,7 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
 
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
         let encoded_tree: Vec<Blake3Hash> =
-            bincode::deserialize(self.fetch(cid, None).await?.as_slice())
+            bincode::deserialize(self.fetch(INTERNAL_DIR, cid, None).await?.as_slice())
                 .expect("Tree to be properly serialized");
         Some(Arc::new(Blake3Tree(encoded_tree)))
     }
@@ -79,7 +79,9 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
         block_hash: &Blake3Hash,
         _compression: CompressionAlgoSet,
     ) -> Option<Self::SharedPointer<ContentChunk>> {
-        let block = self.fetch(block_hash, Some(block_counter as usize)).await?;
+        let block = self
+            .fetch(BLOCK_DIR, block_hash, Some(block_counter as usize))
+            .await?;
         Some(Arc::new(ContentChunk {
             compression: CompressionAlgorithm::Uncompressed,
             content: block,
@@ -94,7 +96,7 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     }
 
     fn get_root_dir(&self) -> PathBuf {
-        self.store_dir_path.to_path_buf()
+        self.root.to_path_buf()
     }
 }
 
@@ -104,10 +106,10 @@ impl<C> Store for Blockstore<C>
 where
     C: Collection,
 {
-    async fn fetch(&self, key: &Blake3Hash, tag: Option<usize>) -> Option<Block> {
+    async fn fetch(&self, location: &str, key: &Blake3Hash, tag: Option<usize>) -> Option<Block> {
         let path = format!(
             "{}/{}",
-            self.store_dir_path.to_string_lossy(),
+            self.root.to_string_lossy(),
             Hash::from(*key).to_hex()
         );
         fs::read(path).await.ok()
@@ -115,6 +117,7 @@ where
 
     async fn insert(
         &mut self,
+        location: &str,
         key: Blake3Hash,
         block: Block,
         tag: Option<usize>,
@@ -129,7 +132,7 @@ where
 
             let store_path = format!(
                 "{}/{}",
-                self.store_dir_path.to_string_lossy(),
+                self.root.to_string_lossy(),
                 Hash::from(key).to_hex()
             );
 
