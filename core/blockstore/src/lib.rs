@@ -1,3 +1,4 @@
+pub mod blockstore;
 pub mod config;
 pub mod fs;
 pub mod memory;

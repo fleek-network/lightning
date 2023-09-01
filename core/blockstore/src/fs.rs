@@ -104,6 +104,10 @@ impl<C: Collection> BlockStoreInterface<C> for FsStore<C> {
             None => IncrementalPut::trust(self.clone()),
         }
     }
+
+    fn get_root_dir(&self) -> PathBuf {
+        todo!()
+    }
 }
 
 // TODO: Add logging.

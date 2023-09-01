@@ -1,4 +1,5 @@
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -124,6 +125,22 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
 
     /// Create a putter that can be used to write a content into the block store.
     fn put(&self, cid: Option<Blake3Hash>) -> Self::Put;
+
+    /// Returns the path to the root directory of the blockstore. The directory layout of
+    /// the blockstore is simple.
+    ///
+    /// ```
+    /// ./root
+    ///     ./internal
+    ///     ./block
+    /// ```
+    ///
+    /// The `internal` directory will map each `root-hash` to a [`Blake3Tree`], the serialization
+    /// should not include the leading length of the vec. In other words the content length should
+    /// always be a multiple of 32, and the first hash must start from offset 0.
+    ///
+    /// The `block` directory maps each `content-hash` (or leaf) to the actual content.
+    fn get_root_dir(&self) -> PathBuf;
 }
 
 /// The interface for the writer to a [`BlockStoreInterface`].
@@ -171,4 +188,6 @@ pub enum PutFinalizeError {
     PartialContent,
     #[error("The final CID does not match the CID which was expected.")]
     InvalidCID,
+    #[error("Writing to disk failed.")]
+    WriteFailed,
 }

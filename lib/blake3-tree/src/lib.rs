@@ -91,6 +91,11 @@ impl IncrementalVerifier {
         }
     }
 
+    #[inline]
+    pub fn get_current_block_counter(&self) -> usize {
+        self.block_counter
+    }
+
     /// Enable preserving the full tree.
     ///
     /// # Panics
@@ -499,7 +504,7 @@ impl IncrementalVerifier {
 
     /// Returns true if the current cursor is pointing to the root of the tree.
     #[inline(always)]
-    fn is_root(&self) -> bool {
+    pub fn is_root(&self) -> bool {
         debug_assert!(!self.cursor.is_null(), "cursor is null");
         // SAFETY: Dereferencing cursor is safe since we never set it a null value.
         unsafe { (*self.cursor).parent.is_null() }

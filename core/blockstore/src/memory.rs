@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -79,6 +80,10 @@ impl<C: Collection> BlockStoreInterface<C> for MemoryBlockStore<C> {
             Some(root) => IncrementalPut::verifier(self.clone(), root),
             None => IncrementalPut::trust(self.clone()),
         }
+    }
+
+    fn get_root_dir(&self) -> PathBuf {
+        todo!()
     }
 }
 
