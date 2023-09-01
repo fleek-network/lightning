@@ -81,13 +81,9 @@ impl TransactionStore {
                 for digest in parcel_chain {
                     self.executed.insert(digest);
                 }
-                if epoch_changed {
-                    // if epoch changed set this to genesis
-                    self.head = [0; 32];
-                } else {
-                    // set head as top of chain
-                    self.head = digest;
-                }
+
+                // set head as top of chain
+                self.head = digest;
 
                 return epoch_changed;
             } else {
