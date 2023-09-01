@@ -38,61 +38,7 @@ use crate::BlockContent;
 
 pub const BLOCK_SIZE: usize = 256 << 10;
 
-// #[derive(Clone)]
-// pub struct BlockStore {}
-//
-// #[async_trait]
-// impl<C: Collection> BlockStoreInterface<C> for BlockStore {
-//     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
-//
-//     type Put = Putter<Self>;
-//
-//     fn init(config: Self::Config) -> anyhow::Result<Self> {
-//         todo!()
-//     }
-//
-//     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
-//         todo!()
-//     }
-//
-//     async fn get(
-//         &self,
-//         block_counter: u32,
-//         block_hash: &Blake3Hash,
-//         compression: CompressionAlgoSet,
-//     ) -> Option<Self::SharedPointer<ContentChunk>> { todo!()
-//     }
-//
-//     fn put(&self, cid: Option<Blake3Hash>) -> Self::Put {
-//         todo!()
-//     }
-//
-//     fn get_root_dir(&self) -> PathBuf {
-//         todo!()
-//     }
-// }
-//
-// impl ConfigConsumer for BlockStore {
-//     const KEY: &'static str = "blockstore";
-//     type Config = Config;
-// }
-
 const TMP_DIR_PREFIX: &str = "tmp-store";
-
-#[derive(Serialize, Deserialize)]
-pub struct FsStoreConfig {
-    pub store_dir_path: ResolvedPathBuf,
-}
-
-impl Default for FsStoreConfig {
-    fn default() -> Self {
-        Self {
-            store_dir_path: "~/.lightning/data/blockstore"
-                .try_into()
-                .expect("Failed to resolve path"),
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct Blockstore<C: Collection> {
@@ -103,7 +49,7 @@ pub struct Blockstore<C: Collection> {
 
 impl<C: Collection> ConfigConsumer for Blockstore<C> {
     const KEY: &'static str = "fsstore";
-    type Config = FsStoreConfig;
+    type Config = Config;
 }
 
 #[async_trait]
@@ -112,9 +58,9 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     type Put = Putter<Self>;
 
     fn init(config: Self::Config) -> anyhow::Result<Self> {
-        std::fs::create_dir_all(config.store_dir_path.clone())?;
+        std::fs::create_dir_all(config.root.clone())?;
         Ok(Self {
-            store_dir_path: config.store_dir_path.to_path_buf(),
+            store_dir_path: config.root.to_path_buf(),
             tmp_dir: TempDir::new(TMP_DIR_PREFIX).map(Arc::new)?,
             collection: PhantomData,
         })

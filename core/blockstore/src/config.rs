@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
-    root: ResolvedPathBuf,
+    pub root: ResolvedPathBuf,
 }
 
 impl Default for Config {
