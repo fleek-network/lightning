@@ -78,9 +78,12 @@ impl<C: Collection> WithStartAndShutdown for BlockStoreServer<C> {
             loop {
                 select! {
                     Ok((socket, _)) = listener.accept() => {
-                        if let Err(e) = handle_connection::<C>(blockstore.clone(), socket).await {
-                            error!("error handling blockstore connection: {e}");
-                        }
+                        let blockstore = blockstore.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = handle_connection::<C>(blockstore, socket).await {
+                                error!("error handling blockstore connection: {e}");
+                            }
+                        });
                     },
                     _ = rx.recv() => break,
                 }
