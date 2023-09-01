@@ -2,6 +2,7 @@ use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use bytes::Bytes;
 use dashmap::DashMap;
 use fleek_crypto::{ClientPublicKey, NodeSecretKey};
 use lightning_interfaces::{ConnectionWork, ExecutorProviderInterface, ServiceHandleInterface};
@@ -56,6 +57,7 @@ pub struct AccessTokenInfo {
 }
 
 pub struct Connection<H: ServiceHandleInterface> {
+    token: Option<[u8; 48]>,
     /// Public key of the client who made the first connection.
     pk: ClientPublicKey,
     /// The two possible senders attached to this connection. The index
@@ -70,7 +72,7 @@ pub struct ProcessHandshakeResult {
     pub perm: TransportPermission,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum TransportPermission {
     Primary = 0x00,
     Secondary = 0x01,
@@ -94,6 +96,7 @@ impl<P: ExecutorProviderInterface> StateData<P> {
         let connection_id = self.next_connection_id.fetch_add(1, Ordering::Relaxed);
 
         let connection = Connection {
+            token: None,
             pk,
             senders: [Some(sender), None],
             handle: handle.clone(),
@@ -218,42 +221,99 @@ impl<P: ExecutorProviderInterface> StateData<P> {
         }
     }
 
-    /// Called by any of the transports connected to a trance
-    pub fn on_request_frame(
-        &self,
-        _perm: TransportPermission,
-        connection_id: u64,
-        frame: schema::RequestFrame,
-    ) {
-        let connection = self.connections.get(&connection_id).unwrap();
+    fn handle_payload_frame(&self, _perm: TransportPermission, connection_id: u64, bytes: Bytes) {
+        let Some(connection) = self.connections.get(&connection_id) else {
+            log::error!("payload for connection '{connection_id}' dropped.");
+            return;
+        };
 
-        match frame {
-            schema::RequestFrame::ServicePayload { bytes } => {
-                connection.handle.message(fn_sdk::internal::OnMessageArgs {
-                    connection_id,
-                    payload: bytes.to_vec(),
-                });
-            },
-            schema::RequestFrame::AccessToken { ttl: _ } => {
-                todo!()
-            },
-            schema::RequestFrame::RefreshAccessToken { access_token: _ } => {
-                todo!()
-            },
-            schema::RequestFrame::DeliveryAcknowledgment {} => {
-                todo!()
-            },
+        // TODO(qti3e): Should we disallow primary to send payload to a service after handover.
+
+        // Send payloads directly to the client.
+        connection.handle.message(fn_sdk::internal::OnMessageArgs {
+            connection_id,
+            payload: bytes.to_vec(),
+        });
+    }
+
+    fn handle_access_token_frame(&self, perm: TransportPermission, connection_id: u64, _ttl: u64) {
+        let Some(mut connection) = self.connections.get_mut(&connection_id) else {
+            log::error!("AccessToken frame for connection '{connection_id}' dropped.");
+            return;
+        };
+
+        if perm != TransportPermission::Primary {
+            let Some(sender) = connection.senders[perm as usize].take() else {
+                return;
+            };
+
+            sender.terminate(schema::TerminationReason::WrongPermssion);
+            return;
         }
 
         todo!()
+    }
+
+    fn handle_refresh_access_token_frame(
+        &self,
+        _perm: TransportPermission,
+        _cid: u64,
+        _access_token: [u8; 48],
+    ) {
+        todo!()
+    }
+
+    fn handle_delivery_acknowledgment_frame(&self, _perm: TransportPermission, _cid: u64) {
+        todo!()
+    }
+
+    /// Called by any of the transports connected to a trance
+    pub fn on_request_frame(
+        &self,
+        perm: TransportPermission,
+        connection_id: u64,
+        frame: schema::RequestFrame,
+    ) {
+        match frame {
+            schema::RequestFrame::ServicePayload { bytes } => {
+                self.handle_payload_frame(perm, connection_id, bytes)
+            },
+            schema::RequestFrame::AccessToken { ttl } => {
+                self.handle_access_token_frame(perm, connection_id, ttl)
+            },
+            schema::RequestFrame::RefreshAccessToken { access_token } => {
+                self.handle_refresh_access_token_frame(perm, connection_id, *access_token)
+            },
+            schema::RequestFrame::DeliveryAcknowledgment {} => {
+                self.handle_delivery_acknowledgment_frame(perm, connection_id)
+            },
+        }
     }
 
     pub fn on_transport_closed(&self, _perm: TransportPermission, _connection_id: u64) {
         todo!()
     }
 
-    pub fn process_work(&self, _request: ConnectionWork) {
+    fn handle_send_work(&self, _connection_id: u64, _payload: Vec<u8>) {
         todo!()
+    }
+
+    fn handle_close_work(&self, _connection_id: u64) {
+        todo!()
+    }
+
+    pub fn process_work(&self, request: ConnectionWork) {
+        match request {
+            ConnectionWork::Send {
+                connection_id,
+                payload,
+            } => {
+                self.handle_send_work(connection_id, payload);
+            },
+            ConnectionWork::Close { connection_id } => {
+                self.handle_close_work(connection_id);
+            },
+        }
     }
 }
 

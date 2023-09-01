@@ -289,6 +289,7 @@ pub enum TerminationReason {
     InvalidService,
     ServiceTerminated,
     ConnectionInUse,
+    WrongPermssion,
     Unknown = 0xFF,
 }
 
