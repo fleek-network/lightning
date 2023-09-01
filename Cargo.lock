@@ -3900,6 +3900,7 @@ dependencies = [
  "lightning-interfaces",
  "log",
  "parking_lot",
+ "rand 0.8.5",
  "resolved-pathbuf",
  "serde",
  "tempdir",

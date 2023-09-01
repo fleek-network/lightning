@@ -130,7 +130,8 @@ where
             Some(tag) => format!("{tag}-{}", Hash::from(key).to_hex()),
             None => format!("{}", Hash::from(key).to_hex()),
         };
-        let tmp_file_path = self.root.to_path_buf().join(TMP_DIR).join(&filename);
+        let tmp_file_name = format!("{}-{}", rand::random::<u64>(), filename);
+        let tmp_file_path = self.root.to_path_buf().join(TMP_DIR).join(&tmp_file_name);
         if let Ok(mut tmp_file) = File::create(&tmp_file_path).await {
             tmp_file.write_all(block.as_ref()).await?;
 
