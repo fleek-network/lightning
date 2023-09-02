@@ -42,11 +42,13 @@ where
     S: Store + 'static,
 {
     pub fn verifier(store: S, root: [u8; 32]) -> Self {
+        let mut verifier = IncrementalVerifier::new(root, 0);
+        verifier.preserve_tree();
         Self::new(
             store,
             PutterMode::WithIncrementalVerification {
                 root_hash: root,
-                verifier: IncrementalVerifier::new(root, 0),
+                verifier,
             },
         )
     }
