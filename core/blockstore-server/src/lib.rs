@@ -21,7 +21,7 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
-use log::error;
+use log::{debug, error, info, trace};
 use tokio::net::TcpListener;
 use tokio::select;
 use triomphe::Arc;
@@ -62,22 +62,24 @@ impl<C: Collection> WithStartAndShutdown for BlockStoreServer<C> {
             return;
         }
 
-        // spawn server task
+        // bind tcp listener to address
         let address = self.config.address;
-        let blockstore = self.blockstore.clone();
-
-        // bind to address
         let listener = TcpListener::bind(address)
             .await
             .expect("failed to bind to address");
 
+        info!("listening on {address}");
+
         let (tx, mut rx) = tokio::sync::oneshot::channel();
         *self.shutdown_tx.write().unwrap() = Some(tx);
 
+        // spawn a task for the main server loop
+        let blockstore = self.blockstore.clone();
         tokio::spawn(async move {
             loop {
                 select! {
                     Ok((socket, _)) = listener.accept() => {
+                        debug!("connection accepted");
                         let blockstore = blockstore.clone();
                         tokio::spawn(async move {
                             let socket = socket.into_std().unwrap();
@@ -86,7 +88,10 @@ impl<C: Collection> WithStartAndShutdown for BlockStoreServer<C> {
                             }
                         });
                     },
-                    _ = &mut rx => break,
+                    _ = &mut rx => {
+                        debug!("shutting down");
+                        break
+                    },
                 }
             }
         });
@@ -105,6 +110,7 @@ async fn handle_connection<C: Collection>(
 ) -> anyhow::Result<()> {
     let mut hash = [0u8; 32];
     socket.read_exact(&mut hash)?;
+    trace!("received request");
 
     // fetch from the blockstore
     let Some(proof) = blockstore.get_tree(&hash).await else {
@@ -123,16 +129,16 @@ async fn handle_connection<C: Collection>(
         total += 1;
     }
 
-    let content_len = blockstore
+    let content_len = match blockstore
         .get(total - 1, &last_hash, CompressionAlgoSet::default())
         .await
-        .expect("last block not available")
-        .content
-        .len()
-        + (total as usize - 1) * 256 * 1024;
+    {
+        Some(a) => a.content.len() + (total as usize - 1) * 256 * 1024,
+        None => return Err(anyhow!("couldn't get last block")),
+    };
+    trace!("streaming {content_len} bytes");
 
     // Setup stream encoder
-
     let mut encoder = Encoder::new(
         socket,
         content_len,
@@ -159,6 +165,7 @@ async fn handle_connection<C: Collection>(
         block_counter += 1;
     }
 
+    trace!("finished streaming content");
     Ok(())
 }
 
