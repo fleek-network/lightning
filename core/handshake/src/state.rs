@@ -191,7 +191,7 @@ impl<P: ExecutorProviderInterface> StateData<P> {
             return None;
         }
 
-        if connection.expiry_time >= now() {
+        if connection.expiry_time <= now() {
             sender.terminate(schema::TerminationReason::InvalidToken);
             return None;
         }
