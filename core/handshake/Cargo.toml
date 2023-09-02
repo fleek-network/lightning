@@ -30,6 +30,7 @@ smallvec = "1.11"
 heapless = "0.7.16"
 axum = "0.6"
 webrtc = "0.8.0"
+rand = "0.8"
 
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }

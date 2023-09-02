@@ -6,6 +6,7 @@ use bytes::Bytes;
 use dashmap::DashMap;
 use fleek_crypto::{ClientPublicKey, NodeSecretKey};
 use lightning_interfaces::{ConnectionWork, ExecutorProviderInterface, ServiceHandleInterface};
+use rand::{thread_rng, Rng};
 use triomphe::Arc;
 
 use crate::schema;
@@ -30,7 +31,6 @@ impl<P: ExecutorProviderInterface> StateRef<P> {
             next_connection_id: AtomicU64::new(0),
             shutdown: waiter,
             provider,
-            access_tokens: Default::default(),
             connections: Default::default(),
         }))
     }
@@ -44,9 +44,6 @@ pub struct StateData<P: ExecutorProviderInterface> {
     next_connection_id: AtomicU64,
     pub shutdown: ShutdownWaiter,
     pub provider: P,
-    /// Map each access token to the info about that access token. aHash has better performance
-    /// on arrays than fxHash.
-    pub access_tokens: DashMap<[u8; 48], AccessTokenInfo, ahash::RandomState>,
     /// Map each connection to the information we have about it.
     pub connections: DashMap<u64, Connection<P::Handle>, fxhash::FxBuildHasher>,
 }
@@ -57,7 +54,6 @@ pub struct AccessTokenInfo {
 }
 
 pub struct Connection<H: ServiceHandleInterface> {
-    token: Option<[u8; 48]>,
     /// Public key of the client who made the first connection.
     pk: ClientPublicKey,
     /// The two possible senders attached to this connection. The index
@@ -65,6 +61,17 @@ pub struct Connection<H: ServiceHandleInterface> {
     senders: [Option<StaticSender>; 2],
     /// Cached handle to the service.
     handle: H,
+    /// The ephemeral access token generated for this connection object. The first
+    /// 8 bytes of an access key are the connection id. The next 40 are random bytes.
+    ///
+    /// In future if this causes memory issue we can use encryption, to derive these
+    /// bytes from the node's secret key signing some metadata.
+    ///
+    /// The randomizer always exists instead of being an `Option`.
+    randomizer: [u8; 40],
+    /// Expiry time of the access token. Set to `0` by default which would make any
+    /// attempt to connect fail. Even if someone somehow knew the value of randomizer.
+    expiry_time: u64,
 }
 
 pub struct ProcessHandshakeResult {
@@ -95,11 +102,19 @@ impl<P: ExecutorProviderInterface> StateData<P> {
         // Get the next available connection id.
         let connection_id = self.next_connection_id.fetch_add(1, Ordering::Relaxed);
 
+        // TODO(qti3e):
+        // Generate and fill the randomizer using the thread rng. Currently rand crate
+        // is used to generate the randomizer. But we can explore a more audit friendly
+        // implementation here.
+        let mut randomizer = [0; 40];
+        thread_rng().fill(randomizer.as_mut_slice());
+
         let connection = Connection {
-            token: None,
             pk,
             senders: [Some(sender), None],
             handle: handle.clone(),
+            randomizer,
+            expiry_time: 0,
         };
 
         self.connections.insert(connection_id, connection);
@@ -164,22 +179,22 @@ impl<P: ExecutorProviderInterface> StateData<P> {
         sender: StaticSender,
         access_token: [u8; 48],
     ) -> Option<ProcessHandshakeResult> {
-        let Some(info) = self.access_tokens.get(&access_token) else {
-            sender.terminate(schema::TerminationReason::InvalidToken);
-            return None;
-        };
-
-        if info.expiry_time <= now() {
-            sender.terminate(schema::TerminationReason::InvalidToken);
-            return None;
-        }
-
-        let connection_id = info.connection_id;
+        let (connection_id, randomizer) = split_access_token(&access_token);
 
         let Some(mut connection) = self.connections.get_mut(&connection_id) else {
             sender.terminate(schema::TerminationReason::InvalidToken);
             return None;
         };
+
+        if connection.randomizer.as_ref() != randomizer {
+            sender.terminate(schema::TerminationReason::InvalidToken);
+            return None;
+        }
+
+        if connection.expiry_time >= now() {
+            sender.terminate(schema::TerminationReason::InvalidToken);
+            return None;
+        }
 
         if connection.senders[1].is_some() {
             // The previous connection is still connected.
@@ -323,4 +338,22 @@ fn now() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis() as u64
+}
+
+/// Generate an access token from connection id and randomizer.
+#[inline(always)]
+fn to_access_token(connection_id: u64, randomizer: &[u8; 40]) -> [u8; 48] {
+    let mut value = [0; 48];
+    value[0..8].copy_from_slice(connection_id.to_be_bytes().as_slice());
+    value[8..].copy_from_slice(randomizer);
+    value
+}
+
+/// Split an access token to connection id and randomizer.
+#[inline(always)]
+fn split_access_token(token: &[u8; 48]) -> (u64, &[u8; 40]) {
+    let connection_id_be = arrayref::array_ref!(token, 0, 8);
+    let connection_id = u64::from_be_bytes(*connection_id_be);
+    let randomizer = arrayref::array_ref!(token, 8, 40);
+    (connection_id, randomizer)
 }
