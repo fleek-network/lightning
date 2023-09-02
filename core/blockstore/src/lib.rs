@@ -145,7 +145,7 @@ mod tests {
             std::fs::remove_dir_all(path).unwrap();
         }
 
-        result.expect("Test to pass");
+        assert!(result.is_err());
     }
 
     #[test]
