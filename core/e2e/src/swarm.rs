@@ -16,7 +16,8 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
-use lightning_blockstore::fs::{FsStore, FsStoreConfig};
+use lightning_blockstore::blockstore::Blockstore;
+use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::config::Config as BlockStoreServerConfig;
 use lightning_blockstore_server::BlockStoreServer;
 use lightning_consensus::config::Config as ConsensusConfig;
@@ -293,8 +294,8 @@ fn build_config(
         address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
     });
 
-    config.inject::<FsStore<FinalTypes>>(FsStoreConfig {
-        store_dir_path: root
+    config.inject::<Blockstore<FinalTypes>>(BlockstoreConfig {
+        root: root
             .join("data/blockstore")
             .try_into()
             .expect("Failed to resolve path"),

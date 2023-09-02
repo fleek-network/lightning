@@ -134,7 +134,7 @@ mod tests {
             putter
                 .feed_proof(proof.as_slice())
                 .map_err(|e| anyhow::anyhow!("{e:?}"))?;
-            let write_result = putter
+            putter
                 .write(blocks.next().unwrap(), CompressionAlgorithm::Uncompressed)
                 .map_err(|e| anyhow::anyhow!("{e:?}"))?;
 
@@ -296,7 +296,7 @@ mod tests {
 
             // When: we put the content by block and feed the proof to verify it.
             let size = blockstore
-                .read_all_to_vec(&hash_tree.hash.as_bytes())
+                .read_all_to_vec(hash_tree.hash.as_bytes())
                 .await
                 .unwrap()
                 .len();
