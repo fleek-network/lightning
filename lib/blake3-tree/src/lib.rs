@@ -183,13 +183,13 @@ impl IncrementalVerifier {
     pub fn verify(
         &mut self,
         block: blake3::tree::BlockHasher,
-    ) -> Result<(), IncrementalVerifierError> {
+    ) -> Result<[u8; 32], IncrementalVerifierError> {
         if self.is_done() {
             return Err(IncrementalVerifierError::VerifierTerminated);
         }
 
         let hash = block.finalize(self.is_root());
-        self.verify_hash(&hash)
+        self.verify_hash(&hash).map(|_| hash)
     }
 
     #[inline(always)]

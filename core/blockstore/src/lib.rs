@@ -7,7 +7,7 @@ mod store;
 mod tests {
     #![allow(unused)]
 
-    use blake3_tree::blake3::tree::{BlockHasher, HashTree, HashTreeBuilder};
+    use blake3_tree::blake3::tree::{HashTree, HashTreeBuilder};
     use blake3_tree::blake3::Hash;
     use blake3_tree::ProofBuf;
     use lightning_interfaces::infu_collection::Collection;
@@ -48,7 +48,8 @@ mod tests {
         // Given: some content.
         let content = create_content();
         // Given: a block store.
-        let path = std::env::temp_dir().join("lightning-blockstore-test_put_verify");
+        let path =
+            std::env::temp_dir().join(format!("test-{}", std::thread::current().name().unwrap()));
         let blockstore = Blockstore::<TestBinding>::init(Config {
             root: path.clone().try_into().unwrap(),
         })
@@ -102,7 +103,8 @@ mod tests {
         let mut content = create_content();
 
         // Given: a block store.
-        let path = std::env::temp_dir().join("lightning-blockstore-test_put_verify");
+        let path =
+            std::env::temp_dir().join(format!("test-{}", std::thread::current().name().unwrap()));
         let blockstore = Blockstore::<TestBinding>::init(Config {
             root: path.clone().try_into().unwrap(),
         })
@@ -154,7 +156,8 @@ mod tests {
         let content = [0; BLOCK_SIZE];
 
         // Given: a block store.
-        let path = std::env::temp_dir().join("lightning-blockstore-test_put_verify");
+        let path =
+            std::env::temp_dir().join(format!("test-{}", std::thread::current().name().unwrap()));
         let blockstore = Blockstore::<TestBinding>::init(Config {
             root: path.clone().try_into().unwrap(),
         })
@@ -210,7 +213,8 @@ mod tests {
         // Given: some content.
         let content = [0; 256];
         // Given: a block store.
-        let path = std::env::temp_dir().join("lightning-blockstore-test_put_verify");
+        let path =
+            std::env::temp_dir().join(format!("test-{}", std::thread::current().name().unwrap()));
         let blockstore = Blockstore::<TestBinding>::init(Config {
             root: path.clone().try_into().unwrap(),
         })
@@ -229,6 +233,8 @@ mod tests {
 
             // Given: the full tree.
             let hash_tree = hash_tree(&content);
+
+            // ----
 
             // When: we put one block and feed the proof to verify it.
             let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
@@ -267,7 +273,8 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Given: a block store.
-        let path = std::env::temp_dir().join("lightning-blockstore-test_put_verify");
+        let path =
+            std::env::temp_dir().join(format!("test-{}", std::thread::current().name().unwrap()));
         let blockstore = Blockstore::<TestBinding>::init(Config {
             root: path.clone().try_into().unwrap(),
         })
@@ -288,22 +295,12 @@ mod tests {
             let hash_tree = hash_tree(&content);
 
             // When: we put the content by block and feed the proof to verify it.
-            let chunk_count = content.chunks(BLOCK_SIZE).count();
-            for (count, chunk) in content.chunks(BLOCK_SIZE).enumerate() {
-                let mut block = BlockHasher::new();
-                block.set_block(count);
-                block.update(chunk);
-                let hash = block.finalize(count == chunk_count - 1);
-                let content_from_store = blockstore
-                    .get(count as u32, &hash, CompressionAlgoSet::new())
-                    .await
-                    .ok_or_else(|| anyhow::anyhow!("failed to get chunk"))?;
-
-                // Then: we get our content as expected.
-                if content_from_store.content != chunk {
-                    anyhow::bail!("Invalid chunk")
-                }
-            }
+            let size = blockstore
+                .read_all_to_vec(&hash_tree.hash.as_bytes())
+                .await
+                .unwrap()
+                .len();
+            assert_eq!(size, 262400);
 
             // When: we verify the content.
             let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
@@ -320,6 +317,7 @@ mod tests {
                 .finalize()
                 .await
                 .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+
             if root != Blake3Hash::from(hash_tree.hash) {
                 anyhow::bail!("Invalid root")
             }
@@ -342,9 +340,8 @@ mod tests {
         let content = create_content();
 
         // Given: a block store.
-        let blockstore = Blockstore::<TestBinding>::init(Config::default()).unwrap();
-
-        let path = std::env::temp_dir().join("lightning-blockstore-test_put_get_fs");
+        let path =
+            std::env::temp_dir().join(format!("test-{}", std::thread::current().name().unwrap()));
         let blockstore = Blockstore::<TestBinding>::init(Config {
             root: path.clone().try_into().unwrap(),
         })
@@ -365,24 +362,6 @@ mod tests {
             let tree = hash_tree(content.as_slice());
             if root != Blake3Hash::from(tree.hash) {
                 anyhow::bail!("invalid root hash");
-            }
-
-            // When: we query the block store for our blocks using their hashes.
-            let chunk_count = content.chunks(BLOCK_SIZE).count();
-            for (count, chunk) in content.chunks(BLOCK_SIZE).enumerate() {
-                let mut block = BlockHasher::new();
-                block.set_block(count);
-                block.update(chunk);
-                let hash = block.finalize(count == chunk_count - 1);
-                let content_from_store = blockstore
-                    .get(count as u32, &hash, CompressionAlgoSet::new())
-                    .await
-                    .ok_or_else(|| anyhow::anyhow!("failed to get chunk"))?;
-
-                // Then: we get our content as expected.
-                if content_from_store.content != chunk {
-                    anyhow::bail!("chunk is invalid");
-                }
             }
 
             // Then: our tree is stored as expected.

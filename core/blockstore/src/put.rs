@@ -75,7 +75,7 @@ where
 
     fn flush(&mut self, finalized: bool) -> Result<(), PutWriteError> {
         let block = if finalized {
-            self.buffer.split()
+            self.buffer.split() // take all reminder
         } else {
             self.buffer.split_to(BLOCK_SIZE)
         };
@@ -91,25 +91,20 @@ where
 
                 block_counter = verifier.get_current_block_counter();
 
-                let mut hasher = BlockHasher::new();
-                hasher.set_block(block_counter);
-                hasher.update(&block);
-                block_hash = hasher.finalize(verifier.is_root());
-
-                verifier
-                    .verify_hash(&block_hash)
+                block_hash = verifier
+                    .verify({
+                        let mut hasher = BlockHasher::new();
+                        hasher.set_block(block_counter);
+                        hasher.update(&block);
+                        hasher
+                    })
                     .map_err(|_| PutWriteError::InvalidContent)?;
             },
+            PutterMode::Trusted { .. } if finalized => {
+                unreachable!("should not reach here.");
+            },
             PutterMode::Trusted { hasher, counter } => {
-                hasher.update(&block);
-
-                // TODO(qti3e): we can do better than this. hasher.update
-                // already does this duplicate task.
-                let mut hasher = BlockHasher::new();
-                hasher.set_block(*counter);
-                hasher.update(&block);
-                block_hash = hasher.finalize(finalized);
-
+                block_hash = hasher.get_block_hash(*counter).unwrap();
                 block_counter = *counter;
                 *counter += 1;
             },
@@ -147,6 +142,13 @@ where
     }
 
     fn write(&mut self, content: &[u8], _: CompressionAlgorithm) -> Result<(), PutWriteError> {
+        // For the trusted mode we do write-ahead before the flush, this way
+        // when we are running the flush function the hasher has already seen
+        // the future bytes of the data.
+        if let PutterMode::Trusted { hasher, .. } = &mut self.mode {
+            hasher.update(content);
+        }
+
         self.buffer.put(content);
 
         let threshold = if self.mode.is_trusted() {
@@ -183,15 +185,8 @@ where
             return Err(PutFinalizeError::PartialContent);
         }
 
-        if self.mode.is_trusted() {
-            // At finalization we should always have some bytes.
-            if self.buffer.is_empty() {
-                self.write_tasks.abort_all();
-                return Err(PutFinalizeError::PartialContent);
-            }
-
-            self.flush(true)
-                .map_err(|_| PutFinalizeError::PartialContent)?;
+        if self.mode.is_with_incremental_verification() && !self.buffer.is_empty() {
+            self.flush(true).map_err(|_| PutFinalizeError::InvalidCID)?;
         }
 
         if let PutterMode::WithIncrementalVerification { verifier, .. } = &self.mode {
@@ -201,23 +196,42 @@ where
             }
         }
 
+        let (hash, tree) = match self.mode {
+            PutterMode::WithIncrementalVerification {
+                root_hash,
+                mut verifier,
+            } => (root_hash, verifier.take_tree()),
+            PutterMode::Trusted { hasher, counter } => {
+                // At finalization we should always have some bytes.
+                if self.buffer.is_empty() {
+                    self.write_tasks.abort_all();
+                    return Err(PutFinalizeError::PartialContent);
+                }
+
+                let tmp = hasher.finalize();
+                let hash = tmp.hash.into();
+                let tree = tmp.tree;
+                let index = counter * 2 - counter.count_ones() as usize;
+                let block_hash = tree[index];
+                let block = self.buffer.split();
+
+                let mut store = self.store.clone();
+                self.write_tasks.spawn(async move {
+                    let _ = store
+                        .insert(BLOCK_DIR, block_hash, block.to_vec(), Some(counter))
+                        .await;
+                });
+
+                (hash, tree)
+            },
+        };
+
         while let Some(res) = self.write_tasks.join_next().await {
             if let Err(e) = res {
                 log::error!("write task failed: {e:?}");
                 return Err(PutFinalizeError::WriteFailed);
             }
         }
-
-        let (hash, tree) = match self.mode {
-            PutterMode::WithIncrementalVerification {
-                root_hash,
-                mut verifier,
-            } => (root_hash, verifier.take_tree()),
-            PutterMode::Trusted { hasher, .. } => {
-                let tmp = hasher.finalize();
-                (tmp.hash.into(), tmp.tree)
-            },
-        };
 
         let encoded_tree = bincode::serialize(&tree).map_err(|e| {
             log::error!("failed to serialize tree: {e:?}");
