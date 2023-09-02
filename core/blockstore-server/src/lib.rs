@@ -7,7 +7,7 @@ use std::sync::RwLock;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use blake3_stream::{Encoder, VerifiedDecoder};
+use blake3_stream::{Encoder, FrameDecoder};
 use blake3_tree::blake3::tree::HashTree;
 use config::Config;
 use lightning_interfaces::blockstore_server::BlockStoreServerInterface;
@@ -192,23 +192,20 @@ impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
         socket.write_all(&block_hash)?;
 
         // Setup the decoder
-        let mut decoder = VerifiedDecoder::new(socket, block_hash);
+        let mut decoder = FrameDecoder::new(socket);
 
-        // TODO: Add a non-verified decoder to blake3-stream that yields proofs and chunks directly
-        // without verification. We can let the blockstore verify for us, and avoid recomputing the
-        // tree.
-        let mut putter = self.blockstore.put(None);
-        let mut buf = [0; 256 * 1024];
-        loop {
-            // Read a block of data, breaking if there is no more
-            let len = decoder.read(&mut buf)?;
-            if len == 0 {
-                break;
+        let mut putter = self.blockstore.put(Some(block_hash));
+        while let Some(frame) = decoder.next_frame()? {
+            match frame {
+                blake3_stream::FrameBytes::Proof(bytes) => {
+                    putter.feed_proof(&bytes)?;
+                },
+                blake3_stream::FrameBytes::Chunk(bytes) => {
+                    putter.write(&bytes, CompressionAlgorithm::Uncompressed)?;
+                },
             }
-
-            // Feed the content into the blockstore
-            putter.write(&buf[..len], CompressionAlgorithm::Uncompressed)?;
         }
+
         let hash = putter.finalize().await?;
         debug_assert_eq!(hash, block_hash);
 

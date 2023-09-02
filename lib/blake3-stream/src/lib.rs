@@ -141,7 +141,7 @@ impl<R: Read> FrameDecoder<R> {
 
 impl<R: Read> FrameDecoder<R> {
     /// Return the next frame in the encoding, reading from the underlying data stream.
-    fn next(&mut self) -> std::io::Result<Option<FrameBytes>> {
+    pub fn next_frame(&mut self) -> std::io::Result<Option<FrameBytes>> {
         while let Some(size) = self.state.next_size() {
             if self.read_buffer.len() >= size {
                 match self.state {
@@ -251,7 +251,7 @@ impl<R: Read + Debug> Read for VerifiedDecoder<R> {
             return Ok(take);
         }
 
-        while let Some(frame) = self.frame_decoder.next()? {
+        while let Some(frame) = self.frame_decoder.next_frame()? {
             match frame {
                 FrameBytes::Proof(bytes) => {
                     self.iv
