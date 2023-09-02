@@ -9,7 +9,7 @@ use chrono::Local;
 use clap::{arg, ArgAction, Parser, Subcommand};
 use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_blockstore::fs::FsStore;
+use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore_server::BlockStoreServer;
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::{ConfigProviderInterface, SignerInterface};
@@ -211,7 +211,7 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
         // testnet sync
         let signer_config = config.get::<Signer<C>>();
         let app_config = config.get::<Application<C>>();
-        let blockstore_config = config.get::<FsStore<C>>();
+        let blockstore_config = config.get::<Blockstore<C>>();
         let block_server_config = config.get::<BlockStoreServer<C>>();
         if app_config.testnet {
             testnet_sync::sync(

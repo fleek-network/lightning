@@ -71,7 +71,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
 
         Ok(Self {
             query_runner: env.query_runner(),
-            update_socket: TokioSpawn::spawn(UpdateWorker::<C>::new(env, blockstore)),
+            update_socket: TokioSpawn::spawn_async(UpdateWorker::<C>::new(env, blockstore)),
             collection: PhantomData,
         })
     }

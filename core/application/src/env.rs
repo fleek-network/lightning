@@ -1,8 +1,9 @@
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
-use affair::Worker as WorkerTrait;
+use affair::AsyncWorker as WorkerTrait;
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
@@ -31,6 +32,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
+use log::warn;
 
 use crate::config::{Config, Mode, StorageConfig};
 use crate::genesis::{Genesis, GenesisPrices};
@@ -117,7 +119,7 @@ impl Env<UpdatePerm> {
     }
 
     #[autometrics::autometrics]
-    fn run<F, P>(&mut self, block: Block, get_putter: F) -> BlockExecutionResponse
+    async fn run<F, P>(&mut self, block: Block, get_putter: F) -> BlockExecutionResponse
     where
         F: FnOnce() -> P,
         P: IncrementalPutInterface,
@@ -163,20 +165,26 @@ impl Env<UpdatePerm> {
             // This will return `None` only if the InMemory backend is used.
             if let Some(checkpoint) = storage.serialize() {
                 let mut blockstore_put = get_putter();
-                blockstore_put
+                if blockstore_put
                     .write(checkpoint.as_slice(), CompressionAlgorithm::Uncompressed)
-                    .unwrap();
-                let state_hash = futures::executor::block_on(blockstore_put.finalize()).unwrap();
+                    .is_ok()
+                {
+                    if let Ok(state_hash) = blockstore_put.finalize().await {
+                        // Only temporary: write the checkpoint to disk directly.
 
-                // Only temporary: write the checkpoint to disk directly.
-
-                self.inner.run(move |ctx| {
-                    let backend = StateTables {
-                        table_selector: ctx,
-                    };
-                    let app = State::new(backend);
-                    app.set_last_epoch_hash(state_hash);
-                })
+                        self.inner.run(move |ctx| {
+                            let backend = StateTables {
+                                table_selector: ctx,
+                            };
+                            let app = State::new(backend);
+                            app.set_last_epoch_hash(state_hash);
+                        })
+                    } else {
+                        warn!("Failed to finalize writing checkpoint to blockstore");
+                    }
+                } else {
+                    warn!("Failed to write checkpoint to blockstore");
+                }
             }
         }
 
@@ -407,10 +415,11 @@ impl<C: Collection> UpdateWorker<C> {
     }
 }
 
+#[async_trait]
 impl<C: Collection> WorkerTrait for UpdateWorker<C> {
     type Request = Block;
     type Response = BlockExecutionResponse;
-    fn handle(&mut self, req: Self::Request) -> Self::Response {
-        self.env.run(req, || self.blockstore.put(None))
+    async fn handle(&mut self, req: Self::Request) -> Self::Response {
+        self.env.run(req, || self.blockstore.put(None)).await
     }
 }

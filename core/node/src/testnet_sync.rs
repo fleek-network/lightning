@@ -7,7 +7,8 @@ use fleek_crypto::{ConsensusSecretKey, NodePublicKey, NodeSecretKey, SecretKey};
 use lightning_application::config::Config as AppConfig;
 use lightning_application::env::Env;
 use lightning_application::genesis::{Genesis, GenesisNode};
-use lightning_blockstore::fs::{FsStore, FsStoreConfig};
+use lightning_blockstore::blockstore::Blockstore;
+use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::config::Config as BlockServerConfig;
 use lightning_blockstore_server::BlockStoreServer;
 use lightning_interfaces::infu_collection::Collection;
@@ -23,14 +24,14 @@ use log::{info, warn};
 use serde::de::DeserializeOwned;
 
 partial!(PartialBinding {
-    BlockStoreInterface = FsStore<Self>;
+    BlockStoreInterface = Blockstore<Self>;
     BlockStoreServerInterface = BlockStoreServer<Self>;
 });
 
 pub async fn sync(
     signer_config: SignerConfig,
     app_config: AppConfig,
-    blockstore_config: FsStoreConfig,
+    blockstore_config: BlockstoreConfig,
     block_server_config: BlockServerConfig,
 ) {
     let genesis = Genesis::load().expect("Failed to load genesis.");
@@ -72,7 +73,7 @@ pub async fn sync(
         return;
     }
 
-    let blockstore = FsStore::<PartialBinding>::init(blockstore_config)
+    let blockstore = Blockstore::<PartialBinding>::init(blockstore_config)
         .expect("Failed to initialize blockstore");
     let block_server =
         BlockStoreServer::<PartialBinding>::init(block_server_config, blockstore.clone())
