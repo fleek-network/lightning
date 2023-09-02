@@ -154,7 +154,9 @@ impl IncrementalVerifier {
 
     /// Verify the new block of data only by providing its hash, you should be aware of
     /// what mode you have finalized the block at.
-    pub fn verify_hash(&mut self, hash: &[u8; 32]) -> Result<(), IncrementalVerifierError> {
+    ///
+    /// Do not attempt to manually call this function, you can not figure out how to finalize.
+    fn verify_hash(&mut self, hash: &[u8; 32]) -> Result<(), IncrementalVerifierError> {
         if self.is_done() {
             return Err(IncrementalVerifierError::VerifierTerminated);
         }
@@ -504,7 +506,7 @@ impl IncrementalVerifier {
 
     /// Returns true if the current cursor is pointing to the root of the tree.
     #[inline(always)]
-    pub fn is_root(&self) -> bool {
+    fn is_root(&self) -> bool {
         debug_assert!(!self.cursor.is_null(), "cursor is null");
         // SAFETY: Dereferencing cursor is safe since we never set it a null value.
         unsafe { (*self.cursor).parent.is_null() }
