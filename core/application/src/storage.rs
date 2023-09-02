@@ -39,6 +39,19 @@ impl AtomoStorageBuilder {
             },
         }
     }
+
+    #[inline(always)]
+    #[allow(unused)]
+    #[allow(clippy::wrong_self_convention)]
+    pub fn from_checkpoint(self, hash: [u8; 32], checkpoint: Vec<u8>) -> Self {
+        match self {
+            AtomoStorageBuilder::InMemory(builder) => AtomoStorageBuilder::InMemory(builder),
+            AtomoStorageBuilder::RocksDb(builder) => {
+                let builder = builder.from_checkpoint(hash, checkpoint);
+                AtomoStorageBuilder::RocksDb(builder)
+            },
+        }
+    }
 }
 
 impl StorageBackendConstructor for AtomoStorageBuilder {

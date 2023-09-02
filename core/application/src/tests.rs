@@ -1087,7 +1087,11 @@ async fn test_supply_across_epoch() {
     // 365 epoch changes to see if the current supply and year start suppply are ok
     for i in 0..365 {
         // add at least one transaction per epoch, so reward pool is not zero
-        let pod_10 = pod_request(&node_secret_key, 10000, 0, i + 1);
+        let nonce = query_runner
+            .get_node_info(&node_secret_key.to_pk())
+            .unwrap()
+            .nonce;
+        let pod_10 = pod_request(&node_secret_key, 10000, 0, nonce + 1);
         // run the delivery ack transaction
         if let TransactionResponse::Revert(error) = run_transaction(vec![pod_10], &update_socket)
             .await

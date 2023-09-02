@@ -2,6 +2,7 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use affair::Worker as WorkerTrait;
+use anyhow::{Context, Result};
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
@@ -43,29 +44,36 @@ pub struct Env<P> {
 }
 
 impl Env<UpdatePerm> {
-    pub fn new(config: &Config) -> Self {
+    pub fn new(config: &Config, checkpoint: Option<([u8; 32], Vec<u8>)>) -> Result<Self> {
         let storage = match config.storage {
             StorageConfig::RocksDb => {
                 let db_path = config
                     .db_path
                     .as_ref()
-                    .expect("db_path must be specified for RocksDb backend");
+                    .context("db_path must be specified for RocksDb backend")?;
                 let mut db_options = if let Some(db_options) = config.db_options.as_ref() {
                     let (options, _) = Options::load_latest(
                         db_options,
-                        RocksEnv::new().expect("Failed to create rocks db env."),
+                        RocksEnv::new().context("Failed to create rocks db env.")?,
                         false,
                         // TODO(matthias): I set this lru cache size arbitrarily
                         RocksCache::new_lru_cache(100),
                     )
-                    .expect("Failed to create rocks db options.");
+                    .context("Failed to create rocks db options.")?;
                     options
                 } else {
                     Options::default()
                 };
                 db_options.create_if_missing(true);
                 db_options.create_missing_column_families(true);
-                AtomoStorageBuilder::new(Some(db_path.as_path())).with_options(db_options)
+                match checkpoint {
+                    Some((hash, checkpoint)) => AtomoStorageBuilder::new(Some(db_path.as_path()))
+                        .with_options(db_options)
+                        .from_checkpoint(hash, checkpoint),
+                    None => {
+                        AtomoStorageBuilder::new(Some(db_path.as_path())).with_options(db_options)
+                    },
+                }
             },
             StorageConfig::InMemory => AtomoStorageBuilder::new::<&Path>(None),
         };
@@ -103,9 +111,9 @@ impl Env<UpdatePerm> {
                 .enable_iter("pub_key_to_index");
         }
 
-        Self {
-            inner: atomo.build().unwrap(),
-        }
+        Ok(Self {
+            inner: atomo.build()?,
+        })
     }
 
     #[autometrics::autometrics]
@@ -159,6 +167,9 @@ impl Env<UpdatePerm> {
                     .write(checkpoint.as_slice(), CompressionAlgorithm::Uncompressed)
                     .unwrap();
                 let state_hash = futures::executor::block_on(blockstore_put.finalize()).unwrap();
+
+                // Only temporary: write the checkpoint to disk directly.
+
                 self.inner.run(move |ctx| {
                     let backend = StateTables {
                         table_selector: ctx,
@@ -187,7 +198,7 @@ impl Env<UpdatePerm> {
     /// This function will panic if the genesis file cannot be decoded into the correct types
     /// Will return true if database was empty and genesis needed to be loaded or false if there was
     /// already state loaded and it didnt load genesis
-    pub fn genesis(&mut self, config: Config) -> bool {
+    pub fn genesis(&mut self, config: &Config) -> bool {
         self.inner.run(|ctx| {
             let mut metadata_table = ctx.get_table::<Metadata, Value>("metadata");
 
@@ -356,7 +367,6 @@ impl Env<UpdatePerm> {
                 total_served_table.insert(epoch, total_served);
             }
 
-
             // add latencies
             if let Some(latencies) = genesis.latencies {
                 for lat in latencies {
@@ -381,7 +391,7 @@ impl Env<UpdatePerm> {
 
 impl Default for Env<UpdatePerm> {
     fn default() -> Self {
-        Self::new(&Config::default())
+        Self::new(&Config::default(), None).unwrap()
     }
 }
 

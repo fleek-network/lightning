@@ -3,26 +3,21 @@ use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
 use fleek_blake3 as blake3;
-use fxhash::FxHashMap;
 use rocksdb::{ColumnFamilyDescriptor, IteratorMode, Options, DB};
 
 type Entry = (Box<[u8]>, Box<[u8]>);
 
-#[allow(dead_code)]
 pub fn build_db_from_checkpoint(
     path: &Path,
     hash: [u8; 32],
-    checkpoint: Vec<u8>,
+    checkpoint: &[u8],
     options: Options,
-    mut column_options: FxHashMap<String, Options>,
 ) -> Result<(DB, Vec<String>)> {
-    let table_map = deserialize_db(&checkpoint)?;
+    let table_map = deserialize_db(checkpoint)?;
     let columns: Vec<String> = table_map.keys().cloned().collect();
     let cf_iter: Vec<_> = columns
         .iter()
-        .map(|name| {
-            ColumnFamilyDescriptor::new(name, column_options.remove(name).unwrap_or_default())
-        })
+        .map(|name| ColumnFamilyDescriptor::new(name, options.clone()))
         .collect();
     let db = DB::open_cf_descriptors(&options, path, cf_iter)?;
     let mut table_names = Vec::new();
@@ -135,7 +130,6 @@ mod tests {
     use std::ops::Range;
 
     use fleek_blake3 as blake3;
-    use fxhash::FxHashMap;
     use rand::Rng;
     use rocksdb::{ColumnFamilyDescriptor, Options, DB};
 
@@ -273,14 +267,9 @@ mod tests {
         }
 
         // Build a new database from the checkpoint
-        let (new_db, _) = build_db_from_checkpoint(
-            &new_path,
-            *hash.as_bytes(),
-            checkpoint.clone(),
-            options,
-            FxHashMap::default(),
-        )
-        .expect("Failed to build db from checkpoint");
+        let (new_db, _) =
+            build_db_from_checkpoint(&new_path, *hash.as_bytes(), &checkpoint, options)
+                .expect("Failed to build db from checkpoint");
 
         // Make sure that the checkpoints match
         let new_checkpoint = serialize_db(&new_db, &table_names).expect("Failed to serialize db");

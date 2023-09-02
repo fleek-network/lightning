@@ -8,6 +8,9 @@ use anyhow::{anyhow, Context, Result};
 use chrono::Local;
 use clap::{arg, ArgAction, Parser, Subcommand};
 use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
+use lightning_application::app::Application;
+use lightning_blockstore::fs::FsStore;
+use lightning_blockstore_server::BlockStoreServer;
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::{ConfigProviderInterface, SignerInterface};
 use lightning_signer::Signer;
@@ -24,6 +27,7 @@ use simplelog::{
 
 use crate::config::TomlConfigProvider;
 use crate::shutdown::ShutdownController;
+use crate::testnet_sync;
 
 const DEFAULT_CONFIG_PATH: &str = "~/.lightning/config.toml";
 
@@ -203,6 +207,22 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
         shutdown_controller.install_handlers();
 
         let config = Self::load_or_write_config(config_path).await?;
+
+        // testnet sync
+        let signer_config = config.get::<Signer<C>>();
+        let app_config = config.get::<Application<C>>();
+        let blockstore_config = config.get::<FsStore<C>>();
+        let block_server_config = config.get::<BlockStoreServer<C>>();
+        if app_config.testnet {
+            testnet_sync::sync(
+                signer_config,
+                app_config,
+                blockstore_config,
+                block_server_config,
+            )
+            .await;
+        }
+
         let node = Node::<C>::init(config)
             .map_err(|e| anyhow::anyhow!("Could not start the node: {e}"))?;
 

@@ -12,7 +12,7 @@ use fxhash::FxHashMap;
 pub use rocksdb::Options;
 pub use rocksdb::{Cache, Env, DB};
 use rocksdb::{ColumnFamilyDescriptor, WriteBatch};
-use serialization::{build_db_from_checkpoint, serialize_db};
+pub use serialization::{build_db_from_checkpoint, serialize_db};
 
 /// Helper alias for an [`atomo::AtomoBuilder`] using a [`RocksBackendBuilder`].
 pub type AtomoBuilderWithRocks<S = DefaultSerdeBackend> = AtomoBuilder<RocksBackendBuilder, S>;
@@ -114,13 +114,8 @@ impl StorageBackendConstructor for RocksBackendBuilder {
                 if tmp_path.exists() {
                     fs::remove_dir_all(&tmp_path)?;
                 }
-                let (_db, column_names) = build_db_from_checkpoint(
-                    &tmp_path,
-                    hash,
-                    checkpoint,
-                    self.options.clone(),
-                    self.column_options.clone(),
-                )?;
+                let (_db, column_names) =
+                    build_db_from_checkpoint(&tmp_path, hash, &checkpoint, self.options.clone())?;
                 // If the build was successful, we move the db over to the actual directory.
                 if self.path.exists() {
                     fs::remove_dir_all(&self.path)?;

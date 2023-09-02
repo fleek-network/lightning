@@ -63,10 +63,10 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
             );
         }
 
-        let mut env = Env::new(&config);
+        let mut env = Env::new(&config, None).expect("Failed to initialize environment.");
 
-        if !env.genesis(config) {
-            info!("State already exists. Not loading genesis");
+        if !env.genesis(&config) {
+            info!("State already exists. Not loading genesis.");
         }
 
         Ok(Self {
