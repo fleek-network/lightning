@@ -76,6 +76,7 @@ pub async fn sync(
         return;
     }
 
+    std::mem::drop(env);
     let blockstore = Blockstore::<PartialBinding>::init(blockstore_config)
         .expect("Failed to initialize blockstore");
     let block_server =
