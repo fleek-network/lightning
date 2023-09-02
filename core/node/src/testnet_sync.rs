@@ -172,14 +172,17 @@ async fn attempt_to_sync_state<C: Collection>(
             }
             if let Some(checkpoint) = blockstore.read_all_to_vec(&hash).await {
                 // Attempt to build db from checkpoint.
-                if let Ok(_env) = Env::new(config, Some((hash, checkpoint))) {
-                    info!("Successfully built database from checkpoint with hash {hash:?}.");
-                    return Ok(());
-                } else {
-                    warn!(
-                        "Failed to built database from checkpoint with hash {hash:?} that we received from node {:?}.",
-                        node.primary_public_key
-                    );
+                match Env::new(config, Some((hash, checkpoint))) {
+                    Ok(_env) => {
+                        info!("Successfully built database from checkpoint with hash {hash:?}.");
+                        return Ok(());
+                    },
+                    Err(e) => {
+                        warn!(
+                            "Failed to built database from checkpoint with hash {hash:?} that we received from node {:?}: {e:?}",
+                            node.primary_public_key
+                        );
+                    },
                 }
             }
         }
