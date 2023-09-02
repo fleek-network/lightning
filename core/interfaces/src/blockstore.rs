@@ -139,6 +139,29 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
     ///
     /// The `block` directory maps each `content-hash` (or leaf) to the actual content.
     fn get_root_dir(&self) -> PathBuf;
+
+    /// Utility function to read an entire file to a vec.
+    async fn read_all_to_vec(&self, hash: &Blake3Hash) -> Option<Vec<u8>> {
+        let value = self.get_tree(hash).await?;
+        let tree = &value.0;
+        let mut result = Vec::new();
+
+        for index in 0usize.. {
+            let i = index * 2 - index.count_ones() as usize;
+            if i >= tree.len() {
+                break;
+            }
+
+            let block = &self
+                .get(index as u32, &tree[i], CompressionAlgoSet::new())
+                .await?
+                .content;
+
+            result.extend_from_slice(block);
+        }
+
+        Some(result)
+    }
 }
 
 /// The interface for the writer to a [`BlockStoreInterface`].
