@@ -30,7 +30,7 @@ pub struct BlockStoreServer<C: Collection> {
     phantom: PhantomData<C>,
     config: Arc<Config>,
     blockstore: C::BlockStoreInterface,
-    shutdown_tx: Arc<RwLock<Option<tokio::sync::mpsc::Sender<()>>>>,
+    shutdown_tx: Arc<RwLock<Option<tokio::sync::oneshot::Sender<()>>>>,
 }
 
 impl<C: Collection> Clone for BlockStoreServer<C> {
@@ -58,22 +58,23 @@ impl<C: Collection> WithStartAndShutdown for BlockStoreServer<C> {
     /// Start the system, should not do anything if the system is already
     /// started.
     async fn start(&self) {
-        let mut shutdown_entry = self.shutdown_tx.write().unwrap();
-        if shutdown_entry.is_some() {
+        if self.shutdown_tx.read().unwrap().is_some() {
             return;
         }
-        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
-        *shutdown_entry = Some(tx);
 
         // spawn server task
         let address = self.config.address;
         let blockstore = self.blockstore.clone();
-        tokio::spawn(async move {
-            // bind to address
-            let listener = TcpListener::bind(address)
-                .await
-                .expect("failed to bind to address");
 
+        // bind to address
+        let listener = TcpListener::bind(address)
+            .await
+            .expect("failed to bind to address");
+
+        let (tx, mut rx) = tokio::sync::oneshot::channel();
+        *self.shutdown_tx.write().unwrap() = Some(tx);
+
+        tokio::spawn(async move {
             loop {
                 select! {
                     Ok((socket, _)) = listener.accept() => {
@@ -85,7 +86,7 @@ impl<C: Collection> WithStartAndShutdown for BlockStoreServer<C> {
                             }
                         });
                     },
-                    _ = rx.recv() => break,
+                    _ = &mut rx => break,
                 }
             }
         });
@@ -94,7 +95,7 @@ impl<C: Collection> WithStartAndShutdown for BlockStoreServer<C> {
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
         let sender = self.shutdown_tx.write().unwrap().take().unwrap();
-        sender.send(()).await.unwrap();
+        sender.send(()).unwrap();
     }
 }
 
