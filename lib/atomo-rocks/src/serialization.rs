@@ -31,7 +31,7 @@ pub fn build_db_from_checkpoint(
     // Check that the serialized db matches the checkpoint.
     let bytes = serialize_db(&db, &table_names)?;
     if checkpoint != bytes {
-        return Err(anyhow!("Failed to deserialize database"));
+        return Err(anyhow!("Serialized db does not match checkpoint"));
     }
     // Verify that the calculated hash matches the hash of the checkpoint.
     let calc_hash = blake3::hash(&bytes);
@@ -45,20 +45,23 @@ pub fn build_db_from_checkpoint(
 /// The serialization format is:
 /// [num_tables][table1 name length][table1 name bytes][table1 bytes][table2 name length][table2
 /// name bytes][table2 bytes]...
-pub fn serialize_db(db: &DB, table_names: &Vec<String>) -> Result<Vec<u8>> {
+pub fn serialize_db(db: &DB, table_names: &[String]) -> Result<Vec<u8>> {
+    let mut table_names_sort = table_names.to_vec();
+    table_names_sort.sort();
+
     let snapshot = db.snapshot();
 
     let mut bytes = Vec::new();
-    let num_tables = (table_names.len() as u64).to_le_bytes();
+    let num_tables = (table_names_sort.len() as u64).to_le_bytes();
     bytes.extend(&num_tables);
 
-    for table_name in table_names {
+    for table_name in table_names_sort {
         let table_name_len = (table_name.len() as u64).to_le_bytes();
         bytes.extend(&table_name_len);
         bytes.extend(table_name.as_bytes());
 
         let cf = db
-            .cf_handle(table_name)
+            .cf_handle(&table_name)
             .ok_or(anyhow!("Unknown table name"))?;
         let table_iter = snapshot.iterator_cf(&cf, IteratorMode::Start);
         let table_bytes = serialize_table(table_iter.flatten());
@@ -179,8 +182,8 @@ mod tests {
             std::fs::remove_dir_all(&db_path).unwrap();
         }
         let columns = vec![
-            "table1".to_owned(),
             "table2".to_owned(),
+            "table1".to_owned(),
             "table3".to_owned(),
             "table4".to_owned(),
         ];
@@ -231,8 +234,8 @@ mod tests {
         options.create_missing_column_families(true);
 
         let columns = vec![
-            "table1".to_owned(),
             "table2".to_owned(),
+            "table1".to_owned(),
             "table3".to_owned(),
             "table4".to_owned(),
         ];
