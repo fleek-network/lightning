@@ -3918,6 +3918,7 @@ dependencies = [
  "async-trait",
  "blake3-stream",
  "blake3-tree",
+ "env_logger 0.10.0",
  "fleek-crypto",
  "futures",
  "infusion",
