@@ -59,7 +59,10 @@ pub async fn sync(
     nodes_to_sync
         .iter()
         .for_each(|(epoch, _)| max_epoch = max_epoch.max(*epoch));
-
+    if my_epoch == max_epoch {
+        info!("No genesis committee members with higher epoch found. Not syncing state.");
+        return;
+    }
     let nodes_to_sync: Vec<GenesisNode> = nodes_to_sync
         .into_iter()
         .filter_map(
