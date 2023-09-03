@@ -4,7 +4,7 @@ use std::time::Duration;
 use affair::Socket;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use lightning_types::NodeIndex;
+use lightning_types::{AccountInfo, NodeIndex};
 
 use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
@@ -120,6 +120,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Returns information about a single node.
     fn get_node_info(&self, id: &NodePublicKey) -> Option<NodeInfo>;
+
+    /// Returns information about an account.
+    fn get_account_info(&self, id: &EthAddress) -> Option<AccountInfo>;
 
     /// Returns a full copy of the entire node-registry, but only contains the nodes that
     /// are still a valid node and have enough stake.

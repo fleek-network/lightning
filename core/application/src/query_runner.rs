@@ -182,6 +182,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
         self.get_node_info_with_pub_key(id, |node_info| node_info)
     }
 
+    fn get_account_info(&self, id: &EthAddress) -> Option<AccountInfo> {
+        self.inner.run(|ctx| self.account_table.get(ctx).get(id))
+    }
+
     fn get_node_registry(&self) -> Vec<NodeInfo> {
         let staking_amount: HpUfixed<18> = self.get_staking_amount().into();
         self.inner.run(|ctx| {

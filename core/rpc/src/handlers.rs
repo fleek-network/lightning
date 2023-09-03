@@ -7,9 +7,8 @@ use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use http::StatusCode;
 use jsonrpc_v2::{Data, Error, MapRouter, Params, RequestObject, ResponseObjects, Server};
-#[cfg(feature = "e2e-test")]
-use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
 use lightning_interfaces::types::{
+    AccountInfo,
     EpochInfo,
     NodeInfo,
     NodeServed,
@@ -17,6 +16,8 @@ use lightning_interfaces::types::{
     TotalServed,
     UpdateRequest,
 };
+#[cfg(feature = "e2e-test")]
+use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
 use lightning_interfaces::SyncQueryRunnerInterface;
 
 use crate::server::RpcData;
@@ -70,6 +71,7 @@ impl RpcServer {
             )
             .with_method("flk_get_locked_time", get_locked_time_handler::<Q>)
             .with_method("flk_get_node_info", get_node_info_handler::<Q>)
+            .with_method("flk_get_account_info", get_account_info_handler::<Q>)
             .with_method("flk_get_staking_amount", get_staking_amount_handler::<Q>)
             .with_method(
                 "flk_get_committee_members",
@@ -175,6 +177,13 @@ pub async fn get_node_info_handler<Q: SyncQueryRunnerInterface>(
     Params(params): Params<NodeKeyParam>,
 ) -> Result<Option<NodeInfo>> {
     Ok(data.0.query_runner.get_node_info(&params.public_key))
+}
+
+pub async fn get_account_info_handler<Q: SyncQueryRunnerInterface>(
+    data: Data<Arc<RpcData<Q>>>,
+    Params(params): Params<PublicKeyParam>,
+) -> Result<Option<AccountInfo>> {
+    Ok(data.0.query_runner.get_account_info(&params.public_key))
 }
 
 pub async fn get_reputation_handler<Q: SyncQueryRunnerInterface>(
