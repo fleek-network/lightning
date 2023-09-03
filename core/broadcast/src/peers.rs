@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
@@ -9,9 +10,11 @@ use fleek_crypto::NodePublicKey;
 use futures::stream::FuturesUnordered;
 use futures::Future;
 use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
+use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::SyncQueryRunnerInterface;
-use tokio::sync::mpsc::Receiver;
+use netkit::endpoint::{NodeAddress, Request};
+use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::ev::Topology;
 use crate::frame::{Digest, Frame};
@@ -30,6 +33,20 @@ pub struct Peers {
     pinned: FxHashSet<NodePublicKey>,
     /// Map each public key to the info we have about that peer.
     peers: im::HashMap<NodePublicKey, Peer>,
+    /// Sender for requests to endpoint.
+    endpoint_tx: Sender<Request>,
+}
+
+impl Peers {
+    pub fn new(endpoint_tx: Sender<Request>) -> Self {
+        Self {
+            us: 0,
+            pinned: Default::default(),
+            stats: Default::default(),
+            peers: Default::default(),
+            endpoint_tx,
+        }
+    }
 }
 
 /// An interned id. But not from our interned table.
@@ -38,6 +55,7 @@ pub type RemoteInternedId = MessageInternedId;
 struct Peer {
     /// The index of the node.
     index: NodeIndex,
+    address: SocketAddr,
     has: im::HashMap<MessageInternedId, RemoteInternedId>,
 }
 
@@ -45,6 +63,7 @@ impl Clone for Peer {
     fn clone(&self) -> Self {
         Self {
             index: self.index,
+            address: self.address,
             has: self.has.clone(),
         }
     }
@@ -148,11 +167,30 @@ impl Peers {
         let Some(info) = self.peers.get(remote) else {
             return;
         };
-        // Todo: send the frame.
-        // let sender = info.sender.clone();
-        // tokio::spawn(async move {
-        //     sender.send(frame).await;
-        // });
+
+        let mut writer = Vec::new();
+        if let Err(e) = frame.encode(&mut writer) {
+            log::error!("frame encoding failed: {e:?}");
+            return;
+        };
+
+        let peer_address = NodeAddress {
+            socket_address: info.address,
+            pk: *remote,
+        };
+        let endpoint_tx = self.endpoint_tx.clone();
+        tokio::spawn(async move {
+            if endpoint_tx
+                .send(Request::SendMessage {
+                    peer: peer_address,
+                    message: writer,
+                })
+                .await
+                .is_err()
+            {
+                tracing::error!("endpoint dropped the channel");
+            }
+        });
     }
 
     /// Send a want request to the given node returns `None` if we don't have the node's
@@ -166,14 +204,35 @@ impl Peers {
         let Some(info) = self.peers.get(remote) else {
             return false;
         };
-        // Todo: send the frame.
-        // let sender = info.sender.clone();
-        // let frame = Frame::Want(Want {
-        //     interned_id: remote_index,
-        // });
-        // tokio::spawn(async move {
-        //     sender.send(frame).await;
-        // });
+
+        let mut writer = Vec::new();
+        if let Err(e) = Frame::Want(Want {
+            interned_id: remote_index,
+        })
+        .encode(&mut writer)
+        {
+            log::error!("frame encoding failed: {e:?}");
+            return false;
+        };
+
+        let peer_address = NodeAddress {
+            socket_address: info.address,
+            pk: *remote,
+        };
+        let endpoint_tx = self.endpoint_tx.clone();
+        tokio::spawn(async move {
+            if endpoint_tx
+                .send(Request::SendMessage {
+                    peer: peer_address,
+                    message: writer,
+                })
+                .await
+                .is_err()
+            {
+                tracing::error!("endpoint dropped the channel");
+            }
+        });
+
         true
     }
 
@@ -181,12 +240,20 @@ impl Peers {
     /// peers that we have. Obviously, we don't do it for the nodes that we already know
     /// have this message.
     pub fn advertise(&self, id: MessageInternedId, digest: Digest) {
-        let msg = Advr {
+        let mut message = Vec::new();
+        if Frame::Advr(Advr {
             interned_id: id,
             digest,
+        })
+        .encode(&mut message)
+        .is_err()
+        {
+            log::error!("failed to encode advertisement");
+            return;
         };
 
-        self.for_each(move |stats, (_pk, info)| {
+        let endpoint_tx = self.endpoint_tx.clone();
+        self.for_each(move |stats, (pk, info)| {
             if info.has.contains_key(&id) {
                 return;
             }
@@ -198,18 +265,33 @@ impl Peers {
                     ..Default::default()
                 },
             );
-            // Todo: Send the frame
-            // tokio::spawn(async move {
-            //     // TODO(qti3e): Explore allowing to send raw buffers from here.
-            //     // There is a lot of duplicated serialization going on because
-            //     // of this pattern.
-            //     //
-            //     // struct Envelop<T>(Vec<u8>, PhantomData<T>);
-            //     // let e = Envelop::new(msg);
-            //     // ...
-            //     // send_envelop(e)
-            //     info.sender.send(Frame::Advr(msg)).await;
-            // });
+
+            let sender = endpoint_tx.clone();
+            let msg = message.clone();
+            tokio::spawn(async move {
+                // TODO(qti3e): Explore allowing to send raw buffers from here.
+                // There is a lot of duplicated serialization going on because
+                // of this pattern.
+                //
+                // struct Envelop<T>(Vec<u8>, PhantomData<T>);
+                // let e = Envelop::new(msg);
+                // ...
+                // send_envelop(e)
+                let address = NodeAddress {
+                    socket_address: info.address,
+                    pk,
+                };
+                if sender
+                    .send(Request::SendMessage {
+                        peer: address,
+                        message: msg,
+                    })
+                    .await
+                    .is_err()
+                {
+                    tracing::error!("endpoint dropped the channel");
+                }
+            });
         });
     }
 
@@ -236,7 +318,12 @@ impl Peers {
         }
     }
 
-    pub fn handle_new_connection(&mut self, index: NodeIndex, peer_pk: NodePublicKey) {
+    pub fn handle_new_connection(
+        &mut self,
+        index: NodeIndex,
+        peer_pk: NodePublicKey,
+        peer_address: SocketAddr,
+    ) {
         assert_ne!(index, self.us); // we shouldn't be calling ourselves.
 
         if let Some(info) = self.peers.get(&peer_pk) {
@@ -246,6 +333,7 @@ impl Peers {
 
         let info = Peer {
             index,
+            address: peer_address,
             has: Default::default(),
         };
 
@@ -263,7 +351,7 @@ impl Peers {
     //             self.peers.insert(pk, info);
     //             return;
     //         }
-    //         info.status = ConnectionStatus::Closed;
+    //         info.status = `ConnectionStatus::Closed`;
     //     }
     // }
 
@@ -299,16 +387,5 @@ impl Peers {
     fn keep_alive(&self, pk: &NodePublicKey) -> bool {
         // TODO(qti3e): Implement this function.
         true
-    }
-}
-
-impl Default for Peers {
-    fn default() -> Self {
-        Self {
-            us: 0,
-            pinned: Default::default(),
-            stats: Default::default(),
-            peers: Default::default(),
-        }
     }
 }
