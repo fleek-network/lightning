@@ -44,12 +44,11 @@ async fn demo() -> anyhow::Result<()> {
 
     node.start().await;
 
-    let client = dial_mock(69).await.unwrap();
+    {
+        let (tx, mut rx) = dial_mock(69).await.unwrap();
 
-    // send the initial handshake
-    client
-        .0
-        .send(
+        // send the initial handshake
+        tx.send(
             schema::HandshakeRequestFrame::Handshake {
                 retry: None,
                 service: 0,
@@ -60,7 +59,23 @@ async fn demo() -> anyhow::Result<()> {
         )
         .await?;
 
-    tokio::time::sleep(Duration::from_secs(1)).await;
+        // let response = rx.recv().await;
+        // println!("handshake response {response:?}");
+
+        // send a message.
+        tx.send(
+            schema::RequestFrame::ServicePayload {
+                bytes: "Hello Service".to_owned().into(),
+            }
+            .encode(),
+        )
+        .await?;
+
+        let response = rx.recv().await;
+        println!("request response {response:?}");
+    }
+
+    tokio::time::sleep(Duration::from_secs(10)).await;
 
     node.shutdown().await;
 

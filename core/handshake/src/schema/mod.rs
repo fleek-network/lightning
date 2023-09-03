@@ -156,8 +156,8 @@ pub enum RequestFrame {
     ServicePayload { bytes: bytes::Bytes },
     /// Request access token from.
     AccessToken { ttl: u64 },
-    /// Refresh an access token.
-    RefreshAccessToken { access_token: Box<[u8; 48]> },
+    /// Extend the access token associated with this connection.
+    ExtendAccessToken { ttl: u64 },
     DeliveryAcknowledgment {
         // TODO
     },
@@ -178,10 +178,10 @@ impl RequestFrame {
                 buf.put_u64(*ttl);
                 buf.into()
             },
-            Self::RefreshAccessToken { access_token } => {
+            Self::ExtendAccessToken { ttl } => {
                 let mut buf = Vec::with_capacity(49);
                 buf.put_u8(0x02);
-                buf.put_slice(access_token.as_slice());
+                buf.put_u64(*ttl);
                 buf.into()
             },
             Self::DeliveryAcknowledgment {} => vec![0x03].into(),
@@ -207,8 +207,8 @@ impl RequestFrame {
                     return Err(anyhow!("wrong number of bytes"));
                 }
 
-                let access_token = Box::new(*array_ref!(bytes, 1, 48));
-                Ok(Self::RefreshAccessToken { access_token })
+                let ttl = u64::from_be_bytes(*array_ref!(bytes, 1, 8));
+                Ok(Self::ExtendAccessToken { ttl })
             },
             0x03 => Ok(Self::DeliveryAcknowledgment {}),
             _ => Err(anyhow!("invalid frame tag")),
@@ -360,9 +360,7 @@ mod tests {
                 bytes: vec![1; 64].into(),
             },
             RequestFrame::AccessToken { ttl: 2 },
-            RequestFrame::RefreshAccessToken {
-                access_token: [3; 48].into(),
-            },
+            RequestFrame::ExtendAccessToken { ttl: 12 },
             RequestFrame::DeliveryAcknowledgment {}
         );
     }

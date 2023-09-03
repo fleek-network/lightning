@@ -83,5 +83,5 @@ async fn run_receive_loop<P: ExecutorProviderInterface, T: Transport>(
         })
         .await;
 
-    state.on_transport_closed(perm, connection_id);
+    state.on_transport_closed(perm, connection_id).await;
 }

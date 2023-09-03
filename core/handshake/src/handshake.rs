@@ -19,6 +19,10 @@ use crate::state::StateRef;
 use crate::transport_driver::{attach_transport_by_config, TransportConfig};
 use crate::worker::{attach_worker, WorkerMode};
 
+/// Default connection timeout. This is the amount of time we will wait
+/// to close a connection after all transports have dropped.
+const CONNECTION_TIMEOUT: Duration = Duration::from_secs(5);
+
 pub struct Handshake<C: Collection> {
     status: Mutex<Option<Run<C>>>,
     config: HandshakeConfig,
@@ -62,7 +66,7 @@ impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
     ) -> anyhow::Result<Self> {
         let shutdown = ShutdownNotifier::default();
         let (_, sk) = signer.get_sk();
-        let state = StateRef::new(shutdown.waiter(), sk, provider);
+        let state = StateRef::new(CONNECTION_TIMEOUT, shutdown.waiter(), sk, provider);
 
         Ok(Self {
             status: Mutex::new(Some(Run {
