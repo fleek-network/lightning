@@ -1,4 +1,3 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -62,8 +61,6 @@ pub struct Execution<Q: SyncQueryRunnerInterface> {
     reconfigure_notify: Arc<Notify>,
     /// Notifier that notifies everytime a block is executed on application state
     new_block_notify: Arc<Notify>,
-    /// If this node is currently on the committee
-    is_committee: AtomicBool,
     /// Used to send payloads to the edge node consensus to broadcast out to other nodes
     tx_narwhal_batches: mpsc::Sender<(AuthenticStampedParcel, bool)>,
     /// Query runner to check application state, mainly used to make sure the last executed block
@@ -83,7 +80,6 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
             executor,
             reconfigure_notify,
             new_block_notify,
-            is_committee: AtomicBool::new(false),
             tx_narwhal_batches,
             query_runner,
         }
@@ -115,10 +111,6 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
 
         change_epoch
     }
-
-    pub fn set_committee_status(&self, on_committee: bool) {
-        self.is_committee.store(on_committee, Ordering::Relaxed)
-    }
 }
 
 #[async_trait]
@@ -127,7 +119,14 @@ impl<Q: SyncQueryRunnerInterface> ExecutionState for Execution<Q> {
         let mut batch_payload: Vec<Transaction> =
             Vec::with_capacity(consensus_output.sub_dag.num_batches());
 
-        for (_, batches) in consensus_output.batches {
+        for (cert, batches) in consensus_output.batches {
+            if cert.epoch() != self.query_runner.get_epoch() {
+                // If the certificate epoch does not match the current epoch in the application
+                // state do not execute this transaction, This could only happen in
+                // certain race conditions at the end of an epoch and we need this to ensure all
+                // nodes execute the same transactions
+                continue;
+            }
             // Put all the batches in this Consensus output into one vec of batches.
             for mut batch in batches {
                 batch_payload.extend(batch.transactions_mut().to_owned());

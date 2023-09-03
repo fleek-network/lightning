@@ -255,9 +255,6 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         // If you are on the committee start the timer to signal when your node thinks its ready
         // to change epochs.
 
-        // Let the execution state know you are on the committee
-        self.execution_state.set_committee_status(true);
-
         // Create the narwhal service
         let service =
             NarwhalService::new(self.narwhal_args.clone(), store, committee, worker_cache);
