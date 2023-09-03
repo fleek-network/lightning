@@ -1,4 +1,6 @@
 // cargo run --example server -- --config ./examples/config.toml -vvvv run
+// run static file server separately, e.g
+// python3 -m http.server
 
 use lightning_handshake::handshake::Handshake;
 use lightning_interfaces::infu_collection::Collection;

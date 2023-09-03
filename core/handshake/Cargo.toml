@@ -31,6 +31,9 @@ heapless = "0.7.16"
 axum = "0.6"
 webrtc = "0.8.0"
 rand = "0.8"
+tower = "0.4"
+tower-http = { version = "0.4.4", features = ["cors"] }
+hyper = "0.14"
 
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }

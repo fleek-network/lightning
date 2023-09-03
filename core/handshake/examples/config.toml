@@ -1,5 +1,11 @@
 [BLANK]
 
+[application]
+db_path = "~/.lightning/data/app_db"
+mode = "Dev"
+storage = "RocksDb"
+testnet = false
+
 [handshake]
 
 [[handshake.worker]]

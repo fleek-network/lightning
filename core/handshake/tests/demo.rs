@@ -71,7 +71,8 @@ async fn demo() -> anyhow::Result<()> {
         )
         .await?;
 
-        let response = rx.recv().await;
+        let response = rx.recv().await.unwrap();
+        let response = schema::ResponseFrame::decode(&response).unwrap();
         println!("request response {response:?}");
     }
 

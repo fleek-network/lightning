@@ -2,6 +2,7 @@ use anyhow::Result;
 use axum::extract::State;
 use axum::routing::post;
 use axum::{Json, Router};
+use tower_http::cors::CorsLayer;
 use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
 
 use crate::shutdown::ShutdownWaiter;
@@ -15,6 +16,7 @@ pub async fn start_signaling_server(
 ) -> Result<()> {
     let app = Router::new()
         .route("/sdp", post(handler))
+        .layer(CorsLayer::permissive())
         .with_state(socket);
 
     axum::Server::bind(&config.signal_address)
