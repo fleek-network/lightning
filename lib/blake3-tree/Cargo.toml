@@ -7,7 +7,7 @@ authors = ["Parsa Ghadimi <parsa@fleek.xyz>"]
 description = "Blake3 supercharged"
 
 [dependencies]
-fleek-blake3 = "1.3"
+fleek-blake3 = "1.4"
 thiserror = "1.0"
 arrayref = "0.3"
 arrayvec = "0.7"

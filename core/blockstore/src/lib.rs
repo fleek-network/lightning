@@ -386,4 +386,35 @@ mod tests {
 
         result.expect("Test to pass");
     }
+
+    #[tokio::test]
+    async fn hash_consistency() {
+        let path =
+            std::env::temp_dir().join(format!("test-{}", std::thread::current().name().unwrap()));
+
+        let blockstore = Blockstore::<TestBinding>::init(Config {
+            root: path.clone().try_into().unwrap(),
+        })
+        .unwrap();
+
+        const SIZE: usize = 4321;
+
+        let mut expected_hash = blake3_tree::blake3::hash(&[0; SIZE]);
+
+        let mut hasher = blake3_tree::blake3::tree::HashTreeBuilder::new();
+        for _ in 0..SIZE {
+            hasher.update(&[0; 1]);
+        }
+        let output = hasher.finalize();
+        assert_eq!(output.hash, expected_hash);
+
+        let mut putter = blockstore.put(None);
+        putter.write(&[0; SIZE], CompressionAlgorithm::Uncompressed);
+        let hash = putter.finalize().await.unwrap();
+        assert_eq!(&hash, output.hash.as_bytes());
+
+        if path.exists() {
+            std::fs::remove_dir_all(path).unwrap();
+        }
+    }
 }

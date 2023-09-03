@@ -12,7 +12,7 @@ atomo.workspace = true
 rocksdb = "0.21"
 fxhash = "0.2"
 anyhow.workspace = true
-fleek-blake3 = "1.3"
+fleek-blake3 = "1.4"
 
 [dev-dependencies]
 rand = "0.8"

@@ -11,7 +11,7 @@ bincode.workspace = true
 bytes.workspace = true
 dashmap = "5.5"
 der = { version = "0.7", features = ["alloc", "derive"] }
-fleek-blake3 = "1.3.3"
+fleek-blake3 = "1.4"
 fleek-crypto = { path = "../../lib/fleek-crypto" }
 infusion.workspace = true
 quinn.workspace = true
