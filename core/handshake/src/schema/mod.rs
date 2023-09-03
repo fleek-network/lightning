@@ -203,7 +203,7 @@ impl RequestFrame {
                 Ok(Self::AccessToken { ttl })
             },
             0x02 => {
-                if bytes.len() != 49 {
+                if bytes.len() != 9 {
                     return Err(anyhow!("wrong number of bytes"));
                 }
 
