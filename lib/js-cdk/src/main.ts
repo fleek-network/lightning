@@ -1,5 +1,3 @@
-import * as schema from './schema.ts'
+import * as schema from "./schema.ts";
 
-export {
-  schema
-}
+export { schema };
