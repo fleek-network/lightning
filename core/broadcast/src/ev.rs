@@ -7,6 +7,7 @@
 //! the entire thing in a central event loop.
 
 use std::cell::OnceCell;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -82,7 +83,7 @@ impl<C: Collection> Context<C> {
     ) -> Self {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
         let pk = sk.to_pk();
-        let peers = Peers::default();
+        let peers = Peers::new(endpoint_tx.clone());
         let stats = peers.stats.clone();
         Self {
             db,
@@ -134,6 +135,11 @@ impl<C: Collection> Context<C> {
 
     fn get_node_pk(&self, index: NodeIndex) -> Option<NodePublicKey> {
         self.sqr.index_to_pubkey(index)
+    }
+
+    fn get_node_address(&self, pk: &NodePublicKey) -> Option<SocketAddr> {
+        let info = self.sqr.get_node_info(pk)?;
+        format!("{}:{}", info.domain, info.ports.pool).parse().ok()
     }
 
     fn apply_topology(&mut self, new_topology: Topology) {
@@ -446,7 +452,11 @@ async fn main_loop<C: Collection>(
                             log::error!("remote node not found");
                             continue;
                         };
-                        ctx.peers.handle_new_connection(index, peer);
+                        let Some(address) = ctx.get_node_address(&peer) else {
+                            log::error!("remote node address not found");
+                            continue;
+                        };
+                        ctx.peers.handle_new_connection(index, peer, address);
                     }
                     Event::Message { peer, message } => {
                         match Frame::decode(&message) {
