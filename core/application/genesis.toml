@@ -12,8 +12,8 @@ consumer_rebate = 0
 max_boost = 4
 max_lock_time = 1460                                                 # 1460 days(epoch) meaning 4 years
 supply_at_genesis = 1000000                                          # set to 1 million for testing, to be determined when initial allocations are set
-protocol_fund_address = "0x2D7cC25A9e1bAEc63a422F702628865092ce1eED"
-governance_address = "0x2aA4C90C2F9D8A699A0C87B573411Db0d34BE61B"
+protocol_fund_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+governance_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 
 [[node_info]]
 owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
