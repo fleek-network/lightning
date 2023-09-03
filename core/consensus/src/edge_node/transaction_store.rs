@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::ToDigest;
+use lightning_interfaces::{SyncQueryRunnerInterface, ToDigest};
 
 use crate::execution::{AuthenticStampedParcel, Digest, Execution};
 
@@ -11,7 +11,6 @@ pub struct TransactionStore {
     parcels: HashMap<Digest, AuthenticStampedParcel>,
     attestations: HashMap<Digest, Vec<NodeIndex>>,
     executed: HashSet<Digest>,
-    pub head: Digest,
 }
 
 impl TransactionStore {
@@ -20,7 +19,6 @@ impl TransactionStore {
             parcels: HashMap::with_capacity(512),
             attestations: HashMap::with_capacity(512),
             executed: HashSet::with_capacity(512),
-            head: [0; 32],
         }
     }
 
@@ -38,11 +36,12 @@ impl TransactionStore {
 
     // Threshold should be 2f + 1 of the committee
     // Returns true if the epoch has changed
-    pub async fn try_execute(
+    pub async fn try_execute<Q: SyncQueryRunnerInterface>(
         &mut self,
         digest: Digest,
         threshold: usize,
-        execution: &Arc<Execution>,
+        execution: &Arc<Execution<Q>>,
+        head: Digest,
     ) -> bool {
         if self.executed.contains(&digest) {
             // if we executed before return false
@@ -53,7 +52,7 @@ impl TransactionStore {
             if x.len() >= threshold {
                 // if we should execute we need to make sure we can connect this to our transaction
                 // chain
-                self.try_execute_chain(digest, execution).await
+                self.try_execute_chain(digest, execution, head).await
             } else {
                 false
             }
@@ -63,7 +62,12 @@ impl TransactionStore {
         }
     }
 
-    async fn try_execute_chain(&mut self, digest: Digest, execution: &Arc<Execution>) -> bool {
+    async fn try_execute_chain<Q: SyncQueryRunnerInterface>(
+        &mut self,
+        digest: Digest,
+        execution: &Arc<Execution<Q>>,
+        head: Digest,
+    ) -> bool {
         let mut txn_chain = VecDeque::new();
         let mut last_digest = digest;
         let mut parcel_chain = Vec::new();
@@ -73,17 +77,14 @@ impl TransactionStore {
             for batch in &parcel.transactions {
                 txn_chain.push_front(batch.clone());
             }
-            if parcel.last_executed == self.head {
+            if parcel.last_executed == head {
                 // We connected the chain now execute all the transactions
-                let epoch_changed = execution.submit_batch(txn_chain.into()).await;
+                let epoch_changed = execution.submit_batch(txn_chain.into(), digest).await;
 
                 // mark all parcels in chain as executed
                 for digest in parcel_chain {
                     self.executed.insert(digest);
                 }
-
-                // set head as top of chain
-                self.head = digest;
 
                 return epoch_changed;
             } else {
@@ -91,10 +92,5 @@ impl TransactionStore {
             }
         }
         false
-    }
-
-    // This should only be called by transaction parsals sent over by narwhal on rx_narwhal_baches
-    pub(crate) fn set_head(&mut self, digest: Digest) {
-        self.head = digest;
     }
 }

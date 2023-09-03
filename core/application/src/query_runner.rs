@@ -430,4 +430,13 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 .unwrap_or(false)
         })
     }
+
+    fn get_last_block(&self) -> [u8; 32] {
+        self.inner.run(
+            |ctx| match self.metadata_table.get(ctx).get(&Metadata::LastBlockHash) {
+                Some(Value::Hash(hash)) => hash,
+                _ => [0; 32],
+            },
+        )
+    }
 }

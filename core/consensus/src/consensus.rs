@@ -79,7 +79,7 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     /// Path to the database used by the narwhal implementation
     pub store_path: ResolvedPathBuf,
     /// Narwhal execution state.
-    execution_state: Arc<Execution>,
+    execution_state: Arc<Execution<Q>>,
     /// Used to send transactions to consensus
     /// We still use this socket on consensus struct because a node is not always on the committee,
     /// so its not always sending     a transaction to its own mempool. The signer interface
@@ -96,7 +96,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         query_runner: Q,
         narwhal_args: NarwhalArgs,
         store_path: ResolvedPathBuf,
-        execution_state: Arc<Execution>,
+        execution_state: Arc<Execution<Q>>,
         txn_socket: SubmitTxSocket,
         pub_sub: P,
         rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
@@ -376,6 +376,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             reconfigure_notify.clone(),
             new_block_notify.clone(),
             tx_narwhal_batches,
+            query_runner.clone(),
         ));
         let epoch_state = EpochState::new(
             query_runner,

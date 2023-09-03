@@ -69,6 +69,7 @@ pub enum Metadata {
     NextNodeIndex,
     GovernanceAddress,
     LastEpochHash,
+    LastBlockHash,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table

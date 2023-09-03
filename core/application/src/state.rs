@@ -820,6 +820,12 @@ impl<B: Backend> State<B> {
             .set(Metadata::LastEpochHash, Value::Hash(state_hash));
     }
 
+    // This function should only be called in the `run` method on `Env`.
+    pub fn set_last_block(&self, block_hash: [u8; 32]) {
+        self.metadata
+            .set(Metadata::LastBlockHash, Value::Hash(block_hash));
+    }
+
     fn add_service(
         &self,
         _sender: TransactionSender,

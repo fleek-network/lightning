@@ -215,7 +215,8 @@ async fn run_consensus(
 
                 let transactions = std::mem::replace(&mut buffer, Vec::with_capacity(32));
                 let block = Block {
-                    transactions
+                    transactions,
+                    digest: [0;32]
                 };
 
                 let _ = exec.run(block).await;

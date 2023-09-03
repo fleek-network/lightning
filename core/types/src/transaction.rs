@@ -36,6 +36,8 @@ const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";
 #[derive(Debug)]
 pub struct Block {
     pub transactions: Vec<UpdateRequest>,
+    // Digest of the narwhal certificate that included this
+    pub digest: [u8; 32],
 }
 
 /// An update transaction, sent from users to the consensus to migrate the application

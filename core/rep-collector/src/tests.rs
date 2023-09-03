@@ -620,6 +620,7 @@ async fn test_reputation_calculation_and_query() {
         let _res = update_socket
             .run(Block {
                 transactions: vec![req],
+                digest: [0; 32],
             })
             .await
             .map_err(|r| anyhow::anyhow!(format!("{r:?}")))

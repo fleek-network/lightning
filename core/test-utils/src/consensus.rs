@@ -148,6 +148,7 @@ impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
 
                     let block = Block {
                         transactions: vec![update_request],
+                        digest: [0;32]
                     };
 
                     let _res = self.executor

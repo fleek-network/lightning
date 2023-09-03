@@ -312,6 +312,7 @@ async fn run_transaction(
     let res = update_socket
         .run(Block {
             transactions: requests,
+            digest: [0; 32],
         })
         .await
         .map_err(|r| anyhow!(format!("{r:?}")))?;

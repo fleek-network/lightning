@@ -155,6 +155,8 @@ impl Env<UpdatePerm> {
                 */
                 response.txn_receipts.push(receipt);
             }
+            // Set the last executed block hash
+            app.set_last_block(block.digest);
 
             // Return the response
             response
@@ -171,14 +173,7 @@ impl Env<UpdatePerm> {
                 {
                     if let Ok(state_hash) = blockstore_put.finalize().await {
                         // Only temporary: write the checkpoint to disk directly.
-
-                        self.inner.run(move |ctx| {
-                            let backend = StateTables {
-                                table_selector: ctx,
-                            };
-                            let app = State::new(backend);
-                            app.set_last_epoch_hash(state_hash);
-                        })
+                        self.update_last_epoch_hash(state_hash);
                     } else {
                         warn!("Failed to finalize writing checkpoint to blockstore");
                     }
@@ -393,6 +388,17 @@ impl Env<UpdatePerm> {
 
         metadata_table.insert(Metadata::Epoch, Value::Epoch(0));
         true
+        })
+    }
+
+    // Should only be called after saving or loading from an epoch checkpoint
+    pub fn update_last_epoch_hash(&mut self, state_hash: [u8; 32]) {
+        self.inner.run(move |ctx| {
+            let backend = StateTables {
+                table_selector: ctx,
+            };
+            let app = State::new(backend);
+            app.set_last_epoch_hash(state_hash);
         })
     }
 }

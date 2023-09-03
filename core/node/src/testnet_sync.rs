@@ -174,8 +174,12 @@ async fn attempt_to_sync_state<C: Collection>(
             if let Some(checkpoint) = blockstore.read_all_to_vec(&hash).await {
                 // Attempt to build db from checkpoint.
                 match Env::new(config, Some((hash, checkpoint))) {
-                    Ok(_env) => {
+                    Ok(mut env) => {
                         info!("Successfully built database from checkpoint with hash {hash:?}.");
+
+                        // Update the last epoch has on state
+                        env.update_last_epoch_hash(hash);
+
                         return Ok(());
                     },
                     Err(e) => {

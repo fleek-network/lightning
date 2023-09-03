@@ -182,6 +182,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// takes NodeInfo and returns if they are a current committee member or not
     fn is_committee(&self, node_index: u32) -> bool;
+
+    /// Returns last executed block hash. [0;32] is genesis
+    fn get_last_block(&self) -> [u8; 32];
 }
 
 #[derive(Clone, Debug)]
