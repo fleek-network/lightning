@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "outDir": "build",
+    "target": "es2017",
+    "strict": true,
+    "alwaysStrict": true,
+    "noImplicitAny": true,
+    "sourceMap": true,
+    "strictNullChecks": true,
+    "lib": ["es2017", "dom"],
+    "downlevelIteration": true,
+    "experimentalDecorators": true,
+    "stripInternal": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "src/**/*",
+    "lib/**/*",
+    "*.d.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

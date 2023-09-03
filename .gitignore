@@ -1,5 +1,4 @@
 target
-*.json
 !openrpc.json
 **/data
 **/lightning.toml
