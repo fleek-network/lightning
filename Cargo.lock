@@ -3947,6 +3947,7 @@ dependencies = [
  "ink-quill",
  "lightning-application",
  "lightning-interfaces",
+ "lightning-metrics",
  "lightning-notifier",
  "lightning-signer",
  "lightning-topology",

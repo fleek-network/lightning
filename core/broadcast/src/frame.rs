@@ -24,6 +24,7 @@ pub struct Message {
     pub origin: NodeIndex,
     pub signature: NodeSignature,
     pub topic: Topic,
+    pub timestamp: u64,
     pub payload: Vec<u8>,
 }
 

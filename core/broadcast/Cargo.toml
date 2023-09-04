@@ -13,6 +13,7 @@ tokio.workspace = true
 fleek-crypto = { path = "../../lib/fleek-crypto" }
 ink-quill = { path = "../../lib/ink-quill" }
 lightning-interfaces = { path = "../interfaces" }
+lightning-metrics = { path = "../metrics" }
 dashmap = "5.5.0"
 mini-moka = "0.10.2"
 tracing = "0.1.37"

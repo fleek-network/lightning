@@ -7,7 +7,7 @@
 //! the entire thing in a central event loop.
 
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
 use infusion::c;
@@ -28,6 +28,7 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
     TopologyInterface,
 };
+use lightning_metrics::histogram;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
@@ -303,6 +304,16 @@ impl<C: Collection> Context<C> {
             payload: msg.payload.into(),
         };
 
+        let now = now();
+        // only insert metrics for pseudo-valid timestamps (not in the future)
+        if msg.timestamp < now {
+            histogram!(
+                "broadcast_message_received",
+                Some("Time taken to receive messages from the originator"),
+                (msg.timestamp - now) as f64 / 1000.
+            );
+        }
+
         // Mark message as received for RTT measurements.
         self.pending_store.received_message(sender, id);
         self.incoming_messages[topic_index].insert(shared);
@@ -332,6 +343,7 @@ impl<C: Collection> Context<C> {
                 origin: self.current_node_index,
                 signature: NodeSignature([0; 64]),
                 topic: cmd.topic,
+                timestamp: now(),
                 payload: cmd.payload,
             };
             let digest = tmp.to_digest();
@@ -514,4 +526,12 @@ fn topic_to_index(topic: Topic) -> usize {
         Topic::DistributedHashTable => 1,
         Topic::Debug => 2,
     }
+}
+
+/// Get the current unix timestamp in milliseconds
+fn now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
 }
