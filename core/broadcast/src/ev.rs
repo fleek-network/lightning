@@ -403,10 +403,7 @@ async fn main_loop<C: Collection>(
     // for resolving connection ordering disputes.
     // This could have been done during initialization, except at that point we don't
     // know if application has started and therefore if the database is loaded yet.
-    ctx.current_node_index = ctx
-        .sqr
-        .pubkey_to_index(ctx.pk)
-        .expect("Current node on the application state.");
+    ctx.current_node_index = ctx.sqr.pubkey_to_index(ctx.pk).unwrap_or(NodeIndex::MAX);
     ctx.peers.set_current_node_index(ctx.current_node_index);
 
     loop {
