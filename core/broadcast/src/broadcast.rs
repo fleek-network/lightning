@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use derive_more::IsVariant;
@@ -145,6 +146,8 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         // Todo: Move this to config.
         let mut builder = Builder::new(sk.clone());
         builder.socket_address(config.address);
+        // Todo: Let's make sure we are cleaning up unused connections.
+        builder.keep_alive_interval(Duration::from_secs(8));
         let mut endpoint = builder.build()?;
         let network_event_rx = endpoint.network_event_receiver();
         let endpoint_tx = endpoint.request_sender();
