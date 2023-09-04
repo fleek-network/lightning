@@ -10,13 +10,14 @@ lightning-interfaces = { path = "../interfaces" }
 lightning-node = { path = "../node" }
 lightning-rpc = { path = "../rpc", features = ["e2e-test"] }
 lightning-application = { path = "../application" }
+lightning-broadcast = { path = "../broadcast" }
 lightning-consensus = { path = "../consensus" }
 lightning-notifier = { path = "../notifier" }
 lightning-handshake = { path = "../handshake" }
 lightning-topology = { path = "../topology" }
 lightning-signer = { path = "../signer" }
 lightning-dht = { path = "../dht" }
-lightning-pool = { path = "../pool" }
+#lightning-pool = { path = "../pool" }
 lightning-blockstore = { path = "../blockstore" }
 lightning-blockstore-server = { path = "../blockstore-server" }
 mock = { path = "../mock" }

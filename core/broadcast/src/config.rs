@@ -1,4 +1,16 @@
+use std::net::SocketAddr;
+
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default)]
-pub struct Config {}
+#[derive(Serialize, Deserialize)]
+pub struct Config {
+    pub address: SocketAddr,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            address: "0.0.0.0:4200".parse().expect("Hardcoded socket address"),
+        }
+    }
+}

@@ -20,6 +20,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::config::Config as BlockStoreServerConfig;
 use lightning_blockstore_server::BlockStoreServer;
+use lightning_broadcast::{Broadcast, Config as BroadcastConfig};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
 use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
@@ -28,7 +29,7 @@ use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::node::FinalTypes;
-use lightning_pool::pool::{ConnectionPool, PoolConfig};
+// use lightning_pool::pool::{ConnectionPool, PoolConfig};
 use lightning_rpc::config::Config as RpcConfig;
 use lightning_rpc::server::Rpc;
 use lightning_signer::{utils, Config as SignerConfig, Signer};
@@ -290,7 +291,7 @@ fn build_config(
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<ConnectionPool<FinalTypes>>(PoolConfig {
+    config.inject::<Broadcast<FinalTypes>>(BroadcastConfig {
         address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
     });
 

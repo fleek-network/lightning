@@ -11,7 +11,6 @@ use lightning_interfaces::infu_collection::{
     ConsensusInterfaceModifier,
 };
 use lightning_notifier::Notifier;
-use lightning_pool::pool::ConnectionPool;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_rpc::server::Rpc;
 use lightning_signer::Signer;
@@ -30,7 +29,6 @@ impl CollectionBase for FinalTypes {
     type BlockStoreInterface<C: Collection> = Blockstore<C>;
     type BlockStoreServerInterface<C: Collection> = BlockStoreServer<C>;
     type BroadcastInterface<C: Collection> = Broadcast<C>;
-    type ConnectionPoolInterface<C: Collection> = ConnectionPool<C>;
     type TopologyInterface<C: Collection> = Topology<C>;
     type ConsensusInterface<C: Collection> = Consensus<C>;
     type HandshakeInterface<C: Collection> = infusion::Blank<C>;
