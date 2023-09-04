@@ -1,11 +1,10 @@
-use std::fs::{self, File};
+use std::fs;
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
-use chrono::Local;
 use clap::{arg, ArgAction, Parser, Subcommand};
 use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_application::app::Application;
@@ -15,15 +14,16 @@ use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::{ConfigProviderInterface, SignerInterface};
 use lightning_signer::Signer;
 use log::LevelFilter;
+use log4rs::append::console::ConsoleAppender;
+use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
+use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
+use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
+use log4rs::append::rolling_file::RollingFileAppender;
+use log4rs::config::runtime::Logger;
+use log4rs::config::{Appender, Config, Root};
+use log4rs::encode::pattern::PatternEncoder;
+use log4rs::filter::threshold::ThresholdFilter;
 use resolved_pathbuf::ResolvedPathBuf;
-use simplelog::{
-    ColorChoice,
-    CombinedLogger,
-    ConfigBuilder,
-    TermLogger,
-    TerminalMode,
-    WriteLogger,
-};
 
 use crate::config::TomlConfigProvider;
 use crate::shutdown::ShutdownController;
@@ -108,45 +108,65 @@ impl<C: Collection> Cli<C> {
 
         let log_level = args.verbose;
         let log_filter = match log_level {
-            0 => LevelFilter::Warn,
+            0 => LevelFilter::Info,
             1 => LevelFilter::Info,
             2 => LevelFilter::Debug,
             _3_or_more => LevelFilter::Trace,
         };
 
-        // Add ignore for process subdag because Narwhal prints it as an err everytime it
-        // successfully processes a new sub_dag
-        let logger_config = ConfigBuilder::new()
-            .add_filter_ignore_str("narwhal_consensus::bullshark")
-            .add_filter_ignore_str("anemo")
-            .set_target_level(LevelFilter::Error)
-            .set_location_level(if args.log_location {
-                LevelFilter::Error
-            } else {
-                LevelFilter::Trace
-            })
-            .build();
+        let stdout = ConsoleAppender::builder().build();
 
-        let date = Local::now();
-        let log_file = std::env::temp_dir().join(format!(
-            "lightning-{}.log",
-            date.format("%Y-%m-%d-%H:%M:%S")
-        ));
+        let log_file = std::env::temp_dir().join("lightning.log");
+        let size_trigger = SizeTrigger::new(150 * 1024 * 1024); // 150 MB
+        let roller = FixedWindowRoller::builder()
+            .build(
+                std::env::temp_dir()
+                    .join("lightning.log.{}.gz")
+                    .to_str()
+                    .unwrap(),
+                10,
+            )
+            .unwrap();
+        let policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(roller));
 
-        CombinedLogger::init(vec![
-            TermLogger::new(
-                log_filter,
-                logger_config,
-                TerminalMode::Mixed,
-                ColorChoice::Auto,
-            ),
-            WriteLogger::new(
-                LevelFilter::Trace,
-                simplelog::Config::default(),
-                File::create(log_file).unwrap(),
-            ),
-        ])
-        .unwrap();
+        let rolling_appender = RollingFileAppender::builder()
+            .encoder(Box::new(PatternEncoder::new(
+                "{d(%Y-%m-%d %H:%M:%S)(utc)} [{l}] {M}:{m}{n}",
+            )))
+            .build(log_file, Box::new(policy))
+            .unwrap();
+
+        let ignore_logger_names = vec!["anemo", "quin_proto"];
+        let mut ignore_loggers: Vec<Logger> = ignore_logger_names
+            .iter()
+            .map(|&name| Logger::builder().build(name, LevelFilter::Off))
+            .collect();
+
+        // the bullshark logger is ignored for console only
+        let bullshark_ignore_logger = Logger::builder()
+            .appenders(vec!["file"])
+            .additive(false)
+            .build("narwhal_consensus::bullshark", LevelFilter::Trace);
+
+        ignore_loggers.push(bullshark_ignore_logger);
+
+        let config = Config::builder()
+            .appender(Appender::builder().build("file", Box::new(rolling_appender)))
+            .appender(
+                Appender::builder()
+                    .filter(Box::new(ThresholdFilter::new(log_filter)))
+                    .build("stdout", Box::new(stdout)),
+            )
+            .loggers(ignore_loggers)
+            .build(
+                Root::builder()
+                    .appender("file")
+                    .appender("stdout")
+                    .build(LevelFilter::Trace),
+            )
+            .unwrap();
+
+        log4rs::init_config(config).unwrap();
     }
 }
 
