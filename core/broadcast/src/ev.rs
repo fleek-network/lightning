@@ -167,23 +167,12 @@ impl<C: Collection> Context<C> {
                 continue;
             }
 
-            // if self.peers.get_connection_status(&pk) != ConnectionStatus::Closed {
-            //     // TODO(qti3e): Should we maybe handle == ConnectionStatus::Open
-            //     // instead.
-            //     continue;
-            // }
+            // We used to check if connections were not closed, we'd skip.
 
-            // let tx = self.new_outgoing_connection_tx.clone();
-            // let connector = self.connector.clone();
-            // tokio::spawn(async move {
-            //     log::trace!("connecting to {pk}");
-            //     let Some((sender, receiver)) = connector.connect(&pk).await else {
-            //         return;
-            //     };
-            //
-            //     log::trace!("connected to {pk}");
-            //     tx.send((sender, receiver));
-            // });
+            // Todo: do make a connection and handle incoming connection events.
+            // We might have to resolve disputes again.
+            // We used to make a `connect` request here.
+            // We should be able to maintain a logical state of the connections.
         }
 
         self.peers.disconnect_unpinned();
