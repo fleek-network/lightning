@@ -6,6 +6,7 @@
 //! implementation complexity or performance drops due to use of locks by just handling
 //! the entire thing in a central event loop.
 
+use std::cell::OnceCell;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -80,7 +81,7 @@ pub struct Context<C: Collection> {
     connector: c![C::ConnectionPoolInterface::Connector<Frame>],
     sk: NodeSecretKey,
     pk: NodePublicKey,
-    current_node_index: NodeIndex,
+    current_node_index: OnceCell<NodeIndex>,
 }
 
 impl<C: Collection> Context<C> {
@@ -121,7 +122,7 @@ impl<C: Collection> Context<C> {
             connector,
             sk,
             pk,
-            current_node_index: 0, // will be set upon spawn.
+            current_node_index: OnceCell::new(), // will be set upon spawn.
         }
     }
 
@@ -165,8 +166,15 @@ impl<C: Collection> Context<C> {
 
             self.peers.pin_peer(pk);
 
+            let node_index = self
+                .sqr
+                .pubkey_to_index(self.pk)
+                .expect("Tried to apply topology before node index was available");
+
+            let node_index = self.current_node_index.get_or_init(|| node_index);
+
             let Some(index) = self.get_node_index(&pk) else { continue };
-            if self.current_node_index > index {
+            if node_index > &index {
                 continue;
             }
 
@@ -343,9 +351,15 @@ impl<C: Collection> Context<C> {
     }
 
     fn handle_send_cmd(&mut self, cmd: SendCmd) {
+        let node_index = self
+            .sqr
+            .pubkey_to_index(self.pk)
+            .expect("Tried to send message before node index was available");
+        let node_index = self.current_node_index.get_or_init(|| node_index);
+
         let (digest, message) = {
             let mut tmp = Message {
-                origin: self.current_node_index,
+                origin: *node_index,
                 signature: NodeSignature([0; 64]),
                 topic: cmd.topic,
                 timestamp: now(),
@@ -403,8 +417,10 @@ async fn main_loop<C: Collection>(
     // for resolving connection ordering disputes.
     // This could have been done during initialization, except at that point we don't
     // know if application has started and therefore if the database is loaded yet.
-    ctx.current_node_index = ctx.sqr.pubkey_to_index(ctx.pk).unwrap_or(NodeIndex::MAX);
-    ctx.peers.set_current_node_index(ctx.current_node_index);
+    if let Some(node_index) = ctx.sqr.pubkey_to_index(ctx.pk) {
+        let node_index = ctx.current_node_index.get_or_init(|| node_index);
+        ctx.peers.set_current_node_index(*node_index);
+    }
 
     loop {
         log::debug!("waiting for next event.");
