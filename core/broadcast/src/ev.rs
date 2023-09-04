@@ -28,7 +28,7 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
     TopologyInterface,
 };
-use lightning_metrics::histogram;
+use lightning_metrics::{counter, histogram, increment_counter};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
@@ -307,8 +307,12 @@ impl<C: Collection> Context<C> {
         let now = now();
         // only insert metrics for pseudo-valid timestamps (not in the future)
         if msg.timestamp < now {
+            increment_counter!(
+                "broadcast_message_received_count",
+                Some("Counter for messages received over time")
+            );
             histogram!(
-                "broadcast_message_received",
+                "broadcast_message_received_time",
                 Some("Time taken to receive messages from the originator"),
                 (msg.timestamp - now) as f64 / 1000.
             );
