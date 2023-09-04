@@ -367,7 +367,7 @@ impl<C: Collection> Context<C> {
     }
 
     fn handle_mark_invalid_sender_cmd(&mut self, digest: Digest) {
-        todo!()
+        log::error!("Received message from invalid sender");
     }
 }
 
