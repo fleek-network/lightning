@@ -119,12 +119,15 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
             .iter()
             .find(|x| x.consensus_key == self.primary_name)
         {
+            // Reset cursor
+            self.cursor = 0;
             self.committee = vec![item.clone()];
         } else {
             // shuffle the order with thread_range so nodes accross the network are not all
             // connecting to the same workers
             committee.shuffle(&mut rand::thread_rng());
             self.committee = committee;
+            self.cursor = 0;
         }
 
         // Set the epoch info to the newest epoch
