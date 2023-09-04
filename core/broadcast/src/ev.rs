@@ -133,7 +133,7 @@ impl<C: Collection> Context<C> {
     pub fn spawn(self) -> (oneshot::Sender<()>, JoinHandle<Self>) {
         let (shutdown_tx, shutdown) = oneshot::channel();
         let handle = tokio::spawn(async move {
-            log::info!("spawnning brodcast");
+            log::info!("spawning broadcast event loop");
             let tmp = main_loop(shutdown, self).await;
             log::info!("broadcast shut down sucessfully");
             tmp
@@ -395,6 +395,11 @@ impl<C: Collection> Context<C> {
 
         // Continue with advertising this message to the connected peers.
         self.peers.advertise(id, digest);
+
+        increment_counter!(
+            "broadcast_messages_propagated",
+            Some("Number of messages we have initialized propagation to our peers for.")
+        )
     }
 
     fn handle_mark_invalid_sender_cmd(&mut self, digest: Digest) {
