@@ -38,7 +38,7 @@ pub trait ResolverInterface<C: Collection>: Sized + ConfigConsumer + WithStartAn
 
     /// Publish new records into the resolver global hash table about us witnessing
     /// the given blake3 hash from resolving the following pointers.
-    fn publish(&self, hash: Blake3Hash, pointers: &[ImmutablePointer]);
+    async fn publish(&self, hash: Blake3Hash, pointers: &[ImmutablePointer]);
 
     /// Tries to find the blake3 hash of an immutable pointer by only relying on locally cached
     /// records and without performing any contact with other nodes.
@@ -51,6 +51,9 @@ pub trait ResolverInterface<C: Collection>: Sized + ConfigConsumer + WithStartAn
 
     /// Returns an origin finder that can yield origins for the provided blake3 hash.
     fn get_origin_finder(&self, hash: Blake3Hash) -> Self::OriginFinder;
+
+    /// Returns all origins in the local db
+    fn get_orgins(&self, hash: Blake3Hash) -> Option<Vec<ResolvedImmutablePointerRecord>>;
 }
 
 /// An `async-iterator`-like interface that tries to find the immutable pointers of

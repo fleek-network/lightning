@@ -1,0 +1,18 @@
+[package]
+name = "lightning-resolver"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lightning-interfaces = { path = "../interfaces" }
+anyhow.workspace = true
+async-trait.workspace = true
+bincode.workspace = true
+fleek-crypto.workspace = true
+log.workspace = true
+resolved-pathbuf.workspace = true
+serde.workspace = true
+tokio.workspace = true
+rocksdb = "0.21"

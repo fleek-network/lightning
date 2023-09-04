@@ -4326,6 +4326,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-resolver"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "fleek-crypto",
+ "lightning-interfaces",
+ "log",
+ "resolved-pathbuf",
+ "rocksdb",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "lightning-rpc"
 version = "0.0.0"
 dependencies = [
