@@ -28,15 +28,13 @@ impl Builder {
         self.address = Some(address);
     }
 
-    pub fn transport_config(&mut self, config: TransportConfig) {
-        self.transport_config = config;
+    pub fn keep_alive_interval(&mut self, duration: Duration) {
+        self.transport_config.keep_alive_interval(Some(duration));
     }
 
-    pub fn build(mut self) -> Result<Endpoint> {
+    pub fn build(self) -> Result<Endpoint> {
         let tls_config = tls::make_server_config(&self.sk).expect("Secret key to be valid");
         let mut server_config = ServerConfig::with_crypto(Arc::new(tls_config));
-        self.transport_config
-            .keep_alive_interval(Some(Duration::from_secs(5)));
         server_config.transport_config(Arc::new(self.transport_config));
 
         let address: SocketAddr = self
