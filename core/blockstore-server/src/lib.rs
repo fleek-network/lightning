@@ -307,6 +307,8 @@ mod tests {
         }
 
         server_a.shutdown().await;
+        std::fs::remove_dir_all("test-fs-a").unwrap();
+        std::fs::remove_dir_all("test-fs-b").unwrap();
         Ok(())
     }
 }
