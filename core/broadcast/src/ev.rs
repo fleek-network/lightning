@@ -306,7 +306,7 @@ impl<C: Collection> Context<C> {
 
         let now = now();
         // only insert metrics for pseudo-valid timestamps (not in the future)
-        if msg.timestamp < now {
+        if msg.timestamp > now {
             increment_counter!(
                 "broadcast_message_received_count",
                 Some("Counter for messages received over time")
