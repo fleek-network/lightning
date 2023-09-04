@@ -35,6 +35,7 @@ use lightning_interfaces::types::{
     ServiceId,
     ServiceRevenue,
     Staking,
+    TestnetAdmin,
     Tokens,
     TotalServed,
     TransactionResponse,
@@ -197,6 +198,9 @@ impl<B: Backend> State<B> {
             },
             UpdateMethod::ChangeProtocolParam { param, value } => {
                 self.change_protocol_param(txn.sender, param, value)
+            },
+            UpdateMethod::TestnetAdmin(inner) => match inner {
+                TestnetAdmin::Kill => self.testnet_kill(txn.sender),
             },
         };
 
@@ -851,6 +855,24 @@ impl<B: Backend> State<B> {
         _node: NodePublicKey,
     ) -> TransactionResponse {
         todo!()
+    }
+
+    // only for testnet
+    fn testnet_kill(&self, sender: TransactionSender) -> TransactionResponse {
+        let sender = match self.only_account_owner(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+        // Since the governance address will be
+        // seeded though genesis, this should never happen.
+        let governance_address = match self.metadata.get(&Metadata::GovernanceAddress) {
+            Some(Value::AccountPublicKey(address)) => address,
+            _ => panic!("Governance address is missing from state."),
+        };
+        if sender != governance_address {
+            return TransactionResponse::Revert(ExecutionError::OnlyGovernance);
+        }
+        panic!("This testnet phase is over. Thank you for participating.");
     }
 
     fn submit_reputation_measurements(

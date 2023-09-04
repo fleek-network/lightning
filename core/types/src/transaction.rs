@@ -162,6 +162,14 @@ pub enum UpdateMethod {
         param: ProtocolParams,
         value: u128,
     },
+    // only for testnet
+    TestnetAdmin(TestnetAdmin),
+}
+
+// only for testnet
+#[derive(Debug, Hash, Clone, Serialize, Deserialize)]
+pub enum TestnetAdmin {
+    Kill,
 }
 
 impl ToDigest for UpdatePayload {
@@ -330,6 +338,12 @@ impl ToDigest for UpdatePayload {
                     .with_prefix("input".to_owned())
                     .with("param", &(param.clone() as u8))
                     .with("value", value);
+            },
+            UpdateMethod::TestnetAdmin(inner) => match inner {
+                TestnetAdmin::Kill => {
+                    transcript_builder =
+                        transcript_builder.with("transaction_name", &"testnet_admin_kill")
+                },
             },
         }
 
