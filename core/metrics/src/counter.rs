@@ -56,15 +56,15 @@ impl Counter for Labels {
 
 #[macro_export]
 macro_rules! increment_counter {
-    ($family:expr, $description:expr, $($label:expr => $value:expr),*) => {
+    ($family:expr, $description:expr $(, $($label:expr => $value:expr),*)?) => {
         {
             let function =
                 $crate::labels::Labels::extract_fn_name($crate::histogram::function_name!());
             let default_labels = $crate::labels::Labels::new(function, module_path!());
             let default_labels = default_labels.to_vec();
 
-            let additional_labels = vec![$($label),*];
-            let additional_values = vec![$($value),*];
+            let additional_labels = vec![$($($label),*)?];
+            let additional_values = vec![$($($value),*)?];
 
             let all_labels: Vec<_> = default_labels
                 .iter().map(|a| a.0).chain(additional_labels).collect();
