@@ -52,6 +52,9 @@ pub enum Event {
         peer: NodePublicKey,
         rtt: Duration,
     },
+    Disconnect {
+        peer: NodePublicKey,
+    },
 }
 
 pub struct Endpoint {
@@ -166,7 +169,7 @@ impl Endpoint {
                 Some(peer) = self.driver_set.join_next() => {
                     match peer {
                         Ok(pk) => {
-                            self.driver.remove(&pk);
+                            self.handle_disconnect(pk);
                         }
                         Err(e) => {
                             tracing::warn!("unable to clean up failed driver tasks: {e:?}");
@@ -318,6 +321,16 @@ impl Endpoint {
 
     fn remove_pending_dial(&mut self, peer: &NodePublicKey) {
         self.pending_dial.remove(peer);
+    }
+
+    fn handle_disconnect(&mut self, peer: NodePublicKey) {
+        self.driver.remove(&peer);
+        let event_tx = self.network_event_tx.clone();
+        tokio::spawn(async move {
+            if event_tx.send(Event::Disconnect { peer }).await.is_err() {
+                tracing::error!("failed to send network event");
+            }
+        });
     }
 }
 
