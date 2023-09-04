@@ -108,7 +108,7 @@ impl<C: Collection> Cli<C> {
 
         let log_level = args.verbose;
         let log_filter = match log_level {
-            0 => LevelFilter::Info,
+            0 => LevelFilter::Warn,
             1 => LevelFilter::Info,
             2 => LevelFilter::Debug,
             _3_or_more => LevelFilter::Trace,
