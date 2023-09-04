@@ -26,6 +26,9 @@ pub struct NodeAddress {
 }
 
 pub enum Request {
+    Connect {
+        peer: NodeAddress,
+    },
     SendMessage {
         /// Peer to connect to.
         peer: NodeAddress,
@@ -242,6 +245,16 @@ impl Endpoint {
 
     fn handle_request(&mut self, request: Request) -> Result<()> {
         match request {
+            Request::Connect { peer } => {
+                if self
+                    .driver
+                    .get(&peer.pk)
+                    .map(|driver_tx| driver_tx.is_closed())
+                    .unwrap_or(true)
+                {
+                    self.enqueue_dial_task(peer)?;
+                }
+            },
             Request::SendMessage { peer, message } => {
                 if self
                     .driver
