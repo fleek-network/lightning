@@ -1,12 +1,7 @@
 import * as schema from "../handshake/schema.ts";
 
-console.log(schema);
-
-console.log("Hello World");
-
 // For webRTC:
-// 1. We need to make a RTCPeerConnection with the ice server we want. Should be the same
-//  as the node is using.
+// 1. We need to make a RTCPeerConnection with the ice server we have.
 // 2. We then create a data channel over the RTCPeerConnection
 //    This will get the messages from the node, and other events.
 // 3. We send /sdp request to a node on click and start the negotiation with the node.
@@ -27,6 +22,22 @@ dataChan.onclose = () => {
 
 dataChan.onopen = () => {
   console.log("dataChan opened.");
+
+  // Send a handshake.
+  dataChan.send(schema.HandshakeRequest.encode({
+    tag: schema.HandshakeRequest.Tag.Handshake,
+    service: 0 as schema.ServiceId,
+    pk: new Uint8Array(96) as schema.ClientPublicKey,
+    pop: new Uint8Array(48) as schema.ClientSignature,
+  }));
+
+  // Send the first request.
+  const encoder = new TextEncoder();
+  const view = encoder.encode("Hello Service!");
+  dataChan.send(schema.Request.encode({
+    tag: schema.Request.Tag.ServicePayload,
+    bytes: view,
+  }));
 };
 
 dataChan.onmessage = (e: MessageEvent) => {
