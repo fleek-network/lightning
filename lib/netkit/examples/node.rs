@@ -82,6 +82,9 @@ async fn main() {
                             Event::NewConnection { peer, rtt } => {
                                 tracing::info!("new connection from {peer:?} with {rtt:?}");
                             }
+                            Event::Disconnect { peer } => {
+                                tracing::info!("disconnected from {:?}", peer.to_string());
+                            }
                         }
                     }
                 }
@@ -100,6 +103,9 @@ async fn main() {
                         }
                         Event::NewConnection { peer, rtt } => {
                             tracing::info!("new connection from {:?} with rtt {rtt:?}", peer.to_string());
+                        }
+                        Event::Disconnect { peer } => {
+                            tracing::info!("disconnected from {:?}", peer.to_string());
                         }
                     }
                 }
