@@ -436,7 +436,7 @@ async fn main_loop<C: Collection>(
                 log::info!("Incoming event {:?}", event);
                 match event {
                     // Todo: We need a disconnect event.
-                    Event::NewConnection {peer, rtt} => {
+                    Event::NewConnection { peer, rtt, .. } => {
                         let Some(index) = ctx.get_node_index(&peer) else {
                             log::error!("remote node not found");
                             continue;
@@ -455,6 +455,9 @@ async fn main_loop<C: Collection>(
                             }
                             Err(e) => log::error!("invalid frame: {e:?}"),
                         }
+                    }
+                    Event::Disconnect { peer } => {
+                        ctx.peers.handle_disconnect(&peer);
                     }
                 }
 

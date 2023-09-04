@@ -341,7 +341,7 @@ impl Peers {
     }
 
     #[inline(always)]
-    fn disconnected(&mut self, peer: &NodePublicKey) {
+    pub fn handle_disconnect(&mut self, peer: &NodePublicKey) {
         self.peers.remove(&peer);
     }
 
