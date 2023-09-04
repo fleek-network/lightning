@@ -340,20 +340,10 @@ impl Peers {
         self.peers.insert(peer_pk, info);
     }
 
-    // #[inline(always)]
-    // fn disconnected(&mut self, receiver: PairedReceiver<R>) {
-    //     let pk = *receiver.pk();
-    //     if let Some(mut info) = self.peers.remove(&pk) {
-    //         if !receiver.is_receiver_of(&info.sender) {
-    //             // We are using a different connection at this point,
-    //             // insert it back and return. There is nothing for us
-    //             // to do here.
-    //             self.peers.insert(pk, info);
-    //             return;
-    //         }
-    //         info.status = `ConnectionStatus::Closed`;
-    //     }
-    // }
+    #[inline(always)]
+    fn disconnected(&mut self, peer: &NodePublicKey) {
+        self.peers.remove(&peer);
+    }
 
     #[inline(always)]
     pub fn report_stats(&mut self, peer: NodePublicKey, frame: &Frame) {
