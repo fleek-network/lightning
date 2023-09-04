@@ -49,6 +49,7 @@ pub enum Event {
         message: Message,
     },
     NewConnection {
+        incoming: bool,
         peer: NodePublicKey,
         rtt: Duration,
     },
@@ -218,7 +219,7 @@ impl Endpoint {
         self.connecting.push(fut);
     }
 
-    fn handle_connection(&mut self, peer: NodePublicKey, connection: Connection, accept: bool) {
+    fn handle_connection(&mut self, peer: NodePublicKey, connection: Connection, incoming: bool) {
         self.cancel_dial(&peer);
 
         let (message_tx, message_rx) = mpsc::channel(1024);
@@ -228,6 +229,7 @@ impl Endpoint {
         self.driver_set.spawn(async move {
             if event_tx
                 .send(Event::NewConnection {
+                    incoming,
                     peer,
                     rtt: connection.rtt(),
                 })
@@ -238,7 +240,7 @@ impl Endpoint {
             }
 
             if let Err(e) =
-                driver::start_driver(connection, peer, message_rx, event_tx, accept).await
+                driver::start_driver(connection, peer, message_rx, event_tx, incoming).await
             {
                 tracing::error!("driver for connection with {peer:?} shutdowned: {e:?}")
             }
