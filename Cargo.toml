@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["core/*", "lib/*", "services/*"]
-exclude = ["etc/global-metrics", "lib/js-cdk"]
+exclude = ["etc/global-metrics", "lib/cdk"]
 
 
 [workspace.package]

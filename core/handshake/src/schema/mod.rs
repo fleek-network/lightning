@@ -179,7 +179,7 @@ impl RequestFrame {
                 buf.into()
             },
             Self::ExtendAccessToken { ttl } => {
-                let mut buf = Vec::with_capacity(49);
+                let mut buf = Vec::with_capacity(9);
                 buf.put_u8(0x02);
                 buf.put_u64(*ttl);
                 buf.into()
@@ -302,6 +302,8 @@ impl TerminationReason {
             0x03 => Self::InvalidDeliveryAcknowledgment,
             0x04 => Self::InvalidService,
             0x05 => Self::ServiceTerminated,
+            0x06 => Self::ConnectionInUse,
+            0x07 => Self::WrongPermssion,
             _ => Self::Unknown,
         }
     }
