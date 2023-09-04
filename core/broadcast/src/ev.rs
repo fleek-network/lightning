@@ -166,11 +166,11 @@ impl<C: Collection> Context<C> {
 
             self.peers.pin_peer(pk);
 
-            let node_index = self
+            let Some(node_index) = self
                 .sqr
-                .pubkey_to_index(self.pk)
-                .expect("Tried to apply topology before node index was available");
-
+                .pubkey_to_index(self.pk) else {
+                return;
+            };
             let node_index = self.current_node_index.get_or_init(|| node_index);
 
             let Some(index) = self.get_node_index(&pk) else { continue };
