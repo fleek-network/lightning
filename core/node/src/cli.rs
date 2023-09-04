@@ -1,5 +1,8 @@
+// TODO(qti3e): Split the CLI and make it more "beautiful".
+
 use std::fs;
 use std::future::Future;
+use std::io::Read;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -11,7 +14,12 @@ use lightning_application::app::Application;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore_server::BlockStoreServer;
 use lightning_interfaces::infu_collection::{Collection, Node};
-use lightning_interfaces::{ConfigProviderInterface, SignerInterface};
+use lightning_interfaces::{
+    BlockStoreInterface,
+    ConfigProviderInterface,
+    IncrementalPutInterface,
+    SignerInterface,
+};
 use lightning_signer::Signer;
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
@@ -57,7 +65,6 @@ pub enum Command {
     /// Handle keys.
     #[command(subcommand)]
     Keys(Keys),
-    ///
     /// Print the loaded configuration.
     ///
     /// By default this command prints the loaded configuration.
@@ -66,14 +73,21 @@ pub enum Command {
         #[arg(long)]
         default: bool,
     },
-    /// Initialize the node without starting it.
-    DevInitOnly,
-    /// Dump the infusion graph of the node instance.
-    DevDumpGraph {
-        /// Only show the initialization order.
-        #[arg(long)]
-        show_order: bool,
-    },
+    /// Dev only sub commands. These are hidden by default.
+    #[command(subcommand, hide = true)]
+    Dev(Dev),
+}
+
+#[derive(Subcommand, Clone)]
+pub enum Dev {
+    /// Initialize every service without starting the node.
+    InitOnly,
+    /// Show the order at which the execution will happen.
+    ShowOrder,
+    /// Dump the mermaid dependency graph of services.
+    DepGraph,
+    /// Store the provided files to the blockstore.
+    Store { input: Vec<PathBuf> },
 }
 
 #[derive(Subcommand)]
@@ -186,38 +200,13 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
             let _ = fs::create_dir_all(parent_dir);
         }
 
-        match args.cmd {
+        match &args.cmd {
             Command::Run {} => self.run(config_path).await,
             Command::Keys(Keys::Generate) => Self::generate_keys(config_path).await,
             Command::Keys(Keys::Show) => Self::show_keys(config_path).await,
-            Command::PrintConfig { default } if default => Self::print_default_config().await,
+            Command::PrintConfig { default } if *default => Self::print_default_config().await,
             Command::PrintConfig { .. } => Self::print_config(config_path).await,
-            Command::DevInitOnly => {
-                let config = Self::load_or_write_config(config_path).await?;
-                Node::<C>::init(config)
-                    .map_err(|e| anyhow::anyhow!("Could not start the node: {e}"))?;
-                Ok(())
-            },
-            Command::DevDumpGraph { show_order } if show_order => {
-                let graph = C::build_graph();
-                let sorted = graph.sort()?;
-                for (i, tag) in sorted.iter().enumerate() {
-                    println!(
-                        "{:0width$}  {tag}\n      = {ty}",
-                        i + 1,
-                        width = 2,
-                        tag = tag.trait_name(),
-                        ty = tag.type_name()
-                    );
-                }
-                Ok(())
-            },
-            Command::DevDumpGraph { .. } => {
-                let graph = C::build_graph();
-                let mermaid = graph.mermaid("Lightning Dependency Graph");
-                println!("{mermaid}");
-                Ok(())
-            },
+            Command::Dev(cmd) => cmd.exec::<C>(config_path).await,
         }
     }
 
@@ -357,9 +346,104 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
     }
 }
 
+impl Dev {
+    pub async fn exec<
+        C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterface = Signer<C>>,
+    >(
+        &self,
+        config_path: ResolvedPathBuf,
+    ) -> Result<()> {
+        match self {
+            Dev::InitOnly => {
+                let config = Cli::<C>::load_or_write_config(config_path).await?;
+                Node::<C>::init(config)
+                    .map_err(|e| anyhow::anyhow!("Could not start the node: {e}"))?;
+                Ok(())
+            },
+            Dev::ShowOrder => {
+                let graph = C::build_graph();
+                let sorted = graph.sort()?;
+                for (i, tag) in sorted.iter().enumerate() {
+                    println!(
+                        "{:0width$}  {tag}\n      = {ty}",
+                        i + 1,
+                        width = 2,
+                        tag = tag.trait_name(),
+                        ty = tag.type_name()
+                    );
+                }
+                Ok(())
+            },
+            Dev::DepGraph => {
+                let graph = C::build_graph();
+                let mermaid = graph.mermaid("Lightning Dependency Graph");
+                println!("{mermaid}");
+                Ok(())
+            },
+            Dev::Store { input } => {
+                let config = Cli::<C>::load_or_write_config(config_path).await?;
+                let store = <C::BlockStoreInterface as BlockStoreInterface<C>>::init(
+                    config.get::<C::BlockStoreInterface>(),
+                )
+                .expect("Could not init blockstore");
+
+                let mut block = vec![0u8; 256 * 1025];
+
+                'outer: for path in input {
+                    let Ok(mut file) = fs::File::open(path) else {
+                        log::error!("Could not open the file {path:?}");
+                        continue;
+                    };
+
+                    let mut putter = store.put(None);
+
+                    loop {
+                        let Ok(size) = file.read(&mut block) else {
+                            log::error!("read error");
+                            break 'outer;
+                        };
+
+                        if size == 0 {
+                            break;
+                        }
+
+                        putter
+                            .write(
+                                &block[0..size],
+                                lightning_types::CompressionAlgorithm::Uncompressed,
+                            )
+                            .unwrap();
+                    }
+
+                    match putter.finalize().await {
+                        Ok(hash) => {
+                            println!("{:x}\t{path:?}", ByteBuf(&hash));
+                        },
+                        Err(e) => {
+                            log::error!("Failed: {e}");
+                        },
+                    }
+                }
+                Ok(())
+            },
+        }
+    }
+}
+
 #[test]
 fn some() {
     let config = PathBuf::from("/config.toml");
 
     config.parent().unwrap();
+}
+
+struct ByteBuf<'a>(&'a [u8]);
+
+impl<'a> std::fmt::LowerHex for ByteBuf<'a> {
+    fn fmt(&self, fmtr: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        for byte in self.0 {
+            fmtr.write_fmt(format_args!("{:02x}", byte))?;
+        }
+        Ok(())
+    }
 }
