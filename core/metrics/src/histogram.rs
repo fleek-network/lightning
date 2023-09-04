@@ -4,6 +4,7 @@ use log::error;
 use once_cell::sync::Lazy;
 use prometheus::core::Collector;
 use prometheus::{register_histogram_vec, HistogramVec};
+pub use stdext::function_name;
 
 use crate::labels::Labels;
 
@@ -73,7 +74,8 @@ macro_rules! histogram {
     ($family:expr, $description:expr, $value:expr, $($bucket:expr),+ ) => {
         {
             let buckets = vec![$($bucket),+];
-            let function = $crate::labels::Labels::extract_fn_name(::stdext::function_name!());
+            let function =
+                $crate::labels::Labels::extract_fn_name($crate::histogram::function_name!());
             let default_labels = $crate::labels::Labels::new(function, module_path!());
             let default_labels = default_labels.to_vec();
 
@@ -88,7 +90,8 @@ macro_rules! histogram {
     };
     ($family:expr, $description:expr, $value:expr ) => {
     {
-        let function = $crate::labels::Labels::extract_fn_name(stdext::function_name!());
+        let function =
+            $crate::labels::Labels::extract_fn_name($crate::histogram::function_name!());
         let default_labels = $crate::labels::Labels::new(function, module_path!());
         let default_labels = default_labels.to_vec();
 

@@ -29,7 +29,6 @@ reqwest = "0.11.18"
 serde = { version = "1.0", features = ["derive"] }
 serde-big-array = "0.5.1"
 serde_json = "1.0.96"
-stdext = "0.3.1"
 thiserror = "1.0"
 tempdir = "0.3"
 parking_lot = "0.12.1"

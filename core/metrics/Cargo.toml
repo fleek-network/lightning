@@ -13,5 +13,5 @@ lightning-types = { path = "../types" }
 log.workspace = true
 once_cell = "1.18.0"
 prometheus = "0.13.3"
-stdext.workspace = true
+stdext = "0.3.1"
 tokio.workspace = true

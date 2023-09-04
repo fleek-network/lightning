@@ -7,6 +7,7 @@ use prometheus::{register_int_counter_vec, IntCounterVec};
 use crate::labels::Labels;
 
 static COUNTERS: Lazy<DashMap<String, IntCounterVec>> = Lazy::new(DashMap::new);
+pub use stdext::function_name;
 
 pub trait Counter {
     fn increment(family: &str, description: Option<&str>, labels: &[&str], label_values: &[&str]);
@@ -57,7 +58,8 @@ impl Counter for Labels {
 macro_rules! increment_counter {
     ($family:expr, $description:expr, $($label:expr => $value:expr),*) => {
         {
-            let function = $crate::labels::Labels::extract_fn_name(stdext::function_name!());
+            let function =
+                $crate::labels::Labels::extract_fn_name($crate::histogram::function_name!());
             let default_labels = $crate::labels::Labels::new(function, module_path!());
             let default_labels = default_labels.to_vec();
 
