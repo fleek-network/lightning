@@ -19,12 +19,13 @@ use crate::{driver, tls};
 
 pub type Message = Vec<u8>;
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct NodeAddress {
     pub pk: NodePublicKey,
     pub socket_address: SocketAddr,
 }
 
+#[derive(Debug)]
 pub enum Request {
     Connect {
         peer: NodeAddress,
@@ -136,6 +137,7 @@ impl Endpoint {
                         None => break,
                         Some(request) => request,
                     };
+                    tracing::trace!("Received request {:?}", request);
                     if let Err(e) = self.handle_request(request) {
                         tracing::error!("failed to handle request: {e:?}");
                     }
@@ -143,13 +145,17 @@ impl Endpoint {
                 connecting = endpoint.accept() => {
                     match connecting {
                         None => break,
-                        Some(connecting) => self.handle_incoming_connection(connecting),
+                        Some(connecting) => {
+                            tracing::trace!("incoming connection");
+                            self.handle_incoming_connection(connecting);
+                        }
                     }
                 }
                 Some(connection_result) = self.connecting.next() => {
                     let ConnectionResult { accept, conn, peer} = connection_result;
                     match conn {
                         Ok(connection) => {
+                            tracing::trace!("new connection with {peer:?}");
                             // The unwrap here is safe because when accepting connections,
                             // we will fail to connect if we cannot obtain the peer's
                             // public key from the TLS session. When dialing, we already
@@ -170,6 +176,7 @@ impl Endpoint {
                 Some(peer) = self.driver_set.join_next() => {
                     match peer {
                         Ok(pk) => {
+                            tracing::trace!("driver finished for connection with {pk:?}");
                             self.handle_disconnect(pk);
                         }
                         Err(e) => {
@@ -251,6 +258,11 @@ impl Endpoint {
     fn handle_request(&mut self, request: Request) -> Result<()> {
         match request {
             Request::Connect { peer } => {
+                if peer.socket_address == self.address {
+                    tracing::warn!("attempted to connect to ourselves");
+                    return Ok(());
+                }
+
                 if self
                     .driver
                     .get(&peer.pk)
