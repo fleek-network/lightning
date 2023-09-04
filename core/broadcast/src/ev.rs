@@ -57,7 +57,7 @@ pub struct Context<C: Collection> {
     /// Our digest interner.
     interner: Interner,
     /// Managers of incoming message queue for each topic.
-    incoming_messages: [RecvBuffer; 3],
+    incoming_messages: [RecvBuffer; 4],
     /// The state related to the connected peers that we have right now.
     peers: Peers<S<C>, R<C>>,
     /// The instance of stats collector.
@@ -103,7 +103,8 @@ impl<C: Collection> Context<C> {
             interner: Interner::new(u16::MAX),
             incoming_messages: [
                 MessageRing::new(2048).into(),
-                MessageRing::new(512).into(),
+                MessageRing::new(32).into(),
+                MessageRing::new(1024).into(),
                 MessageRing::new(1).into(),
             ],
             peers,
@@ -528,7 +529,8 @@ fn topic_to_index(topic: Topic) -> usize {
     match topic {
         Topic::Consensus => 0,
         Topic::DistributedHashTable => 1,
-        Topic::Debug => 2,
+        Topic::Resolver => 2,
+        Topic::Debug => 3,
     }
 }
 

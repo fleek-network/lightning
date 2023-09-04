@@ -1,14 +1,14 @@
 use async_trait::async_trait;
 use infusion::c;
+use lightning_schema::broadcast::ResolvedImmutablePointerRecord;
 
-use crate::dht::DhtInterface;
 use crate::infu_collection::Collection;
-use crate::types::{ImmutablePointer, ResolvedImmutablePointerRecord};
+use crate::types::ImmutablePointer;
 use crate::{
     Blake3Hash,
+    BroadcastInterface,
     ConfigConsumer,
     ConfigProviderInterface,
-    DhtSocket,
     SignerInterface,
     WithStartAndShutdown,
 };
@@ -18,8 +18,13 @@ use crate::{
 #[async_trait]
 #[infusion::service]
 pub trait ResolverInterface<C: Collection>: Sized + ConfigConsumer + WithStartAndShutdown {
-    fn _init(config: ::ConfigProviderInterface, dht: ::DhtInterface, signer: ::SignerInterface) {
-        Self::init(config.get::<Self>(), dht.get_socket(), signer)
+    fn _init(
+        config: ::ConfigProviderInterface,
+        broadcast: ::BroadcastInterface,
+        signer: ::SignerInterface,
+    ) {
+        let pubsub = broadcast.get_pubsub(crate::types::Topic::Resolver);
+        Self::init(config.get::<Self>(), signer, pubsub)
     }
 
     type OriginFinder: OriginFinderAsyncIter;
@@ -27,27 +32,19 @@ pub trait ResolverInterface<C: Collection>: Sized + ConfigConsumer + WithStartAn
     /// Initialize and return the resolver service.
     fn init(
         config: Self::Config,
-        dht: DhtSocket,
         signer: &c!(C::SignerInterface),
+        pubsub: c!(C::BroadcastInterface::PubSub<ResolvedImmutablePointerRecord>),
     ) -> anyhow::Result<Self>;
 
     /// Publish new records into the resolver global hash table about us witnessing
     /// the given blake3 hash from resolving the following pointers.
     fn publish(&self, hash: Blake3Hash, pointers: &[ImmutablePointer]);
 
-    /// Tries to find the blake3 hash of an immutable pointer by performing a global lookup.
-    ///
-    /// This can return [`None`] based on an implementation specific timeout.
-    async fn get_blake3_hash_globally(
-        &self,
-        pointer: ImmutablePointer,
-    ) -> Option<ResolvedImmutablePointerRecord>;
-
     /// Tries to find the blake3 hash of an immutable pointer by only relying on locally cached
     /// records and without performing any contact with other nodes.
     ///
     /// This can return [`None`] if no local record is found.
-    async fn get_blake3_hash_locally(
+    async fn get_blake3_hash(
         &self,
         pointer: ImmutablePointer,
     ) -> Option<ResolvedImmutablePointerRecord>;

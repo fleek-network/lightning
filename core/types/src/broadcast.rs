@@ -12,6 +12,8 @@ pub enum Topic {
     Consensus = 0x00,
     /// The gossip topic for Fleek Network's indexer DHT.
     DistributedHashTable = 0x01,
+    /// The gossip topic for the resolver for content lookups
+    Resolver = 0x02,
     /// The debug topic for tests
     Debug = 0xFF,
 }
