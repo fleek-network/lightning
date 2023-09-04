@@ -135,7 +135,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
     type PubSub<T: LightningMessage + Clone> = PubSubI<T>;
 
     fn init(
-        _config: Self::Config,
+        config: Self::Config,
         sqr: c!(C::ApplicationInterface::SyncExecutor),
         topology: c!(C::TopologyInterface),
         signer: &c!(C::SignerInterface),
@@ -143,9 +143,8 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
     ) -> anyhow::Result<Self> {
         let (_, sk) = signer.get_sk();
         // Todo: Move this to config.
-        let address: SocketAddr = "0.0.0.0:4200".parse().expect("Hardcoded socket address");
         let mut builder = Builder::new(sk.clone());
-        builder.socket_address(address);
+        builder.socket_address(config.address);
         let mut endpoint = builder.build()?;
         let network_event_rx = endpoint.network_event_receiver();
         let endpoint_tx = endpoint.request_sender();

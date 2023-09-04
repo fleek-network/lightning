@@ -24,7 +24,7 @@ use lightning_interfaces::{
     TopologyInterface,
 };
 use lightning_metrics::{counter, histogram, increment_counter};
-use netkit::endpoint::{Event, Request};
+use netkit::endpoint::{Event, NodeAddress, Request};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
@@ -173,6 +173,21 @@ impl<C: Collection> Context<C> {
             // We might have to resolve disputes again.
             // We used to make a `connect` request here.
             // We should be able to maintain a logical state of the connections.
+            let endpoint_tx = self.endpoint_tx.clone();
+            let Some(socket_address) = self.get_node_address(&pk) else {
+                log::error!("failed to find socket address for {pk:?}");
+                continue;
+            };
+            let address = NodeAddress { pk, socket_address };
+            tokio::spawn(async move {
+                if endpoint_tx
+                    .send(Request::Connect { peer: address })
+                    .await
+                    .is_err()
+                {
+                    log::error!("failed to send connect request to endpoint");
+                }
+            });
         }
 
         self.peers.disconnect_unpinned();

@@ -23,7 +23,6 @@ lightning-signer = { path = "../signer" }
 lightning-dht = { path = "../dht" }
 lightning-test-utils = { path = "../test-utils" }
 lightning-topology = { path = "../topology" }
-lightning-pool = { path = "../pool" }
 infusion.workspace = true
 resolved-pathbuf.workspace = true
 mock = { path = "../mock" }

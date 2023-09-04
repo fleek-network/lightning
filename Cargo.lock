@@ -4072,13 +4072,13 @@ dependencies = [
  "lightning-application",
  "lightning-blockstore",
  "lightning-blockstore-server",
+ "lightning-broadcast",
  "lightning-consensus",
  "lightning-dht",
  "lightning-handshake",
  "lightning-interfaces",
  "lightning-node",
  "lightning-notifier",
- "lightning-pool",
  "lightning-rpc",
  "lightning-signer",
  "lightning-topology",
@@ -4213,7 +4213,6 @@ dependencies = [
  "lightning-handshake",
  "lightning-interfaces",
  "lightning-notifier",
- "lightning-pool",
  "lightning-rep-collector",
  "lightning-rpc",
  "lightning-signer",
@@ -4294,37 +4293,6 @@ dependencies = [
  "anyhow",
  "lightning-interfaces",
  "serde",
-]
-
-[[package]]
-name = "lightning-pool"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "async-trait",
- "bincode",
- "bytes",
- "dashmap",
- "der 0.7.7",
- "fleek-blake3",
- "fleek-crypto",
- "futures-util",
- "infusion",
- "lightning-interfaces",
- "log",
- "multiaddr",
- "quinn",
- "rcgen 0.11.1",
- "ring",
- "rustls 0.21.5",
- "serde",
- "thiserror",
- "tokio",
- "tokio-util 0.7.8",
- "tracing",
- "webpki 0.22.0",
- "x509-parser 0.15.1",
 ]
 
 [[package]]
