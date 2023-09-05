@@ -4300,6 +4300,7 @@ dependencies = [
  "lightning-blockstore",
  "lightning-interfaces",
  "lightning-test-utils",
+ "log",
  "multihash 0.19.0",
  "rustls 0.21.7",
  "serde",

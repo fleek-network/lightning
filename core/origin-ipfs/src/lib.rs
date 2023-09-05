@@ -21,6 +21,7 @@ use lightning_interfaces::{
     OriginProviderSocket,
     WithStartAndShutdown,
 };
+use log::info;
 use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, Notify};
 use tokio::time::timeout;
@@ -185,14 +186,12 @@ impl<C: Collection> IPFSOriginInner<C> {
                     let body = res.into_body();
                     return Ok(IPFSStream::new(requested_cid, body));
                 },
-                Ok(Err(_err)) => {
-                    // TODO(matthias): log this error?
-                    //return Err(anyhow!("Failed to fetch from IPFS gateway: {err:?}"))
-                    // error while fetching, onto the next gateway
+                Ok(Err(e)) => {
+                    info!("Failed to fetch from gateway {gateway:?}, moving onto the next gateway: {e:?}");
                     continue;
                 },
                 Err(_) => {
-                    // timeout, onto the next gateway
+                    info!("Timeout while fetching from gateway {gateway:?}, moving onto the next gateway: {e:?}");
                     continue;
                 },
             }
