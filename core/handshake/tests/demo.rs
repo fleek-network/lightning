@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use fleek_crypto::{ClientPublicKey, ClientSignature};
+use lightning_blockstore::blockstore::Blockstore;
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::schema;
 use lightning_handshake::transports::mock::dial_mock;
@@ -13,6 +14,7 @@ use serde_json::json;
 
 partial!(TestBinding {
     SignerInterface = KeyOnlySigner;
+    BlockStoreInterface = Blockstore<Self>;
     ConfigProviderInterface = JsonConfigProvider;
     HandshakeInterface = Handshake<Self>;
     ServiceExecutorInterface = ServiceExecutor<Self>;
