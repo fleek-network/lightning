@@ -37,9 +37,9 @@ struct Run<C: Collection> {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct HandshakeConfig {
     #[serde(rename = "worker")]
-    workers: Vec<WorkerMode>,
+    pub workers: Vec<WorkerMode>,
     #[serde(rename = "transport")]
-    transports: Vec<TransportConfig>,
+    pub transports: Vec<TransportConfig>,
 }
 
 impl Default for HandshakeConfig {
@@ -51,9 +51,7 @@ impl Default for HandshakeConfig {
                 WorkerMode::AsyncWorker,
                 WorkerMode::AsyncWorker,
             ],
-            transports: vec![
-                // TODO
-            ],
+            transports: vec![TransportConfig::WebRTC(Default::default())],
         }
     }
 }

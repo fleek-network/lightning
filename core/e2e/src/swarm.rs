@@ -25,6 +25,9 @@ use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
 use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
 use lightning_dht::dht::Dht;
+use lightning_handshake::handshake::{Handshake, HandshakeConfig};
+use lightning_handshake::transports::webrtc::WebRtcConfig;
+use lightning_handshake::{TransportConfig, WorkerMode};
 use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
@@ -32,6 +35,7 @@ use lightning_node::node::FinalTypes;
 // use lightning_pool::pool::{ConnectionPool, PoolConfig};
 use lightning_rpc::config::Config as RpcConfig;
 use lightning_rpc::server::Rpc;
+use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
 use lightning_signer::{utils, Config as SignerConfig, Signer};
 use resolved_pathbuf::ResolvedPathBuf;
 
@@ -304,6 +308,17 @@ fn build_config(
 
     config.inject::<BlockStoreServer<FinalTypes>>(BlockStoreServerConfig {
         address: ([127, 0, 0, 1], ports.blockstore).into(),
+    });
+
+    config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
+        workers: vec![WorkerMode::AsyncWorker],
+        transports: vec![TransportConfig::WebRTC(WebRtcConfig {
+            signal_address: ([127, 0, 0, 1], ports.handshake).into(),
+        })],
+    });
+
+    config.inject::<ServiceExecutor<FinalTypes>>(ServiceExecutorConfig {
+        services: Default::default(),
     });
 
     config

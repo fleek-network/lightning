@@ -9,3 +9,7 @@ mod transport_driver;
 pub mod transports;
 mod utils;
 mod worker;
+
+pub use transport_driver::TransportConfig;
+pub use worker::WorkerMode;
+
