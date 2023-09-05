@@ -13,12 +13,10 @@ use lazy_static::lazy_static;
 
 // --- SDK Setup
 
-#[no_mangle]
 pub fn on_start(args: OnStartArgs) {
     fn_sdk::api::setup(args);
 }
 
-#[no_mangle]
 pub fn on_event_response(args: OnEventResponseArgs) {
     fn_sdk::api::on_event_response(args);
 }
@@ -39,12 +37,10 @@ struct Connection {
     cursor: usize,
 }
 
-#[no_mangle]
 pub fn on_connected(args: OnConnectedArgs) {
     CONNECTIONS.insert(args.connection_id, Connection::default());
 }
 
-#[no_mangle]
 pub fn on_message(args: OnMessageArgs) {
     fn_sdk::api::spawn(async move {
         let Some(mut conn) = CONNECTIONS.get_mut(&args.connection_id) else {
@@ -93,7 +89,6 @@ pub fn on_message(args: OnMessageArgs) {
     });
 }
 
-#[no_mangle]
 pub fn on_disconnected(args: OnDisconnectedArgs) {
     CONNECTIONS.remove(&args.connection_id);
 }
