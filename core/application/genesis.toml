@@ -1,6 +1,6 @@
 epoch_start = 1693842663839                                          # about 5 o clock 8-28-2023
-epoch_time = 900000                                                  # 1 hour
-committee_size = 4
+epoch_time = 1800000                                                  # 1 hour
+committee_size = 10
 min_stake = 1000
 eligibility_time = 1
 lock_time = 5
@@ -12,7 +12,7 @@ consumer_rebate = 0
 max_boost = 4
 max_lock_time = 1460                                                 # 1460 days(epoch) meaning 4 years
 supply_at_genesis = 1000000                                          # set to 1 million for testing, to be determined when initial allocations are set
-protocol_fund_address = "0x2D7cC25A9e1bAEc63a422F702628865092ce1eED"
+protocol_fund_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 governance_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 
 #node0 -nyc
@@ -57,7 +57,7 @@ stake.staked = "1000"
 stake.stake_locked_until = 0
 stake.locked = "0"
 stake.locked_until = 0
-genesis_committee = false
+genesis_committee = true
 
 #node3- singapore
 [[node_info]]
@@ -111,6 +111,28 @@ consensus_public_key = "qYfukFBS+GmNMLVCh4B+3wfeVwVzPaUhAwYA0zdZGMmG8XJNslNDsjV/
 worker_public_key = "XsE9KtedDRUGv22MLHvy8qcc52QsWGWJYY1LBnWhglg="
 primary_domain = "68.183.175.80"
 worker_domain = "68.183.175.80"
+ports.primary = 18000
+ports.worker = 18101
+ports.mempool = 18102
+ports.rpc = 4069
+ports.pool = 4200
+ports.dht = 8101
+ports.handshake = 6969
+ports.blockstore = 4211
+stake.staked = "1000"
+stake.stake_locked_until = 0
+stake.locked = "0"
+stake.locked_until = 0
+genesis_committee = true
+
+#node 5 - nyc (matthias)
+[[node_info]]
+owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
+primary_public_key = "zBmZaycvQsdFRfe0p5Rig/KgyYPD4yNKQTPDo7JrugM="
+consensus_public_key = "jGzCgwTbk9XUWrivDImX7PPkUvKtU95MLjaSUmHaqXsxuvvllpF0KTE/BLdd6GIXGF+yjthlc+dQgSVvO77QHRdY9leXBOGT+6JTUKZZQkwCpv/DJVJJ5QGxradN/fjE"
+worker_public_key = "zBmZaycvQsdFRfe0p5Rig/KgyYPD4yNKQTPDo7JrugM="
+primary_domain = "167.71.102.115"
+worker_domain = "167.71.102.115"
 ports.primary = 18000
 ports.worker = 18101
 ports.mempool = 18102
