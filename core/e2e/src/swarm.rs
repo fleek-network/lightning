@@ -32,6 +32,8 @@ use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::node::FinalTypes;
+use lightning_resolver::config::Config as ResolverConfig;
+use lightning_resolver::resolver::Resolver;
 // use lightning_pool::pool::{ConnectionPool, PoolConfig};
 use lightning_rpc::config::Config as RpcConfig;
 use lightning_rpc::server::Rpc;
@@ -267,6 +269,12 @@ fn build_config(
 ) -> TomlConfigProvider<FinalTypes> {
     let config = TomlConfigProvider::<FinalTypes>::default();
 
+    config.inject::<Resolver<FinalTypes>>(ResolverConfig {
+        store_path: root
+            .join("data/resolver_store")
+            .try_into()
+            .expect("Failed to resolve path"),
+    });
     config.inject::<Rpc<FinalTypes>>(RpcConfig {
         port: ports.rpc,
         ..Default::default()

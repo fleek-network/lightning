@@ -18,11 +18,15 @@ lightning-types = { path = "../types" }
 lightning-rep-collector = { path = "../rep-collector" }
 lightning-consensus = { path = "../consensus" }
 lightning-notifier = { path = "../notifier" }
-lightning-rpc = { path = "../rpc"}
+lightning-rpc = { path = "../rpc" }
 lightning-signer = { path = "../signer" }
 lightning-dht = { path = "../dht" }
 lightning-test-utils = { path = "../test-utils" }
 lightning-topology = { path = "../topology" }
+lightning-fetcher = { path = "../fetcher" }
+lightning-resolver = { path = "../resolver" }
+lightning-service-executor = { path = "../service-executor" }
+lightning-origin-ipfs = { path = "../origin-ipfs" }
 infusion.workspace = true
 resolved-pathbuf.workspace = true
 mock = { path = "../mock" }
@@ -45,4 +49,10 @@ chrono = "0.4.26"
 reqwest = { version = "0.11", features = ["json"] }
 serde_json = "1.0"
 atomo-rocks.workspace = true
-log4rs = { version = "1.2.0", features = ["rolling_file_appender", "compound_policy", "size_trigger", "fixed_window_roller", "gzip"] }
+log4rs = { version = "1.2.0", features = [
+    "rolling_file_appender",
+    "compound_policy",
+    "size_trigger",
+    "fixed_window_roller",
+    "gzip",
+] }

@@ -104,6 +104,7 @@ async fn init_rpc_without_consensus(
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         app.sync_query(),
+        Default::default(),
     )?;
 
     Ok((rpc, query_runner))
@@ -121,6 +122,7 @@ async fn init_rpc_app_test() -> Result<(Rpc<TestBinding>, QueryRunner)> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         query_runner.clone(),
+        Default::default(),
     )?;
 
     Ok((rpc, query_runner))
