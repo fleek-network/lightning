@@ -150,7 +150,7 @@ impl<C: Collection> Cli<C> {
             .build(log_file, Box::new(policy))
             .unwrap();
 
-        let ignore_logger_names = vec!["anemo", "quin_proto"];
+        let ignore_logger_names = vec!["anemo", "anemo_tower", "quinn", "quinn_proto"];
         let mut ignore_loggers: Vec<Logger> = ignore_logger_names
             .iter()
             .map(|&name| Logger::builder().build(name, LevelFilter::Off))
