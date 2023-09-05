@@ -1,4 +1,4 @@
-epoch_start = 1693525607336                                          # about 5 o clock 8-28-2023
+epoch_start = 1693842663839                                          # about 5 o clock 8-28-2023
 epoch_time = 900000                                                  # 1 hour
 committee_size = 4
 min_stake = 1000
@@ -12,7 +12,7 @@ consumer_rebate = 0
 max_boost = 4
 max_lock_time = 1460                                                 # 1460 days(epoch) meaning 4 years
 supply_at_genesis = 1000000                                          # set to 1 million for testing, to be determined when initial allocations are set
-protocol_fund_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+protocol_fund_address = "0x2D7cC25A9e1bAEc63a422F702628865092ce1eED"
 governance_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 
 #node0 -nyc
@@ -30,6 +30,7 @@ ports.rpc = 4069
 ports.pool = 4200
 ports.dht = 8101
 ports.handshake = 6969
+ports.blockstore = 4211
 stake.staked = "1000"
 stake.stake_locked_until = 0
 stake.locked = "0"
@@ -51,6 +52,7 @@ ports.rpc = 4069
 ports.pool = 4200
 ports.dht = 8101
 ports.handshake = 6969
+ports.blockstore = 4211
 stake.staked = "1000"
 stake.stake_locked_until = 0
 stake.locked = "0"
@@ -72,6 +74,7 @@ ports.rpc = 4069
 ports.pool = 4200
 ports.dht = 8101
 ports.handshake = 6969
+ports.blockstore = 4211
 stake.staked = "1000"
 stake.stake_locked_until = 0
 stake.locked = "0"
@@ -81,6 +84,7 @@ genesis_committee = true
 #node 2 fra
 [[node_info]]
 owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
+primary_public_key = "fycnA7tycZyhOLb+RVgD/2H6OXzWwjAehM4ZgTVLIz0="
 consensus_public_key = "hi7SRlOPxV8WRajfwXGWNObWl2kenZHHKOXV6RN0kE/pSC/tzYtmP7wwYqiVIlw2EAm16j/N7sVgmGXW30RouXp+E0v52M9mkhX+Zoyk0i4FPRoEQsYeSmbueHon8PzR"
 worker_public_key = "fycnA7tycZyhOLb+RVgD/2H6OXzWwjAehM4ZgTVLIz0="
 primary_domain = "165.22.88.71"
@@ -92,6 +96,8 @@ ports.rpc = 4069
 ports.pool = 4200
 ports.dht = 8101
 ports.handshake = 6969
+ports.blockstore = 4211
+stake.staked = "1000"
 stake.stake_locked_until = 0
 stake.locked = "0"
 stake.locked_until = 0
@@ -100,6 +106,7 @@ genesis_committee = true
 #node 4 - sanfran
 [[node_info]]
 owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
+primary_public_key = "XsE9KtedDRUGv22MLHvy8qcc52QsWGWJYY1LBnWhglg="
 consensus_public_key = "qYfukFBS+GmNMLVCh4B+3wfeVwVzPaUhAwYA0zdZGMmG8XJNslNDsjV/ORoGMJMHBH4PAwmQMNw+haI2rx7lgOBVR0zuj810Fr6dhJa8gmsQMsrpMQ6E1Uk91PcnphU8"
 worker_public_key = "XsE9KtedDRUGv22MLHvy8qcc52QsWGWJYY1LBnWhglg="
 primary_domain = "68.183.175.80"
@@ -111,6 +118,8 @@ ports.rpc = 4069
 ports.pool = 4200
 ports.dht = 8101
 ports.handshake = 6969
+ports.blockstore = 4211
+stake.staked = "1000"
 stake.stake_locked_until = 0
 stake.locked = "0"
 stake.locked_until = 0
