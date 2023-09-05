@@ -21,8 +21,10 @@ use lightning_interfaces::{
     ApplicationInterface,
     NotifierInterface,
     ReputationAggregatorInterface,
+    ReputationReporterInterface,
     SyncQueryRunnerInterface,
     TopologyInterface,
+    Weight,
 };
 use lightning_metrics::{counter, histogram, increment_counter};
 use netkit::endpoint::{Event, NodeAddress, Request};
@@ -327,6 +329,8 @@ impl<C: Collection> Context<C> {
 
         // Mark message as received for RTT measurements.
         self.pending_store.received_message(sender, id);
+        // Report a satisfactory interaction when we receive a message.
+        self.rep_reporter.report_sat(&sender, Weight::Weak);
         self.incoming_messages[topic_index].insert(shared);
     }
 
