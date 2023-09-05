@@ -22,7 +22,7 @@ use tokio::time::timeout;
 mod config;
 use config::{Config, Gateway};
 mod ipfs_stream;
-use ipfs_stream::IPFSStream;
+pub use ipfs_stream::IPFSStream;
 #[cfg(test)]
 mod tests;
 

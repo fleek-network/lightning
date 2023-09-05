@@ -1,0 +1,13 @@
+[package]
+name = "lightning-fetcher"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lightning-interfaces = { path = "../interfaces" }
+lightning-origin-ipfs = { path = "../origin-ipfs" }
+serde.workspace = true
+anyhow.workspace = true
+async-trait.workspace = true

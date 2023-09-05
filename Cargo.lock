@@ -4075,6 +4075,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-fetcher"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "lightning-interfaces",
+ "lightning-origin-ipfs",
+ "serde",
+]
+
+[[package]]
 name = "lightning-handshake"
 version = "0.0.0"
 dependencies = [

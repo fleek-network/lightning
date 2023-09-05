@@ -160,7 +160,7 @@ impl<C: Collection> ResolverInner<C> {
 
                     let resolved_pointer_bytes = bincode::serialize(&msg).expect("Could not serialize pubsub message in resolver");
 
-                    let entry = match db.get_cf(&b3_cf, b3_hash).expect("Failed to access db ") {
+                    let entry = match db.get_cf(&b3_cf, b3_hash).expect("Failed to access db") {
                         Some(bytes) => {
                             let mut uris: Vec<ResolvedImmutablePointerRecord> = bincode::deserialize(&bytes).expect("Could not deserialize bytes in rocksdb: resolver");
                             if !uris.iter().any(|x| x.pointer == msg.pointer){
@@ -174,7 +174,7 @@ impl<C: Collection> ResolverInner<C> {
                         }
                     };
                     db.put_cf(&b3_cf, b3_hash, bincode::serialize(&entry).expect("Failed to serialize payload in resolver")).expect("Failed to insert mapping to db in resolver");
-                    db.put_cf(&uri_cf, resolved_pointer_bytes, b3_hash ).expect("Failed to insert mapping to db in resolver")
+                    db.put_cf(&uri_cf, resolved_pointer_bytes, b3_hash).expect("Failed to insert mapping to db in resolver")
                 }
             }
         }
