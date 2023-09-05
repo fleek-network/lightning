@@ -153,28 +153,7 @@ impl<C: Collection> ResolverInner<C> {
             tokio::select! {
                 _ = shutdown_notify.notified() => break,
                 Some(msg) = pubsub.recv() => {
-                    let b3_hash = msg.hash;
-
-                    let b3_cf = db.cf_handle(B3_TO_URI).expect("No b3_to_uri column family in resolver db");
-                    let uri_cf = db.cf_handle(URI_TO_B3).expect("No uri_to_b3 column family in resolver db");
-
-                    let resolved_pointer_bytes = bincode::serialize(&msg).expect("Could not serialize pubsub message in resolver");
-
-                    let entry = match db.get_cf(&b3_cf, b3_hash).expect("Failed to access db") {
-                        Some(bytes) => {
-                            let mut uris: Vec<ResolvedImmutablePointerRecord> = bincode::deserialize(&bytes).expect("Could not deserialize bytes in rocksdb: resolver");
-                            if !uris.iter().any(|x| x.pointer == msg.pointer){
-                                uris.push(msg);
-                            }
-                            uris
-
-                        },
-                        None => {
-                            vec![msg]
-                        }
-                    };
-                    db.put_cf(&b3_cf, b3_hash, bincode::serialize(&entry).expect("Failed to serialize payload in resolver")).expect("Failed to insert mapping to db in resolver");
-                    db.put_cf(&uri_cf, resolved_pointer_bytes, b3_hash).expect("Failed to insert mapping to db in resolver")
+                    ResolverInner::<C>::store_mapping(msg, &db);
                 }
             }
         }
@@ -191,6 +170,7 @@ impl<C: Collection> ResolverInner<C> {
                 originator: self.node_sk.to_pk(),
                 signature: [0; 64].into(),
             };
+            ResolverInner::<C>::store_mapping(resolved_pointer.clone(), &self.db);
 
             for (index, pointer) in pointers.iter().enumerate() {
                 if index > 0 {
@@ -234,5 +214,40 @@ impl<C: Collection> ResolverInner<C> {
         let res = self.db.get_cf(&cf, hash).expect("Failed to access db")?;
 
         bincode::deserialize(&res).ok()
+    }
+
+    fn store_mapping(record: ResolvedImmutablePointerRecord, db: &DB) {
+        let b3_hash = record.hash;
+        let b3_cf = db
+            .cf_handle(B3_TO_URI)
+            .expect("No b3_to_uri column family in resolver db");
+        let uri_cf = db
+            .cf_handle(URI_TO_B3)
+            .expect("No uri_to_b3 column family in resolver db");
+
+        let resolved_pointer_bytes =
+            bincode::serialize(&record).expect("Could not serialize pubsub message in resolver");
+
+        let entry = match db.get_cf(&b3_cf, b3_hash).expect("Failed to access db") {
+            Some(bytes) => {
+                let mut uris: Vec<ResolvedImmutablePointerRecord> = bincode::deserialize(&bytes)
+                    .expect("Could not deserialize bytes in rocksdb: resolver");
+                if !uris.iter().any(|x| x.pointer == record.pointer) {
+                    uris.push(record);
+                }
+                uris
+            },
+            None => {
+                vec![record]
+            },
+        };
+        db.put_cf(
+            &b3_cf,
+            b3_hash,
+            bincode::serialize(&entry).expect("Failed to serialize payload in resolver"),
+        )
+        .expect("Failed to insert mapping to db in resolver");
+        db.put_cf(&uri_cf, resolved_pointer_bytes, b3_hash)
+            .expect("Failed to insert mapping to db in resolver")
     }
 }
