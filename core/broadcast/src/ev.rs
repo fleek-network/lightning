@@ -20,6 +20,7 @@ use lightning_interfaces::types::{NodeIndex, Topic};
 use lightning_interfaces::{
     ApplicationInterface,
     NotifierInterface,
+    ReputationAggregatorInterface,
     SyncQueryRunnerInterface,
     TopologyInterface,
 };
@@ -64,6 +65,7 @@ pub struct Context<C: Collection> {
     sqr: c![C::ApplicationInterface::SyncExecutor],
     notifier: c![C::NotifierInterface],
     topology: c![C::TopologyInterface],
+    rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     network_event_rx: Receiver<Event>,
     endpoint_tx: Sender<Request>,
     sk: NodeSecretKey,
@@ -72,11 +74,13 @@ pub struct Context<C: Collection> {
 }
 
 impl<C: Collection> Context<C> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: Database,
         sqr: c![C::ApplicationInterface::SyncExecutor],
         notifier: c![C::NotifierInterface],
         topology: c![C::TopologyInterface],
+        rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
         network_event_rx: Receiver<Event>,
         endpoint_tx: Sender<Request>,
         sk: NodeSecretKey,
@@ -102,6 +106,7 @@ impl<C: Collection> Context<C> {
             sqr,
             notifier,
             topology,
+            rep_reporter,
             network_event_rx,
             endpoint_tx,
             sk,

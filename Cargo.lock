@@ -4362,6 +4362,7 @@ dependencies = [
  "lightning-application",
  "lightning-broadcast",
  "lightning-interfaces",
+ "lightning-rep-collector",
  "lightning-signer",
  "lightning-test-utils",
  "log",
