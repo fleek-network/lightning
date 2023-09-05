@@ -108,24 +108,31 @@ async fn handle_connection<C: Collection>(
     blockstore: C::BlockStoreInterface,
     mut socket: TcpStream,
 ) -> anyhow::Result<()> {
-    let mut hash = [0u8; 32];
-    socket.read_exact(&mut hash)?;
+    let mut root_hash = [0u8; 32];
+    socket.read_exact(&mut root_hash)?;
     trace!("received request");
 
     // fetch from the blockstore
-    let Some(proof) = blockstore.get_tree(&hash).await else {
+    let Some(proof) = blockstore.get_tree(&root_hash).await else {
         return Err(anyhow!("failed to get proof"));
     };
 
     // find out total content size
     let mut last_hash = [0; 32];
     let mut total = 0;
-    for i in 0u32.. {
-        let ii = (i * 2 - i.count_ones()) as usize;
+    for i in 0usize.. {
+        let ii = i * 2 - i.count_ones() as usize;
         if ii >= proof.0.len() {
             break;
         }
-        last_hash = proof.0[ii];
+
+        // TODO: Fix blockstore saving the root hash as an extra block :/
+        let hash = proof.0[ii];
+        if ii != 0 && hash == root_hash {
+            break;
+        }
+
+        last_hash = hash;
         total += 1;
     }
 
@@ -143,7 +150,7 @@ async fn handle_connection<C: Collection>(
         socket,
         content_len,
         HashTree {
-            hash: hash.into(),
+            hash: root_hash.into(),
             tree: proof.0.clone(),
         },
     )?;
@@ -156,8 +163,14 @@ async fn handle_connection<C: Collection>(
             break;
         }
 
+        // TODO: Fix blockstore saving the root hash as an extra block :/
+        let hash = proof.0[idx];
+        if idx != 0 && hash == root_hash {
+            break;
+        }
+
         let block = blockstore
-            .get(block_counter, &proof.0[idx], CompressionAlgoSet::default())
+            .get(block_counter, &hash, CompressionAlgoSet::default())
             .await
             .ok_or(anyhow!("failed to get block"))?;
         encoder.write_all(&block.content)?;
@@ -235,26 +248,25 @@ mod tests {
     });
 
     const BLOCK_SIZE: usize = 256 << 10;
-    // TODO: Debug why these test cases are failing.
     const TEST_CASES: &[usize] = &[
         BLOCK_SIZE - 1,
         BLOCK_SIZE,
         BLOCK_SIZE + 1,
         2 * BLOCK_SIZE - 1,
         2 * BLOCK_SIZE,
-        //2 * BLOCK_SIZE + 1,
-        //3 * BLOCK_SIZE - 1,
-        //3 * BLOCK_SIZE,
+        2 * BLOCK_SIZE + 1,
+        3 * BLOCK_SIZE - 1,
+        3 * BLOCK_SIZE,
         3 * BLOCK_SIZE + 1,
         4 * BLOCK_SIZE - 1,
         4 * BLOCK_SIZE,
-        //4 * BLOCK_SIZE + 1,
+        4 * BLOCK_SIZE + 1,
         8 * BLOCK_SIZE - 1,
         8 * BLOCK_SIZE,
-        //8 * BLOCK_SIZE + 1,
-        //16 * BLOCK_SIZE - 1,
+        8 * BLOCK_SIZE + 1,
+        16 * BLOCK_SIZE - 1,
         16 * BLOCK_SIZE,
-        //16 * BLOCK_SIZE + 1,
+        16 * BLOCK_SIZE + 1,
     ];
 
     // tests need to be run with multi threaded, otherwise the server spawn is never polled.
@@ -280,7 +292,7 @@ mod tests {
                 .write(&vec![0u8; *size], CompressionAlgorithm::Uncompressed)
                 .unwrap();
             hashes.push(putter.finalize().await.unwrap());
-            info!("put content");
+            info!("put content: {size}");
         }
 
         // Setup node b
