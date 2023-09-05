@@ -106,6 +106,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         let rpc = Ok(Self {
             data: Arc::new(RpcData {
                 mempool_socket: mempool,
+                fetcher,
                 query_runner,
             }),
             config,
