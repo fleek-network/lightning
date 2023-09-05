@@ -191,7 +191,7 @@ impl<C: Collection> IPFSOriginInner<C> {
                     continue;
                 },
                 Err(_) => {
-                    info!("Timeout while fetching from gateway {gateway:?}, moving onto the next gateway: {e:?}");
+                    info!("Timeout while fetching from gateway {gateway:?}, moving onto the next gateway");
                     continue;
                 },
             }
