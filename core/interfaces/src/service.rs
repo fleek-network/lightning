@@ -2,6 +2,7 @@ use std::future::Future;
 
 use fn_sdk::internal::{OnConnectedArgs, OnDisconnectedArgs, OnMessageArgs};
 
+use crate::blockstore::BlockStoreInterface;
 use crate::infu_collection::Collection;
 use crate::types::ServiceId;
 use crate::{ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown};
@@ -15,15 +16,15 @@ use crate::{ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown};
 pub trait ServiceExecutorInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
-    fn _init(config: ::ConfigProviderInterface) {
-        Self::init(config.get::<Self>())
+    fn _init(config: ::ConfigProviderInterface, blockstore: ::BlockStoreInterface) {
+        Self::init(config.get::<Self>(), blockstore)
     }
 
     /// The provider which can be used to get a handle on a service during runtime.
     type Provider: ExecutorProviderInterface;
 
     /// Initialize the service executor.
-    fn init(config: Self::Config) -> anyhow::Result<Self>;
+    fn init(config: Self::Config, blockstore: &C::BlockStoreInterface) -> anyhow::Result<Self>;
 
     /// Returns the service handle provider which can be used to query and get a handle to a
     /// service that is running.

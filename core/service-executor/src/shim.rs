@@ -6,12 +6,14 @@ use fxhash::FxHashSet;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::ServiceId;
 use lightning_interfaces::{
+    BlockStoreInterface,
     ConfigConsumer,
     ExecutorProviderInterface,
     ServiceExecutorInterface,
     ServiceHandleInterface,
     WithStartAndShutdown,
 };
+use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use triomphe::Arc;
 
@@ -27,6 +29,7 @@ pub struct ServiceExecutor<C: Collection> {
     collection: ServiceCollection,
     sender: CommandSender,
     stealer: CommandStealer,
+    blockstore: ResolvedPathBuf,
     p: PhantomData<C>,
 }
 
@@ -44,7 +47,7 @@ pub struct Provider {
 impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     type Provider = Provider;
 
-    fn init(config: Self::Config) -> anyhow::Result<Self> {
+    fn init(config: Self::Config, blockstore: &C::BlockStoreInterface) -> anyhow::Result<Self> {
         let (sender, stealer) = crate::deque::chan();
         Ok(ServiceExecutor {
             config,
@@ -52,6 +55,7 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
             collection: ServiceCollection::default(),
             sender,
             stealer,
+            blockstore: blockstore.get_root_dir().try_into()?,
             p: PhantomData,
         })
     }
@@ -78,7 +82,7 @@ impl<C: Collection> WithStartAndShutdown for ServiceExecutor<C> {
 
             fn_sdk::api::setup(fn_sdk::internal::OnStartArgs {
                 request_sender,
-                block_store_path: "".into(),
+                block_store_path: self.blockstore.clone(),
             });
         }
 
@@ -120,5 +124,8 @@ impl ExecutorProviderInterface for Provider {
 }
 
 fn get_all_services() -> Vec<ServiceHandle> {
-    vec![handle!(0, fleek_service_ping_example)]
+    vec![
+        handle!(0, fleek_service_ping_example),
+        handle!(1, fleek_service_big_buck_bunny),
+    ]
 }

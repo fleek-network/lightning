@@ -2,6 +2,7 @@
 // run static file server separately, e.g
 // python3 -m http.server
 
+use lightning_blockstore::blockstore::Blockstore;
 use lightning_handshake::handshake::Handshake;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
@@ -18,6 +19,7 @@ use lightning_signer::Signer;
 
 partial!(ExampleBinding {
     ConfigProviderInterface = TomlConfigProvider<Self>;
+    BlockStoreInterface = Blockstore<Self>;
     SignerInterface = Signer<Self>;
     HandshakeInterface = Handshake<Self>;
     ServiceExecutorInterface = ServiceExecutor<Self>;

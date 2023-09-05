@@ -17,6 +17,8 @@ async-channel = "1.9.0"
 triomphe = "0.1.9"
 dashmap = "5.5"
 fxhash = "0.2"
+resolved-pathbuf.workspace = true
 
 # Built-in services
 fleek-service-ping-example = { path = "../../services/ping" }
+fleek-service-big-buck-bunny = { path = "../../services/big-buck-bunny" }

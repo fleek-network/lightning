@@ -1,0 +1,11 @@
+[package]
+name = "fleek-service-big-buck-bunny"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fn-sdk = { path = "../../lib/sdk" }
+lazy_static = "1.4"
+tokio  = "1.32"

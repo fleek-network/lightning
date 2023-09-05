@@ -25,7 +25,7 @@ type = "WebRTC"
 signal_address = "0.0.0.0:4210"
 
 [service-executor]
-services = [0]
+services = [0, 1]
 
 [signer]
 consensus_key_path = "~/.lightning/keystore/consensus.pem"

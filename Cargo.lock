@@ -2874,6 +2874,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fleek-service-big-buck-bunny"
+version = "0.1.0"
+dependencies = [
+ "fn-sdk",
+ "lazy_static",
+ "tokio",
+]
+
+[[package]]
 name = "fleek-service-ping-example"
 version = "0.1.0"
 dependencies = [
@@ -4108,6 +4117,7 @@ dependencies = [
  "heapless",
  "hyper",
  "infusion",
+ "lightning-blockstore",
  "lightning-interfaces",
  "lightning-node",
  "lightning-service-executor",
@@ -4400,11 +4410,13 @@ dependencies = [
  "async-channel",
  "async-trait",
  "dashmap",
+ "fleek-service-big-buck-bunny",
  "fleek-service-ping-example",
  "fn-sdk",
  "fxhash",
  "lightning-interfaces",
  "log",
+ "resolved-pathbuf",
  "serde",
  "tokio",
  "triomphe",
