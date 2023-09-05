@@ -2890,8 +2890,14 @@ dependencies = [
 name = "fleek-service-ping-example"
 version = "0.1.0"
 dependencies = [
+ "arrayref",
+ "dashmap",
  "fn-sdk",
+ "fxhash",
+ "hex-literal",
  "lazy_static",
+ "log",
+ "tokio",
 ]
 
 [[package]]
