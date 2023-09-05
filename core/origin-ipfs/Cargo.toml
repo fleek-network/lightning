@@ -20,9 +20,9 @@ hyper = { version = "0.14.27", features = ["stream"]}
 rustls = "0.21.5"
 hyper-rustls = "0.24.1"
 affair.workspace = true
+tokio-util = {version = "0.7.8", features = ["io"]}
 
 
 [dev-dependencies]
-tokio-util = {version = "0.7.8", features = ["io"]}
 lightning-test-utils = { path = "../test-utils" }
 infusion.workspace = true

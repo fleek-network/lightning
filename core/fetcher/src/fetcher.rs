@@ -4,27 +4,43 @@ use anyhow::Result;
 use async_trait::async_trait;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::ImmutablePointer;
-use lightning_interfaces::{Blake3Hash, ConfigConsumer, FetcherInterface, OriginProviderSocket};
-use lightning_origin_ipfs::IPFSStream;
+use lightning_interfaces::{
+    Blake3Hash,
+    ConfigConsumer,
+    FetcherInterface,
+    OriginProviderInterface,
+    OriginProviderSocket,
+};
 
 use crate::config::Config;
 
-#[derive(Clone)]
 pub struct Fetcher<C: Collection> {
-    _origin: OriginProviderSocket<IPFSStream>,
+    origin_socket: OriginProviderSocket,
     _collection: PhantomData<C>,
 }
 
+impl<C: Collection> Clone for Fetcher<C> {
+    fn clone(&self) -> Self {
+        Self {
+            origin_socket: self.origin_socket.clone(),
+            _collection: PhantomData,
+        }
+    }
+}
+
 #[async_trait]
-impl<C: Collection> FetcherInterface<C, IPFSStream> for Fetcher<C> {
+impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
     /// Initialize the fetcher.
     fn init(
         _config: Self::Config,
         _blockstore: C::BlockStoreInterface,
         _resolver: C::ResolverInterface,
-        _origin: &C::OriginProviderInterface,
+        origin: &C::OriginProviderInterface,
     ) -> anyhow::Result<Self> {
-        todo!()
+        Ok(Self {
+            origin_socket: origin.get_socket(),
+            _collection: PhantomData,
+        })
     }
 
     /// Fetches the data from the corresponding origin, puts it in the blockstore, and stores the

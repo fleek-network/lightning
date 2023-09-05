@@ -3,8 +3,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use affair::{Socket, Task};
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
+use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use hyper::client::{self, HttpConnector};
 use hyper::{Body, Client, Request, Uri};
@@ -16,13 +17,14 @@ use lightning_interfaces::{
     OriginProviderSocket,
     WithStartAndShutdown,
 };
+use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, Notify};
 use tokio::time::timeout;
-
 mod config;
 use config::{Config, Gateway};
 mod ipfs_stream;
 pub use ipfs_stream::IPFSStream;
+use tokio_util::io::StreamReader;
 #[cfg(test)]
 mod tests;
 
@@ -31,8 +33,8 @@ const GATEWAY_TIMEOUT: Duration = Duration::from_millis(500);
 #[allow(clippy::type_complexity)]
 pub struct IPFSOrigin<C: Collection> {
     inner: Arc<IPFSOriginInner>,
-    socket: Socket<Vec<u8>, anyhow::Result<IPFSStream>>,
-    rx: Arc<Mutex<Option<mpsc::Receiver<Task<Vec<u8>, anyhow::Result<IPFSStream>>>>>>,
+    socket: Socket<Vec<u8>, anyhow::Result<Vec<u8>>>,
+    rx: Arc<Mutex<Option<mpsc::Receiver<Task<Vec<u8>, anyhow::Result<Vec<u8>>>>>>>,
     is_running: Arc<Mutex<bool>>,
     shutdown_notify: Arc<Notify>,
     collection: PhantomData<C>,
@@ -57,7 +59,7 @@ impl<C: Collection> OriginProviderInterface<C> for IPFSOrigin<C> {
         })
     }
 
-    fn get_socket(&self) -> OriginProviderSocket<IPFSStream> {
+    fn get_socket(&self) -> OriginProviderSocket {
         self.socket.clone()
     }
 }
@@ -91,7 +93,7 @@ struct IPFSOriginInner {
 impl IPFSOriginInner {
     async fn handle(
         self: Arc<Self>,
-        mut rx: mpsc::Receiver<Task<Vec<u8>, anyhow::Result<IPFSStream>>>,
+        mut rx: mpsc::Receiver<Task<Vec<u8>, anyhow::Result<Vec<u8>>>>,
         shutdown_notify: Arc<Notify>,
     ) {
         // Prepare the TLS client config
@@ -114,8 +116,31 @@ impl IPFSOriginInner {
             tokio::select! {
                 task = rx.recv() => {
                     let task = task.expect("Failed to receive fetch request.");
-                    let stream = self.fetch(&client, &task.request).await;
-                    task.respond(stream);
+                    match self.fetch(&client, &task.request).await {
+                        Ok(stream) => {
+                            let mut read = StreamReader::new(stream);
+                            let mut buf = [0; 1024];
+                            let mut bytes: Vec<u8> = Vec::new();
+                            loop {
+                                let len = read.read(&mut buf).await.unwrap();
+                                bytes.extend(&buf[..len]);
+                                if len == 0 {
+                                    break;
+                                }
+                            }
+                            let requested_cid = Cid::try_from(task.request.clone()).expect("Failed to parse uri into cid");
+                            let valid = match Code::try_from(requested_cid.hash().code()) {
+                                Ok(hasher) => &hasher.digest(&bytes) == requested_cid.hash(),
+                                _ => false,
+                            };
+                            if valid {
+                                task.respond(Ok(bytes));
+                            } else {
+                                task.respond(Err(anyhow!("Data verification failed")));
+                            }
+                        },
+                        Err(e) => task.respond(Err(e)),
+                    }
                 }
                 _ = shutdown_notify.notified() => break,
             }

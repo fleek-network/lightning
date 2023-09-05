@@ -9,14 +9,11 @@ use crate::{
     ConfigProviderInterface,
     OriginProviderInterface,
     ResolverInterface,
-    UntrustedStream,
 };
 
 #[async_trait]
 #[infusion::service]
-pub trait FetcherInterface<C: Collection, Stream: UntrustedStream>:
-    ConfigConsumer + Clone + Sized + Send + Sync
-{
+pub trait FetcherInterface<C: Collection>: ConfigConsumer + Clone + Sized + Send + Sync {
     fn _init(
         config: ::ConfigProviderInterface,
         blockstore: ::BlockStoreInterface,

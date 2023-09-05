@@ -5,7 +5,7 @@ use crate::infu_collection::Collection;
 use crate::{ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown};
 
 /// A socket for submitting a fetch request to an origin.
-pub type OriginProviderSocket<Stream> = Socket<Vec<u8>, anyhow::Result<Stream>>;
+pub type OriginProviderSocket = Socket<Vec<u8>, anyhow::Result<Vec<u8>>>;
 
 /// The abstraction layer for different origins and how we handle them in the codebase in
 /// a modular way, and [`OriginProvider`] can be something like a provider for resolving
@@ -24,7 +24,7 @@ pub trait OriginProviderInterface<C: Collection>:
     fn init(config: Self::Config) -> anyhow::Result<Self>;
 
     /// Returns a socket for submitting a fetch request to an origin.
-    fn get_socket(&self) -> OriginProviderSocket<Self::Stream>;
+    fn get_socket(&self) -> OriginProviderSocket;
 }
 
 /// An untrusted stream to an origin, this allows the origin provider to start the
