@@ -10,12 +10,10 @@ use lazy_static::lazy_static;
 
 // --- SDK Setup
 
-#[no_mangle]
 pub fn on_start(args: OnStartArgs) {
     fn_sdk::api::setup(args);
 }
 
-#[no_mangle]
 pub fn on_event_response(args: OnEventResponseArgs) {
     fn_sdk::api::on_event_response(args);
 }
@@ -38,7 +36,6 @@ lazy_static! {
 // our webRTC transport does not handle >64KB messages.
 const CHUNK_SIZE: usize = 32 * 1024;
 
-#[no_mangle]
 pub fn on_connected(args: OnConnectedArgs) {
     if let Some(tree) = TREE.as_ref() {
         fn_sdk::api::connection_send(args.connection_id, (tree.len() as u32).to_be_bytes().into());
@@ -47,7 +44,6 @@ pub fn on_connected(args: OnConnectedArgs) {
     }
 }
 
-#[no_mangle]
 pub fn on_message(args: OnMessageArgs) {
     if args.payload.len() != 4 {
         return;
@@ -75,7 +71,6 @@ pub fn on_message(args: OnMessageArgs) {
     });
 }
 
-#[no_mangle]
 pub fn on_disconnected(args: OnDisconnectedArgs) {
     println!("connection[{}]: disconnected", args.connection_id);
 }
