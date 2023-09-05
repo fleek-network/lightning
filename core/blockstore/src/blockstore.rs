@@ -71,9 +71,14 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     }
 
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
-        let encoded_tree: Vec<Blake3Hash> =
-            bincode::deserialize(self.fetch(INTERNAL_DIR, cid, None).await?.as_slice())
-                .expect("Tree to be properly serialized");
+        // TODO(qti3e): We can optimize Blake3Tree type to not care much about the layout
+        // being [[u8; 32]; N] and do the offset alignment lazily. Just a `n << 5` on read.
+        let data = self.fetch(INTERNAL_DIR, cid, None).await?;
+        let encoded_tree: Vec<Blake3Hash> = data
+            .chunks_exact(32)
+            .map(|slice| *arrayref::array_ref![slice, 0, 32])
+            .collect();
+
         Some(Arc::new(Blake3Tree(encoded_tree)))
     }
 
@@ -123,7 +128,7 @@ where
         &mut self,
         location: &str,
         key: Blake3Hash,
-        block: Block,
+        block: &[u8],
         tag: Option<usize>,
     ) -> io::Result<()> {
         let filename = match tag {
@@ -133,7 +138,7 @@ where
         let tmp_file_name = format!("{}-{}", rand::random::<u64>(), filename);
         let tmp_file_path = self.root.to_path_buf().join(TMP_DIR).join(&tmp_file_name);
         if let Ok(mut tmp_file) = File::create(&tmp_file_path).await {
-            tmp_file.write_all(block.as_ref()).await?;
+            tmp_file.write_all(block).await?;
 
             // TODO: Is this needed before calling rename?
             tmp_file.sync_all().await?;

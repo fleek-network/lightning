@@ -2879,7 +2879,6 @@ version = "0.1.0"
 dependencies = [
  "fn-sdk",
  "lazy_static",
- "tokio",
 ]
 
 [[package]]
@@ -2923,6 +2922,7 @@ name = "fn-sdk"
 version = "0.0.0"
 dependencies = [
  "derive_more",
+ "fleek-blake3",
  "fleek-crypto",
  "futures",
  "tokio",
@@ -3905,6 +3905,7 @@ name = "lightning-blockstore"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "arrayref",
  "async-trait",
  "bincode",
  "blake3-tree",

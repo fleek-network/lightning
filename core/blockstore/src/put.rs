@@ -113,7 +113,7 @@ where
         let mut store = self.store.clone();
         self.write_tasks.spawn(async move {
             let _ = store
-                .insert(BLOCK_DIR, block_hash, block.to_vec(), Some(block_counter))
+                .insert(BLOCK_DIR, block_hash, block.as_ref(), Some(block_counter))
                 .await;
         });
 
@@ -218,7 +218,7 @@ where
                 let mut store = self.store.clone();
                 self.write_tasks.spawn(async move {
                     let _ = store
-                        .insert(BLOCK_DIR, block_hash, block.to_vec(), Some(counter))
+                        .insert(BLOCK_DIR, block_hash, block.as_ref(), Some(counter))
                         .await;
                 });
 
@@ -233,13 +233,14 @@ where
             }
         }
 
-        let encoded_tree = bincode::serialize(&tree).map_err(|e| {
-            log::error!("failed to serialize tree: {e:?}");
-            PutFinalizeError::WriteFailed
-        })?;
+        // In future this can be a no-op/zero-copy when `flatten-slice` is stable in rust.
+        let mut encoded_tree = Vec::with_capacity(32 * tree.len());
+        for item in tree {
+            encoded_tree.extend(&item);
+        }
 
         self.store
-            .insert(INTERNAL_DIR, hash, encoded_tree, None)
+            .insert(INTERNAL_DIR, hash, &encoded_tree, None)
             .await
             .map_err(|e| {
                 log::error!("failed to write tree to store: {e:?}");

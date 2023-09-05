@@ -11,7 +11,7 @@ pub trait Store: Send + Clone {
         &mut self,
         location: &str,
         key: Blake3Hash,
-        block: Block,
+        block: &[u8],
         tag: Option<usize>,
     ) -> io::Result<()>;
 }

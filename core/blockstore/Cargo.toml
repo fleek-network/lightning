@@ -21,6 +21,7 @@ thiserror.workspace = true
 tempdir.workspace = true
 tokio.workspace = true
 derive_more = "0.99"
+arrayref = "0.3"
 
 [dev-dependencies]
 infusion.workspace = true
