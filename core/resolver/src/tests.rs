@@ -84,7 +84,6 @@ async fn test_start_shutdown() {
         BroadcastConfig::default(),
         query_runner.clone(),
         Default::default(),
-        Default::default(),
         &signer,
         Default::default(),
     )
