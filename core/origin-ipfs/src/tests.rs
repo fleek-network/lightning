@@ -1,15 +1,8 @@
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::{
-    partial,
-    OriginProviderInterface,
-    UntrustedStream,
-    WithStartAndShutdown,
-};
+use lightning_interfaces::{partial, OriginProviderInterface, WithStartAndShutdown};
 use lightning_test_utils::ipfs_gateway::spawn_gateway;
-use tokio::io::AsyncReadExt;
-use tokio_util::io::StreamReader;
 
 use crate::config::{Config, Gateway, Protocol};
 use crate::IPFSOrigin;
@@ -33,20 +26,8 @@ async fn test_origin() {
         ipfs_origin.start().await;
 
         let socket = ipfs_origin.get_socket();
-        let stream = socket.run(req_cid.to_bytes()).await.unwrap().unwrap();
+        let bytes = socket.run(req_cid.to_bytes()).await.unwrap().unwrap();
 
-        assert_eq!(stream.was_content_valid(), None);
-
-        let mut read = StreamReader::new(stream);
-        let mut buf = [0; 1024];
-        let mut bytes: Vec<u8> = Vec::new();
-        loop {
-            let len = read.read(&mut buf).await.unwrap();
-            bytes.extend(&buf[..len]);
-            if len == 0 {
-                break;
-            }
-        }
         assert!(
             Code::try_from(req_cid.hash().code())
                 .ok()
