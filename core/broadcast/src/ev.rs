@@ -469,6 +469,7 @@ async fn main_loop<C: Collection>(
                             log::error!("remote node address not found");
                             continue;
                         };
+                        ctx.rep_reporter.report_latency(&peer, rtt / 2);
                         ctx.peers.handle_new_connection(index, peer, address);
                     }
                     Event::Message { peer, message } => {
