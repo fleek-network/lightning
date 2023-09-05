@@ -55,7 +55,7 @@ pub fn on_message(args: OnMessageArgs) {
         return;
     };
 
-    if block > tree.len() {
+    if block >= tree.len() {
         return;
     }
 
