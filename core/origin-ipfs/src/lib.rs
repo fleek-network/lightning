@@ -11,11 +11,14 @@ use hyper::client::{self, HttpConnector};
 use hyper::{Body, Client, Request, Uri};
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
 use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::types::CompressionAlgorithm;
 use lightning_interfaces::{
+    BlockStoreInterface,
     ConfigConsumer,
+    IncrementalPutInterface,
     OriginProviderInterface,
     OriginProviderSocket,
-    WithStartAndShutdown,
+    WithStartAndShutdown, Blake3Hash,
 };
 use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, Notify};
@@ -32,9 +35,9 @@ const GATEWAY_TIMEOUT: Duration = Duration::from_millis(500);
 
 #[allow(clippy::type_complexity)]
 pub struct IPFSOrigin<C: Collection> {
-    inner: Arc<IPFSOriginInner>,
-    socket: Socket<Vec<u8>, anyhow::Result<Vec<u8>>>,
-    rx: Arc<Mutex<Option<mpsc::Receiver<Task<Vec<u8>, anyhow::Result<Vec<u8>>>>>>>,
+    inner: Arc<IPFSOriginInner<C>>,
+    socket: OriginProviderSocket,
+    rx: Arc<Mutex<Option<mpsc::Receiver<Task<Vec<u8>, anyhow::Result<Blake3Hash>>>>>>,
     is_running: Arc<Mutex<bool>>,
     shutdown_notify: Arc<Notify>,
     collection: PhantomData<C>,
@@ -43,10 +46,11 @@ pub struct IPFSOrigin<C: Collection> {
 #[async_trait]
 impl<C: Collection> OriginProviderInterface<C> for IPFSOrigin<C> {
     type Stream = IPFSStream;
-    fn init(config: Config) -> anyhow::Result<Self> {
+    fn init(config: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
         let inner = IPFSOriginInner {
             gateways: config.gateways,
+            blockstore,
         };
 
         Ok(IPFSOrigin {
@@ -86,14 +90,15 @@ impl<C: Collection> WithStartAndShutdown for IPFSOrigin<C> {
     }
 }
 
-struct IPFSOriginInner {
+struct IPFSOriginInner<C: Collection> {
     gateways: Vec<Gateway>,
+    blockstore: C::BlockStoreInterface,
 }
 
-impl IPFSOriginInner {
+impl<C: Collection> IPFSOriginInner<C> {
     async fn handle(
         self: Arc<Self>,
-        mut rx: mpsc::Receiver<Task<Vec<u8>, anyhow::Result<Vec<u8>>>>,
+        mut rx: mpsc::Receiver<Task<Vec<u8>, anyhow::Result<Blake3Hash>>>,
         shutdown_notify: Arc<Notify>,
     ) {
         // Prepare the TLS client config
@@ -112,17 +117,22 @@ impl IPFSOriginInner {
         // Build the hyper client from the HTTPS connector.
         let client: client::Client<_, hyper::Body> = client::Client::builder().build(https);
 
-        loop {
+        'outer: loop {
             tokio::select! {
                 task = rx.recv() => {
                     let task = task.expect("Failed to receive fetch request.");
                     match self.fetch(&client, &task.request).await {
                         Ok(stream) => {
+                            let mut blockstore_putter = self.blockstore.put(None);
                             let mut read = StreamReader::new(stream);
                             let mut buf = [0; 1024];
                             let mut bytes: Vec<u8> = Vec::new();
                             loop {
                                 let len = read.read(&mut buf).await.unwrap();
+                                if let Err(e) = blockstore_putter.write(&buf[..len], CompressionAlgorithm::Uncompressed){
+                                    task.respond(Err(anyhow!("Failed to write to the blockstore: {e}")));
+                                    continue 'outer;
+                                }
                                 bytes.extend(&buf[..len]);
                                 if len == 0 {
                                     break;
@@ -134,7 +144,8 @@ impl IPFSOriginInner {
                                 _ => false,
                             };
                             if valid {
-                                task.respond(Ok(bytes));
+                                let hash = blockstore_putter.finalize().await.map_err(|e| anyhow!("failed to finalize in blockstore: {e}"));
+                                task.respond(hash);
                             } else {
                                 task.respond(Err(anyhow!("Data verification failed")));
                             }

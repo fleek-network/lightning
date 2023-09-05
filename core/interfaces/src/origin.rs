@@ -2,10 +2,16 @@ use affair::Socket;
 use anyhow;
 
 use crate::infu_collection::Collection;
-use crate::{ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown};
+use crate::{
+    Blake3Hash,
+    BlockStoreInterface,
+    ConfigConsumer,
+    ConfigProviderInterface,
+    WithStartAndShutdown,
+};
 
 /// A socket for submitting a fetch request to an origin.
-pub type OriginProviderSocket = Socket<Vec<u8>, anyhow::Result<Vec<u8>>>;
+pub type OriginProviderSocket = Socket<Vec<u8>, anyhow::Result<Blake3Hash>>;
 
 /// The abstraction layer for different origins and how we handle them in the codebase in
 /// a modular way, and [`OriginProvider`] can be something like a provider for resolving
@@ -14,14 +20,14 @@ pub type OriginProviderSocket = Socket<Vec<u8>, anyhow::Result<Vec<u8>>>;
 pub trait OriginProviderInterface<C: Collection>:
     ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
 {
-    fn _init(config: ::ConfigProviderInterface) {
-        Self::init(config.get::<Self>())
+    fn _init(config: ::ConfigProviderInterface, blockstore: ::BlockStoreInterface) {
+        Self::init(config.get::<Self>(), blockstore.clone())
     }
 
     type Stream: UntrustedStream = BlankUntrustedStream;
 
     /// Initialize the origin service.
-    fn init(config: Self::Config) -> anyhow::Result<Self>;
+    fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self>;
 
     /// Returns a socket for submitting a fetch request to an origin.
     fn get_socket(&self) -> OriginProviderSocket;

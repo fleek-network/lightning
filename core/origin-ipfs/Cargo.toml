@@ -16,13 +16,14 @@ cid.workspace = true
 multihash.workspace = true
 tokio.workspace = true
 futures.workspace = true
-hyper = { version = "0.14.27", features = ["stream"]}
+hyper = { version = "0.14.27", features = ["stream"] }
 rustls = "0.21.5"
 hyper-rustls = "0.24.1"
 affair.workspace = true
-tokio-util = {version = "0.7.8", features = ["io"]}
+tokio-util = { version = "0.7.8", features = ["io"] }
 
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }
 infusion.workspace = true
+lightning-blockstore = { path = "../blockstore" }
