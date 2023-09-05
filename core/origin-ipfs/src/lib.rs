@@ -187,11 +187,15 @@ impl<C: Collection> IPFSOriginInner<C> {
                     return Ok(IPFSStream::new(requested_cid, body));
                 },
                 Ok(Err(e)) => {
-                    info!("Failed to fetch from gateway {gateway:?}, moving onto the next gateway: {e:?}");
+                    info!(
+                        "Failed to fetch from gateway {gateway:?}, moving onto the next gateway: {e:?}"
+                    );
                     continue;
                 },
                 Err(_) => {
-                    info!("Timeout while fetching from gateway {gateway:?}, moving onto the next gateway");
+                    info!(
+                        "Timeout while fetching from gateway {gateway:?}, moving onto the next gateway"
+                    );
                     continue;
                 },
             }
