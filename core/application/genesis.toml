@@ -1,5 +1,5 @@
-epoch_start = 1693842663839                                          # about 5 o clock 8-28-2023
-epoch_time = 1800000                                                  # 1 hour
+epoch_start = 1693944010537                                          # about 5 o clock 8-28-2023
+epoch_time = 1800000                                                 # 1 hour
 committee_size = 10
 min_stake = 1000
 eligibility_time = 1
