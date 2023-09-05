@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use fleek_crypto::ClientPublicKey;
 use futures::Future;
 use tokio::task::JoinHandle;
@@ -6,13 +8,19 @@ use crate::futures::RequestFuture;
 use crate::internal::{IpcRequest, OnEventResponseArgs, OnStartArgs, Request};
 
 static mut SENDER: Option<Box<dyn Fn(IpcRequest) + Send + Sync>> = None;
+static mut BLOCKSTORE: Option<PathBuf> = None;
 
 /// This method should always be called during the initialization of the SDK context.
 pub fn setup(args: OnStartArgs) {
     unsafe {
         assert!(SENDER.is_none(), "setup already done");
         SENDER = Some(args.request_sender);
+        BLOCKSTORE = Some(args.block_store_path);
     }
+}
+
+pub(crate) fn blockstore_root() -> &'static PathBuf {
+    unsafe { BLOCKSTORE.as_ref().expect("setup not completed") }
 }
 
 /// Handle a response from core.
