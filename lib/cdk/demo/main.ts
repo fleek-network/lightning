@@ -1,5 +1,24 @@
 import * as schema from "../handshake/schema.ts";
 
+const video = document.querySelector("video")!;
+
+document.getElementById("start")!.onclick = async () => {
+  await startSession();
+};
+
+// State variables.
+
+const queue: Uint8Array[] = []; // Because MediaStream sucks.
+let didReceiveFirstMessage = false;
+let sourceBuffer: SourceBuffer | undefined;
+let segCounter = 0;
+let buffered: Uint8Array[] = [];
+let seen: boolean[] = [];
+let bytesRead = 0;
+
+// --------------------------------------------
+// WebRTC
+//
 // For webRTC:
 // 1. We need to make a RTCPeerConnection with the ice server we have.
 // 2. We then create a data channel over the RTCPeerConnection
@@ -14,7 +33,9 @@ const pc = new RTCPeerConnection({
   ],
 });
 
-const dataChan = pc.createDataChannel("foo");
+const dataChan = pc.createDataChannel("foo", {
+  ordered: true,
+});
 
 dataChan.onclose = () => {
   console.log("dataChan closed.");
@@ -26,23 +47,70 @@ dataChan.onopen = () => {
   // Send a handshake.
   dataChan.send(schema.HandshakeRequest.encode({
     tag: schema.HandshakeRequest.Tag.Handshake,
-    service: 0 as schema.ServiceId,
+    service: 1 as schema.ServiceId,
     pk: new Uint8Array(96) as schema.ClientPublicKey,
     pop: new Uint8Array(48) as schema.ClientSignature,
-  }));
-
-  // Send the first request.
-  const encoder = new TextEncoder();
-  const view = encoder.encode("Hello Service!");
-  dataChan.send(schema.Request.encode({
-    tag: schema.Request.Tag.ServicePayload,
-    bytes: view,
   }));
 };
 
 dataChan.onmessage = (e: MessageEvent) => {
-  console.log("dataChan message", e);
+  if (!didReceiveFirstMessage) {
+    didReceiveFirstMessage = true;
+    if (sourceBuffer != undefined) {
+      getNext();
+    }
+    return;
+  }
+
+  const decoded = schema.Response.decode(e.data);
+  if (decoded && decoded.tag === schema.Response.Tag.ServicePayload) {
+    const size = decoded.bytes.byteLength;
+    const index = decoded.bytes[size - 1];
+    const slice = decoded.bytes.slice(0, size - 1);
+    bytesRead += size - 1;
+
+    // console.log(segCounter, index);
+
+    buffered[index] = slice;
+
+    if ((index > 0 && seen[index - 1]) || index == 0) {
+      appendBuffer(slice);
+      seen[index] = true;
+
+      for (let i = index + 1; buffered[i] != undefined; ++i) {
+        seen[i] = true;
+        appendBuffer(buffered[i]);
+      }
+    }
+
+    if (bytesRead >= 256 * 1024) {
+      bytesRead = 0;
+      seen = [];
+      buffered = [];
+      getNext();
+    }
+  }
 };
+
+function appendBuffer(buffer: Uint8Array) {
+  if (sourceBuffer!.updating || queue.length != 0) {
+    queue.push(buffer);
+    return;
+  }
+
+  sourceBuffer!.appendBuffer(buffer);
+}
+
+function getNext() {
+  const buffer = new ArrayBuffer(4);
+  const view = new DataView(buffer);
+  view.setUint32(0, segCounter++);
+
+  dataChan.send(schema.Request.encode({
+    tag: schema.Request.Tag.ServicePayload,
+    bytes: new Uint8Array(buffer),
+  }));
+}
 
 pc.oniceconnectionstatechange = () => {
   console.log("pc status: ", pc.iceConnectionState);
@@ -90,6 +158,35 @@ const startSession = async () => {
   }
 };
 
-document.getElementById("start")!.onclick = async () => {
-  await startSession();
-};
+// --------------------------------------------
+// MediaSource
+
+// Need to be specific for Blink regarding codecs
+// ./mp4info frag_bunny.mp4 | grep Codec
+const mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
+
+if ("MediaSource" in window && MediaSource.isTypeSupported(mimeCodec)) {
+  const mediaSource = new MediaSource();
+  //console.log(mediaSource.readyState); // closed
+  video.src = URL.createObjectURL(mediaSource);
+  mediaSource.addEventListener("sourceopen", sourceOpen);
+} else {
+  console.error("Unsupported MIME type or codec: ", mimeCodec);
+}
+
+function sourceOpen(this: MediaSource) {
+  console.log(this.readyState); // open
+  sourceBuffer = this.addSourceBuffer(mimeCodec);
+
+  sourceBuffer!.addEventListener("updateend", function (_) {
+    if (queue.length != 0) {
+      sourceBuffer!.appendBuffer(
+        queue.shift()!,
+      );
+    }
+  });
+
+  if (didReceiveFirstMessage) {
+    getNext();
+  }
+}

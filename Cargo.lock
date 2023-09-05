@@ -2877,8 +2877,11 @@ dependencies = [
 name = "fleek-service-big-buck-bunny"
 version = "0.1.0"
 dependencies = [
+ "arrayref",
  "fn-sdk",
+ "hex-literal",
  "lazy_static",
+ "log",
 ]
 
 [[package]]
@@ -2921,6 +2924,7 @@ checksum = "7bad48618fdb549078c333a7a8528acb57af271d0433bdecd523eb620628364e"
 name = "fn-sdk"
 version = "0.0.0"
 dependencies = [
+ "arrayref",
  "derive_more",
  "fleek-blake3",
  "fleek-crypto",
@@ -3381,6 +3385,12 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "hex-literal"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fe2267d4ed49bc07b63801559be28c718ea06c4738b7a03c94df7386d2cde46"
 
 [[package]]
 name = "hkdf"

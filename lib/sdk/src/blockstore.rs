@@ -27,8 +27,16 @@ impl AsRef<HashVec> for HashTree {
 impl HashTree {
     /// Load the hash tree of a file from the blockstore.
     pub async fn load(hash: &[u8; 32]) -> io::Result<Self> {
+        let owned = *hash;
+        tokio::task::spawn_blocking(move || Self::load_sync(&owned))
+            .await
+            .unwrap()
+    }
+
+    /// Load the hash tree of a file from the blockstore.
+    pub fn load_sync(hash: &[u8; 32]) -> io::Result<Self> {
         let path = get_internal_path(hash);
-        let content = fs::read(path).await?;
+        let content = std::fs::read(path)?;
         if content.len() & 31 != 0 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -108,7 +116,7 @@ impl HashVec {
 /// Returns the path to a blockstore item with the given hash.
 pub fn get_internal_path(hash: &[u8; 32]) -> PathBuf {
     crate::api::blockstore_root().join(format!(
-        "/internal/{}",
+        "./internal/{}",
         fleek_blake3::Hash::from_bytes(*hash).to_hex(),
     ))
 }
@@ -116,7 +124,7 @@ pub fn get_internal_path(hash: &[u8; 32]) -> PathBuf {
 /// Returns the path to a blockstore block with the given block counter and hash.
 pub fn get_block_path(counter: usize, block_hash: &[u8; 32]) -> PathBuf {
     crate::api::blockstore_root().join(format!(
-        "/block/{counter}-{}",
+        "./block/{counter}-{}",
         fleek_blake3::Hash::from_bytes(*block_hash).to_hex(),
     ))
 }
