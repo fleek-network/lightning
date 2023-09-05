@@ -18,7 +18,7 @@ use crate::{
 #[async_trait]
 #[infusion::service]
 pub trait ResolverInterface<C: Collection>:
-    Sized + Clone + ConfigConsumer + WithStartAndShutdown
+    Sized + Send + Sync + Clone + ConfigConsumer + WithStartAndShutdown
 {
     fn _init(
         config: ::ConfigProviderInterface,

@@ -39,7 +39,7 @@ pub trait FetcherInterface<C: Collection>: ConfigConsumer + Clone + Sized + Send
     /// Fetches the data from the corresponding origin, puts it in the blockstore, and stores the
     /// mapping using the resolver. If the mapping already exists, the data will not be fetched
     /// from origin again.
-    async fn put(&self, pointer: ImmutablePointer) -> Blake3Hash;
+    async fn put(&self, pointer: ImmutablePointer) -> anyhow::Result<Blake3Hash>;
 
     /// Fetches the data from the blockstore. If the data does not exist in the blockstore, it will
     /// be fetched from the origin.

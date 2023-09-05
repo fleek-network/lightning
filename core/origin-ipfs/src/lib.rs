@@ -13,12 +13,13 @@ use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::CompressionAlgorithm;
 use lightning_interfaces::{
+    Blake3Hash,
     BlockStoreInterface,
     ConfigConsumer,
     IncrementalPutInterface,
     OriginProviderInterface,
     OriginProviderSocket,
-    WithStartAndShutdown, Blake3Hash,
+    WithStartAndShutdown,
 };
 use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, Notify};
@@ -127,9 +128,10 @@ impl<C: Collection> IPFSOriginInner<C> {
                             let mut read = StreamReader::new(stream);
                             let mut buf = [0; 1024];
                             let mut bytes: Vec<u8> = Vec::new();
+                            let comp = CompressionAlgorithm::Uncompressed; // clippy
                             loop {
                                 let len = read.read(&mut buf).await.unwrap();
-                                if let Err(e) = blockstore_putter.write(&buf[..len], CompressionAlgorithm::Uncompressed){
+                                if let Err(e) = blockstore_putter.write(&buf[..len], comp){
                                     task.respond(Err(anyhow!("Failed to write to the blockstore: {e}")));
                                     continue 'outer;
                                 }
