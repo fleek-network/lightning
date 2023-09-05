@@ -23,7 +23,8 @@ collection!([
     RpcInterface,
     DhtInterface,
     ServiceExecutorInterface,
-    SignerInterface
+    SignerInterface,
+    FetcherInterface
 ]);
 
 /// The Fleek Network node.
@@ -75,6 +76,7 @@ impl<C: Collection> Node<C> {
         provider.get::<C::DhtInterface>();
         provider.get::<C::ServiceExecutorInterface>();
         provider.get::<C::SignerInterface>();
+        provider.get::<C::FetcherInterface>();
     }
 }
 

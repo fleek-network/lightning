@@ -4,6 +4,8 @@ use lightning_blockstore_server::BlockStoreServer;
 use lightning_broadcast::Broadcast;
 use lightning_consensus::consensus::Consensus;
 use lightning_dht::dht::Dht;
+use lightning_fetcher::fetcher::Fetcher;
+use lightning_handshake::handshake::Handshake;
 use lightning_interfaces::infu_collection::{
     Collection,
     CollectionBase,
@@ -11,8 +13,11 @@ use lightning_interfaces::infu_collection::{
     ConsensusInterfaceModifier,
 };
 use lightning_notifier::Notifier;
+use lightning_origin_ipfs::IPFSOrigin;
 use lightning_rep_collector::ReputationAggregator;
+use lightning_resolver::resolver::Resolver;
 use lightning_rpc::server::Rpc;
+use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 use lightning_topology::Topology;
 use mock::consensus::MockConsensus;
@@ -31,16 +36,17 @@ impl CollectionBase for FinalTypes {
     type BroadcastInterface<C: Collection> = Broadcast<C>;
     type TopologyInterface<C: Collection> = Topology<C>;
     type ConsensusInterface<C: Collection> = Consensus<C>;
-    type HandshakeInterface<C: Collection> = infusion::Blank<C>;
+    type HandshakeInterface<C: Collection> = Handshake<C>;
     type NotifierInterface<C: Collection> = Notifier<C>;
-    type OriginProviderInterface<C: Collection> = infusion::Blank<C>;
+    type OriginProviderInterface<C: Collection> = IPFSOrigin<C>;
     type DeliveryAcknowledgmentAggregatorInterface<C: Collection> = infusion::Blank<C>;
     type ReputationAggregatorInterface<C: Collection> = ReputationAggregator<C>;
-    type ResolverInterface<C: Collection> = infusion::Blank<C>;
+    type ResolverInterface<C: Collection> = Resolver<C>;
     type RpcInterface<C: Collection> = Rpc<C>;
     type DhtInterface<C: Collection> = Dht<C>;
-    type ServiceExecutorInterface<C: Collection> = infusion::Blank<C>;
+    type ServiceExecutorInterface<C: Collection> = ServiceExecutor<C>;
     type SignerInterface<C: Collection> = Signer<C>;
+    type FetcherInterface<C: Collection> = Fetcher<C>;
 }
 
 // Create the collection modifier that can inject the mock consensus
