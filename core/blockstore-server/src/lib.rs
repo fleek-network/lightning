@@ -118,20 +118,17 @@ async fn handle_connection<C: Collection>(
     };
 
     // find out total content size
-    let mut last_hash = [0; 32];
-    let mut total = 0;
-    for i in 0usize.. {
+    let mut last_hash = proof.0[0];
+    let mut total = 1;
+    for i in 1usize.. {
         let ii = i * 2 - i.count_ones() as usize;
         if ii >= proof.0.len() {
             break;
         }
-
-        // TODO: Fix blockstore saving the root hash as an extra block :/
         let hash = proof.0[ii];
-        if ii != 0 && hash == root_hash {
+        if hash == root_hash {
             break;
         }
-
         last_hash = hash;
         total += 1;
     }
@@ -156,26 +153,13 @@ async fn handle_connection<C: Collection>(
     )?;
 
     // Feed blocks to the stream
-    let mut block_counter = 0u32;
-    loop {
-        let idx = (block_counter * 2 - block_counter.count_ones()) as usize;
-        if idx >= proof.0.len() {
-            break;
-        }
-
-        // TODO: Fix blockstore saving the root hash as an extra block :/
-        let hash = proof.0[idx];
-        if idx != 0 && hash == root_hash {
-            break;
-        }
-
+    for i in 0..total {
+        let idx = (i * 2 - i.count_ones()) as usize;
         let block = blockstore
-            .get(block_counter, &hash, CompressionAlgoSet::default())
+            .get(i, &proof.0[idx], CompressionAlgoSet::default())
             .await
             .ok_or(anyhow!("failed to get block"))?;
         encoder.write_all(&block.content)?;
-
-        block_counter += 1;
     }
 
     trace!("finished streaming content");
@@ -284,17 +268,6 @@ mod tests {
             BlockStoreServer::<TestBindings>::init(Config { address }, blockstore_a.clone())?;
         server_a.start().await;
 
-        // Load each content size into blockstore a and collect the hashes
-        let mut hashes = vec![];
-        for size in TEST_CASES {
-            let mut putter = blockstore_a.put(None);
-            putter
-                .write(&vec![0u8; *size], CompressionAlgorithm::Uncompressed)
-                .unwrap();
-            hashes.push(putter.finalize().await.unwrap());
-            info!("put content: {size}");
-        }
-
         // Setup node b
         let blockstore_b =
             Blockstore::<TestBindings>::init(lightning_blockstore::config::Config {
@@ -307,7 +280,15 @@ mod tests {
             blockstore_b.clone(),
         )?;
 
-        for hash in hashes {
+        for size in TEST_CASES {
+            // Load the content into blockstore a and return the hash
+            let mut putter = blockstore_a.put(None);
+            putter
+                .write(&vec![0u8; *size], CompressionAlgorithm::Uncompressed)
+                .unwrap();
+            let hash = putter.finalize().await.unwrap();
+            info!("put content: {size}");
+
             // Request download from node a, which will put the content into b
             server_b
                 .request_download(hash, "127.0.0.1:17000".parse().unwrap())
@@ -315,7 +296,7 @@ mod tests {
 
             // Verify blockstore b has the fetched content
             assert!(blockstore_b.get_tree(&hash).await.is_some());
-            info!("content received");
+            info!("fetched content: {size}");
         }
 
         server_a.shutdown().await;
