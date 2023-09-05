@@ -21,7 +21,7 @@ use crate::shutdown::ShutdownWaiter;
 pub struct WebRtcConfig {
     /// Address to listen on for the signaling server. This is used to receive and respond to
     /// incoming RTC Session Descriptions, to negotiate a new SRTP connection.
-    signal_address: SocketAddr,
+    pub signal_address: SocketAddr,
 }
 
 impl Default for WebRtcConfig {

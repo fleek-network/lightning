@@ -33,9 +33,17 @@ pub struct ServiceExecutor<C: Collection> {
     p: PhantomData<C>,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ServiceExecutorConfig {
-    services: FxHashSet<ServiceId>,
+    pub services: FxHashSet<ServiceId>,
+}
+
+impl Default for ServiceExecutorConfig {
+    fn default() -> Self {
+        Self {
+            services: [0, 1].into_iter().collect(),
+        }
+    }
 }
 
 #[derive(Clone)]

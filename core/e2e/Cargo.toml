@@ -14,6 +14,7 @@ lightning-broadcast = { path = "../broadcast" }
 lightning-consensus = { path = "../consensus" }
 lightning-notifier = { path = "../notifier" }
 lightning-handshake = { path = "../handshake" }
+lightning-service-executor = { path = "../service-executor" }
 lightning-topology = { path = "../topology" }
 lightning-signer = { path = "../signer" }
 lightning-dht = { path = "../dht" }

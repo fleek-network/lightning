@@ -4095,6 +4095,7 @@ dependencies = [
  "lightning-node",
  "lightning-notifier",
  "lightning-rpc",
+ "lightning-service-executor",
  "lightning-signer",
  "lightning-topology",
  "log",
