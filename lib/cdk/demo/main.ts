@@ -15,6 +15,7 @@ let segCounter = 0;
 let buffered: Uint8Array[] = [];
 let seen: boolean[] = [];
 let bytesRead = 0;
+let getNextSent: undefined | number;
 
 // --------------------------------------------
 // WebRTC
@@ -67,10 +68,16 @@ dataChan.onmessage = (e: MessageEvent) => {
     const size = decoded.bytes.byteLength;
     const index = decoded.bytes[size - 1];
     const slice = decoded.bytes.slice(0, size - 1);
+
+    if (bytesRead == 0) {
+      getNext();
+      console.log(performance.measure("first-byte", {
+        start: getNextSent,
+        end: performance.now(),
+      }));
+    }
+
     bytesRead += size - 1;
-
-    // console.log(segCounter, index);
-
     buffered[index] = slice;
 
     if ((index > 0 && seen[index - 1]) || index == 0) {
@@ -87,7 +94,6 @@ dataChan.onmessage = (e: MessageEvent) => {
       bytesRead = 0;
       seen = [];
       buffered = [];
-      getNext();
     }
   }
 };
@@ -98,10 +104,19 @@ function appendBuffer(buffer: Uint8Array) {
     return;
   }
 
+  if (getNextSent != undefined) {
+    console.log(performance.measure("first-frame", {
+      start: getNextSent,
+      end: performance.now(),
+    }));
+    getNextSent = undefined;
+  }
+
   sourceBuffer!.appendBuffer(buffer);
 }
 
 function getNext() {
+  getNextSent = performance.now();
   const buffer = new ArrayBuffer(4);
   const view = new DataView(buffer);
   view.setUint32(0, segCounter++);
@@ -135,7 +150,7 @@ pc.onnegotiationneeded = async (e) => {
 const startSession = async () => {
   console.log("sending sdp signal");
 
-  const res = await fetch("http://localhost:4210/sdp", {
+  const res = await fetch("http://bench.draco.network:4210/sdp", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
