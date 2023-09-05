@@ -54,7 +54,6 @@ impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
                     let Ok(Ok(hash)) = self.origin_socket.run(pointer.uri.clone()).await else {
                         return Err(anyhow!("Failed to get response"));
                     };
-                    // TODO(matthias): if we publish a record, do we store it ourselves?
                     // TODO(matthias): use different hasing algos
                     self.resolver.publish(hash, &[pointer]).await;
                     Ok(hash)
@@ -67,8 +66,6 @@ impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
     /// Fetches the data from the blockstore. If the data does not exist in the blockstore, it will
     /// be fetched from the origin.
     async fn fetch(&self, hash: Blake3Hash) -> Result<()> {
-        // TODO(matthias): is there a way to check if something is on the blockstore without
-        // getting it?
         if self.blockstore.get_tree(&hash).await.is_some() {
             return Ok(());
         }
