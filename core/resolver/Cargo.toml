@@ -16,3 +16,11 @@ resolved-pathbuf.workspace = true
 serde.workspace = true
 tokio.workspace = true
 rocksdb = "0.21"
+
+[dev-dependencies]
+lightning-test-utils = {path="../test-utils"}
+lightning-signer = {path="../signer"}
+lightning-broadcast = {path="../broadcast"}
+lightning-application = {path="../application", features = ["test"]}
+fleek-crypto.workspace = true
+infusion.workspace = true

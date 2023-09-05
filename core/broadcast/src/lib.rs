@@ -17,5 +17,6 @@ mod ring;
 mod stats;
 
 pub use broadcast::Broadcast;
+pub use config::Config;
 pub use frame::*;
 pub use pubsub::PubSubI;

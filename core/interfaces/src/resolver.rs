@@ -17,7 +17,9 @@ use crate::{
 /// into a Blake3 hash of the content.
 #[async_trait]
 #[infusion::service]
-pub trait ResolverInterface<C: Collection>: Sized + ConfigConsumer + WithStartAndShutdown {
+pub trait ResolverInterface<C: Collection>:
+    Sized + Clone + ConfigConsumer + WithStartAndShutdown
+{
     fn _init(
         config: ::ConfigProviderInterface,
         broadcast: ::BroadcastInterface,
@@ -53,7 +55,7 @@ pub trait ResolverInterface<C: Collection>: Sized + ConfigConsumer + WithStartAn
     fn get_origin_finder(&self, hash: Blake3Hash) -> Self::OriginFinder;
 
     /// Returns all origins in the local db
-    fn get_orgins(&self, hash: Blake3Hash) -> Option<Vec<ResolvedImmutablePointerRecord>>;
+    fn get_origins(&self, hash: Blake3Hash) -> Option<Vec<ResolvedImmutablePointerRecord>>;
 }
 
 /// An `async-iterator`-like interface that tries to find the immutable pointers of
