@@ -5,9 +5,9 @@ use crate::genesis::Genesis;
 
 #[derive(Serialize, Deserialize, Default)]
 pub enum Mode {
-    #[default]
     Dev,
     Test,
+    #[default]
     Prod,
 }
 
@@ -26,7 +26,7 @@ impl Config {
         Self {
             genesis: None,
             mode: Mode::Dev,
-            testnet: false,
+            testnet: true,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,
