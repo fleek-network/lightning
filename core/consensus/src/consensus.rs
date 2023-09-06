@@ -138,6 +138,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
     async fn start_current_epoch(&mut self) {
         // Get current epoch information
         let (committee, worker_cache, epoch, epoch_end) = self.get_epoch_info();
+        self.staging_log(epoch, epoch_end);
 
         // Make or open store specific to current epoch
         let mut store_path = self.store_path.clone();
@@ -297,6 +298,32 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         service.start(self.execution_state.clone()).await;
 
         self.consensus = Some(service)
+    }
+
+    // Log just to print some staging info used for testing live nodes
+    fn staging_log(&self, epoch: Epoch, epoch_end: u64) {
+        let committee_members = self.query_runner.get_committee_members();
+
+        error!("********************************");
+        error!(
+            "{} is starting epoch {}",
+            self.narwhal_args.primary_network_keypair.public(),
+            epoch
+        );
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let until_epoch_ends: u64 = (epoch_end as u128).saturating_sub(now).try_into().unwrap();
+        let time_until_epoch_change = Duration::from_millis(until_epoch_ends);
+        error!("Epoch ends in {:?}", time_until_epoch_change);
+        error!("##################");
+        error!("The current committe is: ");
+        for node in committee_members {
+            error!("node: {node}");
+        }
+        error!("##################");
+        error!("********************************");
     }
 }
 
