@@ -55,7 +55,7 @@ use crate::table::{Backend, TableRef};
 /// Minimum number of reported measurements that have to be available for a node.
 /// If less measurements have been reported, no reputation score will be computed in that epoch.
 #[cfg(all(not(test), not(feature = "test")))]
-const MIN_NUM_MEASUREMENTS: usize = 10;
+const MIN_NUM_MEASUREMENTS: usize = 4;
 #[cfg(any(test, feature = "test"))]
 const MIN_NUM_MEASUREMENTS: usize = 2;
 
@@ -1132,14 +1132,14 @@ impl<B: Backend> State<B> {
             Some(Value::Epoch(epoch)) => epoch,
             _ => 0,
         };
-        let num_of_nodes = match self.metadata.get(&Metadata::NextNodeIndex) {
-            Some(Value::NextNodeIndex(index)) => index,
-            _ => 0,
-        };
+
+        let mut node_registry: Vec<NodeIndex> = self.get_node_registry().keys().copied().collect();
+        let num_of_nodes = node_registry.len() as u128;
+
         let committee_size = self.parameters.get(&ProtocolParams::CommitteeSize).unwrap();
         // if total number of nodes are less than committee size, all nodes are part of committee
         if committee_size >= num_of_nodes.into() {
-            return (0..num_of_nodes).collect();
+            return node_registry;
         }
 
         let committee = self.committee_info.get(&epoch).unwrap();
@@ -1163,7 +1163,6 @@ impl<B: Backend> State<B> {
         let mut seed = [0u8; 32];
         seed.copy_from_slice(&result.as_bytes()[0..32]);
         let mut rng: StdRng = SeedableRng::from_seed(seed);
-        let mut node_registry: Vec<NodeIndex> = self.get_node_registry().keys().copied().collect();
         node_registry.shuffle(&mut rng);
         node_registry
             .into_iter()
@@ -1353,4 +1352,14 @@ impl<B: Backend> State<B> {
             TransactionSender::AccountOwner(_) => None,
         }
     }
+}
+
+#[test]
+fn test() {
+    let number: u128 = 1000;
+
+    let hp: HpUfixed<18> = number.into();
+    let zero = HpUfixed::zero();
+
+    println!("{:?}", zero >= hp);
 }

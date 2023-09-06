@@ -13,6 +13,7 @@ use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore_server::BlockStoreServer;
+use lightning_consensus::notify_container::get_value;
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::{
     BlockStoreInterface,
@@ -212,41 +213,45 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
 
     /// Run the node with the provided configuration path.
     async fn run(self, config_path: ResolvedPathBuf) -> Result<()> {
-        let shutdown_controller = ShutdownController::default();
-        shutdown_controller.install_handlers();
+        loop {
+            let config_path = config_path.clone();
+            // testnet sync
+            let config = Self::load_or_write_config(config_path.try_into().unwrap()).await?;
+            let shutdown_controller = ShutdownController::default();
+            shutdown_controller.install_handlers();
 
-        let config = Self::load_or_write_config(config_path).await?;
+            let signer_config = config.get::<Signer<C>>();
+            let app_config = config.get::<Application<C>>();
+            let blockstore_config = config.get::<Blockstore<C>>();
+            let block_server_config = config.get::<BlockStoreServer<C>>();
+            if app_config.testnet {
+                testnet_sync::sync(
+                    signer_config,
+                    app_config,
+                    blockstore_config,
+                    block_server_config,
+                )
+                .await;
+            }
 
-        // testnet sync
-        let signer_config = config.get::<Signer<C>>();
-        let app_config = config.get::<Application<C>>();
-        let blockstore_config = config.get::<Blockstore<C>>();
-        let block_server_config = config.get::<BlockStoreServer<C>>();
-        if app_config.testnet {
-            testnet_sync::sync(
-                signer_config,
-                app_config,
-                blockstore_config,
-                block_server_config,
-            )
-            .await;
-        }
+            let node = Node::<C>::init(config)
+                .map_err(|e| anyhow::anyhow!("Could not start the node: {e}"))?;
 
-        let node = Node::<C>::init(config)
-            .map_err(|e| anyhow::anyhow!("Could not start the node: {e}"))?;
+            let reset_notifier = get_value();
 
-        if let Some(cb) = &self.1 {
-            ((cb)(&node, true)).await;
-        } else {
             node.start().await;
-        }
 
-        shutdown_controller.wait_for_shutdown().await;
+            tokio::select! {
+                _ = shutdown_controller.wait_for_shutdown() =>{
+                    node.shutdown().await;
+                    break;
+                },
+                _ = reset_notifier.notified() => {
+                    node.shutdown().await;
+                    continue;
+                }
 
-        if let Some(cb) = &self.1 {
-            ((cb)(&node, false)).await;
-        } else {
-            node.shutdown().await;
+            }
         }
 
         Ok(())

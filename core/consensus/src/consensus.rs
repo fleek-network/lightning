@@ -39,6 +39,7 @@ use crate::edge_node::consensus::EdgeConsensus;
 use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Execution};
 use crate::forwarder::Forwarder;
 use crate::narwhal::{NarwhalArgs, NarwhalService};
+use crate::notify_container::set_value;
 
 pub struct Consensus<C: Collection> {
     /// Inner state of the consensus
@@ -89,6 +90,8 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     pub_sub: P,
     /// Narhwal sends payloads ready for broadcast to this reciever
     rx_narwhal_batches: Option<mpsc::Receiver<(AuthenticStampedParcel, bool)>>,
+    /// Testnet only: used to notify node to reset
+    reset_notifier: Arc<Notify>,
 }
 
 impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, P> {
@@ -100,6 +103,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         txn_socket: SubmitTxSocket,
         pub_sub: P,
         rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
+        reset_notifier: Arc<Notify>,
     ) -> Self {
         Self {
             consensus: None,
@@ -110,6 +114,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             txn_socket,
             pub_sub,
             rx_narwhal_batches: Some(rx_narwhal_batches),
+            reset_notifier,
         }
     }
 
@@ -141,12 +146,22 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         // on hits/miss
         let store = NodeStorage::reopen(store_path, None);
 
-        if committee
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let until_epoch_ends: u64 = (epoch_end as u128).saturating_sub(now).try_into().unwrap();
+        let time_until_epoch_change = Duration::from_millis(until_epoch_ends);
+
+        let is_committee = committee
             .authority_by_key(self.narwhal_args.primary_keypair.public())
-            .is_some()
-        {
-            self.run_narwhal(store, epoch_end, epoch, committee, worker_cache)
-                .await
+            .is_some();
+
+        self.wait_to_signal_epoch_change(time_until_epoch_change, epoch, is_committee)
+            .await;
+
+        if is_committee {
+            self.run_narwhal(store, committee, worker_cache).await
         }
     }
 
@@ -224,21 +239,43 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         (narwhal_committee, worker_cache, epoch, epoch_end)
     }
 
-    async fn wait_to_signal_epoch_change(&self, time_until_change: Duration, epoch: Epoch) {
-        let txn_socket = self.txn_socket.clone();
+    async fn wait_to_signal_epoch_change(
+        &self,
+        time_until_change: Duration,
+        epoch: Epoch,
+        is_committee: bool,
+    ) {
+        if is_committee {
+            let txn_socket = self.txn_socket.clone();
+            task::spawn(async move {
+                time::sleep(time_until_change).await;
+                info!("Narwhal: Signalling ready to change epoch");
+                // We shouldnt panic here lets repeatedly try.
+                while txn_socket
+                    .run(UpdateMethod::ChangeEpoch { epoch })
+                    .await
+                    .is_err()
+                {
+                    error!(
+                        "Error sending change epoch transaction to signer interface, trying again..."
+                    );
+                    time::sleep(Duration::from_secs(1)).await;
+                }
+            });
+        }
+
+        let query_runner = self.query_runner.clone();
+        let reset_notifier = self.reset_notifier.clone();
         task::spawn(async move {
-            time::sleep(time_until_change).await;
-            info!("Narwhal: Signalling ready to change epoch");
-            // We shouldnt panic here lets repeatedly try.
-            while txn_socket
-                .run(UpdateMethod::ChangeEpoch { epoch })
-                .await
-                .is_err()
-            {
-                error!(
-                    "Error sending change epoch transaction to signer interface, trying again..."
-                );
-                time::sleep(Duration::from_secs(1)).await;
+            // if its been this long past the time the epoch was suppose to change, try resyncing
+            let additional_time = Duration::from_secs(600);
+            let total = additional_time + time_until_change;
+
+            time::sleep(total).await;
+            let new_epoch = query_runner.get_epoch();
+
+            if epoch == new_epoch {
+                reset_notifier.notify_waiters();
             }
         });
     }
@@ -246,8 +283,6 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
     async fn run_narwhal(
         &mut self,
         store: NodeStorage,
-        epoch_end: u64,
-        epoch: u64,
         committee: Committee,
         worker_cache: WorkerCache,
     ) {
@@ -260,16 +295,6 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             NarwhalService::new(self.narwhal_args.clone(), store, committee, worker_cache);
 
         service.start(self.execution_state.clone()).await;
-
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
-        let until_epoch_ends: u64 = (epoch_end as u128).saturating_sub(now).try_into().unwrap();
-        let time_until_epoch_change = Duration::from_millis(until_epoch_ends);
-
-        self.wait_to_signal_epoch_change(time_until_epoch_change, epoch)
-            .await;
 
         self.consensus = Some(service)
     }
@@ -375,6 +400,10 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             tx_narwhal_batches,
             query_runner.clone(),
         ));
+
+        let reset_notifier = Arc::new(Notify::new());
+        set_value(reset_notifier.clone());
+
         let epoch_state = EpochState::new(
             query_runner,
             narwhal_args,
@@ -383,6 +412,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             signer.get_socket(),
             pubsub,
             rx_narwhal_batches,
+            reset_notifier,
         );
 
         Ok(Self {
