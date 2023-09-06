@@ -1,5 +1,6 @@
 use std::fs;
 use std::net::IpAddr;
+use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
@@ -20,7 +21,7 @@ use lightning_interfaces::{
 };
 use lightning_signer::Config as SignerConfig;
 use lightning_types::{Epoch, NodeInfo};
-use log::{info, warn};
+use log::{error, info, warn};
 use serde::de::DeserializeOwned;
 
 partial!(PartialBinding {
@@ -36,21 +37,27 @@ pub async fn sync(
 ) {
     let genesis = Genesis::load().expect("Failed to load genesis.");
     let on_committee = am_i_on_the_committee(&genesis, &signer_config);
-    let is_whitelisted = am_i_whitelisted(&genesis, &signer_config).await;
-    if on_committee {
-        info!("Node is on the genesis committee.");
-    } else if is_whitelisted {
-        info!("Node is whitelisted.");
-    } else {
-        panic!("Node is not whitelisted. Please join the Fleek Discord to get invited.");
+    loop {
+        let is_whitelisted = am_i_whitelisted(&genesis, &signer_config).await;
+        if is_whitelisted || on_committee {
+            break;
+        } else {
+            error!(
+                "This node is not whitelisted for testnet. Please checkout discord.gg/fleekxyz to learn how to get whitelisted"
+            );
+            error!("checking whitelist again in 5 minutes");
+
+            tokio::time::sleep(Duration::from_secs(300)).await;
+        }
     }
+
     let mut env = Env::new(&app_config, None).expect("Failed to initialize environment.");
     if !env.genesis(&app_config) {
         info!("State already exists. Not loading genesis.");
     }
 
     let nodes_to_sync = find_nodes_for_syncing(genesis).await;
-    if nodes_to_sync.is_empty() && is_whitelisted {
+    if nodes_to_sync.is_empty() && !on_committee {
         panic!("This testnet phase has ended. Stay tuned for the next phase on the Fleek Discord.");
     }
 
