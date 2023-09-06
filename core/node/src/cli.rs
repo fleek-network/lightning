@@ -128,7 +128,11 @@ impl<C: Collection> Cli<C> {
             _3_or_more => LevelFilter::Trace,
         };
 
-        let stdout = ConsoleAppender::builder().build();
+        let stdout = ConsoleAppender::builder()
+            .encoder(Box::new(PatternEncoder::new(
+                "{d(%Y-%m-%d %H:%M:%S)(utc)} | {h({l}):5.5} | {M} - {f}:{L} - {m}{n}",
+            )))
+            .build();
 
         let log_file = std::env::temp_dir().join("lightning.log");
         let size_trigger = SizeTrigger::new(150 * 1024 * 1024); // 150 MB
@@ -145,7 +149,7 @@ impl<C: Collection> Cli<C> {
 
         let rolling_appender = RollingFileAppender::builder()
             .encoder(Box::new(PatternEncoder::new(
-                "{d(%Y-%m-%d %H:%M:%S)(utc)} [{l}] {M}:{m}{n}",
+                "{d(%Y-%m-%d %H:%M:%S)(utc)} | {h({l}):5.5} | {M} - {f}:{L} - {m}{n}",
             )))
             .build(log_file, Box::new(policy))
             .unwrap();
