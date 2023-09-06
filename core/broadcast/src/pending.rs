@@ -103,7 +103,7 @@ impl PendingStore {
                 } else if pub_keys.len() == 1 {
                     Some((id, pub_keys[0]))
                 } else {
-                    let mut max_val: f64 = 1.0;
+                    let mut max_val: f64 = 0.0;
                     let weights: Vec<f64> = pub_keys
                         .iter()
                         .map(|pub_key| self.rtt_map.get(pub_key).and_then(|ema| ema.current()))
@@ -118,11 +118,14 @@ impl PendingStore {
                     // The sampling probability for a particular node is inversely proportional
                     // to the measured RTT (the lower the RTT, the higher the chance of
                     // selecting the node).
-                    let weights: Vec<f64> = weights.into_iter().map(|w| max_val - w).collect();
-                    let dist = WeightedIndex::new(weights).unwrap();
-                    let mut rng = thread_rng();
-                    let peer = pub_keys[dist.sample(&mut rng)];
-
+                    let weights: Vec<f64> =
+                        weights.into_iter().map(|w| max_val - w + 1.0).collect();
+                    let peer = if let Ok(dist) = WeightedIndex::new(weights) {
+                        let mut rng = thread_rng();
+                        pub_keys[dist.sample(&mut rng)]
+                    } else {
+                        pub_keys[0]
+                    };
                     Some((id, peer))
                 }
             })

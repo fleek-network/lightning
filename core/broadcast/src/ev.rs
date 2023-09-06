@@ -20,8 +20,11 @@ use lightning_interfaces::types::{NodeIndex, Topic};
 use lightning_interfaces::{
     ApplicationInterface,
     NotifierInterface,
+    ReputationAggregatorInterface,
+    ReputationReporterInterface,
     SyncQueryRunnerInterface,
     TopologyInterface,
+    Weight,
 };
 use lightning_metrics::{counter, histogram, increment_counter};
 use netkit::endpoint::{Event, NodeAddress, Request};
@@ -64,6 +67,7 @@ pub struct Context<C: Collection> {
     sqr: c![C::ApplicationInterface::SyncExecutor],
     notifier: c![C::NotifierInterface],
     topology: c![C::TopologyInterface],
+    rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     network_event_rx: Receiver<Event>,
     endpoint_tx: Sender<Request>,
     sk: NodeSecretKey,
@@ -72,11 +76,13 @@ pub struct Context<C: Collection> {
 }
 
 impl<C: Collection> Context<C> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: Database,
         sqr: c![C::ApplicationInterface::SyncExecutor],
         notifier: c![C::NotifierInterface],
         topology: c![C::TopologyInterface],
+        rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
         network_event_rx: Receiver<Event>,
         endpoint_tx: Sender<Request>,
         sk: NodeSecretKey,
@@ -102,6 +108,7 @@ impl<C: Collection> Context<C> {
             sqr,
             notifier,
             topology,
+            rep_reporter,
             network_event_rx,
             endpoint_tx,
             sk,
@@ -322,6 +329,8 @@ impl<C: Collection> Context<C> {
 
         // Mark message as received for RTT measurements.
         self.pending_store.received_message(sender, id);
+        // Report a satisfactory interaction when we receive a message.
+        self.rep_reporter.report_sat(&sender, Weight::Weak);
         self.incoming_messages[topic_index].insert(shared);
     }
 
@@ -460,6 +469,7 @@ async fn main_loop<C: Collection>(
                             log::error!("remote node address not found");
                             continue;
                         };
+                        ctx.rep_reporter.report_latency(&peer, rtt / 2);
                         ctx.peers.handle_new_connection(index, peer, address);
                     }
                     Event::Message { peer, message } => {

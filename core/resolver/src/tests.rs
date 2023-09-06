@@ -12,10 +12,12 @@ use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     ConsensusInterface,
+    ReputationAggregatorInterface,
     ResolverInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
+use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 
@@ -27,6 +29,7 @@ partial!(TestBinding {
     ConsensusInterface = MockConsensus<Self>;
     SignerInterface = Signer<Self>;
     BroadcastInterface = Broadcast<Self>;
+    ReputationAggregatorInterface = ReputationAggregator<Self>;
 });
 
 #[tokio::test]
@@ -80,12 +83,21 @@ async fn test_start_shutdown() {
 
     let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
 
+    let rep_aggregator = ReputationAggregator::<TestBinding>::init(
+        lightning_rep_collector::config::Config::default(),
+        signer.get_socket(),
+        Default::default(),
+        query_runner.clone(),
+    )
+    .unwrap();
+
     let broadcast = Broadcast::<TestBinding>::init(
         BroadcastConfig::default(),
         query_runner.clone(),
         Default::default(),
         &signer,
         Default::default(),
+        rep_aggregator.get_reporter(),
     )
     .unwrap();
 

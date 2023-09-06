@@ -10,6 +10,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     ConfigConsumer,
+    ReputationAggregatorInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
@@ -141,6 +142,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         topology: c!(C::TopologyInterface),
         signer: &c!(C::SignerInterface),
         notifier: c!(C::NotifierInterface),
+        rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     ) -> anyhow::Result<Self> {
         let (_, sk) = signer.get_sk();
         // Todo: Move this to config.
@@ -157,6 +159,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
             sqr,
             notifier,
             topology,
+            rep_reporter,
             network_event_rx,
             endpoint_tx,
             sk,

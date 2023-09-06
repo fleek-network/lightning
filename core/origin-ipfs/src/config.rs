@@ -5,13 +5,13 @@ pub struct Config {
     pub gateways: Vec<Gateway>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Protocol {
     Http,
     Https,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Gateway {
     pub protocol: Protocol,
     pub authority: String,
