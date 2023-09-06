@@ -5,6 +5,7 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
 use fleek_crypto::{ConsensusSecretKey, NodePublicKey, NodeSecretKey, SecretKey};
+use hp_fixed::unsigned::HpUfixed;
 use lightning_application::config::Config as AppConfig;
 use lightning_application::env::Env;
 use lightning_application::genesis::{Genesis, GenesisNode};
@@ -234,7 +235,9 @@ pub async fn am_i_whitelisted(genesis: &Genesis, signer_config: &SignerConfig) -
         .await
         {
             if let Some(node_info) = res.result {
-                if node_info.public_key == node_pub_key {
+                if node_info.public_key == node_pub_key
+                    && node_info.stake.staked > HpUfixed::<18>::zero()
+                {
                     return true;
                 }
             }

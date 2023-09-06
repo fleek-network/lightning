@@ -45,6 +45,7 @@ affair.workspace = true
 log.workspace = true
 simplelog = "0.12.1"
 chrono = "0.4.26"
+hp-fixed.workspace = true
 # testnet sync
 reqwest = { version = "0.11", features = ["json"] }
 serde_json = "1.0"

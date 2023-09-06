@@ -4220,6 +4220,7 @@ dependencies = [
  "chrono",
  "clap 4.4.2",
  "fleek-crypto",
+ "hp-fixed",
  "infusion",
  "lightning-application",
  "lightning-blockstore",
