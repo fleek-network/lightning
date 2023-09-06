@@ -1,4 +1,4 @@
-epoch_start = 1693944010537                                          # about 5 o clock 8-28-2023
+epoch_start = 1693966037528                                          # about 5 o clock 8-28-2023
 epoch_time = 1800000                                                 # 1 hour
 committee_size = 10
 min_stake = 1000
@@ -162,6 +162,12 @@ commodity_type = "Compute"
 [[account]]
 public_key = "0x959807B8D94B324A74117956731F09E2893aCd72"
 flk_balance = 100
+stables_balance = 100
+bandwidth_balance = 100
+
+[[account]]
+public_key = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+flk_balance = 1000000
 stables_balance = 100
 bandwidth_balance = 100
 
