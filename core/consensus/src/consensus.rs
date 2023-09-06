@@ -20,7 +20,7 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
 };
 use lightning_schema::AutoImplSerde;
-use log::{error, info};
+use log::{error, info, warn};
 use mysten_metrics::RegistryService;
 use mysten_network::Multiaddr;
 use narwhal_config::{Committee, CommitteeBuilder, WorkerCache, WorkerIndex, WorkerInfo};
@@ -304,8 +304,8 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
     fn staging_log(&self, epoch: Epoch, epoch_end: u64) {
         let committee_members = self.query_runner.get_committee_members();
 
-        error!("********************************");
-        error!(
+        warn!("********************************");
+        warn!(
             "{} is starting epoch {}",
             self.narwhal_args.primary_network_keypair.public(),
             epoch
@@ -316,14 +316,14 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             .as_millis();
         let until_epoch_ends: u64 = (epoch_end as u128).saturating_sub(now).try_into().unwrap();
         let time_until_epoch_change = Duration::from_millis(until_epoch_ends);
-        error!("Epoch ends in {:?}", time_until_epoch_change);
-        error!("##################");
-        error!("The current committe is: ");
+        warn!("Epoch ends in {:?}", time_until_epoch_change);
+        warn!("##################");
+        warn!("The current committe is: ");
         for node in committee_members {
             error!("node: {node}");
         }
-        error!("##################");
-        error!("********************************");
+        warn!("##################");
+        warn!("********************************");
     }
 }
 
