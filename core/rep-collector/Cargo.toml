@@ -15,6 +15,7 @@ fleek-crypto.workspace = true
 tokio.workspace = true
 lru.workspace = true
 scc.workspace = true
+log.workspace = true
 
 [dev-dependencies]
 lightning-test-utils = {path="../test-utils"}

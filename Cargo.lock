@@ -4332,6 +4332,7 @@ dependencies = [
  "lightning-reputation",
  "lightning-signer",
  "lightning-test-utils",
+ "log",
  "lru",
  "rand 0.8.5",
  "scc",

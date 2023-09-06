@@ -17,6 +17,7 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
     Weight,
 };
+use log::{error, info};
 use tokio::sync::mpsc;
 
 use crate::buffered_mpsc;
@@ -24,7 +25,7 @@ use crate::config::Config;
 use crate::measurement_manager::MeasurementManager;
 
 #[cfg(not(test))]
-const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(3600);
+const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(300);
 #[cfg(test)]
 const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(2);
 
@@ -49,10 +50,14 @@ impl<C: Collection> ReputationAggregator<C> {
         loop {
             tokio::select! {
                 report_msg = self.report_rx.recv() => {
-                    self.handle_report(report_msg.expect("Failed to receive message."));
+                    if let Some(report_msg) = report_msg {
+                        self.handle_report(report_msg);
+                    } else {
+                        error!("Failed to receive message");
+                    }
                 }
                 notification = self.notify_rx.recv() => {
-                    if let Notification::BeforeEpochChange = notification.expect("Failed to receive notification.") {
+                    if let Some(Notification::BeforeEpochChange) = notification {
                         self.submit_aggregation();
                         self.notifier
                             .notify_before_epoch_change(
@@ -60,6 +65,8 @@ impl<C: Collection> ReputationAggregator<C> {
                                 self.notify_tx.clone()
                             );
                         self.measurement_manager.clear_measurements();
+                    } else {
+                        error!("Failed to receive message");
                     }
                 }
             }
@@ -151,10 +158,13 @@ impl<C: Collection> ReputationAggregatorInterface<C> for ReputationAggregator<C>
         if !measurements.is_empty() {
             let submit_tx = self.submit_tx.clone();
             tokio::spawn(async move {
-                submit_tx
+                info!("Submitting reputation measurements");
+                if let Err(e) = submit_tx
                     .run(UpdateMethod::SubmitReputationMeasurements { measurements })
                     .await
-                    .expect("SubmitReputationMeasurements transaction failed.");
+                {
+                    error!("SubmitReputationMeasurements transaction failed: {e:?}");
+                }
             });
         }
     }
