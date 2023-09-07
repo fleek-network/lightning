@@ -1,3 +1,4 @@
+pub mod child_process;
 pub mod cli;
 pub mod config;
 pub mod node;

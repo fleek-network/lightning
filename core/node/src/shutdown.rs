@@ -26,6 +26,11 @@ impl ShutdownController {
         });
     }
 
+    /// Manually send the shutdown signal.
+    pub fn shutdown(&self) {
+        self.notify.notify_waiters();
+    }
+
     /// Wait for the shutdown signal to be sent.
     pub async fn wait_for_shutdown(self) {
         tracing::info!("Waiting for shutdown signal");

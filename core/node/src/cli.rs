@@ -13,7 +13,6 @@ use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore_server::BlockStoreServer;
-use lightning_consensus::notify_container::get_value;
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::{
     BlockStoreInterface,
@@ -34,6 +33,7 @@ use log4rs::encode::pattern::PatternEncoder;
 use log4rs::filter::threshold::ThresholdFilter;
 use resolved_pathbuf::ResolvedPathBuf;
 
+use crate::child_process::{ChildProcessConfig, ChildProcessRunner};
 use crate::config::TomlConfigProvider;
 use crate::shutdown::ShutdownController;
 use crate::testnet_sync;
@@ -217,12 +217,12 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
 
     /// Run the node with the provided configuration path.
     async fn run(self, config_path: ResolvedPathBuf) -> Result<()> {
-        loop {
+        if std::env::var("IS_CHILD").is_ok() {
+            let shutdown = ShutdownController::default();
+            shutdown.install_handlers();
+
             let config_path = config_path.clone();
-            // testnet sync
             let config = Self::load_or_write_config(config_path.try_into().unwrap()).await?;
-            let shutdown_controller = ShutdownController::default();
-            shutdown_controller.install_handlers();
 
             let signer_config = config.get::<Signer<C>>();
             let app_config = config.get::<Application<C>>();
@@ -241,22 +241,32 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
             let node = Node::<C>::init(config)
                 .map_err(|e| anyhow::anyhow!("Could not start the node: {e}"))?;
 
-            let reset_notifier = get_value();
-
             node.start().await;
-
-            tokio::select! {
-                _ = shutdown_controller.wait_for_shutdown() =>{
-                    node.shutdown().await;
-                    break;
-                },
-                _ = reset_notifier.notified() => {
-                    node.shutdown().await;
-                    continue;
-                }
-
-            }
+            shutdown.wait_for_shutdown().await;
+            node.shutdown().await;
+            return Ok(());
         }
+
+        let shutdown = ShutdownController::default();
+        shutdown.install_handlers();
+
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        command.env("IS_CHILD", "TRUE");
+        command.args(std::env::args().skip(1));
+
+        let config = ChildProcessConfig {
+            name: "Lightning".to_owned(),
+            command,
+            shutdown_controller: Some(shutdown.clone()),
+            callback: None,
+            pid_file: None,
+        };
+
+        let mut child = ChildProcessRunner::new(config);
+        child.start();
+
+        shutdown.wait_for_shutdown().await;
+        println!("Shutting node down.");
 
         Ok(())
     }

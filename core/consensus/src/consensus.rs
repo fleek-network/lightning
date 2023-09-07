@@ -39,7 +39,6 @@ use crate::edge_node::consensus::EdgeConsensus;
 use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Execution};
 use crate::forwarder::Forwarder;
 use crate::narwhal::{NarwhalArgs, NarwhalService};
-use crate::notify_container::set_value;
 
 pub struct Consensus<C: Collection> {
     /// Inner state of the consensus
@@ -90,8 +89,6 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     pub_sub: P,
     /// Narhwal sends payloads ready for broadcast to this reciever
     rx_narwhal_batches: Option<mpsc::Receiver<(AuthenticStampedParcel, bool)>>,
-    /// Testnet only: used to notify node to reset
-    reset_notifier: Arc<Notify>,
 }
 
 impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, P> {
@@ -103,7 +100,6 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         txn_socket: SubmitTxSocket,
         pub_sub: P,
         rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
-        reset_notifier: Arc<Notify>,
     ) -> Self {
         Self {
             consensus: None,
@@ -114,7 +110,6 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             txn_socket,
             pub_sub,
             rx_narwhal_batches: Some(rx_narwhal_batches),
-            reset_notifier,
         }
     }
 
@@ -266,7 +261,6 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         }
 
         let query_runner = self.query_runner.clone();
-        let reset_notifier = self.reset_notifier.clone();
         task::spawn(async move {
             // if its been this long past the time the epoch was suppose to change, try resyncing
             let additional_time = Duration::from_secs(600);
@@ -276,7 +270,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             let new_epoch = query_runner.get_epoch();
 
             if epoch == new_epoch {
-                reset_notifier.notify_waiters();
+                std::process::abort();
             }
         });
     }
@@ -428,9 +422,6 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             query_runner.clone(),
         ));
 
-        let reset_notifier = Arc::new(Notify::new());
-        set_value(reset_notifier.clone());
-
         let epoch_state = EpochState::new(
             query_runner,
             narwhal_args,
@@ -439,7 +430,6 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             signer.get_socket(),
             pubsub,
             rx_narwhal_batches,
-            reset_notifier,
         );
 
         Ok(Self {

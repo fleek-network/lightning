@@ -57,3 +57,5 @@ log4rs = { version = "1.2.0", features = [
     "fixed_window_roller",
     "gzip",
 ] }
+crossbeam = "0.8"
+garcon = "0.2"
