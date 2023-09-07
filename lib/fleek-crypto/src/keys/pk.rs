@@ -68,7 +68,11 @@ macro_rules! impl_pk_sig {
 
         impl std::fmt::Debug for $pk_name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, concat!(stringify!($pk_name), "<{}>"), self.to_base64())
+                write!(
+                    f,
+                    concat!(stringify!($pk_name), r#"("{}")"#),
+                    self.to_base64()
+                )
             }
         }
 
@@ -103,7 +107,7 @@ macro_rules! impl_pk_sig {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(
                     f,
-                    concat!(stringify!($pk_name), r#"("{}")""#),
+                    concat!(stringify!($pk_name), r#"("{}")"#),
                     Base64::encode(self.0)
                 )
             }
