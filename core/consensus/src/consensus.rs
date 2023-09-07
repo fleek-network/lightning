@@ -431,6 +431,10 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             query_runner.clone(),
         ));
 
+        let mut store_path = config.store_path.clone();
+
+        store_path.push("-v2");
+
         let epoch_state = EpochState::new(
             query_runner,
             narwhal_args,

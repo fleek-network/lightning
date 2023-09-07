@@ -53,6 +53,11 @@ impl Env<UpdatePerm> {
                     .db_path
                     .as_ref()
                     .context("db_path must be specified for RocksDb backend")?;
+
+                let mut db_path = db_path.to_path_buf();
+
+                db_path.push("-v2");
+
                 let mut db_options = if let Some(db_options) = config.db_options.as_ref() {
                     let (options, _) = Options::load_latest(
                         db_options,
