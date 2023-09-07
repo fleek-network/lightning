@@ -1,9 +1,10 @@
 use std::fs;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use autometrics::autometrics;
 use axum::{http, Extension, Json};
-use fleek_crypto::{EthAddress, NodePublicKey};
+use fleek_crypto::{AccountOwnerSignature, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use http::StatusCode;
 use jsonrpc_v2::{Data, Error, MapRouter, Params, RequestObject, ResponseObjects, Server};
@@ -101,7 +102,8 @@ impl RpcServer {
             .with_method("flk_get_reputation", get_reputation_handler::<C>)
             .with_method("flk_get_last_epoch_hash", get_last_epoch_hash_handler::<C>)
             .with_method("flk_send_txn", send_txn::<C>)
-            .with_method("flk_put", put::<C>);
+            .with_method("flk_put", put::<C>)
+            .with_method("testnet_only_kill", kill::<C>);
 
         #[cfg(feature = "e2e-test")]
         {
@@ -119,6 +121,25 @@ pub async fn rpc_discovery_handler<C: Collection>() -> Result<String> {
         Ok(contents) => Ok(contents),
         Err(e) => Err(Error::internal(e)),
     }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct KillParam(AccountOwnerSignature, [u8; 32]);
+/// TESTNET ONLY Kill signal for manually stopping nodes.
+pub async fn kill<C: Collection>(
+    Params(KillParam(signature, digest)): Params<KillParam>,
+) -> Result<()> {
+    let governance_pk = EthAddress::from_str("0x2a8cf657769c264b0c7f88e3a716afdeaec1c318").unwrap();
+    // verify the signature is from the governance key.
+    if governance_pk.verify(&signature, &digest) {
+        eprintln!("--- RECEIVED GOVERNANCE KILL SIGNAL ---");
+        std::process::exit(1);
+    }
+
+    Err(jsonrpc_v2::Error::Provided {
+        code: 401,
+        message: "invalid governance signature",
+    })
 }
 
 pub async fn put<C: Collection>(
