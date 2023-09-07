@@ -245,6 +245,10 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             let txn_socket = self.txn_socket.clone();
             let query_runner = self.query_runner.clone();
             task::spawn(async move {
+                // 10 hours
+                if time_until_change > Duration::from_secs(36000) {
+                    time::sleep(Duration::from_secs(300)).await;
+                }
                 time::sleep(time_until_change).await;
                 info!("Narwhal: Signalling ready to change epoch");
                 // We shouldnt panic here lets repeatedly try.
@@ -271,15 +275,56 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
 
         let query_runner = self.query_runner.clone();
         task::spawn(async move {
-            // if its been this long past the time the epoch was suppose to change, try resyncing
             let additional_time = Duration::from_secs(300);
-            let total = additional_time + time_until_change;
+            if time_until_change > Duration::from_secs(36000) {
+                loop {
+                    time::sleep(additional_time).await;
 
-            time::sleep(total).await;
-            let new_epoch = query_runner.get_epoch();
+                    let json_value = serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "method":"flk_get_epoch",
+                        "params":[],
+                        "id":1,
+                    });
 
-            if epoch == new_epoch {
-                std::process::abort();
+                    let client = reqwest::Client::new();
+
+                    if let Ok(res) = client
+                        .post(format!("http://159.65.254.159:4069/rpc/v0"))
+                        .header("Content-Type", "application/json")
+                        .body(json_value.to_string())
+                        .send()
+                        .await
+                    {
+                        if res.status().is_success() {
+                            if let Ok(value) = res.json().await {
+                                let bootstrap_epoch: RpcResponse<u64> =
+                                    serde_json::from_value(value).unwrap_or(RpcResponse {
+                                        result: epoch,
+                                        ..Default::default()
+                                    });
+                                let new_epoch = query_runner.get_epoch();
+                                if new_epoch != epoch {
+                                    return;
+                                } else if bootstrap_epoch.result != new_epoch {
+                                    std::process::abort();
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // if its been this long past the time the epoch was suppose to change, try
+                // resyncing
+
+                let total = additional_time + time_until_change;
+
+                time::sleep(total).await;
+                let new_epoch = query_runner.get_epoch();
+
+                if epoch == new_epoch {
+                    std::process::abort();
+                }
             }
         });
     }
@@ -473,3 +518,10 @@ pub enum PubSubMsg {
     Attestation(CommitteeAttestation),
 }
 impl AutoImplSerde for PubSubMsg {}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
+struct RpcResponse<T> {
+    jsonrpc: String,
+    id: usize,
+    result: T,
+}

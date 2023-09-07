@@ -42,7 +42,8 @@ mysten-metrics = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada0
 mysten-network = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "mysten-network" }
 sui-protocol-config = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "sui-protocol-config" }
 tonic = { version = "0.8.2", features = ["transport", "tls"] }
-
+serde_json.workspace = true
+reqwest.workspace = true
 prometheus = "0.13.3"
 multiaddr = "0.17.1"
 fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1" }

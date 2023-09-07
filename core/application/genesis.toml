@@ -1,5 +1,5 @@
 epoch_start = 1694108063291                                          # about 1:30am EST 9-7-2023
-epoch_time = 1800000                                                 # 30 minutes
+epoch_time = 432000000                                               # 5 days
 committee_size = 10
 min_stake = 1000
 eligibility_time = 1
