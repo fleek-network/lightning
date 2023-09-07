@@ -226,19 +226,28 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
 
     async fn wait_to_signal_epoch_change(&self, time_until_change: Duration, epoch: Epoch) {
         let txn_socket = self.txn_socket.clone();
+        let query_runner = self.query_runner.clone();
         task::spawn(async move {
             time::sleep(time_until_change).await;
             info!("Narwhal: Signalling ready to change epoch");
             // We shouldnt panic here lets repeatedly try.
-            while txn_socket
-                .run(UpdateMethod::ChangeEpoch { epoch })
-                .await
-                .is_err()
-            {
-                error!(
-                    "Error sending change epoch transaction to signer interface, trying again..."
-                );
-                time::sleep(Duration::from_secs(1)).await;
+            loop {
+                while txn_socket
+                    .run(UpdateMethod::ChangeEpoch { epoch })
+                    .await
+                    .is_err()
+                {
+                    error!(
+                        "Error sending change epoch transaction to signer interface, trying again..."
+                    );
+                    time::sleep(Duration::from_secs(1)).await;
+                }
+
+                time::sleep(Duration::from_secs(120)).await;
+                let new_epoch = query_runner.get_epoch();
+                if new_epoch != epoch {
+                    break;
+                }
             }
         });
     }
