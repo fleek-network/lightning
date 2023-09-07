@@ -1,9 +1,15 @@
+mod server;
+
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::Receiver;
 use wtransport::endpoint::Server;
-use wtransport::Endpoint;
+use wtransport::tls::Certificate;
+use wtransport::{Connection, Endpoint, ServerConfig};
 
 use crate::schema::{HandshakeRequestFrame, HandshakeResponse, RequestFrame, ResponseFrame};
 use crate::shutdown::ShutdownWaiter;
@@ -12,18 +18,20 @@ use crate::transports::{Transport, TransportReceiver, TransportSender};
 #[derive(Deserialize, Serialize)]
 pub struct WebTransportConfig {
     address: SocketAddr,
+    keep_alive: Option<Duration>,
 }
 
 impl Default for WebTransportConfig {
     fn default() -> Self {
         Self {
             address: ([0, 0, 0, 0], 4240).into(),
+            keep_alive: None,
         }
     }
 }
 
 pub struct WebTransport {
-    endpoint: Endpoint<Server>,
+    conn_rx: Receiver<Connection>,
 }
 
 #[async_trait]
@@ -33,7 +41,18 @@ impl Transport for WebTransport {
     type Receiver = WebTransportReceiver;
 
     async fn bind(shutdown: ShutdownWaiter, config: Self::Config) -> anyhow::Result<Self> {
-        todo!()
+        let mut config = ServerConfig::builder()
+            .with_bind_address(config.address)
+            .with_certificate(Certificate::new(vec![], vec![]))
+            .keep_alive_interval(config.keep_alive)
+            .build();
+
+        let endpoint = Endpoint::server(config)?;
+
+        let (conn_tx, conn_rx) = mpsc::channel(2048);
+        tokio::spawn(server::main_loop(endpoint, shutdown, conn_tx));
+
+        Ok(Self { conn_rx })
     }
 
     async fn accept(&mut self) -> Option<(HandshakeRequestFrame, Self::Sender, Self::Receiver)> {
