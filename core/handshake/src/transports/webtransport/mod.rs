@@ -8,8 +8,9 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use wtransport::endpoint::Server;
+use wtransport::error::ConnectionError;
 use wtransport::tls::Certificate;
-use wtransport::{Connection, Endpoint, ServerConfig};
+use wtransport::{Connection, Endpoint, RecvStream, ServerConfig};
 
 use crate::schema::{HandshakeRequestFrame, HandshakeResponse, RequestFrame, ResponseFrame};
 use crate::shutdown::ShutdownWaiter;
@@ -61,7 +62,22 @@ impl Transport for WebTransport {
     }
 
     async fn accept(&mut self) -> Option<(HandshakeRequestFrame, Self::Sender, Self::Receiver)> {
-        todo!()
+        let conn = self.conn_rx.recv().await?;
+        let rx = match conn.accept_uni().await {
+            Ok(rx) => rx,
+            Err(e) => {
+                log::error!("failed to establish first stream: {e:?}");
+                return None;
+            },
+        };
+        let frame = match HandshakeRequestFrame::decode_from_reader(rx).await {
+            Ok(f) => f,
+            Err(e) => {
+                log::error!("failed to get handshake request frame {e:?}");
+                return None;
+            },
+        };
+        Some((frame, WebTransportSender, WebTransportReceiver))
     }
 }
 

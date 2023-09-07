@@ -1,8 +1,9 @@
 use anyhow::{anyhow, Result};
 use arrayref::array_ref;
-use bytes::{BufMut, Bytes};
+use bytes::{BufMut, Bytes, BytesMut};
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey, NodeSignature};
 use lightning_interfaces::types::ServiceId;
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 pub const NETWORK_PREFIX: &[u8; 5] = b"FLEEK";
 
@@ -118,6 +119,28 @@ impl HandshakeRequestFrame {
                 }
                 let access_token = *array_ref!(bytes, 1, 48);
                 Ok(Self::JoinRequest { access_token })
+            },
+            _ => Err(anyhow!("invalid frame tag")),
+        }
+    }
+
+    pub async fn decode_from_reader<R: AsyncRead + Unpin>(mut reader: R) -> Result<Self> {
+        let ty = reader.read_u8().await?;
+        match ty {
+            0x00 => {
+                let mut buf = vec![0u8; 148];
+                reader.read_exact(&mut buf).await?;
+                Self::decode(&buf)
+            },
+            0x01 => {
+                let mut buf = vec![0u8; 156];
+                reader.read_exact(&mut buf).await?;
+                Self::decode(&buf)
+            },
+            0x02 => {
+                let mut buf = vec![0u8; 48];
+                reader.read_exact(&mut buf).await?;
+                Self::decode(&buf)
             },
             _ => Err(anyhow!("invalid frame tag")),
         }
