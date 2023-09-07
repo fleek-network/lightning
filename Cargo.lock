@@ -4390,6 +4390,7 @@ dependencies = [
  "jsonrpc-v2",
  "lightning-application",
  "lightning-interfaces",
+ "log",
  "reqwest",
  "serde",
  "serde_json",

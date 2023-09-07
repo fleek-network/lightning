@@ -13,6 +13,7 @@ use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::{ApplicationInterface, MempoolSocket, RpcInterface};
 #[cfg(feature = "e2e-test")]
 use lightning_interfaces::{DhtInterface, DhtSocket};
+use log::info;
 use tokio::sync::Notify;
 use tokio::task;
 
@@ -49,7 +50,7 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
             return;
         }
 
-        println!("RPC server starting up");
+        info!("RPC server starting up");
 
         let server = RpcServer::new(self.data.clone());
 
@@ -65,7 +66,7 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
         let shutdown_notify = self.shutdown_notify.clone();
         let is_running = self.is_running.clone();
 
-        println!("listening on {http_address}");
+        info!("listening on {http_address}");
         task::spawn(async move {
             axum::Server::bind(&http_address)
                 .serve(app.into_make_service())
