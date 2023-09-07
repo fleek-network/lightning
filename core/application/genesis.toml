@@ -1,4 +1,4 @@
-epoch_start = 1693975604446                                          # about 1am EST 9-6-2023
+epoch_start = 1694061431465                                          # about 1am EST 9-6-2023
 epoch_time = 1800000                                                 # 30 minutes
 committee_size = 10
 min_stake = 1000
