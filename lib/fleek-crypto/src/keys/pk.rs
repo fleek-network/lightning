@@ -30,34 +30,12 @@ macro_rules! impl_pk_sig {
         $verify:ident
     ) => {
         #[derive(
-            From,
-            AsRef,
-            Debug,
-            Hash,
-            PartialEq,
-            PartialOrd,
-            Ord,
-            Eq,
-            Clone,
-            Copy,
-            Serialize,
-            Deserialize,
+            From, AsRef, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize,
         )]
         pub struct $pk_name(#[serde(with = "base64_array")] pub [u8; $pk_size]);
 
         #[derive(
-            From,
-            AsRef,
-            Debug,
-            Hash,
-            PartialEq,
-            PartialOrd,
-            Ord,
-            Eq,
-            Clone,
-            Copy,
-            Serialize,
-            Deserialize,
+            From, AsRef, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize,
         )]
         pub struct $sig_name(#[serde(with = "base64_array")] pub [u8; $sig_size]);
 
@@ -88,6 +66,16 @@ macro_rules! impl_pk_sig {
             }
         }
 
+        impl std::fmt::Debug for $pk_name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(
+                    f,
+                    concat!(stringify!($pk_name), r#"("{}")"#),
+                    self.to_base64()
+                )
+            }
+        }
+
         impl FromStr for $pk_name {
             type Err = std::io::Error;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -112,6 +100,16 @@ macro_rules! impl_pk_sig {
         impl Display for $sig_name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{}", Base64::encode(self.0))
+            }
+        }
+
+        impl std::fmt::Debug for $sig_name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(
+                    f,
+                    concat!(stringify!($pk_name), r#"("{}")"#),
+                    Base64::encode(self.0)
+                )
             }
         }
 

@@ -1,5 +1,6 @@
 // TODO(qti3e): Split the CLI and make it more "beautiful".
 
+use std::collections::HashMap;
 use std::fs;
 use std::future::Future;
 use std::io::Read;
@@ -21,7 +22,7 @@ use lightning_interfaces::{
     SignerInterface,
 };
 use lightning_signer::Signer;
-use log::LevelFilter;
+use log::{LevelFilter, Record};
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
 use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
@@ -31,6 +32,7 @@ use log4rs::config::runtime::Logger;
 use log4rs::config::{Appender, Config, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use log4rs::filter::threshold::ThresholdFilter;
+use log4rs::filter::{Filter, Response};
 use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::child_process::{ChildProcessConfig, ChildProcessRunner};
@@ -155,28 +157,32 @@ impl<C: Collection> Cli<C> {
             .build(log_file, Box::new(policy))
             .unwrap();
 
-        let ignore_logger_names = vec!["anemo", "anemo_tower", "quinn", "quinn_proto"];
-        let mut ignore_loggers: Vec<Logger> = ignore_logger_names
-            .iter()
-            .map(|&name| Logger::builder().build(name, LevelFilter::Off))
-            .collect();
-
+        let mut custom_loggers = Vec::new();
         // the bullshark logger is ignored for console only
         let bullshark_ignore_logger = Logger::builder()
             .appenders(vec!["file"])
             .additive(false)
             .build("narwhal_consensus::bullshark", LevelFilter::Trace);
 
-        ignore_loggers.push(bullshark_ignore_logger);
+        custom_loggers.push(bullshark_ignore_logger);
+
+        let custom_filter = CustomLogFilter::new()
+            .insert("quinn", LevelFilter::Off)
+            .insert("anemo", LevelFilter::Off);
 
         let config = Config::builder()
-            .appender(Appender::builder().build("file", Box::new(rolling_appender)))
+            .appender(
+                Appender::builder()
+                    .filter(Box::new(custom_filter.clone()))
+                    .build("file", Box::new(rolling_appender)),
+            )
             .appender(
                 Appender::builder()
                     .filter(Box::new(ThresholdFilter::new(log_filter)))
+                    .filter(Box::new(custom_filter))
                     .build("stdout", Box::new(stdout)),
             )
-            .loggers(ignore_loggers)
+            .loggers(custom_loggers)
             .build(
                 Root::builder()
                     .appender("file")
@@ -446,6 +452,35 @@ impl Dev {
                 Ok(())
             },
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct CustomLogFilter {
+    loggers: HashMap<String, LevelFilter>,
+}
+
+impl CustomLogFilter {
+    pub fn new() -> Self {
+        Self {
+            loggers: HashMap::new(),
+        }
+    }
+
+    pub fn insert(mut self, name: &str, level: LevelFilter) -> Self {
+        self.loggers.insert(name.to_string(), level);
+        self
+    }
+}
+
+impl Filter for CustomLogFilter {
+    fn filter(&self, record: &Record) -> Response {
+        for (logger, level) in &self.loggers {
+            if record.module_path().unwrap().contains(logger) && record.level() > *level {
+                return Response::Reject;
+            }
+        }
+        Response::Accept
     }
 }
 

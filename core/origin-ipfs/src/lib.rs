@@ -21,7 +21,7 @@ use lightning_interfaces::{
     OriginProviderSocket,
     WithStartAndShutdown,
 };
-use log::info;
+use log::{error, info};
 use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, Notify};
 use tokio::time::timeout;
@@ -122,7 +122,10 @@ impl<C: Collection> IPFSOriginInner<C> {
         'outer: loop {
             tokio::select! {
                 task = rx.recv() => {
-                    let task = task.expect("Failed to receive fetch request.");
+                    let Some(task) = task else {
+                        error!("Failed to receive task");
+                        continue;
+                    };
                     match self.fetch(&client, &task.request).await {
                         Ok(stream) => {
                             let mut blockstore_putter = self.blockstore.put(None);
@@ -141,7 +144,10 @@ impl<C: Collection> IPFSOriginInner<C> {
                                     break;
                                 }
                             }
-                            let requested_cid = Cid::try_from(task.request.clone()).expect("Failed to parse uri into cid");
+                            let Ok(requested_cid) = Cid::try_from(task.request.clone()) else {
+                                error!("Failed to parse uri into cid");
+                                continue;
+                            };
                             let valid = match Code::try_from(requested_cid.hash().code()) {
                                 Ok(hasher) => &hasher.digest(&bytes) == requested_cid.hash(),
                                 _ => false,

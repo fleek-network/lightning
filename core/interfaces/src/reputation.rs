@@ -7,10 +7,12 @@ use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
 use crate::notifier::NotifierInterface;
 use crate::signer::SubmitTxSocket;
-use crate::{ApplicationInterface, ConfigProviderInterface, SignerInterface};
+use crate::{ApplicationInterface, ConfigProviderInterface, SignerInterface, WithStartAndShutdown};
 
 #[infusion::service]
-pub trait ReputationAggregatorInterface<C: Collection>: ConfigConsumer + Sized {
+pub trait ReputationAggregatorInterface<C: Collection>:
+    ConfigConsumer + Sized + WithStartAndShutdown
+{
     fn _init(
         config: ::ConfigProviderInterface,
         signer: ::SignerInterface,
@@ -38,11 +40,6 @@ pub trait ReputationAggregatorInterface<C: Collection>: ConfigConsumer + Sized {
         notifier: c!(C::NotifierInterface),
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self>;
-
-    /// Called by the scheduler to notify that it is time to submit the aggregation, to do
-    /// so one should use the [`SubmitTxSocket`] that is passed during the initialization
-    /// to submit a transaction to the consensus.
-    fn submit_aggregation(&self);
 
     /// Returns a reputation reporter that can be used to capture interactions that we have
     /// with another peer.

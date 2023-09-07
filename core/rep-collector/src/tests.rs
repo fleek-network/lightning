@@ -182,9 +182,7 @@ async fn test_query() {
 
     let rep_reporter = rep_aggregator.get_reporter();
     let rep_query = rep_aggregator.get_query();
-    let mut aggregator_handle = tokio::spawn(async move {
-        rep_aggregator.start().await.unwrap();
-    });
+    rep_aggregator.start().await;
     // Report some measurements for alice and bob.
     let alice = NodePublicKey([1; 32]);
     let bob = NodePublicKey([2; 32]);
@@ -204,7 +202,7 @@ async fn test_query() {
     let mut interval = tokio::time::interval(Duration::from_millis(100));
     loop {
         tokio::select! {
-            _ = &mut aggregator_handle => {}
+            //_ = &mut aggregator_handle => {}
             _ = interval.tick() => {
                 let alice_rep = rep_query.get_reputation_of(&alice);
                 let bob_rep = rep_query.get_reputation_of(&bob);
@@ -338,9 +336,7 @@ async fn test_submit_measurements() {
     .unwrap();
 
     let rep_reporter = rep_aggregator.get_reporter();
-    let mut aggregator_handle = tokio::spawn(async move {
-        rep_aggregator.start().await.unwrap();
-    });
+    rep_aggregator.start().await;
 
     // Report some measurements to the reputation aggregator.
     rep_reporter.report_sat(&peer_public_key, Weight::Weak);
@@ -356,7 +352,6 @@ async fn test_submit_measurements() {
     let mut interval = tokio::time::interval(Duration::from_millis(100));
     loop {
         tokio::select! {
-            _ = &mut aggregator_handle => {}
             _ = interval.tick() => {
                 let measurements = query_runner.get_rep_measurements(peer_public_key);
                 if !measurements.is_empty() {
@@ -548,12 +543,8 @@ async fn test_reputation_calculation_and_query() {
 
     let rep_reporter1 = rep_aggregator1.get_reporter();
     let rep_reporter2 = rep_aggregator2.get_reporter();
-    let mut aggregator_handle1 = tokio::spawn(async move {
-        rep_aggregator1.start().await.unwrap();
-    });
-    let mut aggregator_handle2 = tokio::spawn(async move {
-        rep_aggregator2.start().await.unwrap();
-    });
+    rep_aggregator1.start().await;
+    rep_aggregator2.start().await;
 
     // Both nodes report measurements for two peers (alice and bob).
     // note(dalton): Refactored to not include measurements for non white listed nodes so have to
@@ -583,8 +574,6 @@ async fn test_reputation_calculation_and_query() {
     let mut interval = tokio::time::interval(Duration::from_millis(100));
     loop {
         tokio::select! {
-            _ = &mut aggregator_handle1 => {}
-            _ = &mut aggregator_handle2 => {}
             _ = interval.tick() => {
                 let measure_alice = query_runner.get_rep_measurements(alice);
                 let measure_bob = query_runner.get_rep_measurements(bob);

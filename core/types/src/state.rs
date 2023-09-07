@@ -87,7 +87,7 @@ pub enum Value {
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]
 #[repr(u8)]
 pub enum ProtocolParams {
-    /// The time in seconds that an epoch lasts for. Genesis 24 hours(86400)
+    /// The time in milliseconds that an epoch lasts for. Genesis 24 hours(86400)
     EpochTime = 0,
     /// The size of the committee
     CommitteeSize = 1,
