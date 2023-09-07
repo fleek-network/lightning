@@ -230,6 +230,21 @@ impl<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterf
             let config_path = config_path.clone();
             let config = Self::load_or_write_config(config_path.try_into().unwrap()).await?;
 
+            // Store BBB.
+            {
+                const FILE: &[u8] =
+                    include_bytes!("../../../services/big-buck-bunny/frag_bunny.mp4");
+                let store = <C::BlockStoreInterface as BlockStoreInterface<C>>::init(
+                    config.get::<C::BlockStoreInterface>(),
+                )
+                .expect("Could not init blockstore");
+                let mut putter = store.put(None);
+                let _ = putter.write(FILE, lightning_types::CompressionAlgorithm::Uncompressed);
+                if let Ok(hash) = putter.finalize().await {
+                    log::info!("Stored big-buck-bunny {:x}", ByteBuf(&hash));
+                }
+            }
+
             let signer_config = config.get::<Signer<C>>();
             let app_config = config.get::<Application<C>>();
             let blockstore_config = config.get::<Blockstore<C>>();
