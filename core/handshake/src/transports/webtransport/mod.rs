@@ -13,6 +13,7 @@ use wtransport::{Connection, Endpoint, ServerConfig};
 
 use crate::schema::{HandshakeRequestFrame, HandshakeResponse, RequestFrame, ResponseFrame};
 use crate::shutdown::ShutdownWaiter;
+use crate::transports::webtransport::server::Context;
 use crate::transports::{Transport, TransportReceiver, TransportSender};
 
 #[derive(Deserialize, Serialize)]
@@ -48,9 +49,13 @@ impl Transport for WebTransport {
             .build();
 
         let endpoint = Endpoint::server(config)?;
-
         let (conn_tx, conn_rx) = mpsc::channel(2048);
-        tokio::spawn(server::main_loop(endpoint, shutdown, conn_tx));
+        let ctx = Context {
+            endpoint,
+            conn_tx,
+            shutdown,
+        };
+        tokio::spawn(server::main_loop(ctx));
 
         Ok(Self { conn_rx })
     }

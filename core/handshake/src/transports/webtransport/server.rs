@@ -5,22 +5,25 @@ use wtransport::{Connection, Endpoint};
 
 use crate::shutdown::ShutdownWaiter;
 
-pub async fn main_loop(
-    endpoint: Endpoint<Server>,
-    waiter: ShutdownWaiter,
-    conn_sender: Sender<Connection>,
-) {
+/// The execution context of the WebTransport server.
+pub struct Context {
+    pub endpoint: Endpoint<Server>,
+    pub conn_tx: Sender<Connection>,
+    pub shutdown: ShutdownWaiter,
+}
+
+pub async fn main_loop(ctx: Context) {
     loop {
         tokio::select! {
-            incoming = endpoint.accept() => {
-                let conn_tx = conn_sender.clone();
+            incoming = ctx.endpoint.accept() => {
+                let conn_tx = ctx.conn_tx.clone();
                 tokio::spawn(async move  {
                     if let Err(e) = handle_incoming_session(incoming, conn_tx).await {
                         log::error!("failed to handle incoming WebTransport session");
                     }
                 });
             }
-            _ = waiter.wait_for_shutdown() => {
+            _ = ctx.shutdown.wait_for_shutdown() => {
                 log::info!("shutting down WebTransport server");
                 break;
             }

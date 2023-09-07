@@ -7,8 +7,8 @@ use crate::schema;
 use crate::shutdown::ShutdownWaiter;
 
 pub mod mock;
-pub mod webtransport;
 pub mod webrtc;
+pub mod webtransport;
 
 #[async_trait]
 pub trait Transport: Sized + Send + Sync + 'static {
