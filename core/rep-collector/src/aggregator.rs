@@ -20,7 +20,7 @@ use lightning_interfaces::{
     Weight,
     WithStartAndShutdown,
 };
-use log::{error, info};
+use log::{error, info, warn};
 use tokio::sync::{mpsc, Notify};
 
 use crate::buffered_mpsc;
@@ -178,6 +178,7 @@ impl<C: Collection> ReputationAggregatorInner<C> {
                 }
                 notification = notify_new_epoch_rx.recv() => {
                     if let Some(Notification::NewEpoch) = notification {
+                        warn!("New epoch notify received");
                         self.notifier
                             .notify_before_epoch_change(
                                 BEFORE_EPOCH_CHANGE,
@@ -211,6 +212,7 @@ impl<C: Collection> ReputationAggregatorInner<C> {
             })
             .collect();
         if !measurements.is_empty() {
+            warn!("Preparing to send reputation measurements");
             let submit_tx = self.submit_tx.clone();
             tokio::spawn(async move {
                 info!("Submitting reputation measurements");
