@@ -56,7 +56,7 @@ impl Env<UpdatePerm> {
 
                 let mut db_path = db_path.to_path_buf();
 
-                db_path.push("-v2");
+                db_path.push("-v3");
 
                 let mut db_options = if let Some(db_options) = config.db_options.as_ref() {
                     let (options, _) = Options::load_latest(

@@ -478,7 +478,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
 
         let mut store_path = config.store_path.clone();
 
-        store_path.push("-v2");
+        store_path.push("-v3");
 
         let epoch_state = EpochState::new(
             query_runner,
