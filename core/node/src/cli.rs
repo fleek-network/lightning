@@ -137,25 +137,17 @@ impl<C: Collection> Cli<C> {
             )))
             .build();
 
-        let log_file = std::env::temp_dir().join("lightning.log");
-        let size_trigger = SizeTrigger::new(150 * 1024 * 1024); // 150 MB
-        let roller = FixedWindowRoller::builder()
-            .build(
-                std::env::temp_dir()
-                    .join("lightning.log.{}.gz")
-                    .to_str()
-                    .unwrap(),
-                10,
-            )
-            .unwrap();
-        let policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(roller));
-
-        let rolling_appender = RollingFileAppender::builder()
-            .encoder(Box::new(PatternEncoder::new(
-                "{d(%Y-%m-%d %H:%M:%S)(utc)} | {h({l}):5.5} | {M} - {f}:{L} - {m}{n}",
-            )))
-            .build(log_file, Box::new(policy))
-            .unwrap();
+        let log_dir = std::env::temp_dir();
+        let log_file = log_dir.join("lightning.log");
+        let has_access_to_log = if log_file.exists() {
+            std::fs::metadata(&log_file)
+                .map(|meta| !meta.permissions().readonly())
+                .unwrap_or(false)
+        } else {
+            std::fs::metadata(&log_dir)
+                .map(|meta| !meta.permissions().readonly())
+                .unwrap_or(false)
+        };
 
         let mut custom_loggers = Vec::new();
         // the bullshark logger is ignored for console only
@@ -164,18 +156,48 @@ impl<C: Collection> Cli<C> {
             .additive(false)
             .build("narwhal_consensus::bullshark", LevelFilter::Trace);
 
-        custom_loggers.push(bullshark_ignore_logger);
-
         let custom_filter = CustomLogFilter::new()
             .insert("quinn", LevelFilter::Off)
             .insert("anemo", LevelFilter::Off);
 
-        let config = Config::builder()
-            .appender(
+        let (root, config) = if has_access_to_log {
+            let size_trigger = SizeTrigger::new(150 * 1024 * 1024); // 150 MB
+            let roller = FixedWindowRoller::builder()
+                .build(
+                    std::env::temp_dir()
+                        .join("lightning.log.{}.gz")
+                        .to_str()
+                        .unwrap(),
+                    10,
+                )
+                .unwrap();
+
+            let policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(roller));
+            let rolling_appender = RollingFileAppender::builder()
+                .encoder(Box::new(PatternEncoder::new(
+                    "{d(%Y-%m-%d %H:%M:%S)(utc)} | {h({l}):5.5} | {M} - {f}:{L} - {m}{n}",
+                )))
+                .build(log_file, Box::new(policy))
+                .unwrap();
+
+            let config = Config::builder().appender(
                 Appender::builder()
                     .filter(Box::new(custom_filter.clone()))
                     .build("file", Box::new(rolling_appender)),
-            )
+            );
+
+            let root = Root::builder().appender("file");
+
+            // For whatever, out of my knowledge reason `bullshark_ignore_logger` appenders is set
+            // to vec!["file"]. So it should be enabled only when we have `file`.
+            custom_loggers.push(bullshark_ignore_logger);
+
+            (root, config)
+        } else {
+            (Root::builder(), Config::builder())
+        };
+
+        let config = config
             .appender(
                 Appender::builder()
                     .filter(Box::new(ThresholdFilter::new(log_filter)))
@@ -183,12 +205,7 @@ impl<C: Collection> Cli<C> {
                     .build("stdout", Box::new(stdout)),
             )
             .loggers(custom_loggers)
-            .build(
-                Root::builder()
-                    .appender("file")
-                    .appender("stdout")
-                    .build(LevelFilter::Trace),
-            )
+            .build(root.appender("stdout").build(LevelFilter::Trace))
             .unwrap();
 
         log4rs::init_config(config).unwrap();
