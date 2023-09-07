@@ -7,7 +7,7 @@ use crate::schema;
 use crate::shutdown::ShutdownWaiter;
 
 pub mod mock;
-pub mod web_transport;
+pub mod webtransport;
 pub mod webrtc;
 
 #[async_trait]
@@ -53,11 +53,11 @@ pub trait TransportReceiver: Sized + Send + Sync + 'static {
 pub enum StaticSender {
     MockTransport(mock::MockTransportSender),
     WebRtcTransport(webrtc::WebRtcSender),
-    WebTransport(web_transport::WebTransportSender),
+    WebTransport(webtransport::WebTransportSender),
 }
 
 pub enum TransportConfigs {
     MockTransport(mock::MockTransportSender),
     WebRtcTransport(webrtc::WebRtcSender),
-    WebTransport(web_transport::WebTransportSender),
+    WebTransport(webtransport::WebTransportSender),
 }
