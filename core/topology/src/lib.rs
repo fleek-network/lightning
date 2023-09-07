@@ -148,7 +148,7 @@ impl<C: Collection> TopologyInterface<C> for Topology<C> {
     ) -> anyhow::Result<Self> {
         let inner = TopologyInner {
             target_k: config.testing_target_k,
-            min_nodes: config.testing_min_nodes,
+            min_nodes: 1000, // Hard code this to overwrite the config.
             query: query_runner,
             current_epoch: Mutex::new(u64::MAX),
             current_peers: Mutex::new(Arc::new(Vec::new())),
