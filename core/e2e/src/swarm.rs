@@ -32,6 +32,8 @@ use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::node::FinalTypes;
+use lightning_rep_collector::config::Config as RepAggConfig;
+use lightning_rep_collector::ReputationAggregator;
 use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
 // use lightning_pool::pool::{ConnectionPool, PoolConfig};
@@ -327,6 +329,10 @@ fn build_config(
 
     config.inject::<ServiceExecutor<FinalTypes>>(ServiceExecutorConfig {
         services: Default::default(),
+    });
+
+    config.inject::<ReputationAggregator<FinalTypes>>(RepAggConfig {
+        reporter_buffer_size: 1,
     });
 
     config

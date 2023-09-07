@@ -4094,6 +4094,7 @@ dependencies = [
  "lightning-interfaces",
  "lightning-node",
  "lightning-notifier",
+ "lightning-rep-collector",
  "lightning-resolver",
  "lightning-rpc",
  "lightning-service-executor",
