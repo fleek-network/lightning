@@ -438,7 +438,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         let epoch_state = EpochState::new(
             query_runner,
             narwhal_args,
-            config.store_path,
+            store_path.try_into().unwrap(),
             execution_state,
             signer.get_socket(),
             pubsub,
