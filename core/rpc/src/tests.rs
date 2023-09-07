@@ -766,7 +766,7 @@ async fn test_rpc_get_node_info() -> Result<()> {
     let req = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_node_info",
-        "params": {"public_key": node_public_key},
+        "params": {"public_key": node_public_key, "version": 1},
         "id":1,
     });
 

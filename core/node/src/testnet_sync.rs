@@ -20,6 +20,7 @@ use lightning_interfaces::{
     BlockStoreServerInterface,
     SyncQueryRunnerInterface,
 };
+use lightning_rpc::handlers::RPC_VERSION;
 use lightning_signer::Config as SignerConfig;
 use lightning_types::{Epoch, NodeInfo};
 use log::{error, info, warn};
@@ -230,7 +231,7 @@ pub async fn am_i_whitelisted(genesis: &Genesis, signer_config: &SignerConfig) -
             &client,
             member.primary_domain,
             member.ports.rpc,
-            rpc_node_info(&node_pub_key).to_string(),
+            rpc_node_info(&node_pub_key, RPC_VERSION).to_string(),
         )
         .await
         {
@@ -289,11 +290,11 @@ fn rpc_last_epoch_hash() -> serde_json::Value {
     })
 }
 
-fn rpc_node_info(node_public_key: &NodePublicKey) -> serde_json::Value {
+fn rpc_node_info(node_public_key: &NodePublicKey, version: u8) -> serde_json::Value {
     serde_json::json!({
         "jsonrpc": "2.0",
         "method":"flk_get_node_info",
-        "params":{"public_key": node_public_key},
+        "params":{"public_key": node_public_key, "version": version },
         "id":1,
     })
 }

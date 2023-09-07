@@ -26,8 +26,10 @@ use lightning_interfaces::{Blake3Hash, FetcherInterface, SyncQueryRunnerInterfac
 use crate::server::RpcData;
 #[cfg(feature = "e2e-test")]
 use crate::types::{DhtGetParam, DhtPutParam};
-use crate::types::{NodeKeyParam, PublicKeyParam};
+use crate::types::{NodeKeyParam, PublicKeyParam, VersionedNodeKeyParam};
 static OPEN_RPC_DOCS: &str = "../../docs/rpc/openrpc.json";
+
+pub const RPC_VERSION: u8 = 1;
 
 pub type Result<T> = anyhow::Result<T, Error>;
 
@@ -190,9 +192,16 @@ pub async fn get_locked_time_handler<C: Collection>(
 
 pub async fn get_node_info_handler<C: Collection>(
     data: Data<Arc<RpcData<C>>>,
-    Params(params): Params<NodeKeyParam>,
+    Params(params): Params<VersionedNodeKeyParam>,
 ) -> Result<Option<NodeInfo>> {
-    Ok(data.0.query_runner.get_node_info(&params.public_key))
+    if params.version != RPC_VERSION {
+        Err(Error::Provided {
+            code: 69,
+            message: "Version Mismatch",
+        })
+    } else {
+        Ok(data.0.query_runner.get_node_info(&params.public_key))
+    }
 }
 
 pub async fn get_account_info_handler<C: Collection>(

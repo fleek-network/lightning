@@ -7,6 +7,12 @@ pub struct PublicKeyParam {
 }
 
 #[derive(Deserialize)]
+pub struct VersionedNodeKeyParam {
+    pub public_key: NodePublicKey,
+    pub version: u8,
+}
+
+#[derive(Deserialize)]
 pub struct NodeKeyParam {
     pub public_key: NodePublicKey,
 }

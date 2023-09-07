@@ -201,6 +201,9 @@ impl<B: Backend> State<B> {
             },
             UpdateMethod::TestnetAdmin(inner) => match inner {
                 TestnetAdmin::Kill => self.testnet_kill(txn.sender),
+                TestnetAdmin::ChangeEpoch(new_committee) => {
+                    self.admin_change_epoch(txn.sender, new_committee)
+                },
             },
         };
 
@@ -875,6 +878,68 @@ impl<B: Backend> State<B> {
         panic!("This testnet phase is over. Thank you for participating.");
     }
 
+    // only for testnet
+    fn admin_change_epoch(
+        &self,
+        sender: TransactionSender,
+        new_committee: Option<Vec<NodePublicKey>>,
+    ) -> TransactionResponse {
+        let sender = match self.only_account_owner(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+
+        // Since the governance address will be
+        // seeded though genesis, this should never happen.
+        let governance_address = match self.metadata.get(&Metadata::GovernanceAddress) {
+            Some(Value::AccountPublicKey(address)) => address,
+            _ => panic!("Governance address is missing from state."),
+        };
+
+        if sender != governance_address {
+            return TransactionResponse::Revert(ExecutionError::OnlyGovernance);
+        }
+
+        let current_epoch = match self.metadata.get(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        };
+
+        let next_epoch = current_epoch + 1;
+
+        let current_committee = self.committee_info.get(&current_epoch).unwrap_or_default();
+
+        // calculate the next epoch endstamp
+        let epoch_duration = self
+            .parameters
+            .get(&ProtocolParams::EpochTime)
+            .unwrap_or(6000);
+
+        let new_epoch_end = current_committee.epoch_end_timestamp + epoch_duration as u64;
+
+        let committee_index = if let Some(new_committee) = new_committee {
+            // Get the node indexes of all nodes passed in
+            new_committee
+                .iter()
+                .filter_map(|member| self.pub_key_to_index.get(member))
+                .collect()
+        } else {
+            self.choose_new_committee()
+        };
+
+        self.committee_info.set(
+            next_epoch,
+            Committee {
+                ready_to_change: Vec::with_capacity(committee_index.len()),
+                members: committee_index,
+                epoch_end_timestamp: new_epoch_end,
+            },
+        );
+        self.metadata.set(Metadata::Epoch, Value::Epoch(next_epoch));
+
+        TransactionResponse::Success(ExecutionData::EpochChange)
+    }
+
     fn submit_reputation_measurements(
         &self,
         sender: TransactionSender,
@@ -1138,7 +1203,7 @@ impl<B: Backend> State<B> {
 
         let committee_size = self.parameters.get(&ProtocolParams::CommitteeSize).unwrap();
         // if total number of nodes are less than committee size, all nodes are part of committee
-        if committee_size >= num_of_nodes.into() {
+        if committee_size >= num_of_nodes {
             return node_registry;
         }
 
@@ -1352,14 +1417,4 @@ impl<B: Backend> State<B> {
             TransactionSender::AccountOwner(_) => None,
         }
     }
-}
-
-#[test]
-fn test() {
-    let number: u128 = 1000;
-
-    let hp: HpUfixed<18> = number.into();
-    let zero = HpUfixed::zero();
-
-    println!("{:?}", zero >= hp);
 }

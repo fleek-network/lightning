@@ -170,6 +170,7 @@ pub enum UpdateMethod {
 #[derive(Debug, Hash, Clone, Serialize, Deserialize)]
 pub enum TestnetAdmin {
     Kill,
+    ChangeEpoch(Option<Vec<NodePublicKey>>),
 }
 
 impl ToDigest for UpdatePayload {
@@ -343,6 +344,22 @@ impl ToDigest for UpdatePayload {
                 TestnetAdmin::Kill => {
                     transcript_builder =
                         transcript_builder.with("transaction_name", &"testnet_admin_kill")
+                },
+                TestnetAdmin::ChangeEpoch(new_committee) => {
+                    transcript_builder = transcript_builder
+                        .with("transaction_name", &"admin_change_epoch")
+                        .with_prefix("input".to_owned())
+                        .with(
+                            "new_committee",
+                            &new_committee.clone().unwrap_or_default().iter().fold(
+                                Vec::new(),
+                                |acum, n| {
+                                    let mut vec = acum;
+                                    vec.extend(n.0);
+                                    vec
+                                },
+                            ),
+                        )
                 },
             },
         }

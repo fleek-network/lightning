@@ -263,7 +263,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         let query_runner = self.query_runner.clone();
         task::spawn(async move {
             // if its been this long past the time the epoch was suppose to change, try resyncing
-            let additional_time = Duration::from_secs(600);
+            let additional_time = Duration::from_secs(300);
             let total = additional_time + time_until_change;
 
             time::sleep(total).await;
