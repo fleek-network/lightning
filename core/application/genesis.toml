@@ -148,6 +148,29 @@ stake.locked_until = 0
 genesis_committee = true
 
 
+#node 6 - nyc (Parsa)
+[[node_info]]
+owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
+primary_public_key = "sXfKIzpft6khWeGOwEfmuxyBmX2SNia+fHz/OpJ0bBE="
+consensus_public_key = "oiNEfLFqHZ4LtJmY7SqHpd1ulV/UejySHfHTYd5mm1bHZ/Du1tzl+eOywuEKaJPBAv79Z6ynmHH4/YBhjKvz20WTUtUhYJXAqasmtWCngp8er95TntmeF2s4rDoSyCE+"
+worker_public_key = "sXfKIzpft6khWeGOwEfmuxyBmX2SNia+fHz/OpJ0bBE="
+primary_domain = "135.181.113.243"
+worker_domain = "135.181.113.243"
+ports.primary = 18000
+ports.worker = 18101
+ports.mempool = 18102
+ports.rpc = 4069
+ports.pool = 4200
+ports.dht = 8101
+ports.handshake = 6969
+ports.blockstore = 4211
+stake.staked = "1000"
+stake.stake_locked_until = 0
+stake.locked = "0"
+stake.locked_until = 0
+genesis_committee = true
+
+
 [[service]]
 id = 0
 owner = "0xDC0A31F9eeb151f82BF1eE6831095284fC215Ee7"
