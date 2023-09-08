@@ -2,3 +2,4 @@ target
 !openrpc.json
 **/data
 **/lightning.toml
+.idea
