@@ -608,6 +608,107 @@
           }
         }
       }
+    },
+    {
+      "name": "flk_get_latencies",
+      "summary": "Get latency data between nodes for the current epoch.",
+      "params": [],
+      "result": {
+        "name": "latencies",
+        "description": "A list containing latency measurements between node pairs. Each entry has a 'from' and 'to' identifier and the corresponding latency.",
+        "schema": {
+          "type": "array",
+          "items": {
+            "types": "object",
+            "properties": {
+              "key": {
+                "$ref": "#/components/schemas/LatencyKey"
+              },
+              "value": {
+                "$ref": "#/components/schemas/Duration"
+              }
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_latencies",
+          "params": [],
+          "result": {
+            "name": "latencies",
+            "value": [
+              {
+                "LatencyKey": {
+                  "from": "0x123456789abcdef0123456789abcdef01234567",
+                  "to": "0x765432109abcdef0123456789abcdef01234599"
+                },
+                "duration": 100
+              }
+            ]
+          }
+        }
+      ] 
+    },
+    {
+      "name": "flk_get_reputation_measurements",
+      "summary": "Provides a list of reputation measurements reported by peers for a node with the given public key.",
+      "params": [
+        {
+          "name": "public_key",
+          "description": "The node public key",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "reportedMeasurementsList",
+        "description": "list of reported measurement by multiple nodes identified by reporting_node for each entry",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "reporting_node": {
+                "$ref": "#/components/schemas/NodeIndex"
+              },
+              "measurements": {
+                "$ref": "#/components/schemas/ReputationMeasurement"
+              }
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "name": "flk_get_reputation_measurements",
+          "params": [
+            {
+              "name": "public_key",
+              "value": "0x123456789abcdef0123456789abcdef01234567"
+            }
+          ],
+          "result": {
+            "name": "reportedMeasurementsList",
+            "value": [
+              {
+                "reporting_node": 1,
+                "measurements": {
+                "latency": 100,
+                "interactions": 32,
+                "inbound_bandwidth": 100,
+                "outbound_bandwidth": 100,
+                "bytes_received": 1000,
+                "bytes_sent": 900,
+                "hops": 5
+                }
+              }
+            ]
+          }
+        }
+      ]
     }
   ],
   "components": {
@@ -638,6 +739,10 @@
         "type": "integer",
         "description": "An integer representing the epoch."
       },
+      "NodeIndex": {
+        "type": "integer",
+        "description": "An integer representing the node index in the registry."
+      },
       "ProtocolParams": {
         "type": "string",
         "enum": [
@@ -664,6 +769,18 @@
         "oneOf": [
           {
             "type": "integer"
+          },
+          {
+            "$ref": "#/components/schemas/Null"
+          }
+        ]
+      },
+      "SignedIntegerOrNull": {
+        "title": "signedIntegerOrNull",
+        "oneOf": [
+          {
+            "type": "integer",
+            "format": "int64"
           },
           {
             "$ref": "#/components/schemas/Null"
@@ -745,7 +862,7 @@
           },
           "stake_locked_until": {
             "type": "integer",
-            "format": "int64",
+            "format": "uint64",
             "description": "The epoch until which the stake is locked to get boost."
           },
           "locked": {
@@ -754,7 +871,7 @@
           },
           "locked_until": {
             "type": "integer",
-            "format": "int64",
+            "format": "uint64",
             "description": "The epoch until which the tokens are locked due to unstake txn."
           }
         },
@@ -796,6 +913,65 @@
           "epoch",
           "epoch_end"
         ]
+      },
+      "Duration": {
+        "type": "integer",
+        "format": "uint64",
+        "description": "Duration in seconds"
+      },
+      "DurationOrNull": {
+        "title": "DurationOrNull",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Duration"
+          },
+          {
+            "$ref": "#/components/schemas/Null"
+          }
+        ]
+      },
+      "LatencyKey": {
+        "type": "object",
+        "properties": {
+          "from":{
+            "$ref": "#/components/schemas/NodePublicKey",
+            "description": "The public key for the node that measured the latency"
+          },
+          "to": {
+            "$ref": "#/components/schemas/NodePublicKey",
+            "description": "The public key of the node of which latency was measured"
+          }
+        },
+        "required": ["from", "to"]
+      },
+      "ReputationMeasurement": {
+        "type": "object",
+        "properties": {
+          "latency":{
+            "$ref": "#/components/schemas/DurationOrNull",
+            "description": "The public key for the node that measured the latency"
+          },
+          "interactions":{
+            "$ref": "#/components/schemas/SignedIntegerOrNull",
+            "description": "the number of interactions with the reporting nodes"
+          },
+          "inbound_bandwidth":{
+            "$ref": "#/components/schemas/IntegerOrNull"
+          },
+          "outbound_bandwidth":{
+            "$ref": "#/components/schemas/IntegerOrNull"
+          },
+          "bytes_received":{
+            "$ref": "#/components/schemas/IntegerOrNull"
+          },
+          "bytes_sent":{
+            "$ref": "#/components/schemas/IntegerOrNull"
+          },
+          "hops":{
+            "$ref": "#/components/schemas/IntegerOrNull",
+            "description": "The number of hops from the reporting node"
+          }
+        }
       }
     }
   }
