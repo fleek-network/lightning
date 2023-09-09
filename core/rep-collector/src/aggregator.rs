@@ -68,13 +68,11 @@ impl<C: Collection> WithStartAndShutdown for ReputationAggregator<C> {
 
 struct ReputationAggregatorInner<C: Collection> {
     report_rx: Arc<Mutex<Option<buffered_mpsc::BufferedReceiver<ReportMessage>>>>,
-    //report_rx: buffered_mpsc::BufferedReceiver<ReportMessage>,
     reporter: MyReputationReporter,
     query: MyReputationQuery,
     measurement_manager: Arc<Mutex<MeasurementManager>>,
     submit_tx: SubmitTxSocket,
     notifier: c![C::NotifierInterface],
-    //notify_rx: mpsc::Receiver<Notification>,
     notify_before_epoch_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
     notify_before_epoch_tx: mpsc::Sender<Notification>,
     notify_new_epoch_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,

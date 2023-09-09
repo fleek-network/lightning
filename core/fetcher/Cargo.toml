@@ -11,3 +11,6 @@ lightning-origin-ipfs = { path = "../origin-ipfs" }
 serde.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
+tokio.workspace = true
+affair.workspace = true
+log.workspace = true

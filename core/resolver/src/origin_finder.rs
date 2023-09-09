@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use lightning_interfaces::types::ImmutablePointer;
-use lightning_interfaces::{Blake3Hash, OriginFinderAsyncIter};
+use lightning_interfaces::types::{Blake3Hash, ImmutablePointer};
+use lightning_interfaces::OriginFinderAsyncIter;
 
 pub struct OriginFinder {}
 

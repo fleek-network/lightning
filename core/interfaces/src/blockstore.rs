@@ -7,10 +7,8 @@ use thiserror::Error;
 
 use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
-use crate::types::{CompressionAlgoSet, CompressionAlgorithm};
+use crate::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
 use crate::ConfigProviderInterface;
-
-pub type Blake3Hash = [u8; 32];
 
 pub struct Blake3Tree(pub Vec<Blake3Hash>);
 

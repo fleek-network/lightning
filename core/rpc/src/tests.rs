@@ -16,6 +16,10 @@ use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisAccount, GenesisNode};
 use lightning_application::query_runner::QueryRunner;
+use lightning_blockstore::blockstore::Blockstore;
+use lightning_blockstore::config::Config as BlockstoreConfig;
+use lightning_fetcher::config::Config as FetcherConfig;
+use lightning_fetcher::fetcher::Fetcher;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     EpochInfo,
@@ -30,11 +34,15 @@ use lightning_interfaces::types::{
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
+    BlockStoreInterface,
+    FetcherInterface,
     MempoolSocket,
+    OriginProviderInterface,
     RpcInterface,
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
+use lightning_origin_ipfs::{Config as OriginIPFSConfig, IPFSOrigin};
 use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -69,12 +77,37 @@ impl Worker for MockWorker {
 
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
+    FetcherInterface = Fetcher<Self>;
     RpcInterface = Rpc<Self>;
+    BlockStoreInterface = Blockstore<Self>;
+    OriginProviderInterface = IPFSOrigin<Self>;
 });
+
+fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
+    let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
+    let ipfs_origin =
+        IPFSOrigin::<TestBinding>::init(OriginIPFSConfig::default(), blockstore.clone()).unwrap();
+
+    let fetcher = Fetcher::<TestBinding>::init(
+        FetcherConfig::default(),
+        blockstore,
+        Default::default(),
+        &ipfs_origin,
+    )
+    .unwrap();
+    let rpc = Rpc::<TestBinding>::init(
+        RpcConfig::default(),
+        MockWorker::mempool_socket(),
+        app.sync_query(),
+        &fetcher,
+    )?;
+    Ok(rpc)
+}
 
 async fn init_rpc_without_consensus(
     genesis: Option<Genesis>,
 ) -> Result<(Rpc<TestBinding>, QueryRunner)> {
+    let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
     let app = match genesis {
         Some(genesis) => Application::<TestBinding>::init(
             AppConfig {
@@ -85,45 +118,30 @@ async fn init_rpc_without_consensus(
                 db_path: None,
                 db_options: None,
             },
-            Default::default(),
-            Default::default(),
-        )
-        .unwrap(),
-        None => Application::<TestBinding>::init(
-            AppConfig::test(),
-            Default::default(),
+            blockstore,
             Default::default(),
         )
         .unwrap(),
+        None => Application::<TestBinding>::init(AppConfig::test(), blockstore, Default::default())
+            .unwrap(),
     };
 
     let query_runner = app.sync_query();
     app.start().await;
 
-    let rpc = Rpc::<TestBinding>::init(
-        RpcConfig::default(),
-        MockWorker::mempool_socket(),
-        app.sync_query(),
-        Default::default(),
-    )?;
-
+    let rpc = init_rpc(app).unwrap();
     Ok((rpc, query_runner))
 }
 
 async fn init_rpc_app_test() -> Result<(Rpc<TestBinding>, QueryRunner)> {
-    let app =
-        Application::<TestBinding>::init(AppConfig::test(), Default::default(), Default::default())
-            .unwrap();
+    let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test(), blockstore, Default::default())
+        .unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
     // Init rpc service
-    let rpc = Rpc::<TestBinding>::init(
-        RpcConfig::default(),
-        MockWorker::mempool_socket(),
-        query_runner.clone(),
-        Default::default(),
-    )?;
+    let rpc = init_rpc(app).unwrap();
 
     Ok((rpc, query_runner))
 }

@@ -26,6 +26,9 @@ hp-fixed.workspace = true
 [dev-dependencies]
 reqwest = { workspace = true, features = ["json"] }
 lightning-application = { path = "../application" }
+lightning-fetcher = { path = "../fetcher" }
+lightning-blockstore = { path = "../blockstore" }
+lightning-origin-ipfs = { path = "../origin-ipfs" }
 #lightning-consensus = {path="../consensus"}
 
 [features]

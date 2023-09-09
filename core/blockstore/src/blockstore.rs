@@ -11,9 +11,8 @@ use blake3_tree::blake3::Hash;
 use blake3_tree::IncrementalVerifier;
 use bytes::{BufMut, BytesMut};
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::{CompressionAlgoSet, CompressionAlgorithm};
+use lightning_interfaces::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
 use lightning_interfaces::{
-    Blake3Hash,
     Blake3Tree,
     BlockStoreInterface,
     ConfigConsumer,

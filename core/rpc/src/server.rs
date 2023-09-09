@@ -10,7 +10,13 @@ use axum::{Extension, Router};
 use lightning_interfaces::common::WithStartAndShutdown;
 use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::{ApplicationInterface, MempoolSocket, RpcInterface};
+use lightning_interfaces::{
+    ApplicationInterface,
+    FetcherInterface,
+    FetcherSocket,
+    MempoolSocket,
+    RpcInterface,
+};
 #[cfg(feature = "e2e-test")]
 use lightning_interfaces::{DhtInterface, DhtSocket};
 use log::info;
@@ -31,7 +37,7 @@ pub struct Rpc<C: Collection> {
 pub struct RpcData<C: Collection> {
     pub query_runner: c!(C::ApplicationInterface::SyncExecutor),
     pub mempool_socket: MempoolSocket,
-    pub fetcher: C::FetcherInterface,
+    pub fetcher_socket: FetcherSocket,
     #[cfg(feature = "e2e-test")]
     pub dht_socket: Arc<Mutex<Option<DhtSocket>>>,
 }
@@ -101,13 +107,13 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         config: Self::Config,
         mempool: MempoolSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        fetcher: c!(C::FetcherInterface),
+        fetcher: &C::FetcherInterface,
     ) -> anyhow::Result<Self> {
         #[cfg(not(feature = "e2e-test"))]
         let rpc = Ok(Self {
             data: Arc::new(RpcData {
                 mempool_socket: mempool,
-                fetcher,
+                fetcher_socket: fetcher.get_socket(),
                 query_runner,
             }),
             config,
@@ -120,7 +126,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
                 mempool_socket: mempool,
                 query_runner,
                 dht_socket: Arc::new(Mutex::new(None)),
-                fetcher,
+                fetcher_socket: fetcher.get_socket(),
             }),
             config,
             is_running: Arc::new(AtomicBool::new(false)),

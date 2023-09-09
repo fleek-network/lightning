@@ -1,19 +1,24 @@
+use affair::Socket;
 use async_trait::async_trait;
-use lightning_types::ImmutablePointer;
+use lightning_types::{FetcherRequest, FetcherResponse};
 
 use crate::infu_collection::Collection;
 use crate::{
-    Blake3Hash,
     BlockStoreInterface,
     ConfigConsumer,
     ConfigProviderInterface,
     OriginProviderInterface,
     ResolverInterface,
+    WithStartAndShutdown,
 };
+
+pub type FetcherSocket = Socket<FetcherRequest, FetcherResponse>;
 
 #[async_trait]
 #[infusion::service]
-pub trait FetcherInterface<C: Collection>: ConfigConsumer + Clone + Sized + Send + Sync {
+pub trait FetcherInterface<C: Collection>:
+    WithStartAndShutdown + ConfigConsumer + Clone + Sized + Send + Sync
+{
     fn _init(
         config: ::ConfigProviderInterface,
         blockstore: ::BlockStoreInterface,
@@ -36,12 +41,6 @@ pub trait FetcherInterface<C: Collection>: ConfigConsumer + Clone + Sized + Send
         origin: &C::OriginProviderInterface,
     ) -> anyhow::Result<Self>;
 
-    /// Fetches the data from the corresponding origin, puts it in the blockstore, and stores the
-    /// mapping using the resolver. If the mapping already exists, the data will not be fetched
-    /// from origin again.
-    async fn put(&self, pointer: ImmutablePointer) -> anyhow::Result<Blake3Hash>;
-
-    /// Fetches the data from the blockstore. If the data does not exist in the blockstore, it will
-    /// be fetched from the origin.
-    async fn fetch(&self, hash: Blake3Hash) -> anyhow::Result<()>;
+    /// Returns a socket that can be used to submit requests to the fetcher.
+    fn get_socket(&self) -> FetcherSocket;
 }

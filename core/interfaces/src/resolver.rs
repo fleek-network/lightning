@@ -3,9 +3,8 @@ use infusion::c;
 use lightning_schema::broadcast::ResolvedImmutablePointerRecord;
 
 use crate::infu_collection::Collection;
-use crate::types::ImmutablePointer;
+use crate::types::{Blake3Hash, ImmutablePointer};
 use crate::{
-    Blake3Hash,
     BroadcastInterface,
     ConfigConsumer,
     ConfigProviderInterface,

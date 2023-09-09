@@ -4118,11 +4118,14 @@ dependencies = [
 name = "lightning-fetcher"
 version = "0.0.0"
 dependencies = [
+ "affair",
  "anyhow",
  "async-trait",
  "lightning-interfaces",
  "lightning-origin-ipfs",
+ "log",
  "serde",
+ "tokio",
 ]
 
 [[package]]
@@ -4389,7 +4392,10 @@ dependencies = [
  "infusion",
  "jsonrpc-v2",
  "lightning-application",
+ "lightning-blockstore",
+ "lightning-fetcher",
  "lightning-interfaces",
+ "lightning-origin-ipfs",
  "log",
  "reqwest",
  "serde",
@@ -4499,6 +4505,7 @@ dependencies = [
 name = "lightning-types"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "derive_more",
  "fleek-crypto",
  "hp-fixed",

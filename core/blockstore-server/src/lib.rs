@@ -12,9 +12,13 @@ use blake3_tree::blake3::tree::HashTree;
 use config::Config;
 use lightning_interfaces::blockstore_server::BlockStoreServerInterface;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::{CompressionAlgoSet, CompressionAlgorithm, NodeIndex};
-use lightning_interfaces::{
+use lightning_interfaces::types::{
     Blake3Hash,
+    CompressionAlgoSet,
+    CompressionAlgorithm,
+    NodeIndex,
+};
+use lightning_interfaces::{
     BlockStoreInterface,
     ConfigConsumer,
     IncrementalPutInterface,

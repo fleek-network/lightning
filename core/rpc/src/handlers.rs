@@ -12,7 +12,10 @@ use jsonrpc_v2::{Data, Error, MapRouter, Params, RequestObject, ResponseObjects,
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     AccountInfo,
+    Blake3Hash,
     EpochInfo,
+    FetcherRequest,
+    FetcherResponse,
     ImmutablePointer,
     NodeInfo,
     NodeServed,
@@ -24,7 +27,7 @@ use lightning_interfaces::types::{
 };
 #[cfg(feature = "e2e-test")]
 use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
-use lightning_interfaces::{Blake3Hash, FetcherInterface, SyncQueryRunnerInterface};
+use lightning_interfaces::SyncQueryRunnerInterface;
 
 use crate::server::RpcData;
 #[cfg(feature = "e2e-test")]
@@ -136,7 +139,16 @@ pub async fn put<C: Collection>(
         uri: params,
     };
 
-    data.fetcher.put(pointer).await.map_err(Error::internal)
+    let res = data
+        .fetcher_socket
+        .run(FetcherRequest::Put { pointer })
+        .await
+        .expect("sending put request failed.");
+    if let FetcherResponse::Put(Ok(hash)) = res {
+        Ok(hash)
+    } else {
+        Err(Error::INTERNAL_ERROR)
+    }
 }
 
 #[autometrics]

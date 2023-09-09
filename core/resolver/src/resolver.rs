@@ -6,9 +6,8 @@ use async_trait::async_trait;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::schema::broadcast::ResolvedImmutablePointerRecord;
-use lightning_interfaces::types::ImmutablePointer;
+use lightning_interfaces::types::{Blake3Hash, ImmutablePointer};
 use lightning_interfaces::{
-    Blake3Hash,
     BroadcastInterface,
     ConfigConsumer,
     PubSub,

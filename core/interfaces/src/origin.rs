@@ -2,13 +2,8 @@ use affair::Socket;
 use anyhow;
 
 use crate::infu_collection::Collection;
-use crate::{
-    Blake3Hash,
-    BlockStoreInterface,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    WithStartAndShutdown,
-};
+use crate::types::Blake3Hash;
+use crate::{BlockStoreInterface, ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown};
 
 /// A socket for submitting a fetch request to an origin.
 pub type OriginProviderSocket = Socket<Vec<u8>, anyhow::Result<Blake3Hash>>;

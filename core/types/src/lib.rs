@@ -1,12 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 mod application;
+mod blockstore;
 mod bridge;
 mod broadcast;
 mod compression;
 mod connection;
 mod content;
 mod dht;
+mod fetcher;
 mod metrics;
 mod misbehavior;
 mod pod;
@@ -17,12 +19,14 @@ mod state;
 mod transaction;
 
 pub use application::*;
+pub use blockstore::*;
 pub use bridge::*;
 pub use broadcast::*;
 pub use compression::*;
 pub use connection::*;
 pub use content::*;
 pub use dht::*;
+pub use fetcher::*;
 pub use metrics::*;
 pub use misbehavior::*;
 pub use pod::*;

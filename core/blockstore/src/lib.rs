@@ -11,8 +11,8 @@ mod tests {
     use blake3_tree::blake3::Hash;
     use blake3_tree::ProofBuf;
     use lightning_interfaces::infu_collection::Collection;
-    use lightning_interfaces::types::{CompressionAlgoSet, CompressionAlgorithm};
-    use lightning_interfaces::{partial, Blake3Hash, BlockStoreInterface, IncrementalPutInterface};
+    use lightning_interfaces::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
+    use lightning_interfaces::{partial, BlockStoreInterface, IncrementalPutInterface};
     use tokio::test;
 
     use crate::blockstore::{Blockstore, BLOCK_SIZE};

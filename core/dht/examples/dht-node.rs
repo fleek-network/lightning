@@ -9,8 +9,8 @@ use lightning_dht::config::Config;
 use lightning_dht::dht::{Builder, Dht};
 use lightning_interfaces::dht::{DhtInterface, DhtSocket};
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix};
-use lightning_interfaces::{partial, ApplicationInterface, Blake3Hash, WithStartAndShutdown};
+use lightning_interfaces::types::{Blake3Hash, DhtRequest, DhtResponse, KeyPrefix};
+use lightning_interfaces::{partial, ApplicationInterface, WithStartAndShutdown};
 use lightning_topology::Topology;
 
 #[derive(Parser)]

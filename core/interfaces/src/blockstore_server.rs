@@ -5,8 +5,8 @@ use async_trait::async_trait;
 use lightning_types::NodeIndex;
 
 use crate::infu_collection::Collection;
+use crate::types::Blake3Hash;
 use crate::{
-    Blake3Hash,
     BlockStoreInterface,
     ConfigConsumer,
     ConfigProviderInterface,

@@ -1,7 +1,7 @@
 use std::io;
 
 use async_trait::async_trait;
-use lightning_interfaces::Blake3Hash;
+use lightning_interfaces::types::Blake3Hash;
 
 /// Simple block store interface.
 #[async_trait]

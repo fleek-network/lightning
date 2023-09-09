@@ -22,7 +22,7 @@ pub trait RpcInterface<C: Collection>:
             config.get::<Self>(),
             consensus.mempool(),
             app.sync_query(),
-            fetcher.clone(),
+            fetcher,
         )
     }
 
@@ -31,6 +31,6 @@ pub trait RpcInterface<C: Collection>:
         config: Self::Config,
         mempool: MempoolSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        fetcher: c!(C::FetcherInterface),
+        fetcher: &C::FetcherInterface,
     ) -> anyhow::Result<Self>;
 }

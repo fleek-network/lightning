@@ -11,9 +11,8 @@ use hyper::client::{self, HttpConnector};
 use hyper::{Body, Client, Request, Uri};
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::CompressionAlgorithm;
+use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
 use lightning_interfaces::{
-    Blake3Hash,
     BlockStoreInterface,
     ConfigConsumer,
     IncrementalPutInterface,
@@ -26,7 +25,8 @@ use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, Notify};
 use tokio::time::timeout;
 mod config;
-use config::{Config, Gateway};
+pub use config::Config;
+use config::Gateway;
 mod ipfs_stream;
 pub use ipfs_stream::IPFSStream;
 use tokio_util::io::StreamReader;
