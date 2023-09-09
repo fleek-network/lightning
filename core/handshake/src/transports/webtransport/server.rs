@@ -19,7 +19,7 @@ pub async fn main_loop(ctx: Context) {
                 let conn_tx = ctx.conn_tx.clone();
                 tokio::spawn(async move  {
                     if let Err(e) = handle_incoming_session(incoming, conn_tx).await {
-                        log::error!("failed to handle incoming WebTransport session");
+                        log::error!("failed to handle incoming WebTransport session: {e:?}");
                     }
                 });
             }

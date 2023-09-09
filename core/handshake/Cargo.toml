@@ -17,6 +17,7 @@ fleek-crypto.workspace = true
 async-trait.workspace = true
 futures.workspace = true
 tokio.workspace = true
+tokio-util = { workspace = true, features = ["codec"] }
 bytes = "1.4"
 arrayref = "0.3"
 arrayvec = "0.7"

@@ -1,3 +1,4 @@
+mod connection;
 mod server;
 
 use std::net::SocketAddr;
@@ -5,12 +6,9 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::Receiver;
-use wtransport::endpoint::Server;
-use wtransport::error::ConnectionError;
+use tokio::sync::mpsc::{self, Receiver, Sender};
 use wtransport::tls::Certificate;
-use wtransport::{Connection, Endpoint, RecvStream, ServerConfig};
+use wtransport::{Connection, Endpoint, ServerConfig};
 
 use crate::schema::{HandshakeRequestFrame, HandshakeResponse, RequestFrame, ResponseFrame};
 use crate::shutdown::ShutdownWaiter;
@@ -43,7 +41,7 @@ impl Transport for WebTransport {
     type Receiver = WebTransportReceiver;
 
     async fn bind(shutdown: ShutdownWaiter, config: Self::Config) -> anyhow::Result<Self> {
-        let mut config = ServerConfig::builder()
+        let config = ServerConfig::builder()
             .with_bind_address(config.address)
             .with_certificate(Certificate::new(vec![], vec![]))
             .keep_alive_interval(config.keep_alive)
@@ -77,27 +75,63 @@ impl Transport for WebTransport {
                 return None;
             },
         };
-        Some((frame, WebTransportSender, WebTransportReceiver))
+        let (sender_tx, sender_rx) = mpsc::channel(1024);
+        let (receiver_tx, receiver_rx) = mpsc::channel(1024);
+
+        let context = connection::Context::new(conn, receiver_tx, sender_rx);
+        tokio::spawn(async move {
+            if let Err(e) = connection::connection_loop(context).await {
+                log::error!("unexpected error from connection loop: {e:?}");
+            }
+        });
+        Some((
+            frame,
+            WebTransportSender { tx: sender_tx },
+            WebTransportReceiver { rx: receiver_rx },
+        ))
     }
 }
 
-pub struct WebTransportSender;
+pub struct WebTransportSender {
+    tx: Sender<Vec<u8>>,
+}
 
 impl TransportSender for WebTransportSender {
     fn send_handshake_response(&mut self, response: HandshakeResponse) {
-        todo!()
+        let tx = self.tx.clone();
+        let data = response.encode();
+        tokio::spawn(async move {
+            if tx.send(data.to_vec()).await.is_err() {
+                log::error!("failed to send data to connection loop");
+            }
+        });
     }
 
     fn send(&mut self, frame: ResponseFrame) {
-        todo!()
+        let tx = self.tx.clone();
+        let data = frame.encode();
+        tokio::spawn(async move {
+            if tx.send(data.to_vec()).await.is_err() {
+                log::error!("failed to send data to connection loop");
+            }
+        });
     }
 }
 
-pub struct WebTransportReceiver;
+pub struct WebTransportReceiver {
+    rx: Receiver<Vec<u8>>,
+}
 
 #[async_trait]
 impl TransportReceiver for WebTransportReceiver {
     async fn recv(&mut self) -> Option<RequestFrame> {
-        todo!()
+        let data = self.rx.recv().await?;
+        match RequestFrame::decode(&data) {
+            Ok(data) => Some(data),
+            Err(e) => {
+                log::error!("failed to decode request frame: {e:?}");
+                None
+            },
+        }
     }
 }

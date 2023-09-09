@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use arrayref::array_ref;
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, Bytes};
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey, NodeSignature};
 use lightning_interfaces::types::ServiceId;
 use tokio::io::{AsyncRead, AsyncReadExt};
@@ -231,6 +231,33 @@ impl RequestFrame {
                 }
 
                 let ttl = u64::from_be_bytes(*array_ref!(bytes, 1, 8));
+                Ok(Self::ExtendAccessToken { ttl })
+            },
+            0x03 => Ok(Self::DeliveryAcknowledgment {}),
+            _ => Err(anyhow!("invalid frame tag")),
+        }
+    }
+
+    pub async fn decode_from_reader<R: AsyncRead + Unpin>(reader: &mut R) -> Result<Self> {
+        let ty = reader.read_u8().await?;
+        match ty {
+            0x00 => {
+                let mut bytes = Vec::new();
+                reader.read_to_end(&mut bytes).await?;
+                Ok(Self::ServicePayload {
+                    bytes: bytes.into(),
+                })
+            },
+            0x01 => {
+                let mut bytes = vec![0u8; 8];
+                reader.read_exact(&mut bytes).await?;
+                let ttl = u64::from_be_bytes(*array_ref!(bytes, 0, 8));
+                Ok(Self::AccessToken { ttl })
+            },
+            0x02 => {
+                let mut bytes = vec![0u8; 8];
+                reader.read_exact(&mut bytes).await?;
+                let ttl = u64::from_be_bytes(*array_ref!(bytes, 0, 8));
                 Ok(Self::ExtendAccessToken { ttl })
             },
             0x03 => Ok(Self::DeliveryAcknowledgment {}),
