@@ -128,18 +128,27 @@ impl HandshakeRequestFrame {
         let ty = reader.read_u8().await?;
         match ty {
             0x00 => {
-                let mut buf = vec![0u8; 148];
-                reader.read_exact(&mut buf).await?;
+                let mut buf = vec![0u8; 149];
+                reader
+                    .read_exact(buf.get_mut(1..).expect("Buffer is large enough"))
+                    .await?;
+                buf[0] = 0x00;
                 Self::decode(&buf)
             },
             0x01 => {
-                let mut buf = vec![0u8; 156];
-                reader.read_exact(&mut buf).await?;
+                let mut buf = vec![0u8; 157];
+                reader
+                    .read_exact(buf.get_mut(1..).expect("Buffer is large enough"))
+                    .await?;
+                buf[0] = 0x01;
                 Self::decode(&buf)
             },
             0x02 => {
-                let mut buf = vec![0u8; 48];
-                reader.read_exact(&mut buf).await?;
+                let mut buf = vec![0u8; 49];
+                reader
+                    .read_exact(buf.get_mut(1..).expect("Buffer is large enough"))
+                    .await?;
+                buf[0] = 0x02;
                 Self::decode(&buf)
             },
             _ => Err(anyhow!("invalid frame tag")),
