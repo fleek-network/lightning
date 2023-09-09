@@ -239,6 +239,27 @@
       ]
     },
     {
+      "name": "flk_account_info",
+      "summary": "Retrieves information about a acccount for a public key.",
+      "params": [
+        {
+          "name": "public_key",
+          "description": "The public key of the account",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Address"
+          }
+        }
+      ],
+      "result": {
+        "name": "account_info",
+        "description": "Detailed information about the account",
+        "schema": {
+          "$ref": "#/components/schemas/AccountInfo"
+        }
+      }
+    },
+    {
       "name": "flk_get_node_info",
       "summary": "Retrieves information about a node given its public key.",
       "params": [
@@ -709,6 +730,24 @@
           }
         }
       ]
+    },
+    {
+      "name": "flk_get_last_epoch_hash",
+      "summary": "Get the hash of the most recently ended epoch.",
+      "params": [],
+      "result": {
+        "name": "LastEpochHash",
+        "description": "A 32-byte array representing the unique hash of the last epoch.",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "minItems": 32,
+          "maxItems": 32
+        }
+      }
     }
   ],
   "components": {
@@ -827,6 +866,33 @@
           "stake",
           "domain",
           "workers",
+          "nonce"
+        ]
+      },
+      "AccountInfo": {
+        "type": "object",
+        "properties": {
+          "flk_balance": {
+            "$ref": "#/components/schemas/HpFixed18",
+            "description": "The accounts FLK balance"
+          },
+          "stables_balance": {
+            "$ref": "#/components/schemas/HpFixed6",
+            "description": "The accounts stables balance"
+          },
+          "bandwidth_balance": {
+            "type": "integer"
+          },
+          "nonce": {
+            "type": "integer",
+            "format":"uint64",
+            "description": "The nonce of the account"
+          }
+        },
+        "required": [
+          "flk_balance",
+          "stables_balance",
+          "bandwidth_balance",
           "nonce"
         ]
       },
