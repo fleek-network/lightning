@@ -92,6 +92,7 @@ forward!(async fn start_or_shutdown_node(this, start: bool) on [
     ResolverInterface,
     DeliveryAcknowledgmentAggregatorInterface,
     OriginProviderInterface,
+    FetcherInterface,
     ServiceExecutorInterface,
     RpcInterface,
 ] {
