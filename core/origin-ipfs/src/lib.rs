@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -42,7 +41,6 @@ pub struct IPFSOrigin<C: Collection> {
     rx: Arc<Mutex<Option<mpsc::Receiver<Task<Vec<u8>, anyhow::Result<Blake3Hash>>>>>>,
     is_running: Arc<Mutex<bool>>,
     shutdown_notify: Arc<Notify>,
-    collection: PhantomData<C>,
 }
 
 #[async_trait]
@@ -61,7 +59,6 @@ impl<C: Collection> OriginProviderInterface<C> for IPFSOrigin<C> {
             rx: Arc::new(Mutex::new(Some(rx))),
             is_running: Arc::new(Mutex::new(false)),
             shutdown_notify: Arc::new(Notify::new()),
-            collection: PhantomData,
         })
     }
 

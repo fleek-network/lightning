@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -36,7 +35,6 @@ pub struct ReputationAggregator<C: Collection> {
     inner: Arc<ReputationAggregatorInner<C>>,
     is_running: Arc<AtomicBool>,
     shutdown_notify: Arc<Notify>,
-    _collection: PhantomData<C>,
 }
 
 #[async_trait]
@@ -126,7 +124,6 @@ impl<C: Collection> ReputationAggregatorInterface<C> for ReputationAggregator<C>
             inner: Arc::new(inner),
             is_running: Arc::new(AtomicBool::new(false)),
             shutdown_notify,
-            _collection: PhantomData,
         })
     }
 
