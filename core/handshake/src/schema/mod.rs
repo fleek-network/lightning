@@ -124,7 +124,7 @@ impl HandshakeRequestFrame {
         }
     }
 
-    pub async fn decode_from_reader<R: AsyncRead + Unpin>(mut reader: R) -> Result<Self> {
+    pub async fn decode_from_reader<R: AsyncRead + Unpin>(mut reader: &mut R) -> Result<Self> {
         let ty = reader.read_u8().await?;
         match ty {
             0x00 => {

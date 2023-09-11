@@ -1,14 +1,15 @@
 use anyhow::Result;
 use tokio::sync::mpsc::Sender;
+use tokio_util::codec::{FramedRead, FramedWrite};
 use wtransport::endpoint::{IncomingSession, Server};
-use wtransport::{Connection, Endpoint};
+use wtransport::{Connection, Endpoint, RecvStream, SendStream};
 
 use crate::shutdown::ShutdownWaiter;
 
 /// The execution context of the WebTransport server.
 pub struct Context {
     pub endpoint: Endpoint<Server>,
-    pub conn_tx: Sender<Connection>,
+    pub conn_tx: Sender<(SendStream, RecvStream)>,
     pub shutdown: ShutdownWaiter,
 }
 
@@ -33,7 +34,7 @@ pub async fn main_loop(ctx: Context) {
 
 pub async fn handle_incoming_session(
     incoming: IncomingSession,
-    conn_tx: Sender<Connection>,
+    accept_tx: Sender<(SendStream, RecvStream)>,
 ) -> Result<()> {
     let session_request = incoming.await?;
     // Todo: validate authority and scheme.
@@ -48,8 +49,13 @@ pub async fn handle_incoming_session(
     // the WebTransport server MAY accept the session by replying with a 2xx series status code,
     // as defined in Section 15.3 of [HTTP].
     let connection = session_request.accept().await?;
-    conn_tx
-        .send(connection)
-        .await
-        .map_err(|_| anyhow::anyhow!("failed to send new WebTransport session connection"))
+    loop {
+        let (stream_tx, stream_rx) = connection.accept_bi().await?;
+        let accept_tx_clone = accept_tx.clone();
+        tokio::spawn(async move {
+            if accept_tx_clone.send((stream_tx, stream_rx)).await.is_err() {
+                log::error!("failed to send new WebTransport bi-directional stream")
+            }
+        });
+    }
 }

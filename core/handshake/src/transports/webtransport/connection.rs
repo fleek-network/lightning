@@ -7,7 +7,7 @@ use bytes::Bytes;
 use futures::{SinkExt, StreamExt};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio_util::codec::{Framed, LengthDelimitedCodec};
+use tokio_util::codec::{Framed, FramedWrite, LengthDelimitedCodec};
 use wtransport::{Connection, RecvStream, SendStream};
 
 pub async fn connection_loop(mut ctx: Context) -> Result<()> {
@@ -107,5 +107,16 @@ impl AsyncWrite for BiStream {
         cx: &mut std::task::Context<'_>,
     ) -> Poll<std::result::Result<(), Error>> {
         AsyncWrite::poll_shutdown(Pin::new(&mut self.tx), cx)
+    }
+}
+
+pub async fn sender_loop(
+    mut data_rx: Receiver<Vec<u8>>,
+    mut network_tx: FramedWrite<SendStream, LengthDelimitedCodec>,
+) {
+    while let Some(data) = data_rx.recv().await {
+        if let Err(e) = network_tx.send(Bytes::from(data)).await {
+            log::error!("failed to send data: {e:?}");
+        }
     }
 }
