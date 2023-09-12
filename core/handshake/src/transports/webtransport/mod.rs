@@ -16,7 +16,7 @@ use wtransport::{Connection, Endpoint, RecvStream, SendStream, ServerConfig};
 
 use crate::schema::{HandshakeRequestFrame, HandshakeResponse, RequestFrame, ResponseFrame};
 use crate::shutdown::ShutdownWaiter;
-use crate::transports::webtransport::server::Context;
+use crate::transports::webtransport::server::{Context, RecvRx, SendTx};
 use crate::transports::{Transport, TransportReceiver, TransportSender};
 
 #[derive(Deserialize, Serialize)]
@@ -35,7 +35,7 @@ impl Default for WebTransportConfig {
 }
 
 pub struct WebTransport {
-    conn_rx: Receiver<(SendStream, RecvStream)>,
+    conn_rx: Receiver<(HandshakeRequestFrame, (SendTx, RecvRx))>,
 }
 
 #[async_trait]
@@ -64,18 +64,9 @@ impl Transport for WebTransport {
     }
 
     async fn accept(&mut self) -> Option<(HandshakeRequestFrame, Self::Sender, Self::Receiver)> {
-        let (tx, mut rx) = self.conn_rx.recv().await?;
-        let frame = match HandshakeRequestFrame::decode_from_reader(&mut rx).await {
-            Ok(f) => f,
-            Err(e) => {
-                log::error!("failed to get handshake request frame {e:?}");
-                return None;
-            },
-        };
-        let frame_writer = FramedWrite::new(tx, LengthDelimitedCodec::new());
+        let (frame, (frame_writer, frame_reader)) = self.conn_rx.recv().await?;
         let (data_tx, data_rx) = mpsc::channel(2048);
         tokio::spawn(connection::sender_loop(data_rx, frame_writer));
-        let frame_reader = FramedRead::new(rx, LengthDelimitedCodec::new());
         Some((
             frame,
             WebTransportSender { tx: data_tx },
@@ -111,7 +102,7 @@ impl TransportSender for WebTransportSender {
 }
 
 pub struct WebTransportReceiver {
-    rx: FramedRead<RecvStream, LengthDelimitedCodec>,
+    rx: RecvRx,
 }
 
 #[async_trait]

@@ -1,15 +1,23 @@
+use std::io::Error;
+
 use anyhow::Result;
+use bytes::BytesMut;
+use futures::StreamExt;
 use tokio::sync::mpsc::Sender;
-use tokio_util::codec::{FramedRead, FramedWrite};
+use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use wtransport::endpoint::{IncomingSession, Server};
 use wtransport::{Connection, Endpoint, RecvStream, SendStream};
 
+use crate::schema::HandshakeRequestFrame;
 use crate::shutdown::ShutdownWaiter;
+
+pub type SendTx = FramedWrite<SendStream, LengthDelimitedCodec>;
+pub type RecvRx = FramedRead<RecvStream, LengthDelimitedCodec>;
 
 /// The execution context of the WebTransport server.
 pub struct Context {
     pub endpoint: Endpoint<Server>,
-    pub conn_tx: Sender<(SendStream, RecvStream)>,
+    pub conn_tx: Sender<(HandshakeRequestFrame, (SendTx, RecvRx))>,
     pub shutdown: ShutdownWaiter,
 }
 
@@ -34,7 +42,7 @@ pub async fn main_loop(ctx: Context) {
 
 pub async fn handle_incoming_session(
     incoming: IncomingSession,
-    accept_tx: Sender<(SendStream, RecvStream)>,
+    accept_tx: Sender<(HandshakeRequestFrame, (SendTx, RecvRx))>,
 ) -> Result<()> {
     let session_request = incoming.await?;
     // Todo: validate authority and scheme.
@@ -51,11 +59,33 @@ pub async fn handle_incoming_session(
     let connection = session_request.accept().await?;
     loop {
         let (stream_tx, stream_rx) = connection.accept_bi().await?;
-        let accept_tx_clone = accept_tx.clone();
-        tokio::spawn(async move {
-            if accept_tx_clone.send((stream_tx, stream_rx)).await.is_err() {
-                log::error!("failed to send new WebTransport bi-directional stream")
-            }
-        });
+        let writer = FramedWrite::new(stream_tx, LengthDelimitedCodec::new());
+        let mut reader = FramedRead::new(stream_rx, LengthDelimitedCodec::new());
+
+        match reader.next().await {
+            None => {
+                log::error!("failed to get handshake request frame");
+            },
+            Some(Err(e)) => {
+                log::error!("unexpected error: {e:?}");
+            },
+            Some(Ok(bytes)) => match HandshakeRequestFrame::decode(&bytes) {
+                Ok(frame) => {
+                    let accept_tx_clone = accept_tx.clone();
+                    tokio::spawn(async move {
+                        if accept_tx_clone
+                            .send((frame, (writer, reader)))
+                            .await
+                            .is_err()
+                        {
+                            log::error!("failed to send new WebTransport bi-directional stream")
+                        }
+                    });
+                },
+                Err(e) => {
+                    log::error!("failed to decode frame: {e:?}");
+                },
+            },
+        }
     }
 }
