@@ -9,13 +9,13 @@ use wtransport::{Endpoint, RecvStream, SendStream};
 use crate::schema::HandshakeRequestFrame;
 use crate::shutdown::ShutdownWaiter;
 
-pub type SendTx = FramedWrite<SendStream, LengthDelimitedCodec>;
-pub type RecvRx = FramedRead<RecvStream, LengthDelimitedCodec>;
+pub type FramedStreamTx = FramedWrite<SendStream, LengthDelimitedCodec>;
+pub type FramedStreamRx = FramedRead<RecvStream, LengthDelimitedCodec>;
 
 /// The execution context of the WebTransport server.
 pub struct Context {
     pub endpoint: Endpoint<Server>,
-    pub accept_tx: Sender<(HandshakeRequestFrame, (SendTx, RecvRx))>,
+    pub accept_tx: Sender<(HandshakeRequestFrame, (FramedStreamTx, FramedStreamRx))>,
     pub shutdown: ShutdownWaiter,
 }
 
@@ -40,7 +40,7 @@ pub async fn main_loop(ctx: Context) {
 
 pub async fn handle_incoming_session(
     incoming: IncomingSession,
-    accept_tx: Sender<(HandshakeRequestFrame, (SendTx, RecvRx))>,
+    accept_tx: Sender<(HandshakeRequestFrame, (FramedStreamTx, FramedStreamRx))>,
 ) -> Result<()> {
     let session_request = incoming.await?;
     // Todo: validate authority and scheme.
@@ -88,10 +88,7 @@ pub async fn handle_incoming_session(
     }
 }
 
-pub async fn sender_loop(
-    mut data_rx: Receiver<Vec<u8>>,
-    mut network_tx: FramedWrite<SendStream, LengthDelimitedCodec>,
-) {
+pub async fn sender_loop(mut data_rx: Receiver<Vec<u8>>, mut network_tx: FramedStreamTx) {
     while let Some(data) = data_rx.recv().await {
         if let Err(e) = network_tx.send(Bytes::from(data)).await {
             log::error!("failed to send data: {e:?}");

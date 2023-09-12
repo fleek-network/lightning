@@ -12,7 +12,7 @@ use wtransport::{Endpoint, ServerConfig};
 
 use crate::schema::{HandshakeRequestFrame, HandshakeResponse, RequestFrame, ResponseFrame};
 use crate::shutdown::ShutdownWaiter;
-use crate::transports::webtransport::connection::{Context, RecvRx, SendTx};
+use crate::transports::webtransport::connection::{Context, FramedStreamRx, FramedStreamTx};
 use crate::transports::{Transport, TransportReceiver, TransportSender};
 
 #[derive(Deserialize, Serialize)]
@@ -31,7 +31,7 @@ impl Default for WebTransportConfig {
 }
 
 pub struct WebTransport {
-    conn_rx: Receiver<(HandshakeRequestFrame, (SendTx, RecvRx))>,
+    conn_rx: Receiver<(HandshakeRequestFrame, (FramedStreamTx, FramedStreamRx))>,
 }
 
 #[async_trait]
@@ -98,7 +98,7 @@ impl TransportSender for WebTransportSender {
 }
 
 pub struct WebTransportReceiver {
-    rx: RecvRx,
+    rx: FramedStreamRx,
 }
 
 #[async_trait]
