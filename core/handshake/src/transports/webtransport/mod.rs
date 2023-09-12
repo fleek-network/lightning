@@ -1,18 +1,14 @@
-mod connection;
 mod server;
 
-use std::io::Error;
 use std::net::SocketAddr;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use bytes::BytesMut;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{self, Receiver, Sender};
-use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use wtransport::tls::Certificate;
-use wtransport::{Connection, Endpoint, RecvStream, SendStream, ServerConfig};
+use wtransport::{Endpoint, ServerConfig};
 
 use crate::schema::{HandshakeRequestFrame, HandshakeResponse, RequestFrame, ResponseFrame};
 use crate::shutdown::ShutdownWaiter;
@@ -55,7 +51,7 @@ impl Transport for WebTransport {
         let (conn_tx, conn_rx) = mpsc::channel(2048);
         let ctx = Context {
             endpoint,
-            conn_tx,
+            accept_tx: conn_tx,
             shutdown,
         };
         tokio::spawn(server::main_loop(ctx));
@@ -66,7 +62,7 @@ impl Transport for WebTransport {
     async fn accept(&mut self) -> Option<(HandshakeRequestFrame, Self::Sender, Self::Receiver)> {
         let (frame, (frame_writer, frame_reader)) = self.conn_rx.recv().await?;
         let (data_tx, data_rx) = mpsc::channel(2048);
-        tokio::spawn(connection::sender_loop(data_rx, frame_writer));
+        tokio::spawn(server::sender_loop(data_rx, frame_writer));
         Some((
             frame,
             WebTransportSender { tx: data_tx },

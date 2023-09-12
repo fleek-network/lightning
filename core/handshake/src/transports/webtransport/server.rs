@@ -1,12 +1,10 @@
-use std::io::Error;
-
 use anyhow::Result;
-use bytes::BytesMut;
-use futures::StreamExt;
-use tokio::sync::mpsc::Sender;
+use bytes::Bytes;
+use futures::{SinkExt, StreamExt};
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use wtransport::endpoint::{IncomingSession, Server};
-use wtransport::{Connection, Endpoint, RecvStream, SendStream};
+use wtransport::{Endpoint, RecvStream, SendStream};
 
 use crate::schema::HandshakeRequestFrame;
 use crate::shutdown::ShutdownWaiter;
@@ -17,7 +15,7 @@ pub type RecvRx = FramedRead<RecvStream, LengthDelimitedCodec>;
 /// The execution context of the WebTransport server.
 pub struct Context {
     pub endpoint: Endpoint<Server>,
-    pub conn_tx: Sender<(HandshakeRequestFrame, (SendTx, RecvRx))>,
+    pub accept_tx: Sender<(HandshakeRequestFrame, (SendTx, RecvRx))>,
     pub shutdown: ShutdownWaiter,
 }
 
@@ -25,9 +23,9 @@ pub async fn main_loop(ctx: Context) {
     loop {
         tokio::select! {
             incoming = ctx.endpoint.accept() => {
-                let conn_tx = ctx.conn_tx.clone();
+                let accept_tx = ctx.accept_tx.clone();
                 tokio::spawn(async move  {
-                    if let Err(e) = handle_incoming_session(incoming, conn_tx).await {
+                    if let Err(e) = handle_incoming_session(incoming, accept_tx).await {
                         log::error!("failed to handle incoming WebTransport session: {e:?}");
                     }
                 });
@@ -86,6 +84,17 @@ pub async fn handle_incoming_session(
                     log::error!("failed to decode frame: {e:?}");
                 },
             },
+        }
+    }
+}
+
+pub async fn sender_loop(
+    mut data_rx: Receiver<Vec<u8>>,
+    mut network_tx: FramedWrite<SendStream, LengthDelimitedCodec>,
+) {
+    while let Some(data) = data_rx.recv().await {
+        if let Err(e) = network_tx.send(Bytes::from(data)).await {
+            log::error!("failed to send data: {e:?}");
         }
     }
 }
