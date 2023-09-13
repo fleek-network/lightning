@@ -4,7 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct WebTransportConfig {
     pub address: SocketAddr,
     pub keep_alive: Option<Duration>,
@@ -28,7 +28,7 @@ impl Default for WebTransportConfig {
 }
 
 /// Certificate in the binary DER format.
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct SerializedCertificate {
     pub certificate: Vec<u8>,
     pub key: Vec<u8>,

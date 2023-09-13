@@ -3,6 +3,7 @@ mod config;
 mod connection;
 
 use async_trait::async_trait;
+pub use config::WebTransportConfig;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::StreamExt;
 use tokio::sync::mpsc::{self, Receiver, Sender};
@@ -11,7 +12,6 @@ use wtransport::{Endpoint, ServerConfig};
 
 use crate::schema::{HandshakeRequestFrame, HandshakeResponse, RequestFrame, ResponseFrame};
 use crate::shutdown::ShutdownWaiter;
-use crate::transports::webtransport::config::WebTransportConfig;
 use crate::transports::webtransport::connection::{Context, FramedStreamRx, FramedStreamTx};
 use crate::transports::{Transport, TransportReceiver, TransportSender};
 

@@ -12,6 +12,7 @@ use crate::transports::{self, Transport, TransportReceiver};
 pub enum TransportConfig {
     WebRTC(transports::webrtc::WebRtcConfig),
     Mock(transports::mock::MockTransportConfig),
+    WebTransport(transports::webtransport::WebTransportConfig),
 }
 
 pub async fn attach_transport_by_config<P: ExecutorProviderInterface>(
@@ -27,6 +28,12 @@ pub async fn attach_transport_by_config<P: ExecutorProviderInterface>(
         TransportConfig::Mock(config) => {
             let transport =
                 transports::mock::MockTransport::bind(state.shutdown.clone(), config).await?;
+            Ok(attach_transport_to_state(state, transport))
+        },
+        TransportConfig::WebTransport(config) => {
+            let transport =
+                transports::webtransport::WebTransport::bind(state.shutdown.clone(), config)
+                    .await?;
             Ok(attach_transport_to_state(state, transport))
         },
     }
