@@ -1,34 +1,19 @@
+mod certificate;
+mod config;
 mod connection;
 
-use std::net::SocketAddr;
-use std::time::Duration;
-
 use async_trait::async_trait;
+use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::StreamExt;
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use wtransport::tls::Certificate;
 use wtransport::{Endpoint, ServerConfig};
 
 use crate::schema::{HandshakeRequestFrame, HandshakeResponse, RequestFrame, ResponseFrame};
 use crate::shutdown::ShutdownWaiter;
+use crate::transports::webtransport::config::WebTransportConfig;
 use crate::transports::webtransport::connection::{Context, FramedStreamRx, FramedStreamTx};
 use crate::transports::{Transport, TransportReceiver, TransportSender};
-
-#[derive(Deserialize, Serialize)]
-pub struct WebTransportConfig {
-    address: SocketAddr,
-    keep_alive: Option<Duration>,
-}
-
-impl Default for WebTransportConfig {
-    fn default() -> Self {
-        Self {
-            address: ([0, 0, 0, 0], 4240).into(),
-            keep_alive: None,
-        }
-    }
-}
 
 pub struct WebTransport {
     conn_rx: Receiver<(HandshakeRequestFrame, (FramedStreamTx, FramedStreamRx))>,
@@ -41,9 +26,21 @@ impl Transport for WebTransport {
     type Receiver = WebTransportReceiver;
 
     async fn bind(shutdown: ShutdownWaiter, config: Self::Config) -> anyhow::Result<Self> {
+        let (cert_der, pk) = match config.certificate {
+            None => {
+                log::warn!("no certificate found in config so generating one from random secret");
+                let certificate = certificate::generate_certificate(NodeSecretKey::generate())?;
+                (
+                    certificate.serialize_der()?,
+                    certificate.serialize_private_key_der(),
+                )
+            },
+            Some(cert) => (cert.certificate, cert.key),
+        };
+
         let config = ServerConfig::builder()
             .with_bind_address(config.address)
-            .with_certificate(Certificate::new(vec![], vec![]))
+            .with_certificate(Certificate::new(vec![cert_der], pk))
             .keep_alive_interval(config.keep_alive)
             .build();
 
