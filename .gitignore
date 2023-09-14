@@ -4,3 +4,5 @@ target
 **/data
 **/lightning.toml
 .idea
+./makefile
+./dockerfile
