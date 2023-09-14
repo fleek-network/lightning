@@ -1,0 +1,6 @@
+{
+  "tasks": {},
+  "compilerOptions": {
+    "lib": ["deno.ns"]
+  }
+}
