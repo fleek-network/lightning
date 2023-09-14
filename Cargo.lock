@@ -4031,6 +4031,10 @@ dependencies = [
 [[package]]
 name = "lightning-cli"
 version = "0.1.0"
+dependencies = [
+ "clap 4.4.2",
+ "tokio",
+]
 
 [[package]]
 name = "lightning-consensus"
