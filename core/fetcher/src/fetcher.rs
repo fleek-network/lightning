@@ -2,16 +2,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use affair::{Socket, Task};
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use async_trait::async_trait;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::{
-    Blake3Hash,
-    FetcherRequest,
-    FetcherResponse,
-    ImmutablePointer,
-    OriginProvider,
-};
+use lightning_interfaces::types::{Blake3Hash, FetcherRequest, FetcherResponse, ImmutablePointer};
 use lightning_interfaces::{
     BlockStoreInterface,
     ConfigConsumer,
@@ -23,42 +17,45 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use log::error;
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::{mpsc, oneshot};
 
 use crate::config::Config;
+use crate::origin::{OriginFetcher, OriginRequest};
 
-#[derive(Clone)]
+pub(crate) type Uri = Vec<u8>;
+
 pub struct Fetcher<C: Collection> {
     inner: Arc<FetcherInner<C>>,
     is_running: Arc<AtomicBool>,
     socket: FetcherSocket,
-    shutdown_notify: Arc<Notify>,
+    shutdown_tx: mpsc::Sender<()>,
 }
 
 #[async_trait]
 impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
     /// Initialize the fetcher.
     fn init(
-        _config: Self::Config,
+        config: Self::Config,
         blockstore: C::BlockStoreInterface,
         resolver: C::ResolverInterface,
         origin: &C::OriginProviderInterface,
     ) -> anyhow::Result<Self> {
         let (socket, socket_rx) = Socket::raw_bounded(2048);
-        let shutdown_notify = Arc::new(Notify::new());
+        let (shutdown_tx, shutdown_rx) = mpsc::channel(10);
         let inner = FetcherInner::<C> {
+            config,
             socket_rx: Arc::new(Mutex::new(Some(socket_rx))),
             origin_socket: origin.get_socket(),
             blockstore,
             resolver,
-            shutdown_notify: shutdown_notify.clone(),
+            shutdown_rx: Arc::new(Mutex::new(Some(shutdown_rx))),
         };
 
         Ok(Self {
             inner: Arc::new(inner),
             is_running: Arc::new(AtomicBool::new(false)),
             socket,
-            shutdown_notify,
+            shutdown_tx,
         })
     }
 
@@ -83,89 +80,152 @@ impl<C: Collection> WithStartAndShutdown for Fetcher<C> {
             });
             self.is_running.store(true, Ordering::Relaxed);
         } else {
-            error!("Cannot start reputation aggregator because it is already running");
+            error!("Cannot start fetcher because it is already running");
         }
     }
 
     async fn shutdown(&self) {
-        self.shutdown_notify.notify_one();
+        self.shutdown_tx
+            .send(())
+            .await
+            .expect("Failed to send shutdown signal");
     }
 }
 
 struct FetcherInner<C: Collection> {
+    config: Config,
     #[allow(clippy::type_complexity)]
     socket_rx: Arc<Mutex<Option<mpsc::Receiver<Task<FetcherRequest, FetcherResponse>>>>>,
     origin_socket: OriginProviderSocket,
     blockstore: C::BlockStoreInterface,
     resolver: C::ResolverInterface,
-    shutdown_notify: Arc<Notify>,
+    shutdown_rx: Arc<Mutex<Option<mpsc::Receiver<()>>>>,
 }
 
 impl<C: Collection> FetcherInner<C> {
     async fn start(&self) {
         let mut socket_rx = self.socket_rx.lock().unwrap().take().unwrap();
-        let shutdown_notify = self.shutdown_notify.clone();
+
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        let (tx, rx) = mpsc::channel(128);
+        let mut origin_fetcher = OriginFetcher::<C>::new(
+            self.config.max_concurrent_origin_requests,
+            self.origin_socket.clone(),
+            rx,
+            self.resolver.clone(),
+            shutdown_rx,
+        );
+        tokio::spawn(async move {
+            origin_fetcher.start().await;
+        });
+        let mut shutdown_rx = self.shutdown_rx.lock().unwrap().take().unwrap();
+
         loop {
             tokio::select! {
-                _ = shutdown_notify.notified() => {
+                _ = shutdown_rx.recv() => {
+                    shutdown_tx.send(()).expect("Failed to send shutdown signal to origin fetcher");
                     break;
                 }
                 task = socket_rx.recv() => {
-                    let task = task.expect("Failed to receive UpdateMethod.");
+                    let task = task.expect("Failed to receive fetcher request.");
                     match task.request.clone() {
                         FetcherRequest::Put { pointer } => {
-                            task.respond(FetcherResponse::Put(self.put(pointer).await));
+                            let tx = tx.clone();
+                            let resolver = self.resolver.clone();
+                            tokio::spawn(async move {
+                                FetcherInner::<C>::put(pointer, tx, resolver, task).await;
+                            });
                         }
                         FetcherRequest::Fetch { hash } => {
-                            task.respond(FetcherResponse::Fetch(self.fetch(hash).await));
+                            let tx = tx.clone();
+                            let resolver = self.resolver.clone();
+                            let blockstore = self.blockstore.clone();
+                            tokio::spawn(async move {
+                                FetcherInner::<C>::fetch(
+                                    hash,
+                                    tx,
+                                    resolver,
+                                    blockstore,
+                                    task
+                                ).await;
+                            });
                         }
                     }
-
                 }
             }
         }
         *self.socket_rx.lock().unwrap() = Some(socket_rx);
+        *self.shutdown_rx.lock().unwrap() = Some(shutdown_rx);
     }
 
     /// Fetches the data from the corresponding origin, puts it in the blockstore, and stores the
     /// mapping using the resolver. If the mapping already exists, the data will not be fetched
     /// from origin again.
-    async fn put(&self, pointer: ImmutablePointer) -> Result<Blake3Hash> {
-        match pointer.origin {
-            OriginProvider::IPFS => {
-                if let Some(resolved_pointer) = self.resolver.get_blake3_hash(pointer.clone()).await
-                {
-                    Ok(resolved_pointer.hash)
-                } else {
-                    let Ok(Ok(hash)) = self.origin_socket.run(pointer.uri.clone()).await else {
-                        return Err(anyhow!("Failed to get response"));
-                    };
-                    // TODO(matthias): use different hashing algos
-                    self.resolver.publish(hash, &[pointer]).await;
-                    Ok(hash)
-                }
-            },
-            _ => unreachable!(),
+    async fn put(
+        pointer: ImmutablePointer,
+        tx: mpsc::Sender<OriginRequest>,
+        resolver: C::ResolverInterface,
+        task: Task<FetcherRequest, FetcherResponse>,
+    ) {
+        if let Some(resolved_pointer) = resolver.get_blake3_hash(pointer.clone()).await {
+            task.respond(FetcherResponse::Put(Ok(resolved_pointer.hash)));
+        } else {
+            let (response_tx, response_rx) = oneshot::channel();
+            tx.send(OriginRequest {
+                pointer,
+                response: response_tx,
+            })
+            .await
+            .expect("Failed to send origin request");
+
+            let mut hash_rx = response_rx.await.expect("Failed to receive response");
+
+            match hash_rx.recv().await.expect("Failed to receive response") {
+                Ok(hash) => task.respond(FetcherResponse::Put(Ok(hash))),
+                Err(e) => task.respond(FetcherResponse::Put(Err(anyhow!("{e:?}")))),
+            }
         }
     }
 
     /// Fetches the data from the blockstore. If the data does not exist in the blockstore, it will
     /// be fetched from the origin.
-    async fn fetch(&self, hash: Blake3Hash) -> Result<()> {
-        if self.blockstore.get_tree(&hash).await.is_some() {
-            return Ok(());
-        }
-        if let Some(pointers) = self.resolver.get_origins(hash) {
-            for resolved_pointer in pointers {
-                if let Ok(res_hash) = self.put(resolved_pointer.pointer).await {
-                    if res_hash == hash && self.blockstore.get_tree(&hash).await.is_some() {
-                        return Ok(());
+    async fn fetch(
+        hash: Blake3Hash,
+        tx: mpsc::Sender<OriginRequest>,
+        resolver: C::ResolverInterface,
+        blockstore: C::BlockStoreInterface,
+        task: Task<FetcherRequest, FetcherResponse>,
+    ) {
+        if blockstore.get_tree(&hash).await.is_some() {
+            task.respond(FetcherResponse::Fetch(Ok(())));
+            return;
+        } else if let Some(pointers) = resolver.get_origins(hash) {
+            for res_pointer in pointers {
+                if let Some(res) = resolver.get_blake3_hash(res_pointer.pointer.clone()).await {
+                    if res.hash == hash && blockstore.get_tree(&hash).await.is_some() {
+                        task.respond(FetcherResponse::Fetch(Ok(())));
+                        return;
+                    }
+                } else {
+                    let (response_tx, response_rx) = oneshot::channel();
+                    tx.send(OriginRequest {
+                        pointer: res_pointer.pointer,
+                        response: response_tx,
+                    })
+                    .await
+                    .expect("Failed to send origin request");
+
+                    let mut hash_rx = response_rx.await.expect("Failed to receive response");
+                    if let Ok(hash) = hash_rx.recv().await.expect("Failed to receive response") {
+                        task.respond(FetcherResponse::Put(Ok(hash)));
+                        return;
                     }
                 }
             }
         }
-
-        Err(anyhow!("Failed to fetch data"))
+        task.respond(FetcherResponse::Fetch(Err(anyhow!(
+            "Failed to resolve hash"
+        ))));
     }
 }
 

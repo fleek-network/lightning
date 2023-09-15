@@ -23,7 +23,7 @@ use log::{error, info};
 use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, Notify};
 use tokio::time::timeout;
-mod config;
+pub mod config;
 pub use config::Config;
 use config::Gateway;
 mod ipfs_stream;

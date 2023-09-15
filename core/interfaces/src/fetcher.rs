@@ -17,7 +17,7 @@ pub type FetcherSocket = Socket<FetcherRequest, FetcherResponse>;
 #[async_trait]
 #[infusion::service]
 pub trait FetcherInterface<C: Collection>:
-    WithStartAndShutdown + ConfigConsumer + Clone + Sized + Send + Sync
+    WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
     fn _init(
         config: ::ConfigProviderInterface,

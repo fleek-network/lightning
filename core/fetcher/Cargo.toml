@@ -14,3 +14,16 @@ async-trait.workspace = true
 tokio.workspace = true
 affair.workspace = true
 log.workspace = true
+thiserror = "1.0"
+
+[dev-dependencies]
+lightning-blockstore = { path = "../blockstore" }
+lightning-origin-ipfs = { path = "../origin-ipfs" }
+lightning-resolver = { path = "../resolver" }
+lightning-application = {path="../application", features = ["test"]}
+lightning-signer = {path="../signer"}
+fleek-crypto.workspace = true
+lightning-test-utils = {path="../test-utils"}
+lightning-broadcast = {path="../broadcast"}
+infusion.workspace = true
+cid.workspace = true
