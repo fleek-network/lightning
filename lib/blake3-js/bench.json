@@ -1,0 +1,1128 @@
+{
+  "runtime": "Deno/1.36.4 aarch64-apple-darwin",
+  "cpu": "Apple M1 Max",
+  "benches": [
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "0B",
+      "name": "Sha256 0B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 33,
+            "min": 2046.7292,
+            "max": 2371.1334,
+            "avg": 2185.072354545455,
+            "p75": 2235.5458,
+            "p99": 2371.1334,
+            "p995": 2371.1334,
+            "p999": 2371.1334,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "0B",
+      "name": "Optimized 0B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 164,
+            "min": 308.6292,
+            "max": 1545.2125,
+            "avg": 326.4876298780489,
+            "p75": 321.15,
+            "p99": 338.8417,
+            "p995": 1545.2125,
+            "p999": 1545.2125,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "0B",
+      "name": "WASM 0B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 109,
+            "min": 484.5666,
+            "max": 571.5375,
+            "avg": 508.2859733944954,
+            "p75": 514.35,
+            "p99": 553.6542,
+            "p995": 571.5375,
+            "p999": 571.5375,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "32B",
+      "name": "Sha256 32B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 34,
+            "min": 2092.65,
+            "max": 2577.7041,
+            "avg": 2185.2957088235294,
+            "p75": 2245.375,
+            "p99": 2577.7041,
+            "p995": 2577.7041,
+            "p999": 2577.7041,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "32B",
+      "name": "Optimized 32B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 151,
+            "min": 336.7625,
+            "max": 1310.9333,
+            "avg": 360.92497284768206,
+            "p75": 355.9167,
+            "p99": 477.0875,
+            "p995": 1310.9333,
+            "p999": 1310.9333,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "32B",
+      "name": "WASM 32B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 105,
+            "min": 496.95,
+            "max": 587.8667,
+            "avg": 527.1214247619047,
+            "p75": 533.9083,
+            "p99": 581.0959,
+            "p995": 587.8667,
+            "p999": 587.8667,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "48B",
+      "name": "Sha256 48B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 33,
+            "min": 2152.5666,
+            "max": 2389.6834,
+            "avg": 2219.374866666667,
+            "p75": 2225.2375,
+            "p99": 2389.6834,
+            "p995": 2389.6834,
+            "p999": 2389.6834,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "48B",
+      "name": "Optimized 48B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 147,
+            "min": 346.0083,
+            "max": 428.4167,
+            "avg": 364.57196258503404,
+            "p75": 367.725,
+            "p99": 414.2292,
+            "p995": 428.4167,
+            "p999": 428.4167,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "48B",
+      "name": "WASM 48B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 107,
+            "min": 508.05,
+            "max": 538.85,
+            "avg": 516.1685738317757,
+            "p75": 519.1875,
+            "p99": 528.7125,
+            "p995": 538.85,
+            "p999": 538.85,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "96B",
+      "name": "Sha256 96B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 26,
+            "min": 3071.3917,
+            "max": 3414.7625,
+            "avg": 3183.588946153847,
+            "p75": 3262.4875,
+            "p99": 3414.7625,
+            "p995": 3414.7625,
+            "p999": 3414.7625,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "96B",
+      "name": "Optimized 96B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 125,
+            "min": 420.5542,
+            "max": 487.5167,
+            "avg": 437.01193040000004,
+            "p75": 441.0583,
+            "p99": 479.2375,
+            "p995": 487.5167,
+            "p999": 487.5167,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "96B",
+      "name": "WASM 96B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 88,
+            "min": 620.8667,
+            "max": 685.5084,
+            "avg": 641.5994375,
+            "p75": 649.1875,
+            "p99": 685.5084,
+            "p995": 685.5084,
+            "p999": 685.5084,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "128B",
+      "name": "Sha256 128B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 23,
+            "min": 3964.8916,
+            "max": 4215.5,
+            "avg": 4040.43567826087,
+            "p75": 4096.6083,
+            "p99": 4215.5,
+            "p995": 4215.5,
+            "p999": 4215.5,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "128B",
+      "name": "Optimized 128B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 123,
+            "min": 430.3958,
+            "max": 464.325,
+            "avg": 444.7048463414632,
+            "p75": 450.95,
+            "p99": 462.35,
+            "p995": 464.325,
+            "p999": 464.325,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "128B",
+      "name": "WASM 128B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 85,
+            "min": 629.7334,
+            "max": 970.1625,
+            "avg": 669.9167141176468,
+            "p75": 668.8167,
+            "p99": 970.1625,
+            "p995": 970.1625,
+            "p999": 970.1625,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "256B",
+      "name": "Sha256 256B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 19,
+            "min": 5913.3375,
+            "max": 6563.1792,
+            "avg": 6044.620626315789,
+            "p75": 6073.85,
+            "p99": 6563.1792,
+            "p995": 6563.1792,
+            "p999": 6563.1792,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "256B",
+      "name": "Optimized 256B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 93,
+            "min": 597.2459,
+            "max": 655.1291,
+            "avg": 608.5614301075269,
+            "p75": 608.6417,
+            "p99": 655.1291,
+            "p995": 655.1291,
+            "p999": 655.1291,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "256B",
+      "name": "WASM 256B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 63,
+            "min": 902.1958,
+            "max": 1119.6166,
+            "avg": 946.270173015873,
+            "p75": 947.7208,
+            "p99": 1119.6166,
+            "p995": 1119.6166,
+            "p999": 1119.6166,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "512B",
+      "name": "Sha256 512B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 49696,
+            "min": 9416.0,
+            "max": 2033167.0,
+            "avg": 10064.0,
+            "p75": 10000.0,
+            "p99": 12625.0,
+            "p995": 13666.0,
+            "p999": 72417.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "512B",
+      "name": "Optimized 512B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 61,
+            "min": 934.625,
+            "max": 1423.9083,
+            "avg": 985.8872950819672,
+            "p75": 988.2792,
+            "p99": 1423.9083,
+            "p995": 1423.9083,
+            "p999": 1423.9083,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "512B",
+      "name": "WASM 512B",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 42,
+            "min": 1442.2416,
+            "max": 2528.5292,
+            "avg": 1605.300395238095,
+            "p75": 1585.8667,
+            "p99": 2528.5292,
+            "p995": 2528.5292,
+            "p999": 2528.5292,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "1Kib",
+      "name": "Sha256 1Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 26544,
+            "min": 17125.0,
+            "max": 490917.0,
+            "avg": 18844.0,
+            "p75": 18666.0,
+            "p99": 31875.0,
+            "p995": 41875.0,
+            "p999": 138042.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "1Kib",
+      "name": "Optimized 1Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 41,
+            "min": 1611.3,
+            "max": 1765.025,
+            "avg": 1664.0934926829266,
+            "p75": 1687.025,
+            "p99": 1765.025,
+            "p995": 1765.025,
+            "p999": 1765.025,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "1Kib",
+      "name": "WASM 1Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 30,
+            "min": 2464.45,
+            "max": 2614.025,
+            "avg": 2521.5429233333334,
+            "p75": 2547.8459,
+            "p99": 2614.025,
+            "p995": 2614.025,
+            "p999": 2614.025,
+            "highPrecision": false,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "8Kib",
+      "name": "Sha256 8Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 3868,
+            "min": 125083.0,
+            "max": 266791.0,
+            "avg": 129625.0,
+            "p75": 129875.0,
+            "p99": 168458.0,
+            "p995": 215792.0,
+            "p999": 258541.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "8Kib",
+      "name": "Optimized 8Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 41626,
+            "min": 11541.0,
+            "max": 179958.0,
+            "avg": 12015.0,
+            "p75": 12083.0,
+            "p99": 12750.0,
+            "p995": 13625.0,
+            "p999": 20125.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "8Kib",
+      "name": "WASM 8Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 25829,
+            "min": 18583.0,
+            "max": 340833.0,
+            "avg": 19366.0,
+            "p75": 19334.0,
+            "p99": 23291.0,
+            "p995": 26042.0,
+            "p999": 36375.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "16Kib",
+      "name": "Sha256 16Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 1945,
+            "min": 247541.0,
+            "max": 3264166.0,
+            "avg": 258451.0,
+            "p75": 257750.0,
+            "p99": 310417.0,
+            "p995": 405708.0,
+            "p999": 721667.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "16Kib",
+      "name": "Optimized 16Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 21451,
+            "min": 22875.0,
+            "max": 147334.0,
+            "avg": 23321.0,
+            "p75": 23167.0,
+            "p99": 26833.0,
+            "p995": 31125.0,
+            "p999": 38292.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "16Kib",
+      "name": "WASM 16Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 13207,
+            "min": 37084.0,
+            "max": 144500.0,
+            "avg": 37888.0,
+            "p75": 38167.0,
+            "p99": 41875.0,
+            "p995": 44709.0,
+            "p999": 54583.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "32Kib",
+      "name": "Sha256 32Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 995,
+            "min": 494375.0,
+            "max": 716292.0,
+            "avg": 508023.0,
+            "p75": 507500.0,
+            "p99": 635250.0,
+            "p995": 664458.0,
+            "p999": 716292.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "32Kib",
+      "name": "Optimized 32Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 10705,
+            "min": 45666.0,
+            "max": 119792.0,
+            "avg": 46751.0,
+            "p75": 47291.0,
+            "p99": 54875.0,
+            "p995": 58250.0,
+            "p999": 68500.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "32Kib",
+      "name": "WASM 32Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 6656,
+            "min": 74208.0,
+            "max": 241125.0,
+            "avg": 75240.0,
+            "p75": 74667.0,
+            "p99": 84542.0,
+            "p995": 89625.0,
+            "p999": 103167.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "64Kib",
+      "name": "Sha256 64Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 501,
+            "min": 987958.0,
+            "max": 1310333.0,
+            "avg": 1018746.0,
+            "p75": 1026458.0,
+            "p99": 1213584.0,
+            "p995": 1268875.0,
+            "p999": 1310333.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "64Kib",
+      "name": "Optimized 64Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 5388,
+            "min": 91292.0,
+            "max": 205459.0,
+            "avg": 92988.0,
+            "p75": 94084.0,
+            "p99": 110958.0,
+            "p995": 117166.0,
+            "p999": 140875.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "64Kib",
+      "name": "WASM 64Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 3299,
+            "min": 149500.0,
+            "max": 248792.0,
+            "avg": 152044.0,
+            "p75": 152583.0,
+            "p99": 175958.0,
+            "p995": 188333.0,
+            "p999": 225625.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "128Kib",
+      "name": "Sha256 128Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 254,
+            "min": 1974667.0,
+            "max": 2674708.0,
+            "avg": 2057999.0,
+            "p75": 2089750.0,
+            "p99": 2278458.0,
+            "p995": 2291083.0,
+            "p999": 2674708.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "128Kib",
+      "name": "Optimized 128Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 2624,
+            "min": 183291.0,
+            "max": 247833.0,
+            "avg": 191304.0,
+            "p75": 194459.0,
+            "p99": 226708.0,
+            "p995": 230917.0,
+            "p999": 246083.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "128Kib",
+      "name": "WASM 128Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 1626,
+            "min": 300000.0,
+            "max": 523666.0,
+            "avg": 309416.0,
+            "p75": 312708.0,
+            "p99": 344708.0,
+            "p995": 348250.0,
+            "p999": 414417.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "256Kib",
+      "name": "Sha256 256Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 131,
+            "min": 3957500.0,
+            "max": 5385375.0,
+            "avg": 4131529.0,
+            "p75": 4198166.0,
+            "p99": 5215167.0,
+            "p995": 5385375.0,
+            "p999": 5385375.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "256Kib",
+      "name": "Optimized 256Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 1332,
+            "min": 367292.0,
+            "max": 420333.0,
+            "avg": 378378.0,
+            "p75": 382041.0,
+            "p99": 394000.0,
+            "p995": 399292.0,
+            "p999": 406333.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "256Kib",
+      "name": "WASM 256Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 815,
+            "min": 615000.0,
+            "max": 670500.0,
+            "avg": 621144.0,
+            "p75": 621750.0,
+            "p99": 644417.0,
+            "p995": 649083.0,
+            "p999": 670500.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "512Kib",
+      "name": "Sha256 512Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 71,
+            "min": 8154208.0,
+            "max": 8552083.0,
+            "avg": 8279071.0,
+            "p75": 8308959.0,
+            "p99": 8552083.0,
+            "p995": 8552083.0,
+            "p999": 8552083.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "512Kib",
+      "name": "Optimized 512Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 667,
+            "min": 755042.0,
+            "max": 841333.0,
+            "avg": 761956.0,
+            "p75": 762833.0,
+            "p99": 790958.0,
+            "p995": 809625.0,
+            "p999": 841333.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "512Kib",
+      "name": "WASM 512Kib",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 413,
+            "min": 1234375.0,
+            "max": 1286583.0,
+            "avg": 1240845.0,
+            "p75": 1241333.0,
+            "p99": 1271417.0,
+            "p995": 1274750.0,
+            "p999": 1286583.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "1MB",
+      "name": "Sha256 1MB",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 41,
+            "min": 16308500.0,
+            "max": 16835750.0,
+            "avg": 16509257.0,
+            "p75": 16653959.0,
+            "p99": 16835750.0,
+            "p995": 16835750.0,
+            "p999": 16835750.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "1MB",
+      "name": "Optimized 1MB",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 339,
+            "min": 1468750.0,
+            "max": 1601083.0,
+            "avg": 1523666.0,
+            "p75": 1529333.0,
+            "p99": 1581125.0,
+            "p995": 1584541.0,
+            "p999": 1601083.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "1MB",
+      "name": "WASM 1MB",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 211,
+            "min": 2471542.0,
+            "max": 2586875.0,
+            "avg": 2488967.0,
+            "p75": 2488333.0,
+            "p99": 2556334.0,
+            "p995": 2576959.0,
+            "p999": 2586875.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "100MB",
+      "name": "Sha256 100MB",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 11,
+            "min": 1633126917.0,
+            "max": 1712754542.0,
+            "avg": 1663524429.0,
+            "p75": 1677320333.0,
+            "p99": 1712754542.0,
+            "p995": 1712754542.0,
+            "p999": 1712754542.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "100MB",
+      "name": "Optimized 100MB",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 14,
+            "min": 147587625.0,
+            "max": 152643083.0,
+            "avg": 149785980.0,
+            "p75": 150436667.0,
+            "p99": 152643083.0,
+            "p995": 152643083.0,
+            "p999": 152643083.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    },
+    {
+      "origin": "file:///Users/parsa/Code/Fleek/lightning/lib/blake3-js/src/blake3_benches.ts",
+      "group": "100MB",
+      "name": "WASM 100MB",
+      "baseline": false,
+      "results": [
+        {
+          "ok": {
+            "n": 12,
+            "min": 244759167.0,
+            "max": 282193875.0,
+            "avg": 250242410.0,
+            "p75": 247888291.0,
+            "p99": 282193875.0,
+            "p995": 282193875.0,
+            "p999": 282193875.0,
+            "highPrecision": true,
+            "usedExplicitTimers": false
+          }
+        }
+      ]
+    }
+  ]
+}
