@@ -1,12 +1,11 @@
 use std::fs::create_dir_all;
-use std::path::PathBuf;
 
 use anyhow::{bail, Result};
+use resolved_pathbuf::ResolvedPathBuf;
 
-pub fn ensure_parent_exist(path: &PathBuf) -> Result<()> {
+pub fn ensure_parent_exist(path: &ResolvedPathBuf) -> Result<()> {
     if let Some(parent_dir) = path.parent() {
-        create_dir_all(parent_dir)?;
-        Ok(())
+        Ok(create_dir_all(parent_dir)?)
     } else {
         bail!("Failed to get parent directory from given file: {:?}", path)
     }
