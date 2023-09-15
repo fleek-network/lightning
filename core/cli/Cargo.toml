@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 tokio.workspace = true
 clap = { version = "4.4.2", features = ["derive"] }
+anyhow.workspace = true
