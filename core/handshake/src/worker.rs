@@ -29,12 +29,12 @@ pub fn attach_worker<P: ExecutorProviderInterface>(state: StateRef<P>, mode: Wor
 }
 
 fn blocking_worker<P: ExecutorProviderInterface>(mut stealer: P::Stealer, state: StateRef<P>) {
-    while let Some(work) = stealer.next_blocking() {
+    while let Some(job) = stealer.next_blocking() {
         if state.shutdown.is_shutdown() {
             return;
         }
 
-        state.process_work(work);
+        state.process_work(job);
     }
 }
 

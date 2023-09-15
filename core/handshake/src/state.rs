@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
@@ -117,6 +118,10 @@ pub struct Connection<H: ServiceHandleInterface> {
     last_connection_time: u64,
     /// Cached handle to the service.
     handle: H,
+    /// Sequence id for outgoing payloads
+    sequence_id: u16,
+    /// Buffer for outgoing payloads
+    payload_buffer: BTreeMap<u16, Vec<u8>>,
 }
 
 pub struct ProcessHandshakeResult {
@@ -161,6 +166,8 @@ impl<P: ExecutorProviderInterface> StateData<P> {
             expiry_time: 0,
             last_connection_time: now(),
             handle: handle.clone(),
+            sequence_id: 0,
+            payload_buffer: BTreeMap::new(),
         };
 
         self.connections.insert(connection_id, connection);
@@ -397,17 +404,37 @@ impl<P: ExecutorProviderInterface> StateData<P> {
         }
     }
 
-    fn handle_send_work(&self, connection_id: u64, payload: Vec<u8>) {
+    fn handle_send_work(&self, connection_id: u64, mut sequence_id: u16, payload: Vec<u8>) {
         let Some(mut connection) = self.connections.get_mut(&connection_id) else {
             return;
         };
 
-        // Always send the service payload to the connection with lowest permission,
-        // if there is no transport connected, we drop the data.
-        if let Some(sender) = connection.senders.iter_mut().rev().flatten().next() {
-            sender.send(schema::ResponseFrame::ServicePayload {
-                bytes: payload.into(),
-            });
+        if connection.sequence_id != sequence_id {
+            // This is not the next message
+            connection.payload_buffer.insert(sequence_id, payload);
+            return;
+        }
+
+        // Collect any next payloads available to send
+        sequence_id = sequence_id.wrapping_add(1);
+        let mut messages = vec![payload];
+        while let Some(payload) = connection.payload_buffer.remove(&sequence_id) {
+            messages.push(payload);
+            sequence_id = sequence_id.wrapping_add(1);
+        }
+
+        // Set the next sequence_id for the next call to this function
+        connection.sequence_id = sequence_id;
+
+        // Finally, send all the messages we have
+        if let Some(sender) = connection.senders.iter_mut().flatten().last() {
+            // Always send the service payload to the connection with lowest permission,
+            // if there is no transport connected, we drop the data.
+            for payload in messages {
+                sender.send(schema::ResponseFrame::ServicePayload {
+                    bytes: payload.into(),
+                });
+            }
         }
     }
 
@@ -429,9 +456,10 @@ impl<P: ExecutorProviderInterface> StateData<P> {
         match request {
             ConnectionWork::Send {
                 connection_id,
+                sequence_id,
                 payload,
             } => {
-                self.handle_send_work(connection_id, payload);
+                self.handle_send_work(connection_id, sequence_id, payload);
             },
             ConnectionWork::Close { connection_id } => {
                 self.handle_close_work(connection_id);
