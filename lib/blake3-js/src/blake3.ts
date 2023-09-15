@@ -58,7 +58,7 @@ function compress(
   let s_10 = 0x3C6EF372;
   let s_11 = 0xA54FF53A;
   let s_12 = counter | 0;
-  let s_13 = (counter >> 32) | 0;
+  let s_13 = (counter / 0x100000000) | 0;
   let s_14 = blockLen | 0;
   let s_15 = flags;
   const m_0 = blockWords[blockWordsOffset + 0];
@@ -944,9 +944,7 @@ export function hash(payload: Uint8Array) {
       false,
     );
 
-    cvStackCurrentOffset += 8;
-
-    while (cvStackCurrentOffset > 16) {
+    while (cvStackCurrentOffset > 8) {
       cvStackCurrentOffset -= 8;
 
       compress(

@@ -1,6 +1,6 @@
 {
   "tasks": {},
   "compilerOptions": {
-    "lib": ["deno.ns"]
+    "lib": ["deno.ns", "dom"]
   }
 }

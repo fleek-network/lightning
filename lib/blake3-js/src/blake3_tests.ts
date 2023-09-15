@@ -20,6 +20,7 @@ Deno.test({
       const [size, expectedHash] = VECTOR[id]! as [number, string];
       const input = new Uint8Array(buffer.buffer, 0, size);
       const actualHash = buf2hex(hash(input));
+      // console.log(size, actualHash == expectedHash);
       assertStrictEquals(actualHash, expectedHash, `size=${size}` + input);
     }
   },
