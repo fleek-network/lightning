@@ -48,40 +48,41 @@ impl Cli {
             _3_or_more => LevelFilter::Trace,
         };
 
-        let stdout = ConsoleAppender::builder()
-            .encoder(Box::new(PatternEncoder::new(
-                "{d(%Y-%m-%d %H:%M:%S)(utc)} | {h({l}):5.5} | {M} - {f}:{L} - {m}{n}",
-            )))
+        let fmt = "{d(%Y-%m-%d %H:%M:%S)(utc)} | {h({l}):5.5} | {M} - {f}:{L} - {m}{n}";
+
+        let stdout_appender = ConsoleAppender::builder()
+            .encoder(Box::new(PatternEncoder::new(fmt)))
             .build();
 
-        let log_file = std::env::temp_dir().join("lightning.log");
-        let size_trigger = SizeTrigger::new(150 * 1024 * 1024); // 150 MB
-        let roller = FixedWindowRoller::builder()
+        let file_rolling_appender = RollingFileAppender::builder()
+            .encoder(Box::new(PatternEncoder::new(fmt)))
             .build(
-                std::env::temp_dir()
-                    .join("lightning.log.{}.gz")
-                    .to_str()
-                    .unwrap(),
-                10,
+                std::env::temp_dir().join("lightning.log"), // /tmp/lightning.log
+                // compound policy
+                Box::new(CompoundPolicy::new(
+                    // trigger
+                    Box::new(SizeTrigger::new(150 * 1024 * 1024)), // 150 MB
+                    // roller
+                    Box::new(
+                        FixedWindowRoller::builder()
+                            .build(
+                                std::env::temp_dir()
+                                    .join("lightning.log.{}.gz")
+                                    .to_str()
+                                    .unwrap(),
+                                10,
+                            )
+                            .unwrap(),
+                    ),
+                )),
             )
             .unwrap();
-        let policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(roller));
 
-        let rolling_appender = RollingFileAppender::builder()
-            .encoder(Box::new(PatternEncoder::new(
-                "{d(%Y-%m-%d %H:%M:%S)(utc)} | {h({l}):5.5} | {M} - {f}:{L} - {m}{n}",
-            )))
-            .build(log_file, Box::new(policy))
-            .unwrap();
-
-        let mut custom_loggers = Vec::new();
         // the bullshark logger is ignored for console only
         let bullshark_ignore_logger = Logger::builder()
             .appenders(vec!["file"])
             .additive(false)
             .build("narwhal_consensus::bullshark", LevelFilter::Trace);
-
-        custom_loggers.push(bullshark_ignore_logger);
 
         let custom_filter = CustomLogFilter::new()
             .insert("quinn", LevelFilter::Off)
@@ -91,15 +92,15 @@ impl Cli {
             .appender(
                 Appender::builder()
                     .filter(Box::new(custom_filter.clone()))
-                    .build("file", Box::new(rolling_appender)),
+                    .build("file", Box::new(file_rolling_appender)),
             )
             .appender(
                 Appender::builder()
                     .filter(Box::new(ThresholdFilter::new(log_filter)))
                     .filter(Box::new(custom_filter))
-                    .build("stdout", Box::new(stdout)),
+                    .build("stdout", Box::new(stdout_appender)),
             )
-            .loggers(custom_loggers)
+            .loggers(vec![bullshark_ignore_logger])
             .build(
                 Root::builder()
                     .appender("file")
