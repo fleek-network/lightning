@@ -67,6 +67,7 @@ dataChan.onmessage = (e: MessageEvent) => {
   if (decoded && decoded.tag === schema.Response.Tag.ServicePayload) {
     const size = decoded.bytes.byteLength;
     const index = decoded.bytes[size - 1];
+    console.log("received chunk", index);
     const slice = decoded.bytes.slice(0, size - 1);
 
     if (bytesRead == 0) {
@@ -150,7 +151,7 @@ pc.onnegotiationneeded = async (e) => {
 const startSession = async () => {
   console.log("sending sdp signal");
 
-  const res = await fetch("http://bench.draco.network:4210/sdp", {
+  const res = await fetch("http://localhost:4210/sdp", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
