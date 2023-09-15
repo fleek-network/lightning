@@ -4,15 +4,16 @@ mod worker;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use affair::{Executor, TokioSpawn};
+use affair::{Executor, Socket, TokioSpawn};
 use async_trait::async_trait;
+use bytes::Bytes;
 use log::error;
 use serde::{Deserialize, Serialize};
 use webrtc::data_channel::data_channel_message::DataChannelMessage;
 use webrtc::data_channel::RTCDataChannel;
 
 use self::signal::start_signaling_server;
-use self::worker::IncomingConnectionWorker;
+use self::worker::{IncomingConnectionWorker, SendWorker};
 use super::{Transport, TransportReceiver, TransportSender};
 use crate::schema::{self, HandshakeRequestFrame, RequestFrame};
 use crate::shutdown::ShutdownWaiter;
@@ -89,21 +90,22 @@ impl Transport for WebRtcTransport {
         ));
 
         let receiver = WebRtcReceiver(rx);
-        let sender = WebRtcSender(data_channel);
+        let socket = TokioSpawn::spawn_async(SendWorker(data_channel));
+        let sender = WebRtcSender(socket);
 
         Some((req, sender, receiver))
     }
 }
 
 /// Sender for a webrtc connection.
-pub struct WebRtcSender(Arc<RTCDataChannel>);
+pub struct WebRtcSender(Socket<Bytes, ()>);
 
 macro_rules! webrtc_send {
-    ($t1:expr, $t2:expr) => {
-        let data_channel = $t1.0.clone();
-        let bytes = $t2.encode();
-        tokio::spawn(async move {
-            if let Err(e) = data_channel.send(&bytes).await {
+    ($self:expr, $frame:expr) => {
+        let socket = $self.0.clone();
+        let bytes = $frame.encode();
+        futures::executor::block_on(async move {
+            if let Err(e) = socket.enqueue(bytes).await {
                 error!("failed to send message to peer: {e}");
             };
         });

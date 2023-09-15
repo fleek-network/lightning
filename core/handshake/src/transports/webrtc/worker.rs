@@ -3,6 +3,7 @@ use std::sync::Arc;
 use affair::AsyncWorker;
 use anyhow::anyhow;
 use async_trait::async_trait;
+use bytes::Bytes;
 use log::{debug, error};
 use webrtc::api::interceptor_registry::register_default_interceptors;
 use webrtc::api::media_engine::MediaEngine;
@@ -135,5 +136,20 @@ impl AsyncWorker for IncomingConnectionWorker {
 
         // return our local description
         Ok(response)
+    }
+}
+
+// TODO: Use or create a webrtc library that doesn't require silly things
+pub struct SendWorker(pub Arc<RTCDataChannel>);
+
+#[async_trait]
+impl AsyncWorker for SendWorker {
+    type Request = Bytes;
+    type Response = ();
+
+    async fn handle(&mut self, req: Self::Request) -> Self::Response {
+        if let Err(e) = self.0.send(&req).await {
+            error!("Failed to send payload: {e}");
+        }
     }
 }
