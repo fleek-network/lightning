@@ -3,19 +3,31 @@
 
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::Arc;
 use std::task::Poll;
 
+use dashmap::DashMap;
 use lightning_interfaces::{ConnectionWork, ConnectionWorkStealer};
 use tokio::pin;
 
 pub fn chan() -> (CommandSender, CommandStealer) {
     let (sender, receiver) = async_channel::unbounded();
-    (CommandSender { sender }, CommandStealer { receiver })
+    (CommandSender::new(sender), CommandStealer { receiver })
 }
 
-#[derive(Clone)]
 pub struct CommandSender {
     sender: async_channel::Sender<ConnectionWork>,
+    sequence_map: Arc<DashMap<u64, AtomicU16>>,
+}
+
+impl Clone for CommandSender {
+    fn clone(&self) -> Self {
+        Self {
+            sender: self.sender.clone(),
+            sequence_map: self.sequence_map.clone(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -24,7 +36,24 @@ pub struct CommandStealer {
 }
 
 impl CommandSender {
+    fn new(sender: async_channel::Sender<ConnectionWork>) -> Self {
+        Self {
+            sender,
+            sequence_map: DashMap::new().into(),
+        }
+    }
+
+    pub fn next_sequence_id(&self, connection_id: u64) -> u16 {
+        self.sequence_map
+            .entry(connection_id)
+            .or_default()
+            .fetch_add(1, Ordering::Relaxed)
+    }
+
     pub async fn put(&self, work: ConnectionWork) {
+        if let ConnectionWork::Send { sequence_id, .. } = work {
+            println!("EXECUTOR storing {sequence_id}");
+        };
         self.sender
             .send(work)
             .await

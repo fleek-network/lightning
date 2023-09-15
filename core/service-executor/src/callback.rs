@@ -10,12 +10,12 @@ pub fn make_callback(
 ) -> Box<dyn Fn(IpcRequest) + Send + Sync> {
     Box::new(move |request: IpcRequest| {
         let scheduler = scheduler.clone();
-        tokio::spawn(handle_request(cb, scheduler, request));
+        handle_request(cb, scheduler, request);
     })
 }
 
 #[inline(always)]
-async fn handle_request(
+fn handle_request(
     _cb: fn(OnEventResponseArgs),
     scheduler: CommandSender,
     IpcRequest {
@@ -25,19 +25,25 @@ async fn handle_request(
 ) {
     match request {
         fn_sdk::internal::Request::ConnectionClose { connection_id } => {
-            scheduler.put(ConnectionWork::Close { connection_id }).await;
+            tokio::spawn(
+                async move { scheduler.put(ConnectionWork::Close { connection_id }).await },
+            );
             assert!(request_ctx.is_none());
         },
         fn_sdk::internal::Request::ConnectionSendData {
             connection_id,
             buffer,
         } => {
-            scheduler
-                .put(ConnectionWork::Send {
-                    connection_id,
-                    payload: buffer,
-                })
-                .await;
+            let sequence_id = scheduler.next_sequence_id(connection_id);
+            tokio::spawn(async move {
+                scheduler
+                    .put(ConnectionWork::Send {
+                        sequence_id,
+                        connection_id,
+                        payload: buffer,
+                    })
+                    .await
+            });
             assert!(request_ctx.is_none());
         },
         fn_sdk::internal::Request::QueryClientBalance { pk: _ } => todo!(),

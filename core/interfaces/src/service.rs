@@ -71,6 +71,7 @@ pub trait ConnectionWorkStealer: Clone + Send + Sync + 'static {
 pub enum ConnectionWork {
     Send {
         connection_id: u64,
+        sequence_id: u16,
         payload: Vec<u8>,
     },
     Close {
