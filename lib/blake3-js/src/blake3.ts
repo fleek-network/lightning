@@ -14,6 +14,7 @@ const KEYED_HASH = 1 << 4;
 const DERIVE_KEY_CONTEXT = 1 << 5;
 const DERIVE_KEY_MATERIAL = 1 << 6;
 
+// The first word of the decimal places of the square root of the first 8 primes.
 const IV = new Uint32Array([
   0x6A09E667,
   0xBB67AE85,
@@ -24,8 +25,13 @@ const IV = new Uint32Array([
   0x1F83D9AB,
   0x5BE0CD19,
 ]);
-
+// Blake3 is really little endian friendly, given +95% of devices running the client
+// are indeed little endian, we can do some optimizations in regards to that.
 const IsBigEndian = !(new Uint8Array(new Uint32Array([1]).buffer)[0]);
+// Allocate two global arrays that we can reuse for every call to hash.
+const blockWords = new Uint32Array(16);
+// [[u32; 8]; 54]
+const cvStackBuffer = new Uint32Array(432);
 
 function compress(
   chainingValue: Uint32Array,
@@ -805,10 +811,6 @@ function readLittleEndianWordsPartial(
   }
 }
 
-// Allocate two global arrays that we can reuse.
-const blockWords = new Uint32Array(16);
-const cvStackBuffer = new Uint32Array(432);
-
 export function hash(payload: Uint8Array) {
   const payloadWords = new Uint32Array(
     payload.buffer,
@@ -905,68 +907,78 @@ export function hash(payload: Uint8Array) {
     );
   }
 
-  // TODO: Handle proper finalization.
+  // There are two path in the code here. One case is that there is nothing in
+  // the stack and that this block needs to be finalized. And the other is the
+  // opposite, we have entries in the stack which we should merge.
 
-  // Process last block. If there are nothing in the stack, we finalize here. And
-  // capture the last 8 bytes as well. At the same time, we need to set the `ROOT`
-  // flag when calling compress.
-  const IS_FINALIZED = cvStackCurrentOffset === 0;
-  // The other difference here for a finalized compress is that instead of the chunkCounter
-  // we would have to pass the outputBlockCounter
-  let outputBlockCounter = 0;
-  // Compute the number of items in the stack.
-  let parentNodesRemaining = cvStackCurrentOffset >> 3;
+  let finalChainingValue: Uint32Array;
+  let finalBlockWords: Uint32Array;
+  let finalBlockLen: number;
+  let finalFlags: Word;
 
   readLittleEndianWordsPartial(payload, offset, blockWords);
-  compress(
-    cvStackBuffer,
-    cvStackCurrentOffset,
-    blockWords,
-    0,
-    IS_FINALIZED ? outputBlockCounter : chunkCounter,
-    length - offset,
-    flags | CHUNK_END | (fullBlocks === 0 ? CHUNK_START : 0) |
-      (IS_FINALIZED ? ROOT : 0),
-    cvStackBuffer,
-    cvStackCurrentOffset,
-    IS_FINALIZED,
-  );
 
-  while (parentNodesRemaining > 0) {
-    parentNodesRemaining -= 1;
+  if (cvStackCurrentOffset === 0) {
+    finalChainingValue = cvStackBuffer;
+    finalBlockWords = blockWords;
+    finalBlockLen = length - offset;
+    finalFlags = flags | ROOT | CHUNK_END |
+      (fullBlocks === 0 ? CHUNK_START : 0);
+  } else {
+    finalChainingValue = keyWords;
+    finalBlockWords = cvStackBuffer;
+    finalBlockLen = BLOCK_LEN;
+    finalFlags = flags | PARENT | ROOT;
 
-    // chainingValue: Uint32Array,
-    // chainingValueOffset: number,
-    // blockWords: Uint32Array,
-    // blockWordsOffset: number,
-    // counter: number,
-    // blockLen: Word,
-    // flags: Word,
-    // outBuffer: Uint32Array,
-    // outBufferOffset: number,
-    // keepLast8Byte: boolean,
+    // Compress the last chunk
     compress(
-      keyWords,
-      0,
       cvStackBuffer,
       cvStackCurrentOffset,
+      blockWords,
       0,
-      BLOCK_LEN,
-      flags | PARENT,
+      chunkCounter,
+      length - offset,
+      flags | CHUNK_END | (fullBlocks === 0 ? CHUNK_START : 0),
       cvStackBuffer,
       cvStackCurrentOffset,
       false,
     );
 
-    // output = parentOutput(
-    //   this.cvStack[parentNodesRemaining],
-    //   chainingValueOutput(output),
-    //   this.keyWords,
-    //   this.flags,
-    // );
+    cvStackCurrentOffset += 8;
+
+    while (cvStackCurrentOffset > 16) {
+      cvStackCurrentOffset -= 8;
+
+      compress(
+        keyWords,
+        0,
+        cvStackBuffer,
+        cvStackCurrentOffset,
+        0,
+        BLOCK_LEN,
+        flags | PARENT,
+        cvStackBuffer,
+        cvStackCurrentOffset,
+        false,
+      );
+    }
   }
 
-  // Finalize.
-  // TODO:
+  // 'loop: %outputBlockCounter
+  const outputBlockCounter = 0;
+  compress(
+    finalChainingValue,
+    0,
+    finalBlockWords,
+    0,
+    outputBlockCounter,
+    finalBlockLen,
+    finalFlags,
+    // reuse cvStackBuffer.
+    cvStackBuffer,
+    0,
+    true,
+  );
+
   return (new Uint8Array(cvStackBuffer.buffer, 0, 32)).slice(0);
 }
