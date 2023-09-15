@@ -72,25 +72,25 @@ pub struct WebTransportSender {
     tx: Sender<Vec<u8>>,
 }
 
+macro_rules! webtransport_send {
+    ($t1:expr, $t2:expr) => {
+        let tx = $t1.tx.clone();
+        let bytes = $t2.encode();
+        tokio::spawn(async move {
+            if let Err(e) = tx.send(bytes.to_vec()).await {
+                log::error!("failed to send payload to connection loop: {e}");
+            };
+        });
+    };
+}
+
 impl TransportSender for WebTransportSender {
     fn send_handshake_response(&mut self, response: HandshakeResponse) {
-        let tx = self.tx.clone();
-        let data = response.encode();
-        tokio::spawn(async move {
-            if tx.send(data.to_vec()).await.is_err() {
-                log::error!("failed to send data to connection loop");
-            }
-        });
+        webtransport_send!(self, response);
     }
 
     fn send(&mut self, frame: ResponseFrame) {
-        let tx = self.tx.clone();
-        let data = frame.encode();
-        tokio::spawn(async move {
-            if tx.send(data.to_vec()).await.is_err() {
-                log::error!("failed to send data to connection loop");
-            }
-        });
+        webtransport_send!(self, frame);
     }
 }
 
