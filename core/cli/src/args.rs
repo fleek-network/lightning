@@ -4,7 +4,7 @@ use clap::{arg, ArgAction, Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(about, version)]
-pub struct CliArgs {
+pub struct Args {
     /// Path to the toml configuration file
     #[arg(short, long, default_value_t = format!("{}/.lightning/config.toml", env!("HOME")))]
     pub config: String,
@@ -25,9 +25,9 @@ pub struct CliArgs {
 pub enum Command {
     /// Start the node.
     Run,
-    /// Handle keys.
+    /// Handle key
     #[command(subcommand)]
-    Keys(Keys),
+    Key(KeySubCmd),
     /// Print the loaded configuration.
     ///
     /// By default this command prints the loaded configuration.
@@ -38,11 +38,11 @@ pub enum Command {
     },
     /// Dev only sub commands. These are hidden by default.
     #[command(subcommand, hide = true)]
-    Dev(Dev),
+    Dev(DevSubCmd),
 }
 
 #[derive(Subcommand, Clone)]
-pub enum Dev {
+pub enum DevSubCmd {
     /// Initialize every service without starting the node.
     InitOnly,
     /// Show the order at which the execution will happen.
@@ -54,7 +54,7 @@ pub enum Dev {
 }
 
 #[derive(Subcommand)]
-pub enum Keys {
+pub enum KeySubCmd {
     /// Print the keys.
     Show,
     /// Generate new keys.
