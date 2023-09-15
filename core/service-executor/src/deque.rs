@@ -51,9 +51,6 @@ impl CommandSender {
     }
 
     pub async fn put(&self, work: ConnectionWork) {
-        if let ConnectionWork::Send { sequence_id, .. } = work {
-            println!("EXECUTOR storing {sequence_id}");
-        };
         self.sender
             .send(work)
             .await
