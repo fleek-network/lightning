@@ -1311,6 +1311,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "cdk-rust"
+version = "0.0.0"
+
+[[package]]
 name = "cexpr"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
