@@ -1,3 +1,4 @@
+use crate::client::Pipe;
 use crate::mode::{Mode, PrimaryMode, SecondaryMode};
 use crate::transport::Transport;
 
@@ -56,8 +57,8 @@ impl<T: Transport> Builder<SecondaryMode, T> {
         }
     }
 
-    /// Builds a client.
-    pub fn client(self) {
+    /// Builds a pipe for sending and receiving data.
+    pub fn pipe(self) -> Pipe {
         todo!()
     }
 

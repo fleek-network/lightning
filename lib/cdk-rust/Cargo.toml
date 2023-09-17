@@ -9,4 +9,6 @@ repository = "https://github.com/fleek-network/lightning"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-
+anyhow = "1.0"
+bytes = "1.4"
+tokio = { version = "1.32", features = ["rt-multi-thread", "sync"] }

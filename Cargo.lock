@@ -1313,6 +1313,11 @@ dependencies = [
 [[package]]
 name = "cdk-rust"
 version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "tokio",
+]
 
 [[package]]
 name = "cexpr"
