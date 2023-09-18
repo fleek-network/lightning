@@ -1137,7 +1137,7 @@ impl<B: Backend> State<B> {
         let committee_size = self.parameters.get(&ProtocolParams::CommitteeSize).unwrap();
         let num_of_nodes = node_registry.len() as u128;
         // if total number of nodes are less than committee size, all nodes are part of committee
-        if committee_size >= num_of_nodes.into() {
+        if committee_size >= num_of_nodes {
             return node_registry;
         }
 
