@@ -1,7 +1,8 @@
-use std::fs::remove_file;
+use std::fs::{read_to_string, remove_file};
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
+use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::signer::SignerInterface;
@@ -14,7 +15,7 @@ use crate::node::FinalTypes;
 
 pub async fn exec(key: KeySubCmd, config_path: ResolvedPathBuf) -> Result<()> {
     match key {
-        KeySubCmd::Show => show_key().await,
+        KeySubCmd::Show => show_key::<FinalTypes>(config_path).await,
         KeySubCmd::Generate => generate_key::<FinalTypes>(config_path).await,
     }
 }
@@ -58,7 +59,33 @@ async fn generate_key<C: Collection<SignerInterface = Signer<C>>>(
     Ok(())
 }
 
-async fn show_key() -> Result<()> {
+async fn show_key<C: Collection<SignerInterface = Signer<C>>>(
+    config_path: ResolvedPathBuf,
+) -> Result<()> {
+    let config = Arc::new(load_or_write_config::<C>(config_path).await?);
+    let signer_config = config.get::<C::SignerInterface>();
+    if signer_config.node_key_path.exists() {
+        let node_secret_key = read_to_string(&signer_config.node_key_path)
+            .with_context(|| "Failed to read node pem file")?;
+        let node_secret_key = NodeSecretKey::decode_pem(&node_secret_key)
+            .with_context(|| "Failed to decode node pem file")?;
+        println!("Node Public Key: {}", node_secret_key.to_pk().to_base64());
+    } else {
+        eprintln!("Node Public Key: does not exist");
+    }
+
+    if signer_config.consensus_key_path.exists() {
+        let consensus_secret_key = read_to_string(&signer_config.consensus_key_path)
+            .with_context(|| "Failed to read consensus pem file")?;
+        let consensus_secret_key = ConsensusSecretKey::decode_pem(&consensus_secret_key)
+            .with_context(|| "Failed to decode consensus pem file")?;
+        println!(
+            "Consensus Public Key: {}",
+            consensus_secret_key.to_pk().to_base64()
+        );
+    } else {
+        eprintln!("Consensus Public Key: does not exist");
+    }
     Ok(())
 }
 
