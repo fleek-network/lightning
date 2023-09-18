@@ -4,7 +4,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Context, Result};
 use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_interfaces::config::ConfigProviderInterface;
-use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::signer::SignerInterface;
 use lightning_signer::Signer;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -23,7 +23,7 @@ pub async fn exec(key: KeySubCmd, config_path: ResolvedPathBuf) -> Result<()> {
 async fn generate_key<C: Collection<SignerInterface = Signer<C>>>(
     config_path: ResolvedPathBuf,
 ) -> Result<()> {
-    let config = Arc::new(load_or_write_config::<C>(config_path).await?);
+    let config = Arc::new(TomlConfigProvider::<C>::load_or_write_config(config_path).await?);
     let signer_config = config.get::<C::SignerInterface>();
 
     if signer_config.node_key_path.exists() {
@@ -62,7 +62,7 @@ async fn generate_key<C: Collection<SignerInterface = Signer<C>>>(
 async fn show_key<C: Collection<SignerInterface = Signer<C>>>(
     config_path: ResolvedPathBuf,
 ) -> Result<()> {
-    let config = Arc::new(load_or_write_config::<C>(config_path).await?);
+    let config = Arc::new(TomlConfigProvider::<C>::load_or_write_config(config_path).await?);
     let signer_config = config.get::<C::SignerInterface>();
     if signer_config.node_key_path.exists() {
         let node_secret_key = read_to_string(&signer_config.node_key_path)
@@ -87,17 +87,4 @@ async fn show_key<C: Collection<SignerInterface = Signer<C>>>(
         eprintln!("Consensus Public Key: does not exist");
     }
     Ok(())
-}
-
-async fn load_or_write_config<C: Collection>(
-    config_path: ResolvedPathBuf,
-) -> Result<TomlConfigProvider<C>> {
-    let config = TomlConfigProvider::open(&config_path)?;
-    Node::<C>::fill_configuration(&config);
-
-    if !config_path.exists() {
-        std::fs::write(&config_path, config.serialize_config())?;
-    }
-
-    Ok(config)
 }
