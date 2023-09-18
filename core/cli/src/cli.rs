@@ -36,7 +36,7 @@ impl Cli {
             Command::Run => run::exec().await,
             Command::Key(cmd) => key::exec(cmd, config_path).await,
             Command::PrintConfig { default } => print_config::exec(default, config_path).await,
-            Command::Dev(cmd) => dev::exec(cmd).await,
+            Command::Dev(cmd) => dev::exec(cmd, config_path).await,
         }
     }
 

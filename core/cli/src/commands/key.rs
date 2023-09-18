@@ -13,8 +13,8 @@ use crate::args::KeySubCmd;
 use crate::config::TomlConfigProvider;
 use crate::node::FinalTypes;
 
-pub async fn exec(key: KeySubCmd, config_path: ResolvedPathBuf) -> Result<()> {
-    match key {
+pub async fn exec(cmd: KeySubCmd, config_path: ResolvedPathBuf) -> Result<()> {
+    match cmd {
         KeySubCmd::Show => show_key::<FinalTypes>(config_path).await,
         KeySubCmd::Generate => generate_key::<FinalTypes>(config_path).await,
     }
