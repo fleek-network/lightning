@@ -34,7 +34,7 @@ impl Cli {
 
         match self.args.cmd {
             Command::Run => run::exec().await,
-            Command::Key(cmd) => key::exec(cmd).await,
+            Command::Key(cmd) => key::exec(cmd, config_path).await,
             Command::PrintConfig { default } => print_config::exec(default, config_path).await,
             Command::Dev(cmd) => dev::exec(cmd).await,
         }

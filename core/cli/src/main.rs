@@ -1,6 +1,8 @@
 mod args;
 mod cli;
 mod commands;
+mod config;
+mod node;
 mod utils;
 
 use std::process::exit;
