@@ -2,9 +2,9 @@ mod args;
 mod cli;
 mod commands;
 mod config;
-mod node;
 mod shutdown;
 mod testnet_sync;
+mod types;
 mod utils;
 
 use std::process::exit;
@@ -17,7 +17,7 @@ use crate::args::Args;
 #[tokio::main]
 async fn main() {
     let cli = Cli::new(Args::parse());
-    if let Err(err) = cli.run().await {
+    if let Err(err) = cli.exec().await {
         eprintln!("Command Failed.");
         eprintln!("Error: {err}");
         exit(-1);

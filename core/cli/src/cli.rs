@@ -17,7 +17,7 @@ use crate::args::{Args, Command};
 use crate::commands::run::CustomStartShutdown;
 use crate::commands::{dev, key, print_config, run};
 use crate::config::TomlConfigProvider;
-use crate::node::{FinalTypes, WithMockConsensus};
+use crate::types::{FinalTypes, WithMockConsensus};
 use crate::utils::fs::ensure_parent_exist;
 use crate::utils::log_filter::CustomLogFilter;
 
@@ -30,7 +30,7 @@ impl Cli {
         Self { args }
     }
 
-    pub async fn run(self) -> Result<()> {
+    pub async fn exec(self) -> Result<()> {
         self.setup();
 
         let config_path = ResolvedPathBuf::try_from(self.args.config.as_str())
@@ -38,12 +38,15 @@ impl Cli {
         ensure_parent_exist(&config_path)?;
 
         match self.args.with_mock_consensus {
-            true => self.exec::<WithMockConsensus>(config_path, None).await,
-            false => self.exec::<FinalTypes>(config_path, None).await,
+            true => {
+                log::info!("Using MockConsensus");
+                self.run::<WithMockConsensus>(config_path, None).await
+            },
+            false => self.run::<FinalTypes>(config_path, None).await,
         }
     }
 
-    async fn exec<C>(
+    async fn run<C>(
         self,
         config_path: ResolvedPathBuf,
         custom_start_shutdown: Option<CustomStartShutdown<C>>,
