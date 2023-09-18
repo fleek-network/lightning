@@ -6,7 +6,12 @@ use lightning_consensus::consensus::Consensus;
 use lightning_dht::dht::Dht;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_handshake::handshake::Handshake;
-use lightning_interfaces::infu_collection::{Collection, CollectionBase};
+use lightning_interfaces::infu_collection::{
+    Collection,
+    CollectionBase,
+    ConsensusInterfaceContainer,
+    ConsensusInterfaceModifier,
+};
 use lightning_notifier::Notifier;
 use lightning_origin_ipfs::IPFSOrigin;
 use lightning_rep_collector::ReputationAggregator;
@@ -15,6 +20,7 @@ use lightning_rpc::server::Rpc;
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 use lightning_topology::Topology;
+use mock::consensus::MockConsensus;
 
 use crate::config::TomlConfigProvider;
 
@@ -43,15 +49,12 @@ impl CollectionBase for FinalTypes {
     type FetcherInterface<C: Collection> = Fetcher<C>;
 }
 
-/*
- * // Create the collection modifier that can inject the mock consensus
- * // into the FinalTypes (or other collections.).
- *
- * pub struct UseMockConsensusMarker;
- * impl ConsensusInterfaceContainer for UseMockConsensusMarker {
- *     type ConsensusInterface<C: Collection> = MockConsensus<C>;
- * }
- *
- * pub type WithMockConsensus<O = FinalTypes> =
- * ConsensusInterfaceModifier<UseMockConsensusMarker, O>;
- */
+// Create the collection modifier that can inject the mock consensus
+// into the FinalTypes (or other collections.).
+
+pub struct UseMockConsensusMarker;
+impl ConsensusInterfaceContainer for UseMockConsensusMarker {
+    type ConsensusInterface<C: Collection> = MockConsensus<C>;
+}
+
+pub type WithMockConsensus<O = FinalTypes> = ConsensusInterfaceModifier<UseMockConsensusMarker, O>;

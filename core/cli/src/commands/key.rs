@@ -11,12 +11,14 @@ use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::args::KeySubCmd;
 use crate::config::TomlConfigProvider;
-use crate::node::FinalTypes;
 
-pub async fn exec(cmd: KeySubCmd, config_path: ResolvedPathBuf) -> Result<()> {
+pub async fn exec<C: Collection<SignerInterface = Signer<C>>>(
+    cmd: KeySubCmd,
+    config_path: ResolvedPathBuf,
+) -> Result<()> {
     match cmd {
-        KeySubCmd::Show => show_key::<FinalTypes>(config_path).await,
-        KeySubCmd::Generate => generate_key::<FinalTypes>(config_path).await,
+        KeySubCmd::Show => show_key::<C>(config_path).await,
+        KeySubCmd::Generate => generate_key::<C>(config_path).await,
     }
 }
 

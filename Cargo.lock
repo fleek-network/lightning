@@ -3760,6 +3760,7 @@ name = "lightning-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "atomo-rocks",
  "clap 4.4.2",
  "fleek-crypto",
  "infusion",
@@ -3780,12 +3781,17 @@ dependencies = [
  "lightning-service-executor",
  "lightning-signer",
  "lightning-topology",
+ "lightning-types",
  "log",
  "log4rs",
  "mock",
+ "reqwest",
  "resolved-pathbuf",
+ "serde",
+ "serde_json",
  "tokio",
  "toml 0.7.6",
+ "tracing",
 ]
 
 [[package]]

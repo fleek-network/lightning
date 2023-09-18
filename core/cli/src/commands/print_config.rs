@@ -4,12 +4,11 @@ use lightning_interfaces::infu_collection::{Collection, Node};
 use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::config::TomlConfigProvider;
-use crate::node::FinalTypes;
 
-pub async fn exec(default: bool, config_path: ResolvedPathBuf) -> Result<()> {
+pub async fn exec<C: Collection>(default: bool, config_path: ResolvedPathBuf) -> Result<()> {
     match default {
-        true => print_default::<FinalTypes>().await,
-        false => print::<FinalTypes>(config_path).await,
+        true => print_default::<C>().await,
+        false => print::<C>(config_path).await,
     }
 }
 

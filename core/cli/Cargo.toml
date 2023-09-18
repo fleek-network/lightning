@@ -23,6 +23,7 @@ lightning-rpc = { path = "../rpc" }
 lightning-service-executor = { path = "../service-executor" }
 lightning-signer = { path = "../signer" }
 lightning-topology = { path = "../topology" }
+lightning-types = { path = "../types" }
 mock = { path = "../mock" }
 tokio.workspace = true
 clap = { version = "4.4.2", features = ["derive"] }
@@ -39,3 +40,8 @@ log.workspace = true
 toml = "0.7"
 infusion.workspace = true
 fleek-crypto.workspace = true
+tracing = "0.1"
+serde.workspace = true
+atomo-rocks.workspace = true
+serde_json = "1.0"
+reqwest = { version = "0.11", features = ["json"] }

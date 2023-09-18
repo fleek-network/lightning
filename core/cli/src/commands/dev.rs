@@ -10,14 +10,16 @@ use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::args::DevSubCmd;
 use crate::config::TomlConfigProvider;
-use crate::node::FinalTypes;
 
-pub async fn exec(cmd: DevSubCmd, config_path: ResolvedPathBuf) -> Result<()> {
+pub async fn exec<C>(cmd: DevSubCmd, config_path: ResolvedPathBuf) -> Result<()>
+where
+    C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
+{
     match cmd {
-        DevSubCmd::InitOnly => init::<FinalTypes>(config_path).await,
-        DevSubCmd::ShowOrder => show_order::<FinalTypes>().await,
-        DevSubCmd::DepGraph => dep_graph::<FinalTypes>().await,
-        DevSubCmd::Store { input } => store::<FinalTypes>(input, config_path).await,
+        DevSubCmd::InitOnly => init::<C>(config_path).await,
+        DevSubCmd::ShowOrder => show_order::<C>().await,
+        DevSubCmd::DepGraph => dep_graph::<C>().await,
+        DevSubCmd::Store { input } => store::<C>(input, config_path).await,
     }
 }
 

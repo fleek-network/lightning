@@ -1,4 +1,6 @@
 use anyhow::Result;
+use lightning_interfaces::infu_collection::Collection;
+use lightning_signer::Signer;
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
@@ -12,7 +14,10 @@ use log4rs::filter::threshold::ThresholdFilter;
 use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::args::{Args, Command};
+use crate::commands::run::CustomStartShutdown;
 use crate::commands::{dev, key, print_config, run};
+use crate::config::TomlConfigProvider;
+use crate::node::{FinalTypes, WithMockConsensus};
 use crate::utils::fs::ensure_parent_exist;
 use crate::utils::log_filter::CustomLogFilter;
 
@@ -32,11 +37,25 @@ impl Cli {
             .expect("Failed to resolve config path");
         ensure_parent_exist(&config_path)?;
 
+        match self.args.with_mock_consensus {
+            true => self.exec::<WithMockConsensus>(config_path, None).await,
+            false => self.exec::<FinalTypes>(config_path, None).await,
+        }
+    }
+
+    async fn exec<C>(
+        self,
+        config_path: ResolvedPathBuf,
+        custom_start_shutdown: Option<CustomStartShutdown<C>>,
+    ) -> Result<()>
+    where
+        C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterface = Signer<C>>,
+    {
         match self.args.cmd {
-            Command::Run => run::exec().await,
-            Command::Key(cmd) => key::exec(cmd, config_path).await,
-            Command::PrintConfig { default } => print_config::exec(default, config_path).await,
-            Command::Dev(cmd) => dev::exec(cmd, config_path).await,
+            Command::Run => run::exec::<C>(config_path, custom_start_shutdown).await,
+            Command::Key(cmd) => key::exec::<C>(cmd, config_path).await,
+            Command::PrintConfig { default } => print_config::exec::<C>(default, config_path).await,
+            Command::Dev(cmd) => dev::exec::<C>(cmd, config_path).await,
         }
     }
 

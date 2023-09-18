@@ -3,6 +3,8 @@ mod cli;
 mod commands;
 mod config;
 mod node;
+mod shutdown;
+mod testnet_sync;
 mod utils;
 
 use std::process::exit;
