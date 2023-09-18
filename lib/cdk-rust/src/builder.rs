@@ -1,4 +1,4 @@
-use crate::client::Pipe;
+use crate::driver::Driver;
 use crate::mode::{Mode, PrimaryMode, SecondaryMode};
 use crate::transport::Transport;
 
@@ -14,10 +14,10 @@ where
     T: Transport,
 {
     /// Set the transport of the client or driver.
-    pub fn transport(self, transport: T) -> Self {
-        Self {
+    pub fn transport(self, transport: T) -> Builder<M, AttachedTransport<T>> {
+        Builder {
             mode: self.mode,
-            transport: Some(transport),
+            transport: Some(AttachedTransport(transport)),
         }
     }
 }
@@ -33,16 +33,10 @@ impl<T: Transport> Builder<PrimaryMode, T> {
             transport: None,
         }
     }
+}
 
-    /// Builds a client.
-    pub fn client(self) -> Client {
-        todo!()
-    }
-
-    /// Builds a driver.
-    pub fn driver(self) {
-        todo!()
-    }
+impl<T: Transport> Builder<PrimaryMode, AttachedTransport<T>> {
+    pub fn _drive<D: Driver>(self, _driver: D) {}
 }
 
 impl<T: Transport> Builder<SecondaryMode, T> {
@@ -56,16 +50,10 @@ impl<T: Transport> Builder<SecondaryMode, T> {
             transport: None,
         }
     }
-
-    /// Builds a pipe for sending and receiving data.
-    pub fn pipe(self) -> Pipe {
-        todo!()
-    }
-
-    /// Builds a driver.
-    pub fn driver(self) {
-        todo!()
-    }
 }
 
-pub struct Client;
+impl<T: Transport> Builder<SecondaryMode, AttachedTransport<T>> {
+    pub fn _drive<D: Driver>(self, _driver: D) {}
+}
+
+pub struct AttachedTransport<T>(T);

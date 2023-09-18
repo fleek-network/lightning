@@ -8,6 +8,11 @@ pub struct SecondaryMode {
     pub(crate) node_pk: [u8; 32],
 }
 
+pub enum ModeSetting {
+    Primary(PrimaryMode),
+    Secondary(SecondaryMode),
+}
+
 pub trait Mode: sealed::Sealed {}
 
 impl Mode for PrimaryMode {}
