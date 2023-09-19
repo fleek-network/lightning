@@ -108,7 +108,7 @@ impl<C: Collection> FetcherInner<C> {
 
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         let (tx, rx) = mpsc::channel(128);
-        let mut origin_fetcher = OriginFetcher::<C>::new(
+        let origin_fetcher = OriginFetcher::<C>::new(
             self.config.max_concurrent_origin_requests,
             self.origin_socket.clone(),
             rx,

@@ -38,7 +38,7 @@ impl<C: Collection> OriginFetcher<C> {
         }
     }
 
-    pub async fn start(&mut self) {
+    pub async fn start(mut self) {
         let mut pending_requests: HashMap<Uri, broadcast::Sender<Result<Blake3Hash, OriginError>>> =
             HashMap::new();
         loop {
