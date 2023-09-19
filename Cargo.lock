@@ -1322,6 +1322,8 @@ dependencies = [
  "futures",
  "log",
  "tokio",
+ "tokio-util 0.7.8",
+ "wtransport",
 ]
 
 [[package]]

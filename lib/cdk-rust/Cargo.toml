@@ -15,7 +15,10 @@ bytes = "1.4"
 futures = "0.3"
 log = "0.4"
 tokio = { version = "1.32", features = ["rt-multi-thread", "time", "sync", "io-util"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+wtransport = "0.1"
 
+# For temporary schema module.
 
 arrayref = "0.3"
 fleek-crypto = { path = "../fleek-crypto"}
