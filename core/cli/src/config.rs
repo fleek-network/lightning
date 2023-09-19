@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use anyhow::{Context, Result};
 use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_interfaces::ConfigConsumer;
 use resolved_pathbuf::ResolvedPathBuf;
 use toml::{Table, Value};
 
@@ -39,12 +40,10 @@ impl<C: Collection> Default for TomlConfigProvider<C> {
 }
 
 impl<C: Collection> TomlConfigProvider<C> {
-    /*
-     * pub fn inject<T: ConfigConsumer>(&self, config: T::Config) {
-     *     let mut table = self.table.lock().expect("Failed to acquire lock");
-     *     table.insert(T::KEY.to_owned(), Value::try_from(&config).unwrap());
-     * }
-     */
+    pub fn inject<T: ConfigConsumer>(&self, config: T::Config) {
+        let mut table = self.table.lock().expect("Failed to acquire lock");
+        table.insert(T::KEY.to_owned(), Value::try_from(&config).unwrap());
+    }
 
     fn open<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let path = path.as_ref();
