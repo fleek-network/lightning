@@ -4,9 +4,9 @@ use bytes::Bytes;
 use futures::{Sink, Stream};
 
 #[async_trait]
-pub trait Transport {
-    type Sender: Sink<Bytes, Error = std::io::Error> + Unpin;
-    type Receiver: Stream<Item = Bytes> + Unpin;
+pub trait Transport: Send + Sync + 'static {
+    type Sender: Sink<Bytes, Error = std::io::Error> + Send + Unpin;
+    type Receiver: Stream<Item = Bytes> + Send + Unpin;
 
     fn init() -> Self;
 

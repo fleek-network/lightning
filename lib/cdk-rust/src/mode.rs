@@ -1,11 +1,11 @@
 pub struct PrimaryMode {
-    pub(crate) client_secret_key: [u8; 32],
+    pub(crate) _client_secret_key: [u8; 32],
     pub(crate) service_id: u32,
 }
 
 pub struct SecondaryMode {
     pub(crate) access_token: [u8; 48],
-    pub(crate) node_pk: [u8; 32],
+    pub(crate) _node_pk: [u8; 32],
 }
 
 pub enum ModeSetting {

@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use anyhow::bail;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use futures::{SinkExt, StreamExt};
@@ -70,7 +68,7 @@ async fn start_handshake<T: Transport>(
 }
 
 async fn join_connection<T: Transport>(
-    (mut tx, _): (&mut T::Sender, &mut T::Receiver),
+    (tx, _): (&mut T::Sender, &mut T::Receiver),
     setting: &SecondaryMode,
 ) -> anyhow::Result<bool> {
     tx.send(

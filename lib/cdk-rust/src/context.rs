@@ -1,7 +1,5 @@
 use fleek_crypto::ClientPublicKey;
-use tokio::sync::mpsc::Receiver;
 
-use crate::driver::RequestResponse;
 use crate::mode::ModeSetting;
 
 pub struct Context {

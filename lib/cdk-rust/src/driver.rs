@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use anyhow::Result;
 use bytes::Bytes;
 use tokio::sync::mpsc::Sender;
@@ -10,7 +8,7 @@ use crate::schema::{RequestFrame, ResponseFrame, TerminationReason};
 
 pub type Response = ResponseFrame;
 
-pub trait Driver {
+pub trait Driver: Send + 'static {
     fn drive<'a>(&mut self, _: Event<'a>, _: &mut Context) {}
 }
 
@@ -37,6 +35,10 @@ pub struct RequestResponse {
 pub struct Handle(Sender<RequestResponse>);
 
 impl Handle {
+    pub(crate) fn new(sender: Sender<RequestResponse>) -> Self {
+        Self(sender)
+    }
+
     pub fn send(&self) -> Result<Response> {
         todo!()
     }
