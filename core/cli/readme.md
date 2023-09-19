@@ -1,59 +1,20 @@
----
-title: Fleek Network Dependency Graph
----
-# Fleek Network Dependency Graph
+# lightning-cli
 
-```mermaid
-stateDiagram-v2
-  direction LR
-  ConfigProviderInterface --> ApplicationInterface
-  BlockStoreInterface --> ApplicationInterface
-  BlockStoreServerInterface --> ApplicationInterface
-  ConfigProviderInterface --> BlockStoreInterface
-  ConfigProviderInterface --> BlockStoreServerInterface
-  BlockStoreInterface --> BlockStoreServerInterface
-  ConfigProviderInterface --> BroadcastInterface
-  ApplicationInterface --> BroadcastInterface
-  TopologyInterface --> BroadcastInterface
-  SignerInterface --> BroadcastInterface
-  NotifierInterface --> BroadcastInterface
-  ReputationAggregatorInterface --> BroadcastInterface
-  ConfigProviderInterface --> TopologyInterface
-  SignerInterface --> TopologyInterface
-  ApplicationInterface --> TopologyInterface
-  ConfigProviderInterface --> ConsensusInterface
-  SignerInterface --> ConsensusInterface
-  ApplicationInterface --> ConsensusInterface
-  BroadcastInterface --> ConsensusInterface
-  ConfigProviderInterface --> HandshakeInterface
-  ServiceExecutorInterface --> HandshakeInterface
-  SignerInterface --> HandshakeInterface
-  ApplicationInterface --> NotifierInterface
-  ConfigProviderInterface --> OriginProviderInterface
-  BlockStoreInterface --> OriginProviderInterface
-  ConfigProviderInterface --> DeliveryAcknowledgmentAggregatorInterface
-  SignerInterface --> DeliveryAcknowledgmentAggregatorInterface
-  ConfigProviderInterface --> ReputationAggregatorInterface
-  SignerInterface --> ReputationAggregatorInterface
-  NotifierInterface --> ReputationAggregatorInterface
-  ApplicationInterface --> ReputationAggregatorInterface
-  ConfigProviderInterface --> ResolverInterface
-  BroadcastInterface --> ResolverInterface
-  SignerInterface --> ResolverInterface
-  ConfigProviderInterface --> RpcInterface
-  ConsensusInterface --> RpcInterface
-  ApplicationInterface --> RpcInterface
-  FetcherInterface --> RpcInterface
-  SignerInterface --> DhtInterface
-  TopologyInterface --> DhtInterface
-  ConfigProviderInterface --> DhtInterface
-  ReputationAggregatorInterface --> DhtInterface
-  ConfigProviderInterface --> ServiceExecutorInterface
-  BlockStoreInterface --> ServiceExecutorInterface
-  ConfigProviderInterface --> SignerInterface
-  ApplicationInterface --> SignerInterface
-  ConfigProviderInterface --> FetcherInterface
-  BlockStoreInterface --> FetcherInterface
-  ResolverInterface --> FetcherInterface
-  OriginProviderInterface --> FetcherInterface
+```bash
+$ lightning-cli -h
+Usage: lightning-cli [OPTIONS] <COMMAND>
+
+Commands:
+  run           Start the node
+  key           Handle key
+  print-config  Print the loaded configuration
+  help          Print this message or the help of the given subcommand(s)
+
+Options:
+  -c, --config <CONFIG>      Path to the toml configuration file [default: $HOME/.lightning/config.toml]
+      --with-mock-consensus  Determines that we should be using the mock consensus backend
+  -v...                      Increases the level of verbosity (the max level is -vvv)
+      --log-location         Print code location on console logs
+  -h, --help                 Print help
+  -V, --version              Print version
 ```
