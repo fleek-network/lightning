@@ -1,4 +1,5 @@
 use anyhow::Result;
+use clap::Parser;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_signer::Signer;
 use log::LevelFilter;
@@ -30,13 +31,15 @@ impl Cli {
         Self { args }
     }
 
+    pub fn parse() -> Self {
+        Self {
+            args: Args::parse(),
+        }
+    }
+
     pub async fn exec(self) -> Result<()> {
         self.setup();
-
-        let config_path = ResolvedPathBuf::try_from(self.args.config.as_str())
-            .expect("Failed to resolve config path");
-        ensure_parent_exist(&config_path)?;
-
+        let config_path = self.resolve_config_path()?;
         match self.args.with_mock_consensus {
             true => {
                 log::info!("Using MockConsensus");
@@ -44,6 +47,15 @@ impl Cli {
             },
             false => self.run::<FinalTypes>(config_path, None).await,
         }
+    }
+
+    pub async fn exec_with_custom_start_shutdown<C>(self, cb: CustomStartShutdown<C>) -> Result<()>
+    where
+        C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterface = Signer<C>>,
+    {
+        self.setup();
+        let config_path = self.resolve_config_path()?;
+        self.run::<C>(config_path, Some(cb)).await
     }
 
     async fn run<C>(
@@ -132,5 +144,12 @@ impl Cli {
             .unwrap();
 
         log4rs::init_config(config).unwrap();
+    }
+
+    fn resolve_config_path(&self) -> Result<ResolvedPathBuf> {
+        let config_path = ResolvedPathBuf::try_from(self.args.config.as_str())
+            .expect("Failed to resolve config path");
+        ensure_parent_exist(&config_path)?;
+        Ok(config_path)
     }
 }

@@ -1,5 +1,5 @@
 mod args;
-mod cli;
+pub mod cli;
 mod commands;
 mod config;
 mod shutdown;
