@@ -8,7 +8,5 @@ pub trait Transport: Send + Sync + 'static {
     type Sender: Sink<Bytes, Error = std::io::Error> + Send + Unpin;
     type Receiver: Stream<Item = Bytes> + Send + Unpin;
 
-    fn init() -> Self;
-
     async fn connect(&self) -> Result<(Self::Sender, Self::Receiver)>;
 }

@@ -1,38 +1,12 @@
 #![allow(unused)]
+// Todo: This is only temporary.
+// Consolidate these definitions with the schemas in core/handshake.
 
 use anyhow::{anyhow, Result};
 use arrayref::array_ref;
 use bytes::{BufMut, Bytes};
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey, NodeSignature};
 use tokio::io::{AsyncRead, AsyncReadExt};
-
-pub const NETWORK_PREFIX: &[u8; 5] = b"FLEEK";
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct ChallengeFrame {
-    pub challenge: [u8; 32],
-}
-
-impl ChallengeFrame {
-    pub fn encode(&self) -> Bytes {
-        let mut buf = Vec::with_capacity(37);
-        buf.put_slice(NETWORK_PREFIX);
-        buf.put_slice(&self.challenge);
-        buf.into()
-    }
-
-    pub fn decode(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() != 37 {
-            return Err(anyhow!("wrong number of bytes"));
-        }
-        if array_ref!(bytes, 0, 5) != NETWORK_PREFIX {
-            return Err(anyhow!("invalid network prefix"));
-        }
-        Ok(Self {
-            challenge: *array_ref!(bytes, 5, 32),
-        })
-    }
-}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum HandshakeRequestFrame {
@@ -154,31 +128,6 @@ impl HandshakeRequestFrame {
             },
             _ => Err(anyhow!("invalid frame tag")),
         }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct HandshakeResponse {
-    pub pk: NodePublicKey,
-    pub pop: NodeSignature,
-}
-
-impl HandshakeResponse {
-    pub fn encode(&self) -> Bytes {
-        let mut buf = Vec::with_capacity(96);
-        buf.put_slice(&self.pk.0);
-        buf.put_slice(&self.pop.0);
-        buf.into()
-    }
-
-    pub fn decode(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() != 96 {
-            return Err(anyhow!("wrong number of bytes"));
-        }
-
-        let pk = NodePublicKey(*array_ref!(bytes, 0, 32));
-        let pop = NodeSignature(*array_ref!(bytes, 32, 64));
-        Ok(Self { pk, pop })
     }
 }
 
@@ -366,105 +315,5 @@ impl TerminationReason {
             0x07 => Self::WrongPermssion,
             _ => Self::Unknown,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    macro_rules! encode_decode {
-        ($t:ident, $($s:expr),*) => {
-            $(
-            let frame = $s;
-            assert_eq!(
-                frame,
-                $t::decode(&frame.encode()).unwrap()
-            );)*
-        };
-    }
-
-    #[test]
-    fn handshake_frames() {
-        encode_decode!(ChallengeFrame, ChallengeFrame { challenge: [0; 32] });
-        encode_decode!(
-            HandshakeRequestFrame,
-            HandshakeRequestFrame::Handshake {
-                retry: None,
-                service: 1,
-                pk: ClientPublicKey([2; 96]),
-                pop: ClientSignature([3; 48]),
-            },
-            HandshakeRequestFrame::Handshake {
-                retry: Some(4),
-                service: 5,
-                pk: ClientPublicKey([6; 96]),
-                pop: ClientSignature([7; 48]),
-            },
-            HandshakeRequestFrame::JoinRequest {
-                access_token: [8; 48],
-            }
-        );
-        encode_decode!(
-            HandshakeResponse,
-            HandshakeResponse {
-                pk: NodePublicKey([9; 32]),
-                pop: NodeSignature([0; 64]),
-            }
-        );
-    }
-
-    #[test]
-    fn request_frames() {
-        encode_decode!(
-            RequestFrame,
-            RequestFrame::ServicePayload {
-                bytes: vec![1; 64].into(),
-            },
-            RequestFrame::AccessToken { ttl: 2 },
-            RequestFrame::ExtendAccessToken { ttl: 12 },
-            RequestFrame::DeliveryAcknowledgment {}
-        );
-    }
-
-    #[test]
-    fn response_frames() {
-        encode_decode!(
-            ResponseFrame,
-            ResponseFrame::ServicePayload {
-                bytes: vec![1; 64].into(),
-            },
-            ResponseFrame::AccessToken {
-                ttl: 2,
-                access_token: [3; 48].into(),
-            },
-            ResponseFrame::Termination {
-                reason: TerminationReason::Timeout
-            },
-            ResponseFrame::Termination {
-                reason: TerminationReason::InvalidHandshake
-            },
-            ResponseFrame::Termination {
-                reason: TerminationReason::Timeout
-            },
-            ResponseFrame::Termination {
-                reason: TerminationReason::InvalidHandshake
-            },
-            ResponseFrame::Termination {
-                reason: TerminationReason::InvalidToken
-            },
-            ResponseFrame::Termination {
-                reason: TerminationReason::InvalidDeliveryAcknowledgment
-            },
-            ResponseFrame::Termination {
-                reason: TerminationReason::InvalidService
-            },
-            ResponseFrame::Termination {
-                reason: TerminationReason::ServiceTerminated
-            },
-            ResponseFrame::Termination {
-                reason: TerminationReason::Unknown
-            }
-        );
     }
 }
