@@ -1,15 +1,44 @@
+use std::net::SocketAddr;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{Sink, Stream};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use wtransport::{RecvStream, SendStream};
+use wtransport::endpoint::Client;
+use wtransport::{ClientConfig, Endpoint, RecvStream, SendStream};
 
 use crate::transport::Transport;
 
-pub struct WebTransport;
+pub struct WebTransport {
+    target: String,
+    endpoint: Endpoint<Client>,
+}
+
+impl WebTransport {
+    pub fn new(config: Config) -> Result<Self> {
+        let client_config = ClientConfig::builder()
+            .with_bind_address(config.bind_address)
+            // Todo: We need to customize handshake to validate server certificate hashes.
+            // Maybe we don't have to do this if we perform authentication using keys
+            // in a custom TLS validator similarly to libp2p.
+            .with_no_cert_validation()
+            .build();
+        let endpoint = Endpoint::client(client_config)?;
+        Ok(Self {
+            endpoint,
+            target: config.target,
+        })
+    }
+}
+
+pub struct Config {
+    pub target: String,
+    pub _server_hashes: Vec<[u8; 32]>,
+    pub bind_address: SocketAddr,
+}
 
 pub type FramedStreamTx = FramedWrite<SendStream, LengthDelimitedCodec>;
 pub type FramedStreamRx = FramedRead<RecvStream, LengthDelimitedCodec>;
@@ -20,7 +49,19 @@ impl Transport for WebTransport {
     type Receiver = WebTransportReceiver;
 
     async fn connect(&self) -> anyhow::Result<(Self::Sender, Self::Receiver)> {
-        todo!()
+        let conn = self.endpoint.connect(&self.target).await?;
+        // Todo: For now, we just open one bidirectional stream.
+        // Ideally, we would like to generate new streams from the connection
+        // and perform a request-response exchange in each stream.
+        let (tx, rx) = conn.open_bi().await?.await?;
+        Ok((
+            WebTransportSender {
+                inner: FramedStreamTx::new(tx, LengthDelimitedCodec::new()),
+            },
+            WebTransportReceiver {
+                inner: FramedStreamRx::new(rx, LengthDelimitedCodec::new()),
+            },
+        ))
     }
 }
 

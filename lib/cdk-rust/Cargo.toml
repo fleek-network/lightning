@@ -16,7 +16,7 @@ futures = "0.3"
 log = "0.4"
 tokio = { version = "1.32", features = ["rt-multi-thread", "time", "sync", "io-util"] }
 tokio-util = { version = "0.7", features = ["codec"] }
-wtransport = "0.1"
+wtransport = { version = "0.1", features = ["dangerous-configuration"] }
 
 # For temporary schema module.
 
