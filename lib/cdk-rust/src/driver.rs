@@ -1,112 +1,59 @@
-use anyhow::{bail, Result};
-use fleek_crypto::{ClientPublicKey, ClientSignature};
-use futures::{SinkExt, StreamExt};
-use tokio::sync::mpsc::Receiver;
+use std::borrow::Cow;
 
-use crate::mode::ModeSetting;
-use crate::schema::{HandshakeRequestFrame, ResponseFrame};
-use crate::transport::Transport;
+use anyhow::Result;
+use bytes::Bytes;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::oneshot;
 
-pub async fn drive_connection<T: Transport, D: Driver>(
-    transport: T,
-    mut driver: D,
-    ctx: Context,
-) -> Result<()> {
-    let (mut tx, mut rx) = transport.connect().await?;
+use crate::connection::Context;
+use crate::schema::{RequestFrame, ResponseFrame, TerminationReason};
 
-    if !handshake::<T>((&mut tx, &mut rx), &ctx).await? {
-        bail!("handshake failed")
-    }
-
-    driver.on_connected();
-
-    connection_loop::<T, D>((tx, rx), ctx, driver).await
-}
-
-async fn handshake<T: Transport>(
-    (tx, rx): (&mut T::Sender, &mut T::Receiver),
-    ctx: &Context,
-) -> Result<bool> {
-    let success = match &ctx.mode {
-        ModeSetting::Primary(setting) => {
-            start_handshake::<T>((tx, rx), setting.client_secret_key, setting.service_id).await?
-        },
-        ModeSetting::Secondary(setting) => {
-            join_connection::<T>((tx, rx), setting.access_token, setting.node_pk).await?
-        },
-    };
-
-    Ok(success)
-}
-
-async fn start_handshake<T: Transport>(
-    (tx, _): (&mut T::Sender, &mut T::Receiver),
-    _client_secret_key: [u8; 32],
-    service_id: u32,
-) -> Result<bool> {
-    tx.send(
-        HandshakeRequestFrame::Handshake {
-            retry: None,
-            service: service_id,
-            pk: ClientPublicKey([1; 96]),
-            pop: ClientSignature([2; 48]),
-        }
-        .encode(),
-    )
-    .await?;
-
-    // Todo: Handle complete handshake.
-    // let response = rx
-    //     .next()
-    //     .await
-    //     .ok_or_else(|| anyhow::anyhow!("connection closed unexpectedly"))?;
-    //
-    // let _ = HandshakeResponse::decode(response.as_ref())?;
-
-    Ok(true)
-}
-
-async fn join_connection<T: Transport>(
-    _: (&mut T::Sender, &mut T::Receiver),
-    _access_token: [u8; 48],
-    _node_pk: [u8; 32],
-) -> Result<bool> {
-    todo!()
-}
-
-pub struct Context {
-    mode: ModeSetting,
-    pk: ClientPublicKey,
-    service_id: u32,
-    request_rx: Receiver<HandshakeRequestFrame>,
-}
-
-async fn connection_loop<T: Transport, D: Driver>(
-    (mut tx, mut rx): (T::Sender, T::Receiver),
-    mut ctx: Context,
-    mut driver: D,
-) -> Result<()> {
-    while let Some(request) = ctx.request_rx.recv().await {
-        tx.send(request.encode()).await?;
-        let Some(bytes) = rx.next().await else {
-          bail!("connection closed unexpectedly");
-        };
-        let frame = ResponseFrame::decode(bytes.as_ref())?;
-
-        if let ResponseFrame::ServicePayload { bytes } = frame {
-            driver.on_service_payload()
-        }
-    }
-
-    driver.on_disconnected();
-
-    Ok(())
-}
+pub type Response = ResponseFrame;
 
 pub trait Driver {
-    fn on_connected(&mut self) {}
+    fn drive<'a>(&mut self, _: Event<'a>, _: &mut Context) {}
+}
 
-    fn on_disconnected(&mut self) {}
+pub enum Request {
+    /// Raw message to be sent to the service implementation.
+    ServicePayload { bytes: Bytes },
+    /// Request access token from.
+    AccessToken { ttl: u64 },
+    /// Extend the access token associated with this connection.
+    ExtendAccessToken { ttl: u64 },
+}
 
-    fn on_service_payload(&mut self) {}
+pub enum Event<'a> {
+    Connection { success: bool },
+    PayloadReceived { bytes: &'a [u8] },
+    Disconnect { reason: Option<TerminationReason> },
+}
+
+pub(crate) struct RequestResponse {
+    pub payload: Request,
+    pub respond: oneshot::Sender<Response>,
+}
+
+pub struct Handle(Sender<RequestResponse>);
+
+impl Handle {
+    pub fn send(&self) -> Result<Response> {
+        todo!()
+    }
+
+    pub fn disconnect(self) -> Result<()> {
+        todo!()
+    }
+}
+
+// RequestFrame is internal and includes frames
+// that should not be exposed to clients.
+impl From<Request> for RequestFrame {
+    fn from(value: Request) -> Self {
+        match value {
+            Request::ServicePayload { bytes } => RequestFrame::ServicePayload { bytes },
+            Request::AccessToken { ttl } => RequestFrame::AccessToken { ttl },
+            Request::ExtendAccessToken { ttl } => RequestFrame::ExtendAccessToken { ttl },
+        }
+    }
 }
