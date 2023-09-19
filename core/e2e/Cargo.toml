@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
-lightning-node = { path = "../node" }
+lightning-cli = { path = "../cli" }
 lightning-rpc = { path = "../rpc", features = ["e2e-test"] }
 lightning-application = { path = "../application" }
 lightning-broadcast = { path = "../broadcast" }
