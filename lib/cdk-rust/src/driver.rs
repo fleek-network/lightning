@@ -1,4 +1,6 @@
-use anyhow::Result;
+use std::time::Duration;
+
+use anyhow::{bail, Result};
 use bytes::Bytes;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
@@ -9,7 +11,7 @@ use crate::schema::{RequestFrame, ResponseFrame, TerminationReason};
 pub type Response = ResponseFrame;
 
 pub trait Driver: Send + 'static {
-    fn drive<'a>(&mut self, _: Event<'a>, _: &mut Context) {}
+    fn drive(&mut self, _: Event<'_>, _: &mut Context) {}
 }
 
 pub enum Request {
@@ -39,12 +41,31 @@ impl Handle {
         Self(sender)
     }
 
-    pub fn send(&self) -> Result<Response> {
-        todo!()
+    pub async fn send(&self, request: Request) -> Result<Response> {
+        let (respond_tx, respond_rx) = oneshot::channel();
+        let inner_request = RequestResponse {
+            payload: request,
+            respond: respond_tx,
+        };
+        self.0
+            .send(inner_request)
+            .await
+            .map_err(|_| anyhow::anyhow!("failed to send request"))?;
+
+        // Todo: can probably make this value configurable.
+        let timeout = tokio::time::sleep(Duration::from_secs(3));
+        tokio::select! {
+            _ = timeout => {
+                bail!("timeout");
+            }
+            response = respond_rx => {
+                response.map_err(|e| anyhow::anyhow!("failed to receive response: {e:?}"))
+            }
+        }
     }
 
-    pub fn disconnect(self) -> Result<()> {
-        todo!()
+    pub fn disconnect(self) {
+        // Dropping the senders will cause the connection to disconnect.
     }
 }
 

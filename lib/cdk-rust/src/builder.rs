@@ -59,7 +59,7 @@ impl<T: Transport> Builder<PrimaryMode, AttachedTransport<T>> {
         let context = Context::new(
             ModeSetting::Primary(self.mode),
             // Todo: better default?
-            self.pk.unwrap_or_else(|| ClientPublicKey([1; 96])),
+            self.pk.unwrap_or(ClientPublicKey([1; 96])),
         );
         tokio::spawn(connection::connect_and_drive::<T, D>(
             transport, driver, rx, context,
@@ -90,7 +90,7 @@ impl<T: Transport> Builder<SecondaryMode, AttachedTransport<T>> {
         let context = Context::new(
             ModeSetting::Secondary(self.mode),
             // Todo: better default?
-            self.pk.unwrap_or_else(|| ClientPublicKey([1; 96])),
+            self.pk.unwrap_or(ClientPublicKey([1; 96])),
         );
         tokio::spawn(connection::connect_and_drive::<T, D>(
             transport, driver, rx, context,

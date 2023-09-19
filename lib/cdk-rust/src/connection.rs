@@ -87,7 +87,7 @@ async fn join_connection<T: Transport>(
 async fn connection_loop<T: Transport, D: Driver>(
     (mut tx, mut rx): (T::Sender, T::Receiver),
     mut request_rx: Receiver<RequestResponse>,
-    mut ctx: &mut Context,
+    ctx: &mut Context,
     driver: &mut D,
 ) -> anyhow::Result<()> {
     while let Some(request) = request_rx.recv().await {
@@ -105,7 +105,7 @@ async fn connection_loop<T: Transport, D: Driver>(
             Event::PayloadReceived {
                 bytes: bytes.as_ref(),
             },
-            &mut ctx,
+            ctx,
         );
 
         tokio::spawn(async move {
