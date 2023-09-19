@@ -231,7 +231,7 @@ impl Endpoint {
         self.cancel_dial(&peer);
 
         let (message_tx, message_rx) = mpsc::channel(1024);
-        self.driver.insert(peer, message_tx);
+        self.driver.insert(peer, message_tx.clone());
 
         let event_tx = self.network_event_tx.clone();
         self.driver_set.spawn(async move {
@@ -254,6 +254,16 @@ impl Endpoint {
             }
             peer
         });
+
+        if let Some(pending_messages) = self.pending_send.remove(&peer) {
+            tokio::spawn(async move {
+                for msg in pending_messages {
+                    if message_tx.send(msg).await.is_err() {
+                        tracing::error!("failed to send pending message to driver");
+                    }
+                }
+            });
+        }
     }
 
     fn handle_request(&mut self, request: Request) -> Result<()> {
