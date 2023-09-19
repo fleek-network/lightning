@@ -1,5 +1,6 @@
 mod builder;
 mod connection;
+mod context;
 mod driver;
 mod mode;
 mod schema;

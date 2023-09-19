@@ -5,7 +5,7 @@ use bytes::Bytes;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-use crate::connection::Context;
+use crate::context::Context;
 use crate::schema::{RequestFrame, ResponseFrame, TerminationReason};
 
 pub type Response = ResponseFrame;
@@ -29,7 +29,7 @@ pub enum Event<'a> {
     Disconnect { reason: Option<TerminationReason> },
 }
 
-pub(crate) struct RequestResponse {
+pub struct RequestResponse {
     pub payload: Request,
     pub respond: oneshot::Sender<Response>,
 }

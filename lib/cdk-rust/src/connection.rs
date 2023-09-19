@@ -5,6 +5,7 @@ use fleek_crypto::{ClientPublicKey, ClientSignature};
 use futures::{SinkExt, StreamExt};
 use tokio::sync::mpsc::Receiver;
 
+use crate::context::Context;
 use crate::driver::{Driver, Event, RequestResponse};
 use crate::mode::{ModeSetting, PrimaryMode, SecondaryMode};
 use crate::schema::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
@@ -13,6 +14,7 @@ use crate::transport::Transport;
 pub async fn connect_and_drive<T: Transport, D: Driver>(
     transport: T,
     mut driver: D,
+    request_rx: Receiver<RequestResponse>,
     mut ctx: Context,
 ) -> anyhow::Result<()> {
     let (mut tx, mut rx) = transport.connect().await?;
@@ -25,7 +27,7 @@ pub async fn connect_and_drive<T: Transport, D: Driver>(
         bail!("handshake failed");
     }
 
-    let _ = connection_loop::<T, D>((tx, rx), &mut ctx, &mut driver).await;
+    let _ = connection_loop::<T, D>((tx, rx), request_rx, &mut ctx, &mut driver).await;
 
     // Todo: Add termination reason if applicable.
     driver.drive(Event::Disconnect { reason: None }, &mut ctx);
@@ -37,8 +39,8 @@ async fn handshake<T: Transport>(
     (tx, rx): (&mut T::Sender, &mut T::Receiver),
     ctx: &Context,
 ) -> anyhow::Result<bool> {
-    let success = match &ctx.mode {
-        ModeSetting::Primary(setting) => start_handshake::<T>((tx, rx), setting, ctx.pk).await?,
+    let success = match ctx.mode() {
+        ModeSetting::Primary(setting) => start_handshake::<T>((tx, rx), setting, *ctx.pk()).await?,
         ModeSetting::Secondary(setting) => join_connection::<T>((tx, rx), setting).await?,
     };
 
@@ -84,18 +86,13 @@ async fn join_connection<T: Transport>(
     Ok(true)
 }
 
-pub struct Context {
-    mode: ModeSetting,
-    pk: ClientPublicKey,
-    addr_rx: Receiver<RequestResponse>,
-}
-
 async fn connection_loop<T: Transport, D: Driver>(
     (mut tx, mut rx): (T::Sender, T::Receiver),
+    mut request_rx: Receiver<RequestResponse>,
     mut ctx: &mut Context,
     driver: &mut D,
 ) -> anyhow::Result<()> {
-    while let Some(request) = ctx.addr_rx.recv().await {
+    while let Some(request) = request_rx.recv().await {
         // Todo: If (tx, rx) was a individual (QUIC) stream,
         // we could move this pair in a separate task and
         // avoid waiting.
