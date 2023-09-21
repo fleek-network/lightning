@@ -13,7 +13,7 @@ use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::SyncQueryRunnerInterface;
-use netkit::endpoint::{NodeAddress, Request};
+use netkit::endpoint::{Message as NetkitMessage, NodeAddress, Request, ServiceScope};
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::ev::Topology;
@@ -35,16 +35,19 @@ pub struct Peers {
     peers: im::HashMap<NodePublicKey, Peer>,
     /// Sender for requests to endpoint.
     endpoint_tx: Sender<Request>,
+    /// Service scope for netkit.
+    service_scope: ServiceScope,
 }
 
 impl Peers {
-    pub fn new(endpoint_tx: Sender<Request>) -> Self {
+    pub fn new(endpoint_tx: Sender<Request>, service_scope: ServiceScope) -> Self {
         Self {
             us: 0,
             pinned: Default::default(),
             stats: Default::default(),
             peers: Default::default(),
             endpoint_tx,
+            service_scope,
         }
     }
 }
@@ -179,11 +182,15 @@ impl Peers {
             pk: *remote,
         };
         let endpoint_tx = self.endpoint_tx.clone();
+        let message = NetkitMessage {
+            service: self.service_scope,
+            payload: writer,
+        };
         tokio::spawn(async move {
             if endpoint_tx
                 .send(Request::SendMessage {
                     peer: peer_address,
-                    message: writer,
+                    message,
                 })
                 .await
                 .is_err()
@@ -220,11 +227,15 @@ impl Peers {
             pk: *remote,
         };
         let endpoint_tx = self.endpoint_tx.clone();
+        let message = NetkitMessage {
+            service: self.service_scope,
+            payload: writer,
+        };
         tokio::spawn(async move {
             if endpoint_tx
                 .send(Request::SendMessage {
                     peer: peer_address,
-                    message: writer,
+                    message,
                 })
                 .await
                 .is_err()
@@ -253,6 +264,7 @@ impl Peers {
         };
 
         let endpoint_tx = self.endpoint_tx.clone();
+        let service_scope = self.service_scope;
         self.for_each(move |stats, (pk, info)| {
             if info.has.contains_key(&id) {
                 return;
@@ -268,6 +280,10 @@ impl Peers {
 
             let sender = endpoint_tx.clone();
             let msg = message.clone();
+            let message = NetkitMessage {
+                service: service_scope,
+                payload: msg,
+            };
             tokio::spawn(async move {
                 // TODO(qti3e): Explore allowing to send raw buffers from here.
                 // There is a lot of duplicated serialization going on because
@@ -284,7 +300,7 @@ impl Peers {
                 if sender
                     .send(Request::SendMessage {
                         peer: address,
-                        message: msg,
+                        message,
                     })
                     .await
                     .is_err()

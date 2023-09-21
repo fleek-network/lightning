@@ -5301,6 +5301,7 @@ dependencies = [
  "fleek-blake3",
  "fleek-crypto",
  "futures",
+ "log",
  "quinn",
  "rcgen 0.11.1",
  "ring",

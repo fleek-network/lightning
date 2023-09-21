@@ -3,21 +3,45 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use bytes::{BufMut, Bytes, BytesMut};
 use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
-use quinn::{ClientConfig, Connecting, Connection, ServerConfig};
+use quinn::{
+    ClientConfig,
+    Connecting,
+    Connection,
+    ConnectionError,
+    RecvStream,
+    SendStream,
+    ServerConfig,
+};
 use rustls::Certificate;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
+use x509_parser::nom::AsBytes;
 
 use crate::{driver, tls};
 
-pub type Message = Vec<u8>;
+pub type ServiceScope = u8;
+
+#[derive(Debug)]
+pub struct Message {
+    pub service: ServiceScope,
+    pub payload: Vec<u8>,
+}
+
+pub enum DriverRequest {
+    Message(Message),
+    NewStream {
+        service: ServiceScope,
+        respond: oneshot::Sender<Result<(SendStream, RecvStream), ConnectionError>>,
+    },
+}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct NodeAddress {
@@ -36,6 +60,14 @@ pub enum Request {
         /// The outgoing message.
         message: Message,
     },
+    NewStream {
+        /// Peer to open stream to.
+        peer: NodeAddress,
+        /// The service that requested this stream.
+        service: ServiceScope,
+        /// This channel will return the sender and receiver for the stream.
+        respond: oneshot::Sender<Result<(SendStream, RecvStream), ConnectionError>>,
+    },
     Metrics {
         /// Connection peer.
         peer: NodePublicKey,
@@ -49,6 +81,11 @@ pub enum Event {
     Message {
         peer: NodePublicKey,
         message: Message,
+    },
+    NewStream {
+        peer: NodePublicKey,
+        tx: SendStream,
+        rx: RecvStream,
     },
     NewConnection {
         incoming: bool,
@@ -77,21 +114,24 @@ pub struct Endpoint {
     connecting: FuturesUnordered<BoxFuture<'static, ConnectionResult>>,
     /// Pending dialing tasks.
     pending_dial: HashMap<NodePublicKey, CancellationToken>,
-    /// Pending outgoing messages.
-    pending_send: HashMap<NodePublicKey, Vec<Message>>,
-    /// Used for sending outbound messages to drivers.
-    driver: HashMap<NodePublicKey, Sender<Message>>,
+    /// Pending outgoing requests.
+    pending_send: HashMap<NodePublicKey, Vec<DriverRequest>>,
+    /// Used for sending outbound requests to drivers.
+    driver: HashMap<NodePublicKey, Sender<DriverRequest>>,
     /// Ongoing drivers.
     driver_set: JoinSet<NodePublicKey>,
-    /// Receiver for network events.
-    network_event_tx: Sender<Event>,
-    /// Receiver for network events.
-    network_event_rx: Option<Receiver<Event>>,
+    // Sender for network events.
+    //network_event_tx: Sender<Event>,
+    network_event_tx: HashMap<ServiceScope, mpsc::Sender<Event>>,
+    service_scope: ServiceScope,
+    // Receiver for network events.
+    //network_event_rx: Option<Receiver<Event>>,
 }
 
 impl Endpoint {
     pub fn new(sk: NodeSecretKey, address: SocketAddr, server_config: ServerConfig) -> Self {
-        let (network_event_tx, network_event_rx) = mpsc::channel(1024);
+        //let (network_event_tx, network_event_rx) = mpsc::channel(1024);
+
         let (request_tx, request_rx) = mpsc::channel(1024);
         Self {
             address,
@@ -105,23 +145,25 @@ impl Endpoint {
             driver_set: JoinSet::new(),
             connecting: FuturesUnordered::new(),
             pending_dial: HashMap::new(),
-            network_event_tx,
-            network_event_rx: Some(network_event_rx),
+            //network_event_tx,
+            //network_event_rx: Some(network_event_rx),
+            network_event_tx: HashMap::new(),
+            service_scope: 0,
         }
     }
 
     /// Returns sender for requests to the endpoint.
-    pub fn request_sender(&mut self) -> Sender<Request> {
+    pub fn request_sender(&self) -> Sender<Request> {
         self.request_tx.clone()
     }
 
-    /// Returns receiver for network events.
-    ///
-    /// Panics if called more than once.
-    pub fn network_event_receiver(&mut self) -> Receiver<Event> {
-        self.network_event_rx
-            .take()
-            .expect("To be called called once")
+    /// Returns receiver for network events and increments the service scope.
+    pub fn network_event_receiver(&mut self) -> (ServiceScope, Receiver<Event>) {
+        let (tx, rx) = mpsc::channel(1024);
+        self.network_event_tx.insert(self.service_scope, tx);
+        let service_scope = self.service_scope;
+        self.service_scope += 1;
+        (service_scope, rx)
     }
 
     // Todo: Return metrics.
@@ -230,36 +272,37 @@ impl Endpoint {
     fn handle_connection(&mut self, peer: NodePublicKey, connection: Connection, incoming: bool) {
         self.cancel_dial(&peer);
 
-        let (message_tx, message_rx) = mpsc::channel(1024);
-        self.driver.insert(peer, message_tx.clone());
+        let (request_tx, request_rx) = mpsc::channel(1024);
+        self.driver.insert(peer, request_tx.clone());
 
-        let event_tx = self.network_event_tx.clone();
+        let network_event_tx = self.network_event_tx.clone();
         self.driver_set.spawn(async move {
-            if event_tx
-                .send(Event::NewConnection {
-                    incoming,
-                    peer,
-                    rtt: connection.rtt(),
-                })
-                .await
-                .is_err()
-            {
-                tracing::error!("endpoint client dropped the network event receiver");
+            for (_, event_tx) in network_event_tx.iter() {
+                if event_tx
+                    .send(Event::NewConnection {
+                        incoming,
+                        peer,
+                        rtt: connection.rtt(),
+                    })
+                    .await
+                    .is_err()
+                {
+                    tracing::error!("endpoint client dropped the network event receiver");
+                }
             }
-
             if let Err(e) =
-                driver::start_driver(connection, peer, message_rx, event_tx, incoming).await
+                driver::start_driver(connection, peer, request_rx, network_event_tx, incoming).await
             {
                 tracing::error!("driver for connection with {peer:?} shutdowned: {e:?}")
             }
             peer
         });
 
-        if let Some(pending_messages) = self.pending_send.remove(&peer) {
+        if let Some(pending_requests) = self.pending_send.remove(&peer) {
             tokio::spawn(async move {
-                for msg in pending_messages {
-                    if message_tx.send(msg).await.is_err() {
-                        tracing::error!("failed to send pending message to driver");
+                for req in pending_requests {
+                    if request_tx.send(req).await.is_err() {
+                        tracing::error!("failed to send pending request to driver");
                     }
                 }
             });
@@ -292,12 +335,49 @@ impl Endpoint {
                 {
                     let driver_tx = self.driver.get(&peer.pk).cloned().unwrap();
                     tokio::spawn(async move {
-                        if driver_tx.send(message).await.is_err() {
+                        if driver_tx
+                            .send(DriverRequest::Message(message))
+                            .await
+                            .is_err()
+                        {
                             tracing::error!("driver dropped unexpectedly");
                         }
                     });
                 } else {
-                    self.pending_send.entry(peer.pk).or_default().push(message);
+                    self.pending_send
+                        .entry(peer.pk)
+                        .or_default()
+                        .push(DriverRequest::Message(message));
+                    self.enqueue_dial_task(peer)?;
+                }
+            },
+            Request::NewStream {
+                peer,
+                service,
+                respond,
+            } => {
+                // TODO(matthias): refactor duplicate code
+                if self
+                    .driver
+                    .get(&peer.pk)
+                    .map(|driver_tx| !driver_tx.is_closed())
+                    .unwrap_or(false)
+                {
+                    let driver_tx = self.driver.get(&peer.pk).cloned().unwrap();
+                    tokio::spawn(async move {
+                        if driver_tx
+                            .send(DriverRequest::NewStream { service, respond })
+                            .await
+                            .is_err()
+                        {
+                            tracing::error!("driver dropped unexpectedly");
+                        }
+                    });
+                } else {
+                    self.pending_send
+                        .entry(peer.pk)
+                        .or_default()
+                        .push(DriverRequest::NewStream { service, respond });
                     self.enqueue_dial_task(peer)?;
                 }
             },
@@ -350,10 +430,12 @@ impl Endpoint {
 
     fn handle_disconnect(&mut self, peer: NodePublicKey) {
         self.driver.remove(&peer);
-        let event_tx = self.network_event_tx.clone();
+        let network_event_tx = self.network_event_tx.clone();
         tokio::spawn(async move {
-            if event_tx.send(Event::Disconnect { peer }).await.is_err() {
-                tracing::error!("failed to send network event");
+            for (_, event_tx) in network_event_tx.iter() {
+                if event_tx.send(Event::Disconnect { peer }).await.is_err() {
+                    tracing::error!("failed to send network event");
+                }
             }
         });
     }
@@ -363,4 +445,27 @@ struct ConnectionResult {
     pub accept: bool,
     pub conn: Result<Connection>,
     pub peer: Option<NodePublicKey>,
+}
+
+impl From<Message> for Bytes {
+    fn from(value: Message) -> Self {
+        let mut buf = BytesMut::with_capacity(value.payload.len() + 1);
+        buf.put_u8(value.service);
+        buf.put_slice(&value.payload);
+        buf.into()
+    }
+}
+
+impl TryFrom<BytesMut> for Message {
+    type Error = anyhow::Error;
+
+    fn try_from(value: BytesMut) -> Result<Self> {
+        let bytes = value.as_bytes();
+        if bytes.is_empty() {
+            return Err(anyhow!("Cannot convert empty bytes into a message"));
+        }
+        let service = bytes[0];
+        let payload = bytes[1..bytes.len()].to_vec();
+        Ok(Self { service, payload })
+    }
 }

@@ -27,7 +27,7 @@ use lightning_interfaces::{
     Weight,
 };
 use lightning_metrics::{counter, histogram, increment_counter};
-use netkit::endpoint::{Event, NodeAddress, Request};
+use netkit::endpoint::{Event, NodeAddress, Request, ServiceScope};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
@@ -73,6 +73,7 @@ pub struct Context<C: Collection> {
     sk: NodeSecretKey,
     pk: NodePublicKey,
     current_node_index: OnceCell<NodeIndex>,
+    service_scope: ServiceScope,
 }
 
 impl<C: Collection> Context<C> {
@@ -86,10 +87,11 @@ impl<C: Collection> Context<C> {
         network_event_rx: Receiver<Event>,
         endpoint_tx: Sender<Request>,
         sk: NodeSecretKey,
+        service_scope: ServiceScope,
     ) -> Self {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
         let pk = sk.to_pk();
-        let peers = Peers::new(endpoint_tx.clone());
+        let peers = Peers::new(endpoint_tx.clone(), service_scope);
         let stats = peers.stats.clone();
         Self {
             db,
@@ -114,6 +116,7 @@ impl<C: Collection> Context<C> {
             sk,
             pk,
             current_node_index: OnceCell::new(), // will be set upon spawn.
+            service_scope,
         }
     }
 
@@ -472,8 +475,9 @@ async fn main_loop<C: Collection>(
                         ctx.rep_reporter.report_latency(&peer, rtt / 2);
                         ctx.peers.handle_new_connection(index, peer, address);
                     }
+                    Event::NewStream { peer: _, tx: _, rx: _ } => {}
                     Event::Message { peer, message } => {
-                        match Frame::decode(&message) {
+                        match Frame::decode(&message.payload) {
                             Ok(frame) => {
                                 ctx.peers.report_stats(peer, &frame);
                                 ctx.handle_frame(peer, frame);

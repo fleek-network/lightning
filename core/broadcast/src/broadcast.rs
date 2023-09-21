@@ -151,7 +151,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         // Todo: Let's make sure we are cleaning up unused connections.
         builder.keep_alive_interval(Duration::from_secs(8));
         let mut endpoint = builder.build()?;
-        let network_event_rx = endpoint.network_event_receiver();
+        let (service_scope, network_event_rx) = endpoint.network_event_receiver();
         let endpoint_tx = endpoint.request_sender();
 
         let ctx = Context::<C>::new(
@@ -163,6 +163,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
             network_event_rx,
             endpoint_tx,
             sk,
+            service_scope,
         );
 
         Ok(Self {
