@@ -24,7 +24,8 @@ collection!([
     DhtInterface,
     ServiceExecutorInterface,
     SignerInterface,
-    FetcherInterface
+    FetcherInterface,
+    PoolInterface,
 ]);
 
 /// The Fleek Network node.
@@ -77,12 +78,14 @@ impl<C: Collection> Node<C> {
         provider.get::<C::ServiceExecutorInterface>();
         provider.get::<C::SignerInterface>();
         provider.get::<C::FetcherInterface>();
+        provider.get::<C::PoolInterface>();
     }
 }
 
 forward!(async fn start_or_shutdown_node(this, start: bool) on [
     BlockStoreServerInterface,
     SignerInterface,
+    PoolInterface,
     ApplicationInterface,
     ReputationAggregatorInterface,
     BroadcastInterface,

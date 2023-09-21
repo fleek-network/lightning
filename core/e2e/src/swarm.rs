@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::time::Duration;
 
 use fleek_crypto::{
     AccountOwnerSecretKey,
@@ -32,11 +33,12 @@ use lightning_handshake::transports::webrtc::WebRtcConfig;
 use lightning_handshake::{TransportConfig, WorkerMode};
 use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_interfaces::ConfigProviderInterface;
+use lightning_pool::config::Config as PoolConfig;
+use lightning_pool::pool::Pool;
 use lightning_rep_collector::config::Config as RepAggConfig;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
-// use lightning_pool::pool::{ConnectionPool, PoolConfig};
 use lightning_rpc::config::Config as RpcConfig;
 use lightning_rpc::server::Rpc;
 use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
@@ -333,6 +335,11 @@ fn build_config(
 
     config.inject::<ReputationAggregator<FinalTypes>>(RepAggConfig {
         reporter_buffer_size: 1,
+    });
+
+    config.inject::<Pool<FinalTypes>>(PoolConfig {
+        keep_alive_interval: Duration::from_secs(8),
+        address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
     });
 
     config

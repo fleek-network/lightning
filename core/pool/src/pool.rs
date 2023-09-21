@@ -37,7 +37,7 @@ impl<C: Collection> PoolInterface<C> for Pool<C> {
         })
     }
 
-    fn network_event_receiver(&mut self) -> (ServiceScope, Receiver<Event>) {
+    fn network_event_receiver(&self) -> (ServiceScope, Receiver<Event>) {
         if let Some(endpoint) = self.endpoint.lock().unwrap().as_mut() {
             endpoint.network_event_receiver()
         } else {

@@ -10,12 +10,11 @@ use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     ConfigConsumer,
+    PoolInterface,
     ReputationAggregatorInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
-use netkit::builder::Builder;
-use netkit::endpoint::Endpoint;
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -29,7 +28,6 @@ use crate::pubsub::PubSubI;
 
 pub struct Broadcast<C: Collection> {
     command_sender: CommandSender,
-    endpoint: Mutex<Option<Endpoint>>,
     // This is only ever `None` when the mutex is locked.
     status: Mutex<Option<Status<C>>>,
 }
@@ -38,7 +36,6 @@ pub struct Broadcast<C: Collection> {
 enum Status<C: Collection> {
     Running {
         shutdown: Option<oneshot::Sender<()>>,
-        shutdown_endpoint: Option<CancellationToken>,
         handle: JoinHandle<Context<C>>,
     },
     NotRunning {
@@ -66,12 +63,10 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
         // is one param (i.e size) required.
         let tmp: &mut Option<Status<C>> = &mut guard;
         let state = tmp.take().unwrap();
-        let shutdown_endpoint_token = CancellationToken::new();
         let next_state = if let Status::NotRunning { ctx } = state {
             let (shutdown, handle) = ctx.spawn();
             Status::Running {
                 shutdown: Some(shutdown),
-                shutdown_endpoint: Some(shutdown_endpoint_token.clone()),
                 handle,
             }
         } else {
@@ -79,25 +74,6 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
         };
 
         *guard = Some(next_state);
-
-        let mut endpoint = self
-            .endpoint
-            .lock()
-            .await
-            .take()
-            .expect("There to be a netkit endpoint");
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    _ = shutdown_endpoint_token.cancelled() => {
-                        break;
-                    }
-                    _ = endpoint.start() => {
-                        break
-                    }
-                }
-            }
-        });
     }
 
     async fn shutdown(&self) {
@@ -105,13 +81,7 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
 
         let tmp: &mut Option<Status<C>> = &mut guard;
         let state = tmp.take().unwrap();
-        let next_state = if let Status::Running {
-            shutdown,
-            shutdown_endpoint,
-            handle,
-        } = state
-        {
-            let _ = shutdown_endpoint.unwrap().cancel();
+        let next_state = if let Status::Running { shutdown, handle } = state {
             let _ = shutdown.unwrap().send(());
             let ctx = match handle.await {
                 Ok(ctx) => ctx,
@@ -133,7 +103,6 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
 
 impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
     type Message = Frame;
-
     type PubSub<T: LightningMessage + Clone> = PubSubI<T>;
 
     fn init(
@@ -143,16 +112,12 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         signer: &c!(C::SignerInterface),
         notifier: c!(C::NotifierInterface),
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
+        pool: &c!(C::PoolInterface),
     ) -> anyhow::Result<Self> {
         let (_, sk) = signer.get_sk();
-        // Todo: Move this to config.
-        let mut builder = Builder::new(sk.clone());
-        builder.socket_address(config.address);
         // Todo: Let's make sure we are cleaning up unused connections.
-        builder.keep_alive_interval(Duration::from_secs(8));
-        let mut endpoint = builder.build()?;
-        let (service_scope, network_event_rx) = endpoint.network_event_receiver();
-        let endpoint_tx = endpoint.request_sender();
+        let (service_scope, network_event_rx) = pool.network_event_receiver();
+        let endpoint_tx = pool.request_sender();
 
         let ctx = Context::<C>::new(
             Database::default(),
@@ -169,7 +134,6 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         Ok(Self {
             command_sender: ctx.command_sender(),
             status: Some(Status::NotRunning { ctx }).into(),
-            endpoint: Some(endpoint).into(),
         })
     }
 

@@ -13,6 +13,7 @@ use crate::{
     ConfigConsumer,
     ConfigProviderInterface,
     NotifierInterface,
+    PoolInterface,
     ReputationAggregatorInterface,
     WithStartAndShutdown,
 };
@@ -30,6 +31,7 @@ pub trait BroadcastInterface<C: Collection>:
         signer: ::SignerInterface,
         notifier: ::NotifierInterface,
         rep_aggregator: ::ReputationAggregatorInterface,
+        pool: ::PoolInterface,
     ) {
         Self::init(
             config.get::<Self>(),
@@ -38,6 +40,7 @@ pub trait BroadcastInterface<C: Collection>:
             signer,
             notifier.clone(),
             rep_aggregator.get_reporter(),
+            pool,
         )
     }
 
@@ -55,6 +58,7 @@ pub trait BroadcastInterface<C: Collection>:
         signer: &c!(C::SignerInterface),
         notifier: c!(C::NotifierInterface),
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
+        pool: &c!(C::PoolInterface),
     ) -> Result<Self>;
 
     /// Get a send and receiver for messages in a pub-sub topic.

@@ -12,11 +12,14 @@ use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     ConsensusInterface,
+    PoolInterface,
     ReputationAggregatorInterface,
     ResolverInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
+use lightning_pool::config::Config as PoolConfig;
+use lightning_pool::pool::Pool;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
@@ -30,6 +33,7 @@ partial!(TestBinding {
     SignerInterface = Signer<Self>;
     BroadcastInterface = Broadcast<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
+    PoolInterface = Pool<Self>;
 });
 
 #[tokio::test]
@@ -91,6 +95,8 @@ async fn test_start_shutdown() {
     )
     .unwrap();
 
+    let pool = Pool::<TestBinding>::init(PoolConfig::default(), &signer).unwrap();
+
     let broadcast = Broadcast::<TestBinding>::init(
         BroadcastConfig::default(),
         query_runner.clone(),
@@ -98,6 +104,7 @@ async fn test_start_shutdown() {
         &signer,
         Default::default(),
         rep_aggregator.get_reporter(),
+        &pool,
     )
     .unwrap();
 

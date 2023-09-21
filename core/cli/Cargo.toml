@@ -24,6 +24,7 @@ lightning-rpc = { path = "../rpc" }
 lightning-service-executor = { path = "../service-executor" }
 lightning-signer = { path = "../signer" }
 lightning-topology = { path = "../topology" }
+lightning-pool = { path = "../pool" }
 lightning-types = { path = "../types" }
 mock = { path = "../mock" }
 tokio.workspace = true
