@@ -4007,6 +4007,7 @@ dependencies = [
  "lightning-schema",
  "lightning-types",
  "log",
+ "netkit",
  "serde",
  "serde-big-array",
  "thiserror",
@@ -4092,6 +4093,23 @@ dependencies = [
  "anyhow",
  "lightning-interfaces",
  "serde",
+]
+
+[[package]]
+name = "lightning-pool"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "infusion",
+ "lightning-application",
+ "lightning-interfaces",
+ "lightning-signer",
+ "lightning-test-utils",
+ "log",
+ "netkit",
+ "serde",
+ "tokio",
 ]
 
 [[package]]

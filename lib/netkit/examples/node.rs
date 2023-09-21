@@ -38,7 +38,9 @@ async fn main() {
     let request_tx = endpoint.request_sender();
     let (service_scope, mut event_rx) = endpoint.network_event_receiver();
 
-    tokio::spawn(endpoint.start());
+    tokio::spawn(async move {
+        endpoint.start().await.unwrap();
+    });
 
     match cli.command {
         Commands::Pulse {

@@ -130,8 +130,6 @@ pub struct Endpoint {
 
 impl Endpoint {
     pub fn new(sk: NodeSecretKey, address: SocketAddr, server_config: ServerConfig) -> Self {
-        //let (network_event_tx, network_event_rx) = mpsc::channel(1024);
-
         let (request_tx, request_rx) = mpsc::channel(1024);
         Self {
             address,
@@ -145,8 +143,6 @@ impl Endpoint {
             driver_set: JoinSet::new(),
             connecting: FuturesUnordered::new(),
             pending_dial: HashMap::new(),
-            //network_event_tx,
-            //network_event_rx: Some(network_event_rx),
             network_event_tx: HashMap::new(),
             service_scope: 0,
         }
@@ -167,7 +163,7 @@ impl Endpoint {
     }
 
     // Todo: Return metrics.
-    pub async fn start(mut self) -> Result<()> {
+    pub async fn start(&mut self) -> Result<()> {
         let endpoint = quinn::Endpoint::server(self.server_config.clone(), self.address)?;
         tracing::info!("bound to {:?}", endpoint.local_addr()?);
 

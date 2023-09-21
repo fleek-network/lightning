@@ -1,0 +1,21 @@
+[package]
+name = "lightning-pool"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lightning-interfaces = {path="../interfaces"}
+serde.workspace = true
+anyhow.workspace = true
+netkit.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+log.workspace = true
+
+[dev-dependencies]
+lightning-application = {path="../application", features = ["test"]}
+lightning-signer = {path="../signer"}
+lightning-test-utils = { path = "../test-utils" }
+infusion.workspace = true
