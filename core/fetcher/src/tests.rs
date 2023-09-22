@@ -165,7 +165,7 @@ async fn init_fetcher(
         authority: format!("127.0.0.1:{ipfs_gateway_port}"),
     });
     let ipfs_origin =
-        IPFSOrigin::<TestBinding>::init(IPFSOriginConfig::default(), blockstore.clone()).unwrap();
+        IPFSOrigin::<TestBinding>::init(ipfs_origin_config, blockstore.clone()).unwrap();
     ipfs_origin.start().await;
 
     let fetcher = Fetcher::<TestBinding>::init(
