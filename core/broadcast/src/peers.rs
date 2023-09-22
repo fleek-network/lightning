@@ -10,10 +10,10 @@ use fleek_crypto::NodePublicKey;
 use futures::stream::FuturesUnordered;
 use futures::Future;
 use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
+use lightning_interfaces::pool::{NodeAddress, PoolMessage, PoolRequest, ServiceScope};
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::SyncQueryRunnerInterface;
-use netkit::endpoint::{Message as NetkitMessage, NodeAddress, Request, ServiceScope};
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::ev::Topology;
@@ -34,13 +34,13 @@ pub struct Peers {
     /// Map each public key to the info we have about that peer.
     peers: im::HashMap<NodePublicKey, Peer>,
     /// Sender for requests to endpoint.
-    endpoint_tx: Sender<Request>,
+    endpoint_tx: Sender<PoolRequest>,
     /// Service scope for netkit.
     service_scope: ServiceScope,
 }
 
 impl Peers {
-    pub fn new(endpoint_tx: Sender<Request>, service_scope: ServiceScope) -> Self {
+    pub fn new(endpoint_tx: Sender<PoolRequest>, service_scope: ServiceScope) -> Self {
         Self {
             us: 0,
             pinned: Default::default(),
@@ -182,13 +182,13 @@ impl Peers {
             pk: *remote,
         };
         let endpoint_tx = self.endpoint_tx.clone();
-        let message = NetkitMessage {
+        let message = PoolMessage {
             service: self.service_scope,
             payload: writer,
         };
         tokio::spawn(async move {
             if endpoint_tx
-                .send(Request::SendMessage {
+                .send(PoolRequest::SendMessage {
                     peer: peer_address,
                     message,
                 })
@@ -227,13 +227,13 @@ impl Peers {
             pk: *remote,
         };
         let endpoint_tx = self.endpoint_tx.clone();
-        let message = NetkitMessage {
+        let message = PoolMessage {
             service: self.service_scope,
             payload: writer,
         };
         tokio::spawn(async move {
             if endpoint_tx
-                .send(Request::SendMessage {
+                .send(PoolRequest::SendMessage {
                     peer: peer_address,
                     message,
                 })
@@ -280,7 +280,7 @@ impl Peers {
 
             let sender = endpoint_tx.clone();
             let msg = message.clone();
-            let message = NetkitMessage {
+            let message = PoolMessage {
                 service: service_scope,
                 payload: msg,
             };
@@ -298,7 +298,7 @@ impl Peers {
                     pk,
                 };
                 if sender
-                    .send(Request::SendMessage {
+                    .send(PoolRequest::SendMessage {
                         peer: address,
                         message,
                     })

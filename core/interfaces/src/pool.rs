@@ -1,4 +1,10 @@
-use netkit::endpoint::{Event, Request, ServiceScope};
+pub use netkit::endpoint::{
+    Event,
+    Message as PoolMessage,
+    NodeAddress,
+    Request as PoolRequest,
+    ServiceScope,
+};
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::infu_collection::{c, Collection};
@@ -31,5 +37,5 @@ pub trait PoolInterface<C: Collection>:
     /// # Panics
     ///
     /// This method will panic if it is called after starting the pool.
-    fn request_sender(&self) -> Sender<Request>;
+    fn request_sender(&self) -> Sender<PoolRequest>;
 }

@@ -15,6 +15,7 @@ use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, Secre
 use infusion::c;
 use ink_quill::ToDigest;
 use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::pool::{Event, NodeAddress, PoolRequest, ServiceScope};
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{NodeIndex, Topic};
 use lightning_interfaces::{
@@ -27,7 +28,6 @@ use lightning_interfaces::{
     Weight,
 };
 use lightning_metrics::{counter, histogram, increment_counter};
-use netkit::endpoint::{Event, NodeAddress, Request, ServiceScope};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
@@ -69,7 +69,7 @@ pub struct Context<C: Collection> {
     topology: c![C::TopologyInterface],
     rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     network_event_rx: Receiver<Event>,
-    endpoint_tx: Sender<Request>,
+    endpoint_tx: Sender<PoolRequest>,
     sk: NodeSecretKey,
     pk: NodePublicKey,
     current_node_index: OnceCell<NodeIndex>,
@@ -85,7 +85,7 @@ impl<C: Collection> Context<C> {
         topology: c![C::TopologyInterface],
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
         network_event_rx: Receiver<Event>,
-        endpoint_tx: Sender<Request>,
+        endpoint_tx: Sender<PoolRequest>,
         sk: NodeSecretKey,
         service_scope: ServiceScope,
     ) -> Self {
@@ -191,7 +191,7 @@ impl<C: Collection> Context<C> {
             let address = NodeAddress { pk, socket_address };
             tokio::spawn(async move {
                 if endpoint_tx
-                    .send(Request::Connect { peer: address })
+                    .send(PoolRequest::Connect { peer: address })
                     .await
                     .is_err()
                 {
