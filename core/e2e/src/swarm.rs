@@ -307,9 +307,7 @@ fn build_config(
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<Broadcast<FinalTypes>>(BroadcastConfig {
-        address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
-    });
+    config.inject::<Broadcast<FinalTypes>>(BroadcastConfig {});
 
     config.inject::<Blockstore<FinalTypes>>(BlockstoreConfig {
         root: root
