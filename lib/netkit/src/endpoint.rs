@@ -25,6 +25,7 @@ use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use x509_parser::nom::AsBytes;
 
+use crate::driver::Context;
 use crate::{driver, tls};
 
 pub type ServiceScope = u8;
@@ -120,12 +121,8 @@ pub struct Endpoint {
     driver: HashMap<NodePublicKey, Sender<DriverRequest>>,
     /// Ongoing drivers.
     driver_set: JoinSet<NodePublicKey>,
-    // Sender for network events.
-    //network_event_tx: Sender<Event>,
     network_event_tx: HashMap<ServiceScope, mpsc::Sender<Event>>,
     service_scope: ServiceScope,
-    // Receiver for network events.
-    //network_event_rx: Option<Receiver<Event>>,
 }
 
 impl Endpoint {
@@ -286,9 +283,8 @@ impl Endpoint {
                     tracing::error!("endpoint client dropped the network event receiver");
                 }
             }
-            if let Err(e) =
-                driver::start_driver(connection, peer, request_rx, network_event_tx, incoming).await
-            {
+            let ctx = Context::new(connection, peer, request_rx, network_event_tx, incoming);
+            if let Err(e) = driver::start_driver(ctx).await {
                 tracing::error!("driver for connection with {peer:?} shutdowned: {e:?}")
             }
             peer
@@ -321,6 +317,7 @@ impl Endpoint {
                 {
                     self.enqueue_dial_task(peer)?;
                 }
+                // Todo: We should let client know that we already have a connection.
             },
             Request::SendMessage { peer, message } => {
                 if self

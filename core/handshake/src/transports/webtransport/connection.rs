@@ -3,9 +3,9 @@ use bytes::Bytes;
 use futures::{SinkExt, StreamExt};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use wtransport::endpoint::{IncomingSession};
-use wtransport::{Endpoint, RecvStream, SendStream};
 use wtransport::endpoint::endpoint_side::Server;
+use wtransport::endpoint::IncomingSession;
+use wtransport::{Endpoint, RecvStream, SendStream};
 
 use crate::schema::HandshakeRequestFrame;
 use crate::shutdown::ShutdownWaiter;
