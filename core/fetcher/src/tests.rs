@@ -175,6 +175,7 @@ async fn init_fetcher(
         blockstore.clone(),
         resolver,
         &ipfs_origin,
+        &pool,
     )
     .unwrap();
     (

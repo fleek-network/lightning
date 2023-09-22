@@ -38,11 +38,16 @@ use lightning_interfaces::{
     FetcherInterface,
     MempoolSocket,
     OriginProviderInterface,
+    PoolInterface,
     RpcInterface,
+    SignerInterface,
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use lightning_origin_ipfs::{Config as OriginIPFSConfig, IPFSOrigin};
+use lightning_pool::config::Config as PoolConfig;
+use lightning_pool::pool::Pool;
+use lightning_signer::{Config as SignerConfig, Signer};
 use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -81,6 +86,8 @@ partial!(TestBinding {
     RpcInterface = Rpc<Self>;
     BlockStoreInterface = Blockstore<Self>;
     OriginProviderInterface = IPFSOrigin<Self>;
+    SignerInterface = Signer<Self>;
+    PoolInterface = Pool<Self>;
 });
 
 fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
@@ -88,11 +95,14 @@ fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
     let ipfs_origin =
         IPFSOrigin::<TestBinding>::init(OriginIPFSConfig::default(), blockstore.clone()).unwrap();
 
+    let signer = Signer::<TestBinding>::init(SignerConfig::test(), app.sync_query()).unwrap();
+    let pool = Pool::<TestBinding>::init(PoolConfig::default(), &signer).unwrap();
     let fetcher = Fetcher::<TestBinding>::init(
         FetcherConfig::default(),
         blockstore,
         Default::default(),
         &ipfs_origin,
+        &pool,
     )
     .unwrap();
     let rpc = Rpc::<TestBinding>::init(

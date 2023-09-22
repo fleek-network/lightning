@@ -13,6 +13,7 @@ use lightning_interfaces::{
     FetcherSocket,
     OriginProviderInterface,
     OriginProviderSocket,
+    PoolInterface,
     ResolverInterface,
     WithStartAndShutdown,
 };
@@ -39,6 +40,7 @@ impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
         blockstore: C::BlockStoreInterface,
         resolver: C::ResolverInterface,
         origin: &C::OriginProviderInterface,
+        pool: &C::PoolInterface,
     ) -> anyhow::Result<Self> {
         let (socket, socket_rx) = Socket::raw_bounded(2048);
         let (shutdown_tx, shutdown_rx) = mpsc::channel(10);
@@ -50,6 +52,9 @@ impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
             resolver,
             shutdown_rx: Arc::new(Mutex::new(Some(shutdown_rx))),
         };
+
+        let (_service_scope, _network_event_rx) = pool.network_event_receiver();
+        let _endpoint_tx = pool.request_sender();
 
         Ok(Self {
             inner: Arc::new(inner),

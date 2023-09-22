@@ -8,6 +8,7 @@ use crate::{
     ConfigConsumer,
     ConfigProviderInterface,
     OriginProviderInterface,
+    PoolInterface,
     ResolverInterface,
     WithStartAndShutdown,
 };
@@ -24,12 +25,14 @@ pub trait FetcherInterface<C: Collection>:
         blockstore: ::BlockStoreInterface,
         resolver: ::ResolverInterface,
         origin: ::OriginProviderInterface,
+        pool: ::PoolInterface,
     ) {
         Self::init(
             config.get::<Self>(),
             blockstore.clone(),
             resolver.clone(),
             origin,
+            pool,
         )
     }
 
@@ -39,6 +42,7 @@ pub trait FetcherInterface<C: Collection>:
         blockstore: C::BlockStoreInterface,
         resolver: C::ResolverInterface,
         origin: &C::OriginProviderInterface,
+        pool: &C::PoolInterface,
     ) -> anyhow::Result<Self>;
 
     /// Returns a socket that can be used to submit requests to the fetcher.

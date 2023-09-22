@@ -29,7 +29,8 @@ lightning-application = { path = "../application" }
 lightning-fetcher = { path = "../fetcher" }
 lightning-blockstore = { path = "../blockstore" }
 lightning-origin-ipfs = { path = "../origin-ipfs" }
-#lightning-consensus = {path="../consensus"}
+lightning-pool = { path="../pool" }
+lightning-signer = { path="../signer" }
 
 [features]
 e2e-test = []
