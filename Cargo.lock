@@ -1321,6 +1321,8 @@ dependencies = [
  "fleek-crypto",
  "futures",
  "log",
+ "ring",
+ "rustls 0.21.7",
  "tokio",
  "tokio-util 0.7.8",
  "wtransport",
@@ -4426,9 +4428,9 @@ dependencies = [
 
 [[package]]
 name = "ls-qpack"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c9cc09e1708f1d8b7bea73a87192bf110ebe890585307d4a8b1c12c0a2d2bab"
+checksum = "869de947fe9a873891d6c50d19ef327a4a8cf10a1e03e8f4a75e836ca1a7a606"
 dependencies = [
  "libc",
  "ls-qpack-sys",
@@ -4436,9 +4438,9 @@ dependencies = [
 
 [[package]]
 name = "ls-qpack-sys"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf41337c03c786bceca7954ab1037254886c09df8dd413e5faf9401cfb5c3c55"
+checksum = "129f83365de45553cbb7a903d3ac13ff524b9fbee719c38ddf858693f728e26c"
 dependencies = [
  "bindgen 0.66.1",
  "cmake",
@@ -9256,16 +9258,15 @@ dependencies = [
 
 [[package]]
 name = "wtransport"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e917b4460c9bdd764da8da36c84d0b3a55cefef9b1d02ea618367760bcb349a"
+version = "0.1.4"
+source = "git+https://github.com/kckeiks/wtransport.git?branch=lightning-wtransport#6d96f53e6bce6a92013bc5e3a45ce4e9df8d01fd"
 dependencies = [
  "bytes",
  "quinn",
- "quinn-proto",
  "rustls 0.21.7",
  "rustls-native-certs",
  "rustls-pemfile",
+ "socket2 0.5.3",
  "thiserror",
  "tokio",
  "tracing",
@@ -9275,9 +9276,8 @@ dependencies = [
 
 [[package]]
 name = "wtransport-proto"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff825d2f61eec48c8429c4a6cb1c4835eab113aaacd18cfe2ce867ea2cca9e05"
+version = "0.1.4"
+source = "git+https://github.com/kckeiks/wtransport.git?branch=lightning-wtransport#6d96f53e6bce6a92013bc5e3a45ce4e9df8d01fd"
 dependencies = [
  "ls-qpack",
  "octets",

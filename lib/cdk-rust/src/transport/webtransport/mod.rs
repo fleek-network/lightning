@@ -7,9 +7,10 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{Sink, Stream};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use wtransport::endpoint::Client;
+use wtransport::endpoint::endpoint_side::Client;
 use wtransport::{ClientConfig, Endpoint, RecvStream, SendStream};
 
+use crate::tls;
 use crate::transport::Transport;
 
 pub struct WebTransport {
@@ -24,7 +25,7 @@ impl WebTransport {
             // Todo: We need to customize handshake to validate server certificate hashes.
             // Maybe we don't have to do this if we perform authentication using keys
             // in a custom TLS validator similarly to libp2p.
-            .with_no_cert_validation()
+            .with_custom_tls(tls::tls_config(config.server_hashes))
             .build();
         let endpoint = Endpoint::client(client_config)?;
         Ok(Self {
@@ -36,7 +37,7 @@ impl WebTransport {
 
 pub struct Config {
     pub target: String,
-    pub _server_hashes: Vec<[u8; 32]>,
+    pub server_hashes: Vec<Vec<u8>>,
     pub bind_address: SocketAddr,
 }
 
