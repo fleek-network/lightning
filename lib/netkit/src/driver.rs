@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
+use affair::{AsyncWorker, Executor, TokioSpawn};
 use anyhow::Result;
+use async_trait::async_trait;
 use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
 use futures::{SinkExt, StreamExt};
@@ -54,7 +56,10 @@ pub async fn start_driver(mut ctx: Context) -> Result<()> {
 
     // The first stream is used for sending messages.
     // This stream is used by all services that wish to send messages.
-    let mut message_stream_tx = FramedWrite::new(stream_tx, LengthDelimitedCodec::new());
+    let message_stream_tx = FramedWrite::new(stream_tx, LengthDelimitedCodec::new());
+    let message_sender_socket = TokioSpawn::spawn_async(MessageSender {
+        tx: message_stream_tx,
+    });
     let mut message_stream_rx = FramedRead::new(stream_rx, LengthDelimitedCodec::new());
 
     loop {
@@ -75,9 +80,12 @@ pub async fn start_driver(mut ctx: Context) -> Result<()> {
                 match request {
                     None => break,
                     Some(DriverRequest::Message(message)) => {
-                        // Todo: make this to a worker and use a socket here.
-                        // to avoid waiting on this main loop.
-                        message_stream_tx.send(Bytes::from(message)).await?
+                        let tx = message_sender_socket.clone();
+                        tokio::spawn(async move{
+                            if let Err(e) = tx.run(message).await {
+                                tracing::error!("failed to send message: {e:?}");
+                            }
+                        });
                     },
                     Some(DriverRequest::NewStream { service, respond }) => {
                         let connection = ctx.connection.clone();
@@ -156,4 +164,18 @@ async fn create_stream(
     respond
         .send(Ok((tx, rx)))
         .map_err(|e| anyhow::anyhow!("failed to send new stream to client: {e:?}"))
+}
+
+pub struct MessageSender {
+    tx: FramedWrite<SendStream, LengthDelimitedCodec>,
+}
+
+#[async_trait]
+impl AsyncWorker for MessageSender {
+    type Request = Message;
+    type Response = Result<()>;
+
+    async fn handle(&mut self, req: Self::Request) -> Self::Response {
+        self.tx.send(Bytes::from(req)).await.map_err(Into::into)
+    }
 }
