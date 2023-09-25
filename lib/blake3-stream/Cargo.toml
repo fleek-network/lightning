@@ -9,9 +9,14 @@ anyhow = "1.0.71"
 arrayref = "0.3.7"
 blake3-tree = { path = "../blake3-tree" }
 bytes = "1.4.0"
+tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
+
+[features]
+default = [ "tokio" ]
+tokio = ["dep:tokio"]
 
 [[bench]]
 name = "encode"

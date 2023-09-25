@@ -116,4 +116,27 @@ mod tests {
 
         Ok(())
     }
+
+    #[cfg(feature = "tokio")]
+    #[tokio::test]
+    async fn tokio_encode_and_decode() -> std::io::Result<()> {
+        use crate::TokioEncoder;
+
+        for &content_len in TEST_CASES {
+            let (content, tree) = get_content_and_tree(content_len);
+
+            let mut encoded_buffer = Vec::new();
+            let mut encoder = TokioEncoder::new(&mut encoded_buffer, content.len(), tree.clone())?;
+
+            encoder.write(&content).await?;
+
+            let mut decoder = VerifiedDecoder::new(encoded_buffer.as_slice(), tree.hash.into());
+            let mut decoded_buffer = Vec::with_capacity(content_len);
+            decoder.read_to_end(&mut decoded_buffer)?;
+
+            assert_eq!(content, decoded_buffer);
+        }
+
+        Ok(())
+    }
 }
