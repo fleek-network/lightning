@@ -120,7 +120,9 @@ mod tests {
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn tokio_encode_and_decode() -> std::io::Result<()> {
-        use crate::TokioEncoder;
+        use bytes::BufMut;
+
+        use crate::{TokioEncoder, TokioFrameDecoder};
 
         for &content_len in TEST_CASES {
             let (content, tree) = get_content_and_tree(content_len);
@@ -130,9 +132,15 @@ mod tests {
 
             encoder.write(&content).await?;
 
-            let mut decoder = VerifiedDecoder::new(encoded_buffer.as_slice(), tree.hash.into());
-            let mut decoded_buffer = Vec::with_capacity(content_len);
-            decoder.read_to_end(&mut decoded_buffer)?;
+            let mut decoder = TokioFrameDecoder::new(std::io::Cursor::new(encoded_buffer));
+            let mut decoded_buffer = BytesMut::with_capacity(content.len());
+
+            while let Some(frame) = decoder.next_frame().await? {
+                match frame {
+                    crate::FrameBytes::Proof(_) => {}, // don't verify for this test
+                    crate::FrameBytes::Chunk(bytes) => decoded_buffer.put(bytes),
+                }
+            }
 
             assert_eq!(content, decoded_buffer);
         }
