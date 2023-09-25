@@ -3,7 +3,6 @@ pub mod cli;
 mod commands;
 mod config;
 mod shutdown;
-mod testnet_sync;
 mod types;
 mod utils;
 

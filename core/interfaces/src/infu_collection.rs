@@ -76,7 +76,6 @@ impl<C: Collection> Node<C> {
         provider.get::<C::RpcInterface>();
         provider.get::<C::DhtInterface>();
         provider.get::<C::ServiceExecutorInterface>();
-        provider.get::<C::SignerInterface>();
         provider.get::<C::FetcherInterface>();
         provider.get::<C::PoolInterface>();
     }
