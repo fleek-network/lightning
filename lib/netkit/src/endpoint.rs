@@ -52,9 +52,9 @@ pub struct NodeAddress {
 
 #[derive(Debug)]
 pub enum Request {
-    Connect {
-        peer: NodeAddress,
-    },
+    #[deprecated(note = "Use stream api.")]
+    Connect { peer: NodeAddress },
+    #[deprecated(note = "Use stream api.")]
     SendMessage {
         /// Peer to connect to.
         peer: NodeAddress,
@@ -79,6 +79,7 @@ pub enum Request {
 
 #[derive(Debug)]
 pub enum Event {
+    #[deprecated(note = "Use stream api.")]
     Message {
         peer: NodePublicKey,
         message: Message,
@@ -88,14 +89,14 @@ pub enum Event {
         tx: SendStream,
         rx: RecvStream,
     },
+    #[deprecated(note = "Use stream api.")]
     NewConnection {
         incoming: bool,
         peer: NodePublicKey,
         rtt: Duration,
     },
-    Disconnect {
-        peer: NodePublicKey,
-    },
+    #[deprecated(note = "Use stream api.")]
+    Disconnect { peer: NodePublicKey },
 }
 
 pub struct Endpoint {
