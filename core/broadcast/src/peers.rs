@@ -10,7 +10,7 @@ use fleek_crypto::NodePublicKey;
 use futures::stream::FuturesUnordered;
 use futures::Future;
 use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
-use lightning_interfaces::pool::{NodeAddress, PoolMessage, PoolRequest, ServiceScope};
+use lightning_interfaces::dpool::{NodeAddress, PoolMessage, PoolRequest, ServiceScope};
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::SyncQueryRunnerInterface;

@@ -14,8 +14,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
 use infusion::c;
 use ink_quill::ToDigest;
+use lightning_interfaces::dpool::{Event, NodeAddress, PoolRequest, ServiceScope};
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::pool::{Event, NodeAddress, PoolRequest, ServiceScope};
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{NodeIndex, Topic};
 use lightning_interfaces::{
