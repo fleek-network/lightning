@@ -53,7 +53,7 @@ async fn main() {
     let bootstrap_secret_key = NodeSecretKey::decode_pem(bootstrap_key_pem).unwrap();
 
     let bootstrap_key = match cli.bootstrapper_key {
-        Some(bootstrapper_key) => NodePublicKey::from_base64(&bootstrapper_key)
+        Some(bootstrapper_key) => NodePublicKey::from_base58(&bootstrapper_key)
             .expect("Failed to parse bootstrap public key"),
         None => bootstrap_secret_key.to_pk(),
     };

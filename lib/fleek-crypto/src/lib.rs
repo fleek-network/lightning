@@ -1,5 +1,5 @@
 mod address;
-pub(crate) mod base64_array;
+pub(crate) mod base58_array;
 pub(crate) mod hex_array;
 mod keys;
 mod traits;

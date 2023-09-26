@@ -125,14 +125,14 @@ async fn main() -> Result<()> {
     ));
     s.push_str(&format!(
         "DHT Bootstrapper Public Key: {}\n\n",
-        bootstrap_secret_key.to_pk().to_base64()
+        bootstrap_secret_key.to_pk().to_base58()
     ));
 
     s.push_str("#####################################\n\n");
     for (pub_key, rpc_address) in swarm.get_rpc_addresses() {
         s.push_str(&format!(
             "Public Key: {}\nRPC Address: {}\n\n",
-            pub_key.to_base64(),
+            pub_key.to_base58(),
             rpc_address
         ));
     }

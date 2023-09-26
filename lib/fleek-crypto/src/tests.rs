@@ -11,7 +11,7 @@ oSQDIgADbn0owIbD5+gHfyMLRqhrni5fryqoUsVdKwh2FZjWxLc=
 
     assert_eq!(
         pubkey.to_string(),
-        "A259KMCGw+foB38jC0aoa54uX68qqFLFXSsIdhWY1sS3"
+        "228FehnRsJbWjdP5VCW8teLLhPvhr1oBf6FngsszA44mk"
     );
 }
 

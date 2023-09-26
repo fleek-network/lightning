@@ -5,13 +5,13 @@ use arrayref::array_ref;
 use derive_more::{AsRef, From};
 use fastcrypto::bls12381::min_sig::{BLS12381PublicKey, BLS12381Signature};
 use fastcrypto::ed25519::{Ed25519PublicKey, Ed25519Signature};
-use fastcrypto::encoding::{Base64, Encoding};
+use fastcrypto::encoding::{Base58, Encoding};
 use fastcrypto::secp256k1::recoverable::Secp256k1RecoverableSignature;
 use fastcrypto::secp256k1::Secp256k1PublicKey;
 use fastcrypto::traits::{ToFromBytes, VerifyRecoverable, VerifyingKey};
 use serde::{Deserialize, Serialize};
 
-use crate::{base64_array, PublicKey};
+use crate::{base58_array, PublicKey};
 
 macro_rules! impl_pk_sig {
     // If the name of the verify function is not provided. Default it to `verify`.
@@ -32,12 +32,12 @@ macro_rules! impl_pk_sig {
         #[derive(
             From, AsRef, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize,
         )]
-        pub struct $pk_name(#[serde(with = "base64_array")] pub [u8; $pk_size]);
+        pub struct $pk_name(#[serde(with = "base58_array")] pub [u8; $pk_size]);
 
         #[derive(
             From, AsRef, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize,
         )]
-        pub struct $sig_name(#[serde(with = "base64_array")] pub [u8; $sig_size]);
+        pub struct $sig_name(#[serde(with = "base58_array")] pub [u8; $sig_size]);
 
         impl PublicKey for $pk_name {
             type Signature = $sig_name;
@@ -48,12 +48,12 @@ macro_rules! impl_pk_sig {
                 pubkey.$verify(digest, &signature.into()).is_ok()
             }
 
-            fn to_base64(&self) -> String {
-                Base64::encode(self.0)
+            fn to_base58(&self) -> String {
+                Base58::encode(self.0)
             }
 
-            fn from_base64(encoded: &str) -> Option<Self> {
-                let bytes = Base64::decode(encoded).ok()?;
+            fn from_base58(encoded: &str) -> Option<Self> {
+                let bytes = Base58::decode(encoded).ok()?;
                 (bytes.len() == $pk_size).then(|| Self(*arrayref::array_ref!(bytes, 0, $pk_size)))
             }
         }
@@ -62,7 +62,7 @@ macro_rules! impl_pk_sig {
 
         impl Display for $pk_name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}", self.to_base64())
+                write!(f, "{}", self.to_base58())
             }
         }
 
@@ -71,7 +71,7 @@ macro_rules! impl_pk_sig {
                 write!(
                     f,
                     concat!(stringify!($pk_name), r#"("{}")"#),
-                    self.to_base64()
+                    self.to_base58()
                 )
             }
         }
@@ -79,10 +79,10 @@ macro_rules! impl_pk_sig {
         impl FromStr for $pk_name {
             type Err = std::io::Error;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
-                let bytes = Base64::decode(s).map_err(|_| {
+                let bytes = Base58::decode(s).map_err(|_| {
                     std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
-                        "Public key not in base64 format.",
+                        "Public key not in base58 format.",
                     )
                 })?;
 
@@ -99,7 +99,7 @@ macro_rules! impl_pk_sig {
 
         impl Display for $sig_name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}", Base64::encode(self.0))
+                write!(f, "{}", Base58::encode(self.0))
             }
         }
 
@@ -108,7 +108,7 @@ macro_rules! impl_pk_sig {
                 write!(
                     f,
                     concat!(stringify!($pk_name), r#"("{}")"#),
-                    Base64::encode(self.0)
+                    Base58::encode(self.0)
                 )
             }
         }
@@ -116,10 +116,10 @@ macro_rules! impl_pk_sig {
         impl FromStr for $sig_name {
             type Err = std::io::Error;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
-                let bytes = Base64::decode(s).map_err(|_| {
+                let bytes = Base58::decode(s).map_err(|_| {
                     std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
-                        "Signature not in base64 format.",
+                        "Signature not in base58 format.",
                     )
                 })?;
 

@@ -9,7 +9,7 @@
 //! struct Data(#[serde(with = "base64_array") [u8; 128])
 //! ```
 
-use fastcrypto::encoding::{Base64, Encoding};
+use fastcrypto::encoding::{Base58, Encoding};
 use serde::{Deserialize, Deserializer, Serializer};
 use serde_big_array::BigArray;
 
@@ -18,7 +18,7 @@ where
     S: Serializer,
 {
     if serializer.is_human_readable() {
-        let base64 = Base64::encode(data);
+        let base64 = Base58::encode(data);
         serializer.serialize_str(&base64)
     } else {
         // This uses `BigArray::serialize`.
@@ -32,7 +32,7 @@ where
 {
     if deserializer.is_human_readable() {
         let str: String = String::deserialize(deserializer)?;
-        let vec = Base64::decode(&str).map_err(serde::de::Error::custom)?;
+        let vec = Base58::decode(&str).map_err(serde::de::Error::custom)?;
 
         if vec.len() != N {
             return Err(serde::de::Error::custom("Invalid size."));

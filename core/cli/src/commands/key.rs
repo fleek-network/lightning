@@ -71,7 +71,7 @@ async fn show_key<C: Collection<SignerInterface = Signer<C>>>(
             .with_context(|| "Failed to read node pem file")?;
         let node_secret_key = NodeSecretKey::decode_pem(&node_secret_key)
             .with_context(|| "Failed to decode node pem file")?;
-        println!("Node Public Key: {}", node_secret_key.to_pk().to_base64());
+        println!("Node Public Key: {}", node_secret_key.to_pk().to_base58());
     } else {
         eprintln!("Node Public Key: does not exist");
     }
@@ -83,7 +83,7 @@ async fn show_key<C: Collection<SignerInterface = Signer<C>>>(
             .with_context(|| "Failed to decode consensus pem file")?;
         println!(
             "Consensus Public Key: {}",
-            consensus_secret_key.to_pk().to_base64()
+            consensus_secret_key.to_pk().to_base58()
         );
     } else {
         eprintln!("Consensus Public Key: does not exist");

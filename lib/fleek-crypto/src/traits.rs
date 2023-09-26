@@ -8,10 +8,10 @@ pub trait PublicKey: Sized {
     fn verify(&self, signature: &Self::Signature, digest: &[u8; 32]) -> bool;
 
     /// Encode and return this public key as a string.
-    fn to_base64(&self) -> String;
+    fn to_base58(&self) -> String;
 
     /// Decode a public key.
-    fn from_base64(encoded: &str) -> Option<Self>;
+    fn from_base58(encoded: &str) -> Option<Self>;
 }
 
 pub trait SecretKey: Sized + ZeroizeOnDrop {
@@ -20,10 +20,10 @@ pub trait SecretKey: Sized + ZeroizeOnDrop {
     /// Generate a random secret key using a secure source of randomness.
     fn generate() -> Self;
 
-    ///
+    /// Decode pem data
     fn decode_pem(encoded: &str) -> Option<Self>;
 
-    /// Encode
+    /// Encode pem data
     fn encode_pem(&self) -> String;
 
     /// Sign a raw digest of a message.
