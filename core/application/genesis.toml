@@ -17,9 +17,9 @@ governance_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 
 [[node_info]]
 owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
-primary_public_key = "0UQnMH+oHTzvNCw+TGhXLgIo1uim+JDiTvQxdGqAu/A="
-consensus_public_key = "l0Jel6KEFG7H6sV2nWKOQxDaMKWMeiUBqK5VHKcStWrLPHAANRB+dt7gp0jQ7ooxEaI7ukOQZk6U5vcL7ESHA1J/iAWQ7YNO/ZCvR1pfWfcTNBONIzeiUWAN+iyKfV10"
-worker_public_key = "0UQnMH+oHTzvNCw+TGhXLgIo1uim+JDiTvQxdGqAu/A="
+primary_public_key = "F5tV4PLSzx1Lt4mYBe13aYQ8hsLMTCfjgY2pLr82AumH"
+consensus_public_key = "u76G7q22Qc5nRC5Fi6dzbNE7FQxqRKEtTS9qjDftWFwhBKmoozGLv8wFiFmGnYDFMEKyYxozWRdM3wgjs1Na3fvxDARxi9CSNJUZJfPXC2WUu3uLnUw96jPBRp7rtHEzS5H"
+worker_public_key = "F5tV4PLSzx1Lt4mYBe13aYQ8hsLMTCfjgY2pLr82AumH"
 primary_domain = "127.0.0.1"
 worker_domain = "127.0.0.1"
 ports.primary = 18000
@@ -38,9 +38,9 @@ genesis_committee = true
 
 [[node_info]]
 owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
-primary_public_key = "Bh4HY09Du+3UqAlVXTk9oyJaIj0o3JPA/0scTCwaEWc="
-consensus_public_key = "qipezx5pzmPFWICevMx+SL5+bIjG4yw3A9ieYKKwf2wTEvK0gMRYOln9+KmbNRB3FRbVQBLuCEWIHT0V9GxATT9VeJ+HT88vh/B/6dj7CbWBdWbZ4QXzo0q+uyGchopl"
-worker_public_key = "Bh4HY09Du+3UqAlVXTk9oyJaIj0o3JPA/0scTCwaEWc="
+primary_public_key = "Qt1DzUoTEn7n4itYpAPhaDsXhcriuXe1e7n7uZztGfg"
+consensus_public_key = "21cq5icj1pWKk9DBwdUFSW6nqBrwtzHtvKWcLNrqFRxZV8UbdKYzdoSs8C1u7s7M4FKADDqsHnxETh56hdSK2Z65nsbW3xME1fNcT1s8dfHwCFk567mV4fmSSgH73mTe1H3a"
+worker_public_key = "Qt1DzUoTEn7n4itYpAPhaDsXhcriuXe1e7n7uZztGfg"
 primary_domain = "127.0.0.1"
 worker_domain = "127.0.0.1"
 ports.primary = 28000
@@ -59,9 +59,9 @@ genesis_committee = true
 
 [[node_info]]
 owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
-primary_public_key = "b87GFUI1X6OSU4pDDHkx3bIPVDAedUWU3UDU07oeDO0="
-consensus_public_key = "mAT9YIKvBhmi8L3e50/pr/dna1EaYELYTBuTwWgc7qoj5GrJ86/+7aX2mubVYOMxCUr2CO4H5nCgBBssNJ2u/buAPeM4MmEl+wmPgrX0uAAMzHyUOYQKVHCBFeFWsHJR"
-worker_public_key = "b87GFUI1X6OSU4pDDHkx3bIPVDAedUWU3UDU07oeDO0="
+primary_public_key = "8XT8Kb1PCd2kzmwHLQ8Nw9aAuKJin6tihaPQBCyf6ymn"
+consensus_public_key = "uNHES9wjYK3HkbcPWrBiQQZ2NmcfBVKke8tbH9X7RFT9ZvjL5f55FfPvpjh2RWpxTRyMhKAxYG42TaRv2RGyEZkYcx2aJMfgPYqYaiT8KC1EPHzJYgVmYc7z2ER69LNWC7r"
+worker_public_key = "8XT8Kb1PCd2kzmwHLQ8Nw9aAuKJin6tihaPQBCyf6ymn"
 primary_domain = "127.0.0.1"
 worker_domain = "127.0.0.1"
 ports.primary = 38000
@@ -80,9 +80,9 @@ genesis_committee = true
 
 [[node_info]]
 owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
-primary_public_key = "tJ2YAWTAGpnrlzL6FKplxzeszk+TR0n0wDwpBPb1Lvk="
-consensus_public_key = "kIUjk8SwabLQ9fb92TQB09dEw5O8cNWFmCEEmIpj+/1tQTKUSXpdOOJRKkPUj9HWBOJKIyhno6OIxsmXKHMLmd3p37gJZVVRRtCV2A1FRo9q5rDg/IoGtQGkOEDJamN5"
-worker_public_key = "tJ2YAWTAGpnrlzL6FKplxzeszk+TR0n0wDwpBPb1Lvk="
+primary_public_key = "DA3mDUC5y7s5dNF4bL5MfTy7TtXjwt16rtspGuJcwZHS"
+consensus_public_key = "rnSokyL9vj1cnxsrHVmuMCP677Ns4Xh6N5FmfKvjinxVCA9W8w6DiqXSQTX92TtoapS5eqcHCuKnNKamqxh5MnLpHGZ9UkjKUPWsc7hnQXqQobHTXdw1GSh88wEir94mEba"
+worker_public_key = "DA3mDUC5y7s5dNF4bL5MfTy7TtXjwt16rtspGuJcwZHS"
 primary_domain = "127.0.0.1"
 worker_domain = "127.0.0.1"
 ports.primary = 8000
