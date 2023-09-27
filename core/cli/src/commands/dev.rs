@@ -6,10 +6,10 @@ use anyhow::Result;
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::CompressionAlgorithm;
 use lightning_interfaces::{BlockStoreInterface, ConfigProviderInterface, IncrementalPutInterface};
+use lightning_node::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::args::DevSubCmd;
-use crate::config::TomlConfigProvider;
 
 pub async fn exec<C>(cmd: DevSubCmd, config_path: ResolvedPathBuf) -> Result<()>
 where

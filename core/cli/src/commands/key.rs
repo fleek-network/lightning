@@ -6,11 +6,11 @@ use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::signer::SignerInterface;
+use lightning_node::config::TomlConfigProvider;
 use lightning_signer::Signer;
 use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::args::KeySubCmd;
-use crate::config::TomlConfigProvider;
 
 pub async fn exec<C: Collection<SignerInterface = Signer<C>>>(
     cmd: KeySubCmd,

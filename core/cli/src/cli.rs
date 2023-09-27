@@ -1,6 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
 use lightning_interfaces::infu_collection::Collection;
+use lightning_node::config::TomlConfigProvider;
+use lightning_node::{FinalTypes, WithMockConsensus};
 use lightning_signer::Signer;
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
@@ -17,8 +19,6 @@ use resolved_pathbuf::ResolvedPathBuf;
 use crate::args::{Args, Command};
 use crate::commands::run::CustomStartShutdown;
 use crate::commands::{dev, key, print_config, run};
-use crate::config::TomlConfigProvider;
-use crate::types::{FinalTypes, WithMockConsensus};
 use crate::utils::fs::ensure_parent_exist;
 use crate::utils::log_filter::CustomLogFilter;
 

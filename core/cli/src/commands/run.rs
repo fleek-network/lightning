@@ -3,9 +3,9 @@ use std::pin::Pin;
 
 use anyhow::Result;
 use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_node::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 
-use crate::config::TomlConfigProvider;
 use crate::shutdown::ShutdownController;
 
 pub type CustomStartShutdown<C> = Box<dyn for<'a> Fn(&'a Node<C>, bool) -> Fut<'a>>;

@@ -1,9 +1,8 @@
 use anyhow::Result;
 use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_node::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
-
-use crate::config::TomlConfigProvider;
 
 pub async fn exec<C: Collection>(default: bool, config_path: ResolvedPathBuf) -> Result<()> {
     match default {

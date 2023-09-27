@@ -1,9 +1,7 @@
 mod args;
 pub mod cli;
 mod commands;
-mod config;
 mod shutdown;
-mod types;
 mod utils;
 
 use std::process::exit;
