@@ -22,22 +22,20 @@ lightning-rep-collector = { path = "../rep-collector" }
 lightning-resolver = { path = "../resolver" }
 lightning-rpc = { path = "../rpc" }
 lightning-service-executor = { path = "../service-executor" }
-lightning-signer = { path = "../signer" }
 lightning-topology = { path = "../topology" }
 lightning-pool = { path = "../pool" }
 lightning-types = { path = "../types" }
 mock = { path = "../mock" }
 tokio.workspace = true
-tokio.workspace = true
 anyhow.workspace = true
-tokio.workspace = true
 resolved-pathbuf.workspace = true
 log.workspace = true
 infusion.workspace = true
-fleek-crypto.workspace = true
 serde.workspace = true
 lightning-node = { path = "../node" }
 clap = { version = "4.4.2", features = ["derive"] }
+fleek-crypto.workspace = true
+lightning-signer = { path = "../signer" }
 log4rs = { version = "1.2.0", features = [
   "rolling_file_appender",
   "compound_policy",

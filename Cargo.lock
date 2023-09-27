@@ -3802,6 +3802,7 @@ dependencies = [
  "lightning-resolver",
  "lightning-rpc",
  "lightning-service-executor",
+ "lightning-node",
  "lightning-signer",
  "log",
  "log4rs",
