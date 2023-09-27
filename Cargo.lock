@@ -4035,6 +4035,7 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "lightning-node"
 version = "0.1.0"
 dependencies = [
@@ -4058,6 +4059,36 @@ dependencies = [
  "lightning-service-executor",
  "lightning-signer",
  "lightning-syncronizer",
+ "lightning-topology",
+ "log",
+ "mock",
+ "resolved-pathbuf",
+ "toml 0.7.6",
+]
+
+[[package]]
+name = "lightning-node"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "infusion",
+ "lightning-application",
+ "lightning-blockstore",
+ "lightning-blockstore-server",
+ "lightning-broadcast",
+ "lightning-consensus",
+ "lightning-dht",
+ "lightning-fetcher",
+ "lightning-handshake",
+ "lightning-interfaces",
+ "lightning-notifier",
+ "lightning-origin-ipfs",
+ "lightning-pool",
+ "lightning-rep-collector",
+ "lightning-resolver",
+ "lightning-rpc",
+ "lightning-service-executor",
+ "lightning-signer",
  "lightning-topology",
  "log",
  "mock",
