@@ -14,13 +14,14 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
 use infusion::c;
 use ink_quill::ToDigest;
-use lightning_interfaces::dpool::{Event, NodeAddress, PoolRequest, ServiceScope};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{NodeIndex, Topic};
 use lightning_interfaces::{
     ApplicationInterface,
+    EventHandler,
     NotifierInterface,
+    PoolInterface,
     ReputationAggregatorInterface,
     ReputationReporterInterface,
     SyncQueryRunnerInterface,
@@ -36,15 +37,14 @@ use crate::command::{Command, CommandReceiver, CommandSender, RecvCmd, SendCmd, 
 use crate::db::Database;
 use crate::frame::Frame;
 use crate::interner::Interner;
-use crate::peers::{ConnectionOrigin, ConnectionStatus, Peers};
 use crate::pending::PendingStore;
 use crate::recv_buffer::RecvBuffer;
 use crate::ring::MessageRing;
 use crate::stats::{ConnectionStats, Stats};
-use crate::{Advr, Digest, Message, Want};
+use crate::{Advr, Digest, Message, MessageInternedId, Want};
 
-// TODO(qti3e): Move this to somewhere else.
-pub type Topology = Arc<Vec<Vec<NodePublicKey>>>;
+/// An interned id. But not from our interned table.
+pub type RemoteInternedId = MessageInternedId;
 
 /// The execution context of the broadcast.
 pub struct Context<C: Collection> {
@@ -54,8 +54,9 @@ pub struct Context<C: Collection> {
     interner: Interner,
     /// Managers of incoming message queue for each topic.
     incoming_messages: [RecvBuffer; 4],
-    /// The state related to the connected peers that we have right now.
-    peers: Peers,
+    /// The state related to the connected peers that we have right now. Currently
+    /// we only store the interned id mapping of us to their interned id.
+    peers: im::HashMap<NodeIndex, im::HashMap<MessageInternedId, RemoteInternedId>>,
     /// The instance of stats collector.
     stats: Stats,
     /// The channel which sends the commands to the event loop.
@@ -68,12 +69,10 @@ pub struct Context<C: Collection> {
     notifier: c![C::NotifierInterface],
     topology: c![C::TopologyInterface],
     rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
-    network_event_rx: Receiver<Event>,
-    endpoint_tx: Sender<PoolRequest>,
+    event_handler: c![C::PoolInterface::EventHandler],
     sk: NodeSecretKey,
     pk: NodePublicKey,
     current_node_index: OnceCell<NodeIndex>,
-    service_scope: ServiceScope,
 }
 
 impl<C: Collection> Context<C> {
@@ -84,15 +83,11 @@ impl<C: Collection> Context<C> {
         notifier: c![C::NotifierInterface],
         topology: c![C::TopologyInterface],
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
-        network_event_rx: Receiver<Event>,
-        endpoint_tx: Sender<PoolRequest>,
+        event_handler: c![C::PoolInterface::EventHandler],
         sk: NodeSecretKey,
-        service_scope: ServiceScope,
     ) -> Self {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
         let pk = sk.to_pk();
-        let peers = Peers::new(endpoint_tx.clone(), service_scope);
-        let stats = peers.stats.clone();
         Self {
             db,
             interner: Interner::new(u16::MAX),
@@ -102,8 +97,8 @@ impl<C: Collection> Context<C> {
                 MessageRing::new(1024).into(),
                 MessageRing::new(1).into(),
             ],
-            peers,
-            stats,
+            peers: im::HashMap::default(),
+            stats: Stats::default(),
             command_tx,
             command_rx,
             pending_store: PendingStore::default(),
@@ -111,12 +106,10 @@ impl<C: Collection> Context<C> {
             notifier,
             topology,
             rep_reporter,
-            network_event_rx,
-            endpoint_tx,
+            event_handler,
             sk,
             pk,
             current_node_index: OnceCell::new(), // will be set upon spawn.
-            service_scope,
         }
     }
 
@@ -135,76 +128,21 @@ impl<C: Collection> Context<C> {
         (shutdown_tx, handle)
     }
 
-    /// Try to lookup a node index from a private key in an efficient way by first looking up the
-    /// connected peers mappings and then resorting to the application's query runner.
-    fn get_node_index(&self, pk: &NodePublicKey) -> Option<NodeIndex> {
-        self.peers
-            .get_node_index(pk)
-            .or_else(|| self.sqr.pubkey_to_index(*pk))
-    }
-
+    #[inline]
     fn get_node_pk(&self, index: NodeIndex) -> Option<NodePublicKey> {
         self.sqr.index_to_pubkey(index)
     }
 
-    fn get_node_address(&self, pk: &NodePublicKey) -> Option<SocketAddr> {
-        let info = self.sqr.get_node_info(pk)?;
-        format!("{}:{}", info.domain, info.ports.pool).parse().ok()
-    }
-
-    fn apply_topology(&mut self, new_topology: Topology) {
-        log::info!("applying new topology");
-
-        self.peers.unpin_all();
-
-        for pk in new_topology.iter().flatten().copied() {
-            if pk == self.pk {
-                log::error!("topology contained current node");
-                continue;
-            }
-
-            self.peers.pin_peer(pk);
-
-            let Some(node_index) = self
-                .sqr
-                .pubkey_to_index(self.pk) else {
-                return;
-            };
-            let node_index = self.current_node_index.get_or_init(|| node_index);
-
-            let Some(index) = self.get_node_index(&pk) else { continue };
-            if node_index > &index {
-                continue;
-            }
-
-            // We used to check if connections were not closed, we'd skip.
-
-            // Todo: do make a connection and handle incoming connection events.
-            // We might have to resolve disputes again.
-            // We used to make a `connect` request here.
-            // We should be able to maintain a logical state of the connections.
-            let endpoint_tx = self.endpoint_tx.clone();
-            let Some(socket_address) = self.get_node_address(&pk) else {
-                log::error!("failed to find socket address for {pk:?}");
-                continue;
-            };
-            let address = NodeAddress { pk, socket_address };
-            tokio::spawn(async move {
-                if endpoint_tx
-                    .send(PoolRequest::Connect { peer: address })
-                    .await
-                    .is_err()
-                {
-                    log::error!("failed to send connect request to endpoint");
-                }
+    /// Handle a message sent from another node.
+    fn handle_payload(&mut self, sender: NodeIndex, payload: Vec<u8>) {
+        let Ok(frame) = Frame::decode(&payload) else {
+            self.stats.report(sender, ConnectionStats {
+                invalid_messages_received_from_peer: 1,
+                ..Default::default()
             });
-        }
+            return;
+        };
 
-        self.peers.disconnect_unpinned();
-    }
-
-    /// Handle a message sent from a user.
-    fn handle_frame(&mut self, sender: NodePublicKey, frame: Frame) {
         log::debug!("recivied frame '{frame:?}' from {sender}");
 
         match frame {
@@ -220,7 +158,7 @@ impl<C: Collection> Context<C> {
         }
     }
 
-    fn handle_advr(&mut self, sender: NodePublicKey, advr: Advr) {
+    fn handle_advr(&mut self, sender: NodeIndex, advr: Advr) {
         let digest = advr.digest;
 
         // If we have already propagated a message we really don't care about it anymore.
@@ -242,19 +180,19 @@ impl<C: Collection> Context<C> {
         // This is a new digest which we have never seen before. At this point we immediately
         // wanna see the message and therefore we send out the want request.
         if new_digest {
-            self.peers.send_want_request(&sender, advr.interned_id);
+            // self.peers.send_want_request(&sender, advr.interned_id);
             self.pending_store.insert_request(sender, index);
         }
 
         // Remember the mapping since we may need it.
-        self.peers
-            .insert_index_mapping(&sender, index, advr.interned_id);
+        // self.peers
+        //     .insert_index_mapping(&sender, index, advr.interned_id);
 
         // Handle the case for non-first advr.
         self.pending_store.insert_pending(sender, index);
     }
 
-    fn handle_want(&mut self, sender: NodePublicKey, req: Want) {
+    fn handle_want(&mut self, sender: NodeIndex, req: Want) {
         log::trace!("got want from {sender} for {}", req.interned_id);
         let id = req.interned_id;
         let Some(digest) = self.interner.get(id) else {
@@ -263,13 +201,13 @@ impl<C: Collection> Context<C> {
         let Some(message) = self.db.get_message(digest) else {
             log::trace!("failed to find message");
             return; };
-        self.peers.send_message(&sender, Frame::Message(message));
+        // TODO(qti3e)
+        // self.peers.send_message(&sender, Frame::Message(message));
     }
 
-    fn handle_message(&mut self, sender: NodePublicKey, msg: Message) {
+    fn handle_message(&mut self, sender: NodeIndex, msg: Message) {
         let Some(origin_pk) = self.get_node_pk(msg.origin) else {
-            let index = self.get_node_index(&sender).unwrap();
-            self.stats.report(index, ConnectionStats {
+            self.stats.report(sender, ConnectionStats {
                 invalid_messages_received_from_peer: 1,
                 ..Default::default()
             });
@@ -285,9 +223,8 @@ impl<C: Collection> Context<C> {
             // Accepting it will also further complicate the edge cases related to assigning
             // an interned id to the message, all of which is not supposed to be happening at
             // this step.
-            let index = self.get_node_index(&sender).unwrap();
             self.stats.report(
-                index,
+                sender,
                 ConnectionStats {
                     unwanted_messages_received_from_peer: 1,
                     ..Default::default()
@@ -297,9 +234,8 @@ impl<C: Collection> Context<C> {
         };
 
         if !origin_pk.verify(&msg.signature, &digest) {
-            let index = self.get_node_index(&sender).unwrap();
             self.stats.report(
-                index,
+                sender,
                 ConnectionStats {
                     invalid_messages_received_from_peer: 1,
                     ..Default::default()
@@ -333,7 +269,9 @@ impl<C: Collection> Context<C> {
         // Mark message as received for RTT measurements.
         self.pending_store.received_message(sender, id);
         // Report a satisfactory interaction when we receive a message.
-        self.rep_reporter.report_sat(&sender, Weight::Weak);
+        if let Some(node_pk) = self.get_node_pk(sender) {
+            self.rep_reporter.report_sat(&node_pk, Weight::Weak);
+        }
         self.incoming_messages[topic_index].insert(shared);
     }
 
@@ -379,7 +317,8 @@ impl<C: Collection> Context<C> {
         self.db.insert_with_message(id, digest, message);
 
         // Start advertising the message.
-        self.peers.advertise(id, digest);
+        // TODO(qti3e)
+        // self.peers.advertise(id, digest);
     }
 
     fn handle_propagate_cmd(&mut self, digest: Digest) {
@@ -399,7 +338,8 @@ impl<C: Collection> Context<C> {
         self.pending_store.remove_message(id);
 
         // Continue with advertising this message to the connected peers.
-        self.peers.advertise(id, digest);
+        // TODO(qti3e)
+        // self.peers.advertise(id, digest);
 
         increment_counter!(
             "broadcast_messages_propagated",
@@ -417,19 +357,14 @@ async fn main_loop<C: Collection>(
     mut shutdown: tokio::sync::oneshot::Receiver<()>,
     mut ctx: Context<C>,
 ) -> Context<C> {
-    // Subscribe to the changes from the topology.
-    let mut topology_subscriber =
-        spawn_topology_subscriber::<C>(ctx.notifier.clone(), ctx.topology.clone());
-
     log::info!("starting broadcast for {}", ctx.pk);
 
-    // Provide the peers list with the index of our current node. It will need it
-    // for resolving connection ordering disputes.
-    // This could have been done during initialization, except at that point we don't
-    // know if application has started and therefore if the database is loaded yet.
+    // During initialization the application state might have not had loaded, and at
+    // that point we might not have inserted the node index of the currently running
+    // node. Let's give it another shot here.
+    // TODO(qti3e): We might not even have to do this.
     if let Some(node_index) = ctx.sqr.pubkey_to_index(ctx.pk) {
-        let node_index = ctx.current_node_index.get_or_init(|| node_index);
-        ctx.peers.set_current_node_index(*node_index);
+        ctx.current_node_index.set(node_index);
     }
 
     loop {
@@ -452,52 +387,17 @@ async fn main_loop<C: Collection>(
                 ctx.handle_command(command);
             },
 
-            // The `topology_subscriber` recv can potentially return `None` when the
-            // application execution socket is dropped. At that point we're also shutting
-            // down anyway.
-            Some(new_topology) = topology_subscriber.recv() => {
-                ctx.apply_topology(new_topology);
+            (sender, payload) = ctx.event_handler.receive() => {
+                // TODO(qti3e)
             },
 
-            Some(event) = ctx.network_event_rx.recv() => {
-                log::info!("Incoming event {:?}", event);
-                match event {
-                    // Todo: We need a disconnect event.
-                    Event::NewConnection { peer, rtt, .. } => {
-                        let Some(index) = ctx.get_node_index(&peer) else {
-                            log::error!("remote node not found");
-                            continue;
-                        };
-                        let Some(address) = ctx.get_node_address(&peer) else {
-                            log::error!("remote node address not found");
-                            continue;
-                        };
-                        ctx.rep_reporter.report_latency(&peer, rtt / 2);
-                        ctx.peers.handle_new_connection(index, peer, address);
-                    }
-                    Event::NewStream { peer: _, tx: _, rx: _ } => {}
-                    Event::Message { peer, message } => {
-                        match Frame::decode(&message.payload) {
-                            Ok(frame) => {
-                                ctx.peers.report_stats(peer, &frame);
-                                ctx.handle_frame(peer, frame);
-                            }
-                            Err(e) => log::error!("invalid frame: {e:?}"),
-                        }
-                    }
-                    Event::Disconnect { peer } => {
-                        ctx.peers.handle_disconnect(&peer);
-                    }
-                }
-
-            },
             requests = ctx.pending_store.tick() => {
                 requests.into_iter().for_each(|(interned_id, pub_key)| {
-                    if let Some(remote_index) = ctx.peers.get_index_mapping(&pub_key, interned_id) {
-                        ctx.peers.send_want_request(&pub_key, remote_index);
-                    } else {
-                        log::warn!("Remote index not found for pending request");
-                    }
+                    // if let Some(remote_index) = ctx.peers.get_index_mapping(&pub_key, interned_id) {
+                    //     ctx.peers.send_want_request(&pub_key, remote_index);
+                    // } else {
+                    //     log::warn!("Remote index not found for pending request");
+                    // }
                 });
             }
         }
@@ -505,54 +405,6 @@ async fn main_loop<C: Collection>(
 
     // Handover over the context.
     ctx
-}
-
-/// Spawn a task that listens for epoch changes and sends the new topology through an `mpsc`
-/// channel.
-///
-/// This function will always compute/fire the current topology as the first message before waiting
-/// for the next epoch.
-///
-/// This function does not block the caller and immediately returns.
-fn spawn_topology_subscriber<C: Collection>(
-    notifier: c![C::NotifierInterface],
-    topology: c![C::TopologyInterface],
-) -> mpsc::Receiver<Topology> {
-    // Create the output channel from which we send out the computed
-    // topology.
-    let (w_tx, w_rx) = mpsc::channel(64);
-
-    // Subscribe to new epochs coming in.
-    let (tx, mut rx) = mpsc::channel(64);
-    notifier.notify_on_new_epoch(tx);
-
-    tokio::spawn(async move {
-        'spell: loop {
-            let topology = topology.clone();
-
-            // Computing the topology might be a blocking task.
-            log::debug!("computing new topology");
-            let result = tokio::task::spawn_blocking(move || topology.suggest_connections());
-
-            let topology = result.await.expect("Failed to compute topology.");
-
-            if w_tx.send(topology).await.is_err() {
-                // Nobody is interested in hearing what we have to say anymore.
-                // This can happen when all instance of receivers are dropped.
-                break 'spell;
-            }
-
-            // Wait until the next epoch.
-            if rx.recv().await.is_none() {
-                // Notifier has dropped the sender. Based on the current implementation of
-                // different things, this can happen when the application's execution socket
-                // is dropped.
-                return;
-            }
-        }
-    });
-
-    w_rx
 }
 
 /// Map each topic to a fixed size number.

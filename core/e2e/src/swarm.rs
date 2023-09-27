@@ -33,8 +33,7 @@ use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
-use lightning_pool::config::Config as PoolConfig;
-use lightning_pool::pool::Pool;
+use lightning_pool::{Config as PoolConfig, Pool};
 use lightning_rep_collector::config::Config as RepAggConfig;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_resolver::config::Config as ResolverConfig;
@@ -336,10 +335,11 @@ fn build_config(
         reporter_buffer_size: 1,
     });
 
-    config.inject::<Pool<FinalTypes>>(PoolConfig {
-        keep_alive_interval: Duration::from_secs(8),
-        address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
-    });
+    // TODO
+    // config.inject::<Pool<FinalTypes>>(PoolConfig {
+    //     keep_alive_interval: Duration::from_secs(8),
+    //     address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
+    // });
 
     config
 }

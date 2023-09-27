@@ -12,6 +12,7 @@ use lightning_interfaces::{
     ConfigConsumer,
     PoolInterface,
     ReputationAggregatorInterface,
+    ServiceScope,
     SignerInterface,
     WithStartAndShutdown,
 };
@@ -116,8 +117,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
     ) -> anyhow::Result<Self> {
         let (_, sk) = signer.get_sk();
         // Todo: Let's make sure we are cleaning up unused connections.
-        let (service_scope, network_event_rx) = pool.network_event_receiver();
-        let endpoint_tx = pool.request_sender();
+        let event_handler = pool.open_event(ServiceScope::Broadcast);
 
         let ctx = Context::<C>::new(
             Database::default(),
@@ -125,10 +125,8 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
             notifier,
             topology,
             rep_reporter,
-            network_event_rx,
-            endpoint_tx,
+            event_handler,
             sk,
-            service_scope,
         );
 
         Ok(Self {

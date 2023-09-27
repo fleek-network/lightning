@@ -25,6 +25,5 @@ lightning-signer = {path="../signer"}
 fleek-crypto.workspace = true
 lightning-test-utils = { path="../test-utils" }
 lightning-broadcast = { path="../broadcast" }
-lightning-pool = { path="../pool" }
 infusion.workspace = true
 cid.workspace = true

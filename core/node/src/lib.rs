@@ -16,7 +16,6 @@ use lightning_interfaces::infu_collection::{
 };
 use lightning_notifier::Notifier;
 use lightning_origin_ipfs::IPFSOrigin;
-use lightning_pool::pool::Pool;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_resolver::resolver::Resolver;
 use lightning_rpc::server::Rpc;
@@ -52,7 +51,7 @@ impl CollectionBase for FinalTypes {
     type ServiceExecutorInterface<C: Collection> = ServiceExecutor<C>;
     type SignerInterface<C: Collection> = Signer<C>;
     type FetcherInterface<C: Collection> = Fetcher<C>;
-    type PoolInterface<C: Collection> = Pool<C>;
+    type PoolInterface<C: Collection> = infusion::Blank<C>;
 }
 
 // Create the collection modifier that can inject the mock consensus

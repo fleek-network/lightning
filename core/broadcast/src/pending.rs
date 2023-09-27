@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
-use fleek_crypto::NodePublicKey;
 use fxhash::{FxHashMap, FxHashSet};
+use lightning_interfaces::types::{NodeIndex, Topic};
 use rand::distributions::WeightedIndex;
 use rand::prelude::Distribution;
 use rand::{thread_rng, Rng};
@@ -24,24 +24,24 @@ const BUFFER_SIZE: usize = 1000;
 #[derive(Default)]
 pub struct PendingStore {
     /// Map each pending digest to a set of nodes that we know have this digest.
-    pending_map: FxHashMap<MessageInternedId, FxHashSet<NodePublicKey>>,
+    pending_map: FxHashMap<MessageInternedId, FxHashSet<NodeIndex>>,
 
     /// Map each pending digest to a list of requests we sent out.
     request_map: FxHashMap<MessageInternedId, VecDeque<PendingRequest>>,
 
     /// RTTs for the peers we interacted with.
-    rtt_map: FxHashMap<NodePublicKey, FusedTa<f64, ExponentialMovingAverage>>,
+    rtt_map: FxHashMap<NodeIndex, FusedTa<f64, ExponentialMovingAverage>>,
 }
 
 impl PendingStore {
-    pub fn insert_pending(&mut self, node: NodePublicKey, interned_id: MessageInternedId) {
+    pub fn insert_pending(&mut self, node: NodeIndex, interned_id: MessageInternedId) {
         self.pending_map
             .entry(interned_id)
             .or_default()
             .insert(node);
     }
 
-    pub fn insert_request(&mut self, node: NodePublicKey, interned_id: MessageInternedId) {
+    pub fn insert_request(&mut self, node: NodeIndex, interned_id: MessageInternedId) {
         let mut requests = self.request_map.entry(interned_id).or_default();
         if requests.len() >= BUFFER_SIZE {
             requests.pop_front();
@@ -49,7 +49,7 @@ impl PendingStore {
         requests.push_back(PendingRequest::new(node));
     }
 
-    pub async fn tick(&mut self) -> Vec<(MessageInternedId, NodePublicKey)> {
+    pub async fn tick(&mut self) -> Vec<(MessageInternedId, NodeIndex)> {
         loop {
             let pending_requests = self.get_pending_requests();
             let pending_requests = self.select_request_receivers(pending_requests);
@@ -69,7 +69,7 @@ impl PendingStore {
         }
     }
 
-    pub fn received_message(&mut self, node: NodePublicKey, interned_id: MessageInternedId) {
+    pub fn received_message(&mut self, node: NodeIndex, interned_id: MessageInternedId) {
         if let Some(requests) = self.request_map.get(&interned_id) {}
         self.request_map
             .get(&interned_id)
@@ -92,12 +92,12 @@ impl PendingStore {
 
     fn select_request_receivers(
         &self,
-        requests: Vec<(MessageInternedId, FxHashSet<NodePublicKey>)>,
-    ) -> Vec<(MessageInternedId, NodePublicKey)> {
+        requests: Vec<(MessageInternedId, FxHashSet<NodeIndex>)>,
+    ) -> Vec<(MessageInternedId, NodeIndex)> {
         requests
             .into_iter()
             .filter_map(|(id, pub_keys)| {
-                let pub_keys: Vec<NodePublicKey> = pub_keys.iter().copied().collect();
+                let pub_keys: Vec<NodeIndex> = pub_keys.iter().copied().collect();
                 if pub_keys.is_empty() {
                     None
                 } else if pub_keys.len() == 1 {
@@ -132,7 +132,7 @@ impl PendingStore {
             .collect()
     }
 
-    fn get_pending_requests(&self) -> Vec<(MessageInternedId, FxHashSet<NodePublicKey>)> {
+    fn get_pending_requests(&self) -> Vec<(MessageInternedId, FxHashSet<NodeIndex>)> {
         self.pending_map
             .iter()
             .filter(|(id, pub_keys)| {
@@ -166,13 +166,13 @@ impl PendingStore {
 
 struct PendingRequest {
     /// The node we sent the want request to
-    node: NodePublicKey,
+    node: NodeIndex,
     /// Timestamp when we sent out the request.
     timestamp: Instant,
 }
 
 impl PendingRequest {
-    pub fn new(node: NodePublicKey) -> Self {
+    pub fn new(node: NodeIndex) -> Self {
         Self {
             node,
             timestamp: Instant::now(),

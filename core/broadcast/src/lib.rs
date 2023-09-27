@@ -1,3 +1,5 @@
+//! # Fleek Network Broadcast
+
 #![allow(unused)]
 
 mod broadcast;
@@ -7,7 +9,6 @@ mod db;
 mod ev;
 mod frame;
 mod interner;
-mod peers;
 mod pending;
 mod pubsub;
 mod recv_buffer;

@@ -62,9 +62,9 @@ pub trait PoolInterface<C: Collection>:
         topology: c!(C::TopologyInterface),
     ) -> anyhow::Result<Self>;
 
-    fn open_event(scope: ServiceScope) -> Self::EventHandler;
+    fn open_event(&self, scope: ServiceScope) -> Self::EventHandler;
 
-    fn open_req_res(scope: ServiceScope) -> (Self::Requester, Self::Responder);
+    fn open_req_res(&self, scope: ServiceScope) -> (Self::Requester, Self::Responder);
 }
 
 #[async_trait]

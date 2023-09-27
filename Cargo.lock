@@ -3771,7 +3771,6 @@ dependencies = [
  "lightning-interfaces",
  "lightning-metrics",
  "lightning-notifier",
- "lightning-pool",
  "lightning-signer",
  "lightning-topology",
  "log",
@@ -3796,6 +3795,13 @@ dependencies = [
  "infusion",
  "lightning-interfaces",
  "lightning-node",
+ "lightning-notifier",
+ "lightning-origin-ipfs",
+ "lightning-pool",
+ "lightning-rep-collector",
+ "lightning-resolver",
+ "lightning-rpc",
+ "lightning-service-executor",
  "lightning-signer",
  "log",
  "log4rs",
@@ -3894,7 +3900,6 @@ dependencies = [
  "lightning-interfaces",
  "lightning-node",
  "lightning-notifier",
- "lightning-pool",
  "lightning-rep-collector",
  "lightning-resolver",
  "lightning-rpc",
@@ -3930,7 +3935,6 @@ dependencies = [
  "lightning-broadcast",
  "lightning-interfaces",
  "lightning-origin-ipfs",
- "lightning-pool",
  "lightning-resolver",
  "lightning-signer",
  "lightning-test-utils",
@@ -4005,7 +4009,6 @@ dependencies = [
  "lightning-schema",
  "lightning-types",
  "log",
- "netkit",
  "serde",
  "serde-big-array",
  "thiserror",
@@ -4125,23 +4128,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lightning-pool"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "infusion",
- "lightning-application",
- "lightning-interfaces",
- "lightning-signer",
- "lightning-test-utils",
- "log",
- "netkit",
- "serde",
- "tokio",
-]
-
-[[package]]
 name = "lightning-rep-collector"
 version = "0.0.0"
 dependencies = [
@@ -4186,7 +4172,6 @@ dependencies = [
  "lightning-application",
  "lightning-broadcast",
  "lightning-interfaces",
- "lightning-pool",
  "lightning-rep-collector",
  "lightning-signer",
  "lightning-test-utils",
@@ -4216,7 +4201,6 @@ dependencies = [
  "lightning-fetcher",
  "lightning-interfaces",
  "lightning-origin-ipfs",
- "lightning-pool",
  "lightning-signer",
  "log",
  "reqwest",
