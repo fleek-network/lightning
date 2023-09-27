@@ -1,4 +1,4 @@
-mod config;
+pub mod config;
 
 use lightning_application::app::Application;
 use lightning_blockstore::blockstore::Blockstore;
