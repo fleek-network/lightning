@@ -124,3 +124,4 @@ pub trait Request: Send + Sync {
     fn reject(self, reason: RejectReason);
     async fn send(&mut self, frame: Bytes) -> io::Result<()>;
 }
+
