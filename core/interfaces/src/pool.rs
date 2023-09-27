@@ -1,3 +1,5 @@
+use std::io;
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use lightning_types::NodeIndex;
@@ -23,7 +25,8 @@ pub enum ServiceScope {
 #[repr(u8)]
 #[non_exhaustive]
 pub enum RejectReason {
-    Other,
+    NotFound,
+    Io(io::Error),
 }
 
 /// Defines the connection pool.
@@ -67,23 +70,23 @@ pub trait PoolInterface<C: Collection>:
 #[async_trait]
 #[infusion::blank]
 pub trait EventHandler {
-    fn send_to_all<F: Fn(NodeIndex) -> bool>(&self, payload: Vec<u8>, filter: F);
-    fn send_to_one(&self, node: NodeIndex, payload: Vec<u8>);
-    async fn receive(&self) -> (NodeIndex, Vec<u8>);
+    fn send_to_all<F: Fn(NodeIndex) -> bool>(&self, payload: Bytes, filter: F);
+    fn send_to_one(&self, node: NodeIndex, payload: Bytes);
+    async fn receive(&self) -> (NodeIndex, Bytes);
 }
 
 #[async_trait]
 #[infusion::blank]
 pub trait Requester: Clone + Send + Sync {
     type Response: Response;
-    async fn request(&self, destination: NodeIndex, request: Vec<u8>) -> Self::Response;
+    async fn request(&self, destination: NodeIndex, request: Bytes) -> Self::Response;
 }
 
 #[infusion::blank]
 pub trait Response: Send + Sync {
-    type Body<S: Stream<Item = Bytes>> = infusion::Blank<S>;
+    type Body<S: Stream<Item = io::Result<Bytes>>> = infusion::Blank<S>;
     fn status_code(&self) -> Result<(), RejectReason>;
-    fn body<S: Stream<Item = Bytes>>(self) -> Self::Body<S>;
+    fn body<S: Stream<Item = io::Result<Bytes>>>(self) -> Self::Body<S>;
 }
 
 #[async_trait]
@@ -97,5 +100,5 @@ pub trait Responder {
 #[infusion::blank]
 pub trait Request: Send + Sync {
     fn reject(self, reason: RejectReason);
-    async fn send(&self, frame: Vec<u8>);
+    async fn send(&self, frame: Bytes);
 }
