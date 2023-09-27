@@ -62,4 +62,3 @@ impl ConsensusInterfaceContainer for UseMockConsensusMarker {
 }
 
 pub type WithMockConsensus<O = FinalTypes> = ConsensusInterfaceModifier<UseMockConsensusMarker, O>;
-

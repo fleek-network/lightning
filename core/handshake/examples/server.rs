@@ -4,7 +4,6 @@
 
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_cli::cli::Cli;
-use lightning_node::config::TomlConfigProvider;
 use lightning_handshake::handshake::Handshake;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
@@ -14,6 +13,7 @@ use lightning_interfaces::{
     ServiceExecutorInterface,
     WithStartAndShutdown,
 };
+use lightning_node::config::TomlConfigProvider;
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 

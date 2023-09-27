@@ -110,4 +110,3 @@ impl<C: Collection> ConfigProviderInterface<C> for TomlConfigProvider<C> {
         toml::to_string(&self.table).expect("failed to serialize config")
     }
 }
-
