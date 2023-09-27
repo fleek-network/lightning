@@ -1,0 +1,32 @@
+[package]
+name = "lightning-node"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lightning-application = { path = "../application" }
+lightning-blockstore = { path = "../blockstore" }
+lightning-blockstore-server = { path = "../blockstore-server" }
+lightning-broadcast = { path = "../broadcast" }
+lightning-consensus = { path = "../consensus" }
+lightning-dht = { path = "../dht" }
+lightning-fetcher = { path = "../fetcher" }
+lightning-handshake = { path = "../handshake" }
+lightning-interfaces = { path = "../interfaces" }
+lightning-notifier = { path = "../notifier" }
+lightning-origin-ipfs = { path = "../origin-ipfs" }
+lightning-pool = { path = "../pool" }
+lightning-rep-collector = { path = "../rep-collector" }
+lightning-resolver = { path = "../resolver" }
+lightning-rpc = { path = "../rpc" }
+lightning-service-executor = { path = "../service-executor" }
+lightning-signer = { path = "../signer" }
+lightning-topology = { path = "../topology" }
+mock = { path = "../mock" }
+toml = "0.7"
+infusion.workspace = true
+anyhow.workspace = true
+resolved-pathbuf.workspace = true
+log.workspace = true
