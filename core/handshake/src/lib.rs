@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 mod gc;
 pub mod handshake;
+mod http;
 pub mod schema;
 mod shutdown;
 mod state;

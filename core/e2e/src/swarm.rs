@@ -323,8 +323,9 @@ fn build_config(
     config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
         workers: vec![WorkerMode::AsyncWorker],
         transports: vec![TransportConfig::WebRTC(WebRtcConfig {
-            signal_address: ([127, 0, 0, 1], ports.handshake).into(),
+            signal_address: ([127, 0, 0, 1], ports.handshake + 1).into(),
         })],
+        http_addr: ([127, 0, 0, 1], ports.handshake).into(),
     });
 
     config.inject::<ServiceExecutor<FinalTypes>>(ServiceExecutorConfig {

@@ -1,5 +1,6 @@
 use std::ops::ControlFlow;
 
+use axum::Router;
 use lightning_interfaces::ExecutorProviderInterface;
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
@@ -18,23 +19,24 @@ pub enum TransportConfig {
 pub async fn attach_transport_by_config<P: ExecutorProviderInterface>(
     state: StateRef<P>,
     config: TransportConfig,
-) -> anyhow::Result<JoinHandle<()>> {
+) -> anyhow::Result<(JoinHandle<()>, Option<Router>)> {
     match config {
         TransportConfig::WebRTC(config) => {
-            let transport =
+            let (transport, router) =
                 transports::webrtc::WebRtcTransport::bind(state.shutdown.clone(), config).await?;
-            Ok(attach_transport_to_state(state, transport))
+
+            Ok((attach_transport_to_state(state, transport), router))
         },
         TransportConfig::Mock(config) => {
-            let transport =
+            let (transport, router) =
                 transports::mock::MockTransport::bind(state.shutdown.clone(), config).await?;
-            Ok(attach_transport_to_state(state, transport))
+            Ok((attach_transport_to_state(state, transport), router))
         },
         TransportConfig::WebTransport(config) => {
-            let transport =
+            let (transport, router) =
                 transports::webtransport::WebTransport::bind(state.shutdown.clone(), config)
                     .await?;
-            Ok(attach_transport_to_state(state, transport))
+            Ok((attach_transport_to_state(state, transport), router))
         },
     }
 }

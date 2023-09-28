@@ -34,11 +34,13 @@ async fn demo() -> anyhow::Result<()> {
           {
             "type": "AsyncWorker"
           },
-        ]
+        ],
+        "http_addr": "0.0.0.0:4210"
       },
       "service-executor": {
         "services": [0]
       },
+
     })
     .into();
 
@@ -77,8 +79,6 @@ async fn demo() -> anyhow::Result<()> {
         let response = schema::ResponseFrame::decode(&response).unwrap();
         println!("request response {response:?}");
     }
-
-    tokio::time::sleep(Duration::from_secs(10)).await;
 
     node.shutdown().await;
 

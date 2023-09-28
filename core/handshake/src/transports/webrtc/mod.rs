@@ -6,17 +6,18 @@ use std::sync::Arc;
 
 use affair::{Executor, Socket, TokioSpawn};
 use async_trait::async_trait;
+use axum::Router;
 use bytes::Bytes;
 use log::error;
 use serde::{Deserialize, Serialize};
 use webrtc::data_channel::data_channel_message::DataChannelMessage;
 use webrtc::data_channel::RTCDataChannel;
 
-use self::signal::start_signaling_server;
 use self::worker::{IncomingConnectionWorker, SendWorker};
 use super::{Transport, TransportReceiver, TransportSender};
 use crate::schema::{self, HandshakeRequestFrame, RequestFrame};
 use crate::shutdown::ShutdownWaiter;
+use crate::transports::webrtc::signal::router;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct WebRtcConfig {
@@ -46,7 +47,11 @@ impl Transport for WebRtcTransport {
     type Sender = WebRtcSender;
     type Receiver = WebRtcReceiver;
 
-    async fn bind(waiter: ShutdownWaiter, config: Self::Config) -> anyhow::Result<Self> {
+    async fn bind(
+        _waiter: ShutdownWaiter, // We use the signaling endpoint to dictate new connections, so we
+        // don't need the waiter directly here.
+        config: Self::Config,
+    ) -> anyhow::Result<(Self, Option<Router>)> {
         log::info!("Binding WebRTC transport on {}", config.signal_address);
 
         let (conn_tx, conn_rx) = tokio::sync::mpsc::channel(16);
@@ -55,14 +60,10 @@ impl Transport for WebRtcTransport {
         let worker = IncomingConnectionWorker { conn_tx };
         let socket = TokioSpawn::spawn_async(worker);
 
-        // Spawn a HTTP server for accepting incoming SDP requests.
-        tokio::spawn(async move {
-            start_signaling_server(waiter, config, socket)
-                .await
-                .expect("Failed to setup server");
-        });
+        // Add our sdp endpoint to the http router.
+        let router = router(socket);
 
-        Ok(Self { conn_rx })
+        Ok((Self { conn_rx }, Some(router)))
     }
 
     async fn accept(

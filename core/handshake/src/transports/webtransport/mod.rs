@@ -3,6 +3,7 @@ mod config;
 mod connection;
 
 use async_trait::async_trait;
+use axum::Router;
 pub use config::WebTransportConfig;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::StreamExt;
@@ -25,7 +26,10 @@ impl Transport for WebTransport {
     type Sender = WebTransportSender;
     type Receiver = WebTransportReceiver;
 
-    async fn bind(shutdown: ShutdownWaiter, config: Self::Config) -> anyhow::Result<Self> {
+    async fn bind(
+        shutdown: ShutdownWaiter,
+        config: Self::Config,
+    ) -> anyhow::Result<(Self, Option<Router>)> {
         let (cert_der, pk) = match config.certificate {
             None => {
                 log::warn!("no certificate found in config so generating one from random secret");
@@ -53,7 +57,7 @@ impl Transport for WebTransport {
         };
         tokio::spawn(connection::main_loop(ctx));
 
-        Ok(Self { conn_rx })
+        Ok((Self { conn_rx }, None))
     }
 
     async fn accept(&mut self) -> Option<(HandshakeRequestFrame, Self::Sender, Self::Receiver)> {

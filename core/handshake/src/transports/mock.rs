@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use axum::routing::get;
+use axum::Router;
 use bytes::Bytes;
 use dashmap::DashMap;
 use log::error;
@@ -49,14 +51,20 @@ impl Transport for MockTransport {
     type Sender = MockTransportSender;
     type Receiver = MockTransportReceiver;
 
-    async fn bind(_waiter: ShutdownWaiter, config: Self::Config) -> anyhow::Result<Self> {
+    async fn bind(
+        _waiter: ShutdownWaiter,
+        config: Self::Config,
+    ) -> anyhow::Result<(Self, Option<Router>)> {
         let (conn_tx, conn_rx) = tokio::sync::mpsc::channel(8);
 
         let map = LISTENERS.get_or_init(|| async { DashMap::new() }).await;
         assert!(!map.contains_key(&config.port));
         map.insert(config.port, conn_tx);
 
-        Ok(Self { conn_rx })
+        Ok((
+            Self { conn_rx },
+            Some(Router::new().route("/mock", get(|| async { "mock is enabled" }))),
+        ))
     }
 
     async fn accept(
@@ -138,7 +146,7 @@ mod tests {
             )
             .await?;
 
-        assert!(server.accept().await.is_some());
+        assert!(server.0.accept().await.is_some());
 
         Ok(())
     }

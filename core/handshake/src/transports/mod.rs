@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use axum::Router;
 use enum_dispatch::enum_dispatch;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -18,7 +19,10 @@ pub trait Transport: Sized + Send + Sync + 'static {
     type Receiver: TransportReceiver;
 
     /// Bind the transport with the provided config.
-    async fn bind(shutdown: ShutdownWaiter, config: Self::Config) -> anyhow::Result<Self>;
+    async fn bind(
+        shutdown: ShutdownWaiter,
+        config: Self::Config,
+    ) -> anyhow::Result<(Self, Option<Router>)>;
 
     /// Accept a new connection.
     async fn accept(

@@ -1,6 +1,8 @@
+use std::net::SocketAddr;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use axum::Router;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
@@ -14,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
+use crate::http::spawn_http_server;
 use crate::shutdown::ShutdownNotifier;
 use crate::state::StateRef;
 use crate::transport_driver::{attach_transport_by_config, TransportConfig};
@@ -40,6 +43,7 @@ pub struct HandshakeConfig {
     pub workers: Vec<WorkerMode>,
     #[serde(rename = "transport")]
     pub transports: Vec<TransportConfig>,
+    pub http_addr: SocketAddr,
 }
 
 impl Default for HandshakeConfig {
@@ -52,6 +56,7 @@ impl Default for HandshakeConfig {
                 WorkerMode::AsyncWorker,
             ],
             transports: vec![TransportConfig::WebRTC(Default::default())],
+            http_addr: ([0, 0, 0, 0], 4210).into(),
         }
     }
 }
@@ -92,16 +97,33 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
         let mut guard = self.status.lock().await;
         let run = guard.as_mut().expect("restart not implemented.");
 
+        // Attach workers
         for mode in &self.config.workers {
             attach_worker(run.state.clone(), *mode);
         }
 
+        // Attach transports
+        let mut routers = vec![];
         for config in &self.config.transports {
-            let handle = attach_transport_by_config(run.state.clone(), config.clone())
+            let (handle, router) = attach_transport_by_config(run.state.clone(), config.clone())
                 .await
                 .expect("Faild to setup transport");
 
             run.transports.push(handle);
+            if let Some(router) = router {
+                routers.push(router)
+            }
+        }
+
+        // If we have routers to use, start the http server
+        if !routers.is_empty() {
+            let mut router = Router::new();
+            for child in routers {
+                router = router.nest("", child);
+            }
+            let waiter = run.shutdown.waiter();
+            let http_addr = self.config.http_addr;
+            tokio::spawn(async move { spawn_http_server(http_addr, router, waiter).await });
         }
     }
 
