@@ -10,6 +10,7 @@ use std::cell::OnceCell;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use bytes::{Bytes, BytesMut};
 
 use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
 use infusion::c;
@@ -139,7 +140,7 @@ impl<C: Collection> Context<C> {
     }
 
     /// Handle a message sent from another node.
-    fn handle_frame_payload(&mut self, sender: NodeIndex, payload: Vec<u8>) {
+    fn handle_frame_payload(&mut self, sender: NodeIndex, payload: Bytes) {
         let Ok(frame) = Frame::decode(&payload) else {
             self.stats.report(sender, ConnectionStats {
                 invalid_messages_received_from_peer: 1,
@@ -362,7 +363,7 @@ impl<C: Collection> Context<C> {
 
         // TODO(qti3e): If there are too many connections consider spawning node here.
 
-        self.event_handler.send_to_all(message, |id| {
+        self.event_handler.send_to_all(message.into(), |id| {
             self.peers
                 .get(&id)
                 .map(|mapping| !mapping.contains_key(&interned_id))
@@ -378,7 +379,7 @@ impl<C: Collection> Context<C> {
             return;
         };
 
-        self.event_handler.send_to_one(destination, message);
+        self.event_handler.send_to_one(destination, message.into());
     }
 
     fn handle_pending_tick(&self, requests: Vec<(MessageInternedId, NodeIndex)>) {
