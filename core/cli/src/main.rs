@@ -4,19 +4,15 @@ mod commands;
 mod shutdown;
 mod utils;
 
-use std::process::exit;
-
+use anyhow::Result;
 use clap::Parser;
 use cli::Cli;
 
 use crate::args::Args;
 
 #[tokio::main]
-async fn main() {
-    let cli = Cli::new(Args::parse());
-    if let Err(err) = cli.exec().await {
-        eprintln!("Command Failed.");
-        eprintln!("Error: {err}");
-        exit(-1);
-    }
+async fn main() -> Result<()> {
+    let args = Args::parse();
+    let cli = Cli::new(args);
+    cli.exec().await
 }
