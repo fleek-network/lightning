@@ -261,17 +261,24 @@ export namespace Request {
 export namespace Response {
   export type Frame =
     | ServicePayload
+    | ChunkedServicePayload // webrtc only
     | AccessToken
     | Termination;
 
   export enum Tag {
     ServicePayload,
+    ChunkedServicePayload,
     AccessToken,
     Termination,
   }
 
   export interface ServicePayload {
     readonly tag: Tag.ServicePayload;
+    bytes: Uint8Array;
+  }
+
+  export interface ChunkedServicePayload {
+    readonly tag: Tag.ChunkedServicePayload;
     bytes: Uint8Array;
   }
 
@@ -287,7 +294,7 @@ export namespace Response {
   }
 
   export enum TerminationReason {
-    Timeout = 0x00,
+    Timeout = 0x80,
     InvalidHandshake,
     InvalidToken,
     InvalidDeliveryAcknowledgment,
@@ -301,14 +308,21 @@ export namespace Response {
   export function encode(frame: Frame): ArrayBuffer {
     if (frame.tag === Tag.ServicePayload) {
       const u8 = new Uint8Array(frame.bytes.byteLength + 1);
-      u8[0] = 0x80;
+      u8[0] = 0x00;
+      u8.set(frame.bytes, 1);
+      return u8.buffer;
+    }
+
+    if (frame.tag === Tag.ChunkedServicePayload) {
+      const u8 = new Uint8Array(frame.bytes.byteLength + 1);
+      u8[0] = 0x40;
       u8.set(frame.bytes, 1);
       return u8.buffer;
     }
 
     if (frame.tag === Tag.AccessToken) {
       const writer = new Writer(57);
-      writer.putU8(0x81);
+      writer.putU8(0x01);
       writer.putU64(frame.ttl);
       writer.put(frame.accessToken);
       return writer.getBuffer();
@@ -327,14 +341,21 @@ export namespace Response {
     const reader = new Reader(payload);
     const tag = reader.getU8();
 
-    if (tag == 0x80) {
+    if (tag == 0x00) {
       return {
         tag: Tag.ServicePayload,
         bytes: new Uint8Array(payload).slice(1),
       };
     }
 
-    if (tag == 0x81) {
+    if (tag == 0x40) {
+      return {
+        tag: Tag.ChunkedServicePayload,
+        bytes: new Uint8Array(payload).slice(1),
+      };
+    }
+
+    if (tag == 0x01) {
       const ttl = reader.getU64();
       const accessToken = reader.get(64) as RawAccessToken;
       return {
@@ -342,6 +363,10 @@ export namespace Response {
         ttl,
         accessToken,
       };
+    }
+
+    if (tag < 0x80) {
+      throw new Error("Unsupported");
     }
 
     return {
@@ -355,7 +380,7 @@ export namespace Response {
         5: TerminationReason.ServiceTerminated,
         6: TerminationReason.ConnectionInUse,
         7: TerminationReason.WrongPermssion,
-      }[tag] || TerminationReason.Unknown,
+      }[tag - 0x80] || TerminationReason.Unknown,
     };
   }
 }
