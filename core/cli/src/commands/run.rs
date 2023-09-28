@@ -1,7 +1,7 @@
 use std::future::Future;
 use std::pin::Pin;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_node::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -22,8 +22,9 @@ where
 
     let config = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
 
-    let node =
-        Node::<C>::init(config).map_err(|e| anyhow::anyhow!("Could not start the node: {e:?}"))?;
+    let node = Node::<C>::init(config)
+        .map_err(|e| anyhow::anyhow!("Node Initialization failed: {e:?}"))
+        .context("Could not start the node.")?;
 
     if let Some(cb) = &custom_start_shutdown {
         ((cb)(&node, true)).await;
