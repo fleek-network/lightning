@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::CompressionAlgorithm;
 use lightning_interfaces::{BlockStoreInterface, ConfigProviderInterface, IncrementalPutInterface};
@@ -27,13 +27,17 @@ async fn init<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
     config_path: ResolvedPathBuf,
 ) -> Result<()> {
     let config = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
-    Node::<C>::init(config).map_err(|e| anyhow::anyhow!("Could not start the node: {e}"))?;
+    Node::<C>::init(config)
+        .map_err(|e| anyhow::anyhow!("Node Initialization failed: {e:?}"))
+        .context("Could not start the node.")?;
     Ok(())
 }
 
 async fn show_order<C: Collection>() -> Result<()> {
     let graph = C::build_graph();
-    let sorted = graph.sort()?;
+    let sorted = graph
+        .sort()
+        .map_err(|e| anyhow!("Sort graph error: {e:?}"))?;
     for (i, tag) in sorted.iter().enumerate() {
         println!(
             "{:0width$}  {tag}\n      = {ty}",
@@ -61,7 +65,7 @@ async fn store<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
     let store = <C::BlockStoreInterface as BlockStoreInterface<C>>::init(
         config.get::<C::BlockStoreInterface>(),
     )
-    .expect("Could not init blockstore");
+    .context("Could not init blockstore")?;
 
     let mut block = vec![0u8; 256 * 1025];
 
