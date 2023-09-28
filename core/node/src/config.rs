@@ -81,7 +81,9 @@ impl<C: Collection> TomlConfigProvider<C> {
         Node::<C>::fill_configuration(&config);
 
         if !config_path.exists() {
-            std::fs::write(&config_path, config.serialize_config())?;
+            std::fs::write(&config_path, config.serialize_config()).with_context(|| {
+                format!("Could not write to file: {}", config_path.to_str().unwrap())
+            })?;
         }
 
         Ok(config)
