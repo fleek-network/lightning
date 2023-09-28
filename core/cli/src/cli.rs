@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_node::config::TomlConfigProvider;
@@ -147,8 +147,9 @@ impl Cli {
     }
 
     fn resolve_config_path(&self) -> Result<ResolvedPathBuf> {
-        let config_path = ResolvedPathBuf::try_from(self.args.config.as_str())
-            .expect("Failed to resolve config path");
+        let input_path = self.args.config.as_str();
+        let config_path = ResolvedPathBuf::try_from(input_path)
+            .context(format!("Failed to resolve config path: {input_path}"))?;
         ensure_parent_exist(&config_path)?;
         Ok(config_path)
     }
