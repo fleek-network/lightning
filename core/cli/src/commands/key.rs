@@ -1,7 +1,7 @@
 use std::fs::{read_to_string, remove_file};
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::Collection;
@@ -17,8 +17,12 @@ pub async fn exec<C: Collection<SignerInterface = Signer<C>>>(
     config_path: ResolvedPathBuf,
 ) -> Result<()> {
     match cmd {
-        KeySubCmd::Show => show_key::<C>(config_path).await,
-        KeySubCmd::Generate => generate_key::<C>(config_path).await,
+        KeySubCmd::Show => show_key::<C>(config_path)
+            .await
+            .context("Could not show key"),
+        KeySubCmd::Generate => generate_key::<C>(config_path)
+            .await
+            .context("Could not generate key"),
     }
 }
 
@@ -29,15 +33,11 @@ async fn generate_key<C: Collection<SignerInterface = Signer<C>>>(
     let signer_config = config.get::<C::SignerInterface>();
 
     if signer_config.node_key_path.exists() {
-        return Err(anyhow!(
-            "Node secret key exists at specified path. Not generating keys."
-        ));
+        bail!("Node secret key exists at specified path. Not generating keys.");
     }
 
     if signer_config.consensus_key_path.exists() {
-        return Err(anyhow!(
-            "Consensus secret key exists at specified path. Not generating keys."
-        ));
+        bail!("Consensus secret key exists at specified path. Not generating keys.");
     }
 
     match Signer::<C>::generate_node_key(&signer_config.node_key_path) {
@@ -45,7 +45,7 @@ async fn generate_key<C: Collection<SignerInterface = Signer<C>>>(
             "Successfully created node secret key at: {:?}",
             signer_config.node_key_path
         ),
-        Err(err) => return Err(anyhow!("Failed to create node secret key: {err:?}")),
+        Err(err) => bail!("Failed to create node secret key: {err:?}"),
     };
 
     match Signer::<C>::generate_consensus_key(&signer_config.consensus_key_path) {
@@ -55,7 +55,7 @@ async fn generate_key<C: Collection<SignerInterface = Signer<C>>>(
         ),
         Err(err) => {
             remove_file(signer_config.node_key_path)?;
-            return Err(anyhow!("Failed to create consensus secret key: {err:?}"));
+            bail!("Failed to create consensus secret key: {err:?}");
         },
     };
     Ok(())
@@ -67,10 +67,10 @@ async fn show_key<C: Collection<SignerInterface = Signer<C>>>(
     let config = Arc::new(TomlConfigProvider::<C>::load_or_write_config(config_path).await?);
     let signer_config = config.get::<C::SignerInterface>();
     if signer_config.node_key_path.exists() {
-        let node_secret_key = read_to_string(&signer_config.node_key_path)
-            .with_context(|| "Failed to read node pem file")?;
+        let node_secret_key =
+            read_to_string(&signer_config.node_key_path).context("Failed to read node pem file")?;
         let node_secret_key = NodeSecretKey::decode_pem(&node_secret_key)
-            .with_context(|| "Failed to decode node pem file")?;
+            .context("Failed to decode node pem file")?;
         println!("Node Public Key: {}", node_secret_key.to_pk().to_base58());
     } else {
         eprintln!("Node Public Key: does not exist");
@@ -78,9 +78,9 @@ async fn show_key<C: Collection<SignerInterface = Signer<C>>>(
 
     if signer_config.consensus_key_path.exists() {
         let consensus_secret_key = read_to_string(&signer_config.consensus_key_path)
-            .with_context(|| "Failed to read consensus pem file")?;
+            .context("Failed to read consensus pem file")?;
         let consensus_secret_key = ConsensusSecretKey::decode_pem(&consensus_secret_key)
-            .with_context(|| "Failed to decode consensus pem file")?;
+            .context("Failed to decode consensus pem file")?;
         println!(
             "Consensus Public Key: {}",
             consensus_secret_key.to_pk().to_base58()
