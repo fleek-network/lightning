@@ -35,7 +35,6 @@ pub fn setup() {
         .add_filter_ignore_str("anemo")
         // remove the line below if you want to see narwhal logs
         .add_filter_allow("lightning".to_string())
-        .add_filter_allow("netkit".to_string())
         .set_location_level(LevelFilter::Error)
         .set_thread_level(LevelFilter::Error)
         .set_thread_mode(ThreadLogMode::Names)

@@ -44,3 +44,13 @@ impl Builder {
         Ok(Endpoint::new(self.sk, address, server_config))
     }
 }
+
+impl Clone for Builder {
+    fn clone(&self) -> Self {
+        Self {
+            sk: self.sk.clone(),
+            transport_config: Default::default(),
+            address: self.address,
+        }
+    }
+}

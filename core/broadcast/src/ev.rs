@@ -430,11 +430,9 @@ async fn main_loop<C: Collection>(
                 log::trace!("received command in event loop");
                 ctx.handle_command(command);
             },
-
-            (sender, payload) = ctx.event_handler.receive() => {
+            Some((sender, payload)) = ctx.event_handler.receive() => {
                 ctx.handle_frame_payload(sender, payload);
-            },
-
+            }
             requests = ctx.pending_store.tick() => {
                 ctx.handle_pending_tick(requests);
             }

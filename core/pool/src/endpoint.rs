@@ -9,6 +9,7 @@ use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
+use lightning_interfaces::ServiceScope;
 use quinn::{
     ClientConfig,
     Connecting,
@@ -27,8 +28,6 @@ use x509_parser::nom::AsBytes;
 
 use crate::driver::Context;
 use crate::{driver, tls};
-
-pub type ServiceScope = u8;
 
 #[derive(Debug)]
 pub struct Message {
@@ -52,9 +51,7 @@ pub struct NodeAddress {
 
 #[derive(Debug)]
 pub enum Request {
-    #[deprecated(note = "Use stream api.")]
-    Connect { peer: NodeAddress },
-    #[deprecated(note = "Use stream api.")]
+    #[allow(unused)]
     SendMessage {
         /// Peer to connect to.
         peer: NodeAddress,
@@ -69,6 +66,7 @@ pub enum Request {
         /// This channel will return the sender and receiver for the stream.
         respond: oneshot::Sender<Result<(SendStream, RecvStream), ConnectionError>>,
     },
+    #[allow(unused)]
     Metrics {
         /// Connection peer.
         peer: NodePublicKey,
@@ -79,7 +77,6 @@ pub enum Request {
 
 #[derive(Debug)]
 pub enum Event {
-    #[deprecated(note = "Use stream api.")]
     Message {
         peer: NodePublicKey,
         message: Message,
@@ -89,12 +86,14 @@ pub enum Event {
         tx: SendStream,
         rx: RecvStream,
     },
+    #[allow(unused)]
     #[deprecated(note = "Use stream api.")]
     NewConnection {
         incoming: bool,
         peer: NodePublicKey,
         rtt: Duration,
     },
+    #[allow(unused)]
     #[deprecated(note = "Use stream api.")]
     Disconnect { peer: NodePublicKey },
 }
@@ -123,7 +122,6 @@ pub struct Endpoint {
     /// Ongoing drivers.
     driver_set: JoinSet<NodePublicKey>,
     network_event_tx: HashMap<ServiceScope, mpsc::Sender<Event>>,
-    service_scope: ServiceScope,
 }
 
 impl Endpoint {
@@ -142,22 +140,14 @@ impl Endpoint {
             connecting: FuturesUnordered::new(),
             pending_dial: HashMap::new(),
             network_event_tx: HashMap::new(),
-            service_scope: 0,
         }
     }
 
-    /// Returns sender for requests to the endpoint.
-    pub fn request_sender(&self) -> Sender<Request> {
-        self.request_tx.clone()
-    }
-
     /// Returns receiver for network events and increments the service scope.
-    pub fn network_event_receiver(&mut self) -> (ServiceScope, Receiver<Event>) {
+    pub fn register(&mut self, service: ServiceScope) -> (Sender<Request>, Receiver<Event>) {
         let (tx, rx) = mpsc::channel(1024);
-        self.network_event_tx.insert(self.service_scope, tx);
-        let service_scope = self.service_scope;
-        self.service_scope += 1;
-        (service_scope, rx)
+        self.network_event_tx.insert(service, tx);
+        (self.request_tx.clone(), rx)
     }
 
     // Todo: Return metrics.
@@ -271,19 +261,6 @@ impl Endpoint {
 
         let network_event_tx = self.network_event_tx.clone();
         self.driver_set.spawn(async move {
-            for (_, event_tx) in network_event_tx.iter() {
-                if event_tx
-                    .send(Event::NewConnection {
-                        incoming,
-                        peer,
-                        rtt: connection.rtt(),
-                    })
-                    .await
-                    .is_err()
-                {
-                    tracing::error!("endpoint client dropped the network event receiver");
-                }
-            }
             let ctx = Context::new(connection, peer, request_rx, network_event_tx, incoming);
             if let Err(e) = driver::start_driver(ctx).await {
                 tracing::error!("driver for connection with {peer:?} shutdowned: {e:?}")
@@ -304,22 +281,6 @@ impl Endpoint {
 
     fn handle_request(&mut self, request: Request) -> Result<()> {
         match request {
-            Request::Connect { peer } => {
-                if peer.socket_address == self.address {
-                    tracing::warn!("attempted to connect to ourselves");
-                    return Ok(());
-                }
-
-                if self
-                    .driver
-                    .get(&peer.pk)
-                    .map(|driver_tx| driver_tx.is_closed())
-                    .unwrap_or(true)
-                {
-                    self.enqueue_dial_task(peer)?;
-                }
-                // Todo: We should let client know that we already have a connection.
-            },
             Request::SendMessage { peer, message } => {
                 if self
                     .driver
@@ -424,14 +385,6 @@ impl Endpoint {
 
     fn handle_disconnect(&mut self, peer: NodePublicKey) {
         self.driver.remove(&peer);
-        let network_event_tx = self.network_event_tx.clone();
-        tokio::spawn(async move {
-            for (_, event_tx) in network_event_tx.iter() {
-                if event_tx.send(Event::Disconnect { peer }).await.is_err() {
-                    tracing::error!("failed to send network event");
-                }
-            }
-        });
     }
 }
 
@@ -444,7 +397,7 @@ struct ConnectionResult {
 impl From<Message> for Bytes {
     fn from(value: Message) -> Self {
         let mut buf = BytesMut::with_capacity(value.payload.len() + 1);
-        buf.put_u8(value.service);
+        buf.put_u8(value.service as u8);
         buf.put_slice(&value.payload);
         buf.into()
     }
@@ -458,7 +411,7 @@ impl TryFrom<BytesMut> for Message {
         if bytes.is_empty() {
             return Err(anyhow!("Cannot convert empty bytes into a message"));
         }
-        let service = bytes[0];
+        let service = ServiceScope::try_from(bytes[0])?;
         let payload = bytes[1..bytes.len()].to_vec();
         Ok(Self { service, payload })
     }

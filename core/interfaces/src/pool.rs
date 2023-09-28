@@ -1,8 +1,10 @@
 use std::io;
 
+use anyhow::{bail, Error};
 use async_trait::async_trait;
 use bytes::Bytes;
 use lightning_types::NodeIndex;
+use serde::{Deserialize, Serialize};
 use tokio_stream::Stream;
 
 use crate::infu_collection::{c, Collection};
@@ -16,12 +18,27 @@ use crate::{
     WithStartAndShutdown,
 };
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[repr(u8)]
 pub enum ServiceScope {
-    Broadcast,
+    Broadcast = 0x00,
     /// Fetcher.
-    BlockstoreServer,
+    BlockstoreServer = 0x01,
 }
 
+impl TryFrom<u8> for ServiceScope {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0x00 => Ok(Self::Broadcast),
+            0x01 => Ok(Self::BlockstoreServer),
+            _ => bail!("invalid scope value: {value:?}"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize)]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum RejectReason {
@@ -69,10 +86,10 @@ pub trait PoolInterface<C: Collection>:
 
 #[async_trait]
 #[infusion::blank]
-pub trait EventHandler {
+pub trait EventHandler: Send + Sync {
     fn send_to_all<F: Fn(NodeIndex) -> bool>(&self, payload: Bytes, filter: F);
     fn send_to_one(&self, node: NodeIndex, payload: Bytes);
-    async fn receive(&self) -> (NodeIndex, Bytes);
+    async fn receive(&mut self) -> Option<(NodeIndex, Bytes)>;
 }
 
 #[async_trait]
@@ -84,7 +101,7 @@ pub trait Requester: Clone + Send + Sync {
 
 #[infusion::blank]
 pub trait Response: Send + Sync {
-    type Body<S: Stream<Item = io::Result<Bytes>>> = infusion::Blank<S>;
+    type Body<S: Stream<Item = io::Result<Bytes>>> = tokio_stream::Empty<io::Result<Bytes>>;
     fn status_code(&self) -> Result<(), RejectReason>;
     fn body<S: Stream<Item = io::Result<Bytes>>>(self) -> Self::Body<S>;
 }
@@ -93,12 +110,12 @@ pub trait Response: Send + Sync {
 #[infusion::blank]
 pub trait Responder {
     type Request: Request;
-    async fn get_next_request(&mut self) -> (Bytes, Self::Request);
+    async fn get_next_request(&mut self) -> io::Result<(Bytes, Self::Request)>;
 }
 
 #[async_trait]
 #[infusion::blank]
 pub trait Request: Send + Sync {
     fn reject(self, reason: RejectReason);
-    async fn send(&self, frame: Bytes);
+    async fn send(&mut self, frame: Bytes) -> io::Result<()>;
 }

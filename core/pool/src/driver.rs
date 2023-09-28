@@ -6,13 +6,14 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
 use futures::{SinkExt, StreamExt};
+use lightning_interfaces::ServiceScope;
 use log::{error, info};
 use quinn::{Connection, ConnectionError, RecvStream, SendStream};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-use crate::endpoint::{DriverRequest, Event, Message, ServiceScope};
+use crate::endpoint::{DriverRequest, Event, Message};
 
 /// Context for driving the connection.
 pub struct Context {
@@ -117,7 +118,7 @@ pub async fn start_driver(mut ctx: Context) -> Result<()> {
                                 });
 
                             },
-                            None => info!("received stream request with invalid service scope: {}", message.service),
+                            None => info!("received stream request with invalid service scope: {:?}", message.service),
                         }
                     },
                     Err(e) => error!("failed to deserialize message: {e:?}"),
@@ -137,7 +138,8 @@ async fn handle_incoming_streams(
     // The first byte identifies the service.
     let mut buf = [0u8; 1];
     rx.read_exact(&mut buf).await?;
-    let service = buf[0];
+    // Todo: replace bincode.
+    let service = ServiceScope::try_from(buf[0])?;
     match network_event_tx.get(&service) {
         Some(sender) => {
             let event = Event::NewStream { peer, tx, rx };
@@ -145,7 +147,7 @@ async fn handle_incoming_streams(
                 tracing::error!("failed to send incoming network event");
             }
         },
-        None => info!("received stream request with invalid service scope: {service}"),
+        None => info!("received stream request with invalid service scope: {service:?}"),
     }
     Ok(())
 }
@@ -160,7 +162,7 @@ async fn create_stream(
     // We send the service scope first so
     // that the receiver knows the service
     // that this stream belongs to.
-    tx.write_all(&[service]).await?;
+    tx.write_all(&[service as u8]).await?;
     respond
         .send(Ok((tx, rx)))
         .map_err(|e| anyhow::anyhow!("failed to send new stream to client: {e:?}"))

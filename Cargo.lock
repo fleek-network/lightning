@@ -4128,6 +4128,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-pool"
+version = "0.0.0"
+dependencies = [
+ "affair 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "bytes",
+ "der 0.7.8",
+ "fleek-blake3",
+ "fleek-crypto",
+ "futures",
+ "infusion",
+ "lightning-application",
+ "lightning-interfaces",
+ "lightning-signer",
+ "lightning-test-utils",
+ "log",
+ "quinn",
+ "rcgen 0.11.1",
+ "ring",
+ "rustls 0.21.7",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tokio-util 0.7.8",
+ "tracing",
+ "webpki",
+ "x509-parser 0.15.1",
+]
+
+[[package]]
 name = "lightning-rep-collector"
 version = "0.0.0"
 dependencies = [
@@ -5336,33 +5368,6 @@ dependencies = [
  "ndarray",
  "rand 0.8.5",
  "rand_distr",
-]
-
-[[package]]
-name = "netkit"
-version = "0.0.0"
-dependencies = [
- "affair 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "anyhow",
- "async-trait",
- "bytes",
- "clap 4.4.2",
- "der 0.7.8",
- "env_logger 0.10.0",
- "fleek-blake3",
- "fleek-crypto",
- "futures",
- "log",
- "quinn",
- "rcgen 0.11.1",
- "ring",
- "rustls 0.21.7",
- "thiserror",
- "tokio",
- "tokio-util 0.7.8",
- "tracing",
- "webpki",
- "x509-parser 0.15.1",
 ]
 
 [[package]]
@@ -8191,8 +8196,6 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
- "futures-util",
- "hashbrown 0.12.3",
  "pin-project-lite",
  "slab",
  "tokio",
