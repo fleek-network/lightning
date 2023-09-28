@@ -19,6 +19,9 @@ use crate::schema::{self, HandshakeRequestFrame, RequestFrame};
 use crate::shutdown::ShutdownWaiter;
 use crate::transports::webrtc::signal::router;
 
+/// Maximum size for an outgoing payload.
+const MAX_PAYLOAD_SIZE: usize = 32 << 10;
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct WebRtcConfig {
     /// Address to listen on for the signaling server. This is used to receive and respond to
@@ -102,24 +105,49 @@ impl Transport for WebRtcTransport {
 pub struct WebRtcSender(Socket<Bytes, ()>);
 
 macro_rules! webrtc_send {
-    ($self:expr, $frame:expr) => {
+    ($self:expr, $payload:expr) => {{
         let socket = $self.0.clone();
-        let bytes = $frame.encode();
         futures::executor::block_on(async move {
-            if let Err(e) = socket.enqueue(bytes).await {
+            if let Err(e) = socket.enqueue($payload).await {
                 error!("failed to send message to peer: {e}");
             };
         });
-    };
+    }};
 }
 
 impl TransportSender for WebRtcSender {
     fn send_handshake_response(&mut self, frame: schema::HandshakeResponse) {
-        webrtc_send!(self, frame);
+        webrtc_send!(self, frame.encode());
     }
 
     fn send(&mut self, frame: schema::ResponseFrame) {
-        webrtc_send!(self, frame);
+        match frame {
+            // Frames greater than the max payload size should be chunked with a novel frame tag
+            // for webrtc.
+            schema::ResponseFrame::ServicePayload { bytes } if bytes.len() > MAX_PAYLOAD_SIZE => {
+                let mut iter = bytes.chunks(MAX_PAYLOAD_SIZE).peekable();
+                while let Some(chunk) = iter.next() {
+                    let mut payload = schema::ResponseFrame::ServicePayload {
+                        bytes: chunk.to_vec().into(),
+                    }
+                    .encode()
+                    .to_vec();
+
+                    if iter.peek().is_some() {
+                        // If we have more chunks to send, mark the frame tag as 0x40. This signals
+                        // that the payload will have more data, and should be buffered and
+                        // concatenated with the next frame. The last frame will retain the
+                        // standard tag, 0x00, which also allows small payloads to be encoded
+                        // normally.
+                        payload[0] = 0x40;
+                    }
+
+                    webrtc_send!(self, payload.into())
+                }
+            },
+            // Any other frames are encoded normally and sent out.
+            _ => webrtc_send!(self, frame.encode()),
+        };
     }
 }
 
@@ -130,5 +158,72 @@ pub struct WebRtcReceiver(tokio::sync::mpsc::Receiver<schema::RequestFrame>);
 impl TransportReceiver for WebRtcReceiver {
     async fn recv(&mut self) -> Option<schema::RequestFrame> {
         self.0.recv().await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use affair::{AsyncWorker, Executor, TokioSpawn};
+    use async_trait::async_trait;
+    use bytes::{BufMut, Bytes, BytesMut};
+    use tokio::sync::mpsc::{channel, Sender};
+
+    use crate::schema::ResponseFrame;
+    use crate::transports::webrtc::{WebRtcSender, MAX_PAYLOAD_SIZE};
+    use crate::transports::TransportSender;
+
+    #[tokio::test]
+    async fn sender_payload_chunking() {
+        // Test payload that is the size of one of our complete blake3 blocks.
+        const TEST_PAYLOAD: &[u8] = &[42; 256 << 10];
+
+        /// Dummy worker that collects chunk frames and ensures the final length is correct.
+        struct DummySendWorker(usize, BytesMut, Sender<Bytes>);
+        #[async_trait]
+        impl AsyncWorker for DummySendWorker {
+            type Request = Bytes;
+            type Response = ();
+
+            async fn handle(&mut self, req: Self::Request) -> Self::Response {
+                assert!(req.len() <= MAX_PAYLOAD_SIZE + 1);
+                self.1.put(&req[1..]);
+
+                match req[0] {
+                    0x00 => {
+                        println!("got final chunk");
+                        assert_eq!(self.0, self.1.len());
+                        self.2
+                            .send(self.1.split().into())
+                            .await
+                            .expect("failed to send bytes");
+                    },
+                    0x40 => println!("got payload chunk"),
+                    v => panic!("got {v}"),
+                }
+            }
+        }
+
+        // Init a notify channel, the worker and socket, and the webrtc sender.
+        let (tx, mut rx) = channel(8);
+        let socket = TokioSpawn::spawn_async(DummySendWorker(
+            TEST_PAYLOAD.len(),
+            BytesMut::with_capacity(TEST_PAYLOAD.len()),
+            tx,
+        ));
+        let mut sender = WebRtcSender(socket);
+
+        // Send the content
+        sender.send(ResponseFrame::ServicePayload {
+            bytes: TEST_PAYLOAD.into(),
+        });
+
+        // Wait for the worker to buffer and receive the entire payload
+        let bytes = tokio::time::timeout(Duration::from_secs(2), rx.recv())
+            .await
+            .expect("timeout, did worker panic?")
+            .expect("failed to recv bytes");
+        assert_eq!(&bytes, TEST_PAYLOAD);
     }
 }

@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_handshake::handshake::Handshake;
