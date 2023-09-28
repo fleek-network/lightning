@@ -37,7 +37,10 @@ pub struct SendCmd {
 /// A command is what is sent from the other threads to the event loop.
 #[derive(Debug)]
 pub enum Command {
+    /// Request to read a message from a topic, contains a oneshot which
+    /// we use to send back the latest message.
     Recv(RecvCmd),
+    /// Send a message under the given topic and with the given payload.
     Send(SendCmd),
     /// Send a command to the event loop to cause a propagation of a
     /// previously seen message.

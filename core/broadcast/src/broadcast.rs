@@ -116,7 +116,6 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         pool: &c!(C::PoolInterface),
     ) -> anyhow::Result<Self> {
         let (_, sk) = signer.get_sk();
-        // Todo: Let's make sure we are cleaning up unused connections.
         let event_handler = pool.open_event(ServiceScope::Broadcast);
 
         let ctx = Context::<C>::new(
@@ -130,7 +129,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         );
 
         Ok(Self {
-            command_sender: ctx.command_sender(),
+            command_sender: ctx.get_command_sender(),
             status: Some(Status::NotRunning { ctx }).into(),
         })
     }

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::time::Duration;
 
 use fleek_crypto::{
     AccountOwnerSecretKey,

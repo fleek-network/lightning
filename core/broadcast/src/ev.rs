@@ -113,10 +113,15 @@ impl<C: Collection> Context<C> {
         }
     }
 
-    pub fn command_sender(&self) -> CommandSender {
+    pub fn get_command_sender(&self) -> CommandSender {
         self.command_tx.clone()
     }
 
+    /// Spawn the event loop returning a oneshot sender which can be used by the caller,
+    /// when it is time for us to shutdown and exit the event loop.
+    ///
+    /// The context is preserved and not destroyed on the shutdown. And can be retrieved
+    /// again by awaiting the `JoinHandle`.
     pub fn spawn(self) -> (oneshot::Sender<()>, JoinHandle<Self>) {
         let (shutdown_tx, shutdown) = oneshot::channel();
         let handle = tokio::spawn(async move {
@@ -134,7 +139,7 @@ impl<C: Collection> Context<C> {
     }
 
     /// Handle a message sent from another node.
-    fn handle_payload(&mut self, sender: NodeIndex, payload: Vec<u8>) {
+    fn handle_frame_payload(&mut self, sender: NodeIndex, payload: Vec<u8>) {
         let Ok(frame) = Frame::decode(&payload) else {
             self.stats.report(sender, ConnectionStats {
                 invalid_messages_received_from_peer: 1,
@@ -201,8 +206,7 @@ impl<C: Collection> Context<C> {
         let Some(message) = self.db.get_message(digest) else {
             log::trace!("failed to find message");
             return; };
-        // TODO(qti3e)
-        // self.peers.send_message(&sender, Frame::Message(message));
+        self.send(sender, Frame::Message(message));
     }
 
     fn handle_message(&mut self, sender: NodeIndex, msg: Message) {
@@ -281,74 +285,112 @@ impl<C: Collection> Context<C> {
         log::debug!("handling broadcast command {command:?}");
 
         match command {
-            Command::Recv(cmd) => self.handle_recv_cmd(cmd),
-            Command::Send(cmd) => self.handle_send_cmd(cmd),
-            Command::Propagate(digest) => self.handle_propagate_cmd(digest),
-            Command::MarkInvalidSender(digest) => self.handle_mark_invalid_sender_cmd(digest),
+            Command::Recv(cmd) => {
+                let index = topic_to_index(cmd.topic);
+                self.incoming_messages[index].respond_to_recv_request(cmd.last_seen, cmd.response);
+            },
+            Command::Send(cmd) => {
+                let node_index = self
+                    .sqr
+                    .pubkey_to_index(self.pk)
+                    .expect("Tried to send message before node index was available");
+                let node_index = self.current_node_index.get_or_init(|| node_index);
+
+                let (digest, message) = {
+                    let mut tmp = Message {
+                        origin: *node_index,
+                        signature: NodeSignature([0; 64]),
+                        topic: cmd.topic,
+                        timestamp: now(),
+                        payload: cmd.payload,
+                    };
+                    let digest = tmp.to_digest();
+                    tmp.signature = self.sk.sign(&digest);
+                    (digest, tmp)
+                };
+
+                let id = self.interner.insert(digest);
+                self.db.insert_with_message(id, digest, message);
+
+                // Start advertising the message.
+                self.advertise(id, digest);
+            },
+            Command::Propagate(digest) => {
+                let Some(id) = self.db.get_id(&digest) else  {
+                    debug_assert!(
+                        false,
+                        "We should not be trying to propagate a message we don't know the id of."
+                    );
+                    return;
+                };
+
+                // Mark the message as propagated. This will make us lose any interest for future
+                // advertisements of this message.
+                self.db.mark_propagated(&digest);
+
+                // Remove the received message from the pending store.
+                self.pending_store.remove_message(id);
+
+                // Continue with advertising this message to the connected peers.
+                self.advertise(id, digest);
+
+                increment_counter!(
+                    "broadcast_messages_propagated",
+                    Some("Number of messages we have initialized propagation to our peers for.")
+                )
+            },
+            Command::MarkInvalidSender(digest) => {
+                log::error!("Received message from invalid sender");
+                // TODO(qti3e): There is more to do here.
+            },
         }
     }
 
-    fn handle_recv_cmd(&mut self, cmd: RecvCmd) {
-        let index = topic_to_index(cmd.topic);
-        self.incoming_messages[index].response_to(cmd.last_seen, cmd.response);
-    }
-
-    fn handle_send_cmd(&mut self, cmd: SendCmd) {
-        let node_index = self
-            .sqr
-            .pubkey_to_index(self.pk)
-            .expect("Tried to send message before node index was available");
-        let node_index = self.current_node_index.get_or_init(|| node_index);
-
-        let (digest, message) = {
-            let mut tmp = Message {
-                origin: *node_index,
-                signature: NodeSignature([0; 64]),
-                topic: cmd.topic,
-                timestamp: now(),
-                payload: cmd.payload,
-            };
-            let digest = tmp.to_digest();
-            tmp.signature = self.sk.sign(&digest);
-            (digest, tmp)
-        };
-
-        let id = self.interner.insert(digest);
-        self.db.insert_with_message(id, digest, message);
-
-        // Start advertising the message.
-        // TODO(qti3e)
-        // self.peers.advertise(id, digest);
-    }
-
-    fn handle_propagate_cmd(&mut self, digest: Digest) {
-        let Some(id) = self.db.get_id(&digest) else  {
-            debug_assert!(
-                false,
-                "We should not be trying to propagate a message we don't know the id of."
-            );
+    #[inline]
+    fn advertise(&self, interned_id: MessageInternedId, digest: Digest) {
+        let mut message = Vec::new();
+        if Frame::Advr(Advr {
+            interned_id,
+            digest,
+        })
+        .encode(&mut message)
+        .is_err()
+        {
+            log::error!("failed to encode advertisement");
             return;
         };
 
-        // Mark the message as propagated. This will make us lose any interest for future
-        // advertisements of this message.
-        self.db.mark_propagated(&digest);
+        // TODO(qti3e): If there are too many connections consider spawning node here.
 
-        // Remove the received message from the pending store.
-        self.pending_store.remove_message(id);
-
-        // Continue with advertising this message to the connected peers.
-        // TODO(qti3e)
-        // self.peers.advertise(id, digest);
-
-        increment_counter!(
-            "broadcast_messages_propagated",
-            Some("Number of messages we have initialized propagation to our peers for.")
-        )
+        self.event_handler.send_to_all(message, |id| {
+            self.peers
+                .get(&id)
+                .map(|mapping| !mapping.contains_key(&interned_id))
+                .unwrap_or(false)
+        });
     }
 
-    fn handle_mark_invalid_sender_cmd(&mut self, digest: Digest) {
-        log::error!("Received message from invalid sender");
+    #[inline]
+    fn send(&self, destination: NodeIndex, frame: Frame) {
+        let mut message = Vec::new();
+        if frame.encode(&mut message).is_err() {
+            log::error!("failed to encode outgoing message.");
+            return;
+        };
+
+        self.event_handler.send_to_one(destination, message);
+    }
+
+    fn handle_pending_tick(&self, requests: Vec<(MessageInternedId, NodeIndex)>) {
+        for (our_interned_id, node_index) in requests {
+            if let Some(&interned_id) = self
+                .peers
+                .get(&node_index)
+                .and_then(|c| c.get(&our_interned_id))
+            {
+                self.send(node_index, Frame::Want(Want { interned_id }))
+            }
+        }
     }
 }
 
@@ -357,12 +399,14 @@ async fn main_loop<C: Collection>(
     mut shutdown: tokio::sync::oneshot::Receiver<()>,
     mut ctx: Context<C>,
 ) -> Context<C> {
-    log::info!("starting broadcast for {}", ctx.pk);
+    log::info!("Starting broadcast for {}", ctx.pk);
 
     // During initialization the application state might have not had loaded, and at
     // that point we might not have inserted the node index of the currently running
     // node. Let's give it another shot here.
-    // TODO(qti3e): We might not even have to do this.
+    //
+    // We need the node index because when we're sending messages out (when the current
+    // node is the origin of the message.), we have to put our own id as the origin.
     if let Some(node_index) = ctx.sqr.pubkey_to_index(ctx.pk) {
         ctx.current_node_index.set(node_index);
     }
@@ -388,17 +432,11 @@ async fn main_loop<C: Collection>(
             },
 
             (sender, payload) = ctx.event_handler.receive() => {
-                // TODO(qti3e)
+                ctx.handle_frame_payload(sender, payload);
             },
 
             requests = ctx.pending_store.tick() => {
-                requests.into_iter().for_each(|(interned_id, pub_key)| {
-                    // if let Some(remote_index) = ctx.peers.get_index_mapping(&pub_key, interned_id) {
-                    //     ctx.peers.send_want_request(&pub_key, remote_index);
-                    // } else {
-                    //     log::warn!("Remote index not found for pending request");
-                    // }
-                });
+                ctx.handle_pending_tick(requests);
             }
         }
     }

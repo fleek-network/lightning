@@ -53,7 +53,11 @@ impl<T: Clone> RecvBuffer<T> {
 
     /// Respond to a recv request, if there is no new data available keeps track of the channel
     /// and responds once new data is available upon insertion.
-    pub fn response_to(&mut self, last_seen: Option<usize>, chan: oneshot::Sender<(usize, T)>) {
+    pub fn respond_to_recv_request(
+        &mut self,
+        last_seen: Option<usize>,
+        chan: oneshot::Sender<(usize, T)>,
+    ) {
         let Some(res) = self.ring.recv(last_seen) else {
             self.pending.push(chan);
             return;
