@@ -296,13 +296,13 @@ impl ResponseFrame {
         match self {
             Self::ServicePayload { bytes } => {
                 let mut buf = Vec::with_capacity(1 + bytes.len());
-                buf.put_u8(0x80);
+                buf.put_u8(0x00);
                 buf.put_slice(bytes);
                 buf.into()
             },
             Self::AccessToken { ttl, access_token } => {
                 let mut buf = Vec::with_capacity(57);
-                buf.put_u8(0x81);
+                buf.put_u8(0x01);
                 buf.put_u64(*ttl);
                 buf.put_slice(access_token.as_slice());
                 buf.into()
@@ -313,11 +313,11 @@ impl ResponseFrame {
 
     pub fn decode(bytes: &[u8]) -> Result<Self> {
         match bytes[0] {
-            0x80 => {
+            0x00 => {
                 let bytes = bytes[1..].to_vec().into();
                 Ok(Self::ServicePayload { bytes })
             },
-            0x81 => {
+            0x01 => {
                 if bytes.len() != 57 {
                     return Err(anyhow!("wrong number of bytes"));
                 }
@@ -325,7 +325,7 @@ impl ResponseFrame {
                 let access_token = Box::new(*array_ref!(bytes, 9, 48));
                 Ok(Self::AccessToken { ttl, access_token })
             },
-            byte => {
+            byte if byte >= 0x80 => {
                 if bytes.len() > 1 {
                     return Err(anyhow!("too many bytes"));
                 }
@@ -333,6 +333,7 @@ impl ResponseFrame {
                     reason: TerminationReason::from_u8(byte),
                 })
             },
+            byte => Err(anyhow!("invalid frame tag: {byte}")),
         }
     }
 }
@@ -341,7 +342,7 @@ impl ResponseFrame {
 #[repr(u8)]
 #[non_exhaustive]
 pub enum TerminationReason {
-    Timeout = 0x00,
+    Timeout = 0x80,
     InvalidHandshake,
     InvalidToken,
     InvalidDeliveryAcknowledgment,
@@ -355,14 +356,14 @@ pub enum TerminationReason {
 impl TerminationReason {
     pub fn from_u8(byte: u8) -> Self {
         match byte {
-            0x00 => Self::Timeout,
-            0x01 => Self::InvalidHandshake,
-            0x02 => Self::InvalidToken,
-            0x03 => Self::InvalidDeliveryAcknowledgment,
-            0x04 => Self::InvalidService,
-            0x05 => Self::ServiceTerminated,
-            0x06 => Self::ConnectionInUse,
-            0x07 => Self::WrongPermssion,
+            0x80 => Self::Timeout,
+            0x81 => Self::InvalidHandshake,
+            0x82 => Self::InvalidToken,
+            0x83 => Self::InvalidDeliveryAcknowledgment,
+            0x84 => Self::InvalidService,
+            0x85 => Self::ServiceTerminated,
+            0x86 => Self::ConnectionInUse,
+            0x87 => Self::WrongPermssion,
             _ => Self::Unknown,
         }
     }
