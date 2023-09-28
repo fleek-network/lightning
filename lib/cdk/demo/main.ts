@@ -12,8 +12,6 @@ const queue: Uint8Array[] = []; // Because MediaStream sucks.
 let didReceiveFirstMessage = false;
 let sourceBuffer: SourceBuffer | undefined;
 let segCounter = 0;
-let buffered: Uint8Array[] = [];
-let seen: boolean[] = [];
 let bytesRead = 0;
 let getNextSent: undefined | number;
 
@@ -34,7 +32,7 @@ const pc = new RTCPeerConnection({
   ],
 });
 
-const dataChan = pc.createDataChannel("foo", {
+const dataChan = pc.createDataChannel("fleek", {
   ordered: true,
 });
 
@@ -64,37 +62,26 @@ dataChan.onmessage = (e: MessageEvent) => {
   }
 
   const decoded = schema.Response.decode(e.data);
-  if (decoded && decoded.tag === schema.Response.Tag.ServicePayload) {
-    const size = decoded.bytes.byteLength;
-    const index = decoded.bytes[size - 1];
-    console.log("received chunk", index);
-    const slice = decoded.bytes.slice(0, size - 1);
-
+  if (
+    decoded &&
+    (decoded.tag ===
+        schema.Response.Tag.ServicePayload ||
+      decoded.tag ===
+        schema.Response.Tag.ChunkedServicePayload)
+  ) {
     if (bytesRead == 0) {
-      getNext();
       console.log(performance.measure("first-byte", {
         start: getNextSent,
         end: performance.now(),
       }));
     }
 
-    bytesRead += size - 1;
-    buffered[index] = slice;
-
-    if ((index > 0 && seen[index - 1]) || index == 0) {
-      appendBuffer(slice);
-      seen[index] = true;
-
-      for (let i = index + 1; buffered[i] != undefined; ++i) {
-        seen[i] = true;
-        appendBuffer(buffered[i]);
-      }
-    }
+    bytesRead += decoded.bytes.byteLength;
+    appendBuffer(decoded.bytes);
 
     if (bytesRead >= 256 * 1024) {
+      getNext();
       bytesRead = 0;
-      seen = [];
-      buffered = [];
     }
   }
 };
@@ -201,8 +188,4 @@ function sourceOpen(this: MediaSource) {
       );
     }
   });
-
-  if (didReceiveFirstMessage) {
-    getNext();
-  }
 }

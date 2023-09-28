@@ -33,9 +33,6 @@ lazy_static! {
     };
 }
 
-// our webRTC transport does not handle >64KB messages.
-const CHUNK_SIZE: usize = 32 * 1024;
-
 pub fn on_connected(args: OnConnectedArgs) {
     if let Some(tree) = TREE.as_ref() {
         fn_sdk::api::connection_send(args.connection_id, (tree.len() as u32).to_be_bytes().into());
@@ -63,11 +60,7 @@ pub fn on_message(args: OnMessageArgs) {
 
     fn_sdk::api::spawn(async move {
         let content = tree.get(block).await.unwrap();
-        for (i, chunk) in content.chunks(CHUNK_SIZE).enumerate() {
-            let mut vec = chunk.to_vec();
-            vec.push(i as u8);
-            fn_sdk::api::connection_send(args.connection_id, vec);
-        }
+        fn_sdk::api::connection_send(args.connection_id, content);
     });
 }
 
