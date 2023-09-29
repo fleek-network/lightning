@@ -68,7 +68,8 @@ where
                 //
                 std::mem::drop(node);
                 // start local env in checkpoint mode to seed database with the new checkpoint
-                C::ApplicationInterface::load_from_checkpoint(&app_config, checkpoint, checkpoint_hash)?;
+                C::ApplicationInterface::load_from_checkpoint(
+                    &app_config, checkpoint, checkpoint_hash)?;
 
                 node = Node::<C>::init(config.clone())
                     .map_err(|e| anyhow::anyhow!("Could not start the node: {e:?}"))?;
