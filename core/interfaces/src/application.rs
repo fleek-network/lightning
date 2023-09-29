@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use affair::Socket;
+use anyhow::Result;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_types::{AccountInfo, NodeIndex};
@@ -24,7 +25,7 @@ use crate::types::{
     TransactionResponse,
     UpdateRequest,
 };
-use crate::{BlockStoreInterface, BlockStoreServerInterface, ConfigProviderInterface};
+use crate::{BlockStoreInterface, ConfigProviderInterface};
 
 /// The socket that is handled by the application layer and fed by consensus (or other
 /// synchronization systems in place) which executes and persists transactions that
@@ -41,24 +42,16 @@ pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
 pub trait ApplicationInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
-    fn _init(
-        config: ::ConfigProviderInterface,
-        blockstore: ::BlockStoreInterface,
-        blockstore_server: ::BlockStoreServerInterface,
-    ) {
+    fn _init(config: ::ConfigProviderInterface, blockstore: ::BlockStoreInterface) {
         let config = config.get::<Self>();
-        Self::init(config, blockstore.clone(), blockstore_server.clone())
+        Self::init(config, blockstore.clone())
     }
 
     /// The type for the sync query executor.
     type SyncExecutor: SyncQueryRunnerInterface;
 
     /// Create a new instance of the application layer using the provided configuration.
-    fn init(
-        config: Self::Config,
-        blockstore: C::BlockStoreInterface,
-        blockstore_server: C::BlockStoreServerInterface,
-    ) -> anyhow::Result<Self>;
+    fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self>;
 
     /// Returns a socket that should be used to submit transactions to be executed
     /// by the application layer.
@@ -75,6 +68,13 @@ pub trait ApplicationInterface<C: Collection>:
     /// without slowing down the system.
     #[blank = Default::default()]
     fn sync_query(&self) -> Self::SyncExecutor;
+
+    /// Will seed its underlying database with the checkpoint provided
+    fn load_from_checkpoint(
+        config: &Self::Config,
+        checkpoint: Vec<u8>,
+        checkpoint_hash: [u8; 32],
+    ) -> Result<()>;
 }
 
 #[infusion::blank]
@@ -185,6 +185,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// takes NodeInfo and returns if they are a current committee member or not
     fn is_committee(&self, node_index: u32) -> bool;
+
+    /// Returns the node info of the genesis committee members
+    fn genesis_committee(&self) -> Vec<NodeInfo>;
 
     /// Returns last executed block hash. [0;32] is genesis
     fn get_last_block(&self) -> [u8; 32];

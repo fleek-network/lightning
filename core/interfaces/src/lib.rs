@@ -19,6 +19,7 @@ pub mod resolver;
 pub mod rpc;
 pub mod service;
 pub mod signer;
+pub mod syncronizer;
 pub mod topology;
 pub mod types;
 
@@ -41,6 +42,7 @@ pub use resolver::*;
 pub use rpc::*;
 pub use service::*;
 pub use signer::*;
+pub use syncronizer::*;
 pub use topology::*;
 
 // Re-export schema.

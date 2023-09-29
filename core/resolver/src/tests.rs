@@ -78,7 +78,6 @@ async fn test_start_shutdown() {
             db_options: None,
         },
         Default::default(),
-        Default::default(),
     )
     .unwrap();
     app.start().await;

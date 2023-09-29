@@ -4052,6 +4052,7 @@ dependencies = [
  "lightning-rpc",
  "lightning-service-executor",
  "lightning-signer",
+ "lightning-syncronizer",
  "lightning-topology",
  "log",
  "mock",
@@ -4273,6 +4274,21 @@ dependencies = [
  "log",
  "resolved-pathbuf",
  "serde",
+ "tokio",
+]
+
+[[package]]
+name = "lightning-syncronizer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "lightning-interfaces",
+ "log",
+ "rand 0.8.5",
+ "reqwest",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 

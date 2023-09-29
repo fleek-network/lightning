@@ -443,4 +443,25 @@ impl SyncQueryRunnerInterface for QueryRunner {
             },
         )
     }
+
+    fn genesis_committee(&self) -> Vec<NodeInfo> {
+        self.inner.run(|ctx| {
+            let node_table = self.node_table.get(ctx);
+
+            match self
+                .metadata_table
+                .get(ctx)
+                .get(&Metadata::GenesisCommittee)
+            {
+                Some(Value::GenesisCommittee(committee)) => committee
+                    .iter()
+                    .filter_map(|index| node_table.get(index))
+                    .collect(),
+                _ => {
+                    // unreachable seeded at genesis
+                    Vec::new()
+                },
+            }
+        })
+    }
 }

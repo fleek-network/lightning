@@ -117,7 +117,6 @@ async fn init_fetcher(
             db_options: None,
         },
         blockstore.clone(),
-        Default::default(),
     )
     .unwrap();
     app.start().await;

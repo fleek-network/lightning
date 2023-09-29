@@ -129,11 +129,9 @@ async fn init_rpc_without_consensus(
                 db_options: None,
             },
             blockstore,
-            Default::default(),
         )
         .unwrap(),
-        None => Application::<TestBinding>::init(AppConfig::test(), blockstore, Default::default())
-            .unwrap(),
+        None => Application::<TestBinding>::init(AppConfig::test(), blockstore).unwrap(),
     };
 
     let query_runner = app.sync_query();
@@ -145,8 +143,7 @@ async fn init_rpc_without_consensus(
 
 async fn init_rpc_app_test() -> Result<(Rpc<TestBinding>, QueryRunner)> {
     let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
-    let app = Application::<TestBinding>::init(AppConfig::test(), blockstore, Default::default())
-        .unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test(), blockstore).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 

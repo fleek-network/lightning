@@ -328,6 +328,7 @@ impl Env<UpdatePerm> {
             }
 
         }
+            metadata_table.insert(Metadata::GenesisCommittee, Value::GenesisCommittee(committee_members.clone()));
             committee_table.insert(
                 0,
                 Committee {

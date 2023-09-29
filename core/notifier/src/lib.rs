@@ -122,8 +122,7 @@ mod tests {
             db_options: None,
         };
 
-        let app = Application::<TestBinding>::init(config, Default::default(), Default::default())
-            .unwrap();
+        let app = Application::<TestBinding>::init(config, Default::default()).unwrap();
 
         (app.transaction_executor(), app)
     }

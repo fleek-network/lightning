@@ -23,6 +23,7 @@ lightning-resolver = { path = "../resolver" }
 lightning-rpc = { path = "../rpc" }
 lightning-service-executor = { path = "../service-executor" }
 lightning-signer = { path = "../signer" }
+lightning-syncronizer = { path = "../syncronizer" }
 lightning-topology = { path = "../topology" }
 mock = { path = "../mock" }
 toml = "0.7"

@@ -138,7 +138,6 @@ async fn test_query() {
             db_options: None,
         },
         Default::default(),
-        Default::default(),
     )
     .unwrap();
     app.start().await;
@@ -292,7 +291,6 @@ async fn test_submit_measurements() {
             db_path: None,
             db_options: None,
         },
-        Default::default(),
         Default::default(),
     )
     .unwrap();
@@ -473,7 +471,6 @@ async fn test_reputation_calculation_and_query() {
             db_path: None,
             db_options: None,
         },
-        Default::default(),
         Default::default(),
     )
     .unwrap();

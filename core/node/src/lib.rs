@@ -22,6 +22,7 @@ use lightning_resolver::resolver::Resolver;
 use lightning_rpc::server::Rpc;
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
+use lightning_syncronizer::syncronizer::Syncronizer;
 use lightning_topology::Topology;
 use mock::consensus::MockConsensus;
 
@@ -36,6 +37,7 @@ impl CollectionBase for FinalTypes {
     type ApplicationInterface<C: Collection> = Application<C>;
     type BlockStoreInterface<C: Collection> = Blockstore<C>;
     type BlockStoreServerInterface<C: Collection> = BlockStoreServer<C>;
+    type SyncronizerInterface<C: Collection> = Syncronizer<C>;
     type BroadcastInterface<C: Collection> = Broadcast<C>;
     type TopologyInterface<C: Collection> = Topology<C>;
     type ConsensusInterface<C: Collection> = Consensus<C>;

@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use affair::{Executor, TokioSpawn};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
@@ -10,7 +10,7 @@ use lightning_interfaces::{
     ExecutionEngineSocket,
     WithStartAndShutdown,
 };
-use log::info;
+use log::{error, info};
 
 use crate::config::{Config, StorageConfig};
 use crate::env::{Env, UpdateWorker};
@@ -50,12 +50,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
     type SyncExecutor = QueryRunner;
 
     /// Create a new instance of the application layer using the provided configuration.
-    #[allow(unused)]
-    fn init(
-        config: Self::Config,
-        blockstore: C::BlockStoreInterface,
-        blockstore_server: C::BlockStoreServerInterface,
-    ) -> Result<Self> {
+    fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> Result<Self> {
         if let StorageConfig::RocksDb = &config.storage {
             assert!(
                 config.db_path.is_some(),
@@ -93,5 +88,27 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
     /// without slowing down the system.
     fn sync_query(&self) -> Self::SyncExecutor {
         self.query_runner.clone()
+    }
+
+    fn load_from_checkpoint(
+        config: &Self::Config,
+        checkpoint: Vec<u8>,
+        checkpoint_hash: [u8; 32],
+    ) -> Result<()> {
+        match Env::new(config, Some((checkpoint_hash, checkpoint))) {
+            Ok(mut env) => {
+                info!("Successfully built database from checkpoint with hash {checkpoint_hash:?}");
+
+                // Update the last epoch hash on state
+                env.update_last_epoch_hash(checkpoint_hash);
+
+                Ok(())
+            },
+            Err(e) => {
+                error!("Failed to build app db from checkpoint");
+
+                Err(anyhow!("Failed to build app db from checkpoint: {}", e))
+            },
+        }
     }
 }

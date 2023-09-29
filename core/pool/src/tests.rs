@@ -23,9 +23,7 @@ partial!(TestBinding {
 
 #[tokio::test]
 async fn test_shutdown_and_start_again() {
-    let app =
-        Application::<TestBinding>::init(AppConfig::test(), Default::default(), Default::default())
-            .unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
     let mut signer =
         Signer::<TestBinding>::init(SignerConfig::test(), query_runner.clone()).unwrap();
