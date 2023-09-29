@@ -59,6 +59,16 @@ impl<C: Collection> Node<C> {
         start_or_shutdown_node::<C>(&self.container, false).await;
     }
 
+    /// Will load the appstate from a checkpoint. Stops the proccesses that depend on the appstate,
+    /// replaces the db with the checkpoint and restarts the processess
+    pub async fn load_checkpoint(&self, _checkpoint: ()) {
+        // shutdown node
+        start_or_shutdown_node::<C>(&self.container, false).await;
+        // load db
+
+        start_or_shutdown_node::<C>(&self.container, true).await;
+    }
+
     /// Fill the configuration provider with the default configuration without performing any
     /// initialization.
     pub fn fill_configuration<T: Collection>(provider: &impl ConfigProviderInterface<T>) {

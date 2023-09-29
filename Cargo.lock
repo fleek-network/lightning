@@ -4090,6 +4090,7 @@ dependencies = [
  "lightning-rpc",
  "lightning-service-executor",
  "lightning-signer",
+ "lightning-syncronizer",
  "lightning-topology",
  "log",
  "mock",
