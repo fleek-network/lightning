@@ -96,7 +96,7 @@ pub trait EventHandler: Send + Sync {
 #[infusion::blank]
 pub trait Requester: Clone + Send + Sync {
     type Response: Response;
-    async fn request(&self, destination: NodeIndex, request: Bytes) -> Self::Response;
+    async fn request(&self, destination: NodeIndex, request: Bytes) -> io::Result<Self::Response>;
 }
 
 #[infusion::blank]

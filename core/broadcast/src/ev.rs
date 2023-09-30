@@ -10,8 +10,8 @@ use std::cell::OnceCell;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use bytes::{Bytes, BytesMut};
 
+use bytes::{Bytes, BytesMut};
 use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
 use infusion::c;
 use ink_quill::ToDigest;

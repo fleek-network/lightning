@@ -1,30 +1,25 @@
-use std::collections::HashMap;
-
 use affair::{AsyncWorker, Executor, TokioSpawn};
 use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
-use fleek_crypto::NodePublicKey;
 use futures::{SinkExt, StreamExt};
 use lightning_interfaces::ServiceScope;
-use log::{error, info};
 use quinn::{Connection, ConnectionError, RecvStream, SendStream};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-use crate::endpoint::{DriverRequest, Event, Message};
+use crate::connection::ConnectionEvent;
+use crate::service::broadcast::Message;
 
 /// Context for driving the connection.
 pub struct Context {
     /// The QUIC connection.
     connection: Connection,
-    /// The peer's public key.
-    peer: NodePublicKey,
     /// Receive requests from services.
     service_request_rx: Receiver<DriverRequest>,
     /// Send events from the network.
-    network_event_tx: HashMap<ServiceScope, Sender<Event>>,
+    connection_event_tx: Sender<ConnectionEvent>,
     /// If the connection was started
     /// by the peer, this is true and false otherwise.
     incoming: bool,
@@ -33,16 +28,14 @@ pub struct Context {
 impl Context {
     pub fn new(
         connection: Connection,
-        peer: NodePublicKey,
         service_request_rx: Receiver<DriverRequest>,
-        service_event_tx: HashMap<ServiceScope, Sender<Event>>,
+        connection_event_tx: Sender<ConnectionEvent>,
         incoming: bool,
     ) -> Self {
         Self {
             connection,
-            peer,
             service_request_rx,
-            network_event_tx: service_event_tx,
+            connection_event_tx,
             incoming,
         }
     }
@@ -67,11 +60,10 @@ pub async fn start_driver(mut ctx: Context) -> Result<()> {
         tokio::select! {
             accept_bi = ctx.connection.accept_bi() => {
                 let (tx, rx) = accept_bi?;
-                let network_event_tx = ctx.network_event_tx.clone();
-                let peer = ctx.peer;
+                let connection_event_tx = ctx.connection_event_tx.clone();
                 tokio::spawn(async move {
                     if let Err(e) =
-                        handle_incoming_streams((tx, rx), network_event_tx, peer).await
+                        handle_incoming_streams((tx, rx), connection_event_tx).await
                     {
                         tracing::error!("failed to handle incoming stream: {e:?}");
                     }
@@ -105,23 +97,17 @@ pub async fn start_driver(mut ctx: Context) -> Result<()> {
                 };
                 match Message::try_from(message) {
                     Ok(message) => {
-                        match ctx.network_event_tx.get(&message.service).cloned() {
-                            Some(sender) => {
-                                let peer = ctx.peer;
-                                tokio::spawn(async move {
-                                    if sender
-                                        .send(Event::Message{ peer, message })
-                                        .await
-                                        .is_err() {
-                                            tracing::error!("failed to send incoming network event");
-                                        }
-                                });
-
-                            },
-                            None => info!("received stream request with invalid service scope: {:?}", message.service),
-                        }
+                        let connection_event_tx = ctx.connection_event_tx.clone();
+                        tokio::spawn(async move {
+                            if connection_event_tx
+                                .send(ConnectionEvent::Broadcast{ message })
+                                .await
+                                .is_err() {
+                                    tracing::error!("failed to send incoming network event");
+                            }
+                        });
                     },
-                    Err(e) => error!("failed to deserialize message: {e:?}"),
+                    Err(e) => tracing::error!("failed to deserialize message: {e:?}"),
                 }
             }
         }
@@ -130,24 +116,20 @@ pub async fn start_driver(mut ctx: Context) -> Result<()> {
 }
 
 async fn handle_incoming_streams(
-    (tx, mut rx): (SendStream, RecvStream),
-    network_event_tx: HashMap<ServiceScope, Sender<Event>>,
-    peer: NodePublicKey,
+    (_, mut rx): (SendStream, RecvStream),
+    connection_event_tx: Sender<ConnectionEvent>,
 ) -> Result<()> {
     // The peer opened a stream.
     // The first byte identifies the service.
     let mut buf = [0u8; 1];
     rx.read_exact(&mut buf).await?;
-    // Todo: replace bincode.
-    let service = ServiceScope::try_from(buf[0])?;
-    match network_event_tx.get(&service) {
-        Some(sender) => {
-            let event = Event::NewStream { peer, tx, rx };
-            if sender.send(event).await.is_err() {
-                tracing::error!("failed to send incoming network event");
-            }
-        },
-        None => info!("received stream request with invalid service scope: {service:?}"),
+    let service_scope = ServiceScope::try_from(buf[0])?;
+    if connection_event_tx
+        .send(ConnectionEvent::Stream { service_scope })
+        .await
+        .is_err()
+    {
+        tracing::error!("failed to send incoming network event");
     }
     Ok(())
 }
@@ -180,4 +162,13 @@ impl AsyncWorker for MessageSender {
     async fn handle(&mut self, req: Self::Request) -> Self::Response {
         self.tx.send(Bytes::from(req)).await.map_err(Into::into)
     }
+}
+
+pub enum DriverRequest {
+    Message(Message),
+    #[allow(unused)]
+    NewStream {
+        service: ServiceScope,
+        respond: oneshot::Sender<Result<(SendStream, RecvStream), ConnectionError>>,
+    },
 }
