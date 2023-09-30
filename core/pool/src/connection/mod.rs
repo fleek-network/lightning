@@ -12,8 +12,7 @@ use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{ApplicationInterface, ServiceScope, SyncQueryRunnerInterface};
-use quinn::{Connection, Endpoint, ServerConfig};
-use tokio::io::{AsyncRead, AsyncWrite};
+use quinn::{Connection, RecvStream, SendStream, ServerConfig};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::task::JoinSet;
 
@@ -22,21 +21,21 @@ use crate::connection::driver::{Context, DriverRequest};
 use crate::service::broadcast::{BroadcastRequest, BroadcastService, BroadcastTask, Message};
 use crate::service::stream::{StreamRequest, StreamService};
 
-/// Manager for the transport connections.
-pub struct ConnectionPool<C: Collection, W, R> {
+/// Endpoint for pool
+pub struct Endpoint<C: Collection> {
     /// Pool of transport connections.
     pool: HashMap<NodeIndex, Sender<DriverRequest>>,
     /// Used for getting peer information from state.
     sync_query: c![C::ApplicationInterface::SyncExecutor],
     /// Network broadcast service.
     broadcast_service: BroadcastService<Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>>,
-    /// Send handle to return to users as they register with the broadcast service.
+    /// Sender to return to users as they register with the broadcast service.
     broadcast_service_tx:
         Sender<BroadcastRequest<Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>>>,
     /// Receive requests for a multiplexed stream.
-    stream_service: StreamService<W, R>,
+    stream_service: StreamService,
     /// Send handle to return to users as they register with the stream service.
-    stream_service_tx: Sender<StreamRequest<W, R>>,
+    stream_service_tx: Sender<StreamRequest>,
     /// Source of network topology.
     _topology: c![C::TopologyInterface],
     /// Receiver of events from a connection.
@@ -54,18 +53,16 @@ pub struct ConnectionPool<C: Collection, W, R> {
     // Todo: Make an interface to abstract Endpoint.
     // This will allow us to use other protocols besides QUIC.
     /// QUIC Endpoint.
-    endpoint: Option<Endpoint>,
+    endpoint: Option<quinn::Endpoint>,
     /// QUIC server config.
     server_config: ServerConfig,
     /// Node socket address.
     address: SocketAddr,
 }
 
-impl<C, W, R> ConnectionPool<C, W, R>
+impl<C> Endpoint<C>
 where
     C: Collection,
-    W: AsyncWrite + Send + 'static,
-    R: AsyncRead + Send + 'static,
 {
     pub fn new(
         topology: c!(C::TopologyInterface),
@@ -112,9 +109,61 @@ where
     pub fn register_stream_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<StreamRequest<W, R>>, Receiver<(W, R)>) {
+    ) -> (Sender<StreamRequest>, Receiver<(SendStream, RecvStream)>) {
         let rx = self.stream_service.register(service_scope);
         (self.stream_service_tx.clone(), rx)
+    }
+
+    pub fn handle_stream_request(&mut self, request: StreamRequest) -> Result<()> {
+        let StreamRequest {
+            peer,
+            respond,
+            service_scope,
+        } = request;
+        match self.pool.get(&peer).cloned() {
+            None => {
+                let pk = self
+                    .sync_query
+                    .index_to_pubkey(peer)
+                    .ok_or(anyhow::anyhow!(""))?;
+                let info = self
+                    .sync_query
+                    .get_node_info(&pk)
+                    .ok_or(anyhow::anyhow!(""))?;
+                let address = NodeAddress {
+                    index: peer,
+                    pk,
+                    socket_address: SocketAddr::from((info.domain, info.ports.pool)),
+                };
+
+                self.connector.enqueue_dial_task(
+                    address,
+                    self.endpoint
+                        .clone()
+                        .expect("Endpoint is always initialized on start"),
+                )?;
+
+                // Todo: possible optimization would be to give more priority to
+                // NewStream requests.
+                let request = DriverRequest::NewStream {
+                    service: service_scope,
+                    respond,
+                };
+                self.enqueue_pending_request(peer, request);
+            },
+            Some(driver_tx) => {
+                tokio::spawn(async move {
+                    let request = DriverRequest::NewStream {
+                        service: service_scope,
+                        respond,
+                    };
+                    if driver_tx.send(request).await.is_err() {
+                        tracing::error!("failed to send driver stream request");
+                    }
+                });
+            },
+        }
+        Ok(())
     }
 
     pub fn handle_broadcast_task(&mut self, task: BroadcastTask) -> Result<()> {
@@ -124,6 +173,9 @@ where
                 message,
                 peers,
             } => {
+                // From the all the peers we want to send messages to,
+                // we partition into those we are connected to and those
+                // that we're not.
                 let (connected, not_connected) = match peers {
                     None => (self.pool.keys().copied().collect::<Vec<_>>(), vec![]),
                     Some(peers) => peers
@@ -136,6 +188,7 @@ where
                     payload: message.to_vec(),
                 };
 
+                // We will enqueue a dial task for these peers.
                 for index in not_connected {
                     let Some(pk) = self.sync_query.index_to_pubkey(index) else {
                         continue;
@@ -151,13 +204,19 @@ where
 
                     self.connector.enqueue_dial_task(
                         address,
-                        self.endpoint.clone().expect("Endpoint to exist in state"),
+                        self.endpoint
+                            .clone()
+                            .expect("Endpoint is always initialized on start"),
                     )?;
+                    // Enqueue message for later after we connect.
                     self.enqueue_pending_request(index, DriverRequest::Message(message.clone()))
                 }
 
+                // We already have connections to these peers already
+                // so we can just send our message.
                 for index in connected {
                     let Some(driver_tx) = self.pool.get(&index).cloned() else {
+                        tracing::error!("we were told that we had a connection already to peer {index:?}");
                         continue;
                     };
                     let request = DriverRequest::Message(message.clone());
@@ -168,7 +227,9 @@ where
                     });
                 }
             },
-            BroadcastTask::Update { .. } => {},
+            BroadcastTask::Update { .. } => {
+                todo!()
+            },
         }
 
         Ok(())
@@ -200,17 +261,20 @@ where
         }
     }
 
+    /// Enqueues requests that will be sent after a connection is established with the peer.
+    #[inline]
     fn enqueue_pending_request(&mut self, peer: NodeIndex, request: DriverRequest) {
         self.pending_task.entry(peer).or_default().push(request);
     }
 
+    #[inline]
     fn handle_disconnect(&mut self, peer: NodeIndex) {
         self.driver.remove(&peer);
     }
 
     // Todo: Return metrics.
     pub async fn start(&mut self) -> Result<()> {
-        let endpoint = Endpoint::server(self.server_config.clone(), self.address)?;
+        let endpoint = quinn::Endpoint::server(self.server_config.clone(), self.address)?;
         tracing::info!("bound to {:?}", endpoint.local_addr()?);
 
         self.endpoint = Some(endpoint.clone());
@@ -256,8 +320,13 @@ where
                         tracing::error!("failed to handle broadcast task: {e:?}");
                     }
                 }
-                _broadcast_request = self.stream_service.next() => {
-
+                stream_request = self.stream_service.next() => {
+                    let Some(stream_request) = stream_request else {
+                        break;
+                    };
+                    if let Err(e) = self.handle_stream_request(stream_request) {
+                        tracing::error!("failed to handle stream request: {e:?}");
+                    }
                 }
                 Some(peer) = self.driver_set.join_next() => {
                     match peer {
@@ -276,11 +345,18 @@ where
     }
 }
 
+/// An event associated to a connection.
 pub enum ConnectionEvent {
-    Broadcast { message: Message },
-    Stream { service_scope: ServiceScope },
+    Broadcast {
+        message: Message,
+    },
+    Stream {
+        service_scope: ServiceScope,
+        stream: (SendStream, RecvStream),
+    },
 }
 
+/// Address of a peer node.
 pub struct NodeAddress {
     index: NodeIndex,
     pk: NodePublicKey,

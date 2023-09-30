@@ -16,8 +16,8 @@ use lightning_interfaces::{
     SignerInterface,
     WithStartAndShutdown,
 };
+use quinn::{RecvStream, SendStream};
 use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{oneshot, Mutex};
 use tokio::task::JoinHandle;
@@ -25,7 +25,7 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 use crate::builder::Builder;
 use crate::config::Config;
-use crate::connection::ConnectionPool;
+use crate::connection::Endpoint;
 use crate::service::broadcast::{BroadcastRequest, Param};
 use crate::service::stream::StreamRequest;
 
@@ -35,26 +35,20 @@ pub enum Status {
     Failed(RejectReason),
 }
 
-pub enum State<C: Collection, W, R> {
-    NotRunning {
-        endpoint: Option<ConnectionPool<C, W, R>>,
-    },
-    Running {
-        handle: JoinHandle<ConnectionPool<C, W, R>>,
-    },
+pub enum State<C: Collection> {
+    NotRunning { endpoint: Option<Endpoint<C>> },
+    Running { handle: JoinHandle<Endpoint<C>> },
 }
 
-pub struct Pool<C: Collection, W, R> {
-    state: Mutex<Option<State<C, W, R>>>,
+pub struct Pool<C: Collection> {
+    state: Mutex<Option<State<C>>>,
 }
 
-impl<C, W, R> Pool<C, W, R>
+impl<C> Pool<C>
 where
     C: Collection,
-    W: AsyncWrite + Send + Sync + Unpin + 'static,
-    R: AsyncRead + Send + Sync + Unpin + 'static,
 {
-    fn new(endpoint: ConnectionPool<C, W, R>) -> Result<Self> {
+    fn new(endpoint: Endpoint<C>) -> Result<Self> {
         Ok(Self {
             state: Mutex::new(Some(State::NotRunning {
                 endpoint: Some(endpoint),
@@ -86,7 +80,7 @@ where
     fn register_stream_service(
         &self,
         service: ServiceScope,
-    ) -> (Sender<StreamRequest<W, R>>, Receiver<(W, R)>) {
+    ) -> (Sender<StreamRequest>, Receiver<(SendStream, RecvStream)>) {
         let mut guard = self.state.blocking_lock();
         match guard.as_mut().expect("Pool to have a state") {
             State::Running { .. } => {
@@ -103,11 +97,9 @@ where
 }
 
 #[async_trait]
-impl<C, W, R> WithStartAndShutdown for Pool<C, W, R>
+impl<C> WithStartAndShutdown for Pool<C>
 where
     C: Collection,
-    W: AsyncWrite + Send + Sync + Unpin + 'static,
-    R: AsyncRead + Send + Sync + Unpin + 'static,
 {
     fn is_running(&self) -> bool {
         matches!(
@@ -151,25 +143,21 @@ where
     }
 }
 
-impl<C, W, R> ConfigConsumer for Pool<C, W, R>
+impl<C> ConfigConsumer for Pool<C>
 where
     C: Collection,
-    W: AsyncWrite + Send + Sync + Unpin + 'static,
-    R: AsyncRead + Send + Sync + Unpin + 'static,
 {
     const KEY: &'static str = "pool";
     type Config = Config;
 }
 
-impl<C, W, R> PoolInterface<C> for Pool<C, W, R>
+impl<C> PoolInterface<C> for Pool<C>
 where
     C: Collection,
-    W: AsyncWrite + Send + Sync + Unpin + 'static,
-    R: AsyncRead + Send + Sync + Unpin + 'static,
 {
     type EventHandler = EventHandler;
-    type Requester = Requester<W, R>;
-    type Responder = Responder<W, R>;
+    type Requester = Requester;
+    type Responder = Responder;
 
     fn init(
         config: Self::Config,
@@ -260,12 +248,12 @@ impl lightning_interfaces::pool::EventHandler for EventHandler {
     }
 }
 
-pub struct Requester<W, R> {
-    request_tx: Sender<StreamRequest<W, R>>,
+pub struct Requester {
+    request_tx: Sender<StreamRequest>,
     service_scope: ServiceScope,
 }
 
-impl<W, R> Clone for Requester<W, R> {
+impl Clone for Requester {
     fn clone(&self) -> Self {
         Self {
             request_tx: self.request_tx.clone(),
@@ -275,20 +263,20 @@ impl<W, R> Clone for Requester<W, R> {
 }
 
 #[async_trait]
-impl<W, R> lightning_interfaces::pool::Requester for Requester<W, R>
-where
-    W: AsyncWrite + Send + Sync + Unpin + 'static,
-    R: AsyncRead + Send + Sync + Unpin + 'static,
-{
-    type Response = Response<R>;
+impl lightning_interfaces::pool::Requester for Requester {
+    type Response = Response;
 
-    async fn request(&self, _: NodeIndex, request: Bytes) -> io::Result<Self::Response> {
+    async fn request(&self, peer: NodeIndex, request: Bytes) -> io::Result<Self::Response> {
         let (tx, rx) = oneshot::channel();
         self.request_tx
-            .send(StreamRequest { respond: tx })
+            .send(StreamRequest {
+                peer,
+                service_scope: self.service_scope,
+                respond: tx,
+            })
             .await
             .map_err(|_| io::ErrorKind::BrokenPipe)?;
-        let (stream_tx, stream_rx) = rx.await.map_err(|_| io::ErrorKind::BrokenPipe)?;
+        let (stream_tx, stream_rx) = rx.await.map_err(|_| io::ErrorKind::BrokenPipe)??;
 
         FramedWrite::new(stream_tx, LengthDelimitedCodec::new())
             .send(request)
@@ -307,20 +295,14 @@ where
     }
 }
 
-pub struct Response<R>
-where
-    R: AsyncRead + Send + Sync + Unpin + 'static,
-{
+pub struct Response {
     status: Status,
-    rx: FramedRead<R, LengthDelimitedCodec>,
+    rx: FramedRead<RecvStream, LengthDelimitedCodec>,
 }
 
 #[async_trait]
-impl<R> lightning_interfaces::pool::Response for Response<R>
-where
-    R: AsyncRead + Send + Sync + Unpin + 'static,
-{
-    type Body<S: Stream<Item = io::Result<Bytes>>> = Body<R>;
+impl lightning_interfaces::pool::Response for Response {
+    type Body<S: Stream<Item = io::Result<Bytes>>> = Body;
     fn status_code(&self) -> Result<(), RejectReason> {
         match &self.status {
             Status::Ok => Ok(()),
@@ -333,14 +315,11 @@ where
     }
 }
 
-pub struct Body<R> {
-    rx: FramedRead<R, LengthDelimitedCodec>,
+pub struct Body {
+    rx: FramedRead<RecvStream, LengthDelimitedCodec>,
 }
 
-impl<R> Stream for Body<R>
-where
-    R: AsyncRead + Send + Sync + Unpin + 'static,
-{
+impl Stream for Body {
     type Item = io::Result<Bytes>;
 
     fn poll_next(
@@ -354,17 +333,13 @@ where
     }
 }
 
-pub struct Responder<W, R> {
-    inner: Receiver<(W, R)>,
+pub struct Responder {
+    inner: Receiver<(SendStream, RecvStream)>,
 }
 
 #[async_trait]
-impl<W, R> lightning_interfaces::pool::Responder for Responder<W, R>
-where
-    W: AsyncWrite + Send + Sync + Unpin + 'static,
-    R: AsyncRead + Send + Sync + Unpin + 'static,
-{
-    type Request = Request<W>;
+impl lightning_interfaces::pool::Responder for Responder {
+    type Request = Request;
 
     async fn get_next_request(&mut self) -> io::Result<(Bytes, Self::Request)> {
         let (stream_tx, stream_rx) = self
@@ -388,16 +363,13 @@ where
     }
 }
 
-pub struct Request<W> {
-    stream_tx: FramedWrite<W, LengthDelimitedCodec>,
+pub struct Request {
+    stream_tx: FramedWrite<SendStream, LengthDelimitedCodec>,
     ok_header_sent: bool,
 }
 
 #[async_trait]
-impl<W> lightning_interfaces::pool::Request for Request<W>
-where
-    W: AsyncWrite + Send + Sync + Unpin + 'static,
-{
+impl lightning_interfaces::pool::Request for Request {
     fn reject(self, reason: RejectReason) {
         let mut us = self;
         let header = bincode::serialize(&Status::Failed(reason)).expect("Defined object");

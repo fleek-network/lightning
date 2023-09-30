@@ -1,37 +1,38 @@
 use std::collections::HashMap;
 
+use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ServiceScope;
-use tokio::io::{AsyncRead, AsyncWrite};
+use quinn::{ConnectionError, RecvStream, SendStream};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 
-pub struct StreamService<W, R> {
+pub struct StreamService {
     /// Service handles.
-    handles: HashMap<ServiceScope, Sender<(W, R)>>,
+    handles: HashMap<ServiceScope, Sender<(SendStream, RecvStream)>>,
     /// Receive requests for a multiplexed stream.
-    stream_rx: Receiver<StreamRequest<W, R>>,
+    stream_rx: Receiver<StreamRequest>,
 }
 
-impl<W, R> StreamService<W, R>
-where
-    W: AsyncWrite + Send + 'static,
-    R: AsyncRead + Send + 'static,
-{
-    pub fn new(stream_rx: Receiver<StreamRequest<W, R>>) -> Self {
+impl StreamService {
+    pub fn new(stream_rx: Receiver<StreamRequest>) -> Self {
         Self {
             handles: HashMap::new(),
             stream_rx,
         }
     }
 
-    pub fn register(&mut self, service_scope: ServiceScope) -> Receiver<(W, R)> {
+    pub fn register(&mut self, service_scope: ServiceScope) -> Receiver<(SendStream, RecvStream)> {
         let (tx, rx) = mpsc::channel(1024);
         self.handles.insert(service_scope, tx);
         rx
     }
 
     #[allow(unused)]
-    pub fn handle_incoming_stream(&self, service_scope: ServiceScope, stream: (W, R)) {
+    pub fn handle_incoming_stream(
+        &self,
+        service_scope: ServiceScope,
+        stream: (SendStream, RecvStream),
+    ) {
         match self.handles.get(&service_scope).cloned() {
             None => tracing::warn!("received unknown service scope: {service_scope:?}"),
             Some(tx) => {
@@ -44,12 +45,14 @@ where
         }
     }
 
-    pub async fn next(&mut self) -> Option<oneshot::Sender<(W, R)>> {
-        let StreamRequest { respond } = self.stream_rx.recv().await?;
-        Some(respond)
+    #[inline]
+    pub async fn next(&mut self) -> Option<StreamRequest> {
+        self.stream_rx.recv().await
     }
 }
 
-pub struct StreamRequest<W, R> {
-    pub respond: oneshot::Sender<(W, R)>,
+pub struct StreamRequest {
+    pub service_scope: ServiceScope,
+    pub peer: NodeIndex,
+    pub respond: oneshot::Sender<Result<(SendStream, RecvStream), ConnectionError>>,
 }
