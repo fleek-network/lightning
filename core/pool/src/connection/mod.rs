@@ -30,7 +30,7 @@ use crate::service::stream::{StreamRequest, StreamService};
 /// Endpoint for pool
 pub struct Endpoint<C: Collection> {
     /// Pool of connections.
-    pool: HashMap<NodeIndex, Sender<DriverRequest>>,
+    pool: HashMap<NodeIndex, DriverHandle>,
     /// Used for getting peer information from state.
     sync_query: c![C::ApplicationInterface::SyncExecutor],
     /// Network broadcast service.
@@ -39,7 +39,7 @@ pub struct Endpoint<C: Collection> {
     stream_service: StreamService,
     /// Source of network topology.
     topology: c![C::TopologyInterface],
-    /// Epoch notifier for trigger polling of topology.
+    /// Epoch notifier for triggering polling of topology.
     notifier: Receiver<Notification>,
     /// Receiver of events from a connection.
     connection_event_rx: Receiver<ConnectionEvent>,
@@ -49,8 +49,6 @@ pub struct Endpoint<C: Collection> {
     connector: Connector<C>,
     /// Pending outgoing requests.
     pending_task: HashMap<NodeIndex, Vec<DriverRequest>>,
-    /// Used for sending outbound requests to drivers.
-    driver: HashMap<NodeIndex, Sender<DriverRequest>>,
     /// Ongoing drivers.
     driver_set: JoinSet<NodeIndex>,
     // Todo: Make an interface to abstract Endpoint.
@@ -88,7 +86,6 @@ where
             connection_event_tx,
             connector: Connector::new(sync_query, sk),
             pending_task: HashMap::new(),
-            driver: HashMap::new(),
             driver_set: JoinSet::new(),
             endpoint: None,
             server_config,
@@ -119,7 +116,7 @@ where
             respond,
             service_scope,
         } = request;
-        match self.pool.get(&peer).cloned() {
+        match self.pool.get_mut(&peer) {
             None => {
                 let pk = self
                     .sync_query
@@ -150,7 +147,11 @@ where
                 };
                 self.enqueue_pending_request(peer, request);
             },
-            Some(driver_tx) => {
+            Some(handle) => {
+                // We pin this now because we dont want to drop this
+                // on a topology change. See `DriverHandle`.
+                handle.pinned = true;
+                let driver_tx = handle.tx.clone();
                 tokio::spawn(async move {
                     let request = DriverRequest::NewStream {
                         service: service_scope,
@@ -214,10 +215,12 @@ where
                 // We already have connections to these peers already
                 // so we can just send our message.
                 for index in connected {
-                    let Some(driver_tx) = self.pool.get(&index).cloned() else {
+                    let Some(handle) = self.pool.get(&index) else {
                         tracing::error!("we were told that we had a connection already to peer {index:?}");
                         continue;
                     };
+
+                    let driver_tx = handle.tx.clone();
                     let request = DriverRequest::Message(message.clone());
                     tokio::spawn(async move {
                         if driver_tx.send(request).await.is_err() {
@@ -228,9 +231,16 @@ where
             },
             BroadcastTask::Update { peers } => {
                 for index in peers.iter() {
-                    let Some(driver_tx) = self.pool.get(index).cloned() else {
+                    let Some(handle) = self.pool.get(index) else {
                         continue;
                     };
+
+                    // We don't want to disconnect pinned connections.
+                    if handle.pinned {
+                        continue;
+                    }
+
+                    let driver_tx = handle.tx.clone();
                     tokio::spawn(async move {
                         if driver_tx.send(DriverRequest::Disconnect).await.is_err() {
                             tracing::error!("failed to send driver a disconnect request");
@@ -247,9 +257,8 @@ where
     fn handle_connection(&mut self, peer: NodeIndex, connection: Connection, incoming: bool) {
         self.connector.cancel_dial(&peer);
 
+        // Start worker to drive the connection.
         let (request_tx, request_rx) = mpsc::channel(1024);
-        self.driver.insert(peer, request_tx.clone());
-
         let connection_event_tx = self.connection_event_tx.clone();
         self.driver_set.spawn(async move {
             let ctx = Context::new(connection, peer, request_rx, connection_event_tx, incoming);
@@ -259,15 +268,31 @@ where
             peer
         });
 
+        // If connection is not expected for broadcast,
+        // we pin the connection.
+        let mut pin = !incoming && !self.broadcast_service.contains(&peer);
+
+        // Handle requests that were waiting for a connection to be established.
         if let Some(pending_requests) = self.pending_task.remove(&peer) {
-            tokio::spawn(async move {
-                for req in pending_requests {
-                    if request_tx.send(req).await.is_err() {
+            for req in pending_requests {
+                // We need to pin the connection if used by stream service.
+                pin = matches!(req, DriverRequest::NewStream { .. });
+
+                let request_tx_clone = request_tx.clone();
+                tokio::spawn(async move {
+                    if request_tx_clone.send(req).await.is_err() {
                         tracing::error!("failed to send pending request to driver");
                     }
-                }
-            });
+                });
+            }
         }
+
+        // Save a handle to the driver to send requests.
+        let handle = DriverHandle {
+            pinned: pin,
+            tx: request_tx.clone(),
+        };
+        self.pool.insert(peer, handle);
     }
 
     /// Enqueues requests that will be sent after a connection is established with the peer.
@@ -278,7 +303,14 @@ where
 
     #[inline]
     fn handle_disconnect(&mut self, peer: NodeIndex) {
-        self.driver.remove(&peer);
+        self.pool.remove(&peer);
+    }
+
+    #[inline]
+    fn pin_connection(&mut self, peer: NodeIndex) {
+        self.pool
+            .entry(peer)
+            .and_modify(|handle| handle.pinned = true);
     }
 
     // Todo: Return metrics.
@@ -304,8 +336,14 @@ where
                         ConnectionEvent::Broadcast { peer, message } => {
                             self.broadcast_service.handle_broadcast_message(peer, message);
                         },
-                        ConnectionEvent::Stream { service_scope, stream } => {
-                            self.stream_service.handle_incoming_stream(service_scope, stream);
+                        ConnectionEvent::Stream { peer, service_scope, stream } => {
+                            tracing::trace!("incoming stream from peer {peer:?}");
+                            // We want to make sure that this request passes some basic checks
+                            // before we commit to pinning the connection.
+                            if self.stream_service.handle_incoming_stream(service_scope, stream) {
+                                self.pin_connection(peer);
+                            }
+
                         }
                     }
                 }
@@ -393,6 +431,7 @@ pub enum ConnectionEvent {
         message: Message,
     },
     Stream {
+        peer: NodeIndex,
         service_scope: ServiceScope,
         stream: (SendStream, RecvStream),
     },
@@ -403,4 +442,17 @@ pub struct NodeAddress {
     index: NodeIndex,
     pk: NodePublicKey,
     socket_address: SocketAddr,
+}
+
+pub struct DriverHandle {
+    tx: Sender<DriverRequest>,
+    // Pinned connections are those connections used by the
+    // stream service. We may not want to disconnect these
+    // during a topology event because they might be in used by
+    // the stream users.
+    //
+    // Todo
+    // Research: Will incoming topology-related connections
+    // always be pinned because we don't know them?
+    pinned: bool,
 }

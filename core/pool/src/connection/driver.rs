@@ -68,9 +68,14 @@ pub async fn start_driver(mut ctx: Context) -> Result<()> {
             accept_result = ctx.connection.accept_bi() => {
                 let (stream_tx, stream_rx) = accept_result?;
                 let connection_event_tx = ctx.connection_event_tx.clone();
+                let peer = ctx.peer;
                 tokio::spawn(async move {
                     if let Err(e) =
-                        handle_incoming_streams((stream_tx, stream_rx), connection_event_tx).await
+                        handle_incoming_streams(
+                            peer,
+                            (stream_tx, stream_rx),
+                            connection_event_tx
+                        ).await
                     {
                         tracing::error!("failed to handle incoming stream: {e:?}");
                     }
@@ -123,6 +128,7 @@ pub async fn start_driver(mut ctx: Context) -> Result<()> {
 }
 
 async fn handle_incoming_streams(
+    peer: NodeIndex,
     (stream_tx, mut stream_rx): (SendStream, RecvStream),
     connection_event_tx: Sender<ConnectionEvent>,
 ) -> Result<()> {
@@ -133,6 +139,7 @@ async fn handle_incoming_streams(
     let service_scope = ServiceScope::try_from(buf[0])?;
     connection_event_tx
         .send(ConnectionEvent::Stream {
+            peer,
             service_scope,
             stream: (stream_tx, stream_rx),
         })

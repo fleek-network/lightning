@@ -38,15 +38,19 @@ impl StreamService {
         &self,
         service_scope: ServiceScope,
         stream: (SendStream, RecvStream),
-    ) {
+    ) -> bool {
         match self.handles.get(&service_scope).cloned() {
-            None => tracing::warn!("received unknown service scope: {service_scope:?}"),
+            None => {
+                tracing::warn!("received unknown service scope: {service_scope:?}");
+                false
+            },
             Some(tx) => {
                 tokio::spawn(async move {
                     if tx.send(stream).await.is_err() {
                         tracing::error!("failed to send incoming stream to user");
                     }
                 });
+                true
             },
         }
     }

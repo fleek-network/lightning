@@ -1,13 +1,12 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
 
 use anyhow::Result;
 use fleek_crypto::NodeSecretKey;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{ApplicationInterface, NotifierInterface};
-use quinn::{ServerConfig, TransportConfig};
+use quinn::{ServerConfig, TransportConfig, VarInt};
 use tokio::sync::mpsc;
 
 use crate::connection::Endpoint;
@@ -43,8 +42,9 @@ impl<C: Collection> Builder<C> {
         self.address = Some(address);
     }
 
-    pub fn keep_alive_interval(&mut self, duration: Duration) {
-        self.transport_config.keep_alive_interval(Some(duration));
+    pub fn max_idle_timeout(&mut self, timeout: u32) {
+        self.transport_config
+            .max_idle_timeout(Some(VarInt::from_u32(timeout).into()));
     }
 
     pub fn build(self) -> Result<Endpoint<C>> {

@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::time::Duration;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use lightning_interfaces::types::NodeIndex;
@@ -22,7 +21,6 @@ where
     request_tx: Sender<BroadcastRequest<F>>,
 }
 
-#[allow(unused)]
 impl<F> BroadcastService<F>
 where
     F: Fn(NodeIndex) -> bool,
@@ -61,10 +59,12 @@ where
         }
     }
 
-    pub fn handle_connection_event(&mut self, peer: NodeIndex, _: Duration) {
-        tracing::trace!("ignoring incoming connection from {peer:?}")
+    #[inline]
+    pub fn contains(&self, peer: &NodeIndex) -> bool {
+        self.peers.contains(peer)
     }
 
+    #[inline]
     pub fn update_connections(&mut self, peers: HashSet<NodeIndex>) -> BroadcastTask {
         self.peers.retain(|index| peers.contains(index));
         BroadcastTask::Update { peers }

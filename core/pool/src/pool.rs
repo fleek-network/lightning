@@ -168,7 +168,7 @@ where
     ) -> Result<Self> {
         let (_, sk) = signer.get_sk();
         let mut builder = Builder::new(sk, topology, sync_query, notifier);
-        builder.keep_alive_interval(config.keep_alive_interval);
+        builder.max_idle_timeout(config.max_idle_timeout);
         builder.socket_address(config.address);
         let endpoint = builder.build()?;
         Pool::new(endpoint)
