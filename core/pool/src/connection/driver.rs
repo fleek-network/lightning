@@ -3,6 +3,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use futures::{SinkExt, StreamExt};
+use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ServiceScope;
 use quinn::{Connection, ConnectionError, RecvStream, SendStream};
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -16,6 +17,8 @@ use crate::service::broadcast::Message;
 pub struct Context {
     /// The QUIC connection.
     connection: Connection,
+    /// Peer's index.
+    peer: NodeIndex,
     /// Receive requests to perform on connection.
     service_request_rx: Receiver<DriverRequest>,
     /// Send events from this connection.
@@ -28,12 +31,14 @@ pub struct Context {
 impl Context {
     pub fn new(
         connection: Connection,
+        peer: NodeIndex,
         service_request_rx: Receiver<DriverRequest>,
         connection_event_tx: Sender<ConnectionEvent>,
         incoming: bool,
     ) -> Self {
         Self {
             connection,
+            peer,
             service_request_rx,
             connection_event_tx,
             incoming,
@@ -76,9 +81,10 @@ pub async fn start_driver(mut ctx: Context) -> Result<()> {
                     None => break,
                     Some(message) => message?,
                 };
+                let peer = ctx.peer;
                 let event_tx = ctx.connection_event_tx.clone();
                 tokio::spawn(async move{
-                    if let Err(e) = handle_incoming_message(message, event_tx).await {
+                    if let Err(e) = handle_incoming_message(peer, message, event_tx).await {
                         tracing::error!("failed to send message: {e:?}");
                     }
                 });
@@ -135,12 +141,13 @@ async fn handle_incoming_streams(
 }
 
 async fn handle_incoming_message(
+    peer: NodeIndex,
     message: BytesMut,
     connection_event_tx: Sender<ConnectionEvent>,
 ) -> Result<()> {
     let message = Message::try_from(message)?;
     connection_event_tx
-        .send(ConnectionEvent::Broadcast { message })
+        .send(ConnectionEvent::Broadcast { peer, message })
         .await
         .map_err(|_| anyhow::anyhow!("failed to send incoming network event"))
 }

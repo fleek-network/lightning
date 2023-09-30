@@ -23,23 +23,18 @@ use crate::service::stream::{StreamRequest, StreamService};
 
 /// Endpoint for pool
 pub struct Endpoint<C: Collection> {
-    /// Pool of transport connections.
+    /// Pool of connections.
     pool: HashMap<NodeIndex, Sender<DriverRequest>>,
     /// Used for getting peer information from state.
     sync_query: c![C::ApplicationInterface::SyncExecutor],
     /// Network broadcast service.
     broadcast_service: BroadcastService<Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>>,
-    /// Sender to return to users as they register with the broadcast service.
-    broadcast_service_tx:
-        Sender<BroadcastRequest<Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>>>,
     /// Receive requests for a multiplexed stream.
     stream_service: StreamService,
-    /// Send handle to return to users as they register with the stream service.
-    stream_service_tx: Sender<StreamRequest>,
     /// Source of network topology.
     _topology: c![C::TopologyInterface],
     /// Receiver of events from a connection.
-    _connection_event_rx: Receiver<ConnectionEvent>,
+    connection_event_rx: Receiver<ConnectionEvent>,
     /// Sender of events from a connection.
     connection_event_tx: Sender<ConnectionEvent>,
     /// Performs dial tasks.
@@ -72,18 +67,14 @@ where
         address: SocketAddr,
     ) -> Self {
         let (connection_event_tx, connection_event_rx) = mpsc::channel(1024);
-        let (broadcast_service_tx, broadcast_service_rx) = mpsc::channel(1024);
-        let (stream_service_tx, stream_service_rx) = mpsc::channel(1024);
 
         Self {
             pool: HashMap::new(),
             sync_query: sync_query.clone(),
-            broadcast_service: BroadcastService::new(broadcast_service_rx),
-            broadcast_service_tx,
-            stream_service: StreamService::new(stream_service_rx),
-            stream_service_tx,
+            broadcast_service: BroadcastService::new(),
+            stream_service: StreamService::new(),
             _topology: topology,
-            _connection_event_rx: connection_event_rx,
+            connection_event_rx: connection_event_rx,
             connection_event_tx,
             connector: Connector::new(sync_query, sk),
             pending_task: HashMap::new(),
@@ -102,16 +93,14 @@ where
         Sender<BroadcastRequest<Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>>>,
         Receiver<(NodeIndex, Bytes)>,
     ) {
-        let rx = self.broadcast_service.register(service_scope);
-        (self.broadcast_service_tx.clone(), rx)
+        self.broadcast_service.register(service_scope)
     }
 
     pub fn register_stream_service(
         &mut self,
         service_scope: ServiceScope,
     ) -> (Sender<StreamRequest>, Receiver<(SendStream, RecvStream)>) {
-        let rx = self.stream_service.register(service_scope);
-        (self.stream_service_tx.clone(), rx)
+        self.stream_service.register(service_scope)
     }
 
     pub fn handle_stream_request(&mut self, request: StreamRequest) -> Result<()> {
@@ -253,7 +242,7 @@ where
 
         let connection_event_tx = self.connection_event_tx.clone();
         self.driver_set.spawn(async move {
-            let ctx = Context::new(connection, request_rx, connection_event_tx, incoming);
+            let ctx = Context::new(connection, peer, request_rx, connection_event_tx, incoming);
             if let Err(e) = driver::start_driver(ctx).await {
                 tracing::error!("driver for connection with {peer:?} shutdowned: {e:?}")
             }
@@ -297,6 +286,16 @@ where
                         Some(connecting) => {
                             tracing::trace!("incoming connection");
                             self.connector.handle_incoming_connection(connecting);
+                        }
+                    }
+                }
+                Some(event) = self.connection_event_rx.recv() => {
+                    match event {
+                        ConnectionEvent::Broadcast { peer, message } => {
+                            self.broadcast_service.handle_broadcast_message(peer, message);
+                        },
+                        ConnectionEvent::Stream { service_scope, stream } => {
+                            self.stream_service.handle_incoming_stream(service_scope, stream);
                         }
                     }
                 }
@@ -358,6 +357,7 @@ where
 /// An event associated to a connection.
 pub enum ConnectionEvent {
     Broadcast {
+        peer: NodeIndex,
         message: Message,
     },
     Stream {

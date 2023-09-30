@@ -10,24 +10,30 @@ pub struct StreamService {
     /// Service handles.
     handles: HashMap<ServiceScope, Sender<(SendStream, RecvStream)>>,
     /// Receive requests for a multiplexed stream.
-    stream_rx: Receiver<StreamRequest>,
+    stream_request_rx: Receiver<StreamRequest>,
+    /// Send handle to return to users as they register with the stream service.
+    stream_request_tx: Sender<StreamRequest>,
 }
 
 impl StreamService {
-    pub fn new(stream_rx: Receiver<StreamRequest>) -> Self {
+    pub fn new() -> Self {
+        let (stream_request_tx, stream_request_rx) = mpsc::channel(1024);
         Self {
             handles: HashMap::new(),
-            stream_rx,
+            stream_request_tx,
+            stream_request_rx,
         }
     }
 
-    pub fn register(&mut self, service_scope: ServiceScope) -> Receiver<(SendStream, RecvStream)> {
+    pub fn register(
+        &mut self,
+        service_scope: ServiceScope,
+    ) -> (Sender<StreamRequest>, Receiver<(SendStream, RecvStream)>) {
         let (tx, rx) = mpsc::channel(1024);
         self.handles.insert(service_scope, tx);
-        rx
+        (self.stream_request_tx.clone(), rx)
     }
 
-    #[allow(unused)]
     pub fn handle_incoming_stream(
         &self,
         service_scope: ServiceScope,
@@ -47,7 +53,7 @@ impl StreamService {
 
     #[inline]
     pub async fn next(&mut self) -> Option<StreamRequest> {
-        self.stream_rx.recv().await
+        self.stream_request_rx.recv().await
     }
 }
 

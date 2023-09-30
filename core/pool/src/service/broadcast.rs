@@ -18,6 +18,8 @@ where
     peers: HashSet<NodeIndex>,
     /// Receive requests for broadcast service.
     request_rx: Receiver<BroadcastRequest<F>>,
+    /// Sender to return to users as they register with the broadcast service.
+    request_tx: Sender<BroadcastRequest<F>>,
 }
 
 #[allow(unused)]
@@ -25,18 +27,23 @@ impl<F> BroadcastService<F>
 where
     F: Fn(NodeIndex) -> bool,
 {
-    pub fn new(request_rx: Receiver<BroadcastRequest<F>>) -> Self {
+    pub fn new() -> Self {
+        let (request_tx, request_rx) = mpsc::channel(1024);
         Self {
             handles: HashMap::new(),
             peers: HashSet::new(),
+            request_tx,
             request_rx,
         }
     }
 
-    pub fn register(&mut self, service_scope: ServiceScope) -> Receiver<(NodeIndex, Bytes)> {
+    pub fn register(
+        &mut self,
+        service_scope: ServiceScope,
+    ) -> (Sender<BroadcastRequest<F>>, Receiver<(NodeIndex, Bytes)>) {
         let (tx, rx) = mpsc::channel(1024);
         self.handles.insert(service_scope, tx);
-        rx
+        (self.request_tx.clone(), rx)
     }
 
     pub fn handle_broadcast_message(&mut self, peer: NodeIndex, event: Message) {

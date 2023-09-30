@@ -38,6 +38,7 @@ impl<C: Collection> Connector<C> {
         }
     }
 
+    #[inline]
     pub async fn advance(&mut self) -> Option<ConnectionResult> {
         self.connecting.next().await
     }
@@ -133,12 +134,14 @@ impl<C: Collection> Connector<C> {
         self.connecting.push(fut);
     }
 
+    #[inline]
     pub fn cancel_dial(&mut self, peer: &NodeIndex) {
         if let Some(cancel) = self.pending_dial.remove(peer) {
             cancel.cancel();
         }
     }
 
+    #[inline]
     pub fn remove_pending_dial(&mut self, peer: &NodeIndex) {
         self.pending_dial.remove(peer);
     }
