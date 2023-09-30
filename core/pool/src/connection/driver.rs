@@ -103,6 +103,11 @@ pub async fn start_driver(mut ctx: Context) -> Result<()> {
                             }
                         });
                     }
+                    Some(DriverRequest::Disconnect) => {
+                        tracing::info!("closing the connection");
+                        ctx.connection.close(0u8.into(), b"close from disconnect");
+                        break;
+                    }
                     None => break,
                 }
             }
@@ -175,6 +180,7 @@ impl AsyncWorker for MessageSender {
 
 /// Requests for a driver worker.
 pub enum DriverRequest {
+    Disconnect,
     Message(Message),
     NewStream {
         service: ServiceScope,

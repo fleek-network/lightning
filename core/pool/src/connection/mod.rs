@@ -227,8 +227,18 @@ where
                     });
                 }
             },
-            BroadcastTask::Update { .. } => {
-                todo!()
+            BroadcastTask::Update { peers } => {
+                for index in peers.iter() {
+                    let Some(driver_tx) = self.pool.get(index).cloned() else {
+                        continue;
+                    };
+                    tokio::spawn(async move {
+                        if driver_tx.send(DriverRequest::Disconnect).await.is_err() {
+                            tracing::error!("failed to send driver a disconnect request");
+                        }
+                    });
+                }
+                self.pool.retain(|index, _| !peers.contains(index));
             },
         }
 
