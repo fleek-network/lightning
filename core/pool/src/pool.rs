@@ -163,11 +163,11 @@ where
         config: Self::Config,
         signer: &c!(C::SignerInterface),
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
-        _: c!(C::NotifierInterface),
+        notifier: c!(C::NotifierInterface),
         topology: c!(C::TopologyInterface),
     ) -> Result<Self> {
         let (_, sk) = signer.get_sk();
-        let mut builder = Builder::new(sk, topology, sync_query);
+        let mut builder = Builder::new(sk, topology, sync_query, notifier);
         builder.keep_alive_interval(config.keep_alive_interval);
         builder.socket_address(config.address);
         let endpoint = builder.build()?;

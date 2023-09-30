@@ -1,7 +1,7 @@
 mod connector;
 mod driver;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 
 use anyhow::Result;
@@ -11,7 +11,13 @@ use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{ApplicationInterface, ServiceScope, SyncQueryRunnerInterface};
+use lightning_interfaces::{
+    ApplicationInterface,
+    Notification,
+    ServiceScope,
+    SyncQueryRunnerInterface,
+    TopologyInterface,
+};
 use quinn::{Connection, RecvStream, SendStream, ServerConfig};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::task::JoinSet;
@@ -32,7 +38,9 @@ pub struct Endpoint<C: Collection> {
     /// Receive requests for a multiplexed stream.
     stream_service: StreamService,
     /// Source of network topology.
-    _topology: c![C::TopologyInterface],
+    topology: c![C::TopologyInterface],
+    /// Epoch notifier for trigger polling of topology.
+    notifier: Receiver<Notification>,
     /// Receiver of events from a connection.
     connection_event_rx: Receiver<ConnectionEvent>,
     /// Sender of events from a connection.
@@ -62,6 +70,7 @@ where
     pub fn new(
         topology: c!(C::TopologyInterface),
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
+        notifier: Receiver<Notification>,
         sk: NodeSecretKey,
         server_config: ServerConfig,
         address: SocketAddr,
@@ -73,8 +82,9 @@ where
             sync_query: sync_query.clone(),
             broadcast_service: BroadcastService::new(),
             stream_service: StreamService::new(),
-            _topology: topology,
-            connection_event_rx: connection_event_rx,
+            topology,
+            notifier,
+            connection_event_rx,
             connection_event_tx,
             connector: Connector::new(sync_query, sk),
             pending_task: HashMap::new(),
@@ -335,6 +345,28 @@ where
                     };
                     if let Err(e) = self.handle_stream_request(stream_request) {
                         tracing::error!("failed to handle stream request: {e:?}");
+                    }
+                }
+                Some(epoch_event) = self.notifier.recv() => {
+                    match epoch_event {
+                        Notification::NewEpoch => {
+                            let new_connections = self
+                                .topology
+                                .suggest_connections()
+                                .iter()
+                                .flatten()
+                                .filter_map(|pk| self.sync_query.pubkey_to_index(*pk))
+                                .collect::<HashSet<_>>();
+                            let broadcast_task =  self
+                                .broadcast_service
+                                .update_connections(new_connections);
+                            if let Err(e) = self.handle_broadcast_task(broadcast_task) {
+                                tracing::error!("failed to handle broadcast task: {e:?}");
+                            }
+                        }
+                        Notification::BeforeEpochChange => {
+                            unreachable!("we're only registered for new epoch events")
+                        }
                     }
                 }
                 Some(peer) = self.driver_set.join_next() => {
