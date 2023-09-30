@@ -87,7 +87,11 @@ pub trait PoolInterface<C: Collection>:
 #[async_trait]
 #[infusion::blank]
 pub trait EventHandler: Send + Sync {
-    fn send_to_all<F: Fn(NodeIndex) -> bool>(&self, payload: Bytes, filter: F);
+    fn send_to_all<F: Fn(NodeIndex) -> bool + Send + Sync + 'static>(
+        &self,
+        payload: Bytes,
+        filter: F,
+    );
     fn send_to_one(&self, node: NodeIndex, payload: Bytes);
     async fn receive(&mut self) -> Option<(NodeIndex, Bytes)>;
 }

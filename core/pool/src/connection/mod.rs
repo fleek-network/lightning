@@ -103,7 +103,7 @@ where
         service_scope: ServiceScope,
     ) -> (
         Sender<BroadcastRequest<Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>>>,
-        Receiver<Bytes>,
+        Receiver<(NodeIndex, Bytes)>,
     ) {
         let rx = self.broadcast_service.register(service_scope);
         (self.broadcast_service_tx.clone(), rx)

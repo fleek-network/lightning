@@ -26,7 +26,7 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use crate::builder::Builder;
 use crate::config::Config;
 use crate::connection::ConnectionPool;
-use crate::service::broadcast::BroadcastRequest;
+use crate::service::broadcast::{BroadcastRequest, Param};
 use crate::service::stream::StreamRequest;
 
 #[derive(Deserialize, Serialize)]
@@ -67,7 +67,7 @@ where
         service: ServiceScope,
     ) -> (
         Sender<BroadcastRequest<Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>>>,
-        Receiver<Bytes>,
+        Receiver<(NodeIndex, Bytes)>,
     ) {
         let mut guard = self.state.blocking_lock();
         match guard.as_mut().expect("Pool to have a state") {
@@ -189,9 +189,9 @@ where
     fn open_event(&self, service: ServiceScope) -> Self::EventHandler {
         let (tx, rx) = self.register_broadcast_service(service);
         EventHandler {
-            _event_rx: rx,
-            _request_tx: tx,
-            _service_scope: service,
+            event_rx: rx,
+            request_tx: tx,
+            service_scope: service,
         }
     }
 
@@ -208,23 +208,55 @@ where
 }
 
 pub struct EventHandler {
-    _request_tx: Sender<BroadcastRequest<Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>>>,
-    _event_rx: Receiver<Bytes>,
-    _service_scope: ServiceScope,
+    request_tx: Sender<BroadcastRequest<Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>>>,
+    event_rx: Receiver<(NodeIndex, Bytes)>,
+    service_scope: ServiceScope,
 }
 
 #[async_trait]
 impl lightning_interfaces::pool::EventHandler for EventHandler {
-    fn send_to_all<F: Fn(NodeIndex) -> bool>(&self, _: Bytes, _: F) {
-        todo!()
+    fn send_to_all<F: Fn(NodeIndex) -> bool + Send + Sync + 'static>(
+        &self,
+        message: Bytes,
+        filter: F,
+    ) {
+        let tx = self.request_tx.clone();
+        let service_scope = self.service_scope;
+        tokio::spawn(async move {
+            if tx
+                .send(BroadcastRequest {
+                    service_scope,
+                    message,
+                    param: Param::Filter(Box::new(filter)),
+                })
+                .await
+                .is_err()
+            {
+                tracing::error!("failed to send to broadcast service");
+            }
+        });
     }
 
-    fn send_to_one(&self, _: NodeIndex, _: Bytes) {
-        todo!()
+    fn send_to_one(&self, index: NodeIndex, message: Bytes) {
+        let tx = self.request_tx.clone();
+        let service_scope = self.service_scope;
+        tokio::spawn(async move {
+            if tx
+                .send(BroadcastRequest {
+                    service_scope,
+                    message,
+                    param: Param::Index(index),
+                })
+                .await
+                .is_err()
+            {
+                tracing::error!("failed to send to broadcast service");
+            }
+        });
     }
 
     async fn receive(&mut self) -> Option<(NodeIndex, Bytes)> {
-        todo!()
+        self.event_rx.recv().await
     }
 }
 
@@ -252,21 +284,22 @@ where
 
     async fn request(&self, _: NodeIndex, request: Bytes) -> io::Result<Self::Response> {
         let (tx, rx) = oneshot::channel();
-        // Todo: Return a bad response if channel send fails.
-        // Todo: Update service code.
         self.request_tx
             .send(StreamRequest { respond: tx })
             .await
-            .unwrap();
+            .map_err(|_| io::ErrorKind::BrokenPipe)?;
         let (stream_tx, stream_rx) = rx.await.map_err(|_| io::ErrorKind::BrokenPipe)?;
 
         FramedWrite::new(stream_tx, LengthDelimitedCodec::new())
             .send(request)
-            .await
-            .unwrap();
+            .await?;
         let mut response_rx = FramedRead::new(stream_rx, LengthDelimitedCodec::new());
-        let header = response_rx.next().await.unwrap().unwrap();
-        let status: Status = bincode::deserialize(header.as_ref()).unwrap();
+        let header = response_rx
+            .next()
+            .await
+            .ok_or(io::ErrorKind::BrokenPipe)??;
+        let status: Status =
+            bincode::deserialize(header.as_ref()).map_err(|_| io::ErrorKind::Other)?;
         Ok(Response {
             status,
             rx: response_rx,
@@ -371,7 +404,6 @@ where
         tokio::spawn(async move { us.stream_tx.send(Bytes::from(header)).await });
     }
 
-    // Todo: Maybe this doesnt have to be mut. Let's think about it more.
     async fn send(&mut self, frame: Bytes) -> io::Result<()> {
         if !self.ok_header_sent {
             let header = bincode::serialize(&Status::Ok)

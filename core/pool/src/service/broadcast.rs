@@ -13,7 +13,7 @@ where
     F: Fn(NodeIndex) -> bool,
 {
     /// Service handles.
-    handles: HashMap<ServiceScope, Sender<Bytes>>,
+    handles: HashMap<ServiceScope, Sender<(NodeIndex, Bytes)>>,
     /// Peers that we are currently connected to.
     peers: HashSet<NodeIndex>,
     /// Receive requests for broadcast service.
@@ -33,13 +33,13 @@ where
         }
     }
 
-    pub fn register(&mut self, service_scope: ServiceScope) -> Receiver<Bytes> {
+    pub fn register(&mut self, service_scope: ServiceScope) -> Receiver<(NodeIndex, Bytes)> {
         let (tx, rx) = mpsc::channel(1024);
         self.handles.insert(service_scope, tx);
         rx
     }
 
-    pub fn handle_broadcast_message(&mut self, event: Message) {
+    pub fn handle_broadcast_message(&mut self, peer: NodeIndex, event: Message) {
         let Message {
             service: service_scope,
             payload: message,
@@ -47,7 +47,7 @@ where
 
         if let Some(tx) = self.handles.get(&service_scope).cloned() {
             tokio::spawn(async move {
-                if tx.send(Bytes::from(message)).await.is_err() {
+                if tx.send((peer, Bytes::from(message))).await.is_err() {
                     tracing::error!("failed to send message to user");
                 }
             });
@@ -89,7 +89,6 @@ where
     }
 }
 
-#[allow(unused)]
 pub enum Param<F>
 where
     F: Fn(NodeIndex) -> bool,
