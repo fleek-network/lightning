@@ -9,7 +9,7 @@ use lightning_interfaces::{ApplicationInterface, NotifierInterface};
 use quinn::{ServerConfig, TransportConfig, VarInt};
 use tokio::sync::mpsc;
 
-use crate::connection::Endpoint;
+use crate::endpoint::Endpoint;
 use crate::tls;
 
 pub struct Builder<C: Collection> {

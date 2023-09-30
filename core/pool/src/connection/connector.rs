@@ -9,12 +9,12 @@ use futures::{FutureExt, StreamExt};
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_interfaces::{ApplicationInterface, SyncQueryRunnerInterface};
 use quinn::{ClientConfig, Connecting, Connection, Endpoint};
 use rustls::Certificate;
 use tokio_util::sync::CancellationToken;
 
-use crate::connection::{ApplicationInterface, NodeAddress};
+use crate::endpoint::NodeAddress;
 use crate::tls;
 
 pub struct Connector<C: Collection> {

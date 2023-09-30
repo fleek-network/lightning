@@ -25,7 +25,7 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 use crate::builder::Builder;
 use crate::config::Config;
-use crate::connection::Endpoint;
+use crate::endpoint::Endpoint;
 use crate::service::broadcast::{BroadcastRequest, Param};
 use crate::service::stream::StreamRequest;
 

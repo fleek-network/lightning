@@ -10,7 +10,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-use crate::connection::ConnectionEvent;
+use crate::endpoint::ConnectionEvent;
 use crate::service::broadcast::Message;
 
 /// Context for driving the connection.
