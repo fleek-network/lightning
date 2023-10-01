@@ -145,6 +145,12 @@ impl<C: Collection> Connector<C> {
     pub fn remove_pending_dial(&mut self, peer: &NodeIndex) {
         self.pending_dial.remove(peer);
     }
+
+    /// Clears the state.
+    pub fn clear(&mut self) {
+        self.connecting.clear();
+        self.pending_dial.clear();
+    }
 }
 
 pub enum ConnectionResult {

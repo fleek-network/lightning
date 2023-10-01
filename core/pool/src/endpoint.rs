@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use bytes::Bytes;
 use fleek_crypto::{NodePublicKey, NodeSecretKey};
@@ -14,8 +15,8 @@ use lightning_interfaces::{
     TopologyInterface,
 };
 use quinn::{Connection, RecvStream, SendStream, ServerConfig};
-use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinSet;
 
 use crate::connection::connector::{ConnectionResult, Connector};
@@ -309,8 +310,21 @@ where
             .and_modify(|handle| handle.pinned = true);
     }
 
+    /// Shutdowns workers and clears state.
+    pub async fn shutdown(&mut self) {
+        for handle in self.pool.values() {
+            let _ = handle.tx.send(DriverRequest::Disconnect).await;
+        }
+
+        self.pool.clear();
+        self.pending_task.clear();
+        self.connector.clear();
+
+        while let Some(_) = self.driver_set.join_next().await {}
+    }
+
     // Todo: Return metrics.
-    pub async fn start(&mut self) -> anyhow::Result<()> {
+    pub async fn start(&mut self, shutdown: Arc<Notify>) -> anyhow::Result<()> {
         let endpoint = quinn::Endpoint::server(self.server_config.clone(), self.address)?;
         tracing::info!("bound to {:?}", endpoint.local_addr()?);
 
@@ -318,6 +332,9 @@ where
 
         loop {
             tokio::select! {
+                _ = shutdown.notified() => {
+                    break;
+                }
                 connecting = endpoint.accept() => {
                     match connecting {
                         None => break,

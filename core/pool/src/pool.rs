@@ -1,5 +1,6 @@
 use std::io;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::Poll;
 
 use anyhow::{Context, Result};
@@ -19,7 +20,7 @@ use lightning_interfaces::{
 use quinn::{RecvStream, SendStream};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{oneshot, Mutex, Notify};
 use tokio::task::JoinHandle;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
@@ -29,19 +30,9 @@ use crate::endpoint::Endpoint;
 use crate::service::broadcast::{BroadcastRequest, Param};
 use crate::service::stream::StreamRequest;
 
-#[derive(Deserialize, Serialize)]
-pub enum Status {
-    Ok,
-    Failed(RejectReason),
-}
-
-pub enum State<C: Collection> {
-    NotRunning { endpoint: Option<Endpoint<C>> },
-    Running { handle: JoinHandle<Endpoint<C>> },
-}
-
 pub struct Pool<C: Collection> {
     state: Mutex<Option<State<C>>>,
+    shutdown_notify: Arc<Notify>,
 }
 
 impl<C> Pool<C>
@@ -53,6 +44,7 @@ where
             state: Mutex::new(Some(State::NotRunning {
                 endpoint: Some(endpoint),
             })),
+            shutdown_notify: Arc::new(Notify::new()),
         })
     }
 
@@ -109,6 +101,7 @@ where
     }
 
     async fn start(&self) {
+        let shutdown = self.shutdown_notify.clone();
         let mut guard = self.state.lock().await;
         let state = guard.take().expect("There to be a state");
         let handle = match state {
@@ -118,7 +111,7 @@ where
             State::NotRunning { mut endpoint } => {
                 let mut endpoint = endpoint.take().expect("There to be an Endpoint");
                 tokio::spawn(async move {
-                    if let Err(e) = endpoint.start().await {
+                    if let Err(e) = endpoint.start(shutdown).await {
                         log::error!("unexpected endpoint failure: {e:?}");
                     }
                     endpoint
@@ -131,12 +124,16 @@ where
     async fn shutdown(&self) {
         let mut guard = self.state.lock().await;
         let state = guard.take().expect("There to be a state");
-        let endpoint = match state {
-            State::Running { handle } => handle.await.context("endpoint tasked failed").unwrap(),
+        let mut endpoint = match state {
+            State::Running { handle } => {
+                self.shutdown_notify.notify_one();
+                handle.await.context("endpoint tasked failed").unwrap()
+            },
             State::NotRunning { .. } => {
                 panic!("failed to shutdown: endpoint is not running");
             },
         };
+        endpoint.shutdown().await;
         *guard = Some(State::NotRunning {
             endpoint: Some(endpoint),
         });
@@ -208,10 +205,10 @@ impl lightning_interfaces::pool::EventHandler for EventHandler {
         message: Bytes,
         filter: F,
     ) {
-        let tx = self.request_tx.clone();
+        let request_tx = self.request_tx.clone();
         let service_scope = self.service_scope;
         tokio::spawn(async move {
-            if tx
+            if request_tx
                 .send(BroadcastRequest {
                     service_scope,
                     message,
@@ -226,10 +223,10 @@ impl lightning_interfaces::pool::EventHandler for EventHandler {
     }
 
     fn send_to_one(&self, index: NodeIndex, message: Bytes) {
-        let tx = self.request_tx.clone();
+        let request_tx = self.request_tx.clone();
         let service_scope = self.service_scope;
         tokio::spawn(async move {
-            if tx
+            if request_tx
                 .send(BroadcastRequest {
                     service_scope,
                     message,
@@ -267,27 +264,35 @@ impl lightning_interfaces::pool::Requester for Requester {
     type Response = Response;
 
     async fn request(&self, peer: NodeIndex, request: Bytes) -> io::Result<Self::Response> {
-        let (tx, rx) = oneshot::channel();
+        let (respond_tx, respond_rx) = oneshot::channel();
+        // Request a stream.
         self.request_tx
             .send(StreamRequest {
                 peer,
                 service_scope: self.service_scope,
-                respond: tx,
+                respond: respond_tx,
             })
             .await
             .map_err(|_| io::ErrorKind::BrokenPipe)?;
-        let (stream_tx, stream_rx) = rx.await.map_err(|_| io::ErrorKind::BrokenPipe)??;
 
+        let (stream_tx, stream_rx) = respond_rx.await.map_err(|_| io::ErrorKind::BrokenPipe)??;
+
+        // Send our request.
         FramedWrite::new(stream_tx, LengthDelimitedCodec::new())
             .send(request)
             .await?;
+
+        // Read the response header.
         let mut response_rx = FramedRead::new(stream_rx, LengthDelimitedCodec::new());
         let header = response_rx
             .next()
             .await
             .ok_or(io::ErrorKind::BrokenPipe)??;
+
+        // Todo: Use something better than bincode.
         let status: Status =
             bincode::deserialize(header.as_ref()).map_err(|_| io::ErrorKind::Other)?;
+
         Ok(Response {
             status,
             rx: response_rx,
@@ -342,17 +347,21 @@ impl lightning_interfaces::pool::Responder for Responder {
     type Request = Request;
 
     async fn get_next_request(&mut self) -> io::Result<(Bytes, Self::Request)> {
+        // Received a new stream so a request is incoming.
         let (stream_tx, stream_rx) = self
             .inner
             .recv()
             .await
             .ok_or_else(|| io::Error::from(io::ErrorKind::BrokenPipe))?;
         let mut message_rx = FramedRead::new(stream_rx, LengthDelimitedCodec::new());
+
+        // Get the header.
         let bytes = message_rx
             .next()
             .await
             .ok_or(io::ErrorKind::BrokenPipe)?
             .map(Bytes::from)?;
+
         Ok((
             bytes,
             Request {
@@ -378,6 +387,8 @@ impl lightning_interfaces::pool::Request for Request {
 
     async fn send(&mut self, frame: Bytes) -> io::Result<()> {
         if !self.ok_header_sent {
+            // We haven't sent the header.
+            // Let's send it first and only once.
             let header = bincode::serialize(&Status::Ok)
                 .map(Bytes::from)
                 .expect("Defined object");
@@ -386,4 +397,15 @@ impl lightning_interfaces::pool::Request for Request {
         }
         self.stream_tx.send(frame).await
     }
+}
+
+#[derive(Deserialize, Serialize)]
+pub enum Status {
+    Ok,
+    Failed(RejectReason),
+}
+
+pub enum State<C: Collection> {
+    NotRunning { endpoint: Option<Endpoint<C>> },
+    Running { handle: JoinHandle<Endpoint<C>> },
 }
