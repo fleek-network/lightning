@@ -6,19 +6,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+bincode.workspace = true
 bytes.workspace = true
 infusion.workspace = true
-serde.workspace = true
-anyhow.workspace = true
-tokio.workspace = true
-tokio-stream.workspace = true
-async-trait.workspace = true
-log.workspace = true
 fleek-crypto.workspace = true
 futures.workspace = true
-tokio-util = { workspace = true, features = ["codec"] }
 lightning-interfaces = {path="../interfaces"}
-bincode.workspace = true
+log.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tokio-util = { workspace = true, features = ["codec"] }
+
 
 affair = "0.1.2"
 der = { version = "0.7", features = ["alloc", "derive"] }
@@ -32,8 +33,3 @@ tracing = "0.1"
 webpki = { version = "0.22", features = ["std"] }
 x509-parser = "0.15.1"
 
-[dev-dependencies]
-lightning-application = { path="../application", features = ["test"] }
-lightning-signer = { path="../signer" }
-lightning-test-utils = { path = "../test-utils" }
-infusion.workspace = true
