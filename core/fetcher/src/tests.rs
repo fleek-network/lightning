@@ -34,8 +34,7 @@ use lightning_interfaces::{
 };
 use lightning_origin_ipfs::config::{Gateway, Protocol};
 use lightning_origin_ipfs::{Config as IPFSOriginConfig, IPFSOrigin};
-use lightning_pool::config::Config as PoolConfig;
-use lightning_pool::pool::Pool;
+use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
 use lightning_signer::{Config as SignerConfig, Signer};
@@ -123,7 +122,14 @@ async fn init_fetcher(
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
     let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
-    let pool = Pool::<TestBinding>::init(PoolConfig::default(), &signer).unwrap();
+    let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
+        PoolConfig::default(),
+        &signer,
+        app.sync_query(),
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
 
     let broadcast = Broadcast::<TestBinding>::init(
         BroadcastConfig::default(),

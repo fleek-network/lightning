@@ -18,8 +18,7 @@ use lightning_interfaces::{
     SignerInterface,
     WithStartAndShutdown,
 };
-use lightning_pool::config::Config as PoolConfig;
-use lightning_pool::pool::Pool;
+use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
@@ -94,7 +93,14 @@ async fn test_start_shutdown() {
     )
     .unwrap();
 
-    let pool = Pool::<TestBinding>::init(PoolConfig::default(), &signer).unwrap();
+    let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
+        PoolConfig::default(),
+        &signer,
+        app.sync_query(),
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
 
     let broadcast = Broadcast::<TestBinding>::init(
         BroadcastConfig::default(),

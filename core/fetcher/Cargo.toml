@@ -20,6 +20,7 @@ thiserror = "1.0"
 lightning-blockstore = { path = "../blockstore" }
 lightning-origin-ipfs = { path = "../origin-ipfs" }
 lightning-resolver = { path = "../resolver" }
+lightning-pool = { path = "../pool" }
 lightning-application = { path="../application", features = ["test"] }
 lightning-signer = {path="../signer"}
 fleek-crypto.workspace = true

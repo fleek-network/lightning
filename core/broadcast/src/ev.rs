@@ -363,8 +363,9 @@ impl<C: Collection> Context<C> {
 
         // TODO(qti3e): If there are too many connections consider spawning node here.
 
-        self.event_handler.send_to_all(message.into(), |id| {
-            self.peers
+        let peers = self.peers.clone();
+        self.event_handler.send_to_all(message.into(), move |id| {
+            peers
                 .get(&id)
                 .map(|mapping| !mapping.contains_key(&interned_id))
                 .unwrap_or(false)

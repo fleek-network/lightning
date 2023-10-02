@@ -45,8 +45,7 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use lightning_origin_ipfs::{Config as OriginIPFSConfig, IPFSOrigin};
-use lightning_pool::config::Config as PoolConfig;
-use lightning_pool::pool::Pool;
+use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_signer::{Config as SignerConfig, Signer};
 use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
@@ -96,7 +95,14 @@ fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
         IPFSOrigin::<TestBinding>::init(OriginIPFSConfig::default(), blockstore.clone()).unwrap();
 
     let signer = Signer::<TestBinding>::init(SignerConfig::test(), app.sync_query()).unwrap();
-    let pool = Pool::<TestBinding>::init(PoolConfig::default(), &signer).unwrap();
+    let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
+        PoolConfig::default(),
+        &signer,
+        app.sync_query(),
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
     let fetcher = Fetcher::<TestBinding>::init(
         FetcherConfig::default(),
         blockstore,

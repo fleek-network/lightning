@@ -32,7 +32,7 @@ use crate::service::broadcast::{BroadcastRequest, Param};
 use crate::service::stream::StreamRequest;
 use crate::{muxer, tls};
 
-pub struct Pool<C, M>
+pub struct Pool<C, M = QuinnMuxer>
 where
     C: Collection,
     M: MuxerInterface,
