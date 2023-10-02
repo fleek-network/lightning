@@ -1,3 +1,5 @@
+use std::io;
+
 use affair::{AsyncWorker, Executor, TokioSpawn};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -5,18 +7,19 @@ use bytes::{Bytes, BytesMut};
 use futures::{SinkExt, StreamExt};
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ServiceScope;
-use quinn::{Connection, ConnectionError, RecvStream, SendStream};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 use crate::endpoint::ConnectionEvent;
+use crate::muxer::{Channel, ConnectionInterface};
 use crate::service::broadcast::Message;
 
 /// Context for driving the connection.
-pub struct Context {
+pub struct Context<C> {
     /// The QUIC connection.
-    connection: Connection,
+    connection: C,
     /// Peer's index.
     peer: NodeIndex,
     /// Receive requests to perform on connection.
@@ -28,9 +31,9 @@ pub struct Context {
     incoming: bool,
 }
 
-impl Context {
+impl<C: ConnectionInterface> Context<C> {
     pub fn new(
-        connection: Connection,
+        connection: C,
         peer: NodeIndex,
         service_request_rx: Receiver<DriverRequest>,
         connection_event_tx: Sender<ConnectionEvent>,
@@ -47,16 +50,16 @@ impl Context {
 }
 
 /// Drives the connection.
-pub async fn start_driver(mut ctx: Context) -> Result<()> {
+pub async fn start_driver<C: ConnectionInterface>(mut ctx: Context<C>) -> Result<()> {
     // The first stream is used for broadcasting messages.
     let (stream_tx, stream_rx) = match ctx.incoming {
-        true => ctx.connection.accept_bi().await?,
-        false => ctx.connection.open_bi().await?,
+        true => ctx.connection.accept_stream().await?,
+        false => ctx.connection.open_stream().await?,
     };
 
     // Since streams are not cloneable, we spawn a worker to drive the sending side of the stream.
     let message_stream_tx = FramedWrite::new(stream_tx, LengthDelimitedCodec::new());
-    let message_sender_socket = TokioSpawn::spawn_async(MessageSender {
+    let message_sender_socket = TokioSpawn::spawn_async(MessageSender::<C> {
         tx: message_stream_tx,
     });
 
@@ -65,13 +68,13 @@ pub async fn start_driver(mut ctx: Context) -> Result<()> {
 
     loop {
         tokio::select! {
-            accept_result = ctx.connection.accept_bi() => {
+            accept_result = ctx.connection.accept_stream() => {
                 let (stream_tx, stream_rx) = accept_result?;
                 let connection_event_tx = ctx.connection_event_tx.clone();
                 let peer = ctx.peer;
                 tokio::spawn(async move {
                     if let Err(e) =
-                        handle_incoming_streams(
+                        handle_incoming_streams::<C>(
                             peer,
                             (stream_tx, stream_rx),
                             connection_event_tx
@@ -127,9 +130,9 @@ pub async fn start_driver(mut ctx: Context) -> Result<()> {
     Ok(())
 }
 
-async fn handle_incoming_streams(
+async fn handle_incoming_streams<C: ConnectionInterface>(
     peer: NodeIndex,
-    (stream_tx, mut stream_rx): (SendStream, RecvStream),
+    (stream_tx, mut stream_rx): (C::SendStream, C::RecvStream),
     connection_event_tx: Sender<ConnectionEvent>,
 ) -> Result<()> {
     // The peer opened a stream.
@@ -141,7 +144,7 @@ async fn handle_incoming_streams(
         .send(ConnectionEvent::Stream {
             peer,
             service_scope,
-            stream: (stream_tx, stream_rx),
+            stream: Channel::new::<C>(stream_tx, stream_rx),
         })
         .await
         .map_err(|_| anyhow::anyhow!("failed to send incoming network event"))
@@ -159,31 +162,31 @@ async fn handle_incoming_message(
         .map_err(|_| anyhow::anyhow!("failed to send incoming network event"))
 }
 
-async fn create_stream(
-    connection: Connection,
+async fn create_stream<C: ConnectionInterface>(
+    mut connection: C,
     service: ServiceScope,
-    respond: oneshot::Sender<Result<(SendStream, RecvStream), ConnectionError>>,
+    respond: oneshot::Sender<io::Result<Channel>>,
 ) -> Result<()> {
     // We open a new QUIC stream.
-    let (mut stream_tx, stream_rx) = connection.open_bi().await?;
+    let (mut stream_tx, stream_rx) = connection.open_stream().await?;
     // We send the service scope first so
     // that the receiver knows the service
     // that this stream belongs to.
     stream_tx.write_all(&[service as u8]).await?;
     respond
-        .send(Ok((stream_tx, stream_rx)))
-        .map_err(|e| anyhow::anyhow!("failed to send new stream to client: {e:?}"))
+        .send(Ok(Channel::new::<C>(stream_tx, stream_rx)))
+        .map_err(|_| anyhow::anyhow!("failed to send new stream to client"))
 }
 
 /// Worker to send messages over the sending side of a stream.
 ///
 /// Takes ownership of a non-cloneable stream.
-pub struct MessageSender {
-    tx: FramedWrite<SendStream, LengthDelimitedCodec>,
+pub struct MessageSender<C: ConnectionInterface> {
+    tx: FramedWrite<C::SendStream, LengthDelimitedCodec>,
 }
 
 #[async_trait]
-impl AsyncWorker for MessageSender {
+impl<C: ConnectionInterface> AsyncWorker for MessageSender<C> {
     type Request = Message;
     type Response = Result<()>;
 
@@ -198,6 +201,6 @@ pub enum DriverRequest {
     Message(Message),
     NewStream {
         service: ServiceScope,
-        respond: oneshot::Sender<Result<(SendStream, RecvStream), ConnectionError>>,
+        respond: oneshot::Sender<io::Result<Channel>>,
     },
 }

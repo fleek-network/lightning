@@ -1,14 +1,16 @@
 use std::collections::HashMap;
+use std::io;
 
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ServiceScope;
-use quinn::{ConnectionError, RecvStream, SendStream};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 
+use crate::muxer::Channel;
+
 pub struct StreamService {
     /// Service handles.
-    handles: HashMap<ServiceScope, Sender<(SendStream, RecvStream)>>,
+    handles: HashMap<ServiceScope, Sender<Channel>>,
     /// Receive requests for a multiplexed stream.
     stream_request_rx: Receiver<StreamRequest>,
     /// Send handle to return to users as they register with the stream service.
@@ -28,17 +30,13 @@ impl StreamService {
     pub fn register(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<StreamRequest>, Receiver<(SendStream, RecvStream)>) {
+    ) -> (Sender<StreamRequest>, Receiver<Channel>) {
         let (tx, rx) = mpsc::channel(1024);
         self.handles.insert(service_scope, tx);
         (self.stream_request_tx.clone(), rx)
     }
 
-    pub fn handle_incoming_stream(
-        &self,
-        service_scope: ServiceScope,
-        stream: (SendStream, RecvStream),
-    ) -> bool {
+    pub fn handle_incoming_stream(&self, service_scope: ServiceScope, stream: Channel) -> bool {
         match self.handles.get(&service_scope).cloned() {
             None => {
                 tracing::warn!("received unknown service scope: {service_scope:?}");
@@ -64,5 +62,5 @@ impl StreamService {
 pub struct StreamRequest {
     pub service_scope: ServiceScope,
     pub peer: NodeIndex,
-    pub respond: oneshot::Sender<Result<(SendStream, RecvStream), ConnectionError>>,
+    pub respond: oneshot::Sender<io::Result<Channel>>,
 }

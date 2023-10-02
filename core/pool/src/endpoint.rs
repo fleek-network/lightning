@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use fleek_crypto::{NodePublicKey, NodeSecretKey};
+use fleek_crypto::NodePublicKey;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
@@ -14,18 +14,22 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
     TopologyInterface,
 };
-use quinn::{Connection, RecvStream, SendStream, ServerConfig};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinSet;
 
 use crate::connection::connector::{ConnectionResult, Connector};
 use crate::connection::driver::{self, Context, DriverRequest};
+use crate::muxer::{Channel, MuxerInterface};
 use crate::service::broadcast::{BroadcastRequest, BroadcastService, BroadcastTask, Message};
 use crate::service::stream::{StreamRequest, StreamService};
 
 /// Endpoint for pool
-pub struct Endpoint<C: Collection> {
+pub struct Endpoint<C, M>
+where
+    C: Collection,
+    M: MuxerInterface,
+{
     /// Pool of connections.
     pool: HashMap<NodeIndex, DriverHandle>,
     /// Used for getting peer information from state.
@@ -43,7 +47,7 @@ pub struct Endpoint<C: Collection> {
     /// Sender of events from a connection.
     connection_event_tx: Sender<ConnectionEvent>,
     /// Performs dial tasks.
-    connector: Connector<C>,
+    connector: Connector<C, M>,
     /// Pending outgoing requests.
     pending_task: HashMap<NodeIndex, Vec<DriverRequest>>,
     /// Ongoing drivers.
@@ -51,24 +55,20 @@ pub struct Endpoint<C: Collection> {
     // Todo: Make an interface to abstract Endpoint.
     // This will allow us to use other protocols besides QUIC.
     /// QUIC Endpoint.
-    endpoint: Option<quinn::Endpoint>,
-    /// QUIC server config.
-    server_config: ServerConfig,
-    /// Node socket address.
-    address: SocketAddr,
+    muxer: Option<M>,
+    config: M::Config,
 }
 
-impl<C> Endpoint<C>
+impl<C, M> Endpoint<C, M>
 where
     C: Collection,
+    M: MuxerInterface,
 {
     pub fn new(
         topology: c!(C::TopologyInterface),
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         notifier: Receiver<Notification>,
-        sk: NodeSecretKey,
-        server_config: ServerConfig,
-        address: SocketAddr,
+        config: M::Config,
     ) -> Self {
         let (connection_event_tx, connection_event_rx) = mpsc::channel(1024);
 
@@ -81,12 +81,11 @@ where
             notifier,
             connection_event_rx,
             connection_event_tx,
-            connector: Connector::new(sync_query, sk),
+            connector: Connector::new(sync_query),
             pending_task: HashMap::new(),
             driver_set: JoinSet::new(),
-            endpoint: None,
-            server_config,
-            address,
+            muxer: None,
+            config,
         }
     }
 
@@ -103,7 +102,7 @@ where
     pub fn register_stream_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<StreamRequest>, Receiver<(SendStream, RecvStream)>) {
+    ) -> (Sender<StreamRequest>, Receiver<Channel>) {
         self.stream_service.register(service_scope)
     }
 
@@ -131,7 +130,7 @@ where
 
                 self.connector.enqueue_dial_task(
                     address,
-                    self.endpoint
+                    self.muxer
                         .clone()
                         .expect("Endpoint is always initialized on start"),
                 )?;
@@ -201,7 +200,7 @@ where
 
                     self.connector.enqueue_dial_task(
                         address,
-                        self.endpoint
+                        self.muxer
                             .clone()
                             .expect("Endpoint is always initialized on start"),
                     )?;
@@ -251,7 +250,7 @@ where
         Ok(())
     }
 
-    fn handle_connection(&mut self, peer: NodeIndex, connection: Connection, incoming: bool) {
+    fn handle_connection(&mut self, peer: NodeIndex, connection: M::Connection, incoming: bool) {
         self.connector.cancel_dial(&peer);
 
         // Start worker to drive the connection.
@@ -321,21 +320,22 @@ where
         self.connector.clear();
 
         while let Some(_) = self.driver_set.join_next().await {}
+
+        // We drop the muxer to unbind the address.
+        self.muxer.take();
     }
 
     // Todo: Return metrics.
     pub async fn start(&mut self, shutdown: Arc<Notify>) -> anyhow::Result<()> {
-        let endpoint = quinn::Endpoint::server(self.server_config.clone(), self.address)?;
-        tracing::info!("bound to {:?}", endpoint.local_addr()?);
-
-        self.endpoint = Some(endpoint.clone());
+        let muxer = M::init(self.config.clone())?;
+        self.muxer = Some(muxer.clone());
 
         loop {
             tokio::select! {
                 _ = shutdown.notified() => {
                     break;
                 }
-                connecting = endpoint.accept() => {
+                connecting = muxer.accept() => {
                     match connecting {
                         None => break,
                         Some(connecting) => {
@@ -446,7 +446,7 @@ pub enum ConnectionEvent {
     Stream {
         peer: NodeIndex,
         service_scope: ServiceScope,
-        stream: (SendStream, RecvStream),
+        stream: Channel,
     },
 }
 

@@ -11,6 +11,7 @@ infusion.workspace = true
 serde.workspace = true
 anyhow.workspace = true
 tokio.workspace = true
+tokio-stream.workspace = true
 async-trait.workspace = true
 log.workspace = true
 fleek-crypto.workspace = true

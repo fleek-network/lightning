@@ -1,8 +1,6 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use anyhow::{Error, Result};
-use fleek_crypto::NodeSecretKey;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
@@ -10,57 +8,61 @@ use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{ApplicationInterface, SyncQueryRunnerInterface};
-use quinn::{ClientConfig, Connecting, Connection, Endpoint};
-use rustls::Certificate;
 use tokio_util::sync::CancellationToken;
 
 use crate::endpoint::NodeAddress;
-use crate::tls;
+use crate::muxer::{ConnectionInterface, MuxerInterface};
 
-pub struct Connector<C: Collection> {
+pub struct Connector<C, M>
+where
+    C: Collection,
+    M: MuxerInterface,
+{
     /// Used for getting peer information from state.
     sync_query: c![C::ApplicationInterface::SyncExecutor],
     /// Ongoing incoming and outgoing connection set-up tasks.
-    connecting: FuturesUnordered<BoxFuture<'static, ConnectionResult>>,
+    connecting: FuturesUnordered<BoxFuture<'static, ConnectionResult<M::Connection>>>,
     /// Pending dialing tasks.
     pending_dial: HashMap<NodeIndex, CancellationToken>,
-    /// Node secret key.
-    sk: NodeSecretKey,
 }
 
-impl<C: Collection> Connector<C> {
-    pub fn new(sync_query: c!(C::ApplicationInterface::SyncExecutor), sk: NodeSecretKey) -> Self {
+impl<C, M> Connector<C, M>
+where
+    C: Collection,
+    M: MuxerInterface,
+{
+    pub fn new(sync_query: c!(C::ApplicationInterface::SyncExecutor)) -> Self {
         Self {
             sync_query,
             connecting: FuturesUnordered::new(),
             pending_dial: HashMap::new(),
-            sk,
         }
     }
 
     #[inline]
-    pub async fn advance(&mut self) -> Option<ConnectionResult> {
+    pub async fn advance(&mut self) -> Option<ConnectionResult<M::Connection>> {
         self.connecting.next().await
     }
 
-    pub fn enqueue_dial_task(&mut self, address: NodeAddress, endpoint: Endpoint) -> Result<()> {
+    pub fn enqueue_dial_task(&mut self, address: NodeAddress, muxer: M) -> Result<()> {
         let cancel = CancellationToken::new();
 
-        self.pending_dial.insert(address.index, cancel.clone());
+        self.pending_dial
+            .insert(address.index.clone(), cancel.clone());
 
-        let tls_config = tls::make_client_config(&self.sk, Some(address.pk))?;
         let fut = async move {
-            let client_config = ClientConfig::new(Arc::new(tls_config));
-            let connect = || async move {
-                endpoint
-                    .connect_with(client_config, address.socket_address, "localhost")?
+            let index = address.index.clone();
+            let connect = || async {
+                muxer
+                    .connect(address, "localhost")
+                    .await?
                     .await
                     .map_err(Into::into)
             };
             let connection = tokio::select! {
                 biased;
                 _ = cancel.cancelled() => return ConnectionResult::Failed {
-                    peer: Some(address.index),
+                    peer: Some(index.clone()),
                     error: anyhow::anyhow!("dial was cancelled")
                 },
                 connection = connect() => connection,
@@ -69,10 +71,10 @@ impl<C: Collection> Connector<C> {
                 Ok(conn) => ConnectionResult::Success {
                     incoming: false,
                     conn,
-                    peer: address.index,
+                    peer: index,
                 },
                 Err(e) => ConnectionResult::Failed {
-                    peer: Some(address.index),
+                    peer: Some(index.clone()),
                     error: e,
                 },
             }
@@ -84,25 +86,14 @@ impl<C: Collection> Connector<C> {
         Ok(())
     }
 
-    pub fn handle_incoming_connection(&mut self, connecting: Connecting) {
+    pub fn handle_incoming_connection(&mut self, connecting: M::Connecting) {
         let sync_query = self.sync_query.clone();
         let fut = async move {
             let connect = || async move {
                 let connection = connecting.await?;
-                let key = match connection.peer_identity() {
-                    None => {
-                        anyhow::bail!("failed to get peer identity from successful TLS handshake")
-                    },
-                    Some(any) => {
-                        let chain = any
-                            .downcast::<Vec<Certificate>>()
-                            .map_err(|_| anyhow::anyhow!("invalid peer certificate"))?;
-                        let certificate = chain
-                            .first()
-                            .ok_or_else(|| anyhow::anyhow!("invalid certificate chain"))?;
-                        tls::parse_unverified(certificate.as_ref())?.peer_pk()
-                    },
-                };
+                let key = connection.peer_identity().ok_or(anyhow::anyhow!(
+                    "failed to get peer identity from successful TLS handshake"
+                ))?;
                 Ok((key, connection))
             };
 
@@ -153,10 +144,10 @@ impl<C: Collection> Connector<C> {
     }
 }
 
-pub enum ConnectionResult {
+pub enum ConnectionResult<C: ConnectionInterface> {
     Success {
         incoming: bool,
-        conn: Connection,
+        conn: C,
         peer: NodeIndex,
     },
     Failed {

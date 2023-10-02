@@ -105,9 +105,10 @@ pub trait Requester: Clone + Send + Sync {
 
 #[infusion::blank]
 pub trait Response: Send + Sync {
-    type Body<S: Stream<Item = io::Result<Bytes>>> = tokio_stream::Empty<io::Result<Bytes>>;
+    type Body: Stream<Item = io::Result<Bytes>> + Send + Unpin =
+        tokio_stream::Empty<io::Result<Bytes>>;
     fn status_code(&self) -> Result<(), RejectReason>;
-    fn body<S: Stream<Item = io::Result<Bytes>>>(self) -> Self::Body<S>;
+    fn body(self) -> Self::Body;
 }
 
 #[async_trait]

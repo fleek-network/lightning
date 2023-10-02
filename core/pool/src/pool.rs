@@ -2,6 +2,7 @@ use std::io;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -14,32 +15,38 @@ use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
+    NotifierInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
-use quinn::{RecvStream, SendStream};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{oneshot, Mutex, Notify};
+use tokio::sync::{mpsc, oneshot, Mutex, Notify};
 use tokio::task::JoinHandle;
-use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-use crate::builder::Builder;
 use crate::config::Config;
 use crate::endpoint::Endpoint;
+use crate::muxer::quinn::QuinnMuxer;
+use crate::muxer::{Channel, MuxerInterface};
 use crate::service::broadcast::{BroadcastRequest, Param};
 use crate::service::stream::StreamRequest;
+use crate::{muxer, tls};
 
-pub struct Pool<C: Collection> {
-    state: Mutex<Option<State<C>>>,
+pub struct Pool<C, M>
+where
+    C: Collection,
+    M: MuxerInterface,
+{
+    state: Mutex<Option<State<C, M>>>,
     shutdown_notify: Arc<Notify>,
 }
 
-impl<C> Pool<C>
+impl<C, M> Pool<C, M>
 where
     C: Collection,
+    M: MuxerInterface,
 {
-    fn new(endpoint: Endpoint<C>) -> Result<Self> {
+    fn new(endpoint: Endpoint<C, M>) -> Result<Self> {
         Ok(Self {
             state: Mutex::new(Some(State::NotRunning {
                 endpoint: Some(endpoint),
@@ -72,7 +79,7 @@ where
     fn register_stream_service(
         &self,
         service: ServiceScope,
-    ) -> (Sender<StreamRequest>, Receiver<(SendStream, RecvStream)>) {
+    ) -> (Sender<StreamRequest>, Receiver<Channel>) {
         let mut guard = self.state.blocking_lock();
         match guard.as_mut().expect("Pool to have a state") {
             State::Running { .. } => {
@@ -89,7 +96,7 @@ where
 }
 
 #[async_trait]
-impl<C> WithStartAndShutdown for Pool<C>
+impl<C> WithStartAndShutdown for Pool<C, QuinnMuxer>
 where
     C: Collection,
 {
@@ -140,7 +147,7 @@ where
     }
 }
 
-impl<C> ConfigConsumer for Pool<C>
+impl<C> ConfigConsumer for Pool<C, QuinnMuxer>
 where
     C: Collection,
 {
@@ -148,10 +155,9 @@ where
     type Config = Config;
 }
 
-impl<C> PoolInterface<C> for Pool<C>
-where
-    C: Collection,
-{
+// Todo: An improvement would be to pass a `Muxer` in `init`.
+// See comments in `MuxerInterface`.
+impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
     type EventHandler = EventHandler;
     type Requester = Requester;
     type Responder = Responder;
@@ -162,13 +168,32 @@ where
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         notifier: c!(C::NotifierInterface),
         topology: c!(C::TopologyInterface),
-    ) -> Result<Self> {
+    ) -> Result<Pool<C, QuinnMuxer>> {
         let (_, sk) = signer.get_sk();
-        let mut builder = Builder::new(sk, topology, sync_query, notifier);
-        builder.max_idle_timeout(config.max_idle_timeout);
-        builder.socket_address(config.address);
-        let endpoint = builder.build()?;
-        Pool::new(endpoint)
+
+        let mut transport_config = quinn::TransportConfig::default();
+        transport_config.max_idle_timeout(Some(
+            Duration::from_secs(config.max_idle_timeout).try_into()?,
+        ));
+        let tls_config = tls::make_server_config(&sk).expect("Secret key to be valid");
+        let mut server_config = quinn::ServerConfig::with_crypto(Arc::new(tls_config));
+        server_config.transport_config(Arc::new(transport_config));
+
+        let muxer_config = muxer::quinn::Config {
+            server_config,
+            address: config.address,
+            sk,
+        };
+
+        let (notifier_tx, notifier_rx) = mpsc::channel(32);
+        notifier.notify_on_new_epoch(notifier_tx);
+
+        Pool::new(Endpoint::<C, QuinnMuxer>::new(
+            topology,
+            sync_query,
+            notifier_rx,
+            muxer_config,
+        ))
     }
 
     fn open_event(&self, service: ServiceScope) -> Self::EventHandler {
@@ -275,39 +300,30 @@ impl lightning_interfaces::pool::Requester for Requester {
             .await
             .map_err(|_| io::ErrorKind::BrokenPipe)?;
 
-        let (stream_tx, stream_rx) = respond_rx.await.map_err(|_| io::ErrorKind::BrokenPipe)??;
+        let mut channel = respond_rx.await.map_err(|_| io::ErrorKind::BrokenPipe)??;
 
         // Send our request.
-        FramedWrite::new(stream_tx, LengthDelimitedCodec::new())
-            .send(request)
-            .await?;
+        channel.send(request).await?;
 
         // Read the response header.
-        let mut response_rx = FramedRead::new(stream_rx, LengthDelimitedCodec::new());
-        let header = response_rx
-            .next()
-            .await
-            .ok_or(io::ErrorKind::BrokenPipe)??;
+        let header = channel.next().await.ok_or(io::ErrorKind::BrokenPipe)??;
 
         // Todo: Use something better than bincode.
         let status: Status =
             bincode::deserialize(header.as_ref()).map_err(|_| io::ErrorKind::Other)?;
 
-        Ok(Response {
-            status,
-            rx: response_rx,
-        })
+        Ok(Response { status, channel })
     }
 }
 
 pub struct Response {
     status: Status,
-    rx: FramedRead<RecvStream, LengthDelimitedCodec>,
+    channel: Channel,
 }
 
 #[async_trait]
 impl lightning_interfaces::pool::Response for Response {
-    type Body<S: Stream<Item = io::Result<Bytes>>> = Body;
+    type Body = Body;
     fn status_code(&self) -> Result<(), RejectReason> {
         match &self.status {
             Status::Ok => Ok(()),
@@ -315,13 +331,15 @@ impl lightning_interfaces::pool::Response for Response {
         }
     }
 
-    fn body<S: Stream<Item = io::Result<Bytes>>>(self) -> Self::Body<S> {
-        Body { rx: self.rx }
+    fn body(self) -> Self::Body {
+        Body {
+            channel: self.channel,
+        }
     }
 }
 
 pub struct Body {
-    rx: FramedRead<RecvStream, LengthDelimitedCodec>,
+    channel: Channel,
 }
 
 impl Stream for Body {
@@ -331,7 +349,7 @@ impl Stream for Body {
         mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.rx)
+        Pin::new(&mut self.channel)
             .poll_next(cx)
             .map(|item| item.map(|result| result.map(|bytes| Bytes::from(bytes.to_vec()))))
             .map_err(Into::into)
@@ -339,7 +357,7 @@ impl Stream for Body {
 }
 
 pub struct Responder {
-    inner: Receiver<(SendStream, RecvStream)>,
+    inner: Receiver<Channel>,
 }
 
 #[async_trait]
@@ -348,15 +366,14 @@ impl lightning_interfaces::pool::Responder for Responder {
 
     async fn get_next_request(&mut self) -> io::Result<(Bytes, Self::Request)> {
         // Received a new stream so a request is incoming.
-        let (stream_tx, stream_rx) = self
+        let mut channel = self
             .inner
             .recv()
             .await
             .ok_or_else(|| io::Error::from(io::ErrorKind::BrokenPipe))?;
-        let mut message_rx = FramedRead::new(stream_rx, LengthDelimitedCodec::new());
 
         // Get the header.
-        let bytes = message_rx
+        let bytes = channel
             .next()
             .await
             .ok_or(io::ErrorKind::BrokenPipe)?
@@ -366,14 +383,14 @@ impl lightning_interfaces::pool::Responder for Responder {
             bytes,
             Request {
                 ok_header_sent: false,
-                stream_tx: FramedWrite::new(stream_tx, LengthDelimitedCodec::new()),
+                channel,
             },
         ))
     }
 }
 
 pub struct Request {
-    stream_tx: FramedWrite<SendStream, LengthDelimitedCodec>,
+    channel: Channel,
     ok_header_sent: bool,
 }
 
@@ -381,8 +398,8 @@ pub struct Request {
 impl lightning_interfaces::pool::Request for Request {
     fn reject(self, reason: RejectReason) {
         let mut us = self;
-        let header = bincode::serialize(&Status::Failed(reason)).expect("Defined object");
-        tokio::spawn(async move { us.stream_tx.send(Bytes::from(header)).await });
+        let header = bincode::serialize(&Status::Failed(reason)).expect("Typed object");
+        tokio::spawn(async move { us.channel.send(Bytes::from(header)).await });
     }
 
     async fn send(&mut self, frame: Bytes) -> io::Result<()> {
@@ -392,10 +409,10 @@ impl lightning_interfaces::pool::Request for Request {
             let header = bincode::serialize(&Status::Ok)
                 .map(Bytes::from)
                 .expect("Defined object");
-            self.stream_tx.send(header).await?;
+            self.channel.send(header).await?;
             self.ok_header_sent = true;
         }
-        self.stream_tx.send(frame).await
+        self.channel.send(frame).await
     }
 }
 
@@ -405,7 +422,11 @@ pub enum Status {
     Failed(RejectReason),
 }
 
-pub enum State<C: Collection> {
-    NotRunning { endpoint: Option<Endpoint<C>> },
-    Running { handle: JoinHandle<Endpoint<C>> },
+pub enum State<C, M>
+where
+    C: Collection,
+    M: MuxerInterface,
+{
+    NotRunning { endpoint: Option<Endpoint<C, M>> },
+    Running { handle: JoinHandle<Endpoint<C, M>> },
 }
