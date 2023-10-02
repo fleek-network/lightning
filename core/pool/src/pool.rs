@@ -58,10 +58,7 @@ where
     fn register_broadcast_service(
         &self,
         service: ServiceScope,
-    ) -> (
-        Sender<BroadcastRequest<Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>>>,
-        Receiver<(NodeIndex, Bytes)>,
-    ) {
+    ) -> (Sender<BroadcastRequest>, Receiver<(NodeIndex, Bytes)>) {
         let mut guard = self.state.blocking_lock();
         match guard.as_mut().expect("Pool to have a state") {
             State::Running { .. } => {
@@ -218,7 +215,7 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
 }
 
 pub struct EventHandler {
-    request_tx: Sender<BroadcastRequest<Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>>>,
+    request_tx: Sender<BroadcastRequest>,
     event_rx: Receiver<(NodeIndex, Bytes)>,
     service_scope: ServiceScope,
 }

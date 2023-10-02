@@ -47,11 +47,10 @@ where
     pub fn enqueue_dial_task(&mut self, address: NodeAddress, muxer: M) -> Result<()> {
         let cancel = CancellationToken::new();
 
-        self.pending_dial
-            .insert(address.index.clone(), cancel.clone());
+        self.pending_dial.insert(address.index, cancel.clone());
 
         let fut = async move {
-            let index = address.index.clone();
+            let index = address.index;
             let connect = || async {
                 muxer
                     .connect(address, "localhost")
@@ -62,7 +61,7 @@ where
             let connection = tokio::select! {
                 biased;
                 _ = cancel.cancelled() => return ConnectionResult::Failed {
-                    peer: Some(index.clone()),
+                    peer: Some(index),
                     error: anyhow::anyhow!("dial was cancelled")
                 },
                 connection = connect() => connection,
@@ -74,7 +73,7 @@ where
                     peer: index,
                 },
                 Err(e) => ConnectionResult::Failed {
-                    peer: Some(index.clone()),
+                    peer: Some(index),
                     error: e,
                 },
             }

@@ -119,7 +119,7 @@ pub async fn start_driver<C: ConnectionInterface>(mut ctx: Context<C>) -> Result
                     }
                     Some(DriverRequest::Disconnect) => {
                         tracing::info!("closing the connection");
-                        ctx.connection.close(0u8.into(), b"close from disconnect");
+                        ctx.connection.close(0u8, b"close from disconnect");
                         break;
                     }
                     None => break,

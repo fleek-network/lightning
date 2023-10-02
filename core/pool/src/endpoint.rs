@@ -92,10 +92,7 @@ where
     pub fn register_broadcast_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (
-        Sender<BroadcastRequest<Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>>>,
-        Receiver<(NodeIndex, Bytes)>,
-    ) {
+    ) -> (Sender<BroadcastRequest>, Receiver<(NodeIndex, Bytes)>) {
         self.broadcast_service.register(service_scope)
     }
 
@@ -286,7 +283,7 @@ where
         // Save a handle to the driver to send requests.
         let handle = DriverHandle {
             pinned: pin,
-            tx: request_tx.clone(),
+            tx: request_tx,
         };
         self.pool.insert(peer, handle);
     }
@@ -319,7 +316,7 @@ where
         self.pending_task.clear();
         self.connector.clear();
 
-        while let Some(_) = self.driver_set.join_next().await {}
+        while self.driver_set.join_next().await.is_some() {}
 
         // We drop the muxer to unbind the address.
         self.muxer.take();

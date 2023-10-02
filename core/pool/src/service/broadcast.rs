@@ -104,7 +104,9 @@ where
     Index(NodeIndex),
 }
 
-pub struct BroadcastRequest<F>
+pub type BoxedFilterCallback = Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>;
+
+pub struct BroadcastRequest<F = BoxedFilterCallback>
 where
     F: Fn(NodeIndex) -> bool,
 {
