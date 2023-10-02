@@ -205,7 +205,7 @@ async fn test_send_to_all() {
     let msg = Bytes::from("hello");
     event_handlers[0].send_to_all(msg.clone(), |node| {
         println!("{node:?}");
-        false
+        true
     });
 
     #[allow(clippy::needless_range_loop)]

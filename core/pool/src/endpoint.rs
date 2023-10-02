@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use anyhow::Result;
 use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
 use infusion::c;
@@ -103,7 +104,7 @@ where
         self.stream_service.register(service_scope)
     }
 
-    pub fn handle_stream_request(&mut self, request: StreamRequest) -> anyhow::Result<()> {
+    pub fn handle_stream_request(&mut self, request: StreamRequest) -> Result<()> {
         let StreamRequest {
             peer,
             respond,
@@ -159,7 +160,7 @@ where
         Ok(())
     }
 
-    pub fn handle_broadcast_task(&mut self, task: BroadcastTask) -> anyhow::Result<()> {
+    pub fn handle_broadcast_task(&mut self, task: BroadcastTask) -> Result<()> {
         match task {
             BroadcastTask::Send {
                 service_scope,
@@ -183,24 +184,20 @@ where
 
                 // We will enqueue a dial task for these peers.
                 for index in not_connected {
-                    let Some(pk) = self.sync_query.index_to_pubkey(index) else {
-                        continue;
-                    };
-                    let Some(info) = self.sync_query.get_node_info(&pk) else {
-                        continue;
-                    };
-                    let address = NodeAddress {
-                        index,
-                        pk,
-                        socket_address: SocketAddr::from((info.domain, info.ports.pool)),
-                    };
+                    match self.node_address_from_state(&index) {
+                        Ok(address) => {
+                            if let Err(e) = self.connector.enqueue_dial_task(
+                                address,
+                                self.muxer
+                                    .clone()
+                                    .expect("Endpoint is always initialized on start"),
+                            ) {
+                                tracing::error!("failed to enqueue task: {e:?}");
+                            }
+                        },
+                        Err(e) => tracing::error!("failed to get address from state: {e:?}"),
+                    }
 
-                    self.connector.enqueue_dial_task(
-                        address,
-                        self.muxer
-                            .clone()
-                            .expect("Endpoint is always initialized on start"),
-                    )?;
                     // Enqueue message for later after we connect.
                     self.enqueue_pending_request(index, DriverRequest::Message(message.clone()))
                 }
@@ -222,8 +219,27 @@ where
                     });
                 }
             },
-            BroadcastTask::Update { peers } => {
-                for index in peers.iter() {
+            BroadcastTask::Update { keep, disconnect } => {
+                // Let's make sure we're connected to them.
+                for index in &keep {
+                    if self.pool.contains_key(index) {
+                        continue;
+                    }
+
+                    match self.node_address_from_state(index) {
+                        Ok(address) => {
+                            if let Err(e) = self
+                                .connector
+                                .enqueue_dial_task(address, self.muxer.clone().unwrap())
+                            {
+                                tracing::error!("failed to enqueue the dial task: {e:?}");
+                            }
+                        },
+                        Err(e) => tracing::info!("failed to get node info from state: {e:?}"),
+                    }
+                }
+
+                for index in disconnect.iter() {
                     let Some(handle) = self.pool.get(index) else {
                         continue;
                     };
@@ -240,7 +256,8 @@ where
                         }
                     });
                 }
-                self.pool.retain(|index, _| !peers.contains(index));
+
+                self.pool.retain(|index, _| keep.contains(index));
             },
         }
 
@@ -306,6 +323,24 @@ where
             .and_modify(|handle| handle.pinned = true);
     }
 
+    fn node_address_from_state(&self, index: &NodeIndex) -> Result<NodeAddress> {
+        let pk = self
+            .sync_query
+            .index_to_pubkey(*index)
+            .ok_or(anyhow::anyhow!("failed to get public key"))?;
+
+        let info = self
+            .sync_query
+            .get_node_info(&pk)
+            .ok_or(anyhow::anyhow!("failed to get node info"))?;
+
+        Ok(NodeAddress {
+            index: *index,
+            pk,
+            socket_address: SocketAddr::from((info.domain, info.ports.pool)),
+        })
+    }
+
     /// Shutdowns workers and clears state.
     pub async fn shutdown(&mut self) {
         for handle in self.pool.values() {
@@ -323,7 +358,7 @@ where
     }
 
     // Todo: Return metrics.
-    pub async fn start(&mut self, shutdown: Arc<Notify>) -> anyhow::Result<()> {
+    pub async fn start(&mut self, shutdown: Arc<Notify>) -> Result<()> {
         let muxer = M::init(self.config.clone())?;
         self.muxer = Some(muxer.clone());
 
