@@ -1,6 +1,6 @@
 use std::io;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::task::Poll;
 use std::time::Duration;
 
@@ -21,7 +21,7 @@ use lightning_interfaces::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{mpsc, oneshot, Mutex, Notify};
+use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
 
 use crate::config::Config;
@@ -59,7 +59,7 @@ where
         &self,
         service: ServiceScope,
     ) -> (Sender<BroadcastRequest>, Receiver<(NodeIndex, Bytes)>) {
-        let mut guard = self.state.blocking_lock();
+        let mut guard = self.state.lock().unwrap();
         match guard.as_mut().expect("Pool to have a state") {
             State::Running { .. } => {
                 panic!("failed to start: endpoint is already running");
@@ -77,7 +77,7 @@ where
         &self,
         service: ServiceScope,
     ) -> (Sender<StreamRequest>, Receiver<Channel>) {
-        let mut guard = self.state.blocking_lock();
+        let mut guard = self.state.lock().unwrap();
         match guard.as_mut().expect("Pool to have a state") {
             State::Running { .. } => {
                 panic!("failed to start: endpoint is already running");
@@ -99,14 +99,14 @@ where
 {
     fn is_running(&self) -> bool {
         matches!(
-            self.state.blocking_lock().as_ref(),
+            self.state.lock().unwrap().as_ref(),
             Some(&State::Running { .. })
         )
     }
 
     async fn start(&self) {
         let shutdown = self.shutdown_notify.clone();
-        let mut guard = self.state.lock().await;
+        let mut guard = self.state.lock().unwrap();
         let state = guard.take().expect("There to be a state");
         let handle = match state {
             State::Running { .. } => {
@@ -126,8 +126,11 @@ where
     }
 
     async fn shutdown(&self) {
-        let mut guard = self.state.lock().await;
-        let state = guard.take().expect("There to be a state");
+        let state = {
+            let mut guard = self.state.lock().unwrap();
+            guard.take().expect("There to be a state")
+        };
+
         let mut endpoint = match state {
             State::Running { handle } => {
                 self.shutdown_notify.notify_one();
@@ -137,7 +140,10 @@ where
                 panic!("failed to shutdown: endpoint is not running");
             },
         };
+
         endpoint.shutdown().await;
+
+        let mut guard = self.state.lock().unwrap();
         *guard = Some(State::NotRunning {
             endpoint: Some(endpoint),
         });

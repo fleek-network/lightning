@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
+    // TODO(qti3e): Should be a duration.
     pub max_idle_timeout: u64,
     pub address: SocketAddr,
 }

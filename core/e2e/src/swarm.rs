@@ -334,11 +334,10 @@ fn build_config(
         reporter_buffer_size: 1,
     });
 
-    // TODO
-    // config.inject::<Pool<FinalTypes>>(PoolConfig {
-    //     keep_alive_interval: Duration::from_secs(8),
-    //     address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
-    // });
+    config.inject::<Pool<FinalTypes>>(PoolConfig {
+        address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
+        ..Default::default()
+    });
 
     config
 }

@@ -42,8 +42,7 @@ impl TryFrom<u8> for ServiceScope {
 #[repr(u8)]
 #[non_exhaustive]
 pub enum RejectReason {
-    NotFound,
-    Io(io::Error),
+    Other,
 }
 
 /// Defines the connection pool.
@@ -124,4 +123,3 @@ pub trait Request: Send + Sync {
     fn reject(self, reason: RejectReason);
     async fn send(&mut self, frame: Bytes) -> io::Result<()>;
 }
-
