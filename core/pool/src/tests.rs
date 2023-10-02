@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::time::Duration;
 
 use bytes::Bytes;
 use fleek_crypto::{
@@ -45,16 +46,23 @@ struct Peer<C: Collection> {
 }
 
 async fn get_pools(
+    test_name: &str,
+    port_offset: u16,
     num_peers: usize,
 ) -> (Vec<Peer<TestBinding>>, Application<TestBinding>, PathBuf) {
     let mut signers_configs = Vec::new();
     let mut genesis = Genesis::load().unwrap();
-    let path = std::env::temp_dir().join("lightning-pool-test");
+    let path = std::env::temp_dir()
+        .join("lightning-pool-test")
+        .join(test_name);
     if path.exists() {
         std::fs::remove_dir_all(&path).unwrap();
     }
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
+
+    genesis.node_info = vec![];
+
     for i in 0..num_peers {
         let node_secret_key = NodeSecretKey::generate();
         let consensus_secret_key = ConsensusSecretKey::generate();
@@ -80,7 +88,7 @@ async fn get_pools(
                 worker: 48101_u16,
                 mempool: 48202_u16,
                 rpc: 48300_u16,
-                pool: 48400_u16 + i as u16,
+                pool: port_offset + i as u16,
                 dht: 48500_u16,
                 handshake: 48600_u16,
                 blockstore: 48700_u16,
@@ -117,7 +125,9 @@ async fn get_pools(
         .unwrap();
         let config = Config {
             max_idle_timeout: 300,
-            address: format!("0.0.0.0:{}", 48400_u16 + i as u16).parse().unwrap(),
+            address: format!("0.0.0.0:{}", port_offset + i as u16)
+                .parse()
+                .unwrap(),
         };
         let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
             config,
@@ -139,7 +149,7 @@ async fn get_pools(
 
 #[tokio::test]
 async fn test_send_to_one() {
-    let (peers, app, path) = get_pools(2).await;
+    let (peers, app, path) = get_pools("send_to_one", 48000, 2).await;
     let query_runner = app.sync_query();
 
     let node_index1 = query_runner
@@ -151,14 +161,63 @@ async fn test_send_to_one() {
     let event_handler1 = peers[0].pool.open_event(ServiceScope::Broadcast);
     let mut event_handler2 = peers[1].pool.open_event(ServiceScope::Broadcast);
 
-    peers[0].pool.start().await;
-    peers[1].pool.start().await;
+    for peer in &peers {
+        peer.pool.start().await;
+    }
 
     let msg = Bytes::from("hello");
     event_handler1.send_to_one(node_index2, msg.clone());
     let (sender, recv_msg) = event_handler2.receive().await.unwrap();
     assert_eq!(recv_msg, msg);
     assert_eq!(sender, node_index1);
+
+    for peer in &peers {
+        peer.pool.shutdown().await;
+    }
+
+    if path.exists() {
+        std::fs::remove_dir_all(&path).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn test_send_to_all() {
+    let (peers, app, path) = get_pools("send_to_all", 49000, 4).await;
+    let query_runner = app.sync_query();
+
+    let node_index1 = query_runner
+        .pubkey_to_index(peers[0].node_public_key)
+        .unwrap();
+
+    let mut event_handlers: Vec<_> = peers
+        .iter()
+        .map(|peer| peer.pool.open_event(ServiceScope::Broadcast))
+        .collect();
+
+    for peer in &peers {
+        println!("calling start");
+        peer.pool.start().await;
+    }
+
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    println!("SEND MSG");
+    let msg = Bytes::from("hello");
+    event_handlers[0].send_to_all(msg.clone(), |node| {
+        println!("{node:?}");
+        false
+    });
+
+    #[allow(clippy::needless_range_loop)]
+    for i in 1..peers.len() {
+        let (sender, recv_msg) = event_handlers[i].receive().await.unwrap();
+        assert_eq!(recv_msg, msg);
+        assert_eq!(sender, node_index1);
+    }
+
+    for peer in &peers {
+        peer.pool.shutdown().await;
+    }
 
     if path.exists() {
         std::fs::remove_dir_all(&path).unwrap();

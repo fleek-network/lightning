@@ -105,6 +105,7 @@ where
     }
 
     async fn start(&self) {
+        println!("START POOL");
         let shutdown = self.shutdown_notify.clone();
         let mut guard = self.state.lock().unwrap();
         let state = guard.take().expect("There to be a state");

@@ -327,6 +327,19 @@ where
         let muxer = M::init(self.config.clone())?;
         self.muxer = Some(muxer.clone());
 
+        let new_connections = self
+            .topology
+            .suggest_connections()
+            .iter()
+            .flatten()
+            .filter_map(|pk| self.sync_query.pubkey_to_index(*pk))
+            .collect::<HashSet<_>>();
+        println!("{new_connections:?}");
+        let broadcast_task = self.broadcast_service.update_connections(new_connections);
+        if let Err(e) = self.handle_broadcast_task(broadcast_task) {
+            tracing::error!("failed to handle broadcast task: {e:?}");
+        }
+
         loop {
             tokio::select! {
                 _ = shutdown.notified() => {
@@ -396,6 +409,7 @@ where
                     }
                 }
                 Some(epoch_event) = self.notifier.recv() => {
+                    println!("SUGGEST CONNECTIONS");
                     match epoch_event {
                         Notification::NewEpoch => {
                             let new_connections = self
