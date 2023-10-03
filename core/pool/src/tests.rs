@@ -164,6 +164,7 @@ async fn test_send_to_one() {
     for peer in &peers {
         peer.pool.start().await;
     }
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     let msg = Bytes::from("hello");
     event_handler1.send_to_one(node_index2, msg.clone());
@@ -195,18 +196,13 @@ async fn test_send_to_all() {
         .collect();
 
     for peer in &peers {
-        println!("calling start");
         peer.pool.start().await;
     }
 
     tokio::time::sleep(Duration::from_secs(2)).await;
 
-    println!("SEND MSG");
     let msg = Bytes::from("hello");
-    event_handlers[0].send_to_all(msg.clone(), |node| {
-        println!("{node:?}");
-        true
-    });
+    event_handlers[0].send_to_all(msg.clone(), |_| true);
 
     #[allow(clippy::needless_range_loop)]
     for i in 1..peers.len() {
