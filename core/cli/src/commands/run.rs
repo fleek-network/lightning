@@ -35,16 +35,16 @@ where
         .map_err(|e| anyhow::anyhow!("Node Initialization failed: {e:?}"))
         .context("Could not start the node.")?;
 
-    let mut rx_update_ready = node
-        .container
-        .get::<<C as Collection>::SyncronizerInterface>(tag!(C::SyncronizerInterface))
-        .checkpoint_socket();
-
     if let Some(cb) = &custom_start_shutdown {
         ((cb)(&node, true)).await;
     } else {
         node.start().await;
     }
+
+    let mut rx_update_ready = node
+        .container
+        .get::<<C as Collection>::SyncronizerInterface>(tag!(C::SyncronizerInterface))
+        .checkpoint_socket();
 
     let shutdown_future = shutdown_controller.wait_for_shutdown();
     pin!(shutdown_future);
