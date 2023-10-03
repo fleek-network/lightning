@@ -9,6 +9,7 @@ use fleek_crypto::{
     NodeSecretKey,
     SecretKey,
 };
+use futures::StreamExt;
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
@@ -20,6 +21,10 @@ use lightning_interfaces::{
     EventHandler,
     NotifierInterface,
     PoolInterface,
+    Request,
+    Requester,
+    Responder,
+    Response,
     ServiceScope,
     SignerInterface,
     SyncQueryRunnerInterface,
@@ -210,6 +215,70 @@ async fn test_send_to_all() {
         assert_eq!(recv_msg, msg);
         assert_eq!(sender, node_index1);
     }
+
+    for peer in &peers {
+        peer.pool.shutdown().await;
+    }
+
+    if path.exists() {
+        std::fs::remove_dir_all(&path).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn test_open_req_res() {
+    let (peers, app, path) = get_pools("open_req_res", 49100, 2).await;
+    let query_runner = app.sync_query();
+
+    let node_index1 = query_runner
+        .pubkey_to_index(peers[0].node_public_key)
+        .unwrap();
+    let _node_index2 = query_runner
+        .pubkey_to_index(peers[1].node_public_key)
+        .unwrap();
+    let (_requester1, mut responder1) = peers[0].pool.open_req_res(ServiceScope::BlockstoreServer);
+    let (requester2, _responder2) = peers[1].pool.open_req_res(ServiceScope::BlockstoreServer);
+
+    for peer in &peers {
+        peer.pool.start().await;
+    }
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    let chunks = vec![
+        Bytes::from("one"),
+        Bytes::from("two"),
+        Bytes::from("three"),
+        Bytes::from("end"),
+    ];
+    let chunks_clone = chunks.clone();
+    let sender_fut = async move {
+        let (request_bytes, mut request) = responder1.get_next_request().await.unwrap();
+        assert_eq!(request_bytes, Bytes::from("a hash"));
+        for chunk in chunks_clone {
+            request.send(chunk).await.unwrap();
+        }
+    };
+
+    let recv_fut = async move {
+        let end_marker = chunks[chunks.len() - 1].clone();
+        let response = requester2
+            .request(node_index1, Bytes::from("a hash"))
+            .await
+            .unwrap();
+        response.status_code().unwrap();
+        let mut body = response.body();
+        let mut i = 0;
+        loop {
+            let chunk = body.next().await.unwrap().unwrap();
+            assert_eq!(chunk, chunks[i]);
+            if chunk == end_marker {
+                break;
+            }
+            i += 1;
+        }
+    };
+
+    futures::join!(sender_fut, recv_fut);
 
     for peer in &peers {
         peer.pool.shutdown().await;

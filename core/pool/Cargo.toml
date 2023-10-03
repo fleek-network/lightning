@@ -40,3 +40,4 @@ lightning-application = {path="../application", features = ["test"]}
 lightning-notifier = {path="../notifier"}
 lightning-topology = {path="../topology"}
 fleek-crypto.workspace = true
+futures.workspace = true
