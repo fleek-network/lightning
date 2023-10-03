@@ -1,6 +1,7 @@
+use arrayref::array_ref;
 use dashmap::DashMap;
 use fn_sdk::api::{connection_close, connection_send};
-use fn_sdk::blockstore::HashTree;
+use fn_sdk::blockstore::ContentHandle;
 use fn_sdk::internal::{
     OnConnectedArgs,
     OnDisconnectedArgs,
@@ -33,7 +34,7 @@ const CHUNK_SIZE: usize = 32 * 1024;
 
 #[derive(Default)]
 struct Connection {
-    tree: Option<HashTree>,
+    tree: Option<ContentHandle>,
     cursor: usize,
 }
 
@@ -59,7 +60,7 @@ pub fn on_message(args: OnMessageArgs) {
                 return;
             }
 
-            let Ok(tree) = HashTree::load(arrayref::array_ref![args.payload, 0, 32]).await else {
+            let Ok(tree) = ContentHandle::load(array_ref![args.payload, 0, 32]).await else {
                 connection_send(args.connection_id, "NOTFOUND".into());
                 connection_close(args.connection_id);
                 return;

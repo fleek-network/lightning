@@ -2735,6 +2735,7 @@ name = "fn-sdk"
 version = "0.0.0"
 dependencies = [
  "arrayref",
+ "blake3-tree",
  "derive_more",
  "fleek-blake3",
  "fleek-crypto",
