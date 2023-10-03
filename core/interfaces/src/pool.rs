@@ -38,7 +38,7 @@ impl TryFrom<u8> for ServiceScope {
     }
 }
 
-#[derive(Clone, Copy, Deserialize, Serialize)]
+#[derive(Clone, Copy, Deserialize, Serialize, Debug)]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum RejectReason {
