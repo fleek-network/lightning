@@ -22,9 +22,9 @@ ENV RUST_BACKTRACE=1
 RUN mkdir -p /build/target/release
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/build/target \
-    cargo build --profile release --bin lightning-cli && \
+    cargo build --profile release --bin lightning-node && \
     cargo strip && \
-    cp /build/target/release/lightning-cli /build
+    cp /build/target/release/lightning-node /build
 
 FROM ubuntu:latest
 ARG LIGHTNING_PORTS="4069 4200 6969 18000 18101 18102"
@@ -36,7 +36,7 @@ RUN apt-get update && \
     libssl-dev \
     ca-certificates
 
-COPY --from=build /build/lightning-cli /usr/local/bin/lgtn
+COPY --from=build /build/lightning-node /usr/local/bin/lgtn
 
 COPY <<EOF /root/init
 #!/usr/bin/bash

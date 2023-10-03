@@ -3,7 +3,6 @@
 // python3 -m http.server
 
 use lightning_blockstore::blockstore::Blockstore;
-use lightning_cli::cli::Cli;
 use lightning_handshake::handshake::Handshake;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
@@ -13,6 +12,7 @@ use lightning_interfaces::{
     ServiceExecutorInterface,
     WithStartAndShutdown,
 };
+use lightning_node::cli::Cli;
 use lightning_node::config::TomlConfigProvider;
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
@@ -44,11 +44,12 @@ fn get_name<T>(_: &T) -> &str {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let cli = Cli::parse();
-    cli.exec_with_custom_start_shutdown::<ExampleBinding>(Box::new(|node, start| {
-        Box::pin(async move {
-            start_or_shutdown_node::<ExampleBinding>(&node.container, start).await;
-        })
-    }))
-    .await
+    Cli::<ExampleBinding>::parse()
+        .with_custom_start_shutdown(Box::new(|node, start| {
+            Box::pin(async move {
+                start_or_shutdown_node::<ExampleBinding>(&node.container, start).await;
+            })
+        }))
+        .exec()
+        .await
 }

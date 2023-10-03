@@ -2,22 +2,20 @@
 name = "lightning-node"
 version = "0.1.0"
 edition = "2021"
+default-run = "lightning-node"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+autometrics.workspace = true
 lightning-application = { path = "../application" }
+lightning-broadcast = { path = "../broadcast" }
 lightning-blockstore = { path = "../blockstore" }
 lightning-blockstore-server = { path = "../blockstore-server" }
-lightning-broadcast = { path = "../broadcast" }
-lightning-consensus = { path = "../consensus" }
-lightning-dht = { path = "../dht" }
-lightning-fetcher = { path = "../fetcher" }
 lightning-handshake = { path = "../handshake" }
 lightning-interfaces = { path = "../interfaces" }
 lightning-notifier = { path = "../notifier" }
 lightning-origin-ipfs = { path = "../origin-ipfs" }
-lightning-pool = { path = "../pool" }
 lightning-rep-collector = { path = "../rep-collector" }
 lightning-resolver = { path = "../resolver" }
 lightning-rpc = { path = "../rpc" }
@@ -25,9 +23,38 @@ lightning-service-executor = { path = "../service-executor" }
 lightning-signer = { path = "../signer" }
 lightning-syncronizer = { path = "../syncronizer" }
 lightning-topology = { path = "../topology" }
-mock = { path = "../mock" }
-toml = "0.7"
+lightning-pool = { path = "../pool" }
+lightning-types = { path = "../types" }
+lightning-consensus = { path = "../consensus" }
+lightning-dht = { path = "../dht" }
+lightning-test-utils = { path = "../test-utils" }
+lightning-fetcher = { path = "../fetcher" }
 infusion.workspace = true
-anyhow.workspace = true
 resolved-pathbuf.workspace = true
+mock = { path = "../mock" }
+anyhow.workspace = true
+clap = { version = "4.2", features = ["derive"] }
+serde.workspace = true
+toml = "0.7"
+async-trait.workspace = true
+mockall = "0.11.4"
+tokio.workspace = true
+bytes.workspace = true
+tokio-stream.workspace = true
+fleek-crypto.workspace = true
+tracing = "0.1"
+affair.workspace = true
 log.workspace = true
+simplelog = "0.12.1"
+chrono = "0.4.26"
+# testnet sync
+reqwest = { version = "0.11", features = ["json"] }
+serde_json = "1.0"
+atomo-rocks.workspace = true
+log4rs = { version = "1.2.0", features = [
+    "rolling_file_appender",
+    "compound_policy",
+    "size_trigger",
+    "fixed_window_roller",
+    "gzip",
+] }

@@ -3,11 +3,10 @@ use std::marker::PhantomData;
 use std::path::Path;
 use std::sync::Mutex;
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 use lightning_interfaces::config::ConfigProviderInterface;
-use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::ConfigConsumer;
-use resolved_pathbuf::ResolvedPathBuf;
 use toml::{Table, Value};
 
 /// The implementation of a configuration loader that uses the `toml` backend.
@@ -45,7 +44,7 @@ impl<C: Collection> TomlConfigProvider<C> {
         table.insert(T::KEY.to_owned(), Value::try_from(&config).unwrap());
     }
 
-    fn open<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+    pub fn open<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let path = path.as_ref();
 
         let table = if path.exists() {
@@ -72,21 +71,6 @@ impl<C: Collection> TomlConfigProvider<C> {
             table,
             collection: PhantomData,
         })
-    }
-
-    pub async fn load_or_write_config(
-        config_path: ResolvedPathBuf,
-    ) -> Result<TomlConfigProvider<C>> {
-        let config = Self::open(&config_path)?;
-        Node::<C>::fill_configuration(&config);
-
-        if !config_path.exists() {
-            std::fs::write(&config_path, config.serialize_config()).with_context(|| {
-                format!("Could not write to file: {}", config_path.to_str().unwrap())
-            })?;
-        }
-
-        Ok(config)
     }
 }
 

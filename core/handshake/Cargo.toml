@@ -44,7 +44,6 @@ hyper = "0.14"
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
 affair.workspace = true
 lightning-node = { path = "../node" } # for TomlConfigProvider
-lightning-cli = { path = "../cli" }
 lightning-service-executor = { path = "../service-executor" }
 lightning-signer = { path = "../signer" }
 lightning-blockstore = { path = "../blockstore/" }

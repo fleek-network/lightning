@@ -3787,25 +3787,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lightning-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap 4.4.2",
- "fleek-crypto",
- "infusion",
- "lightning-interfaces",
- "lightning-node",
- "lightning-signer",
- "log",
- "log4rs",
- "resolved-pathbuf",
- "serde",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "lightning-consensus"
 version = "0.0.0"
 dependencies = [
@@ -3964,7 +3945,6 @@ dependencies = [
  "hyper",
  "infusion",
  "lightning-blockstore",
- "lightning-cli",
  "lightning-interfaces",
  "lightning-node",
  "lightning-service-executor",
@@ -4034,7 +4014,15 @@ dependencies = [
 name = "lightning-node"
 version = "0.1.0"
 dependencies = [
+ "affair 0.1.2",
  "anyhow",
+ "async-trait",
+ "atomo-rocks",
+ "autometrics",
+ "bytes",
+ "chrono",
+ "clap 4.4.2",
+ "fleek-crypto",
  "infusion",
  "lightning-application",
  "lightning-blockstore",
@@ -4054,11 +4042,22 @@ dependencies = [
  "lightning-service-executor",
  "lightning-signer",
  "lightning-syncronizer",
+ "lightning-test-utils",
  "lightning-topology",
+ "lightning-types",
  "log",
+ "log4rs",
  "mock",
+ "mockall",
+ "reqwest",
  "resolved-pathbuf",
+ "serde",
+ "serde_json",
+ "simplelog",
+ "tokio",
+ "tokio-stream",
  "toml 0.7.6",
+ "tracing",
 ]
 
 [[package]]
