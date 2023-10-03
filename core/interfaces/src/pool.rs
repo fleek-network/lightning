@@ -43,6 +43,7 @@ impl TryFrom<u8> for ServiceScope {
 #[non_exhaustive]
 pub enum RejectReason {
     Other,
+    TooManyRequests,
 }
 
 /// Defines the connection pool.
@@ -112,7 +113,7 @@ pub trait Response: Send + Sync {
 
 #[async_trait]
 #[infusion::blank]
-pub trait Responder {
+pub trait Responder: Send {
     type Request: Request;
     async fn get_next_request(&mut self) -> io::Result<(Bytes, Self::Request)>;
 }
