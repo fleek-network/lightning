@@ -56,6 +56,14 @@ impl HashVec {
         Self { inner }
     }
 
+    /// Get the root hash from the tree
+    #[inline(always)]
+    pub fn get_root(&self) -> &[u8; 32] {
+        // The root hash is always the last 32 bytes in the buffer
+        arrayref::array_ref![self.inner, self.inner.len() - 32, 32]
+    }
+
+    /// Get the total number of hashes in the tree
     #[inline(always)]
     pub fn len(&self) -> usize {
         self.inner.len() >> 5
@@ -138,6 +146,12 @@ impl HashTree {
     #[inline(always)]
     pub fn from_inner(inner: HashVec) -> Self {
         Self { inner }
+    }
+
+    /// Get the root hash from the tree
+    #[inline(always)]
+    pub fn get_root(&self) -> &[u8; 32] {
+        self.inner.get_root()
     }
 
     /// Return the number of leaf blocks in this hash tree.
