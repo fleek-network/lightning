@@ -134,9 +134,13 @@ async fn test_start_shutdown() {
     let config = Config {
         store_path: path.clone().try_into().unwrap(),
     };
-    let resolver =
-        Resolver::<TestBinding>::init(config, &signer, broadcast.get_pubsub(Topic::Resolver))
-            .unwrap();
+    let resolver = Resolver::<TestBinding>::init(
+        config,
+        &signer,
+        broadcast.get_pubsub(Topic::Resolver),
+        app.sync_query(),
+    )
+    .unwrap();
 
     assert!(!resolver.is_running());
     resolver.start().await;

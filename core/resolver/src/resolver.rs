@@ -6,13 +6,15 @@ use async_trait::async_trait;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::schema::broadcast::ResolvedImmutablePointerRecord;
-use lightning_interfaces::types::{Blake3Hash, ImmutablePointer};
+use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, NodeIndex};
 use lightning_interfaces::{
+    ApplicationInterface,
     BroadcastInterface,
     ConfigConsumer,
     PubSub,
     ResolverInterface,
     SignerInterface,
+    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use log::error;
@@ -76,6 +78,7 @@ impl<C: Collection> ResolverInterface<C> for Resolver<C> {
         config: Self::Config,
         signer: &c!(C::SignerInterface),
         pubsub: c!(C::BroadcastInterface::PubSub<ResolvedImmutablePointerRecord>),
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self> {
         let (_, node_sk) = signer.get_sk();
 
@@ -90,11 +93,16 @@ impl<C: Collection> ResolverInterface<C> for Resolver<C> {
                 .expect("Was not able to create Resolver DB"),
         );
 
+        let node_index = query_runner
+            .pubkey_to_index(node_sk.to_pk())
+            .unwrap_or(NodeIndex::MAX);
+
         let shutdown_notify = Arc::new(Notify::new());
 
         let inner = ResolverInner {
             pubsub,
-            node_sk,
+            _node_sk: node_sk,
+            node_index,
             db,
             shutdown_notify: shutdown_notify.clone(),
             _collection: PhantomData,
@@ -136,7 +144,8 @@ impl<C: Collection> ResolverInterface<C> for Resolver<C> {
 
 struct ResolverInner<C: Collection> {
     pubsub: c!(C::BroadcastInterface::PubSub<ResolvedImmutablePointerRecord>),
-    node_sk: NodeSecretKey,
+    _node_sk: NodeSecretKey,
+    node_index: NodeIndex,
     db: Arc<DB>,
     shutdown_notify: Arc<Notify>,
     _collection: PhantomData<C>,
@@ -166,7 +175,7 @@ impl<C: Collection> ResolverInner<C> {
             let mut resolved_pointer = ResolvedImmutablePointerRecord {
                 pointer: pointers[0].clone(),
                 hash,
-                originator: self.node_sk.to_pk(),
+                originator: self.node_index,
                 signature: [0; 64].into(),
             };
             ResolverInner::<C>::store_mapping(resolved_pointer.clone(), &self.db);

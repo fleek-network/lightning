@@ -158,9 +158,13 @@ async fn init_fetcher(
     let config = ResolverConfig {
         store_path: resolver_path.try_into().unwrap(),
     };
-    let resolver =
-        Resolver::<TestBinding>::init(config, &signer, broadcast.get_pubsub(Topic::Resolver))
-            .unwrap();
+    let resolver = Resolver::<TestBinding>::init(
+        config,
+        &signer,
+        broadcast.get_pubsub(Topic::Resolver),
+        app.sync_query(),
+    )
+    .unwrap();
 
     let mut ipfs_origin_config = IPFSOriginConfig::default();
     ipfs_origin_config.gateways.push(Gateway {

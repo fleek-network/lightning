@@ -5,6 +5,7 @@ use lightning_schema::broadcast::ResolvedImmutablePointerRecord;
 use crate::infu_collection::Collection;
 use crate::types::{Blake3Hash, ImmutablePointer};
 use crate::{
+    ApplicationInterface,
     BroadcastInterface,
     ConfigConsumer,
     ConfigProviderInterface,
@@ -23,9 +24,10 @@ pub trait ResolverInterface<C: Collection>:
         config: ::ConfigProviderInterface,
         broadcast: ::BroadcastInterface,
         signer: ::SignerInterface,
+        app: ::ApplicationInterface,
     ) {
         let pubsub = broadcast.get_pubsub(crate::types::Topic::Resolver);
-        Self::init(config.get::<Self>(), signer, pubsub)
+        Self::init(config.get::<Self>(), signer, pubsub, app.sync_query())
     }
 
     type OriginFinder: OriginFinderAsyncIter;
@@ -35,6 +37,7 @@ pub trait ResolverInterface<C: Collection>:
         config: Self::Config,
         signer: &c!(C::SignerInterface),
         pubsub: c!(C::BroadcastInterface::PubSub<ResolvedImmutablePointerRecord>),
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self>;
 
     /// Publish new records into the resolver global hash table about us witnessing

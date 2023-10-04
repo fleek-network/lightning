@@ -64,22 +64,6 @@ impl<C: Collection> WithStartAndShutdown for ReputationAggregator<C> {
     }
 }
 
-struct ReputationAggregatorInner<C: Collection> {
-    report_rx: Arc<Mutex<Option<buffered_mpsc::BufferedReceiver<ReportMessage>>>>,
-    reporter: MyReputationReporter,
-    query: MyReputationQuery,
-    measurement_manager: Arc<Mutex<MeasurementManager>>,
-    submit_tx: SubmitTxSocket,
-    notifier: c![C::NotifierInterface],
-    notify_before_epoch_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
-    notify_before_epoch_tx: mpsc::Sender<Notification>,
-    notify_new_epoch_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
-    notify_new_epoch_tx: mpsc::Sender<Notification>,
-    query_runner: c![C::ApplicationInterface::SyncExecutor],
-    shutdown_notify: Arc<Notify>,
-    _config: Config,
-}
-
 #[async_trait]
 impl<C: Collection> ReputationAggregatorInterface<C> for ReputationAggregator<C> {
     /// The reputation reporter can be used by our system to report the reputation of other
@@ -138,6 +122,22 @@ impl<C: Collection> ReputationAggregatorInterface<C> for ReputationAggregator<C>
     fn get_query(&self) -> Self::ReputationQuery {
         self.inner.query.clone()
     }
+}
+
+struct ReputationAggregatorInner<C: Collection> {
+    report_rx: Arc<Mutex<Option<buffered_mpsc::BufferedReceiver<ReportMessage>>>>,
+    reporter: MyReputationReporter,
+    query: MyReputationQuery,
+    measurement_manager: Arc<Mutex<MeasurementManager>>,
+    submit_tx: SubmitTxSocket,
+    notifier: c![C::NotifierInterface],
+    notify_before_epoch_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
+    notify_before_epoch_tx: mpsc::Sender<Notification>,
+    notify_new_epoch_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
+    notify_new_epoch_tx: mpsc::Sender<Notification>,
+    query_runner: c![C::ApplicationInterface::SyncExecutor],
+    shutdown_notify: Arc<Notify>,
+    _config: Config,
 }
 
 impl<C: Collection> ReputationAggregatorInner<C> {

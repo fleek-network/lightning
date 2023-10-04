@@ -1,6 +1,6 @@
 use fleek_crypto::{NodePublicKey, NodeSignature};
 use ink_quill::{ToDigest, TranscriptBuilder};
-use lightning_types::{ImmutablePointer, Topic};
+use lightning_types::{ImmutablePointer, NodeIndex, Topic};
 use serde::{Deserialize, Serialize};
 
 use crate::AutoImplSerde;
@@ -46,7 +46,7 @@ pub struct ResolvedImmutablePointerRecord {
     /// The blake3 hash of the content. Used to store the content on the blockstore.
     pub hash: [u8; 32],
     /// The public key of the node which fetched and attested to this content.
-    pub originator: NodePublicKey,
+    pub originator: NodeIndex,
     /// The signature of the node.
     pub signature: NodeSignature,
 }
