@@ -2,15 +2,15 @@ use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 use fxhash::{FxHashMap, FxHashSet};
-use lightning_interfaces::types::{NodeIndex, Topic};
+use lightning_interfaces::types::NodeIndex;
 use rand::distributions::WeightedIndex;
 use rand::prelude::Distribution;
-use rand::{thread_rng, Rng};
+use rand::thread_rng;
 use ta::indicators::ExponentialMovingAverage;
 use ta::Next;
 
 use crate::stats::FusedTa;
-use crate::{Digest, MessageInternedId};
+use crate::MessageInternedId;
 
 const TICK_DURATION: Duration = Duration::from_millis(500);
 const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_millis(1000);
@@ -42,7 +42,7 @@ impl PendingStore {
     }
 
     pub fn insert_request(&mut self, node: NodeIndex, interned_id: MessageInternedId) {
-        let mut requests = self.request_map.entry(interned_id).or_default();
+        let requests = self.request_map.entry(interned_id).or_default();
         if requests.len() >= BUFFER_SIZE {
             requests.pop_front();
         }
@@ -70,7 +70,6 @@ impl PendingStore {
     }
 
     pub fn received_message(&mut self, node: NodeIndex, interned_id: MessageInternedId) {
-        if let Some(requests) = self.request_map.get(&interned_id) {}
         self.request_map
             .get(&interned_id)
             .map(|requests| requests.iter().find(|req| req.node == node))
@@ -135,7 +134,7 @@ impl PendingStore {
     fn get_pending_requests(&self) -> Vec<(MessageInternedId, FxHashSet<NodeIndex>)> {
         self.pending_map
             .iter()
-            .filter(|(id, pub_keys)| {
+            .filter(|(id, _pub_keys)| {
                 if let Some(requests) = self.request_map.get(id) {
                     if let Some(req) = requests.back() {
                         // If the most recent request for this message is too far in the past,

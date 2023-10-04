@@ -1,5 +1,3 @@
-use fxhash::{FxBuildHasher, FxHashMap};
-
 use crate::frame::{Digest, MessageInternedId};
 
 /// The interner is responsible for assigning a numeric value to each digest

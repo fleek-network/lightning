@@ -1,7 +1,5 @@
 //! # Fleek Network Broadcast
 
-#![allow(unused)]
-
 mod broadcast;
 mod command;
 mod config;

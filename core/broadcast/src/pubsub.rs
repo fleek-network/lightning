@@ -1,14 +1,13 @@
-use std::io::Write;
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{NodeIndex, Topic};
 use lightning_interfaces::{BroadcastEventInterface, PubSub};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 
-use crate::command::{Command, CommandSender, RecvCmd, SendCmd, SharedMessage};
-use crate::{Digest, Message};
+use crate::command::{Command, CommandSender, RecvCmd, SendCmd};
+use crate::Digest;
 
 pub struct PubSubI<T: LightningMessage + Clone> {
     topic: Topic,
@@ -59,7 +58,7 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
         let mut payload = Vec::with_capacity(512);
         msg.encode(&mut payload)
             .expect("Unexpected failure writing to buffer.");
-        self.command_sender.send(Command::Send(SendCmd {
+        let _ = self.command_sender.send(Command::Send(SendCmd {
             topic: self.topic,
             payload,
         }));
@@ -76,8 +75,8 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
         }
 
         loop {
-            let (tx, mut rx) = oneshot::channel();
-            self.command_sender.send(Command::Recv(RecvCmd {
+            let (tx, rx) = oneshot::channel();
+            let _ = self.command_sender.send(Command::Recv(RecvCmd {
                 topic: self.topic,
                 last_seen: self.last_seen,
                 response: tx,
@@ -96,7 +95,7 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
             self.last_seen = Some(id);
 
             if let Ok(decoded) = T::decode(&msg.payload) {
-                self.command_sender.send(Command::Propagate(msg.digest));
+                let _ = self.command_sender.send(Command::Propagate(msg.digest));
                 return Some(decoded);
             } else {
                 log::info!(
@@ -115,8 +114,8 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
         }
 
         loop {
-            let (tx, mut rx) = oneshot::channel();
-            self.command_sender.send(Command::Recv(RecvCmd {
+            let (tx, rx) = oneshot::channel();
+            let _ = self.command_sender.send(Command::Recv(RecvCmd {
                 topic: self.topic,
                 last_seen: self.last_seen,
                 response: tx,
@@ -162,11 +161,12 @@ impl<T: LightningMessage> BroadcastEventInterface<T> for Event<T> {
     }
 
     fn propagate(self) {
-        self.command_sender.send(Command::Propagate(self.digest));
+        let _ = self.command_sender.send(Command::Propagate(self.digest));
     }
 
     fn mark_invalid_sender(self) {
-        self.command_sender
+        let _ = self
+            .command_sender
             .send(Command::MarkInvalidSender(self.digest));
     }
 }

@@ -1,4 +1,4 @@
-use fxhash::{FxHashMap, FxHashSet};
+use fxhash::FxHashMap;
 
 use crate::frame::{Digest, MessageInternedId};
 use crate::Message;

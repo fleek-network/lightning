@@ -7,11 +7,9 @@
 //! the entire thing in a central event loop.
 
 use std::cell::OnceCell;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
 use infusion::c;
 use ink_quill::ToDigest;
@@ -21,20 +19,17 @@ use lightning_interfaces::types::{NodeIndex, Topic};
 use lightning_interfaces::{
     ApplicationInterface,
     EventHandler,
-    NotifierInterface,
     PoolInterface,
     ReputationAggregatorInterface,
     ReputationReporterInterface,
     SyncQueryRunnerInterface,
-    TopologyInterface,
     Weight,
 };
-use lightning_metrics::{counter, histogram, increment_counter};
-use tokio::sync::mpsc::{Receiver, Sender};
+use lightning_metrics::{histogram, increment_counter};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
-use crate::command::{Command, CommandReceiver, CommandSender, RecvCmd, SendCmd, SharedMessage};
+use crate::command::{Command, CommandReceiver, CommandSender, SharedMessage};
 use crate::db::Database;
 use crate::frame::Frame;
 use crate::interner::Interner;
@@ -67,8 +62,6 @@ pub struct Context<C: Collection> {
     // Pending store.
     pending_store: PendingStore,
     sqr: c![C::ApplicationInterface::SyncExecutor],
-    notifier: c![C::NotifierInterface],
-    topology: c![C::TopologyInterface],
     rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     event_handler: c![C::PoolInterface::EventHandler],
     sk: NodeSecretKey,
@@ -81,8 +74,6 @@ impl<C: Collection> Context<C> {
     pub fn new(
         db: Database,
         sqr: c![C::ApplicationInterface::SyncExecutor],
-        notifier: c![C::NotifierInterface],
-        topology: c![C::TopologyInterface],
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
         event_handler: c![C::PoolInterface::EventHandler],
         sk: NodeSecretKey,
@@ -104,8 +95,6 @@ impl<C: Collection> Context<C> {
             command_rx,
             pending_store: PendingStore::default(),
             sqr,
-            notifier,
-            topology,
             rep_reporter,
             event_handler,
             sk,
@@ -340,7 +329,7 @@ impl<C: Collection> Context<C> {
                     Some("Number of messages we have initialized propagation to our peers for.")
                 )
             },
-            Command::MarkInvalidSender(digest) => {
+            Command::MarkInvalidSender(_digest) => {
                 log::error!("Received message from invalid sender");
                 // TODO(qti3e): There is more to do here.
             },
@@ -410,7 +399,7 @@ async fn main_loop<C: Collection>(
     // We need the node index because when we're sending messages out (when the current
     // node is the origin of the message.), we have to put our own id as the origin.
     if let Some(node_index) = ctx.sqr.pubkey_to_index(ctx.pk) {
-        ctx.current_node_index.set(node_index);
+        let _ = ctx.current_node_index.set(node_index);
     }
 
     loop {

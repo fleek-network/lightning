@@ -1,7 +1,7 @@
 use smallvec::SmallVec;
 use tokio::sync::oneshot;
 
-use crate::command::{RecvCmd, SharedMessage};
+use crate::command::SharedMessage;
 use crate::ring::MessageRing;
 
 /// A wrapper around the [`MessageRing`] which can also keep track of a set of

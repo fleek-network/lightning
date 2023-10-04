@@ -1,5 +1,3 @@
-use crate::command::SharedMessage;
-
 /// The message ring is where incoming messages come and sit until a `PubSub::recv` tries
 /// to poll them.
 ///

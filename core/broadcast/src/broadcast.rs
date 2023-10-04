@@ -1,6 +1,3 @@
-use std::net::SocketAddr;
-use std::time::Duration;
-
 use async_trait::async_trait;
 use derive_more::IsVariant;
 use lightning_interfaces::infu_collection::{c, Collection};
@@ -16,9 +13,8 @@ use lightning_interfaces::{
     SignerInterface,
     WithStartAndShutdown,
 };
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{oneshot, Mutex};
 use tokio::task::JoinHandle;
-use tokio_util::sync::CancellationToken;
 
 use crate::command::CommandSender;
 use crate::config::Config;
@@ -107,26 +103,18 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
     type PubSub<T: LightningMessage + Clone> = PubSubI<T>;
 
     fn init(
-        config: Self::Config,
+        _config: Self::Config,
         sqr: c!(C::ApplicationInterface::SyncExecutor),
-        topology: c!(C::TopologyInterface),
+        _topology: c!(C::TopologyInterface),
         signer: &c!(C::SignerInterface),
-        notifier: c!(C::NotifierInterface),
+        _notifier: c!(C::NotifierInterface),
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
         pool: &c!(C::PoolInterface),
     ) -> anyhow::Result<Self> {
         let (_, sk) = signer.get_sk();
         let event_handler = pool.open_event(ServiceScope::Broadcast);
 
-        let ctx = Context::<C>::new(
-            Database::default(),
-            sqr,
-            notifier,
-            topology,
-            rep_reporter,
-            event_handler,
-            sk,
-        );
+        let ctx = Context::<C>::new(Database::default(), sqr, rep_reporter, event_handler, sk);
 
         Ok(Self {
             command_sender: ctx.get_command_sender(),
