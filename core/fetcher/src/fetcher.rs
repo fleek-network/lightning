@@ -63,7 +63,7 @@ impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
             origin_socket: origin.get_socket(),
             blockstore,
             blockstore_server,
-            _request_tx: request_tx,
+            server_request_tx: request_tx,
             resolver,
             shutdown_rx: Arc::new(Mutex::new(Some(shutdown_rx))),
         };
@@ -116,7 +116,7 @@ struct FetcherInner<C: Collection> {
     origin_socket: OriginProviderSocket,
     blockstore: C::BlockStoreInterface,
     blockstore_server: BlockstoreServer<C>,
-    _request_tx: mpsc::Sender<ServerRequest>,
+    server_request_tx: mpsc::Sender<ServerRequest>,
     resolver: C::ResolverInterface,
     shutdown_rx: Arc<Mutex<Option<mpsc::Receiver<()>>>>,
 }
@@ -160,12 +160,14 @@ impl<C: Collection> FetcherInner<C> {
                             let tx = tx.clone();
                             let resolver = self.resolver.clone();
                             let blockstore = self.blockstore.clone();
+                            let server_request_tx = self.server_request_tx.clone();
                             tokio::spawn(async move {
                                 FetcherInner::<C>::fetch(
                                     hash,
                                     tx,
                                     resolver,
                                     blockstore,
+                                    server_request_tx,
                                     task
                                 ).await;
                             });
@@ -215,6 +217,7 @@ impl<C: Collection> FetcherInner<C> {
         tx: mpsc::Sender<OriginRequest>,
         resolver: C::ResolverInterface,
         blockstore: C::BlockStoreInterface,
+        server_request_tx: mpsc::Sender<ServerRequest>,
         task: Task<FetcherRequest, FetcherResponse>,
     ) {
         if blockstore.get_tree(&hash).await.is_some() {
@@ -227,20 +230,40 @@ impl<C: Collection> FetcherInner<C> {
                         task.respond(FetcherResponse::Fetch(Ok(())));
                         return;
                     }
-                } else {
-                    let (response_tx, response_rx) = oneshot::channel();
-                    tx.send(OriginRequest {
-                        pointer: res_pointer.pointer,
-                        response: response_tx,
-                    })
-                    .await
-                    .expect("Failed to send origin request");
-
-                    let mut hash_rx = response_rx.await.expect("Failed to receive response");
-                    if let Ok(hash) = hash_rx.recv().await.expect("Failed to receive response") {
-                        task.respond(FetcherResponse::Put(Ok(hash)));
+                    // Try to get the content from the peer that advertized the record.
+                    let (tx, rx) = oneshot::channel();
+                    server_request_tx
+                        .send(ServerRequest {
+                            hash,
+                            peer: res.originator,
+                            response: tx,
+                        })
+                        .await
+                        .expect("Failed to send request to blockstore server");
+                    let mut res = rx.await.expect("Failed to get receiver");
+                    if let Ok(()) = res
+                        .recv()
+                        .await
+                        .expect("Failed to receive response from blockstore server")
+                    {
+                        task.respond(FetcherResponse::Fetch(Ok(())));
                         return;
                     }
+                }
+                // If the content is neither in the blockstore and we cannot get it from our peers,
+                // we go to the origin.
+                let (response_tx, response_rx) = oneshot::channel();
+                tx.send(OriginRequest {
+                    pointer: res_pointer.pointer,
+                    response: response_tx,
+                })
+                .await
+                .expect("Failed to send origin request");
+
+                let mut hash_rx = response_rx.await.expect("Failed to receive response");
+                if let Ok(hash) = hash_rx.recv().await.expect("Failed to receive response") {
+                    task.respond(FetcherResponse::Put(Ok(hash)));
+                    return;
                 }
             }
         }
@@ -248,6 +271,38 @@ impl<C: Collection> FetcherInner<C> {
             "Failed to resolve hash"
         ))));
     }
+
+    //async fn fetch_from_origin(
+    //    hash: Blake3Hash,
+    //    origin_tx: mpsc::Sender<OriginRequest>,
+    //    resolver: C::ResolverInterface,
+    //    blockstore: C::BlockStoreInterface,
+    //) -> Result<()> {
+    //    if let Some(pointers) = resolver.get_origins(hash) {
+    //        for res_pointer in pointers {
+    //            if let Some(res) = resolver.get_blake3_hash(res_pointer.pointer.clone()).await {
+    //                if res.hash == hash && blockstore.get_tree(&hash).await.is_some() {
+    //                    return Ok(());
+    //                }
+    //            } else {
+    //                let (response_tx, response_rx) = oneshot::channel();
+    //                origin_tx
+    //                    .send(OriginRequest {
+    //                        pointer: res_pointer.pointer,
+    //                        response: response_tx,
+    //                    })
+    //                    .await
+    //                    .expect("Failed to send origin request");
+
+    //                let mut hash_rx = response_rx.await.expect("Failed to receive response");
+    //                if let Ok(_hash) = hash_rx.recv().await.expect("Failed to receive response") {
+    //                    return Ok(());
+    //                }
+    //            }
+    //        }
+    //    }
+    //    Err(anyhow!("Failed to retrieve content"))
+    //}
 }
 
 impl<C: Collection> ConfigConsumer for Fetcher<C> {
