@@ -403,7 +403,6 @@ async fn send_request<C: Collection>(
     blockstore: C::BlockStoreInterface,
     pool_requester: c!(C::PoolInterface::Requester),
 ) -> Result<PeerRequest, ErrorResponse> {
-    // TODO(matthias): make this less nested
     match timeout(
         REQUEST_TIMEOUT,
         pool_requester.request(peer, Bytes::from(request.clone())),
@@ -416,31 +415,29 @@ async fn send_request<C: Collection>(
                     let mut body = response.body();
                     let mut putter = blockstore.put(Some(request.hash));
                     while let Some(bytes) = body.next().await {
-                        if let Ok(bytes) = bytes {
-                            if let Ok(frame) = Frame::try_from(bytes) {
-                                match frame {
-                                    Frame::Proof(proof) => putter.feed_proof(&proof).unwrap(),
-                                    Frame::Chunk(chunk) => putter
-                                        .write(&chunk, CompressionAlgorithm::Uncompressed)
-                                        .unwrap(),
-                                    Frame::Eos => {
-                                        let _hash = putter.finalize().await.unwrap();
-                                        // TODO(matthias): do we have to compare this hash to the
-                                        // requested hash?
-                                        return Ok(request);
-                                    },
-                                }
-                            } else {
-                                return Err(ErrorResponse {
-                                    error: PeerRequestError::Incomplete,
-                                    request,
-                                });
-                            }
-                        } else {
+                        let Ok(bytes) = bytes else {
                             return Err(ErrorResponse {
                                 error: PeerRequestError::Incomplete,
                                 request,
                             });
+                        };
+                        let Ok(frame) = Frame::try_from(bytes) else {
+                            return Err(ErrorResponse {
+                                error: PeerRequestError::Incomplete,
+                                request,
+                            });
+                        };
+                        match frame {
+                            Frame::Proof(proof) => putter.feed_proof(&proof).unwrap(),
+                            Frame::Chunk(chunk) => putter
+                                .write(&chunk, CompressionAlgorithm::Uncompressed)
+                                .unwrap(),
+                            Frame::Eos => {
+                                let _hash = putter.finalize().await.unwrap();
+                                // TODO(matthias): do we have to compare this hash to the
+                                // requested hash?
+                                return Ok(request);
+                            },
                         }
                     }
                     Err(ErrorResponse {
