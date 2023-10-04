@@ -105,9 +105,7 @@ async fn test_start_shutdown() {
     let broadcast = Broadcast::<TestBinding>::init(
         BroadcastConfig::default(),
         query_runner.clone(),
-        Default::default(),
         &signer,
-        Default::default(),
         rep_aggregator.get_reporter(),
         &pool,
     )

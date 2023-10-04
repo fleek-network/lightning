@@ -105,9 +105,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
     fn init(
         _config: Self::Config,
         sqr: c!(C::ApplicationInterface::SyncExecutor),
-        _topology: c!(C::TopologyInterface),
         signer: &c!(C::SignerInterface),
-        _notifier: c!(C::NotifierInterface),
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
         pool: &c!(C::PoolInterface),
     ) -> anyhow::Result<Self> {

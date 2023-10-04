@@ -6,13 +6,11 @@ use lightning_types::NodeIndex;
 
 use crate::infu_collection::Collection;
 use crate::signer::SignerInterface;
-use crate::topology::TopologyInterface;
 use crate::types::Topic;
 use crate::{
     ApplicationInterface,
     ConfigConsumer,
     ConfigProviderInterface,
-    NotifierInterface,
     PoolInterface,
     ReputationAggregatorInterface,
     WithStartAndShutdown,
@@ -27,18 +25,14 @@ pub trait BroadcastInterface<C: Collection>:
     fn _init(
         config: ::ConfigProviderInterface,
         app: ::ApplicationInterface,
-        topology: ::TopologyInterface,
         signer: ::SignerInterface,
-        notifier: ::NotifierInterface,
         rep_aggregator: ::ReputationAggregatorInterface,
         pool: ::PoolInterface,
     ) {
         Self::init(
             config.get::<Self>(),
             app.sync_query(),
-            topology.clone(),
             signer,
-            notifier.clone(),
             rep_aggregator.get_reporter(),
             pool,
         )
@@ -54,9 +48,7 @@ pub trait BroadcastInterface<C: Collection>:
     fn init(
         config: Self::Config,
         sqr: c!(C::ApplicationInterface::SyncExecutor),
-        topology: c!(C::TopologyInterface),
         signer: &c!(C::SignerInterface),
-        notifier: c!(C::NotifierInterface),
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
         pool: &c!(C::PoolInterface),
     ) -> Result<Self>;

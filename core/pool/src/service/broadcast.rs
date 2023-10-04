@@ -68,11 +68,10 @@ where
     pub fn update_connections(&mut self, peers: HashSet<NodeIndex>) -> BroadcastTask {
         let (keep, disconnect) = match self.peers.is_empty() {
             true => (peers, HashSet::new()),
-            false => {
-                self.peers
-                    .union(&peers)
-                    .partition(|index| peers.contains(index))
-            },
+            false => self
+                .peers
+                .union(&peers)
+                .partition(|index| peers.contains(index)),
         };
         self.peers = keep.clone();
         BroadcastTask::Update { keep, disconnect }

@@ -134,9 +134,7 @@ async fn init_fetcher(
     let broadcast = Broadcast::<TestBinding>::init(
         BroadcastConfig::default(),
         query_runner.clone(),
-        Default::default(),
         &signer,
-        Default::default(),
         Default::default(),
         &pool,
     )
