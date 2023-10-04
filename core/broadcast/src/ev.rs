@@ -175,13 +175,20 @@ impl<C: Collection> Context<C> {
         // This is a new digest which we have never seen before. At this point we immediately
         // wanna see the message and therefore we send out the want request.
         if new_digest {
-            // self.peers.send_want_request(&sender, advr.interned_id);
+            self.send(
+                sender,
+                Frame::Want(Want {
+                    interned_id: advr.interned_id,
+                }),
+            );
             self.pending_store.insert_request(sender, index);
         }
 
         // Remember the mapping since we may need it.
-        // self.peers
-        //     .insert_index_mapping(&sender, index, advr.interned_id);
+        self.peers
+            .entry(sender)
+            .or_default()
+            .insert(index, advr.interned_id);
 
         // Handle the case for non-first advr.
         self.pending_store.insert_pending(sender, index);
@@ -357,7 +364,7 @@ impl<C: Collection> Context<C> {
             peers
                 .get(&id)
                 .map(|mapping| !mapping.contains_key(&interned_id))
-                .unwrap_or(false)
+                .unwrap_or(true)
         });
     }
 
