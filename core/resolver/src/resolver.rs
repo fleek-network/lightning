@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use fleek_crypto::{NodeSecretKey, SecretKey};
+use fleek_crypto::{NodeSecretKey, PublicKey, SecretKey};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::schema::broadcast::ResolvedImmutablePointerRecord;
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, NodeIndex};
@@ -14,9 +14,10 @@ use lightning_interfaces::{
     ResolverInterface,
     SignerInterface,
     SyncQueryRunnerInterface,
+    ToDigest,
     WithStartAndShutdown,
 };
-use log::error;
+use log::{error, warn};
 use rocksdb::{Options, DB};
 use tokio::sync::{Notify, OnceCell};
 
@@ -154,8 +155,19 @@ impl<C: Collection> ResolverInner<C> {
         loop {
             tokio::select! {
                 _ = shutdown_notify.notified() => break,
-                Some(msg) = pubsub.recv() => {
-                    ResolverInner::<C>::store_mapping(msg, &db);
+                Some(record) = pubsub.recv() => {
+                    match self.query_runner.index_to_pubkey(record.originator) {
+                        Some(peer_public_key) => {
+                            let digest = record.to_digest();
+                            peer_public_key.verify(&record.signature, &digest);
+                            if peer_public_key.verify(&record.signature, &digest) {
+                                ResolverInner::<C>::store_mapping(record, &db);
+                            } else {
+                                warn!("Received record with invalid signature")
+                            }
+                        },
+                        None => warn!("Received record from unknown node index"),
+                    }
                 }
             }
         }
@@ -185,13 +197,14 @@ impl<C: Collection> ResolverInner<C> {
                 originator: node_index,
                 signature: [0; 64].into(),
             };
+            let digest = resolved_pointer.to_digest();
+            resolved_pointer.signature = self.node_sk.sign(&digest);
             ResolverInner::<C>::store_mapping(resolved_pointer.clone(), &self.db);
 
             for (index, pointer) in pointers.iter().enumerate() {
                 if index > 0 {
                     resolved_pointer.pointer = pointer.clone();
                 }
-
                 self.pubsub.send(&resolved_pointer).await;
             }
         }

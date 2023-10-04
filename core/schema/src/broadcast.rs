@@ -51,4 +51,14 @@ pub struct ResolvedImmutablePointerRecord {
     pub signature: NodeSignature,
 }
 
+impl ToDigest for ResolvedImmutablePointerRecord {
+    fn transcript(&self) -> TranscriptBuilder {
+        TranscriptBuilder::empty("lightning-resolved-pointer")
+            .with("pointer-origin", &self.pointer.origin.to_string())
+            .with("pointer-uri", &self.pointer.uri)
+            .with("hash", &self.hash)
+            .with("originator", &self.originator)
+    }
+}
+
 impl AutoImplSerde for ResolvedImmutablePointerRecord {}
