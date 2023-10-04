@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -19,7 +18,7 @@ use lightning_interfaces::{
 };
 use log::error;
 use rocksdb::{Options, DB};
-use tokio::sync::Notify;
+use tokio::sync::{Notify, OnceCell};
 
 use crate::config::Config;
 use crate::origin_finder::OriginFinder;
@@ -93,19 +92,14 @@ impl<C: Collection> ResolverInterface<C> for Resolver<C> {
                 .expect("Was not able to create Resolver DB"),
         );
 
-        let node_index = query_runner
-            .pubkey_to_index(node_sk.to_pk())
-            .unwrap_or(NodeIndex::MAX);
-
         let shutdown_notify = Arc::new(Notify::new());
-
         let inner = ResolverInner {
             pubsub,
-            _node_sk: node_sk,
-            node_index,
+            node_sk,
+            node_index: OnceCell::new(),
             db,
             shutdown_notify: shutdown_notify.clone(),
-            _collection: PhantomData,
+            query_runner,
         };
 
         Ok(Self {
@@ -144,11 +138,11 @@ impl<C: Collection> ResolverInterface<C> for Resolver<C> {
 
 struct ResolverInner<C: Collection> {
     pubsub: c!(C::BroadcastInterface::PubSub<ResolvedImmutablePointerRecord>),
-    _node_sk: NodeSecretKey,
-    node_index: NodeIndex,
+    node_sk: NodeSecretKey,
+    node_index: OnceCell<NodeIndex>,
     db: Arc<DB>,
     shutdown_notify: Arc<Notify>,
-    _collection: PhantomData<C>,
+    query_runner: c!(C::ApplicationInterface::SyncExecutor),
 }
 
 impl<C: Collection> ResolverInner<C> {
@@ -172,10 +166,23 @@ impl<C: Collection> ResolverInner<C> {
     async fn publish(&self, hash: Blake3Hash, pointers: &[ImmutablePointer]) {
         if !pointers.is_empty() {
             // todo(dalton): actaully sign this
+            let node_index = match self.node_index.get() {
+                Some(node_index) => *node_index,
+                None => {
+                    let node_index = self
+                        .query_runner
+                        .pubkey_to_index(self.node_sk.to_pk())
+                        .expect("Called `publish` without being on the application state.");
+                    self.node_index
+                        .set(node_index)
+                        .expect("Failed to set once cell");
+                    node_index
+                },
+            };
             let mut resolved_pointer = ResolvedImmutablePointerRecord {
                 pointer: pointers[0].clone(),
                 hash,
-                originator: self.node_index,
+                originator: node_index,
                 signature: [0; 64].into(),
             };
             ResolverInner::<C>::store_mapping(resolved_pointer.clone(), &self.db);
