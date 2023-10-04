@@ -2,7 +2,7 @@
 name = "lightning-cli"
 version = "0.1.0"
 edition = "2021"
-default-run = "lightning-cli"
+default-run = "lightning-node"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -44,3 +44,7 @@ log4rs = { version = "1.2.0", features = [
   "gzip",
 ] }
 tracing = "0.1"
+
+[[bin]]
+name = "lightning-node"
+path = "src/main.rs"
