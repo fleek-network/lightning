@@ -8,12 +8,16 @@ edition = "2021"
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
 lightning-origin-ipfs = { path = "../origin-ipfs" }
+blake3-tree = { path = "../../lib/blake3-tree" }
+infusion.workspace = true
 serde.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
 tokio.workspace = true
 affair.workspace = true
 log.workspace = true
+tokio-stream.workspace = true
+bytes.workspace = true
 thiserror = "1.0"
 
 [dev-dependencies]
@@ -23,8 +27,9 @@ lightning-resolver = { path = "../resolver" }
 lightning-pool = { path = "../pool" }
 lightning-application = { path="../application", features = ["test"] }
 lightning-signer = {path="../signer"}
-fleek-crypto.workspace = true
 lightning-test-utils = { path="../test-utils" }
 lightning-broadcast = { path="../broadcast" }
-infusion.workspace = true
+lightning-notifier = {path="../notifier"}
+lightning-topology = {path="../topology"}
+fleek-crypto.workspace = true
 cid.workspace = true
