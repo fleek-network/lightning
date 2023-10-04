@@ -177,7 +177,6 @@ impl<C: Collection> ResolverInner<C> {
     /// the given blake3 hash from resolving the following pointers.
     async fn publish(&self, hash: Blake3Hash, pointers: &[ImmutablePointer]) {
         if !pointers.is_empty() {
-            // todo(dalton): actaully sign this
             let node_index = match self.node_index.get() {
                 Some(node_index) => *node_index,
                 None => {
