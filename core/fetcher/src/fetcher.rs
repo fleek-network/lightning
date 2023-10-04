@@ -13,12 +13,15 @@ use lightning_interfaces::{
     FetcherSocket,
     OriginProviderInterface,
     OriginProviderSocket,
+    PoolInterface,
     ResolverInterface,
+    ServiceScope,
     WithStartAndShutdown,
 };
 use log::error;
 use tokio::sync::{mpsc, oneshot};
 
+use crate::blockstore_server::{BlockstoreServer, ServerRequest};
 use crate::config::Config;
 use crate::origin::{OriginFetcher, OriginRequest};
 
@@ -39,8 +42,19 @@ impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
         blockstore: C::BlockStoreInterface,
         resolver: C::ResolverInterface,
         origin: &C::OriginProviderInterface,
-        _pool: &C::PoolInterface,
+        pool: &C::PoolInterface,
     ) -> anyhow::Result<Self> {
+        let (pool_requester, pool_responder) = pool.open_req_res(ServiceScope::BlockstoreServer);
+        let (request_tx, request_rx) = mpsc::channel(1024);
+        let blockstore_server = BlockstoreServer::<C>::init(
+            blockstore.clone(),
+            request_rx,
+            config.max_conc_req,
+            config.max_conc_res,
+            pool_requester,
+            pool_responder,
+        )?;
+
         let (socket, socket_rx) = Socket::raw_bounded(2048);
         let (shutdown_tx, shutdown_rx) = mpsc::channel(10);
         let inner = FetcherInner::<C> {
@@ -48,12 +62,11 @@ impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
             socket_rx: Arc::new(Mutex::new(Some(socket_rx))),
             origin_socket: origin.get_socket(),
             blockstore,
+            blockstore_server,
+            _request_tx: request_tx,
             resolver,
             shutdown_rx: Arc::new(Mutex::new(Some(shutdown_rx))),
         };
-
-        // let (_service_scope, _network_event_rx) = pool.network_event_receiver();
-        // let _endpoint_tx = pool.request_sender();
 
         Ok(Self {
             inner: Arc::new(inner),
@@ -102,6 +115,8 @@ struct FetcherInner<C: Collection> {
     socket_rx: Arc<Mutex<Option<mpsc::Receiver<Task<FetcherRequest, FetcherResponse>>>>>,
     origin_socket: OriginProviderSocket,
     blockstore: C::BlockStoreInterface,
+    blockstore_server: BlockstoreServer<C>,
+    _request_tx: mpsc::Sender<ServerRequest>,
     resolver: C::ResolverInterface,
     shutdown_rx: Arc<Mutex<Option<mpsc::Receiver<()>>>>,
 }
@@ -113,7 +128,7 @@ impl<C: Collection> FetcherInner<C> {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         let (tx, rx) = mpsc::channel(128);
         let origin_fetcher = OriginFetcher::<C>::new(
-            self.config.max_concurrent_origin_requests,
+            self.config.max_conc_origin_req,
             self.origin_socket.clone(),
             rx,
             self.resolver.clone(),
@@ -122,6 +137,7 @@ impl<C: Collection> FetcherInner<C> {
         tokio::spawn(async move {
             origin_fetcher.start().await;
         });
+        self.blockstore_server.start().await;
         let mut shutdown_rx = self.shutdown_rx.lock().unwrap().take().unwrap();
 
         loop {
@@ -160,6 +176,7 @@ impl<C: Collection> FetcherInner<C> {
         }
         *self.socket_rx.lock().unwrap() = Some(socket_rx);
         *self.shutdown_rx.lock().unwrap() = Some(shutdown_rx);
+        self.blockstore_server.shutdown().await;
     }
 
     /// Fetches the data from the corresponding origin, puts it in the blockstore, and stores the

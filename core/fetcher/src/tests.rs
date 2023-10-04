@@ -173,7 +173,9 @@ async fn init_fetcher(
 
     let fetcher = Fetcher::<TestBinding>::init(
         Config {
-            max_concurrent_origin_requests: 3,
+            max_conc_origin_req: 3,
+            max_conc_req: 5,
+            max_conc_res: 5,
         },
         blockstore.clone(),
         resolver,
