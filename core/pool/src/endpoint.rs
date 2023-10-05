@@ -1,3 +1,4 @@
+use std::cell::OnceCell;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
@@ -68,7 +69,8 @@ where
     redundant_pool: HashMap<NodeIndex, DriverHandle>,
     muxer: Option<M>,
     config: M::Config,
-    index: NodeIndex,
+    node_public_key: NodePublicKey,
+    index: OnceCell<NodeIndex>,
 }
 
 impl<C, M> Endpoint<C, M>
@@ -81,7 +83,8 @@ where
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         notifier: Receiver<Notification>,
         config: M::Config,
-        index: NodeIndex,
+        node_public_key: NodePublicKey,
+        index: OnceCell<NodeIndex>,
     ) -> Self {
         let (connection_event_tx, connection_event_rx) = mpsc::channel(1024);
 
@@ -99,6 +102,7 @@ where
             driver_set: JoinSet::new(),
             muxer: None,
             config,
+            node_public_key,
             index,
             redundant_pool: HashMap::new(),
         }
@@ -126,7 +130,7 @@ where
         } = request;
 
         // We don't want to connect to ourselves.
-        debug_assert_ne!(peer, self.index);
+        debug_assert_ne!(peer, self.get_index());
 
         match self.pool.get_mut(&peer) {
             None => {
@@ -189,7 +193,7 @@ where
 
                 // We will enqueue a dial task for these peers.
                 for index in not_connected {
-                    debug_assert_ne!(index, self.index);
+                    debug_assert_ne!(index, self.get_index());
 
                     match self.node_address_from_state(&index) {
                         Ok(address) => {
@@ -229,7 +233,7 @@ where
             BroadcastTask::Update { neighbors: keep } => {
                 // Let's make sure we're connected to them.
                 for index in &keep {
-                    debug_assert_ne!(*index, self.index);
+                    debug_assert_ne!(*index, self.get_index());
 
                     if self.pool.contains_key(index) {
                         continue;
@@ -259,7 +263,7 @@ where
     fn handle_connection(&mut self, peer: NodeIndex, connection: M::Connection) {
         self.connector.cancel_dial(&peer);
 
-        let is_redundant = self.pool.contains_key(&peer) && peer > self.index;
+        let is_redundant = self.pool.contains_key(&peer) && peer > self.get_index();
 
         if is_redundant && self.redundant_pool.contains_key(&peer) {
             tracing::warn!("too many redundant connections");
@@ -320,6 +324,17 @@ where
             Entry::Vacant(vacant) => {
                 vacant.insert(handle);
             },
+        }
+    }
+
+    fn get_index(&self) -> NodeIndex {
+        if let Some(index) = self.index.get() {
+            *index
+        } else if let Some(index) = self.sync_query.pubkey_to_index(self.node_public_key) {
+            self.index.set(index).expect("Failed to set index");
+            index
+        } else {
+            u32::MAX
         }
     }
 
@@ -397,7 +412,7 @@ where
             .iter()
             .flatten()
             .filter_map(|pk| self.sync_query.pubkey_to_index(*pk))
-            .filter(|index| *index != self.index)
+            .filter(|index| *index != self.get_index())
             .collect::<HashSet<_>>();
         let broadcast_task = self.broadcast_service.update_connections(new_connections);
         if let Err(e) = self.handle_broadcast_task(broadcast_task) {
@@ -478,7 +493,7 @@ where
                                 .iter()
                                 .flatten()
                                 .filter_map(|pk| self.sync_query.pubkey_to_index(*pk))
-                                .filter(|index| *index != self.index)
+                                .filter(|index| *index != self.get_index())
                                 .collect::<HashSet<_>>();
                             let broadcast_task =  self
                                 .broadcast_service

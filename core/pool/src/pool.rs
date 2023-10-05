@@ -1,3 +1,4 @@
+use std::cell::OnceCell;
 use std::io;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
@@ -18,7 +19,6 @@ use lightning_interfaces::{
     ConfigConsumer,
     NotifierInterface,
     SignerInterface,
-    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use serde::{Deserialize, Serialize};
@@ -175,9 +175,7 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
         topology: c!(C::TopologyInterface),
     ) -> Result<Pool<C, QuinnMuxer>> {
         let (_, sk) = signer.get_sk();
-        let index = sync_query
-            .pubkey_to_index(sk.to_pk())
-            .expect("We have an index");
+        let public_key = sk.to_pk();
 
         let mut transport_config = quinn::TransportConfig::default();
         transport_config.max_idle_timeout(Some(
@@ -201,7 +199,8 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
             sync_query,
             notifier_rx,
             muxer_config,
-            index,
+            public_key,
+            OnceCell::new(),
         ))
     }
 
