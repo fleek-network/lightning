@@ -169,7 +169,6 @@ async fn test_send_to_one() {
     for peer in &peers {
         peer.pool.start().await;
     }
-    tokio::time::sleep(Duration::from_secs(2)).await;
 
     let msg = Bytes::from("hello");
     event_handler1.send_to_one(node_index2, msg.clone());
@@ -242,7 +241,6 @@ async fn test_open_req_res() {
     for peer in &peers {
         peer.pool.start().await;
     }
-    tokio::time::sleep(Duration::from_secs(2)).await;
 
     let chunks = vec![
         Bytes::from("one"),

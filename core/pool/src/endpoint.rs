@@ -26,6 +26,8 @@ use crate::muxer::{Channel, ConnectionInterface, MuxerInterface};
 use crate::service::broadcast::{BroadcastRequest, BroadcastService, BroadcastTask, Message};
 use crate::service::stream::{StreamRequest, StreamService};
 
+type ConnectionId = usize;
+
 /// Endpoint for pool
 pub struct Endpoint<C, M>
 where
@@ -53,7 +55,17 @@ where
     /// Pending outgoing requests.
     pending_task: HashMap<NodeIndex, Vec<DriverRequest>>,
     /// Ongoing drivers.
-    driver_set: JoinSet<(NodeIndex, usize)>,
+    driver_set: JoinSet<(NodeIndex, ConnectionId)>,
+    /// Connections that are redundant.
+    // There may be edge cases when two peers connect
+    // to each other at the same time. During resolution,
+    // instead of closing the extra connection, we
+    // hold it in case there is data being
+    // transmitted. Nodes will prefer the other connection
+    // over this one, so these will eventually close
+    // themselves when the idle-timeout triggers.
+    // These will need to be garbage collected.
+    redundant_pool: HashMap<NodeIndex, DriverHandle>,
     muxer: Option<M>,
     config: M::Config,
     index: NodeIndex,
@@ -88,6 +100,7 @@ where
             muxer: None,
             config,
             index,
+            redundant_pool: HashMap::new(),
         }
     }
 
@@ -176,6 +189,8 @@ where
 
                 // We will enqueue a dial task for these peers.
                 for index in not_connected {
+                    debug_assert_ne!(index, self.index);
+
                     match self.node_address_from_state(&index) {
                         Ok(address) => {
                             if let Err(e) = self.connector.enqueue_dial_task(
@@ -214,6 +229,8 @@ where
             BroadcastTask::Update { neighbors: keep } => {
                 // Let's make sure we're connected to them.
                 for index in &keep {
+                    debug_assert_ne!(*index, self.index);
+
                     if self.pool.contains_key(index) {
                         continue;
                     }
@@ -239,11 +256,14 @@ where
         Ok(())
     }
 
-    fn handle_connection(&mut self, peer: NodeIndex, connection: M::Connection, incoming: bool) {
+    fn handle_connection(&mut self, peer: NodeIndex, connection: M::Connection) {
         self.connector.cancel_dial(&peer);
 
-        if self.pool.contains_key(&peer) && peer > self.index {
-            connection.close(0u8, b"connection already exists");
+        let is_redundant = self.pool.contains_key(&peer) && peer > self.index;
+
+        if is_redundant && self.redundant_pool.contains_key(&peer) {
+            tracing::warn!("too many redundant connections");
+            connection.close(0u8, b"close from disconnect");
             return;
         }
 
@@ -252,17 +272,17 @@ where
         // Start worker to drive the connection.
         let (request_tx, request_rx) = mpsc::channel(1024);
         let connection_event_tx = self.connection_event_tx.clone();
+        let ctx = Context::new(connection, peer, request_rx, connection_event_tx);
         self.driver_set.spawn(async move {
-            let ctx = Context::new(connection, peer, request_rx, connection_event_tx);
             if let Err(e) = driver::start_driver(ctx).await {
-                tracing::error!("driver for connection with {peer:?} exited with error: {e:?}");
+                tracing::info!("driver for connection with {peer:?} exited with error: {e:?}");
             }
             (peer, connection_id)
         });
 
         // If connection is not expected for broadcast,
         // we pin the connection.
-        let mut pin = !incoming && !self.broadcast_service.contains(&peer);
+        let mut pin = !self.broadcast_service.contains(&peer);
 
         // Handle requests that were waiting for a connection to be established.
         if let Some(pending_requests) = self.pending_task.remove(&peer) {
@@ -285,7 +305,22 @@ where
             tx: request_tx,
             connection_id,
         };
-        self.pool.insert(peer, handle);
+
+        match self.pool.entry(peer) {
+            Entry::Occupied(mut entry) => {
+                if is_redundant {
+                    self.redundant_pool.insert(peer, handle);
+                } else {
+                    // The old connection could be in the middle of a write,
+                    // so we give it a chance to finish.
+                    let old = entry.insert(handle);
+                    self.redundant_pool.insert(peer, old);
+                }
+            },
+            Entry::Vacant(vacant) => {
+                vacant.insert(handle);
+            },
+        }
     }
 
     /// Enqueues requests that will be sent after a connection is established with the peer.
@@ -297,6 +332,14 @@ where
     #[inline]
     fn garbage_collect_closed_connections(&mut self, peer: NodeIndex, connection_id: usize) {
         if let Entry::Occupied(entry) = self.pool.entry(peer) {
+            // If the connection IDs do not match, another connection was opened or superseded
+            // this one so we need to rely on this identifier instead of just the key.
+            if entry.get().connection_id == connection_id {
+                entry.remove();
+            }
+        }
+
+        if let Entry::Occupied(entry) = self.redundant_pool.entry(peer) {
             // If the connection IDs do not match, another connection was opened or superseded
             // this one so we need to rely on this identifier instead of just the key.
             if entry.get().connection_id == connection_id {
@@ -333,6 +376,7 @@ where
     /// Shutdowns workers and clears state.
     pub async fn shutdown(&mut self) {
         self.pool.clear();
+        self.redundant_pool.clear();
         self.pending_task.clear();
         self.connector.clear();
 
@@ -390,12 +434,12 @@ where
                 }
                 Some(connection_result) = self.connector.advance() => {
                     match connection_result {
-                        ConnectionResult::Success { incoming, conn, peer} => {
+                        ConnectionResult::Success { conn, peer, .. } => {
                             // The unwrap here is safe because when accepting connections,
                             // we will fail to connect if we cannot obtain the peer's
                             // public key from the TLS session. When dialing, we already
                             // have the peer's public key.
-                            self.handle_connection(peer, conn, incoming);
+                            self.handle_connection(peer, conn);
                         }
                         ConnectionResult::Failed { peer, error } => {
                             if peer.is_none() {
