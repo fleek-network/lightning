@@ -172,7 +172,7 @@ async fn e2e_committee_change() -> Result<()> {
         .with_max_port(10300)
         .with_num_nodes(5)
         .with_committee_size(committee_size)
-        .with_epoch_time(30000)
+        .with_epoch_time(20000)
         .with_epoch_start(epoch_start)
         .build();
     swarm.launch().await.unwrap();
@@ -180,13 +180,13 @@ async fn e2e_committee_change() -> Result<()> {
     // Wait a bit for the nodes to start.
     tokio::time::sleep(Duration::from_secs(5)).await;
 
-    // Get the committee from the first node.
+    // Make sure all nodes start with the same committee.
     compare_committee(swarm.get_rpc_addresses(), committee_size as usize).await;
 
-    // The epoch will change after 40 seconds, and we already waited 5 seconds.
-    // To give some time for the epoch change, we will wait another 30 seconds here.
+    // Wait for epoch to change.
     tokio::time::sleep(Duration::from_secs(30)).await;
 
+    // Make sure all nodes still all have the same committee.
     compare_committee(swarm.get_rpc_addresses(), committee_size as usize).await;
     Ok(())
 }
