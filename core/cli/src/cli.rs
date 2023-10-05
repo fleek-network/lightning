@@ -75,6 +75,7 @@ impl Cli {
     }
 
     fn setup(&self) {
+        console_subscriber::init();
         let log_filter = match self.args.verbose {
             0 => LevelFilter::Warn,
             1 => LevelFilter::Info,
