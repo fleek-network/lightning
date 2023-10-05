@@ -48,10 +48,7 @@ pub trait ResolverInterface<C: Collection>:
     /// records and without performing any contact with other nodes.
     ///
     /// This can return [`None`] if no local record is found.
-    async fn get_blake3_hash(
-        &self,
-        pointer: ImmutablePointer,
-    ) -> Option<ResolvedImmutablePointerRecord>;
+    async fn get_blake3_hash(&self, pointer: ImmutablePointer) -> Option<Blake3Hash>;
 
     /// Returns an origin finder that can yield origins for the provided blake3 hash.
     fn get_origin_finder(&self, hash: Blake3Hash) -> Self::OriginFinder;

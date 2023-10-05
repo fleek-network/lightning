@@ -129,7 +129,9 @@ impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
         loop {
             tokio::select! {
                 task = rx.recv() => {
-                    let task = task.expect("Failed to receive UpdateRequest.");
+                    let Some(task) = task else {
+                        continue;
+                    };
                     // Randomly wait before ordering the transaction to make it more realistic.
                     let range = self.config.min_ordering_time..self.config.max_ordering_time;
                     let ordering_duration = rand::thread_rng().gen_range(range);

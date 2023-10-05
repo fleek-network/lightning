@@ -3984,6 +3984,7 @@ dependencies = [
  "lightning-notifier",
  "lightning-origin-ipfs",
  "lightning-pool",
+ "lightning-rep-collector",
  "lightning-resolver",
  "lightning-signer",
  "lightning-test-utils",

@@ -31,5 +31,6 @@ lightning-test-utils = { path="../test-utils" }
 lightning-broadcast = { path="../broadcast" }
 lightning-notifier = {path="../notifier"}
 lightning-topology = {path="../topology"}
+lightning-rep-collector = {path="../rep-collector"}
 fleek-crypto.workspace = true
 cid.workspace = true

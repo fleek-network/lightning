@@ -120,10 +120,7 @@ impl<C: Collection> ResolverInterface<C> for Resolver<C> {
     /// records and without performing any contact with other nodes.
     ///
     /// This can return [`None`] if no local record is found.
-    async fn get_blake3_hash(
-        &self,
-        pointer: ImmutablePointer,
-    ) -> Option<ResolvedImmutablePointerRecord> {
+    async fn get_blake3_hash(&self, pointer: ImmutablePointer) -> Option<Blake3Hash> {
         self.inner.get_blake3_hash(pointer).await
     }
 
@@ -213,10 +210,7 @@ impl<C: Collection> ResolverInner<C> {
     /// records and without performing any contact with other nodes.
     ///
     /// This can return [`None`] if no local record is found.
-    async fn get_blake3_hash(
-        &self,
-        pointer: ImmutablePointer,
-    ) -> Option<ResolvedImmutablePointerRecord> {
+    async fn get_blake3_hash(&self, pointer: ImmutablePointer) -> Option<Blake3Hash> {
         let cf = self
             .db
             .cf_handle(URI_TO_B3)
@@ -252,8 +246,8 @@ impl<C: Collection> ResolverInner<C> {
             .cf_handle(URI_TO_B3)
             .expect("No uri_to_b3 column family in resolver db");
 
-        let resolved_pointer_bytes =
-            bincode::serialize(&record).expect("Could not serialize pubsub message in resolver");
+        let pointer_bytes = bincode::serialize(&record.pointer)
+            .expect("Could not serialize pubsub message in resolver");
 
         let entry = match db.get_cf(&b3_cf, b3_hash).expect("Failed to access db") {
             Some(bytes) => {
@@ -274,7 +268,7 @@ impl<C: Collection> ResolverInner<C> {
             bincode::serialize(&entry).expect("Failed to serialize payload in resolver"),
         )
         .expect("Failed to insert mapping to db in resolver");
-        db.put_cf(&uri_cf, resolved_pointer_bytes, b3_hash)
+        db.put_cf(&uri_cf, pointer_bytes, b3_hash)
             .expect("Failed to insert mapping to db in resolver")
     }
 }

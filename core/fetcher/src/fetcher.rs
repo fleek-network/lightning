@@ -147,7 +147,9 @@ impl<C: Collection> FetcherInner<C> {
                     break;
                 }
                 task = socket_rx.recv() => {
-                    let task = task.expect("Failed to receive fetcher request.");
+                    let Some(task) = task else {
+                        continue;
+                    };
                     match task.request.clone() {
                         FetcherRequest::Put { pointer } => {
                             let tx = tx.clone();
@@ -190,8 +192,8 @@ impl<C: Collection> FetcherInner<C> {
         resolver: C::ResolverInterface,
         task: Task<FetcherRequest, FetcherResponse>,
     ) {
-        if let Some(resolved_pointer) = resolver.get_blake3_hash(pointer.clone()).await {
-            task.respond(FetcherResponse::Put(Ok(resolved_pointer.hash)));
+        if let Some(hash) = resolver.get_blake3_hash(pointer.clone()).await {
+            task.respond(FetcherResponse::Put(Ok(hash)));
         } else {
             let (response_tx, response_rx) = oneshot::channel();
             tx.send(OriginRequest {
@@ -225,31 +227,30 @@ impl<C: Collection> FetcherInner<C> {
             return;
         } else if let Some(pointers) = resolver.get_origins(hash) {
             for res_pointer in pointers {
-                if let Some(res) = resolver.get_blake3_hash(res_pointer.pointer.clone()).await {
-                    if res.hash == hash && blockstore.get_tree(&hash).await.is_some() {
-                        task.respond(FetcherResponse::Fetch(Ok(())));
-                        return;
-                    }
-                    // Try to get the content from the peer that advertized the record.
-                    let (tx, rx) = oneshot::channel();
-                    server_request_tx
-                        .send(ServerRequest {
-                            hash,
-                            peer: res.originator,
-                            response: tx,
-                        })
-                        .await
-                        .expect("Failed to send request to blockstore server");
-                    let mut res = rx.await.expect("Failed to get receiver");
-                    if let Ok(()) = res
-                        .recv()
-                        .await
-                        .expect("Failed to receive response from blockstore server")
-                    {
-                        task.respond(FetcherResponse::Fetch(Ok(())));
-                        return;
-                    }
+                if res_pointer.hash == hash && blockstore.get_tree(&hash).await.is_some() {
+                    task.respond(FetcherResponse::Fetch(Ok(())));
+                    return;
                 }
+                // Try to get the content from the peer that advertized the record.
+                let (server_tx, server_rx) = oneshot::channel();
+                server_request_tx
+                    .send(ServerRequest {
+                        hash,
+                        peer: res_pointer.originator,
+                        response: server_tx,
+                    })
+                    .await
+                    .expect("Failed to send request to blockstore server");
+                let mut res = server_rx.await.expect("Failed to get receiver");
+                if let Ok(()) = res
+                    .recv()
+                    .await
+                    .expect("Failed to receive response from blockstore server")
+                {
+                    task.respond(FetcherResponse::Fetch(Ok(())));
+                    return;
+                }
+
                 // If the content is neither in the blockstore and we cannot get it from our peers,
                 // we go to the origin.
                 let (response_tx, response_rx) = oneshot::channel();
