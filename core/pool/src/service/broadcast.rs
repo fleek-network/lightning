@@ -66,15 +66,9 @@ where
 
     #[inline]
     pub fn update_connections(&mut self, peers: HashSet<NodeIndex>) -> BroadcastTask {
-        let (keep, disconnect) = match self.peers.is_empty() {
-            true => (peers, HashSet::new()),
-            false => self
-                .peers
-                .union(&peers)
-                .partition(|index| peers.contains(index)),
-        };
-        self.peers = keep.clone();
-        BroadcastTask::Update { keep, disconnect }
+        self.peers.retain(|index| peers.contains(index));
+        self.peers = self.peers.union(&peers).copied().collect();
+        BroadcastTask::Update { neighbors: peers }
     }
 
     pub async fn next(&mut self) -> Option<BroadcastTask> {
@@ -129,8 +123,7 @@ pub enum BroadcastTask {
         peers: Option<HashSet<NodeIndex>>,
     },
     Update {
-        keep: HashSet<NodeIndex>,
-        disconnect: HashSet<NodeIndex>,
+        neighbors: HashSet<NodeIndex>,
     },
 }
 

@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 use anyhow::{Error, Result};
@@ -45,42 +46,43 @@ where
     }
 
     pub fn enqueue_dial_task(&mut self, address: NodeAddress, muxer: M) -> Result<()> {
-        let cancel = CancellationToken::new();
+        if let Entry::Vacant(entry) = self.pending_dial.entry(address.index) {
+            let cancel = CancellationToken::new();
+            entry.insert(cancel.clone());
 
-        self.pending_dial.insert(address.index, cancel.clone());
-
-        let fut = async move {
-            let index = address.index;
-            let connect = || async {
-                muxer
-                    .connect(address, "localhost")
-                    .await?
-                    .await
-                    .map_err(Into::into)
-            };
-            let connection = tokio::select! {
-                biased;
-                _ = cancel.cancelled() => return ConnectionResult::Failed {
-                    peer: Some(index),
-                    error: anyhow::anyhow!("dial was cancelled")
-                },
-                connection = connect() => connection,
-            };
-            match connection {
-                Ok(conn) => ConnectionResult::Success {
-                    incoming: false,
-                    conn,
-                    peer: index,
-                },
-                Err(e) => ConnectionResult::Failed {
-                    peer: Some(index),
-                    error: e,
-                },
+            let fut = async move {
+                let index = address.index;
+                let connect = || async {
+                    muxer
+                        .connect(address, "localhost")
+                        .await?
+                        .await
+                        .map_err(Into::into)
+                };
+                let connection = tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => return ConnectionResult::Failed {
+                        peer: Some(index),
+                        error: anyhow::anyhow!("dial was cancelled")
+                    },
+                    connection = connect() => connection,
+                };
+                match connection {
+                    Ok(conn) => ConnectionResult::Success {
+                        incoming: false,
+                        conn,
+                        peer: index,
+                    },
+                    Err(e) => ConnectionResult::Failed {
+                        peer: Some(index),
+                        error: e,
+                    },
+                }
             }
-        }
-        .boxed();
+            .boxed();
 
-        self.connecting.push(fut);
+            self.connecting.push(fut);
+        }
 
         Ok(())
     }

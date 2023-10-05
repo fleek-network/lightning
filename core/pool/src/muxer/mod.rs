@@ -40,9 +40,12 @@ pub trait ConnectionInterface: Clone + Send + 'static {
     type RecvStream: AsyncRead + Send + Unpin;
 
     async fn open_stream(&mut self) -> io::Result<(Self::SendStream, Self::RecvStream)>;
+    async fn open_uni_stream(&mut self) -> io::Result<Self::SendStream>;
     async fn accept_stream(&mut self) -> io::Result<(Self::SendStream, Self::RecvStream)>;
+    async fn accept_uni_stream(&mut self) -> io::Result<Self::RecvStream>;
     fn peer_identity(&self) -> Option<NodePublicKey>;
     fn remote_address(&self) -> SocketAddr;
+    fn connection_id(&self) -> usize;
     fn close(&self, error_code: u8, reason: &[u8]);
 }
 

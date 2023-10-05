@@ -4,10 +4,11 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use fleek_crypto::{NodePublicKey, NodeSecretKey};
-use quinn::{ClientConfig, Endpoint, RecvStream, SendStream, ServerConfig};
+use quinn::{ClientConfig, Endpoint, RecvStream, SendStream, ServerConfig, TransportConfig};
 use rustls::Certificate;
 
 use crate::endpoint::NodeAddress;
@@ -48,7 +49,10 @@ impl MuxerInterface for QuinnMuxer {
     async fn connect(&self, peer: NodeAddress, server_name: &str) -> io::Result<Self::Connecting> {
         let tls_config = tls::make_client_config(&self.sk, Some(peer.pk))
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-        let client_config = ClientConfig::new(Arc::new(tls_config));
+        let mut client_config = ClientConfig::new(Arc::new(tls_config));
+        let mut transport_config = TransportConfig::default();
+        transport_config.max_idle_timeout(Some(Duration::from_secs(300).try_into().unwrap()));
+        client_config.transport_config(Arc::new(transport_config));
         let connecting = self
             .endpoint
             .connect_with(client_config, peer.socket_address, server_name)
@@ -89,9 +93,23 @@ impl ConnectionInterface for Connection {
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
 
+    async fn open_uni_stream(&mut self) -> io::Result<Self::SendStream> {
+        self.0
+            .open_uni()
+            .await
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+    }
+
     async fn accept_stream(&mut self) -> io::Result<(Self::SendStream, Self::RecvStream)> {
         self.0
             .accept_bi()
+            .await
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+    }
+
+    async fn accept_uni_stream(&mut self) -> io::Result<Self::RecvStream> {
+        self.0
+            .accept_uni()
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
@@ -124,6 +142,10 @@ impl ConnectionInterface for Connection {
 
     fn remote_address(&self) -> SocketAddr {
         self.0.remote_address()
+    }
+
+    fn connection_id(&self) -> usize {
+        self.0.stable_id()
     }
 
     fn close(&self, error_code: u8, reason: &[u8]) {

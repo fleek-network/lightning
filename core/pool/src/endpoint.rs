@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -21,7 +22,7 @@ use tokio::task::JoinSet;
 
 use crate::connection::connector::{ConnectionResult, Connector};
 use crate::connection::driver::{self, Context, DriverRequest};
-use crate::muxer::{Channel, MuxerInterface};
+use crate::muxer::{Channel, ConnectionInterface, MuxerInterface};
 use crate::service::broadcast::{BroadcastRequest, BroadcastService, BroadcastTask, Message};
 use crate::service::stream::{StreamRequest, StreamService};
 
@@ -52,12 +53,10 @@ where
     /// Pending outgoing requests.
     pending_task: HashMap<NodeIndex, Vec<DriverRequest>>,
     /// Ongoing drivers.
-    driver_set: JoinSet<NodeIndex>,
-    // Todo: Make an interface to abstract Endpoint.
-    // This will allow us to use other protocols besides QUIC.
-    /// QUIC Endpoint.
+    driver_set: JoinSet<(NodeIndex, usize)>,
     muxer: Option<M>,
     config: M::Config,
+    index: NodeIndex,
 }
 
 impl<C, M> Endpoint<C, M>
@@ -70,6 +69,7 @@ where
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         notifier: Receiver<Notification>,
         config: M::Config,
+        index: NodeIndex,
     ) -> Self {
         let (connection_event_tx, connection_event_rx) = mpsc::channel(1024);
 
@@ -87,6 +87,7 @@ where
             driver_set: JoinSet::new(),
             muxer: None,
             config,
+            index,
         }
     }
 
@@ -110,22 +111,13 @@ where
             respond,
             service_scope,
         } = request;
+
+        // We don't want to connect to ourselves.
+        debug_assert_ne!(peer, self.index);
+
         match self.pool.get_mut(&peer) {
             None => {
-                let pk = self
-                    .sync_query
-                    .index_to_pubkey(peer)
-                    .ok_or(anyhow::anyhow!(""))?;
-                let info = self
-                    .sync_query
-                    .get_node_info(&pk)
-                    .ok_or(anyhow::anyhow!(""))?;
-                let address = NodeAddress {
-                    index: peer,
-                    pk,
-                    socket_address: SocketAddr::from((info.domain, info.ports.pool)),
-                };
-
+                let address = self.node_address_from_state(&peer)?;
                 self.connector.enqueue_dial_task(
                     address,
                     self.muxer
@@ -219,7 +211,7 @@ where
                     });
                 }
             },
-            BroadcastTask::Update { keep, disconnect } => {
+            BroadcastTask::Update { neighbors: keep } => {
                 // Let's make sure we're connected to them.
                 for index in &keep {
                     if self.pool.contains_key(index) {
@@ -239,25 +231,8 @@ where
                     }
                 }
 
-                for index in disconnect.iter() {
-                    let Some(handle) = self.pool.get(index) else {
-                        continue;
-                    };
-
-                    // We don't want to disconnect pinned connections.
-                    if handle.pinned {
-                        continue;
-                    }
-
-                    let driver_tx = handle.tx.clone();
-                    tokio::spawn(async move {
-                        if driver_tx.send(DriverRequest::Disconnect).await.is_err() {
-                            tracing::error!("failed to send driver a disconnect request");
-                        }
-                    });
-                }
-
-                self.pool.retain(|index, _| keep.contains(index));
+                self.pool
+                    .retain(|index, handle| keep.contains(index) || handle.pinned);
             },
         }
 
@@ -267,15 +242,22 @@ where
     fn handle_connection(&mut self, peer: NodeIndex, connection: M::Connection, incoming: bool) {
         self.connector.cancel_dial(&peer);
 
+        if self.pool.contains_key(&peer) && peer > self.index {
+            connection.close(0u8, b"connection already exists");
+            return;
+        }
+
+        let connection_id = connection.connection_id();
+
         // Start worker to drive the connection.
         let (request_tx, request_rx) = mpsc::channel(1024);
         let connection_event_tx = self.connection_event_tx.clone();
         self.driver_set.spawn(async move {
-            let ctx = Context::new(connection, peer, request_rx, connection_event_tx, incoming);
+            let ctx = Context::new(connection, peer, request_rx, connection_event_tx);
             if let Err(e) = driver::start_driver(ctx).await {
-                tracing::error!("driver for connection with {peer:?} shutdowned: {e:?}")
+                tracing::error!("driver for connection with {peer:?} exited with error: {e:?}");
             }
-            peer
+            (peer, connection_id)
         });
 
         // If connection is not expected for broadcast,
@@ -301,6 +283,7 @@ where
         let handle = DriverHandle {
             pinned: pin,
             tx: request_tx,
+            connection_id,
         };
         self.pool.insert(peer, handle);
     }
@@ -312,8 +295,14 @@ where
     }
 
     #[inline]
-    fn handle_disconnect(&mut self, peer: NodeIndex) {
-        self.pool.remove(&peer);
+    fn garbage_collect_closed_connections(&mut self, peer: NodeIndex, connection_id: usize) {
+        if let Entry::Occupied(entry) = self.pool.entry(peer) {
+            // If the connection IDs do not match, another connection was opened or superseded
+            // this one so we need to rely on this identifier instead of just the key.
+            if entry.get().connection_id == connection_id {
+                entry.remove();
+            }
+        }
     }
 
     #[inline]
@@ -343,10 +332,6 @@ where
 
     /// Shutdowns workers and clears state.
     pub async fn shutdown(&mut self) {
-        for handle in self.pool.values() {
-            let _ = handle.tx.send(DriverRequest::Disconnect).await;
-        }
-
         self.pool.clear();
         self.pending_task.clear();
         self.connector.clear();
@@ -368,6 +353,7 @@ where
             .iter()
             .flatten()
             .filter_map(|pk| self.sync_query.pubkey_to_index(*pk))
+            .filter(|index| *index != self.index)
             .collect::<HashSet<_>>();
         let broadcast_task = self.broadcast_service.update_connections(new_connections);
         if let Err(e) = self.handle_broadcast_task(broadcast_task) {
@@ -383,7 +369,6 @@ where
                     match connecting {
                         None => break,
                         Some(connecting) => {
-                            tracing::trace!("incoming connection");
                             self.connector.handle_incoming_connection(connecting);
                         }
                     }
@@ -394,7 +379,6 @@ where
                             self.broadcast_service.handle_broadcast_message(peer, message);
                         },
                         ConnectionEvent::Stream { peer, service_scope, stream } => {
-                            tracing::trace!("incoming stream from peer {peer:?}");
                             // We want to make sure that this request passes some basic checks
                             // before we commit to pinning the connection.
                             if self.stream_service.handle_incoming_stream(service_scope, stream) {
@@ -407,12 +391,11 @@ where
                 Some(connection_result) = self.connector.advance() => {
                     match connection_result {
                         ConnectionResult::Success { incoming, conn, peer} => {
-                            tracing::trace!("new connection with {peer:?}");
                             // The unwrap here is safe because when accepting connections,
                             // we will fail to connect if we cannot obtain the peer's
                             // public key from the TLS session. When dialing, we already
                             // have the peer's public key.
-                            self.handle_connection(peer, conn, incoming)
+                            self.handle_connection(peer, conn, incoming);
                         }
                         ConnectionResult::Failed { peer, error } => {
                             if peer.is_none() {
@@ -451,6 +434,7 @@ where
                                 .iter()
                                 .flatten()
                                 .filter_map(|pk| self.sync_query.pubkey_to_index(*pk))
+                                .filter(|index| *index != self.index)
                                 .collect::<HashSet<_>>();
                             let broadcast_task =  self
                                 .broadcast_service
@@ -466,9 +450,9 @@ where
                 }
                 Some(peer) = self.driver_set.join_next() => {
                     match peer {
-                        Ok(pk) => {
-                            tracing::trace!("driver finished for connection with {pk:?}");
-                            self.handle_disconnect(pk);
+                        Ok((index, id)) => {
+                            tracing::trace!("driver for connection={id:?} with node={index:?} ended");
+                            self.garbage_collect_closed_connections(index, id);
                         }
                         Err(e) => {
                             tracing::warn!("unable to clean up failed driver tasks: {e:?}");
@@ -512,4 +496,5 @@ pub struct DriverHandle {
     // Research: Will incoming topology-related connections
     // always be pinned because we don't know them?
     pinned: bool,
+    connection_id: usize,
 }

@@ -7,6 +7,7 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use bytes::Bytes;
+use fleek_crypto::SecretKey;
 use futures::{SinkExt, Stream, StreamExt};
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
@@ -17,6 +18,7 @@ use lightning_interfaces::{
     ConfigConsumer,
     NotifierInterface,
     SignerInterface,
+    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use serde::{Deserialize, Serialize};
@@ -173,6 +175,9 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
         topology: c!(C::TopologyInterface),
     ) -> Result<Pool<C, QuinnMuxer>> {
         let (_, sk) = signer.get_sk();
+        let index = sync_query
+            .pubkey_to_index(sk.to_pk())
+            .expect("We have an index");
 
         let mut transport_config = quinn::TransportConfig::default();
         transport_config.max_idle_timeout(Some(
@@ -196,6 +201,7 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
             sync_query,
             notifier_rx,
             muxer_config,
+            index,
         ))
     }
 

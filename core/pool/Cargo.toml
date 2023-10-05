@@ -33,7 +33,6 @@ tracing = "0.1"
 webpki = { version = "0.22", features = ["std"] }
 x509-parser = "0.15.1"
 
-
 [dev-dependencies]
 lightning-signer = {path="../signer"}
 lightning-application = {path="../application", features = ["test"]}
