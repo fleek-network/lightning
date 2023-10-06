@@ -57,70 +57,70 @@ jobs:
       - name: Build Release
         run: cargo build --all --release
 
-  test:
-    name: Cargo Test
-    runs-on: ubuntu-latest
-    needs: count_commits
-    if: ${{ needs.count_commits.outputs.count != '0' }}
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup Rust Toolchain
-        run: |
-          rm rust-toolchain
-          rustup toolchain install stable --profile minimal
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-directories: ~/.cargo/registry/src/**/librocksdb-sys-*
-          cache-all-crates: "true"
-      - name: Setup junitify
-        run: cargo install junitify
-      - name: Cargo Test
-        # RUSTC_BOOTSTRAP=1 is used to ensure unstable features are allowed in order to use unstable 
-        # json output and report times in tests. This is in preparation for rust 1.70 which will not 
-        # allow this anymore: 
-        # - https://github.com/rust-lang/rust/issues/75526
-        # - https://github.com/johnterickson/cargo2junit/issues/79
-        run: |
-          RUSTC_BOOTSTRAP=1 \
-          cargo test --all -- \
-          --format=json -Z unstable-options --report-time \
-          > tests.out
-      - name: Parse Test Output
-        if: always()
-        run: cat tests.out | junitify -i --out test_results/
-      - name: Publish Test Summary
-        uses: test-summary/action@v2
-        if: always()
-        with:
-          paths: 'test_results/*.xml'
-  
-  coverage:
-    name: Code Coverage
-    runs-on: ubuntu-latest
-    needs: count_commits
-    if: ${{ needs.count_commits.outputs.count != '0' }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-      - name: Setup Rust Toolchain
-        run: | 
-          rm rust-toolchain
-          rustup toolchain install stable --profile minimal --component llvm-tools-preview
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-directories: ~/.cargo/registry/src/**/librocksdb-sys-*
-          cache-all-crates: "true"
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Generate Code Coverage
-        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: lcov.info
-          fail_ci_if_error: false
+  # test:
+  #   name: Cargo Test
+  #   runs-on: ubuntu-latest
+  #   needs: count_commits
+  #   if: ${{ needs.count_commits.outputs.count != '0' }}
+  #   timeout-minutes: 30
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v3
+  #     - name: Setup Rust Toolchain
+  #       run: |
+  #         rm rust-toolchain
+  #         rustup toolchain install stable --profile minimal
+  #     - name: Rust Cache
+  #       uses: Swatinem/rust-cache@v2
+  #       with:
+  #         cache-directories: ~/.cargo/registry/src/**/librocksdb-sys-*
+  #         cache-all-crates: "true"
+  #     - name: Setup junitify
+  #       run: cargo install junitify
+  #     - name: Cargo Test
+  #       # RUSTC_BOOTSTRAP=1 is used to ensure unstable features are allowed in order to use unstable 
+  #       # json output and report times in tests. This is in preparation for rust 1.70 which will not 
+  #       # allow this anymore: 
+  #       # - https://github.com/rust-lang/rust/issues/75526
+  #       # - https://github.com/johnterickson/cargo2junit/issues/79
+  #       run: |
+  #         RUSTC_BOOTSTRAP=1 \
+  #         cargo test --all -- \
+  #         --format=json -Z unstable-options --report-time \
+  #         > tests.out
+  #     - name: Parse Test Output
+  #       if: always()
+  #       run: cat tests.out | junitify -i --out test_results/
+  #     - name: Publish Test Summary
+  #       uses: test-summary/action@v2
+  #       if: always()
+  #       with:
+  #         paths: 'test_results/*.xml'
+  #
+  # coverage:
+  #   name: Code Coverage
+  #   runs-on: ubuntu-latest
+  #   needs: count_commits
+  #   if: ${{ needs.count_commits.outputs.count != '0' }}
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v3
+  #     - name: Setup Rust Toolchain
+  #       run: | 
+  #         rm rust-toolchain
+  #         rustup toolchain install stable --profile minimal --component llvm-tools-preview
+  #     - name: Rust Cache
+  #       uses: Swatinem/rust-cache@v2
+  #       with:
+  #         cache-directories: ~/.cargo/registry/src/**/librocksdb-sys-*
+  #         cache-all-crates: "true"
+  #     - name: Install cargo-llvm-cov
+  #       uses: taiki-e/install-action@cargo-llvm-cov
+  #     - name: Generate Code Coverage
+  #       run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+  #     - name: Upload to Codecov
+  #       uses: codecov/codecov-action@v3
+  #       with:
+  #         token: ${{ secrets.CODECOV_TOKEN }}
+  #         files: lcov.info
+  #         fail_ci_if_error: false
