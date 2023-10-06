@@ -142,9 +142,6 @@ where
                 self.enqueue_pending_request(peer_index, request);
             },
             Some(handle) => {
-                // We pin this now because we dont want to drop this
-                // on a topology change. See `DriverHandle`.
-                handle.pinned = true;
                 let driver_tx = handle.tx.clone();
                 tokio::spawn(async move {
                     let request = DriverRequest::NewStream {
@@ -231,8 +228,7 @@ where
                 }
             },
             BroadcastTask::Update { peers } => {
-                self.pool
-                    .retain(|index, handle| peers.contains_key(index) || handle.pinned);
+                self.pool.retain(|index, _| peers.contains_key(index));
 
                 // Let's make sure we're connected to them.
                 for update in peers.into_values() {
@@ -282,13 +278,13 @@ where
 
             // If connection is not expected for broadcast,
             // we pin the connection.
-            let mut pin = !self.network_overlay.contains(&peer_index);
+            let mut should_pin = !self.network_overlay.contains(&peer_index);
 
             // Handle requests that were waiting for a connection to be established.
             if let Some(pending_requests) = self.pending_task.remove(&peer_index) {
                 for req in pending_requests {
                     // We need to pin the connection if used by stream service.
-                    pin = matches!(req, DriverRequest::NewStream { .. });
+                    should_pin = matches!(req, DriverRequest::NewStream { .. });
 
                     let request_tx_clone = request_tx.clone();
                     tokio::spawn(async move {
@@ -299,9 +295,18 @@ where
                 }
             }
 
+            // If connection is not expected for the overlay,
+            // we pin the connection.
+            // We pin it now because we don't want an update from
+            // topology.
+            if should_pin {
+                if let Some(address) = self.network_overlay.node_address_from_state(&peer_index) {
+                    self.network_overlay.pin_connection(peer_index, address);
+                }
+            }
+
             // Save a handle to the driver to send requests.
             let handle = DriverHandle {
-                pinned: pin,
                 tx: request_tx,
                 connection_id,
             };
@@ -347,13 +352,6 @@ where
                 entry.remove();
             }
         }
-    }
-
-    #[inline]
-    fn pin_connection(&mut self, peer: NodeIndex) {
-        self.pool
-            .entry(peer)
-            .and_modify(|handle| handle.pinned = true);
     }
 
     /// Shutdowns workers and clears state.
@@ -406,11 +404,7 @@ where
                             self.network_overlay.handle_broadcast_message(peer, message);
                         },
                         ConnectionEvent::Stream { peer, service_scope, stream } => {
-                            // We want to make sure that this request passes some basic checks
-                            // before we commit to pinning the connection.
-                            if self.network_overlay.handle_incoming_stream(service_scope, stream) {
-                                self.pin_connection(peer);
-                            }
+                            self.network_overlay.handle_incoming_stream(peer, service_scope, stream)
                         }
                     }
                 }
@@ -516,14 +510,5 @@ pub struct NodeAddress {
 
 pub struct DriverHandle {
     tx: Sender<DriverRequest>,
-    // Pinned connections are those connections used by the
-    // stream service. We may not want to disconnect these
-    // during a topology event because they might be in used by
-    // the stream users.
-    //
-    // Todo
-    // Research: Will incoming topology-related connections
-    // always be pinned because we don't know them?
-    pinned: bool,
     connection_id: usize,
 }

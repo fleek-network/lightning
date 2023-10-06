@@ -89,7 +89,10 @@ where
     }
 
     pub fn handle_broadcast_message(&mut self, peer: NodeIndex, event: Message) {
-        // Todo: Validate if peer is in our overlay
+        if !self.peers.contains_key(&peer) {
+            return;
+        }
+
         let Message {
             service: service_scope,
             payload: message,
@@ -104,20 +107,27 @@ where
         }
     }
 
-    // Todo: Pass the public key so we can validate the peer.
-    pub fn handle_incoming_stream(&self, service_scope: ServiceScope, stream: Channel) -> bool {
+    pub fn handle_incoming_stream(
+        &mut self,
+        peer: NodeIndex,
+        service_scope: ServiceScope,
+        stream: Channel,
+    ) {
         match self.stream_handles.get(&service_scope).cloned() {
             None => {
                 tracing::warn!("received unknown service scope: {service_scope:?}");
-                false
             },
             Some(tx) => {
-                tokio::spawn(async move {
-                    if tx.send(stream).await.is_err() {
-                        tracing::error!("failed to send incoming stream to user");
+                if let Some(address) = self.node_address_from_state(&peer) {
+                    if self.contains(&peer) {
+                        self.pin_connection(peer, address);
                     }
-                });
-                true
+                    tokio::spawn(async move {
+                        if tx.send(stream).await.is_err() {
+                            tracing::error!("failed to send incoming stream to user");
+                        }
+                    });
+                }
             },
         }
     }
@@ -182,7 +192,7 @@ where
         }
     }
 
-    fn node_address_from_state(&self, index: &NodeIndex) -> Option<NodeAddress> {
+    pub fn node_address_from_state(&self, index: &NodeIndex) -> Option<NodeAddress> {
         let pk = self.sync_query.index_to_pubkey(*index)?;
 
         let info = self.sync_query.get_node_info(&pk)?;
