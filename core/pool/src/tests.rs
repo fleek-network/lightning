@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::time::Duration;
 
 use bytes::Bytes;
 use fleek_crypto::{
@@ -202,8 +201,6 @@ async fn test_send_to_all() {
     for peer in &peers {
         peer.pool.start().await;
     }
-
-    tokio::time::sleep(Duration::from_secs(2)).await;
 
     let msg = Bytes::from("hello");
     event_handlers[0].send_to_all(msg.clone(), |_| true);

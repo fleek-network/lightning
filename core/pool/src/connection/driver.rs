@@ -12,13 +12,13 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 use crate::endpoint::ConnectionEvent;
 use crate::muxer::{Channel, ConnectionInterface};
-use crate::service::broadcast::Message;
+use crate::overlay::Message;
 
 /// Context for driving the connection.
 pub struct Context<C> {
-    /// The QUIC connection.
+    /// The multiplexed connection.
     connection: C,
-    /// Peer's index.
+    /// The peer's index.
     peer: NodeIndex,
     /// Receive requests to perform on connection.
     service_request_rx: Receiver<DriverRequest>,

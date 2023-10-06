@@ -24,8 +24,15 @@ use tokio::task::JoinSet;
 use crate::connection::connector::{ConnectionResult, Connector};
 use crate::connection::driver::{self, Context, DriverRequest};
 use crate::muxer::{Channel, ConnectionInterface, MuxerInterface};
-use crate::service::broadcast::{BroadcastRequest, BroadcastService, BroadcastTask, Message};
-use crate::service::stream::{StreamRequest, StreamService};
+use crate::overlay::{
+    BroadcastRequest,
+    BroadcastTask,
+    Message,
+    NetworkOverlay,
+    PoolTask,
+    StreamRequest,
+    StreamTask,
+};
 
 type ConnectionId = usize;
 
@@ -39,10 +46,8 @@ where
     pool: HashMap<NodeIndex, DriverHandle>,
     /// Used for getting peer information from state.
     sync_query: c![C::ApplicationInterface::SyncExecutor],
-    /// Network broadcast service.
-    broadcast_service: BroadcastService<Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>>,
-    /// Receive requests for a multiplexed stream.
-    stream_service: StreamService,
+    /// Network overlay.
+    network_overlay: NetworkOverlay<C>,
     /// Source of network topology.
     topology: c![C::TopologyInterface],
     /// Epoch notifier for triggering polling of topology.
@@ -67,10 +72,10 @@ where
     // themselves when the idle-timeout triggers.
     // These will need to be garbage collected.
     redundant_pool: HashMap<NodeIndex, DriverHandle>,
+    /// Multiplexed transport.
     muxer: Option<M>,
+    /// Config for the multiplexed transport.
     config: M::Config,
-    node_public_key: NodePublicKey,
-    index: OnceCell<NodeIndex>,
 }
 
 impl<C, M> Endpoint<C, M>
@@ -91,8 +96,7 @@ where
         Self {
             pool: HashMap::new(),
             sync_query: sync_query.clone(),
-            broadcast_service: BroadcastService::new(),
-            stream_service: StreamService::new(),
+            network_overlay: NetworkOverlay::new(sync_query.clone(), node_public_key, index),
             topology,
             notifier,
             connection_event_rx,
@@ -102,8 +106,6 @@ where
             driver_set: JoinSet::new(),
             muxer: None,
             config,
-            node_public_key,
-            index,
             redundant_pool: HashMap::new(),
         }
     }
@@ -112,31 +114,29 @@ where
         &mut self,
         service_scope: ServiceScope,
     ) -> (Sender<BroadcastRequest>, Receiver<(NodeIndex, Bytes)>) {
-        self.broadcast_service.register(service_scope)
+        self.network_overlay
+            .register_broadcast_service(service_scope)
     }
 
     pub fn register_stream_service(
         &mut self,
         service_scope: ServiceScope,
     ) -> (Sender<StreamRequest>, Receiver<Channel>) {
-        self.stream_service.register(service_scope)
+        self.network_overlay.register_stream_service(service_scope)
     }
 
-    pub fn handle_stream_request(&mut self, request: StreamRequest) -> Result<()> {
-        let StreamRequest {
+    pub fn handle_stream_request(&mut self, task: StreamTask) -> Result<()> {
+        let StreamTask {
             peer,
             respond,
             service_scope,
-        } = request;
+        } = task;
 
-        // We don't want to connect to ourselves.
-        debug_assert_ne!(peer, self.get_index());
-
-        match self.pool.get_mut(&peer) {
+        match self.pool.get_mut(&peer.index) {
             None => {
-                let address = self.node_address_from_state(&peer)?;
+                let peer_index = peer.index;
                 self.connector.enqueue_dial_task(
-                    address,
+                    peer,
                     self.muxer
                         .clone()
                         .expect("Endpoint is always initialized on start"),
@@ -148,7 +148,7 @@ where
                     service: service_scope,
                     respond,
                 };
-                self.enqueue_pending_request(peer, request);
+                self.enqueue_pending_request(peer_index, request);
             },
             Some(handle) => {
                 // We pin this now because we dont want to drop this
@@ -180,10 +180,20 @@ where
                 // we partition into those we are connected to and those
                 // that we're not.
                 let (connected, not_connected) = match peers {
+                    Some(peers) => {
+                        let (connected, not_connected) =
+                            peers.into_iter().partition::<Vec<_>, _>(|info| {
+                                self.pool.contains_key(&info.address.index)
+                            });
+                        (
+                            connected
+                                .into_iter()
+                                .map(|info| info.address.index)
+                                .collect::<Vec<_>>(),
+                            not_connected,
+                        )
+                    },
                     None => (self.pool.keys().copied().collect::<Vec<_>>(), vec![]),
-                    Some(peers) => peers
-                        .iter()
-                        .partition(|index| self.pool.contains_key(index)),
                 };
 
                 let message = Message {
@@ -192,25 +202,24 @@ where
                 };
 
                 // We will enqueue a dial task for these peers.
-                for index in not_connected {
-                    debug_assert_ne!(index, self.get_index());
+                for info in not_connected {
+                    tracing::debug!("received send request for peers not in the overlay");
 
-                    match self.node_address_from_state(&index) {
-                        Ok(address) => {
-                            if let Err(e) = self.connector.enqueue_dial_task(
-                                address,
-                                self.muxer
-                                    .clone()
-                                    .expect("Endpoint is always initialized on start"),
-                            ) {
-                                tracing::error!("failed to enqueue task: {e:?}");
-                            }
-                        },
-                        Err(e) => tracing::error!("failed to get address from state: {e:?}"),
+                    let peer_index = info.address.index;
+                    if let Err(e) = self.connector.enqueue_dial_task(
+                        info.address,
+                        self.muxer
+                            .clone()
+                            .expect("Endpoint is always initialized on start"),
+                    ) {
+                        tracing::error!("failed to enqueue task: {e:?}");
                     }
 
                     // Enqueue message for later after we connect.
-                    self.enqueue_pending_request(index, DriverRequest::Message(message.clone()))
+                    self.enqueue_pending_request(
+                        peer_index,
+                        DriverRequest::Message(message.clone()),
+                    )
                 }
 
                 // We already have connections to these peers already
@@ -230,30 +239,23 @@ where
                     });
                 }
             },
-            BroadcastTask::Update { neighbors: keep } => {
-                // Let's make sure we're connected to them.
-                for index in &keep {
-                    debug_assert_ne!(*index, self.get_index());
+            BroadcastTask::Update { peers } => {
+                self.pool
+                    .retain(|index, handle| peers.contains_key(index) || handle.pinned);
 
-                    if self.pool.contains_key(index) {
+                // Let's make sure we're connected to them.
+                for update in peers.into_values() {
+                    if self.pool.contains_key(&update.address.index) || !update.connect {
                         continue;
                     }
 
-                    match self.node_address_from_state(index) {
-                        Ok(address) => {
-                            if let Err(e) = self
-                                .connector
-                                .enqueue_dial_task(address, self.muxer.clone().unwrap())
-                            {
-                                tracing::error!("failed to enqueue the dial task: {e:?}");
-                            }
-                        },
-                        Err(e) => tracing::info!("failed to get node info from state: {e:?}"),
+                    if let Err(e) = self
+                        .connector
+                        .enqueue_dial_task(update.address, self.muxer.clone().unwrap())
+                    {
+                        tracing::error!("failed to enqueue the dial task: {e:?}");
                     }
                 }
-
-                self.pool
-                    .retain(|index, handle| keep.contains(index) || handle.pinned);
             },
         }
 
@@ -263,7 +265,7 @@ where
     fn handle_connection(&mut self, peer: NodeIndex, connection: M::Connection) {
         self.connector.cancel_dial(&peer);
 
-        let is_redundant = self.pool.contains_key(&peer) && peer > self.get_index();
+        let is_redundant = self.network_overlay.is_redundant(&peer);
 
         if is_redundant && self.redundant_pool.contains_key(&peer) {
             tracing::warn!("too many redundant connections");
@@ -286,7 +288,7 @@ where
 
         // If connection is not expected for broadcast,
         // we pin the connection.
-        let mut pin = !self.broadcast_service.contains(&peer);
+        let mut pin = !self.network_overlay.contains(&peer);
 
         // Handle requests that were waiting for a connection to be established.
         if let Some(pending_requests) = self.pending_task.remove(&peer) {
@@ -327,17 +329,6 @@ where
         }
     }
 
-    fn get_index(&self) -> NodeIndex {
-        if let Some(index) = self.index.get() {
-            *index
-        } else if let Some(index) = self.sync_query.pubkey_to_index(self.node_public_key) {
-            self.index.set(index).expect("Failed to set index");
-            index
-        } else {
-            u32::MAX
-        }
-    }
-
     /// Enqueues requests that will be sent after a connection is established with the peer.
     #[inline]
     fn enqueue_pending_request(&mut self, peer: NodeIndex, request: DriverRequest) {
@@ -370,24 +361,6 @@ where
             .and_modify(|handle| handle.pinned = true);
     }
 
-    fn node_address_from_state(&self, index: &NodeIndex) -> Result<NodeAddress> {
-        let pk = self
-            .sync_query
-            .index_to_pubkey(*index)
-            .ok_or(anyhow::anyhow!("failed to get public key"))?;
-
-        let info = self
-            .sync_query
-            .get_node_info(&pk)
-            .ok_or(anyhow::anyhow!("failed to get node info"))?;
-
-        Ok(NodeAddress {
-            index: *index,
-            pk,
-            socket_address: SocketAddr::from((info.domain, info.ports.pool)),
-        })
-    }
-
     /// Shutdowns workers and clears state.
     pub async fn shutdown(&mut self) {
         self.pool.clear();
@@ -411,10 +384,10 @@ where
             .suggest_connections()
             .iter()
             .flatten()
-            .filter_map(|pk| self.sync_query.pubkey_to_index(*pk))
-            .filter(|index| *index != self.get_index())
+            .filter_map(|pk| self.network_overlay.pubkey_to_index(*pk))
+            .filter(|index| *index != self.network_overlay.get_index())
             .collect::<HashSet<_>>();
-        let broadcast_task = self.broadcast_service.update_connections(new_connections);
+        let broadcast_task = self.network_overlay.update_connections(new_connections);
         if let Err(e) = self.handle_broadcast_task(broadcast_task) {
             tracing::error!("failed to handle broadcast task: {e:?}");
         }
@@ -435,15 +408,14 @@ where
                 Some(event) = self.connection_event_rx.recv() => {
                     match event {
                         ConnectionEvent::Broadcast { peer, message } => {
-                            self.broadcast_service.handle_broadcast_message(peer, message);
+                            self.network_overlay.handle_broadcast_message(peer, message);
                         },
                         ConnectionEvent::Stream { peer, service_scope, stream } => {
                             // We want to make sure that this request passes some basic checks
                             // before we commit to pinning the connection.
-                            if self.stream_service.handle_incoming_stream(service_scope, stream) {
+                            if self.network_overlay.handle_incoming_stream(service_scope, stream) {
                                 self.pin_connection(peer);
                             }
-
                         }
                     }
                 }
@@ -468,21 +440,23 @@ where
                         }
                     }
                 }
-                broadcast_task = self.broadcast_service.next() => {
-                    let Some(broadcast_task) = broadcast_task else {
+                task = self.network_overlay.next() => {
+                    let Some(task) = task else {
                         break;
                     };
-                    if let Err(e) = self.handle_broadcast_task(broadcast_task) {
-                        tracing::error!("failed to handle broadcast task: {e:?}");
+                    match task {
+                        PoolTask::Broadcast(task) => {
+                            if let Err(e) = self.handle_broadcast_task(task) {
+                                tracing::error!("failed to handle broadcast task: {e:?}");
+                            }
+                        }
+                        PoolTask::Stream(task) => {
+                            if let Err(e) = self.handle_stream_request(task) {
+                                tracing::error!("failed to handle stream request: {e:?}");
+                            }
+                        }
                     }
-                }
-                stream_request = self.stream_service.next() => {
-                    let Some(stream_request) = stream_request else {
-                        break;
-                    };
-                    if let Err(e) = self.handle_stream_request(stream_request) {
-                        tracing::error!("failed to handle stream request: {e:?}");
-                    }
+
                 }
                 Some(epoch_event) = self.notifier.recv() => {
                     match epoch_event {
@@ -493,10 +467,10 @@ where
                                 .iter()
                                 .flatten()
                                 .filter_map(|pk| self.sync_query.pubkey_to_index(*pk))
-                                .filter(|index| *index != self.get_index())
+                                .filter(|index| *index != self.network_overlay.get_index())
                                 .collect::<HashSet<_>>();
                             let broadcast_task =  self
-                                .broadcast_service
+                                .network_overlay
                                 .update_connections(new_connections);
                             if let Err(e) = self.handle_broadcast_task(broadcast_task) {
                                 tracing::error!("failed to handle broadcast task: {e:?}");
@@ -538,6 +512,7 @@ pub enum ConnectionEvent {
 }
 
 /// Address of a peer node.
+#[derive(Clone)]
 pub struct NodeAddress {
     pub index: NodeIndex,
     pub pk: NodePublicKey,

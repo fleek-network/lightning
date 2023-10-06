@@ -30,8 +30,7 @@ use crate::config::Config;
 use crate::endpoint::Endpoint;
 use crate::muxer::quinn::QuinnMuxer;
 use crate::muxer::{Channel, MuxerInterface};
-use crate::service::broadcast::{BroadcastRequest, Param};
-use crate::service::stream::StreamRequest;
+use crate::overlay::{BroadcastRequest, Param, StreamRequest};
 use crate::{muxer, tls};
 
 pub struct Pool<C, M = QuinnMuxer>

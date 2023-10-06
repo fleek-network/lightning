@@ -2,8 +2,8 @@ mod config;
 mod connection;
 mod endpoint;
 pub mod muxer;
+mod overlay;
 mod pool;
-mod service;
 #[cfg(test)]
 mod tests;
 mod tls;
