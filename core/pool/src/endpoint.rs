@@ -228,10 +228,12 @@ where
                 }
             },
             BroadcastTask::Update { peers } => {
+                // Keep ongoing connections.
                 self.pool.retain(|index, _| peers.contains_key(index));
 
-                // Let's make sure we're connected to them.
                 for update in peers.into_values() {
+                    // We do not want to connect to peers we're already connected to
+                    // and to peers that should be connecting to us during an update.
                     if self.pool.contains_key(&update.address.index) || !update.connect {
                         continue;
                     }
@@ -253,14 +255,21 @@ where
         if let Some(peer_index) = self.network_overlay.index_from_connection::<M>(&connection) {
             self.connector.cancel_dial(&peer_index);
 
+            // Redundant connections arent dropped immediately. Please see comment in `Endpoint`.
             let is_redundant = self.network_overlay.is_redundant(&peer_index);
 
+            // We only allow one redundant connection per peer.
             if is_redundant && self.redundant_pool.contains_key(&peer_index) {
-                tracing::warn!("too many redundant connections");
+                tracing::warn!("too many redundant connections with peer {peer_index:?}");
                 connection.close(0u8, b"close from disconnect");
                 return;
             }
 
+            // The connection ID is used for garbage collection.
+            // Because a connection could be `incoming` or `outgoing`
+            // and because connections can be downgraded if they're redundant,
+            // we could inadvertently drop the wrong connection if we only
+            // rely on `NodeIndex`.
             let connection_id = connection.connection_id();
 
             // Start worker to drive the connection.
@@ -298,7 +307,7 @@ where
             // If connection is not expected for the overlay,
             // we pin the connection.
             // We pin it now because we don't want an update from
-            // topology.
+            // topology to remove drop it.
             if should_pin {
                 if let Some(address) = self.network_overlay.node_address_from_state(&peer_index) {
                     self.network_overlay.pin_connection(peer_index, address);
@@ -352,6 +361,9 @@ where
                 entry.remove();
             }
         }
+
+        // Clean up pinned logical connections.
+        self.network_overlay.clean(peer);
     }
 
     /// Shutdowns workers and clears state.
@@ -361,6 +373,8 @@ where
         self.pending_task.clear();
         self.connector.clear();
 
+        // All driver tasks should finished since we dropped all
+        // Senders above.
         while self.driver_set.join_next().await.is_some() {}
 
         // We drop the muxer to unbind the address.
@@ -411,17 +425,12 @@ where
                 Some(connection_result) = self.connector.advance() => {
                     match connection_result {
                         ConnectionResult::Success { conn, .. } => {
-                            // The unwrap here is safe because when accepting connections,
-                            // we will fail to connect if we cannot obtain the peer's
-                            // public key from the TLS session. When dialing, we already
-                            // have the peer's public key.
                             self.handle_connection(conn);
                         }
                         ConnectionResult::Failed { peer, error } => {
                             if peer.is_none() {
                                 tracing::warn!("failed to connect to peer: {error:?}");
                             } else {
-                                // The unwrap here is safe. See comment above.
                                 let peer = peer.unwrap();
                                 tracing::warn!("failed to dial peer {:?}: {error:?}", peer);
                                 self.connector.remove_pending_dial(&peer);
@@ -445,7 +454,6 @@ where
                             }
                         }
                     }
-
                 }
                 Some(epoch_event) = self.notifier.recv() => {
                     match epoch_event {
@@ -462,7 +470,7 @@ where
                                 .network_overlay
                                 .update_connections(new_connections);
                             if let Err(e) = self.handle_broadcast_task(broadcast_task) {
-                                tracing::error!("failed to handle broadcast task: {e:?}");
+                                tracing::error!("failed to handle broadcast task after an update: {e:?}");
                             }
                         }
                         Notification::BeforeEpochChange => {

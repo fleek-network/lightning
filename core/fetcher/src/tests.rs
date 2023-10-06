@@ -167,7 +167,7 @@ async fn get_fetchers(
         let notifier = Notifier::<TestBinding>::init(&app);
         let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
         let config = PoolConfig {
-            max_idle_timeout: 300,
+            max_idle_timeout: Duration::from_secs(5),
             address: format!("0.0.0.0:{}", pool_port_offset + i as u16)
                 .parse()
                 .unwrap(),

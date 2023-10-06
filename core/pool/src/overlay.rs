@@ -1,4 +1,5 @@
 use std::cell::OnceCell;
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::net::SocketAddr;
@@ -153,6 +154,7 @@ where
             .filter_map(|index| {
                 let address = self.node_address_from_state(&index)?;
                 Some(ConnectionInfo {
+                    from_topology: true,
                     pinned: false,
                     address,
                 })
@@ -210,8 +212,19 @@ where
             .and_modify(|info| info.pinned = true)
             .or_insert(ConnectionInfo {
                 pinned: true,
+                from_topology: false,
                 address,
             });
+    }
+
+    /// Cleans up pinned connection that we was not set on a topology update.
+    pub fn clean(&mut self, peer: NodeIndex) {
+        if let Entry::Occupied(entry) = self.peers.entry(peer) {
+            let info = entry.get();
+            if !info.from_topology && info.pinned {
+                entry.remove();
+            }
+        }
     }
 
     pub fn index_from_connection<M: MuxerInterface>(
@@ -259,11 +272,11 @@ where
                             .map(|(_, info)| info.clone())
                             .collect::<Vec<_>>(),
                         Param::Index(index) => {
-                            let Some(address) = self.node_address_from_state(&index) else {
-                                tracing::error!("failed to find address for peer {index:?}");
+                            let Some(info) = self.peers.get(&index) else {
+                                tracing::info!("skipping broadcast send for peer {index:?}: unknown peer");
                                 continue;
                             };
-                            vec![ConnectionInfo { pinned: false, address }]
+                            vec![info.clone()]
                         },
                     };
 
@@ -327,6 +340,8 @@ pub struct StreamRequest {
     pub respond: oneshot::Sender<io::Result<Channel>>,
 }
 
+/// Information about an update from
+/// the overlay for the transport layer.
 pub struct ConnectionUpdate {
     pub address: NodeAddress,
     pub connect: bool,
@@ -334,7 +349,12 @@ pub struct ConnectionUpdate {
 
 #[derive(Clone)]
 pub struct ConnectionInfo {
+    /// Pinned connections should not be dropped
+    /// on topology changes.
     pub pinned: bool,
+    /// This connection was initiated on a topology event.
+    pub from_topology: bool,
+    /// The address of the peer.
     pub address: NodeAddress,
 }
 

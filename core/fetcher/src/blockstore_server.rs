@@ -613,7 +613,7 @@ mod tests {
             )
             .unwrap();
             let config = PoolConfig {
-                max_idle_timeout: 300,
+                max_idle_timeout: Duration::from_secs(5),
                 address: format!("0.0.0.0:{}", port_offset + i as u16)
                     .parse()
                     .unwrap(),

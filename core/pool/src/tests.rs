@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::time::Duration;
 
 use bytes::Bytes;
 use fleek_crypto::{
@@ -128,7 +129,7 @@ async fn get_pools(
         )
         .unwrap();
         let config = Config {
-            max_idle_timeout: 300,
+            max_idle_timeout: Duration::from_secs(5),
             address: format!("0.0.0.0:{}", port_offset + i as u16)
                 .parse()
                 .unwrap(),

@@ -1,18 +1,18 @@
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
-    // TODO(qti3e): Should be a duration.
-    pub max_idle_timeout: u64,
+    pub max_idle_timeout: Duration,
     pub address: SocketAddr,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            max_idle_timeout: 300, // 5 minutes.
+            max_idle_timeout: Duration::from_millis(30000),
             address: "0.0.0.0:4200".parse().expect("Hardcoded socket address"),
         }
     }

@@ -3,7 +3,6 @@ use std::io;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::Poll;
-use std::time::Duration;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -177,9 +176,7 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
         let public_key = sk.to_pk();
 
         let mut transport_config = quinn::TransportConfig::default();
-        transport_config.max_idle_timeout(Some(
-            Duration::from_secs(config.max_idle_timeout).try_into()?,
-        ));
+        transport_config.max_idle_timeout(Some(config.max_idle_timeout.try_into()?));
         let tls_config = tls::make_server_config(&sk).expect("Secret key to be valid");
         let mut server_config = quinn::ServerConfig::with_crypto(Arc::new(tls_config));
         server_config.transport_config(Arc::new(transport_config));
