@@ -145,42 +145,35 @@ where
 
     #[inline]
     pub fn update_connections(&mut self, peers: HashSet<NodeIndex>) -> BroadcastTask {
-        // We keep pinned connections as well.
+        // We keep pinned connections.
         self.peers
             .retain(|index, info| peers.contains(index) || info.pinned);
 
+        // We get information about the peers.
         let peers = peers
             .into_iter()
+            // We ignore connections for which we don't have information on state.
             .filter_map(|index| {
                 let address = self.node_address_from_state(&index)?;
+                let should_connect = address.index < self.get_index();
                 Some(ConnectionInfo {
                     from_topology: true,
                     pinned: false,
                     address,
+                    connect: should_connect,
                 })
             })
             .collect::<Vec<_>>();
 
+        // We perform a union.
         for info in peers.iter() {
             self.peers.entry(info.address.index).or_insert(info.clone());
         }
 
-        let updated = self
-            .peers
-            .values()
-            .map(|info| {
-                let should_connect = info.address.index < self.get_index();
-                (
-                    info.address.index,
-                    ConnectionUpdate {
-                        address: info.address.clone(),
-                        connect: should_connect,
-                    },
-                )
-            })
-            .collect::<HashMap<_, _>>();
-
-        BroadcastTask::Update { peers: updated }
+        // We tell the pool who to connect to.
+        BroadcastTask::Update {
+            peers: self.peers.clone(),
+        }
     }
 
     pub fn get_index(&self) -> NodeIndex {
@@ -207,22 +200,32 @@ where
     }
 
     pub fn pin_connection(&mut self, peer: NodeIndex, address: NodeAddress) {
+        let our_index = self.get_index();
         self.peers
             .entry(peer)
             .and_modify(|info| info.pinned = true)
-            .or_insert(ConnectionInfo {
-                pinned: true,
-                from_topology: false,
-                address,
+            .or_insert({
+                let should_connect = peer < our_index;
+                ConnectionInfo {
+                    pinned: true,
+                    from_topology: false,
+                    address,
+                    connect: should_connect,
+                }
             });
     }
 
-    /// Cleans up pinned connection that we was not set on a topology update.
+    /// Cleans up a pinned connection.
+    ///
+    /// This method assumes that there are no active transport connections
+    /// before calling it because we could potentially erroneously unpin a connection.
     pub fn clean(&mut self, peer: NodeIndex) {
-        if let Entry::Occupied(entry) = self.peers.entry(peer) {
-            let info = entry.get();
+        if let Entry::Occupied(mut entry) = self.peers.entry(peer) {
+            let info = entry.get_mut();
             if !info.from_topology && info.pinned {
                 entry.remove();
+            } else if info.pinned {
+                info.pinned = false;
             }
         }
     }
@@ -324,7 +327,7 @@ pub enum BroadcastTask {
     },
     Update {
         // Nodes that are in our overlay.
-        peers: HashMap<NodeIndex, ConnectionUpdate>,
+        peers: HashMap<NodeIndex, ConnectionInfo>,
     },
 }
 
@@ -340,13 +343,6 @@ pub struct StreamRequest {
     pub respond: oneshot::Sender<io::Result<Channel>>,
 }
 
-/// Information about an update from
-/// the overlay for the transport layer.
-pub struct ConnectionUpdate {
-    pub address: NodeAddress,
-    pub connect: bool,
-}
-
 #[derive(Clone)]
 pub struct ConnectionInfo {
     /// Pinned connections should not be dropped
@@ -356,6 +352,10 @@ pub struct ConnectionInfo {
     pub from_topology: bool,
     /// The address of the peer.
     pub address: NodeAddress,
+    /// This field is used during topology updates.
+    /// It tells the pool whether it should connect
+    /// to the peer or wait for the peer to connect.
+    pub connect: bool,
 }
 
 #[derive(Clone, Debug)]

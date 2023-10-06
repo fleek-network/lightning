@@ -30,7 +30,38 @@ use crate::overlay::{
 
 type ConnectionId = usize;
 
-/// Endpoint for pool
+/// The endpoint for the networking system of the lightning node.
+///
+/// It provides the following features:
+/// - A pool of multiplexed-transport connections.
+/// - Broadcasting.
+/// - [`Channels`] for direct task to task communication over the network.
+///
+/// # Overlay
+///
+/// The endpoint maintains state for our view of the network overlay
+/// in [`NetworkOverlay`]. This object maintains logical connections with
+/// a set of peers. These peers are pushed to the [`NetworkOverlay`] during topology
+/// updates on every epoch. Broadcast operation are performed only on and for
+/// those peers for which we have logical connections to.
+///
+/// # Pool
+///
+/// The endpoint has a pool of transport connections which implement
+/// the [`MuxerInterface`] trait. When a transport connection is
+/// established with a peer, a driver tasks is spawned and given ownership
+/// of the connection. The driver task will listen for incoming unidirectional
+/// streams, for p2p applications such as broadcasting, and for bidirectional
+/// streams for request/response applications. Bidirectional streams are used
+/// for implementing [`Channel`]s.
+///
+/// # Pinning
+///
+/// To support applications that need to communicate with peers outside of their
+/// local network e.g. peers that [`NetworkOverlay`] did not get from topology updates,
+/// we allow user tasks to make transport connections to peers outside of their neighborhood.
+/// The [`NetworkOverlay`] `pins` these connections in its state so that they may be kept
+/// when connections are being dropped during a topology update event.
 pub struct Endpoint<C, M>
 where
     C: Collection,
@@ -63,6 +94,7 @@ where
     // over this one, so these will eventually close
     // themselves when the idle-timeout triggers.
     // These will need to be garbage collected.
+    // Todo: Look into avoiding to maintain two tables.
     redundant_pool: HashMap<NodeIndex, DriverHandle>,
     /// Multiplexed transport.
     muxer: Option<M>,
@@ -231,16 +263,16 @@ where
                 // Keep ongoing connections.
                 self.pool.retain(|index, _| peers.contains_key(index));
 
-                for update in peers.into_values() {
+                for info in peers.into_values() {
                     // We do not want to connect to peers we're already connected to
                     // and to peers that should be connecting to us during an update.
-                    if self.pool.contains_key(&update.address.index) || !update.connect {
+                    if self.pool.contains_key(&info.address.index) || !info.connect {
                         continue;
                     }
 
                     if let Err(e) = self
                         .connector
-                        .enqueue_dial_task(update.address, self.muxer.clone().unwrap())
+                        .enqueue_dial_task(info.address, self.muxer.clone().unwrap())
                     {
                         tracing::error!("failed to enqueue the dial task: {e:?}");
                     }
@@ -307,7 +339,7 @@ where
             // If connection is not expected for the overlay,
             // we pin the connection.
             // We pin it now because we don't want an update from
-            // topology to remove drop it.
+            // topology to drop it.
             if should_pin {
                 if let Some(address) = self.network_overlay.node_address_from_state(&peer_index) {
                     self.network_overlay.pin_connection(peer_index, address);
@@ -362,8 +394,12 @@ where
             }
         }
 
-        // Clean up pinned logical connections.
-        self.network_overlay.clean(peer);
+        // Before we attempt to remove any logical pinned connection
+        // we must make sure that we don't have any active
+        // transport connection.
+        if !self.redundant_pool.contains_key(&peer) && !self.pool.contains_key(&peer) {
+            self.network_overlay.clean(peer);
+        }
     }
 
     /// Shutdowns workers and clears state.
