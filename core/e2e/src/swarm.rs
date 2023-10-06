@@ -18,8 +18,7 @@ use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
-use lightning_blockstore_server::config::Config as BlockStoreServerConfig;
-use lightning_blockstore_server::BlockStoreServer;
+use lightning_blockstore_server::{BlockStoreServer, Config as BlockStoreServerConfig};
 use lightning_broadcast::{Broadcast, Config as BroadcastConfig};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
@@ -314,9 +313,7 @@ fn build_config(
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<BlockStoreServer<FinalTypes>>(BlockStoreServerConfig {
-        address: ([127, 0, 0, 1], ports.blockstore).into(),
-    });
+    config.inject::<BlockStoreServer<FinalTypes>>(BlockStoreServerConfig::default());
 
     config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
         workers: vec![WorkerMode::AsyncWorker],

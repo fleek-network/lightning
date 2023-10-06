@@ -3914,23 +3914,27 @@ dependencies = [
 
 [[package]]
 name = "lightning-blockstore-server"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
  "async-trait",
- "blake3-stream",
  "blake3-tree",
- "env_logger 0.10.0",
+ "bytes",
  "fleek-crypto",
- "futures",
  "infusion",
+ "lightning-application",
  "lightning-blockstore",
  "lightning-interfaces",
+ "lightning-notifier",
+ "lightning-pool",
+ "lightning-signer",
+ "lightning-topology",
  "log",
  "serde",
+ "thiserror",
  "tokio",
- "triomphe",
+ "tokio-stream",
 ]
 
 [[package]]
@@ -4125,6 +4129,7 @@ dependencies = [
  "infusion",
  "lightning-application",
  "lightning-blockstore",
+ "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-interfaces",
  "lightning-notifier",
@@ -4432,6 +4437,7 @@ dependencies = [
  "jsonrpc-v2",
  "lightning-application",
  "lightning-blockstore",
+ "lightning-blockstore-server",
  "lightning-fetcher",
  "lightning-interfaces",
  "lightning-origin-ipfs",
@@ -4571,6 +4577,7 @@ dependencies = [
  "num-derive",
  "num-traits",
  "serde",
+ "thiserror",
 ]
 
 [[package]]

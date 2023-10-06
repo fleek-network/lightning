@@ -293,41 +293,41 @@ impl Env<UpdatePerm> {
             );
 
             let epoch_end: u64 = genesis.epoch_time + genesis.epoch_start;
-           let mut committee_members = Vec::with_capacity(4);
+            let mut committee_members = Vec::with_capacity(4);
 
-           // add node info
-           for node in genesis.node_info {
-            let mut node_info = NodeInfo::from(&node);
-            node_info.stake.staked = genesis.min_stake.into();
-            let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
-                Some(Value::NextNodeIndex(index)) => index,
-                _ => 0,
-            };
-            consensus_key_to_index_table.insert(node_info.consensus_key, node_index);
-            pub_key_to_index_table.insert(node_info.public_key, node_index);
-            node_table.insert(node_index, node_info);
-            metadata_table.insert(
-                Metadata::NextNodeIndex,
-                Value::NextNodeIndex(node_index + 1),
-            );
-            // add genesis current epoch served if there
-            if let Some(served) = node.current_epoch_served {
-                current_epoch_served_table.insert(node_index, served);
-            }
-            // add genesis reputation if there
-            if let Some(rep) = node.reputation {
-                assert!(
-                    (0..=100).contains(&rep),
-                    "Reputation scores must be in range [0, 100]."
+            // add node info
+            for node in genesis.node_info {
+                let mut node_info = NodeInfo::from(&node);
+                node_info.stake.staked = genesis.min_stake.into();
+                let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
+                    Some(Value::NextNodeIndex(index)) => index,
+                    _ => 0,
+                };
+                consensus_key_to_index_table.insert(node_info.consensus_key, node_index);
+                pub_key_to_index_table.insert(node_info.public_key, node_index);
+                node_table.insert(node_index, node_info);
+                metadata_table.insert(
+                    Metadata::NextNodeIndex,
+                    Value::NextNodeIndex(node_index + 1),
                 );
-                rep_scores_table.insert(node_index, rep);
-            }
-            // if there a committee member push them to the committee vec and set after loop
-            if node.genesis_committee{
-                committee_members.push(node_index);
-            }
+                // add genesis current epoch served if there
+                if let Some(served) = node.current_epoch_served {
+                    current_epoch_served_table.insert(node_index, served);
+                }
+                // add genesis reputation if there
+                if let Some(rep) = node.reputation {
+                    assert!(
+                        (0..=100).contains(&rep),
+                        "Reputation scores must be in range [0, 100]."
+                    );
+                    rep_scores_table.insert(node_index, rep);
+                }
+                // if there a committee member push them to the committee vec and set after loop
+                if node.genesis_committee{
+                    committee_members.push(node_index);
+                }
 
-        }
+            }
             metadata_table.insert(Metadata::GenesisCommittee,
                  Value::GenesisCommittee(committee_members.clone()));
             committee_table.insert(

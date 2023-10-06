@@ -1,34 +1,39 @@
-use std::net::SocketAddr;
-
+use affair::Socket;
 use anyhow::Result;
 use async_trait::async_trait;
-use lightning_types::NodeIndex;
+use lightning_types::{PeerRequestError, ServerRequest};
+use tokio::sync::broadcast;
 
 use crate::infu_collection::Collection;
-use crate::types::Blake3Hash;
 use crate::{
     BlockStoreInterface,
     ConfigConsumer,
     ConfigProviderInterface,
-    SyncQueryRunnerInterface,
+    PoolInterface,
     WithStartAndShutdown,
 };
+
+pub type BlockStoreServerSocket =
+    Socket<ServerRequest, broadcast::Receiver<Result<(), PeerRequestError>>>;
 
 #[async_trait]
 #[infusion::service]
 pub trait BlockStoreServerInterface<C: Collection>:
-    Clone + Send + Sync + ConfigConsumer + WithStartAndShutdown
+    Sized + Send + Sync + ConfigConsumer + WithStartAndShutdown
 {
-    fn _init(config: ::ConfigProviderInterface, blockstre: ::BlockStoreInterface) {
-        Self::init(config.get::<Self>(), blockstre.clone())
+    fn _init(
+        config: ::ConfigProviderInterface,
+        blockstre: ::BlockStoreInterface,
+        pool: ::PoolInterface,
+    ) {
+        Self::init(config.get::<Self>(), blockstre.clone(), pool)
     }
 
-    fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self>;
+    fn init(
+        config: Self::Config,
+        blockstore: C::BlockStoreInterface,
+        pool: &C::PoolInterface,
+    ) -> anyhow::Result<Self>;
 
-    fn extract_address<Q: SyncQueryRunnerInterface>(
-        query_runner: Q,
-        target: NodeIndex,
-    ) -> Option<SocketAddr>;
-
-    async fn request_download(&self, block_hash: Blake3Hash, target: SocketAddr) -> Result<()>;
+    fn get_socket(&self) -> BlockStoreServerSocket;
 }

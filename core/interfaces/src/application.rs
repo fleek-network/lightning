@@ -187,7 +187,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn is_committee(&self, node_index: u32) -> bool;
 
     /// Returns the node info of the genesis committee members
-    fn genesis_committee(&self) -> Vec<NodeInfo>;
+    fn genesis_committee(&self) -> Vec<(NodeIndex, NodeInfo)>;
 
     /// Returns last executed block hash. [0;32] is genesis
     fn get_last_block(&self) -> [u8; 32];

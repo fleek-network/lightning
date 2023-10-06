@@ -24,13 +24,13 @@ pub trait SyncronizerInterface<C: Collection>: WithStartAndShutdown + Sized {
         let sqr = app.sync_query();
         let (tx_epoch_change, rx_epoch_change) = tokio::sync::mpsc::channel(10);
         notifier.notify_on_new_epoch(tx_epoch_change);
-        Self::init(sqr, blockstore_server.clone(), rx_epoch_change)
+        Self::init(sqr, blockstore_server, rx_epoch_change)
     }
 
     /// Create a syncronizer service for quickly syncronizing the node state with the chain
     fn init(
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        blockstore_server: C::BlockStoreServerInterface,
+        blockstore_server: &C::BlockStoreServerInterface,
         rx_epoch_change: Receiver<Notification>,
     ) -> anyhow::Result<Self>;
 

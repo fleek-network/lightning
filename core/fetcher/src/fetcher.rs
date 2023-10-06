@@ -5,23 +5,28 @@ use affair::{Socket, Task};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::{Blake3Hash, FetcherRequest, FetcherResponse, ImmutablePointer};
+use lightning_interfaces::types::{
+    Blake3Hash,
+    FetcherRequest,
+    FetcherResponse,
+    ImmutablePointer,
+    ServerRequest,
+};
 use lightning_interfaces::{
     BlockStoreInterface,
+    BlockStoreServerInterface,
+    BlockStoreServerSocket,
     ConfigConsumer,
     FetcherInterface,
     FetcherSocket,
     OriginProviderInterface,
     OriginProviderSocket,
-    PoolInterface,
     ResolverInterface,
-    ServiceScope,
     WithStartAndShutdown,
 };
 use log::error;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::blockstore_server::{BlockstoreServer, ServerRequest};
 use crate::config::Config;
 use crate::origin::{OriginFetcher, OriginRequest};
 
@@ -40,21 +45,10 @@ impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
     fn init(
         config: Self::Config,
         blockstore: C::BlockStoreInterface,
+        blockstore_server: &C::BlockStoreServerInterface,
         resolver: C::ResolverInterface,
         origin: &C::OriginProviderInterface,
-        pool: &C::PoolInterface,
     ) -> anyhow::Result<Self> {
-        let (pool_requester, pool_responder) = pool.open_req_res(ServiceScope::BlockstoreServer);
-        let (request_tx, request_rx) = mpsc::channel(1024);
-        let blockstore_server = BlockstoreServer::<C>::init(
-            blockstore.clone(),
-            request_rx,
-            config.max_conc_req,
-            config.max_conc_res,
-            pool_requester,
-            pool_responder,
-        )?;
-
         let (socket, socket_rx) = Socket::raw_bounded(2048);
         let (shutdown_tx, shutdown_rx) = mpsc::channel(10);
         let inner = FetcherInner::<C> {
@@ -62,8 +56,7 @@ impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
             socket_rx: Arc::new(Mutex::new(Some(socket_rx))),
             origin_socket: origin.get_socket(),
             blockstore,
-            blockstore_server,
-            server_request_tx: request_tx,
+            blockstore_server_socket: blockstore_server.get_socket(),
             resolver,
             shutdown_rx: Arc::new(Mutex::new(Some(shutdown_rx))),
         };
@@ -115,8 +108,7 @@ struct FetcherInner<C: Collection> {
     socket_rx: Arc<Mutex<Option<mpsc::Receiver<Task<FetcherRequest, FetcherResponse>>>>>,
     origin_socket: OriginProviderSocket,
     blockstore: C::BlockStoreInterface,
-    blockstore_server: BlockstoreServer<C>,
-    server_request_tx: mpsc::Sender<ServerRequest>,
+    blockstore_server_socket: BlockStoreServerSocket,
     resolver: C::ResolverInterface,
     shutdown_rx: Arc<Mutex<Option<mpsc::Receiver<()>>>>,
 }
@@ -137,7 +129,6 @@ impl<C: Collection> FetcherInner<C> {
         tokio::spawn(async move {
             origin_fetcher.start().await;
         });
-        self.blockstore_server.start().await;
         let mut shutdown_rx = self.shutdown_rx.lock().unwrap().take().unwrap();
 
         loop {
@@ -162,14 +153,14 @@ impl<C: Collection> FetcherInner<C> {
                             let tx = tx.clone();
                             let resolver = self.resolver.clone();
                             let blockstore = self.blockstore.clone();
-                            let server_request_tx = self.server_request_tx.clone();
+                            let blockstore_server_socket = self.blockstore_server_socket.clone();
                             tokio::spawn(async move {
                                 FetcherInner::<C>::fetch(
                                     hash,
                                     tx,
                                     resolver,
                                     blockstore,
-                                    server_request_tx,
+                                    blockstore_server_socket,
                                     task
                                 ).await;
                             });
@@ -180,7 +171,6 @@ impl<C: Collection> FetcherInner<C> {
         }
         *self.socket_rx.lock().unwrap() = Some(socket_rx);
         *self.shutdown_rx.lock().unwrap() = Some(shutdown_rx);
-        self.blockstore_server.shutdown().await;
     }
 
     /// Fetches the data from the corresponding origin, puts it in the blockstore, and stores the
@@ -219,7 +209,7 @@ impl<C: Collection> FetcherInner<C> {
         tx: mpsc::Sender<OriginRequest>,
         resolver: C::ResolverInterface,
         blockstore: C::BlockStoreInterface,
-        server_request_tx: mpsc::Sender<ServerRequest>,
+        blockstore_server_socket: BlockStoreServerSocket,
         task: Task<FetcherRequest, FetcherResponse>,
     ) {
         if blockstore.get_tree(&hash).await.is_some() {
@@ -232,16 +222,13 @@ impl<C: Collection> FetcherInner<C> {
                     return;
                 }
                 // Try to get the content from the peer that advertized the record.
-                let (server_tx, server_rx) = oneshot::channel();
-                server_request_tx
-                    .send(ServerRequest {
+                let mut res = blockstore_server_socket
+                    .run(ServerRequest {
                         hash,
                         peer: res_pointer.originator,
-                        response: server_tx,
                     })
                     .await
                     .expect("Failed to send request to blockstore server");
-                let mut res = server_rx.await.expect("Failed to get receiver");
                 if let Ok(()) = res
                     .recv()
                     .await
@@ -272,38 +259,6 @@ impl<C: Collection> FetcherInner<C> {
             "Failed to resolve hash"
         ))));
     }
-
-    //async fn fetch_from_origin(
-    //    hash: Blake3Hash,
-    //    origin_tx: mpsc::Sender<OriginRequest>,
-    //    resolver: C::ResolverInterface,
-    //    blockstore: C::BlockStoreInterface,
-    //) -> Result<()> {
-    //    if let Some(pointers) = resolver.get_origins(hash) {
-    //        for res_pointer in pointers {
-    //            if let Some(res) = resolver.get_blake3_hash(res_pointer.pointer.clone()).await {
-    //                if res.hash == hash && blockstore.get_tree(&hash).await.is_some() {
-    //                    return Ok(());
-    //                }
-    //            } else {
-    //                let (response_tx, response_rx) = oneshot::channel();
-    //                origin_tx
-    //                    .send(OriginRequest {
-    //                        pointer: res_pointer.pointer,
-    //                        response: response_tx,
-    //                    })
-    //                    .await
-    //                    .expect("Failed to send origin request");
-
-    //                let mut hash_rx = response_rx.await.expect("Failed to receive response");
-    //                if let Ok(_hash) = hash_rx.recv().await.expect("Failed to receive response") {
-    //                    return Ok(());
-    //                }
-    //            }
-    //        }
-    //    }
-    //    Err(anyhow!("Failed to retrieve content"))
-    //}
 }
 
 impl<C: Collection> ConfigConsumer for Fetcher<C> {

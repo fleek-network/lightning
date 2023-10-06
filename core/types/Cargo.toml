@@ -16,3 +16,4 @@ num-bigint = { workspace = true, features=["serde"]}
 num-traits.workspace = true
 num-derive.workspace = true
 derive_more = "0.99"
+thiserror = "1.0"

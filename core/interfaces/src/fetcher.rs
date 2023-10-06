@@ -5,10 +5,10 @@ use lightning_types::{FetcherRequest, FetcherResponse};
 use crate::infu_collection::Collection;
 use crate::{
     BlockStoreInterface,
+    BlockStoreServerInterface,
     ConfigConsumer,
     ConfigProviderInterface,
     OriginProviderInterface,
-    PoolInterface,
     ResolverInterface,
     WithStartAndShutdown,
 };
@@ -23,16 +23,16 @@ pub trait FetcherInterface<C: Collection>:
     fn _init(
         config: ::ConfigProviderInterface,
         blockstore: ::BlockStoreInterface,
+        blockstore_server: ::BlockStoreServerInterface,
         resolver: ::ResolverInterface,
         origin: ::OriginProviderInterface,
-        pool: ::PoolInterface,
     ) {
         Self::init(
             config.get::<Self>(),
             blockstore.clone(),
+            blockstore_server,
             resolver.clone(),
             origin,
-            pool,
         )
     }
 
@@ -40,9 +40,9 @@ pub trait FetcherInterface<C: Collection>:
     fn init(
         config: Self::Config,
         blockstore: C::BlockStoreInterface,
+        blockstore_server: &C::BlockStoreServerInterface,
         resolver: C::ResolverInterface,
         origin: &C::OriginProviderInterface,
-        pool: &C::PoolInterface,
     ) -> anyhow::Result<Self>;
 
     /// Returns a socket that can be used to submit requests to the fetcher.

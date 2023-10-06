@@ -18,6 +18,7 @@ use lightning_application::genesis::{Genesis, GenesisAccount, GenesisNode};
 use lightning_application::query_runner::QueryRunner;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
+use lightning_blockstore_server::{BlockStoreServer, Config as BlockServerConfig};
 use lightning_fetcher::config::Config as FetcherConfig;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_interfaces::infu_collection::Collection;
@@ -35,6 +36,7 @@ use lightning_interfaces::{
     partial,
     ApplicationInterface,
     BlockStoreInterface,
+    BlockStoreServerInterface,
     FetcherInterface,
     MempoolSocket,
     OriginProviderInterface,
@@ -84,6 +86,7 @@ partial!(TestBinding {
     FetcherInterface = Fetcher<Self>;
     RpcInterface = Rpc<Self>;
     BlockStoreInterface = Blockstore<Self>;
+    BlockStoreServerInterface = BlockStoreServer<Self>;
     OriginProviderInterface = IPFSOrigin<Self>;
     SignerInterface = Signer<Self>;
     PoolInterface = Pool<Self>;
@@ -103,12 +106,20 @@ fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
         Default::default(),
     )
     .unwrap();
+
+    let blockstore_server = BlockStoreServer::<TestBinding>::init(
+        BlockServerConfig::default(),
+        blockstore.clone(),
+        &pool,
+    )
+    .unwrap();
+
     let fetcher = Fetcher::<TestBinding>::init(
         FetcherConfig::default(),
         blockstore,
+        &blockstore_server,
         Default::default(),
         &ipfs_origin,
-        &pool,
     )
     .unwrap();
     let rpc = Rpc::<TestBinding>::init(

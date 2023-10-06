@@ -9,6 +9,7 @@ use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
+use lightning_blockstore_server::{BlockStoreServer, Config as BlockServerConfig};
 use lightning_broadcast::{Broadcast, Config as BroadcastConfig};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
@@ -23,6 +24,7 @@ use lightning_interfaces::{
     partial,
     ApplicationInterface,
     BlockStoreInterface,
+    BlockStoreServerInterface,
     BroadcastInterface,
     ConsensusInterface,
     FetcherInterface,
@@ -57,6 +59,7 @@ partial!(TestBinding {
     OriginProviderInterface = IPFSOrigin<Self>;
     BroadcastInterface = Broadcast<Self>;
     BlockStoreInterface = Blockstore<Self>;
+    BlockStoreServerInterface = BlockStoreServer<Self>;
     SignerInterface = Signer<Self>;
     ResolverInterface = Resolver<Self>;
     ApplicationInterface = Application<Self>;
@@ -72,6 +75,7 @@ struct Peer<C: Collection> {
     _consensus: C::ConsensusInterface,
     _pool: C::PoolInterface,
     _broadcast: C::BroadcastInterface,
+    _blockstore_server: C::BlockStoreServerInterface,
     _rep_aggregator: C::ReputationAggregatorInterface,
     _signer: C::SignerInterface,
     _ipfs_origin: C::OriginProviderInterface,
@@ -235,16 +239,21 @@ async fn get_fetchers(
         let ipfs_origin =
             IPFSOrigin::<TestBinding>::init(ipfs_origin_config, blockstore.clone()).unwrap();
 
+        let blockstore_server = BlockStoreServer::<TestBinding>::init(
+            BlockServerConfig::default(),
+            blockstore.clone(),
+            &pool,
+        )
+        .unwrap();
+
         let fetcher = Fetcher::<TestBinding>::init(
             Config {
                 max_conc_origin_req: 3,
-                max_conc_req: 5,
-                max_conc_res: 5,
             },
             blockstore.clone(),
+            &blockstore_server,
             resolver,
             &ipfs_origin,
-            &pool,
         )
         .unwrap();
 
@@ -255,12 +264,14 @@ async fn get_fetchers(
         fetcher.start().await;
         pool.start().await;
         rep_aggregator.start().await;
+        blockstore_server.start().await;
 
         let peer = Peer::<TestBinding> {
             fetcher,
             _consensus: consensus,
             _pool: pool,
             _broadcast: broadcast,
+            _blockstore_server: blockstore_server,
             _rep_aggregator: rep_aggregator,
             _signer: signer,
             _ipfs_origin: ipfs_origin,

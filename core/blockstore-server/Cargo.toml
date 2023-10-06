@@ -1,23 +1,29 @@
 [package]
 name = "lightning-blockstore-server"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
+blake3-tree = { path = "../../lib/blake3-tree" }
+affair.workspace = true
+bytes.workspace = true
+infusion.workspace = true
+serde.workspace = true
 tokio.workspace = true
-futures.workspace = true
+tokio-stream.workspace = true
+anyhow.workspace = true
 async-trait.workspace = true
 log.workspace = true
-anyhow.workspace = true
-serde.workspace = true
-infusion.workspace = true
-affair.workspace = true
-fleek-crypto.workspace = true
-triomphe = "0.1.9"
-blake3-stream = { path = "../../lib/blake3-stream" }
-blake3-tree = { path = "../../lib/blake3-tree" }
+thiserror = "1.0"
 
 [dev-dependencies]
+lightning-application = { path="../application", features = ["test"] }
 lightning-blockstore = { path = "../blockstore" }
-env_logger = "0.10"
+lightning-notifier = { path="../notifier" }
+lightning-topology = { path="../topology" }
+lightning-signer = { path="../signer" }
+lightning-pool = { path = "../pool" }
+fleek-crypto.workspace = true

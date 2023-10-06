@@ -4,10 +4,18 @@ use std::time::{Duration, SystemTime};
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::types::{Blake3Hash, Epoch, EpochInfo, NodeInfo};
+use lightning_interfaces::types::{
+    Blake3Hash,
+    Epoch,
+    EpochInfo,
+    NodeIndex,
+    NodeInfo,
+    ServerRequest,
+};
 use lightning_interfaces::{
     ApplicationInterface,
     BlockStoreServerInterface,
+    BlockStoreServerSocket,
     Notification,
     SyncQueryRunnerInterface,
     SyncronizerInterface,
@@ -31,9 +39,9 @@ pub struct Syncronizer<C: Collection> {
 
 pub struct SyncronizerInner<C: Collection> {
     query_runner: c![C::ApplicationInterface::SyncExecutor],
-    blockstore_server: C::BlockStoreServerInterface,
+    blockstore_server_socket: BlockStoreServerSocket,
     rx_epoch_change: Receiver<Notification>,
-    genesis_committee: Vec<NodeInfo>,
+    genesis_committee: Vec<(NodeIndex, NodeInfo)>,
     rpc_client: reqwest::Client,
 }
 
@@ -85,7 +93,7 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
     /// Create a syncronizer service for quickly syncronizing the node state with the chain
     fn init(
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        blockstore_server: C::BlockStoreServerInterface,
+        blockstore_server: &C::BlockStoreServerInterface,
         rx_epoch_change: Receiver<Notification>,
     ) -> Result<Self> {
         let inner = SyncronizerInner::new(query_runner, blockstore_server, rx_epoch_change);
@@ -108,7 +116,7 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
 impl<C: Collection> SyncronizerInner<C> {
     fn new(
         query_runner: c![C::ApplicationInterface::SyncExecutor],
-        blockstore_server: C::BlockStoreServerInterface,
+        blockstore_server: &C::BlockStoreServerInterface,
         rx_epoch_change: Receiver<Notification>,
     ) -> Self {
         let mut genesis_committee = query_runner.genesis_committee();
@@ -120,7 +128,7 @@ impl<C: Collection> SyncronizerInner<C> {
 
         Self {
             query_runner,
-            blockstore_server,
+            blockstore_server_socket: blockstore_server.get_socket(),
             rx_epoch_change,
             genesis_committee,
             rpc_client,
@@ -204,7 +212,7 @@ impl<C: Collection> SyncronizerInner<C> {
 
     /// This function will rpc request genesis nodes in sequence and stop when one of them responds
     async fn ask_bootstrap_nodes<T: DeserializeOwned>(&self, req: String) -> Result<T> {
-        for node in &self.genesis_committee {
+        for (_, node) in &self.genesis_committee {
             if let Ok(res) =
                 rpc_request::<T>(&self.rpc_client, node.domain, node.ports.rpc, req.clone()).await
             {
@@ -215,17 +223,17 @@ impl<C: Collection> SyncronizerInner<C> {
     }
 
     async fn download_checkpoint_from_bootstrap(&self, checkpoint_hash: [u8; 32]) -> Result<()> {
-        for node in &self.genesis_committee {
-            let address = format!("{}:{}", node.domain, node.ports.blockstore)
-                .parse()
-                .unwrap();
-
-            if self
-                .blockstore_server
-                .request_download(checkpoint_hash, address)
+        for (node_index, _) in &self.genesis_committee {
+            let mut res = self
+                .blockstore_server_socket
+                .run(ServerRequest {
+                    hash: checkpoint_hash,
+                    peer: *node_index,
+                })
                 .await
-                .is_ok()
-            {
+                .expect("Failed to send blockstore server request");
+
+            if res.recv().await.is_ok() {
                 return Ok(());
             }
         }

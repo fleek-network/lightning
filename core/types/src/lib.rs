@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 mod application;
 mod blockstore;
+mod blockstore_server;
 mod bridge;
 mod broadcast;
 mod compression;
@@ -19,6 +20,7 @@ mod transaction;
 
 pub use application::*;
 pub use blockstore::*;
+pub use blockstore_server::*;
 pub use bridge::*;
 pub use broadcast::*;
 pub use compression::*;
