@@ -10,7 +10,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
 
-#[derive(Clone, Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Default)]
+#[derive(Clone, Hash, PartialEq, PartialOrd, Ord, Eq, Default)]
 
 /// A high-precision fixed-point number backed by a `BigInt`.
 ///
@@ -84,7 +84,13 @@ impl<const P: usize> HpFixed<P> {
 
 impl<const P: usize> fmt::Display for HpFixed<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        format_hp_fixed::<BigInt, P>(&self.0, f)
+        format_hp_fixed::<BigInt, P>(&self.0, f, false)
+    }
+}
+
+impl<const P: usize> fmt::Debug for HpFixed<P> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        format_hp_fixed::<BigInt, P>(&self.0, f, true)
     }
 }
 

@@ -41,7 +41,7 @@ use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
 ///
 /// * `BigUint`: The underlying large unsigned integer value that the `HpUfixed` wraps around.
 
-#[derive(Clone, Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Default)]
+#[derive(Clone, Hash, PartialEq, PartialOrd, Ord, Eq, Default)]
 pub struct HpUfixed<const P: usize>(BigUint);
 
 impl<const P: usize> HpUfixed<P> {
@@ -81,7 +81,13 @@ impl<const P: usize> HpUfixed<P> {
 
 impl<const P: usize> fmt::Display for HpUfixed<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        format_hp_fixed::<BigUint, P>(&self.0, f)
+        format_hp_fixed::<BigUint, P>(&self.0, f, false)
+    }
+}
+
+impl<const P: usize> fmt::Debug for HpUfixed<P> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        format_hp_fixed::<BigUint, P>(&self.0, f, true)
     }
 }
 

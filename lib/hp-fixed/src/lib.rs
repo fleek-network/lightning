@@ -41,7 +41,11 @@ impl fmt::Display for HpFixedConversionError {
     }
 }
 
-fn format_hp_fixed<T, const P: usize>(value: &T, f: &mut fmt::Formatter<'_>) -> fmt::Result
+fn format_hp_fixed<T, const P: usize>(
+    value: &T,
+    f: &mut fmt::Formatter<'_>,
+    debug: bool,
+) -> fmt::Result
 where
     T: fmt::Display + fmt::Debug + Zero + PartialEq,
 {
@@ -58,12 +62,16 @@ where
             formatted.push(chars[i]);
             count += 1;
 
-            if count % 3 == 0 && i != 0 {
+            if debug && count % 3 == 0 && i != 0 {
                 formatted.push('_');
             }
         }
         formatted = formatted.chars().rev().collect();
-        write!(f, "{formatted}<{P}>")
+        if debug {
+            write!(f, "{formatted}<{P}>")
+        } else {
+            write!(f, "{formatted}")
+        }
     }
 }
 
