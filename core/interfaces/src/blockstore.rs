@@ -3,14 +3,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use blake3_tree::utils::HashTree;
 use thiserror::Error;
 
 use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
 use crate::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
 use crate::ConfigProviderInterface;
-
-pub struct Blake3Tree(pub Vec<Blake3Hash>);
 
 /// A chunk of content (usually 256KiB) with a compression tag which determines
 /// the compression algorithm that was used to compress this data.
@@ -103,7 +102,7 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
 
     /// Returns the Blake3 tree associated with the given CID. Returns [`None`] if the content
     /// is not present in our block store.
-    async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>>;
+    async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<HashTree>>;
 
     /// Returns the content associated with the given hash and block number, the compression
     /// set determines which compression modes we care about.
@@ -140,18 +139,12 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
 
     /// Utility function to read an entire file to a vec.
     async fn read_all_to_vec(&self, hash: &Blake3Hash) -> Option<Vec<u8>> {
-        let value = self.get_tree(hash).await?;
-        let tree = &value.0;
+        let tree = self.get_tree(hash).await?;
         let mut result = Vec::new();
 
-        for index in 0usize.. {
-            let i = index * 2 - index.count_ones() as usize;
-            if i >= tree.len() {
-                break;
-            }
-
+        for i in 0usize..tree.len() {
             let block = &self
-                .get(index as u32, &tree[i], CompressionAlgoSet::new())
+                .get(i as u32, &tree[i], CompressionAlgoSet::new())
                 .await?
                 .content;
 

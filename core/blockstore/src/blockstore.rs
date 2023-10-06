@@ -8,12 +8,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use blake3_tree::blake3::tree::{BlockHasher, HashTreeBuilder};
 use blake3_tree::blake3::Hash;
+use blake3_tree::utils::{HashTree, HashVec};
 use blake3_tree::IncrementalVerifier;
 use bytes::{BufMut, BytesMut};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
 use lightning_interfaces::{
-    Blake3Tree,
     BlockStoreInterface,
     ConfigConsumer,
     ContentChunk,
@@ -22,6 +22,7 @@ use lightning_interfaces::{
     PutFinalizeError,
     PutWriteError,
 };
+use log::error;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use tempdir::TempDir;
@@ -69,16 +70,16 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
         })
     }
 
-    async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<Blake3Tree>> {
-        // TODO(qti3e): We can optimize Blake3Tree type to not care much about the layout
-        // being [[u8; 32]; N] and do the offset alignment lazily. Just a `n << 5` on read.
+    async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<HashTree>> {
         let data = self.fetch(INTERNAL_DIR, cid, None).await?;
-        let encoded_tree: Vec<Blake3Hash> = data
-            .chunks_exact(32)
-            .map(|slice| *arrayref::array_ref![slice, 0, 32])
-            .collect();
+        if data.len() & 31 != 0 {
+            error!("Tried to read corrupted proof from disk");
+            return None;
+        }
 
-        Some(Arc::new(Blake3Tree(encoded_tree)))
+        Some(Arc::new(HashTree::from_inner(HashVec::from_inner(
+            data.into_boxed_slice(),
+        ))))
     }
 
     async fn get(

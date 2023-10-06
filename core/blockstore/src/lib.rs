@@ -5,13 +5,10 @@ mod store;
 
 #[cfg(test)]
 mod tests {
-    #![allow(unused)]
-
     use blake3_tree::blake3::tree::{HashTree, HashTreeBuilder};
-    use blake3_tree::blake3::Hash;
     use blake3_tree::ProofBuf;
     use lightning_interfaces::infu_collection::Collection;
-    use lightning_interfaces::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
+    use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
     use lightning_interfaces::{partial, BlockStoreInterface, IncrementalPutInterface};
     use tokio::test;
 
@@ -366,15 +363,13 @@ mod tests {
 
             // Then: our tree is stored as expected.
             let tree = hash_tree(content.as_slice());
-            if tree.tree
-                != blockstore
-                    .get_tree(&Blake3Hash::from(tree.hash))
-                    .await
-                    .ok_or_else(|| anyhow::anyhow!("failed to get tree"))?
-                    .0
-            {
-                anyhow::bail!("tree is invalid");
-            }
+            let shared = blockstore
+                .get_tree(&Blake3Hash::from(tree.hash))
+                .await
+                .ok_or_else(|| anyhow::anyhow!("failed to get tree"))?;
+            let tree2: &[[u8; 32]] = shared.as_ref().as_ref();
+            assert_eq!(tree.tree, tree2, "tree is invalid");
+
             Ok(())
         };
 
@@ -399,7 +394,7 @@ mod tests {
 
         const SIZE: usize = 4321;
 
-        let mut expected_hash = blake3_tree::blake3::hash(&[0; SIZE]);
+        let expected_hash = blake3_tree::blake3::hash(&[0; SIZE]);
 
         let mut hasher = blake3_tree::blake3::tree::HashTreeBuilder::new();
         for _ in 0..SIZE {
@@ -409,7 +404,9 @@ mod tests {
         assert_eq!(output.hash, expected_hash);
 
         let mut putter = blockstore.put(None);
-        putter.write(&[0; SIZE], CompressionAlgorithm::Uncompressed);
+        putter
+            .write(&[0; SIZE], CompressionAlgorithm::Uncompressed)
+            .expect("failed to write to putter");
         let hash = putter.finalize().await.unwrap();
         assert_eq!(&hash, output.hash.as_bytes());
 
