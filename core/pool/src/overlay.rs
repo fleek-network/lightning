@@ -14,7 +14,7 @@ use tokio::sync::{mpsc, oneshot};
 use x509_parser::nom::AsBytes;
 
 use crate::endpoint::NodeAddress;
-use crate::muxer::Channel;
+use crate::muxer::{Channel, ConnectionInterface, MuxerInterface};
 
 pub type BoxedFilterCallback = Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>;
 
@@ -202,6 +202,14 @@ where
                 pinned: true,
                 address,
             });
+    }
+
+    pub fn index_from_connection<M: MuxerInterface>(
+        &self,
+        connection: &M::Connection,
+    ) -> Option<NodeIndex> {
+        let pk = connection.peer_identity()?;
+        self.sync_query.pubkey_to_index(pk)
     }
 
     pub fn pubkey_to_index(&self, key: NodePublicKey) -> Option<NodeIndex> {

@@ -5,36 +5,28 @@ use anyhow::{Error, Result};
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
-use infusion::c;
-use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{ApplicationInterface, SyncQueryRunnerInterface};
 use tokio_util::sync::CancellationToken;
 
 use crate::endpoint::NodeAddress;
 use crate::muxer::{ConnectionInterface, MuxerInterface};
 
-pub struct Connector<C, M>
+pub struct Connector<M>
 where
-    C: Collection,
     M: MuxerInterface,
 {
-    /// Used for getting peer information from state.
-    sync_query: c![C::ApplicationInterface::SyncExecutor],
     /// Ongoing incoming and outgoing connection set-up tasks.
     connecting: FuturesUnordered<BoxFuture<'static, ConnectionResult<M::Connection>>>,
     /// Pending dialing tasks.
     pending_dial: HashMap<NodeIndex, CancellationToken>,
 }
 
-impl<C, M> Connector<C, M>
+impl<M> Connector<M>
 where
-    C: Collection,
     M: MuxerInterface,
 {
-    pub fn new(sync_query: c!(C::ApplicationInterface::SyncExecutor)) -> Self {
+    pub fn new() -> Self {
         Self {
-            sync_query,
             connecting: FuturesUnordered::new(),
             pending_dial: HashMap::new(),
         }
@@ -71,7 +63,6 @@ where
                     Ok(conn) => ConnectionResult::Success {
                         incoming: false,
                         conn,
-                        peer: index,
                     },
                     Err(e) => ConnectionResult::Failed {
                         peer: Some(index),
@@ -88,37 +79,15 @@ where
     }
 
     pub fn handle_incoming_connection(&mut self, connecting: M::Connecting) {
-        let sync_query = self.sync_query.clone();
         let fut = async move {
-            let connect = || async move {
-                let connection = connecting.await?;
-                let key = connection.peer_identity().ok_or(anyhow::anyhow!(
-                    "failed to get peer identity from successful TLS handshake"
-                ))?;
-                Ok((key, connection))
-            };
-
-            match connect().await {
-                Ok((key, conn)) => {
-                    // Todo: does this prove that they're staked?
-                    match sync_query.pubkey_to_index(key) {
-                        Some(peer) => ConnectionResult::Success {
-                            incoming: true,
-                            conn,
-                            peer,
-                        },
-                        None => ConnectionResult::Failed {
-                            peer: None,
-                            error: anyhow::anyhow!(
-                                "rejecting connection: index not found for peer ({key:?}, {:?})",
-                                conn.remote_address()
-                            ),
-                        },
-                    }
+            match connecting.await {
+                Ok(conn) => ConnectionResult::Success {
+                    incoming: true,
+                    conn,
                 },
                 Err(e) => ConnectionResult::Failed {
                     peer: None,
-                    error: e,
+                    error: e.into(),
                 },
             }
         }
@@ -149,7 +118,6 @@ pub enum ConnectionResult<C: ConnectionInterface> {
     Success {
         incoming: bool,
         conn: C,
-        peer: NodeIndex,
     },
     Failed {
         // Always Some when connection attempt

@@ -10,13 +10,7 @@ use fleek_crypto::NodePublicKey;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{
-    ApplicationInterface,
-    Notification,
-    ServiceScope,
-    SyncQueryRunnerInterface,
-    TopologyInterface,
-};
+use lightning_interfaces::{ApplicationInterface, Notification, ServiceScope, TopologyInterface};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinSet;
@@ -44,8 +38,6 @@ where
 {
     /// Pool of connections.
     pool: HashMap<NodeIndex, DriverHandle>,
-    /// Used for getting peer information from state.
-    sync_query: c![C::ApplicationInterface::SyncExecutor],
     /// Network overlay.
     network_overlay: NetworkOverlay<C>,
     /// Source of network topology.
@@ -57,7 +49,7 @@ where
     /// Sender of events from a connection.
     connection_event_tx: Sender<ConnectionEvent>,
     /// Performs dial tasks.
-    connector: Connector<C, M>,
+    connector: Connector<M>,
     /// Pending outgoing requests.
     pending_task: HashMap<NodeIndex, Vec<DriverRequest>>,
     /// Ongoing drivers.
@@ -95,13 +87,12 @@ where
 
         Self {
             pool: HashMap::new(),
-            sync_query: sync_query.clone(),
-            network_overlay: NetworkOverlay::new(sync_query.clone(), node_public_key, index),
+            network_overlay: NetworkOverlay::new(sync_query, node_public_key, index),
             topology,
             notifier,
             connection_event_rx,
             connection_event_tx,
-            connector: Connector::new(sync_query),
+            connector: Connector::new(),
             pending_task: HashMap::new(),
             driver_set: JoinSet::new(),
             muxer: None,
@@ -262,70 +253,74 @@ where
         Ok(())
     }
 
-    fn handle_connection(&mut self, peer: NodeIndex, connection: M::Connection) {
-        self.connector.cancel_dial(&peer);
+    fn handle_connection(&mut self, connection: M::Connection) {
+        if let Some(peer_index) = self.network_overlay.index_from_connection::<M>(&connection) {
+            self.connector.cancel_dial(&peer_index);
 
-        let is_redundant = self.network_overlay.is_redundant(&peer);
+            let is_redundant = self.network_overlay.is_redundant(&peer_index);
 
-        if is_redundant && self.redundant_pool.contains_key(&peer) {
-            tracing::warn!("too many redundant connections");
-            connection.close(0u8, b"close from disconnect");
-            return;
-        }
-
-        let connection_id = connection.connection_id();
-
-        // Start worker to drive the connection.
-        let (request_tx, request_rx) = mpsc::channel(1024);
-        let connection_event_tx = self.connection_event_tx.clone();
-        let ctx = Context::new(connection, peer, request_rx, connection_event_tx);
-        self.driver_set.spawn(async move {
-            if let Err(e) = driver::start_driver(ctx).await {
-                tracing::info!("driver for connection with {peer:?} exited with error: {e:?}");
+            if is_redundant && self.redundant_pool.contains_key(&peer_index) {
+                tracing::warn!("too many redundant connections");
+                connection.close(0u8, b"close from disconnect");
+                return;
             }
-            (peer, connection_id)
-        });
 
-        // If connection is not expected for broadcast,
-        // we pin the connection.
-        let mut pin = !self.network_overlay.contains(&peer);
+            let connection_id = connection.connection_id();
 
-        // Handle requests that were waiting for a connection to be established.
-        if let Some(pending_requests) = self.pending_task.remove(&peer) {
-            for req in pending_requests {
-                // We need to pin the connection if used by stream service.
-                pin = matches!(req, DriverRequest::NewStream { .. });
-
-                let request_tx_clone = request_tx.clone();
-                tokio::spawn(async move {
-                    if request_tx_clone.send(req).await.is_err() {
-                        tracing::error!("failed to send pending request to driver");
-                    }
-                });
-            }
-        }
-
-        // Save a handle to the driver to send requests.
-        let handle = DriverHandle {
-            pinned: pin,
-            tx: request_tx,
-            connection_id,
-        };
-
-        match self.pool.entry(peer) {
-            Entry::Occupied(mut entry) => {
-                if is_redundant {
-                    self.redundant_pool.insert(peer, handle);
-                } else {
-                    // The old connection could be in the middle of a write,
-                    // so we give it a chance to finish.
-                    let old = entry.insert(handle);
-                    self.redundant_pool.insert(peer, old);
+            // Start worker to drive the connection.
+            let (request_tx, request_rx) = mpsc::channel(1024);
+            let connection_event_tx = self.connection_event_tx.clone();
+            let ctx = Context::new(connection, peer_index, request_rx, connection_event_tx);
+            self.driver_set.spawn(async move {
+                if let Err(e) = driver::start_driver(ctx).await {
+                    tracing::info!(
+                        "driver for connection with {peer_index:?} exited with error: {e:?}"
+                    );
                 }
-            },
-            Entry::Vacant(vacant) => {
-                vacant.insert(handle);
-            },
+                (peer_index, connection_id)
+            });
+
+            // If connection is not expected for broadcast,
+            // we pin the connection.
+            let mut pin = !self.network_overlay.contains(&peer_index);
+
+            // Handle requests that were waiting for a connection to be established.
+            if let Some(pending_requests) = self.pending_task.remove(&peer_index) {
+                for req in pending_requests {
+                    // We need to pin the connection if used by stream service.
+                    pin = matches!(req, DriverRequest::NewStream { .. });
+
+                    let request_tx_clone = request_tx.clone();
+                    tokio::spawn(async move {
+                        if request_tx_clone.send(req).await.is_err() {
+                            tracing::error!("failed to send pending request to driver");
+                        }
+                    });
+                }
+            }
+
+            // Save a handle to the driver to send requests.
+            let handle = DriverHandle {
+                pinned: pin,
+                tx: request_tx,
+                connection_id,
+            };
+
+            match self.pool.entry(peer_index) {
+                Entry::Occupied(mut entry) => {
+                    if is_redundant {
+                        self.redundant_pool.insert(peer_index, handle);
+                    } else {
+                        // The old connection could be in the middle of a write,
+                        // so we give it a chance to finish.
+                        let old = entry.insert(handle);
+                        self.redundant_pool.insert(peer_index, old);
+                    }
+                },
+                Entry::Vacant(vacant) => {
+                    vacant.insert(handle);
+                },
+            }
         }
     }
 
@@ -421,12 +416,12 @@ where
                 }
                 Some(connection_result) = self.connector.advance() => {
                     match connection_result {
-                        ConnectionResult::Success { conn, peer, .. } => {
+                        ConnectionResult::Success { conn, .. } => {
                             // The unwrap here is safe because when accepting connections,
                             // we will fail to connect if we cannot obtain the peer's
                             // public key from the TLS session. When dialing, we already
                             // have the peer's public key.
-                            self.handle_connection(peer, conn);
+                            self.handle_connection(conn);
                         }
                         ConnectionResult::Failed { peer, error } => {
                             if peer.is_none() {
@@ -466,7 +461,7 @@ where
                                 .suggest_connections()
                                 .iter()
                                 .flatten()
-                                .filter_map(|pk| self.sync_query.pubkey_to_index(*pk))
+                                .filter_map(|pk| self.network_overlay.pubkey_to_index(*pk))
                                 .filter(|index| *index != self.network_overlay.get_index())
                                 .collect::<HashSet<_>>();
                             let broadcast_task =  self
