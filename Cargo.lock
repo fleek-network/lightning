@@ -4530,7 +4530,6 @@ dependencies = [
  "hp-fixed",
  "lightning-interfaces",
  "rand 0.8.5",
- "scc",
  "serde",
  "serde_json",
  "tokio",
