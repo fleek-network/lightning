@@ -4,6 +4,8 @@ use std::str::FromStr;
 
 use num_bigint::BigUint;
 use num_traits::{CheckedDiv, FromPrimitive, ToPrimitive, Zero};
+use ruint::aliases::U256;
+use ruint::ToUintError;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
@@ -407,6 +409,15 @@ impl<const P: usize> TryFrom<HpUfixed<P>> for BigUint {
             .0
             .checked_div(&divisor)
             .ok_or(HpFixedConversionError::DivisionError)
+    }
+}
+
+#[cfg(feature = "ruint")]
+impl<const P: usize> TryFrom<HpUfixed<P>> for U256 {
+    type Error = ToUintError<U256>;
+
+    fn try_from(value: HpUfixed<P>) -> Result<Self, Self::Error> {
+        value.0.try_into()
     }
 }
 

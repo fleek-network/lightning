@@ -4,14 +4,16 @@ license = "MIT OR Apache-2.0"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = "1.0.71"
 num-bigint = {version = "0.4.3", features=["serde"]}
 num-traits ="0.2.15"
 serde = { version = "1.0", features = ["derive"] }
+ruint = { version = "1.10", features = ["num-bigint"], optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true
 bincode.workspace = true
+
+[features]
+default = ["ruint"]
