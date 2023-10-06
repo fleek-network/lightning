@@ -9,6 +9,7 @@ use std::time::Duration;
 use affair::{Socket, Task};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use blake3_tree::utils::HashTree;
 use blake3_tree::ProofBuf;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use infusion::c;
@@ -344,28 +345,29 @@ async fn handle_request<C: Collection>(
 ) {
     num_responses.fetch_add(1, Ordering::Relaxed);
     if let Some(proof) = blockstore.get_tree(&peer_request.hash).await {
-        let num_blocks = (&proof.0.len() + 1) / 2;
-        for block in 0..num_blocks {
-            let idx = (block as u32 * 2 - (block as u32).count_ones()) as usize;
-
+        // TODO: blockstore should return this util type directly
+        let tree = HashTree::from(proof.0.as_ref());
+        for block in 0..tree.len() {
             let compr = CompressionAlgoSet::default(); // rustfmt
-            let Some(chunk) = blockstore.get(block as u32, &proof.0[idx], compr).await else {
+            let Some(chunk) = blockstore.get(block as u32, &tree[block], compr).await else {
                 break;
             };
 
             let proof = if block == 0 {
-                ProofBuf::new(&proof.0, 0)
+                ProofBuf::new(tree.as_ref(), 0)
             } else {
-                ProofBuf::resume(&proof.0, block)
+                ProofBuf::resume(tree.as_ref(), block)
             };
 
-            if let Err(e) = request
-                .send(Bytes::from(Frame::Proof(Cow::Borrowed(proof.as_slice()))))
-                .await
-            {
-                error!("Failed to send proof: {e:?}");
-                num_responses.fetch_sub(1, Ordering::Relaxed);
-                return;
+            if !proof.is_empty() {
+                if let Err(e) = request
+                    .send(Bytes::from(Frame::Proof(Cow::Borrowed(proof.as_slice()))))
+                    .await
+                {
+                    error!("Failed to send proof: {e:?}");
+                    num_responses.fetch_sub(1, Ordering::Relaxed);
+                    return;
+                }
             }
 
             if let Err(e) = request
