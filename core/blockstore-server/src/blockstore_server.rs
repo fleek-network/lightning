@@ -9,7 +9,6 @@ use std::time::Duration;
 use affair::{Socket, Task};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use blake3_tree::utils::HashTree;
 use blake3_tree::ProofBuf;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use infusion::c;
@@ -344,9 +343,7 @@ async fn handle_request<C: Collection>(
     num_responses: Arc<AtomicUsize>,
 ) {
     num_responses.fetch_add(1, Ordering::Relaxed);
-    if let Some(proof) = blockstore.get_tree(&peer_request.hash).await {
-        // TODO: blockstore should return this util type directly
-        let tree = HashTree::from(proof.0.as_ref());
+    if let Some(tree) = blockstore.get_tree(&peer_request.hash).await {
         for block in 0..tree.len() {
             let compr = CompressionAlgoSet::default(); // rustfmt
             let Some(chunk) = blockstore.get(block as u32, &tree[block], compr).await else {
@@ -424,6 +421,9 @@ async fn send_request<C: Collection>(
                                 .write(&chunk, CompressionAlgorithm::Uncompressed)
                                 .unwrap(),
                             Frame::Eos => {
+                                // TODO: Handle premature end of stream errors instead of
+                                // unwrapping here, since we there could be an upstream blockstore
+                                // miss where the server would send an EOS frame.
                                 let _hash = putter.finalize().await.unwrap();
                                 // TODO(matthias): do we have to compare this hash to the
                                 // requested hash?

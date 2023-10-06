@@ -197,6 +197,7 @@ async fn get_peers(
     (peers, app, path)
 }
 
+/// Temporary sanity check on the flow
 #[tokio::test]
 async fn test_stream_verified_content() {
     let path1 = std::env::temp_dir().join("lightning-blockstore-transfer-1");
@@ -224,23 +225,22 @@ async fn test_stream_verified_content() {
     let mut network_wire = VecDeque::new();
 
     // The sender sends the content with the proofs to the receiver
-    if let Some(proof) = blockstore1.get_tree(&root_hash).await {
-        let num_blocks = (&proof.0.len() + 1) / 2;
-        for block in 0..num_blocks {
-            let idx = (block as u32 * 2 - (block as u32).count_ones()) as usize;
-
+    if let Some(tree) = blockstore1.get_tree(&root_hash).await {
+        for block in 0..tree.len() {
             let compr = CompressionAlgoSet::default(); // rustfmt
-            let Some(chunk) = blockstore1.get(block as u32, &proof.0[idx], compr).await else {
-                break;
-            };
-
+            let chunk = blockstore1
+                .get(block as u32, &tree[block], compr)
+                .await
+                .expect("failed to get block from store");
             let proof = if block == 0 {
-                ProofBuf::new(&proof.0, 0)
+                ProofBuf::new(tree.as_ref().as_ref(), 0)
             } else {
-                ProofBuf::resume(&proof.0, block)
+                ProofBuf::resume(tree.as_ref().as_ref(), block)
             };
 
-            network_wire.push_back(Frame::Proof(Cow::Owned(proof.as_slice().to_vec())));
+            if !proof.is_empty() {
+                network_wire.push_back(Frame::Proof(Cow::Owned(proof.as_slice().to_vec())));
+            }
             network_wire.push_back(Frame::Chunk(Cow::Owned(chunk.content.clone())));
         }
         network_wire.push_back(Frame::Eos);
