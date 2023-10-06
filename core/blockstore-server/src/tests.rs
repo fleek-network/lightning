@@ -1,10 +1,9 @@
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use blake3_tree::blake3::tree::HashTree;
 use blake3_tree::ProofBuf;
-use bytes::{BufMut, BytesMut};
 use fleek_crypto::{
     AccountOwnerSecretKey,
     ConsensusSecretKey,
@@ -214,48 +213,25 @@ async fn test_stream_verified_content() {
 
     // The sender sends the content with the proofs to the receiver
     if let Some(proof) = blockstore1.get_tree(&root_hash).await {
-        let tree = HashTree {
-            hash: root_hash.into(),
-            tree: proof.0.clone(),
-        };
-        let num_blocks = (tree.tree.len() + 1) / 2;
-        let mut block = 0;
-        let mut buffer = BytesMut::new();
-        for i in 0_u32.. {
-            let idx = (i * 2 - i.count_ones()) as usize;
-            if idx < proof.0.len() {}
-            let idx = if idx < proof.0.len() {
-                idx
-            } else {
-                network_wire.push_back(Frame::Eos);
+        let num_blocks = (&proof.0.len() + 1) / 2;
+        for block in 0..num_blocks {
+            let idx = (block as u32 * 2 - (block as u32).count_ones()) as usize;
+
+            let compr = CompressionAlgoSet::default(); // rustfmt
+            let Some(chunk) = blockstore1.get(block as u32, &proof.0[idx], compr).await else {
                 break;
             };
-            let compr = CompressionAlgoSet::default();
-            let Some(chunk) = blockstore1.get(i, &proof.0[idx], compr).await else {
-                    network_wire.push_back(Frame::Eos);
-                    break;
-                };
-            buffer.put(chunk.content.as_slice());
 
-            let mut proof = if block == 0 {
-                ProofBuf::new(&tree.tree, 0)
+            let proof = if block == 0 {
+                ProofBuf::new(&proof.0, 0)
             } else {
-                ProofBuf::resume(&tree.tree, block)
+                ProofBuf::resume(&proof.0, block)
             };
 
-            while !buffer.is_empty() {
-                if !proof.is_empty() {
-                    network_wire.push_back(Frame::Proof(proof.as_slice().to_vec()));
-                };
-
-                let bytes = buffer.split_to(buffer.len().min(BLOCK_SIZE));
-                network_wire.push_back(Frame::Chunk(bytes.to_vec()));
-                block += 1;
-                if block < num_blocks {
-                    proof = ProofBuf::resume(&tree.tree, block)
-                }
-            }
+            network_wire.push_back(Frame::Proof(Cow::Owned(proof.as_slice().to_vec())));
+            network_wire.push_back(Frame::Chunk(Cow::Owned(chunk.content.clone())));
         }
+        network_wire.push_back(Frame::Eos);
     }
 
     // The receiver reads the frames and puts them into its blockstore

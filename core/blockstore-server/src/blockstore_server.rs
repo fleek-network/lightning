@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 use std::mem;
 use std::net::SocketAddr;
@@ -8,7 +9,6 @@ use std::time::Duration;
 use affair::{Socket, Task};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use blake3_tree::blake3::tree::HashTree;
 use blake3_tree::ProofBuf;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use infusion::c;
@@ -47,9 +47,6 @@ use crate::config::Config;
 
 type ServerRequestTask = Task<ServerRequest, broadcast::Receiver<Result<(), PeerRequestError>>>;
 
-// TODO(matthias): This must be the same value as the `BLOCK_SIZE` constant defined in the block
-// store implementation. We should define a single constant somewhere else.
-const BLOCK_SIZE: usize = 256 << 10;
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(100);
 
 pub struct BlockStoreServer<C: Collection> {
@@ -288,13 +285,13 @@ impl TryFrom<Bytes> for PeerRequest {
     }
 }
 
-pub enum Frame {
-    Proof(Vec<u8>),
-    Chunk(Vec<u8>),
+pub enum Frame<'a> {
+    Proof(Cow<'a, [u8]>),
+    Chunk(Cow<'a, [u8]>),
     Eos,
 }
 
-impl From<Frame> for Bytes {
+impl<'a> From<Frame<'a>> for Bytes {
     fn from(value: Frame) -> Self {
         let mut b = BytesMut::new();
         match value {
@@ -314,13 +311,13 @@ impl From<Frame> for Bytes {
     }
 }
 
-impl TryFrom<Bytes> for Frame {
+impl TryFrom<Bytes> for Frame<'static> {
     type Error = anyhow::Error;
 
     fn try_from(mut value: Bytes) -> Result<Self> {
         match value.get_u8() {
-            0x00 => Ok(Frame::Proof(value.to_vec())),
-            0x01 => Ok(Frame::Chunk(value.to_vec())),
+            0x00 => Ok(Frame::Proof(Cow::Owned(value.to_vec()))),
+            0x01 => Ok(Frame::Chunk(Cow::Owned(value.to_vec()))),
             0x02 => Ok(Frame::Eos),
             _ => Err(anyhow!("Unknown magic byte")),
         }
@@ -347,51 +344,43 @@ async fn handle_request<C: Collection>(
 ) {
     num_responses.fetch_add(1, Ordering::Relaxed);
     if let Some(proof) = blockstore.get_tree(&peer_request.hash).await {
-        let tree = HashTree {
-            hash: peer_request.hash.into(),
-            tree: proof.0.clone(),
-        };
-        let num_blocks = (tree.tree.len() + 1) / 2;
-        let mut block = 0;
-        let mut buffer = BytesMut::new();
-        for i in 0_u32.. {
-            let idx = (i * 2 - i.count_ones()) as usize;
-            if idx < proof.0.len() {}
-            let idx = if idx < proof.0.len() {
-                idx
-            } else {
-                let _ = request.send(Bytes::from(Frame::Eos)).await;
-                return;
-            };
+        let num_blocks = (&proof.0.len() + 1) / 2;
+        for block in 0..num_blocks {
+            let idx = (block as u32 * 2 - (block as u32).count_ones()) as usize;
+
             let compr = CompressionAlgoSet::default(); // rustfmt
-            let Some(chunk) = blockstore.get(i, &proof.0[idx], compr).await else {
-                let _ = request.send(Bytes::from(Frame::Eos)).await;
-                return;
+            let Some(chunk) = blockstore.get(block as u32, &proof.0[idx], compr).await else {
+                break;
             };
-            buffer.put(chunk.content.as_slice());
 
-            let mut proof = if block == 0 {
-                ProofBuf::new(&tree.tree, 0)
+            let proof = if block == 0 {
+                ProofBuf::new(&proof.0, 0)
             } else {
-                ProofBuf::resume(&tree.tree, block)
+                ProofBuf::resume(&proof.0, block)
             };
 
-            while !buffer.is_empty() {
-                if !proof.is_empty() {
-                    let _ = request
-                        .send(Bytes::from(Frame::Proof(proof.as_slice().to_vec())))
-                        .await;
-                };
-
-                let bytes = buffer.split_to(buffer.len().min(BLOCK_SIZE));
-                let _ = request
-                    .send(Bytes::from(Frame::Chunk(bytes.to_vec())))
-                    .await;
-                block += 1;
-                if block < num_blocks {
-                    proof = ProofBuf::resume(&tree.tree, block)
-                }
+            if let Err(e) = request
+                .send(Bytes::from(Frame::Proof(Cow::Borrowed(proof.as_slice()))))
+                .await
+            {
+                error!("Failed to send proof: {e:?}");
+                num_responses.fetch_sub(1, Ordering::Relaxed);
+                return;
             }
+
+            if let Err(e) = request
+                .send(Bytes::from(Frame::Chunk(Cow::Borrowed(
+                    chunk.content.as_slice(),
+                ))))
+                .await
+            {
+                error!("Failed to send chunk: {e:?}");
+                num_responses.fetch_sub(1, Ordering::Relaxed);
+                return;
+            }
+        }
+        if let Err(e) = request.send(Bytes::from(Frame::Eos)).await {
+            error!("Failed to send eos: {e:?}");
         }
     }
     num_responses.fetch_sub(1, Ordering::Relaxed);
