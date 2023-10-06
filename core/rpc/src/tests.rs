@@ -41,6 +41,7 @@ use lightning_interfaces::{
     MempoolSocket,
     OriginProviderInterface,
     PoolInterface,
+    ReputationAggregatorInterface,
     RpcInterface,
     SignerInterface,
     SyncQueryRunnerInterface,
@@ -48,6 +49,7 @@ use lightning_interfaces::{
 };
 use lightning_origin_ipfs::{Config as OriginIPFSConfig, IPFSOrigin};
 use lightning_pool::{muxer, Config as PoolConfig, Pool};
+use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{Config as SignerConfig, Signer};
 use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
@@ -90,20 +92,32 @@ partial!(TestBinding {
     OriginProviderInterface = IPFSOrigin<Self>;
     SignerInterface = Signer<Self>;
     PoolInterface = Pool<Self>;
+    ReputationAggregatorInterface = ReputationAggregator<Self>;
 });
 
 fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
     let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
+
     let ipfs_origin =
         IPFSOrigin::<TestBinding>::init(OriginIPFSConfig::default(), blockstore.clone()).unwrap();
 
     let signer = Signer::<TestBinding>::init(SignerConfig::test(), app.sync_query()).unwrap();
+
+    let rep_aggregator = ReputationAggregator::<TestBinding>::init(
+        Default::default(),
+        signer.get_socket(),
+        Default::default(),
+        app.sync_query(),
+    )
+    .unwrap();
+
     let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         PoolConfig::default(),
         &signer,
         app.sync_query(),
         Default::default(),
         Default::default(),
+        rep_aggregator.get_reporter(),
     )
     .unwrap();
 
@@ -122,6 +136,7 @@ fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
         &ipfs_origin,
     )
     .unwrap();
+
     let rpc = Rpc::<TestBinding>::init(
         RpcConfig::default(),
         MockWorker::mempool_socket(),

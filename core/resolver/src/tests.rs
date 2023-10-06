@@ -99,6 +99,7 @@ async fn test_start_shutdown() {
         app.sync_query(),
         Default::default(),
         Default::default(),
+        rep_aggregator.get_reporter(),
     )
     .unwrap();
 

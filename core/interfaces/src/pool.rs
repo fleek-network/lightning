@@ -14,6 +14,7 @@ use crate::{
     ConfigConsumer,
     ConfigProviderInterface,
     NotifierInterface,
+    ReputationAggregatorInterface,
     TopologyInterface,
     WithStartAndShutdown,
 };
@@ -57,6 +58,7 @@ pub trait PoolInterface<C: Collection>:
         app: ::ApplicationInterface,
         notifier: ::NotifierInterface,
         topology: ::TopologyInterface,
+        rep_aggregator: ::ReputationAggregatorInterface,
     ) {
         Self::init(
             config.get::<Self>(),
@@ -64,6 +66,7 @@ pub trait PoolInterface<C: Collection>:
             app.sync_query(),
             notifier.clone(),
             topology.clone(),
+            rep_aggregator.get_reporter(),
         )
     }
 
@@ -77,6 +80,7 @@ pub trait PoolInterface<C: Collection>:
         sqr: c!(C::ApplicationInterface::SyncExecutor),
         notifier: c!(C::NotifierInterface),
         topology: c!(C::TopologyInterface),
+        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     ) -> anyhow::Result<Self>;
 
     fn open_event(&self, scope: ServiceScope) -> Self::EventHandler;

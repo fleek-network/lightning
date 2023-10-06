@@ -12,7 +12,7 @@ use quinn::{ClientConfig, Endpoint, RecvStream, SendStream, ServerConfig, Transp
 use rustls::Certificate;
 
 use crate::endpoint::NodeAddress;
-use crate::muxer::{ConnectionInterface, MuxerInterface};
+use crate::muxer::{ConnectionInterface, Metrics, MuxerInterface};
 use crate::tls;
 
 #[derive(Clone)]
@@ -146,6 +146,10 @@ impl ConnectionInterface for Connection {
 
     fn connection_id(&self) -> usize {
         self.0.stable_id()
+    }
+
+    fn metrics(&self) -> Metrics {
+        Metrics { rtt: self.0.rtt() }
     }
 
     fn close(&self, error_code: u8, reason: &[u8]) {

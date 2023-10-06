@@ -31,6 +31,7 @@ use lightning_interfaces::{
     IncrementalPutInterface,
     NotifierInterface,
     PoolInterface,
+    ReputationAggregatorInterface,
     SignerInterface,
     SyncQueryRunnerInterface,
     TopologyInterface,
@@ -38,6 +39,7 @@ use lightning_interfaces::{
 };
 use lightning_notifier::Notifier;
 use lightning_pool::{muxer, Config as PoolConfig, Pool};
+use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{utils, Config as SignerConfig, Signer};
 use lightning_topology::{Config as TopologyConfig, Topology};
 
@@ -53,6 +55,7 @@ partial!(TestBinding {
     SignerInterface = Signer<Self>;
     NotifierInterface = Notifier<Self>;
     TopologyInterface = Topology<Self>;
+    ReputationAggregatorInterface = ReputationAggregator<Self>;
 });
 
 fn create_content() -> Vec<u8> {
@@ -150,8 +153,16 @@ async fn get_peers(
             query_runner.clone(),
         )
         .unwrap();
+        let rep_aggregator = ReputationAggregator::<TestBinding>::init(
+            Default::default(),
+            signer.get_socket(),
+            notifier.clone(),
+            query_runner.clone(),
+        )
+        .unwrap();
+
         let config = PoolConfig {
-            max_idle_timeout: 300,
+            max_idle_timeout: Duration::from_secs(5),
             address: format!("0.0.0.0:{}", port_offset + i as u16)
                 .parse()
                 .unwrap(),
@@ -162,6 +173,7 @@ async fn get_peers(
             query_runner,
             notifier,
             topology,
+            rep_aggregator.get_reporter(),
         )
         .unwrap();
 

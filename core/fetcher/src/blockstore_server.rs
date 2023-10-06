@@ -492,6 +492,7 @@ mod tests {
         IncrementalPutInterface,
         NotifierInterface,
         PoolInterface,
+        ReputationAggregatorInterface,
         ServiceScope,
         SignerInterface,
         SyncQueryRunnerInterface,
@@ -500,6 +501,7 @@ mod tests {
     };
     use lightning_notifier::Notifier;
     use lightning_pool::{muxer, Config as PoolConfig, Pool};
+    use lightning_rep_collector::ReputationAggregator;
     use lightning_signer::{utils, Config as SignerConfig, Signer};
     use lightning_topology::{Config as TopologyConfig, Topology};
     use tokio::sync::{mpsc, oneshot};
@@ -514,6 +516,7 @@ mod tests {
         SignerInterface = Signer<Self>;
         NotifierInterface = Notifier<Self>;
         TopologyInterface = Topology<Self>;
+        ReputationAggregatorInterface = ReputationAggregator<Self>;
     });
 
     fn create_content() -> Vec<u8> {
@@ -612,6 +615,13 @@ mod tests {
                 query_runner.clone(),
             )
             .unwrap();
+            let rep_aggregator = ReputationAggregator::<TestBinding>::init(
+                lightning_rep_collector::config::Config::default(),
+                signer.get_socket(),
+                notifier.clone(),
+                query_runner.clone(),
+            )
+            .unwrap();
             let config = PoolConfig {
                 max_idle_timeout: Duration::from_secs(5),
                 address: format!("0.0.0.0:{}", port_offset + i as u16)
@@ -624,6 +634,7 @@ mod tests {
                 query_runner,
                 notifier,
                 topology,
+                rep_aggregator.get_reporter(),
             )
             .unwrap();
 

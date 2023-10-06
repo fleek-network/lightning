@@ -32,6 +32,7 @@ lightning-blockstore-server = { path = "../blockstore-server" }
 lightning-origin-ipfs = { path = "../origin-ipfs" }
 lightning-signer = { path="../signer" }
 lightning-pool = { path = "../pool" }
+lightning-rep-collector = { path = "../rep-collector" }
 
 [features]
 e2e-test = []

@@ -17,6 +17,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
     NotifierInterface,
+    ReputationAggregatorInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
@@ -171,6 +172,7 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         notifier: c!(C::NotifierInterface),
         topology: c!(C::TopologyInterface),
+        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     ) -> Result<Pool<C, QuinnMuxer>> {
         let (_, sk) = signer.get_sk();
         let public_key = sk.to_pk();
@@ -194,6 +196,7 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
             topology,
             sync_query,
             notifier_rx,
+            rep_reporter,
             muxer_config,
             public_key,
             OnceCell::new(),

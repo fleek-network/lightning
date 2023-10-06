@@ -242,6 +242,10 @@ where
         self.sync_query.pubkey_to_index(key)
     }
 
+    pub fn index_to_pubkey(&self, index: NodeIndex) -> Option<NodePublicKey> {
+        self.sync_query.index_to_pubkey(index)
+    }
+
     pub async fn next(&mut self) -> Option<PoolTask> {
         loop {
             tokio::select! {

@@ -21,6 +21,7 @@ use lightning_interfaces::{
     EventHandler,
     NotifierInterface,
     PoolInterface,
+    ReputationAggregatorInterface,
     Request,
     Requester,
     Responder,
@@ -32,6 +33,7 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
+use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{utils, Config as SignerConfig, Signer};
 use lightning_topology::{Config as TopologyConfig, Topology};
 
@@ -43,6 +45,7 @@ partial!(TestBinding {
     SignerInterface = Signer<Self>;
     NotifierInterface = Notifier<Self>;
     TopologyInterface = Topology<Self>;
+    ReputationAggregatorInterface = ReputationAggregator<Self>;
 });
 
 struct Peer<C: Collection> {
@@ -120,14 +123,26 @@ async fn get_pools(
     let mut peers = Vec::new();
     for (i, signer_config) in signers_configs.into_iter().enumerate() {
         let (_, query_runner) = (app.transaction_executor(), app.sync_query());
+
         let signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+
         let notifier = Notifier::<TestBinding>::init(&app);
+
         let topology = Topology::<TestBinding>::init(
             TopologyConfig::default(),
             signer.get_ed25519_pk(),
             query_runner.clone(),
         )
         .unwrap();
+
+        let rep_aggregator = ReputationAggregator::<TestBinding>::init(
+            Default::default(),
+            signer.get_socket(),
+            notifier.clone(),
+            query_runner.clone(),
+        )
+        .unwrap();
+
         let config = Config {
             max_idle_timeout: Duration::from_secs(5),
             address: format!("0.0.0.0:{}", port_offset + i as u16)
@@ -140,6 +155,7 @@ async fn get_pools(
             query_runner,
             notifier,
             topology,
+            rep_aggregator.get_reporter(),
         )
         .unwrap();
 

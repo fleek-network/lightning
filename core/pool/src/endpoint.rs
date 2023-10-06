@@ -10,7 +10,14 @@ use fleek_crypto::NodePublicKey;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{ApplicationInterface, Notification, ServiceScope, TopologyInterface};
+use lightning_interfaces::{
+    ApplicationInterface,
+    Notification,
+    ReputationAggregatorInterface,
+    ReputationReporterInterface,
+    ServiceScope,
+    TopologyInterface,
+};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinSet;
@@ -75,6 +82,8 @@ where
     topology: c![C::TopologyInterface],
     /// Epoch notifier for triggering polling of topology.
     notifier: Receiver<Notification>,
+    /// Report metrics of peers.
+    rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     /// Receiver of events from a connection.
     connection_event_rx: Receiver<ConnectionEvent>,
     /// Sender of events from a connection.
@@ -111,6 +120,7 @@ where
         topology: c!(C::TopologyInterface),
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         notifier: Receiver<Notification>,
+        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
         config: M::Config,
         node_public_key: NodePublicKey,
         index: OnceCell<NodeIndex>,
@@ -122,6 +132,7 @@ where
             network_overlay: NetworkOverlay::new(sync_query, node_public_key, index),
             topology,
             notifier,
+            rep_reporter,
             connection_event_rx,
             connection_event_tx,
             connector: Connector::new(),
@@ -303,6 +314,13 @@ where
             // we could inadvertently drop the wrong connection if we only
             // rely on `NodeIndex`.
             let connection_id = connection.connection_id();
+
+            // Report the latency of this peer.
+            // Todo: Remove this `if` when we switch to using NodeIndex.
+            if let Some(pk) = self.network_overlay.index_to_pubkey(peer_index) {
+                self.rep_reporter
+                    .report_latency(&pk, connection.metrics().rtt);
+            }
 
             // Start worker to drive the connection.
             let (request_tx, request_rx) = mpsc::channel(1024);

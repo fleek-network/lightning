@@ -5,6 +5,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
@@ -46,6 +47,7 @@ pub trait ConnectionInterface: Clone + Send + 'static {
     fn peer_identity(&self) -> Option<NodePublicKey>;
     fn remote_address(&self) -> SocketAddr;
     fn connection_id(&self) -> usize;
+    fn metrics(&self) -> Metrics;
     fn close(&self, error_code: u8, reason: &[u8]);
 }
 
@@ -151,4 +153,8 @@ impl Sink<Bytes> for Channel {
             .poll_close(cx)
             .map_err(|_| io::ErrorKind::BrokenPipe.into())
     }
+}
+
+pub struct Metrics {
+    pub rtt: Duration,
 }

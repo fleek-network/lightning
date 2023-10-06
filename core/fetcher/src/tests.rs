@@ -155,7 +155,7 @@ async fn get_fetchers(
 
     let mut peers = Vec::new();
     for (i, signer_config) in signers_configs.into_iter().enumerate() {
-        let (_, query_runner) = (app.transaction_executor(), app.sync_query());
+        let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
         let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
         let topology = Topology::<TestBinding>::init(
             TopologyConfig::default(),
@@ -165,7 +165,18 @@ async fn get_fetchers(
         .unwrap();
 
         let notifier = Notifier::<TestBinding>::init(&app);
-        let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+
+        let rep_coll_config = RepCollConfig {
+            reporter_buffer_size: 1,
+        };
+        let rep_aggregator = ReputationAggregator::<TestBinding>::init(
+            rep_coll_config,
+            signer.get_socket(),
+            notifier.clone(),
+            query_runner.clone(),
+        )
+        .unwrap();
+
         let config = PoolConfig {
             max_idle_timeout: Duration::from_secs(5),
             address: format!("0.0.0.0:{}", pool_port_offset + i as u16)
@@ -176,19 +187,9 @@ async fn get_fetchers(
             config,
             &signer,
             query_runner.clone(),
-            notifier.clone(),
-            topology,
-        )
-        .unwrap();
-
-        let rep_coll_config = RepCollConfig {
-            reporter_buffer_size: 1,
-        };
-        let rep_aggregator = ReputationAggregator::<TestBinding>::init(
-            rep_coll_config,
-            signer.get_socket(),
             notifier,
-            query_runner.clone(),
+            topology,
+            rep_aggregator.get_reporter(),
         )
         .unwrap();
 

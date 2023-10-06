@@ -39,5 +39,6 @@ lightning-application = {path="../application", features = ["test"]}
 lightning-notifier = {path="../notifier"}
 lightning-topology = {path="../topology"}
 lightning-pool = {path="../pool"}
+lightning-rep-collector = { path = "../rep-collector" }
 fleek-crypto.workspace = true
 futures.workspace = true

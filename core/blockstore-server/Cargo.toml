@@ -26,4 +26,5 @@ lightning-notifier = { path="../notifier" }
 lightning-topology = { path="../topology" }
 lightning-signer = { path="../signer" }
 lightning-pool = { path = "../pool" }
+lightning-rep-collector = { path = "../rep-collector" }
 fleek-crypto.workspace = true
