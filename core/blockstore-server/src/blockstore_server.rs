@@ -131,7 +131,6 @@ pub struct BlockstoreServerInner<C: Collection> {
 }
 
 impl<C: Collection> BlockstoreServerInner<C> {
-    #[allow(unused)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         blockstore: C::BlockStoreInterface,

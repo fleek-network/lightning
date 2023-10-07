@@ -10,6 +10,7 @@ lightning-interfaces = { path = "../interfaces" }
 lightning-node = { path = "../node" }
 lightning-rpc = { path = "../rpc", features = ["e2e-test"] }
 lightning-application = { path = "../application" }
+lightning-syncronizer = { path = "../syncronizer", features = ["e2e-test"] }
 lightning-broadcast = { path = "../broadcast" }
 lightning-consensus = { path = "../consensus" }
 lightning-notifier = { path = "../notifier" }
@@ -39,6 +40,7 @@ serial_test = "2.0.0"
 simplelog = "0.12.1"
 log.workspace = true
 chrono = "0.4.26"
+fleek-blake3 = "1.4"
 
 toml = "0.7"
 resolve-path = "0.1.0"

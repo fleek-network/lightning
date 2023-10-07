@@ -130,7 +130,7 @@ fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
 
     let fetcher = Fetcher::<TestBinding>::init(
         FetcherConfig::default(),
-        blockstore,
+        blockstore.clone(),
         &blockstore_server,
         Default::default(),
         &ipfs_origin,
@@ -141,6 +141,7 @@ fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
         RpcConfig::default(),
         MockWorker::mempool_socket(),
         app.sync_query(),
+        blockstore,
         &fetcher,
     )?;
     Ok(rpc)

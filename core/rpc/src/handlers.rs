@@ -27,7 +27,7 @@ use lightning_interfaces::types::{
 };
 #[cfg(feature = "e2e-test")]
 use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
-use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_interfaces::{BlockStoreInterface, SyncQueryRunnerInterface};
 
 use crate::server::RpcData;
 #[cfg(feature = "e2e-test")]
@@ -115,6 +115,7 @@ impl RpcServer {
         #[cfg(feature = "e2e-test")]
         {
             server = server
+                .with_method("flk_get", get::<C>)
                 .with_method("flk_dht_put", dht_put::<C>)
                 .with_method("flk_dht_get", dht_get::<C>);
         }
@@ -127,6 +128,17 @@ pub async fn rpc_discovery_handler<C: Collection>() -> Result<String> {
     match fs::read_to_string(OPEN_RPC_DOCS) {
         Ok(contents) => Ok(contents),
         Err(e) => Err(Error::internal(e)),
+    }
+}
+
+#[cfg(feature = "e2e-test")]
+pub async fn get<C: Collection>(
+    data: Data<Arc<RpcData<C>>>,
+    Params(params): Params<Blake3Hash>,
+) -> Result<Vec<u8>> {
+    match data.blockstore.read_all_to_vec(&params).await {
+        Some(content) => Ok(content),
+        None => Err(Error::INTERNAL_ERROR),
     }
 }
 

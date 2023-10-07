@@ -30,6 +30,11 @@ use tokio::task::JoinHandle;
 
 use crate::rpc::{rpc_epoch, rpc_last_epoch_hash, rpc_request};
 
+#[cfg(all(not(test), not(feature = "e2e-test")))]
+const EPOCH_CHANGE_DELTA: Duration = Duration::from_secs(300);
+#[cfg(any(test, feature = "e2e-test"))]
+const EPOCH_CHANGE_DELTA: Duration = Duration::from_secs(5);
+
 pub struct Syncronizer<C: Collection> {
     inner: Mutex<Option<SyncronizerInner<C>>>,
     rx_checkpoint_ready: Mutex<Option<oneshot::Receiver<Blake3Hash>>>,
@@ -157,8 +162,7 @@ impl<C: Collection> SyncronizerInner<C> {
             let until_epoch_ends: u64 = (epoch_end as u128).saturating_sub(now).try_into().unwrap();
             let time_until_epoch_change = Duration::from_millis(until_epoch_ends);
 
-            let time_to_check =
-                tokio::time::sleep(time_until_epoch_change + Duration::from_secs(300));
+            let time_to_check = tokio::time::sleep(time_until_epoch_change + EPOCH_CHANGE_DELTA);
 
             let epoch_change_future = self.rx_epoch_change.recv();
 

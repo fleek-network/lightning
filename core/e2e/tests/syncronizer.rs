@@ -1,0 +1,101 @@
+use std::fs;
+use std::time::{Duration, SystemTime};
+
+use anyhow::Result;
+use fleek_blake3 as blake3;
+use lightning_e2e::swarm::Swarm;
+use lightning_e2e::utils::{logging, rpc};
+use resolved_pathbuf::ResolvedPathBuf;
+use serde_json::json;
+use serial_test::serial;
+
+#[tokio::test]
+#[serial]
+async fn e2e_syncronize_state() -> Result<()> {
+    logging::setup();
+
+    // Start epoch now and let it end in 40 seconds.
+    let epoch_start = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+
+    let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/syncronize-state").unwrap();
+    if path.exists() {
+        fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
+    }
+    let swarm = Swarm::builder()
+        .with_directory(path)
+        .with_min_port(10501)
+        .with_max_port(10600)
+        .with_num_nodes(5)
+        .with_committee_size(4)
+        .with_epoch_time(15000)
+        .with_epoch_start(epoch_start)
+        .use_persistence()
+        .build();
+    swarm.launch_genesis_committee().await.unwrap();
+
+    // Wait for the epoch to change.
+    tokio::time::sleep(Duration::from_secs(20)).await;
+
+    // Make sure that all genesis nodes changed epoch.
+    let request = json!({
+        "jsonrpc": "2.0",
+        "method":"flk_get_epoch",
+        "params":[],
+        "id":1,
+    });
+    for (_, address) in swarm.get_genesis_committee_rpc_addresses() {
+        let response = rpc::rpc_request(address, request.to_string())
+            .await
+            .unwrap();
+
+        let epoch = rpc::parse_response::<u64>(response)
+            .await
+            .expect("Failed to parse response.");
+        assert_eq!(epoch, 1);
+    }
+
+    // Start the node that is not on the genesis committee.
+    swarm.launch_non_genesis_committee().await.unwrap();
+
+    // Get the checkpoint receivers from the syncronizer for the node that is not on the genesis
+    // committee.
+    let ckpt_rx = swarm
+        .get_non_genesis_committee_ckpt_rx()
+        .pop()
+        .unwrap()
+        .unwrap();
+    let (_, rpc_address) = swarm
+        .get_non_genesis_committee_rpc_addresses()
+        .into_iter()
+        .next()
+        .unwrap();
+
+    // Wait for the syncronizer to detect that we are behind and send the checkpoint hash.
+    let ckpt_hash = ckpt_rx.await.expect("Failed to receive checkpoint hash");
+
+    // Get the hash for this checkpoint from our blockstore. The syncronizer should have downloaded
+    // it.
+    let request = json!({
+        "jsonrpc": "2.0",
+        "method": "flk_get",
+        "params": ckpt_hash,
+        "id":1,
+    });
+    let response = rpc::rpc_request(rpc_address, request.to_string())
+        .await
+        .unwrap();
+
+    let checkpoint = rpc::parse_response::<Vec<u8>>(response)
+        .await
+        .expect("Failed to parse response.");
+
+    // Make sure the checkpoint matches the hash.
+    let hash = blake3::hash(&checkpoint);
+    assert_eq!(hash, ckpt_hash);
+
+    swarm.shutdown();
+    Ok(())
+}

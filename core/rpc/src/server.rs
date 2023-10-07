@@ -38,6 +38,7 @@ pub struct RpcData<C: Collection> {
     pub query_runner: c!(C::ApplicationInterface::SyncExecutor),
     pub mempool_socket: MempoolSocket,
     pub fetcher_socket: FetcherSocket,
+    pub blockstore: C::BlockStoreInterface,
     #[cfg(feature = "e2e-test")]
     pub dht_socket: Arc<Mutex<Option<DhtSocket>>>,
 }
@@ -107,6 +108,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         config: Self::Config,
         mempool: MempoolSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        blockstore: C::BlockStoreInterface,
         fetcher: &C::FetcherInterface,
     ) -> anyhow::Result<Self> {
         #[cfg(not(feature = "e2e-test"))]
@@ -126,6 +128,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
                 mempool_socket: mempool,
                 query_runner,
                 dht_socket: Arc::new(Mutex::new(None)),
+                blockstore,
                 fetcher_socket: fetcher.get_socket(),
             }),
             config,

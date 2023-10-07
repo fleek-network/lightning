@@ -27,7 +27,7 @@ use lightning_dht::dht::Dht;
 use lightning_handshake::handshake::{Handshake, HandshakeConfig};
 use lightning_handshake::transports::webrtc::WebRtcConfig;
 use lightning_handshake::{TransportConfig, WorkerMode};
-use lightning_interfaces::types::{NodePorts, Staking};
+use lightning_interfaces::types::{Blake3Hash, NodePorts, Staking};
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
@@ -41,6 +41,7 @@ use lightning_rpc::server::Rpc;
 use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
 use lightning_signer::{utils, Config as SignerConfig, Signer};
 use resolved_pathbuf::ResolvedPathBuf;
+use tokio::sync::oneshot;
 
 use crate::containerized_node::ContainerizedNode;
 use crate::utils::networking::{PortAssigner, Transport};
@@ -66,6 +67,28 @@ impl Swarm {
         Ok(())
     }
 
+    pub async fn launch_genesis_committee(&self) -> anyhow::Result<()> {
+        try_join_all(
+            self.nodes
+                .values()
+                .filter(|node| node.is_genesis_committee())
+                .map(|node| node.start()),
+        )
+        .await?;
+        Ok(())
+    }
+
+    pub async fn launch_non_genesis_committee(&self) -> anyhow::Result<()> {
+        try_join_all(
+            self.nodes
+                .values()
+                .filter(|node| !node.is_genesis_committee())
+                .map(|node| node.start()),
+        )
+        .await?;
+        Ok(())
+    }
+
     pub fn shutdown(mut self) {
         self.shutdown_internal();
     }
@@ -74,6 +97,30 @@ impl Swarm {
         self.nodes
             .iter()
             .map(|(pubkey, node)| (*pubkey, node.get_rpc_address()))
+            .collect()
+    }
+
+    pub fn get_genesis_committee_rpc_addresses(&self) -> HashMap<NodePublicKey, String> {
+        self.nodes
+            .iter()
+            .filter(|(_, node)| node.is_genesis_committee())
+            .map(|(pubkey, node)| (*pubkey, node.get_rpc_address()))
+            .collect()
+    }
+
+    pub fn get_non_genesis_committee_rpc_addresses(&self) -> HashMap<NodePublicKey, String> {
+        self.nodes
+            .iter()
+            .filter(|(_, node)| !node.is_genesis_committee())
+            .map(|(pubkey, node)| (*pubkey, node.get_rpc_address()))
+            .collect()
+    }
+
+    pub fn get_non_genesis_committee_ckpt_rx(&self) -> Vec<Option<oneshot::Receiver<Blake3Hash>>> {
+        self.nodes
+            .values()
+            .filter(|node| !node.is_genesis_committee())
+            .map(|node| node.take_ckpt_rx())
             .collect()
     }
 
@@ -239,6 +286,7 @@ impl SwarmBuilder {
 
         let mut nodes = HashMap::new();
         for (index, (owner_sk, node_pk, config)) in tmp_nodes.into_iter().enumerate() {
+            let is_committee = (index as u64) < genesis.committee_size;
             let root = directory.join(format!("node-{index}"));
             let storage = if self.use_persistence {
                 StorageConfig::RocksDb
@@ -254,7 +302,7 @@ impl SwarmBuilder {
                 db_options: None,
             });
 
-            let node = ContainerizedNode::new(config, owner_sk, index);
+            let node = ContainerizedNode::new(config, owner_sk, index, is_committee);
             nodes.insert(node_pk, node);
         }
 

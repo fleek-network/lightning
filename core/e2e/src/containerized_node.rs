@@ -1,10 +1,12 @@
 use std::sync::Mutex;
 
 use fleek_crypto::AccountOwnerSecretKey;
+use lightning_interfaces::types::Blake3Hash;
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
 use lightning_rpc::server::Rpc;
+use tokio::sync::oneshot;
 
 use crate::container::Container;
 
@@ -14,6 +16,7 @@ pub struct ContainerizedNode {
     container: Mutex<Option<Container<FinalTypes>>>,
     runtime_type: RuntimeType,
     index: usize,
+    is_genesis_committee: bool,
 }
 
 impl ContainerizedNode {
@@ -21,6 +24,7 @@ impl ContainerizedNode {
         config: TomlConfigProvider<FinalTypes>,
         owner_secret_key: AccountOwnerSecretKey,
         index: usize,
+        is_genesis_committee: bool,
     ) -> Self {
         Self {
             config,
@@ -28,6 +32,7 @@ impl ContainerizedNode {
             container: Default::default(),
             runtime_type: RuntimeType::MultiThreaded,
             index,
+            is_genesis_committee,
         }
     }
 
@@ -59,6 +64,22 @@ impl ContainerizedNode {
 
     pub fn get_index(&self) -> usize {
         self.index
+    }
+
+    pub fn take_ckpt_rx(&self) -> Option<oneshot::Receiver<Blake3Hash>> {
+        let container = self.container.lock().unwrap().take();
+        if let Some(mut container) = container {
+            let ckpt_rx = container.take_ckpt_rx();
+            *self.container.lock().unwrap() = Some(container);
+            ckpt_rx
+        } else {
+            *self.container.lock().unwrap() = None;
+            None
+        }
+    }
+
+    pub fn is_genesis_committee(&self) -> bool {
+        self.is_genesis_committee
     }
 }
 

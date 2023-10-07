@@ -3,8 +3,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
+use infusion::tag;
 use lightning_interfaces::infu_collection::{Collection, Node};
-use tokio::sync::Notify;
+use lightning_interfaces::types::Blake3Hash;
+use lightning_interfaces::SyncronizerInterface;
+use tokio::sync::{oneshot, Notify};
 
 use crate::containerized_node::RuntimeType;
 
@@ -12,6 +15,7 @@ use crate::containerized_node::RuntimeType;
 pub struct Container<C: Collection> {
     join_handle: Option<JoinHandle<()>>,
     shutdown_notify: Option<Arc<Notify>>,
+    ckpt_rx: Option<oneshot::Receiver<Blake3Hash>>,
     collection: PhantomData<C>,
 }
 
@@ -31,6 +35,7 @@ impl<C: Collection> Container<C> {
         let shutdown_notify_rx = shutdown_notify.clone();
         let (started_tx, started_rx) = tokio::sync::oneshot::channel::<()>();
 
+        let (tx, rx) = std::sync::mpsc::channel();
         let handle = std::thread::Builder::new()
             .name(format!("NODE-{index}#MAIN"))
             .spawn(move || {
@@ -52,6 +57,14 @@ impl<C: Collection> Container<C> {
                 runtime.block_on(async move {
                     let node = Node::<C>::init(config).unwrap();
                     node.start().await;
+                    let ckpt_socket = node
+                        .container
+                        .get::<<C as Collection>::SyncronizerInterface>(tag!(
+                            C::SyncronizerInterface
+                        ))
+                        .checkpoint_socket();
+                    tx.send(ckpt_socket)
+                        .expect("Failed to send checkpoint socket");
 
                     let _ = started_tx.send(());
 
@@ -61,11 +74,13 @@ impl<C: Collection> Container<C> {
             })
             .expect("Failed to spawn E2E thread");
 
+        let ckpt_rx = rx.recv().expect("Failed to receive checkpoint socket");
         started_rx.await.expect("Failed to start the node.");
 
         Self {
             join_handle: Some(handle),
             shutdown_notify: Some(shutdown_notify),
+            ckpt_rx: Some(ckpt_rx),
             collection: PhantomData,
         }
     }
@@ -76,5 +91,9 @@ impl<C: Collection> Container<C> {
             shutdown_notify.notify_one();
             handle.join().expect("Failed to shutdown container.");
         }
+    }
+
+    pub fn take_ckpt_rx(&mut self) -> Option<oneshot::Receiver<Blake3Hash>> {
+        self.ckpt_rx.take()
     }
 }
