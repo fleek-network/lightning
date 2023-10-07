@@ -134,11 +134,6 @@ where
     }
 
     #[inline]
-    pub fn is_redundant(&self, peer: &NodeIndex) -> bool {
-        self.peers.contains_key(peer) && peer > &self.get_index()
-    }
-
-    #[inline]
     pub fn contains(&self, peer: &NodeIndex) -> bool {
         self.peers.contains_key(peer)
     }

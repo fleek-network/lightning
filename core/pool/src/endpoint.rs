@@ -273,6 +273,8 @@ where
             BroadcastTask::Update { peers } => {
                 // Keep ongoing connections.
                 self.pool.retain(|index, _| peers.contains_key(index));
+                self.redundant_pool
+                    .retain(|index, _| peers.contains_key(index));
 
                 for info in peers.into_values() {
                     // We do not want to connect to peers we're already connected to
@@ -298,11 +300,9 @@ where
         if let Some(peer_index) = self.network_overlay.index_from_connection::<M>(&connection) {
             self.connector.cancel_dial(&peer_index);
 
-            // Redundant connections arent dropped immediately. Please see comment in `Endpoint`.
-            let is_redundant = self.network_overlay.is_redundant(&peer_index);
-
             // We only allow one redundant connection per peer.
-            if is_redundant && self.redundant_pool.contains_key(&peer_index) {
+            if self.pool.contains_key(&peer_index) && self.redundant_pool.contains_key(&peer_index)
+            {
                 tracing::warn!("too many redundant connections with peer {peer_index:?}");
                 connection.close(0u8, b"close from disconnect");
                 return;
@@ -368,15 +368,8 @@ where
             };
 
             match self.pool.entry(peer_index) {
-                Entry::Occupied(mut entry) => {
-                    if is_redundant {
-                        self.redundant_pool.insert(peer_index, handle);
-                    } else {
-                        // The old connection could be in the middle of a write,
-                        // so we give it a chance to finish.
-                        let old = entry.insert(handle);
-                        self.redundant_pool.insert(peer_index, old);
-                    }
+                Entry::Occupied(_) => {
+                    self.redundant_pool.insert(peer_index, handle);
                 },
                 Entry::Vacant(vacant) => {
                     vacant.insert(handle);
@@ -393,11 +386,16 @@ where
 
     #[inline]
     fn garbage_collect_closed_connections(&mut self, peer: NodeIndex, connection_id: usize) {
-        if let Entry::Occupied(entry) = self.pool.entry(peer) {
+        if let Entry::Occupied(mut entry) = self.pool.entry(peer) {
             // If the connection IDs do not match, another connection was opened or superseded
             // this one so we need to rely on this identifier instead of just the key.
             if entry.get().connection_id == connection_id {
-                entry.remove();
+                // Connection ID is unique so this is safe.
+                if let Some(handle) = self.redundant_pool.remove(&peer) {
+                    entry.insert(handle);
+                } else {
+                    entry.remove();
+                }
             }
         }
 
