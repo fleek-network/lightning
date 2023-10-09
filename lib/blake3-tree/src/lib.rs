@@ -10,13 +10,6 @@ use arrayvec::ArrayVec;
 pub use fleek_blake3 as blake3;
 use thiserror::Error;
 
-// Debug only code for testing against memory leaks.
-#[cfg(debug_assertions)]
-thread_local! {
-    /// Number of pointers that `IncrementalVerifierTreeNode` has allocated.
-    static POINTERS: std::cell::RefCell<usize> = std::cell::RefCell::new(0);
-}
-
 /// An incremental verifier that can consume a stream of proofs and content
 /// and verify the integrity of the content using a blake3 root hash.
 // TODO(qti3e): Using an arena might improve performance here.
@@ -45,6 +38,8 @@ pub struct IncrementalVerifier {
     /// so that we can change the cursor to that node once the stack is merged
     /// with the current cursor during the final phase of the feed_proof procedure.
     next_head: *mut IncrementalVerifierTreeNode,
+    #[cfg(debug_assertions)]
+    tracker: pointer_tracker::PointerTracker,
 }
 
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -83,13 +78,22 @@ impl IncrementalVerifier {
     ///
     /// The `starting_block` determines where the content stream will start from.
     pub fn new(root_hash: [u8; 32], starting_block: usize) -> Self {
+        #[cfg(debug_assertions)]
+        let mut tracker = pointer_tracker::PointerTracker::default();
+
         Self {
             iv: blake3::tree::IV::new(),
             keeper: None,
-            cursor: IncrementalVerifierTreeNode::leaf(root_hash),
+            cursor: IncrementalVerifierTreeNode::leaf(
+                #[cfg(debug_assertions)]
+                &mut tracker,
+                root_hash,
+            ),
             block_counter: starting_block,
             stack: ArrayVec::new(),
             next_head: ptr::null_mut(),
+            #[cfg(debug_assertions)]
+            tracker,
         }
     }
 
@@ -149,7 +153,11 @@ impl IncrementalVerifier {
             }
             debug_assert!(!current.is_null());
             debug_assert!((*current).parent.is_null());
-            IncrementalVerifierTreeNode::free(current);
+            IncrementalVerifierTreeNode::free(
+                #[cfg(debug_assertions)]
+                &mut self.tracker,
+                current,
+            );
             self.cursor = ptr::null_mut();
         }
     }
@@ -158,7 +166,10 @@ impl IncrementalVerifier {
     /// what mode you have finalized the block at.
     ///
     /// Do not attempt to manually call this function, you can not figure out how to finalize.
-    fn verify_hash(&mut self, hash: &[u8; 32]) -> Result<(), IncrementalVerifierError> {
+    ///
+    /// Only exposed for fuzz and test purposes.
+    #[doc(hidden)]
+    pub fn verify_hash(&mut self, hash: &[u8; 32]) -> Result<(), IncrementalVerifierError> {
         if self.is_done() {
             return Err(IncrementalVerifierError::VerifierTerminated);
         }
@@ -296,7 +307,11 @@ impl IncrementalVerifier {
         // we will never going to access the node on the left side of a node which we
         // have already visited, so we can free the memory.
         unsafe {
-            IncrementalVerifierTreeNode::free((*self.cursor).left);
+            IncrementalVerifierTreeNode::free(
+                #[cfg(debug_assertions)]
+                &mut self.tracker,
+                (*self.cursor).left,
+            );
             (*self.cursor).left = ptr::null_mut();
         }
 
@@ -384,7 +399,11 @@ impl IncrementalVerifier {
             self.merge_stack(false);
         }
 
-        let node = IncrementalVerifierTreeNode::leaf(hash);
+        let node = IncrementalVerifierTreeNode::leaf(
+            #[cfg(debug_assertions)]
+            &mut self.tracker,
+            hash,
+        );
         self.stack.push(node);
 
         if flip && self.stack.is_full() {
@@ -442,7 +461,11 @@ impl IncrementalVerifier {
                 // remove it here before we return.
                 debug_assert!(!(*node).left.is_null());
                 debug_assert!(!(*node).right.is_null());
-                IncrementalVerifierTreeNode::free(node);
+                IncrementalVerifierTreeNode::free(
+                    #[cfg(debug_assertions)]
+                    &mut self.tracker,
+                    node,
+                );
                 // Also set the next_head to null since we no longer need it anymore.
                 self.next_head = ptr::null_mut();
                 return Err(IncrementalVerifierError::HashMismatch);
@@ -479,7 +502,11 @@ impl IncrementalVerifier {
         unsafe {
             debug_assert!((*node).left.is_null());
             debug_assert!((*node).right.is_null());
-            IncrementalVerifierTreeNode::free(node);
+            IncrementalVerifierTreeNode::free(
+                #[cfg(debug_assertions)]
+                &mut self.tracker,
+                node,
+            );
         }
 
         // If we're at the root right now instead of traversing all the way to
@@ -564,7 +591,13 @@ impl IncrementalVerifier {
         let (left_cv, right_cv) = unsafe { (&(*left).hash, &(*right).hash) };
 
         let parent_hash = self.iv.merge(left_cv, right_cv, is_root);
-        let parent = IncrementalVerifierTreeNode::new(left, right, parent_hash);
+        let parent = IncrementalVerifierTreeNode::new(
+            #[cfg(debug_assertions)]
+            &mut self.tracker,
+            left,
+            right,
+            parent_hash,
+        );
 
         // Push the new parent node into the stack.
         self.stack.push(parent);
@@ -589,39 +622,68 @@ impl IncrementalVerifier {
 
 impl IncrementalVerifierTreeNode {
     #[inline(always)]
-    pub fn new(left: *mut Self, right: *mut Self, hash: [u8; 32]) -> *mut Self {
-        #[cfg(debug_assertions)]
-        POINTERS.with(|c| {
-            *c.borrow_mut() += 1;
-        });
-
-        Box::into_raw(Box::new(Self {
+    pub fn new(
+        #[cfg(debug_assertions)] tracker: &mut pointer_tracker::PointerTracker,
+        left: *mut Self,
+        right: *mut Self,
+        hash: [u8; 32],
+    ) -> *mut Self {
+        let ptr = Box::into_raw(Box::new(Self {
             parent: ptr::null_mut(),
             left,
             right,
             hash,
-        }))
+        }));
+
+        #[cfg(debug_assertions)]
+        tracker.track(ptr);
+
+        ptr
     }
 
     #[inline(always)]
-    pub fn leaf(hash: [u8; 32]) -> *mut Self {
-        Self::new(ptr::null_mut(), ptr::null_mut(), hash)
+    pub fn leaf(
+        #[cfg(debug_assertions)] tracker: &mut pointer_tracker::PointerTracker,
+        hash: [u8; 32],
+    ) -> *mut Self {
+        Self::new(tracker, ptr::null_mut(), ptr::null_mut(), hash)
     }
 
     #[inline(always)]
-    pub unsafe fn free(ptr: *mut Self) {
+    pub unsafe fn free(
+        #[cfg(debug_assertions)] tracker: &mut pointer_tracker::PointerTracker,
+        ptr: *mut Self,
+    ) {
         debug_assert!(!ptr.is_null(), "Attempted to free null pointer.");
 
         #[cfg(debug_assertions)]
-        POINTERS.with(|c| {
-            let mut pointers_mut = c.borrow_mut();
-            if *pointers_mut == 0 {
-                panic!("Double free detected.");
-            }
-            *pointers_mut -= 1;
-        });
+        tracker.free(ptr);
 
-        drop(Box::from_raw(ptr))
+        let mut this = Box::from_raw(ptr);
+
+        // SAFETY: Each node owns its children and is responsible for
+        // dropping them when its being drooped.
+        unsafe {
+            if !this.left.is_null() {
+                IncrementalVerifierTreeNode::free(
+                    #[cfg(debug_assertions)]
+                    tracker,
+                    this.left,
+                );
+                this.left = ptr::null_mut();
+            }
+
+            if !this.right.is_null() {
+                IncrementalVerifierTreeNode::free(
+                    #[cfg(debug_assertions)]
+                    tracker,
+                    this.right,
+                );
+                this.right = ptr::null_mut();
+            }
+        }
+
+        drop(this);
     }
 }
 
@@ -642,27 +704,24 @@ impl Drop for IncrementalVerifier {
         for pointer in self.stack.drain(..) {
             // SAFETY: The stack owns its pending items.
             unsafe {
-                IncrementalVerifierTreeNode::free(pointer);
+                IncrementalVerifierTreeNode::free(
+                    #[cfg(debug_assertions)]
+                    &mut self.tracker,
+                    pointer,
+                );
             }
         }
     }
 }
 
 impl Drop for IncrementalVerifierTreeNode {
+    // ASSUMPTIONS: Every IncrementalVerifierTreeNode is always freed by calling
+    // `IncrementalVerifierTreeNode::free`. That call must free the children and
+    // set them to null.
+    #[inline(always)]
     fn drop(&mut self) {
-        // SAFETY: Each node owns its children and is responsible for
-        // dropping them when its being drooped.
-        unsafe {
-            if !self.left.is_null() {
-                IncrementalVerifierTreeNode::free(self.left);
-                self.left = ptr::null_mut();
-            }
-
-            if !self.right.is_null() {
-                IncrementalVerifierTreeNode::free(self.right);
-                self.right = ptr::null_mut();
-            }
-        }
+        debug_assert!(self.left.is_null());
+        debug_assert!(self.right.is_null());
     }
 }
 
@@ -1012,7 +1071,7 @@ impl Iterator for TreeWalker {
             return Some((Direction::Target, self.current));
         }
 
-        // The left subtree in a blake3 tree is always guranteed to contain a power of two
+        // The left subtree in a blake3 tree is always guaranteed to contain a power of two
         // number of leaf (chunks), therefore the number of items on the left subtree can
         // be easily computed as the previous power of two (less than but not equal to)
         // the current items that we know our current subtree has, anything else goes
@@ -1078,17 +1137,43 @@ fn is_valid_proof_len(n: usize) -> bool {
     hash_bytes & 31 == 0 && n <= 32 * 47 + 6 && ((hash_bytes / 32) >= 2 || n == 0)
 }
 
+#[cfg(debug_assertions)]
+mod pointer_tracker {
+    use std::collections::HashSet;
+
+    use crate::IncrementalVerifierTreeNode;
+
+    #[derive(Default)]
+    pub struct PointerTracker {
+        allocated: HashSet<*mut IncrementalVerifierTreeNode>,
+    }
+
+    impl PointerTracker {
+        pub(super) fn track(&mut self, ptr: *mut IncrementalVerifierTreeNode) {
+            assert!(
+                self.allocated.insert(ptr),
+                "Attempted to track a pointer more than once."
+            );
+        }
+
+        pub(super) fn free(&mut self, ptr: *mut IncrementalVerifierTreeNode) {
+            assert!(
+                self.allocated.remove(&ptr),
+                "Attempted to free an untracked pointer."
+            );
+        }
+    }
+
+    impl Drop for PointerTracker {
+        fn drop(&mut self) {
+            assert_eq!(self.allocated.len(), 0, "Leak detected.");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn assert_no_leak() {
-        #[cfg(debug_assertions)]
-        POINTERS.with(|c| {
-            let n = *c.borrow();
-            assert_eq!(n, 0, "Memory leak detected.");
-        })
-    }
 
     /// Create a mock tree that has n leaf nodes, each leaf node `i` starting
     /// from 1 has their `i`-th bit set to 1, and merging two nodes is done
@@ -1343,7 +1428,6 @@ mod tests {
             }
 
             drop(verifier);
-            assert_no_leak();
         }
     }
 
@@ -1372,7 +1456,6 @@ mod tests {
         );
 
         drop(verifier);
-        assert_no_leak();
     }
 
     #[test]
@@ -1428,7 +1511,6 @@ mod tests {
         assert!(verifier.is_done());
 
         drop(verifier);
-        assert_no_leak();
     }
 
     #[test]
@@ -1469,7 +1551,6 @@ mod tests {
         assert!(verifier.is_done());
 
         drop(verifier);
-        assert_no_leak();
     }
 
     #[test]
@@ -1511,7 +1592,6 @@ mod tests {
         assert!(verifier.is_done());
 
         drop(verifier);
-        assert_no_leak();
     }
 
     #[test]
@@ -1549,7 +1629,6 @@ mod tests {
                 .unwrap_or_else(|_| panic!("Invalid Content: size={SIZE} start={start}"));
 
             drop(verifier);
-            assert_no_leak();
         }
     }
 
@@ -1601,7 +1680,6 @@ mod tests {
                 .unwrap_or_else(|_| panic!("Invalid Resume Content: size={SIZE} start={start}"));
 
             drop(verifier);
-            assert_no_leak();
         }
     }
 
@@ -1666,7 +1744,6 @@ mod tests {
             );
 
             drop(verifier);
-            assert_no_leak();
         }
     }
 
@@ -1729,7 +1806,6 @@ mod tests {
         );
 
         drop(verifier);
-        assert_no_leak();
     }
 
     #[test]
@@ -1779,6 +1855,5 @@ mod tests {
             .unwrap_or_else(|_| panic!("Invalid Content on Resume: size={SIZE}"));
 
         drop(verifier);
-        assert_no_leak();
     }
 }
