@@ -28,7 +28,9 @@ use lightning_interfaces::types::{
 };
 #[cfg(feature = "e2e-test")]
 use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
-use lightning_interfaces::{BlockStoreInterface, SyncQueryRunnerInterface};
+#[cfg(feature = "e2e-test")]
+use lightning_interfaces::BlockStoreInterface;
+use lightning_interfaces::SyncQueryRunnerInterface;
 
 use crate::server::RpcData;
 #[cfg(feature = "e2e-test")]

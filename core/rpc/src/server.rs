@@ -116,6 +116,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
             data: Arc::new(RpcData {
                 mempool_socket: mempool,
                 fetcher_socket: fetcher.get_socket(),
+                blockstore,
                 query_runner,
             }),
             config,
