@@ -33,7 +33,7 @@ where
     /// Sender to return to users as they register with the broadcast service.
     broadcast_request_tx: Sender<BroadcastRequest<F>>,
     /// Service handles.
-    stream_handles: HashMap<ServiceScope, Sender<Channel>>,
+    stream_handles: HashMap<ServiceScope, Sender<(NodeIndex, Channel)>>,
     /// Receive requests for a multiplexed stream.
     stream_request_rx: Receiver<StreamRequest>,
     /// Send handle to return to users as they register with the stream service.
@@ -83,7 +83,7 @@ where
     pub fn register_stream_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<StreamRequest>, Receiver<Channel>) {
+    ) -> (Sender<StreamRequest>, Receiver<(NodeIndex, Channel)>) {
         let (tx, rx) = mpsc::channel(1024);
         self.stream_handles.insert(service_scope, tx);
         (self.stream_request_tx.clone(), rx)
@@ -124,7 +124,7 @@ where
                         self.pin_connection(peer, address);
                     }
                     tokio::spawn(async move {
-                        if tx.send(stream).await.is_err() {
+                        if tx.send((peer, stream)).await.is_err() {
                             tracing::error!("failed to send incoming stream to user");
                         }
                     });

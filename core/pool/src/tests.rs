@@ -246,7 +246,7 @@ async fn test_open_req_res() {
     let node_index1 = query_runner
         .pubkey_to_index(peers[0].node_public_key)
         .unwrap();
-    let _node_index2 = query_runner
+    let node_index2 = query_runner
         .pubkey_to_index(peers[1].node_public_key)
         .unwrap();
     let (_requester1, mut responder1) = peers[0].pool.open_req_res(ServiceScope::BlockstoreServer);
@@ -265,6 +265,7 @@ async fn test_open_req_res() {
     let chunks_clone = chunks.clone();
     let sender_fut = async move {
         let (request_header, mut request) = responder1.get_next_request().await.unwrap();
+        assert_eq!(request_header.peer, node_index2);
         assert_eq!(request_header.bytes, Bytes::from("a hash"));
         for chunk in chunks_clone {
             request.send(chunk).await.unwrap();

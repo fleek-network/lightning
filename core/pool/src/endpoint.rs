@@ -155,7 +155,7 @@ where
     pub fn register_stream_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<StreamRequest>, Receiver<Channel>) {
+    ) -> (Sender<StreamRequest>, Receiver<(NodeIndex, Channel)>) {
         self.network_overlay.register_stream_service(service_scope)
     }
 

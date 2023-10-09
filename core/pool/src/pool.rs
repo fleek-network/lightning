@@ -26,7 +26,6 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
-use x509_parser::nom::AsBytes;
 
 use crate::config::Config;
 use crate::endpoint::Endpoint;
@@ -79,7 +78,7 @@ where
     fn register_stream_service(
         &self,
         service: ServiceScope,
-    ) -> (Sender<StreamRequest>, Receiver<Channel>) {
+    ) -> (Sender<StreamRequest>, Receiver<(NodeIndex, Channel)>) {
         let mut guard = self.state.lock().unwrap();
         match guard.as_mut().expect("Pool to have a state") {
             State::Running { .. } => {
@@ -313,9 +312,6 @@ impl lightning_interfaces::pool::Requester for Requester {
 
         // Send our request.
         channel.send(request).await?;
-        channel
-            .send(Bytes::from_iter(peer.to_le_bytes().into_iter()))
-            .await?;
 
         // Read the response header.
         let header = channel.next().await.ok_or(io::ErrorKind::BrokenPipe)??;
@@ -369,7 +365,7 @@ impl Stream for Body {
 }
 
 pub struct Responder {
-    inner: Receiver<Channel>,
+    inner: Receiver<(NodeIndex, Channel)>,
 }
 
 #[async_trait]
@@ -378,7 +374,7 @@ impl lightning_interfaces::pool::Responder for Responder {
 
     async fn get_next_request(&mut self) -> io::Result<(RequestHeader, Self::Request)> {
         // Received a new stream so a request is incoming.
-        let mut channel = self
+        let (peer, mut channel) = self
             .inner
             .recv()
             .await
@@ -390,12 +386,7 @@ impl lightning_interfaces::pool::Responder for Responder {
             .await
             .ok_or(io::ErrorKind::BrokenPipe)?
             .map(Bytes::from)?;
-        let peer = channel.next().await.ok_or(io::ErrorKind::BrokenPipe)??;
-        let index_bytes: [u8; 4] = peer
-            .as_bytes()
-            .try_into()
-            .map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?;
-        let peer = NodeIndex::from_le_bytes(index_bytes);
+
         let header = RequestHeader { peer, bytes };
 
         Ok((
