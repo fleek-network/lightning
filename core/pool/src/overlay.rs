@@ -6,6 +6,7 @@ use std::net::SocketAddr;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use fleek_crypto::NodePublicKey;
+use hp_fixed::unsigned::HpUfixed;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
@@ -225,7 +226,14 @@ where
         }
     }
 
-    pub fn index_from_connection<M: MuxerInterface>(
+    /// Returns true if the peer has staked the required amount
+    /// to be a valid node in the network, and false otherwise.
+    #[inline]
+    pub fn validate_stake(&self, peer: NodePublicKey) -> bool {
+        HpUfixed::from(self.sync_query.get_staking_amount()) <= self.sync_query.get_staked(&peer)
+    }
+
+    pub fn _index_from_connection<M: MuxerInterface>(
         &self,
         connection: &M::Connection,
     ) -> Option<NodeIndex> {

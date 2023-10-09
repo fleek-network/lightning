@@ -297,7 +297,17 @@ where
     }
 
     fn handle_connection(&mut self, connection: M::Connection) {
-        if let Some(peer_index) = self.network_overlay.index_from_connection::<M>(&connection) {
+        let Some(pk) = connection.peer_identity() else {
+            tracing::debug!("failed to get peer identity from connection");
+            return;
+        };
+
+        if !self.network_overlay.validate_stake(pk) {
+            tracing::info!("peer {pk} failed stake validation: rejecting connection");
+            return;
+        }
+
+        if let Some(peer_index) = self.network_overlay.pubkey_to_index(pk) {
             self.connector.cancel_dial(&peer_index);
 
             // We only allow one redundant connection per peer.

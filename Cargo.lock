@@ -4299,6 +4299,7 @@ dependencies = [
  "fleek-blake3",
  "fleek-crypto",
  "futures",
+ "hp-fixed",
  "infusion",
  "lightning-application",
  "lightning-interfaces",

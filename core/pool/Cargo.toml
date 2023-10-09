@@ -11,6 +11,7 @@ async-trait.workspace = true
 bincode.workspace = true
 bytes.workspace = true
 infusion.workspace = true
+hp-fixed.workspace = true
 fleek-crypto.workspace = true
 futures.workspace = true
 lightning-interfaces = {path="../interfaces"}
