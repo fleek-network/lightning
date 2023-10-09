@@ -55,9 +55,7 @@ dataChan.onopen = () => {
 dataChan.onmessage = (e: MessageEvent) => {
   if (!didReceiveFirstMessage) {
     didReceiveFirstMessage = true;
-    if (sourceBuffer != undefined) {
-      getNext();
-    }
+    getNext();
     return;
   }
 
@@ -76,12 +74,16 @@ dataChan.onmessage = (e: MessageEvent) => {
       }));
     }
 
-    bytesRead += decoded.bytes.byteLength;
+    bytesRead += decoded.bytes.length;
     appendBuffer(decoded.bytes);
 
-    if (bytesRead >= 256 * 1024) {
-      getNext();
+    if (bytesRead == 256 * 1024) {
+      console.log(performance.measure("last-byte", {
+        start: getNextSent,
+        end: performance.now(),
+      }));
       bytesRead = 0;
+      getNext();
     }
   }
 };
@@ -91,24 +93,14 @@ function appendBuffer(buffer: Uint8Array) {
     queue.push(buffer);
     return;
   }
-
-  if (getNextSent != undefined) {
-    console.log(performance.measure("first-frame", {
-      start: getNextSent,
-      end: performance.now(),
-    }));
-    getNextSent = undefined;
-  }
-
   sourceBuffer!.appendBuffer(buffer);
 }
 
 function getNext() {
-  getNextSent = performance.now();
   const buffer = new ArrayBuffer(4);
   const view = new DataView(buffer);
   view.setUint32(0, segCounter++);
-
+  getNextSent = performance.now();
   dataChan.send(schema.Request.encode({
     tag: schema.Request.Tag.ServicePayload,
     bytes: new Uint8Array(buffer),
@@ -138,7 +130,7 @@ pc.onnegotiationneeded = async (e) => {
 const startSession = async () => {
   console.log("sending sdp signal");
 
-  const res = await fetch("http://localhost:4210/sdp", {
+  const res = await fetch("http://localhost:4220/sdp", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
