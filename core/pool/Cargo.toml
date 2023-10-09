@@ -23,7 +23,7 @@ tokio-util = { workspace = true, features = ["codec"] }
 
 affair = "0.1.2"
 der = { version = "0.7", features = ["alloc", "derive"] }
-fleek-blake3 = "1.4"
+fleek-blake3 = "1.5"
 ring = "0.16.20"
 rustls = { version = "0.21", default-features = false, features = ["dangerous_configuration"] }
 rcgen = "0.11.1"

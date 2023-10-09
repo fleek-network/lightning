@@ -24,7 +24,7 @@ derive_more = "0.99.17"
 futures-util = "0.3.28"
 fxhash = "0.2.1"
 dashmap = "5.5.0"
-fleek-blake3 = "1.4"
+fleek-blake3 = "1.5"
 
 
 # Narwhal b06ada015694890d7c46347b13fbc3e9a763513c

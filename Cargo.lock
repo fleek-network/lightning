@@ -1158,16 +1158,15 @@ dependencies = [
 
 [[package]]
 name = "blake3"
-version = "1.4.1"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "199c42ab6972d92c9f8995f086273d25c42fc0f7b2a1fcefba465c1352d25ba5"
+checksum = "0231f06152bf547e9c2b5194f247cd97aacf6dcd8b15d8e5ec0663f64580da87"
 dependencies = [
  "arrayref",
  "arrayvec",
  "cc",
  "cfg-if",
  "constant_time_eq 0.3.0",
- "digest 0.10.7",
 ]
 
 [[package]]
@@ -2816,12 +2815,13 @@ dependencies = [
 
 [[package]]
 name = "fleek-blake3"
-version = "1.4.1"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13613e92ee4f5b70b2df75dbc588c0586026f202c334463129ee76bf6b2e5a03"
+checksum = "51ba0163346ed44fd9078834b53af838326ab49888955276c21ec309417f7b67"
 dependencies = [
  "arrayref",
  "arrayvec",
+ "blake3",
  "cc",
  "cfg-if",
  "constant_time_eq 0.3.0",
