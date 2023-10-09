@@ -646,7 +646,13 @@ impl IncrementalVerifierTreeNode {
         #[cfg(debug_assertions)] tracker: &mut pointer_tracker::PointerTracker,
         hash: [u8; 32],
     ) -> *mut Self {
-        Self::new(tracker, ptr::null_mut(), ptr::null_mut(), hash)
+        Self::new(
+            #[cfg(debug_assertions)]
+            tracker,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            hash,
+        )
     }
 
     #[inline(always)]
