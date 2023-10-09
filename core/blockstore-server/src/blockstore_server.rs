@@ -174,9 +174,9 @@ impl<C: Collection> BlockstoreServerInner<C> {
                 _ = self.shutdown_notify.notified() => {
                     break;
                 }
-                Ok((request, responder)) = pool_responder.get_next_request() => {
+                Ok((req_header, responder)) = pool_responder.get_next_request() => {
                     // TODO(matthias): find out which peer the request came from
-                    match PeerRequest::try_from(request) {
+                    match PeerRequest::try_from(req_header.bytes) {
                         Ok(request) => {
                             if self.num_responses.load(Ordering::Relaxed) > self.max_conc_res {
                                 responder.reject(RejectReason::TooManyRequests);

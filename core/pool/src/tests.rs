@@ -264,8 +264,8 @@ async fn test_open_req_res() {
     ];
     let chunks_clone = chunks.clone();
     let sender_fut = async move {
-        let (request_bytes, mut request) = responder1.get_next_request().await.unwrap();
-        assert_eq!(request_bytes, Bytes::from("a hash"));
+        let (request_header, mut request) = responder1.get_next_request().await.unwrap();
+        assert_eq!(request_header.bytes, Bytes::from("a hash"));
         for chunk in chunks_clone {
             request.send(chunk).await.unwrap();
         }

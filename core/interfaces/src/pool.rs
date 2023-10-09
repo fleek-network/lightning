@@ -47,6 +47,12 @@ pub enum RejectReason {
     TooManyRequests,
 }
 
+#[derive(Clone, Debug)]
+pub struct RequestHeader {
+    pub peer: NodeIndex,
+    pub bytes: Bytes,
+}
+
 /// Defines the connection pool.
 #[infusion::service]
 pub trait PoolInterface<C: Collection>:
@@ -119,7 +125,7 @@ pub trait Response: Send + Sync {
 #[infusion::blank]
 pub trait Responder: Send {
     type Request: Request;
-    async fn get_next_request(&mut self) -> io::Result<(Bytes, Self::Request)>;
+    async fn get_next_request(&mut self) -> io::Result<(RequestHeader, Self::Request)>;
 }
 
 #[async_trait]

@@ -18,6 +18,7 @@ use lightning_interfaces::{
     ConfigConsumer,
     NotifierInterface,
     ReputationAggregatorInterface,
+    RequestHeader,
     SignerInterface,
     WithStartAndShutdown,
 };
@@ -25,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
+use x509_parser::nom::AsBytes;
 
 use crate::config::Config;
 use crate::endpoint::Endpoint;
@@ -311,6 +313,9 @@ impl lightning_interfaces::pool::Requester for Requester {
 
         // Send our request.
         channel.send(request).await?;
+        channel
+            .send(Bytes::from_iter(peer.to_le_bytes().into_iter()))
+            .await?;
 
         // Read the response header.
         let header = channel.next().await.ok_or(io::ErrorKind::BrokenPipe)??;
@@ -371,7 +376,7 @@ pub struct Responder {
 impl lightning_interfaces::pool::Responder for Responder {
     type Request = Request;
 
-    async fn get_next_request(&mut self) -> io::Result<(Bytes, Self::Request)> {
+    async fn get_next_request(&mut self) -> io::Result<(RequestHeader, Self::Request)> {
         // Received a new stream so a request is incoming.
         let mut channel = self
             .inner
@@ -385,9 +390,16 @@ impl lightning_interfaces::pool::Responder for Responder {
             .await
             .ok_or(io::ErrorKind::BrokenPipe)?
             .map(Bytes::from)?;
+        let peer = channel.next().await.ok_or(io::ErrorKind::BrokenPipe)??;
+        let index_bytes: [u8; 4] = peer
+            .as_bytes()
+            .try_into()
+            .map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?;
+        let peer = NodeIndex::from_le_bytes(index_bytes);
+        let header = RequestHeader { peer, bytes };
 
         Ok((
-            bytes,
+            header,
             Request {
                 ok_header_sent: false,
                 channel,
