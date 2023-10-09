@@ -4181,6 +4181,7 @@ dependencies = [
  "lightning-signer",
  "lightning-test-utils",
  "log",
+ "mock",
  "rand 0.8.5",
  "rcgen 0.11.1",
  "ring",

@@ -16,11 +16,13 @@ use lightning_interfaces::{
 use lightning_node::config::TomlConfigProvider;
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
+use mock::syncronizer::MockSyncronizer;
 
 partial!(ExampleBinding {
     ConfigProviderInterface = TomlConfigProvider<Self>;
     BlockStoreInterface = Blockstore<Self>;
     SignerInterface = Signer<Self>;
+    SyncronizerInterface = MockSyncronizer<Self>;
     HandshakeInterface = Handshake<Self>;
     ServiceExecutorInterface = ServiceExecutor<Self>;
 });

@@ -50,3 +50,4 @@ lightning-signer = { path = "../signer" }
 lightning-blockstore = { path = "../blockstore/" }
 serde_json.workspace = true
 lightning-test-utils = { path = "../test-utils" }
+mock = { path = "../mock" }
