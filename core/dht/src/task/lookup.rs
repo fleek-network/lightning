@@ -5,7 +5,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::{ReputationAggregatorInterface, ReputationReporterInterface, Weight};
+use lightning_interfaces::ReputationAggregatorInterface;
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
@@ -147,7 +147,7 @@ pub async fn lookup<C: Collection>(mut lookup: LookupTask<C>) -> Result<TaskResp
 
                     // Report a satisfactory interaction for the node that responded to our
                     // request.
-                    lookup.rep_reporter.report_sat(&sender_key, Weight::Weak);
+                    //lookup.rep_reporter.report_sat(&sender_key, Weight::Weak);
 
                     // If this is look up is a find a value, we check if the value is in the response.
                     if lookup.find_value_lookup && response.value.is_some() {
@@ -237,7 +237,7 @@ pub struct LookupTask<C: Collection> {
     // Socket to send queries over the network.
     socket: Arc<UdpSocket>,
     // Socket for reporting reputation measurements.
-    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+    _rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
 }
 
 impl<C: Collection> LookupTask<C> {
@@ -261,7 +261,7 @@ impl<C: Collection> LookupTask<C> {
             table_tx,
             main_rx,
             socket,
-            rep_reporter,
+            _rep_reporter: rep_reporter,
         }
     }
 }

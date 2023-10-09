@@ -3,8 +3,7 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::Duration;
 
-use fleek_crypto::NodePublicKey;
-use lightning_interfaces::types::ReputationMeasurements;
+use lightning_interfaces::types::{NodeIndex, ReputationMeasurements};
 use lightning_interfaces::Weight;
 use lightning_reputation::statistics::try_min_max_normalize;
 use lru::LruCache;
@@ -20,9 +19,9 @@ const REP_EWMA_WEIGHT: f64 = 0.7;
 
 /// Manages the measurements for all the peers.
 pub struct MeasurementManager {
-    peers: LruCache<NodePublicKey, MeasurementStore>,
+    peers: LruCache<NodeIndex, MeasurementStore>,
     summary_stats: SummaryStatistics,
-    local_reputation: Arc<scc::HashMap<NodePublicKey, u8>>,
+    local_reputation: Arc<scc::HashMap<NodeIndex, u8>>,
 }
 
 impl MeasurementManager {
@@ -39,18 +38,18 @@ impl MeasurementManager {
         self.summary_stats.clear();
     }
 
-    pub fn get_measurements(&self) -> BTreeMap<NodePublicKey, ReputationMeasurements> {
+    pub fn get_measurements(&self) -> BTreeMap<NodeIndex, ReputationMeasurements> {
         self.peers
             .iter()
             .map(|(peer, measurement_store)| (*peer, measurement_store.into()))
             .collect()
     }
 
-    pub fn get_local_reputation_ref(&self) -> Arc<scc::HashMap<NodePublicKey, u8>> {
+    pub fn get_local_reputation_ref(&self) -> Arc<scc::HashMap<NodeIndex, u8>> {
         self.local_reputation.clone()
     }
 
-    pub fn report_sat(&mut self, peer: NodePublicKey, weight: Weight) {
+    pub fn report_sat(&mut self, peer: NodeIndex, weight: Weight) {
         self.insert_if_not_exists(&peer);
         let (old_val, new_val) = self
             .peers
@@ -62,7 +61,7 @@ impl MeasurementManager {
         self.update_local_reputation_score(peer);
     }
 
-    pub fn report_unsat(&mut self, peer: NodePublicKey, weight: Weight) {
+    pub fn report_unsat(&mut self, peer: NodeIndex, weight: Weight) {
         self.insert_if_not_exists(&peer);
         let (old_val, new_val) = self
             .peers
@@ -74,7 +73,7 @@ impl MeasurementManager {
         self.update_local_reputation_score(peer);
     }
 
-    pub fn report_latency(&mut self, peer: NodePublicKey, latency: Duration) {
+    pub fn report_latency(&mut self, peer: NodeIndex, latency: Duration) {
         self.insert_if_not_exists(&peer);
         let (old_val, new_val) = self.peers.get_mut(&peer).unwrap().register_latency(latency);
         self.summary_stats.remove_latency(old_val);
@@ -84,7 +83,7 @@ impl MeasurementManager {
 
     pub fn report_bytes_received(
         &mut self,
-        peer: NodePublicKey,
+        peer: NodeIndex,
         bytes: u64,
         duration: Option<Duration>,
     ) {
@@ -109,12 +108,7 @@ impl MeasurementManager {
         self.update_local_reputation_score(peer);
     }
 
-    pub fn report_bytes_sent(
-        &mut self,
-        peer: NodePublicKey,
-        bytes: u64,
-        duration: Option<Duration>,
-    ) {
+    pub fn report_bytes_sent(&mut self, peer: NodeIndex, bytes: u64, duration: Option<Duration>) {
         self.insert_if_not_exists(&peer);
         let (old_val, new_val) = self
             .peers
@@ -136,14 +130,14 @@ impl MeasurementManager {
         self.update_local_reputation_score(peer);
     }
 
-    pub fn report_hops(&mut self, peer: NodePublicKey, hops: u8) {
+    pub fn report_hops(&mut self, peer: NodeIndex, hops: u8) {
         self.insert_if_not_exists(&peer);
         let (old_val, new_val) = self.peers.get_mut(&peer).unwrap().register_hops(hops);
         self.summary_stats.remove_hops(old_val);
         self.summary_stats.add_hops(new_val);
     }
 
-    fn insert_if_not_exists(&mut self, peer: &NodePublicKey) {
+    fn insert_if_not_exists(&mut self, peer: &NodeIndex) {
         if !self.peers.contains(peer) {
             if let Some((_, measurements)) = self.peers.push(*peer, MeasurementStore::default()) {
                 // If the insertion removed measurements from the lru cache, we have to update the
@@ -153,7 +147,7 @@ impl MeasurementManager {
         }
     }
 
-    fn update_local_reputation_score(&mut self, peer: NodePublicKey) {
+    fn update_local_reputation_score(&mut self, peer: NodeIndex) {
         if let Some(measurements) = self.peers.get(&peer) {
             let measurements: ReputationMeasurements = measurements.into();
             let norm_measurements = NormalizedMeasurements::new(measurements, &self.summary_stats);
@@ -745,7 +739,6 @@ impl NormalizedMeasurements {
 
 #[cfg(test)]
 mod tests {
-    use fleek_crypto::NodePublicKey;
     use lightning_interfaces::types::ReputationMeasurements;
     use lightning_interfaces::Weight;
     use lightning_test_utils::{random, reputation};
@@ -770,7 +763,7 @@ mod tests {
     #[test]
     fn test_report_sat() {
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 32]);
+        let peer = 0;
         manager.report_sat(peer, Weight::Weak);
         let measurements = manager.peers.get(&peer).unwrap();
         assert_eq!(
@@ -782,7 +775,7 @@ mod tests {
     #[test]
     fn test_report_unsat() {
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 32]);
+        let peer = 0;
         manager.report_unsat(peer, Weight::Weak);
         let measurements = manager.peers.get(&peer).unwrap();
         assert_eq!(
@@ -794,7 +787,7 @@ mod tests {
     #[test]
     fn test_report_sat_unsat() {
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 32]);
+        let peer = 0;
         manager.report_sat(peer, Weight::Weak);
         manager.report_unsat(peer, Weight::Weak);
         let measurements = manager.peers.get(&peer).unwrap();
@@ -804,7 +797,7 @@ mod tests {
     #[test]
     fn test_report_latency() {
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 32]);
+        let peer = 0;
         manager.report_latency(peer, Duration::from_millis(200));
         manager.report_latency(peer, Duration::from_millis(100));
         let measurements = manager.peers.get(&peer).unwrap();
@@ -817,7 +810,7 @@ mod tests {
     #[test]
     fn test_report_bytes_received() {
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 32]);
+        let peer = 0;
         manager.report_bytes_received(peer, 1024, Some(Duration::from_millis(200)));
         let measurements = manager.peers.get(&peer).unwrap();
 
@@ -828,7 +821,7 @@ mod tests {
     #[test]
     fn test_report_bytes_sent() {
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 32]);
+        let peer = 0;
         manager.report_bytes_sent(peer, 1024, Some(Duration::from_millis(200)));
         let measurements = manager.peers.get(&peer).unwrap();
 
@@ -839,7 +832,7 @@ mod tests {
     #[test]
     fn test_report_hops() {
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 32]);
+        let peer = 0;
         manager.report_hops(peer, 10);
         let measurements = manager.peers.get(&peer).unwrap();
 
@@ -849,7 +842,7 @@ mod tests {
     #[test]
     fn test_lateny_min_max() {
         let mut rng = random::get_seedable_rng();
-        let peers: Vec<NodePublicKey> = (0..10).map(|i| NodePublicKey([i; 32])).collect();
+        let peers: Vec<NodeIndex> = (0..10).collect();
         let mut manager = MeasurementManager::new();
 
         for _ in 0..100 {
@@ -876,7 +869,7 @@ mod tests {
     #[test]
     fn test_interactions_min_max() {
         let mut rng = random::get_seedable_rng();
-        let peers: Vec<NodePublicKey> = (0..10).map(|i| NodePublicKey([i; 32])).collect();
+        let peers: Vec<NodeIndex> = (0..10).collect();
         let mut manager = MeasurementManager::new();
 
         for _ in 0..100 {
@@ -903,7 +896,7 @@ mod tests {
     #[test]
     fn test_bytes_received_min_max() {
         let mut rng = random::get_seedable_rng();
-        let peers: Vec<NodePublicKey> = (0..10).map(|i| NodePublicKey([i; 32])).collect();
+        let peers: Vec<NodeIndex> = (0..10).collect();
         let mut manager = MeasurementManager::new();
 
         for _ in 0..100 {
@@ -948,7 +941,7 @@ mod tests {
     #[test]
     fn test_bytes_sent_min_max() {
         let mut rng = random::get_seedable_rng();
-        let peers: Vec<NodePublicKey> = (0..10).map(|i| NodePublicKey([i; 32])).collect();
+        let peers: Vec<NodeIndex> = (0..10).collect();
         let mut manager = MeasurementManager::new();
 
         for _ in 0..100 {
@@ -987,7 +980,7 @@ mod tests {
     #[test]
     fn test_hops_min_max() {
         let mut rng = random::get_seedable_rng();
-        let peers: Vec<NodePublicKey> = (0..10).map(|i| NodePublicKey([i; 32])).collect();
+        let peers: Vec<NodeIndex> = (0..10).collect();
         let mut manager = MeasurementManager::new();
 
         for _ in 0..100 {
@@ -1011,9 +1004,9 @@ mod tests {
     #[test]
     fn test_get_local_reputation_ref() {
         let mut manager = MeasurementManager::new();
-        let peer1 = NodePublicKey([0; 32]);
+        let peer1 = 0;
         manager.report_sat(peer1, Weight::Weak);
-        let peer2 = NodePublicKey([1; 32]);
+        let peer2 = 1;
         manager.report_sat(peer2, Weight::Strong);
         let reputation_map = manager.get_local_reputation_ref();
         assert!(reputation_map.contains(&peer2));
@@ -1022,9 +1015,9 @@ mod tests {
     #[test]
     fn test_get_measurements_contains() {
         let mut manager = MeasurementManager::new();
-        let peer1 = NodePublicKey([1; 32]);
+        let peer1 = 1;
         manager.report_sat(peer1, Weight::Weak);
-        let peer2 = NodePublicKey([0; 32]);
+        let peer2 = 0;
         manager.report_sat(peer2, Weight::Weak);
         let peer_measurements = manager.get_measurements();
         assert!(peer_measurements.contains_key(&peer1));
@@ -1034,7 +1027,7 @@ mod tests {
     #[test]
     fn test_get_measurements_equals() {
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 32]);
+        let peer = 0;
         manager.report_sat(peer, Weight::Weak);
         manager.report_latency(peer, Duration::from_millis(200));
         let peer_measurements = manager.get_measurements();
@@ -1049,7 +1042,7 @@ mod tests {
     #[test]
     fn test_clear_measurements() {
         let mut manager = MeasurementManager::new();
-        let peer = NodePublicKey([0; 32]);
+        let peer = 0;
         manager.report_sat(peer, Weight::Weak);
         let peer_measurements = manager.get_measurements();
         assert!(peer_measurements.contains_key(&peer));

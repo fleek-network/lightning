@@ -104,10 +104,10 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_locked_time(&self, node: &NodePublicKey) -> Epoch;
 
     /// Returns the reported reputation measurements for a node.
-    fn get_rep_measurements(&self, node: NodePublicKey) -> Vec<ReportedReputationMeasurements>;
+    fn get_rep_measurements(&self, node: &NodeIndex) -> Vec<ReportedReputationMeasurements>;
 
     /// Returns the global reputation of a node.
-    fn get_reputation(&self, node: &NodePublicKey) -> Option<u8>;
+    fn get_reputation(&self, node: &NodeIndex) -> Option<u8>;
 
     /// Returns the relative score between two nodes, this score should measure how much two
     /// nodes `n1` and `n2` trust each other. Of course in real world a direct measurement

@@ -4,7 +4,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use fleek_crypto::NodePublicKey;
 use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::notifier::{Notification, NotifierInterface};
@@ -15,7 +14,6 @@ use lightning_interfaces::{
     ApplicationInterface,
     ReputationQueryInteface,
     ReputationReporterInterface,
-    SyncQueryRunnerInterface,
     Weight,
     WithStartAndShutdown,
 };
@@ -99,7 +97,7 @@ impl<C: Collection> ReputationAggregatorInterface<C> for ReputationAggregator<C>
             notify_before_epoch_tx,
             notify_new_epoch_rx: Arc::new(Mutex::new(Some(notify_new_epoch_rx))),
             notify_new_epoch_tx,
-            query_runner,
+            _query_runner: query_runner,
             shutdown_notify: shutdown_notify.clone(),
             _config: config,
         };
@@ -135,7 +133,7 @@ struct ReputationAggregatorInner<C: Collection> {
     notify_before_epoch_tx: mpsc::Sender<Notification>,
     notify_new_epoch_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
     notify_new_epoch_tx: mpsc::Sender<Notification>,
-    query_runner: c![C::ApplicationInterface::SyncExecutor],
+    _query_runner: c![C::ApplicationInterface::SyncExecutor],
     shutdown_notify: Arc<Notify>,
     _config: Config,
 }
@@ -199,11 +197,6 @@ impl<C: Collection> ReputationAggregatorInner<C> {
             .unwrap()
             .get_measurements()
             .into_iter()
-            .filter_map(|(key, m)| {
-                self.query_runner
-                    .pubkey_to_index(key)
-                    .map(|index| (index, m))
-            })
             .collect();
         if !measurements.is_empty() {
             let submit_tx = self.submit_tx.clone();
@@ -277,18 +270,18 @@ impl<C: Collection> ConfigConsumer for ReputationAggregator<C> {
 
 #[derive(Clone)]
 pub struct MyReputationQuery {
-    local_reputation: Arc<scc::HashMap<NodePublicKey, u8>>,
+    local_reputation: Arc<scc::HashMap<NodeIndex, u8>>,
 }
 
 impl MyReputationQuery {
-    fn new(local_reputation: Arc<scc::HashMap<NodePublicKey, u8>>) -> Self {
+    fn new(local_reputation: Arc<scc::HashMap<NodeIndex, u8>>) -> Self {
         Self { local_reputation }
     }
 }
 
 impl ReputationQueryInteface for MyReputationQuery {
     /// Returns the reputation of the provided node locally.
-    fn get_reputation_of(&self, peer: &NodePublicKey) -> Option<u8> {
+    fn get_reputation_of(&self, peer: &NodeIndex) -> Option<u8> {
         self.local_reputation.get(peer).map(|entry| *entry.get())
     }
 }
@@ -313,36 +306,27 @@ impl MyReputationReporter {
 
 impl ReputationReporterInterface for MyReputationReporter {
     /// Report a satisfactory (happy) interaction with the given peer.
-    fn report_sat(&self, peer: &NodePublicKey, weight: Weight) {
-        let message = ReportMessage::Sat {
-            peer: *peer,
-            weight,
-        };
+    fn report_sat(&self, peer: NodeIndex, weight: Weight) {
+        let message = ReportMessage::Sat { peer, weight };
         self.send_message(message);
     }
 
     /// Report a unsatisfactory (happy) interaction with the given peer.
-    fn report_unsat(&self, peer: &NodePublicKey, weight: Weight) {
-        let message = ReportMessage::Unsat {
-            peer: *peer,
-            weight,
-        };
+    fn report_unsat(&self, peer: NodeIndex, weight: Weight) {
+        let message = ReportMessage::Unsat { peer, weight };
         self.send_message(message);
     }
 
     /// Report a latency which we witnessed from another peer.
-    fn report_latency(&self, peer: &NodePublicKey, latency: Duration) {
-        let message = ReportMessage::Latency {
-            peer: *peer,
-            latency,
-        };
+    fn report_latency(&self, peer: NodeIndex, latency: Duration) {
+        let message = ReportMessage::Latency { peer, latency };
         self.send_message(message);
     }
 
     /// Report the number of (healthy) bytes which we received from another peer.
-    fn report_bytes_received(&self, peer: &NodePublicKey, bytes: u64, duration: Option<Duration>) {
+    fn report_bytes_received(&self, peer: NodeIndex, bytes: u64, duration: Option<Duration>) {
         let message = ReportMessage::BytesReceived {
-            peer: *peer,
+            peer,
             bytes,
             duration,
         };
@@ -350,9 +334,9 @@ impl ReputationReporterInterface for MyReputationReporter {
     }
 
     /// Report the number of (healthy) bytes which we sent from another peer.
-    fn report_bytes_sent(&self, peer: &NodePublicKey, bytes: u64, duration: Option<Duration>) {
+    fn report_bytes_sent(&self, peer: NodeIndex, bytes: u64, duration: Option<Duration>) {
         let message = ReportMessage::BytesSent {
-            peer: *peer,
+            peer,
             bytes,
             duration,
         };
@@ -360,8 +344,8 @@ impl ReputationReporterInterface for MyReputationReporter {
     }
 
     /// Report the number of hops we have witnessed to the given peer.
-    fn report_hops(&self, peer: &NodePublicKey, hops: u8) {
-        let message = ReportMessage::Hops { peer: *peer, hops };
+    fn report_hops(&self, peer: NodeIndex, hops: u8) {
+        let message = ReportMessage::Hops { peer, hops };
         self.send_message(message);
     }
 }
@@ -369,29 +353,29 @@ impl ReputationReporterInterface for MyReputationReporter {
 #[derive(Debug)]
 enum ReportMessage {
     Sat {
-        peer: NodePublicKey,
+        peer: NodeIndex,
         weight: Weight,
     },
     Unsat {
-        peer: NodePublicKey,
+        peer: NodeIndex,
         weight: Weight,
     },
     Latency {
-        peer: NodePublicKey,
+        peer: NodeIndex,
         latency: Duration,
     },
     BytesReceived {
-        peer: NodePublicKey,
+        peer: NodeIndex,
         bytes: u64,
         duration: Option<Duration>,
     },
     BytesSent {
-        peer: NodePublicKey,
+        peer: NodeIndex,
         bytes: u64,
         duration: Option<Duration>,
     },
     Hops {
-        peer: NodePublicKey,
+        peer: NodeIndex,
         hops: u8,
     },
 }

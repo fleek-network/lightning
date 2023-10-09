@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use fleek_crypto::NodePublicKey;
 use infusion::c;
+use lightning_types::NodeIndex;
 
 use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
@@ -56,7 +56,7 @@ pub trait ReputationAggregatorInterface<C: Collection>:
 #[infusion::blank]
 pub trait ReputationQueryInteface: Clone + Send + Sync {
     /// Returns the reputation of the provided node locally.
-    fn get_reputation_of(&self, peer: &NodePublicKey) -> Option<u8>;
+    fn get_reputation_of(&self, peer: &NodeIndex) -> Option<u8>;
 }
 
 /// Reputation reporter is a cheaply cleanable object which can be used to report the interactions
@@ -66,22 +66,22 @@ pub trait ReputationQueryInteface: Clone + Send + Sync {
 #[infusion::blank]
 pub trait ReputationReporterInterface: Clone + Send + Sync {
     /// Report a satisfactory (happy) interaction with the given peer. Used for up time.
-    fn report_sat(&self, peer: &NodePublicKey, weight: Weight);
+    fn report_sat(&self, peer: NodeIndex, weight: Weight);
 
     /// Report a unsatisfactory (happy) interaction with the given peer. Used for down time.
-    fn report_unsat(&self, peer: &NodePublicKey, weight: Weight);
+    fn report_unsat(&self, peer: NodeIndex, weight: Weight);
 
     /// Report a latency which we witnessed from another peer.
-    fn report_latency(&self, peer: &NodePublicKey, latency: Duration);
+    fn report_latency(&self, peer: NodeIndex, latency: Duration);
 
     /// Report the number of (healthy) bytes which we received from another peer.
-    fn report_bytes_received(&self, peer: &NodePublicKey, bytes: u64, duration: Option<Duration>);
+    fn report_bytes_received(&self, peer: NodeIndex, bytes: u64, duration: Option<Duration>);
 
     /// Report the number of (healthy) bytes which we sent from another peer.
-    fn report_bytes_sent(&self, peer: &NodePublicKey, bytes: u64, duration: Option<Duration>);
+    fn report_bytes_sent(&self, peer: NodeIndex, bytes: u64, duration: Option<Duration>);
 
     /// Report the number of hops we have witnessed to the given peer.
-    fn report_hops(&self, peer: &NodePublicKey, hops: u8);
+    fn report_hops(&self, peer: NodeIndex, hops: u8);
 }
 
 // TODO: Move to types/reputation.rs as `ReputationWeight`.

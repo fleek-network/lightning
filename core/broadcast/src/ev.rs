@@ -270,9 +270,7 @@ impl<C: Collection> Context<C> {
         // Mark message as received for RTT measurements.
         self.pending_store.received_message(sender, id);
         // Report a satisfactory interaction when we receive a message.
-        if let Some(node_pk) = self.get_node_pk(sender) {
-            self.rep_reporter.report_sat(&node_pk, Weight::Weak);
-        }
+        self.rep_reporter.report_sat(sender, Weight::Weak);
         self.incoming_messages[topic_index].insert(shared);
     }
 

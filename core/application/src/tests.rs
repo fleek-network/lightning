@@ -929,12 +929,12 @@ async fn test_submit_rep_measurements() {
         panic!("{e}");
     }
 
-    let rep_measurements1 = query_runner.get_rep_measurements(peer1);
+    let rep_measurements1 = query_runner.get_rep_measurements(&peer_index1);
     assert_eq!(rep_measurements1.len(), 1);
     assert_eq!(rep_measurements1[0].reporting_node, reporting_node_index);
     assert_eq!(rep_measurements1[0].measurements, measurements1);
 
-    let rep_measurements2 = query_runner.get_rep_measurements(peer2);
+    let rep_measurements2 = query_runner.get_rep_measurements(&peer_index2);
     assert_eq!(rep_measurements2.len(), 1);
     assert_eq!(rep_measurements2[0].reporting_node, reporting_node_index);
     assert_eq!(rep_measurements2[0].measurements, measurements2);
@@ -1008,8 +1008,8 @@ async fn test_rep_scores() {
         run_transaction(vec![req], &update_socket).await.unwrap();
     }
 
-    assert!(query_runner.get_reputation(&peer1).is_some());
-    assert!(query_runner.get_reputation(&peer2).is_some());
+    assert!(query_runner.get_reputation(&peer_index1).is_some());
+    assert!(query_runner.get_reputation(&peer_index2).is_some());
 }
 
 #[test]

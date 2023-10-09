@@ -4444,6 +4444,7 @@ dependencies = [
  "lightning-blockstore-server",
  "lightning-fetcher",
  "lightning-interfaces",
+ "lightning-notifier",
  "lightning-origin-ipfs",
  "lightning-pool",
  "lightning-rep-collector",

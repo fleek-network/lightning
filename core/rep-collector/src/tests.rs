@@ -1,13 +1,7 @@
 use std::collections::HashSet;
 use std::time::{Duration, SystemTime};
 
-use fleek_crypto::{
-    AccountOwnerSecretKey,
-    ConsensusSecretKey,
-    NodePublicKey,
-    NodeSecretKey,
-    SecretKey,
-};
+use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
@@ -183,19 +177,19 @@ async fn test_query() {
     let rep_query = rep_aggregator.get_query();
     rep_aggregator.start().await;
     // Report some measurements for alice and bob.
-    let alice = NodePublicKey([1; 32]);
-    let bob = NodePublicKey([2; 32]);
-    rep_reporter.report_sat(&alice, Weight::Strong);
-    rep_reporter.report_sat(&alice, Weight::VeryStrong);
-    rep_reporter.report_sat(&bob, Weight::Weak);
-    rep_reporter.report_unsat(&bob, Weight::Strong);
+    let alice = 1;
+    let bob = 2;
+    rep_reporter.report_sat(alice, Weight::Strong);
+    rep_reporter.report_sat(alice, Weight::VeryStrong);
+    rep_reporter.report_sat(bob, Weight::Weak);
+    rep_reporter.report_unsat(bob, Weight::Strong);
 
-    rep_reporter.report_latency(&alice, Duration::from_millis(100));
-    rep_reporter.report_latency(&alice, Duration::from_millis(120));
-    rep_reporter.report_latency(&bob, Duration::from_millis(300));
-    rep_reporter.report_latency(&bob, Duration::from_millis(350));
+    rep_reporter.report_latency(alice, Duration::from_millis(100));
+    rep_reporter.report_latency(alice, Duration::from_millis(120));
+    rep_reporter.report_latency(bob, Duration::from_millis(300));
+    rep_reporter.report_latency(bob, Duration::from_millis(350));
 
-    rep_reporter.report_bytes_sent(&bob, 1000, None);
+    rep_reporter.report_bytes_sent(bob, 1000, None);
 
     // Check that there are local reputation score for alice and bob.
     let mut interval = tokio::time::interval(Duration::from_millis(100));
@@ -337,13 +331,14 @@ async fn test_submit_measurements() {
     rep_aggregator.start().await;
 
     // Report some measurements to the reputation aggregator.
-    rep_reporter.report_sat(&peer_public_key, Weight::Weak);
-    rep_reporter.report_sat(&peer_public_key, Weight::Strong);
-    rep_reporter.report_latency(&peer_public_key, Duration::from_millis(300));
-    rep_reporter.report_latency(&peer_public_key, Duration::from_millis(100));
-    rep_reporter.report_bytes_sent(&peer_public_key, 10_000, Some(Duration::from_millis(100)));
-    rep_reporter.report_bytes_received(&peer_public_key, 20_000, Some(Duration::from_millis(100)));
-    rep_reporter.report_hops(&peer_public_key, 4);
+    let peer_index = query_runner.pubkey_to_index(peer_public_key).unwrap();
+    rep_reporter.report_sat(peer_index, Weight::Weak);
+    rep_reporter.report_sat(peer_index, Weight::Strong);
+    rep_reporter.report_latency(peer_index, Duration::from_millis(300));
+    rep_reporter.report_latency(peer_index, Duration::from_millis(100));
+    rep_reporter.report_bytes_sent(peer_index, 10_000, Some(Duration::from_millis(100)));
+    rep_reporter.report_bytes_received(peer_index, 20_000, Some(Duration::from_millis(100)));
+    rep_reporter.report_hops(peer_index, 4);
 
     let reporting_node_index = query_runner.pubkey_to_index(node_public_key).unwrap();
 
@@ -351,7 +346,7 @@ async fn test_submit_measurements() {
     loop {
         tokio::select! {
             _ = interval.tick() => {
-                let measurements = query_runner.get_rep_measurements(peer_public_key);
+                let measurements = query_runner.get_rep_measurements(&peer_index);
                 if !measurements.is_empty() {
                     // Make sure that the reported measurements were submitted to the application
                     // state.
@@ -546,34 +541,34 @@ async fn test_reputation_calculation_and_query() {
     // Both nodes report measurements for two peers (alice and bob).
     // note(dalton): Refactored to not include measurements for non white listed nodes so have to
     // switch Alice and bob to the keys we added to the committee
-    let alice = node_public_key1;
-    let bob = node_public_key2;
-    rep_reporter1.report_sat(&alice, Weight::Strong);
-    rep_reporter1.report_latency(&alice, Duration::from_millis(100));
-    rep_reporter1.report_bytes_sent(&alice, 10_000, Some(Duration::from_millis(100)));
-    rep_reporter1.report_bytes_received(&alice, 20_000, Some(Duration::from_millis(100)));
+    let alice = query_runner.pubkey_to_index(node_public_key1).unwrap();
+    let bob = query_runner.pubkey_to_index(node_public_key2).unwrap();
+    rep_reporter1.report_sat(alice, Weight::Strong);
+    rep_reporter1.report_latency(alice, Duration::from_millis(100));
+    rep_reporter1.report_bytes_sent(alice, 10_000, Some(Duration::from_millis(100)));
+    rep_reporter1.report_bytes_received(alice, 20_000, Some(Duration::from_millis(100)));
 
-    rep_reporter1.report_sat(&bob, Weight::Weak);
-    rep_reporter1.report_latency(&bob, Duration::from_millis(300));
-    rep_reporter1.report_bytes_sent(&bob, 12_000, Some(Duration::from_millis(300)));
-    rep_reporter1.report_bytes_received(&bob, 23_000, Some(Duration::from_millis(400)));
+    rep_reporter1.report_sat(bob, Weight::Weak);
+    rep_reporter1.report_latency(bob, Duration::from_millis(300));
+    rep_reporter1.report_bytes_sent(bob, 12_000, Some(Duration::from_millis(300)));
+    rep_reporter1.report_bytes_received(bob, 23_000, Some(Duration::from_millis(400)));
 
-    rep_reporter2.report_sat(&alice, Weight::Strong);
-    rep_reporter2.report_latency(&alice, Duration::from_millis(120));
-    rep_reporter2.report_bytes_sent(&alice, 11_000, Some(Duration::from_millis(90)));
-    rep_reporter2.report_bytes_received(&alice, 22_000, Some(Duration::from_millis(110)));
+    rep_reporter2.report_sat(alice, Weight::Strong);
+    rep_reporter2.report_latency(alice, Duration::from_millis(120));
+    rep_reporter2.report_bytes_sent(alice, 11_000, Some(Duration::from_millis(90)));
+    rep_reporter2.report_bytes_received(alice, 22_000, Some(Duration::from_millis(110)));
 
-    rep_reporter2.report_sat(&bob, Weight::Weak);
-    rep_reporter2.report_latency(&bob, Duration::from_millis(250));
-    rep_reporter2.report_bytes_sent(&bob, 9_000, Some(Duration::from_millis(280)));
-    rep_reporter2.report_bytes_received(&bob, 19_000, Some(Duration::from_millis(350)));
+    rep_reporter2.report_sat(bob, Weight::Weak);
+    rep_reporter2.report_latency(bob, Duration::from_millis(250));
+    rep_reporter2.report_bytes_sent(bob, 9_000, Some(Duration::from_millis(280)));
+    rep_reporter2.report_bytes_received(bob, 19_000, Some(Duration::from_millis(350)));
 
     let mut interval = tokio::time::interval(Duration::from_millis(100));
     loop {
         tokio::select! {
             _ = interval.tick() => {
-                let measure_alice = query_runner.get_rep_measurements(alice);
-                let measure_bob = query_runner.get_rep_measurements(bob);
+                let measure_alice = query_runner.get_rep_measurements(&alice);
+                let measure_bob = query_runner.get_rep_measurements(&bob);
                 if measure_alice.len() == 2 && measure_bob.len() == 2 {
                     // Wait until all measurements were submitted to the application.
                     break;

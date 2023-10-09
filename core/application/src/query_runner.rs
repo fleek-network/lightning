@@ -155,23 +155,13 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .unwrap_or(0)
     }
 
-    fn get_rep_measurements(&self, node: NodePublicKey) -> Vec<ReportedReputationMeasurements> {
-        self.inner.run(|ctx| {
-            self.pub_key_to_index
-                .get(ctx)
-                .get(node)
-                .map(|index| self.rep_measurements.get(ctx).get(index).unwrap_or(vec![]))
-                .unwrap_or(vec![])
-        })
+    fn get_rep_measurements(&self, node: &NodeIndex) -> Vec<ReportedReputationMeasurements> {
+        self.inner
+            .run(|ctx| self.rep_measurements.get(ctx).get(node).unwrap_or(vec![]))
     }
 
-    fn get_reputation(&self, node: &NodePublicKey) -> Option<u8> {
-        self.inner.run(|ctx| {
-            self.pub_key_to_index
-                .get(ctx)
-                .get(node)
-                .and_then(|index| self.rep_scores.get(ctx).get(index))
-        })
+    fn get_reputation(&self, node: &NodeIndex) -> Option<u8> {
+        self.inner.run(|ctx| self.rep_scores.get(ctx).get(node))
     }
 
     fn get_relative_score(&self, _n1: &NodePublicKey, _n2: &NodePublicKey) -> u128 {
@@ -215,6 +205,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn get_epoch_randomness_seed(&self) -> &[u8; 32] {
         todo!()
     }
+
     #[autometrics]
     fn get_committee_members(&self) -> Vec<NodePublicKey> {
         self.inner.run(|ctx| {

@@ -39,6 +39,7 @@ use lightning_interfaces::{
     BlockStoreServerInterface,
     FetcherInterface,
     MempoolSocket,
+    NotifierInterface,
     OriginProviderInterface,
     PoolInterface,
     ReputationAggregatorInterface,
@@ -47,6 +48,7 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
+use lightning_notifier::Notifier;
 use lightning_origin_ipfs::{Config as OriginIPFSConfig, IPFSOrigin};
 use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_rep_collector::ReputationAggregator;
@@ -91,6 +93,7 @@ partial!(TestBinding {
     BlockStoreServerInterface = BlockStoreServer<Self>;
     OriginProviderInterface = IPFSOrigin<Self>;
     SignerInterface = Signer<Self>;
+    NotifierInterface = Notifier<Self>;
     PoolInterface = Pool<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
 });
@@ -103,10 +106,11 @@ fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
 
     let signer = Signer::<TestBinding>::init(SignerConfig::test(), app.sync_query()).unwrap();
 
+    let notifier = Notifier::<TestBinding>::init(&app);
     let rep_aggregator = ReputationAggregator::<TestBinding>::init(
         Default::default(),
         signer.get_socket(),
-        Default::default(),
+        notifier.clone(),
         app.sync_query(),
     )
     .unwrap();
@@ -115,7 +119,7 @@ fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
         PoolConfig::default(),
         &signer,
         app.sync_query(),
-        Default::default(),
+        notifier,
         Default::default(),
         rep_aggregator.get_reporter(),
     )
@@ -339,7 +343,8 @@ async fn test_rpc_get_reputation() -> Result<()> {
     genesis_node.reputation = Some(46);
     genesis.node_info.push(genesis_node);
 
-    let (mut rpc, _) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
+    let (mut rpc, query_runner) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
+    let node_index = query_runner.pubkey_to_index(node_public_key).unwrap();
     let port = 30002;
     rpc.config.port = port;
 
@@ -351,7 +356,7 @@ async fn test_rpc_get_reputation() -> Result<()> {
     let req = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_reputation",
-        "params": {"public_key": node_public_key},
+        "params": node_index,
         "id":1,
     });
 

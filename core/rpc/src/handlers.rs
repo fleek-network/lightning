@@ -17,6 +17,7 @@ use lightning_interfaces::types::{
     FetcherRequest,
     FetcherResponse,
     ImmutablePointer,
+    NodeIndex,
     NodeInfo,
     NodeServed,
     OriginProvider,
@@ -236,9 +237,9 @@ pub async fn get_account_info_handler<C: Collection>(
 
 pub async fn get_reputation_handler<C: Collection>(
     data: Data<Arc<RpcData<C>>>,
-    Params(params): Params<NodeKeyParam>,
+    Params(node): Params<NodeIndex>,
 ) -> Result<Option<u8>> {
-    Ok(data.0.query_runner.get_reputation(&params.public_key))
+    Ok(data.0.query_runner.get_reputation(&node))
 }
 
 pub async fn get_latencies_handler<C: Collection>(
@@ -249,9 +250,9 @@ pub async fn get_latencies_handler<C: Collection>(
 
 pub async fn get_reputation_measurements_handler<C: Collection>(
     data: Data<Arc<RpcData<C>>>,
-    Params(params): Params<NodeKeyParam>,
+    Params(node): Params<NodeIndex>,
 ) -> Result<Vec<ReportedReputationMeasurements>> {
-    Ok(data.0.query_runner.get_rep_measurements(params.public_key))
+    Ok(data.0.query_runner.get_rep_measurements(&node))
 }
 
 pub async fn get_staking_amount_handler<C: Collection>(

@@ -1,12 +1,10 @@
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
-use std::time::Duration;
 
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::{ReputationAggregatorInterface, ReputationQueryInteface};
+use lightning_interfaces::ReputationAggregatorInterface;
 use thiserror::Error;
 use tokio::sync::mpsc::{self, Receiver};
 use tokio::sync::{oneshot, Notify};
@@ -16,7 +14,7 @@ use crate::distance;
 use crate::node::NodeInfo;
 use crate::task::Task;
 
-const DELTA: u64 = Duration::from_secs(600).as_millis() as u64; // 10 minutes
+//const DELTA: u64 = Duration::from_secs(600).as_millis() as u64; // 10 minutes
 
 pub type TableKey = [u8; 32];
 
@@ -24,7 +22,7 @@ pub async fn start_worker<C: Collection>(
     mut rx: Receiver<TableRequest>,
     local_key: NodePublicKey,
     task_tx: mpsc::Sender<Task>,
-    local_rep_query: c![C::ReputationAggregatorInterface::ReputationQuery],
+    _local_rep_query: c![C::ReputationAggregatorInterface::ReputationQuery],
     shutdown_notify: Arc<Notify>,
 ) {
     let mut table = Table::new(local_key);
@@ -108,24 +106,25 @@ pub async fn start_worker<C: Collection>(
                                 bucket.sort_by(|a, b| {
                                     // Sort the bucket such that the most desirable nodes are at the end of
                                     // the vec.
-                                    match (a.last_responded, b.last_responded) {
-                                        (Some(a_last_res), Some(b_last_res)) => {
-                                            let score_a = local_rep_query.get_reputation_of(&a.key);
-                                            let score_b = local_rep_query.get_reputation_of(&b.key);
-                                            if a_last_res.abs_diff(b_last_res) < DELTA
-                                                && (score_a.is_some() || score_b.is_some()) {
-                                                // If the dfference between the timestamps of the
-                                                // last responses is less than some specified delta,
-                                                // we use the local reputation as a tie breaker.
-                                                score_a.cmp(&score_b)
-                                            } else {
-                                                a_last_res.cmp(&b_last_res)
-                                            }
-                                        },
-                                        (Some(_), None) => Ordering::Greater,
-                                        (None, Some(_)) => Ordering::Less,
-                                        (None, None) => Ordering::Equal,
-                                    }
+                                    //match (a.last_responded, b.last_responded) {
+                                    //    (Some(a_last_res), Some(b_last_res)) => {
+                                    //        let score_a = local_rep_query.get_reputation_of(&a.key);
+                                    //        let score_b = local_rep_query.get_reputation_of(&b.key);
+                                    //        if a_last_res.abs_diff(b_last_res) < DELTA
+                                    //            && (score_a.is_some() || score_b.is_some()) {
+                                    //            // If the dfference between the timestamps of the
+                                    //            // last responses is less than some specified delta,
+                                    //            // we use the local reputation as a tie breaker.
+                                    //            score_a.cmp(&score_b)
+                                    //        } else {
+                                    //            a_last_res.cmp(&b_last_res)
+                                    //        }
+                                    //    },
+                                    //    (Some(_), None) => Ordering::Greater,
+                                    //    (None, Some(_)) => Ordering::Less,
+                                    //    (None, None) => Ordering::Equal,
+                                    //}
+                                    a.last_responded.cmp(&b.last_responded)
                                 });
                             }
                             // Pick the most desirable nodes from each bucket.

@@ -316,11 +316,8 @@ where
             let connection_id = connection.connection_id();
 
             // Report the latency of this peer.
-            // Todo: Remove this `if` when we switch to using NodeIndex.
-            if let Some(pk) = self.network_overlay.index_to_pubkey(peer_index) {
-                self.rep_reporter
-                    .report_latency(&pk, connection.metrics().rtt);
-            }
+            self.rep_reporter
+                .report_latency(peer_index, connection.metrics().rtt / 2);
 
             // Start worker to drive the connection.
             let (request_tx, request_rx) = mpsc::channel(1024);
