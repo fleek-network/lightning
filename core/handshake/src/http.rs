@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 
+use anyhow::Context;
 use axum::Router;
 use tower_http::cors::CorsLayer;
 
@@ -10,9 +11,13 @@ pub async fn spawn_http_server(
     router: Router,
     waiter: ShutdownWaiter,
 ) -> anyhow::Result<()> {
+    let app = router
+        .layer(CorsLayer::permissive())
+        .into_make_service_with_connect_info::<SocketAddr>();
+
     axum::Server::bind(&addr)
-        .serve(router.layer(CorsLayer::permissive()).into_make_service())
+        .serve(app)
         .with_graceful_shutdown(waiter.wait_for_shutdown())
         .await
-        .map_err(|e| e.into())
+        .context("failed to run http server")
 }

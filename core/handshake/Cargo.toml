@@ -29,8 +29,8 @@ enum_dispatch = "0.3.12"
 triomphe = "0.1.9"
 smallvec = "1.11"
 heapless = "0.7.16"
-axum = "0.6"
-webrtc = "0.9.0"
+axum = { version = "0.6", features = ["macros"]}
+str0m = "0.3.0"
 wtransport = { git = "https://github.com/kckeiks/wtransport.git", branch = "lightning-wtransport", features = ["dangerous-configuration"] }
 rand = "0.8"
 rcgen = "0.11"

@@ -7,6 +7,7 @@ storage = "RocksDb"
 testnet = false
 
 [handshake]
+http_address = "0.0.0.0:4220"
 
 [[handshake.worker]]
 type = "AsyncWorker"
@@ -22,7 +23,7 @@ type = "AsyncWorker"
 
 [[handshake.transport]]
 type = "WebRTC"
-signal_address = "0.0.0.0:4210"
+udp_address = "127.0.0.1:4221"
 
 [service-executor]
 services = [0, 1]

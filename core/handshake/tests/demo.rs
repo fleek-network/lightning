@@ -22,6 +22,7 @@ partial!(TestBinding {
 async fn demo() -> anyhow::Result<()> {
     let config: JsonConfigProvider = json!({
       "handshake": {
+        "http_address": "127.0.0.1:4220",
         "transport": [
           {
             "type": "Mock",

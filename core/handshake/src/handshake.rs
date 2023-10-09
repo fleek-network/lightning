@@ -43,7 +43,7 @@ pub struct HandshakeConfig {
     pub workers: Vec<WorkerMode>,
     #[serde(rename = "transport")]
     pub transports: Vec<TransportConfig>,
-    pub http_addr: SocketAddr,
+    pub http_address: SocketAddr,
 }
 
 impl Default for HandshakeConfig {
@@ -56,7 +56,7 @@ impl Default for HandshakeConfig {
                 WorkerMode::AsyncWorker,
             ],
             transports: vec![TransportConfig::WebRTC(Default::default())],
-            http_addr: ([0, 0, 0, 0], 4210).into(),
+            http_address: ([0, 0, 0, 0], 4220).into(),
         }
     }
 }
@@ -122,7 +122,7 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
                 router = router.nest("", child);
             }
             let waiter = run.shutdown.waiter();
-            let http_addr = self.config.http_addr;
+            let http_addr = self.config.http_address;
             tokio::spawn(async move { spawn_http_server(http_addr, router, waiter).await });
         }
     }
