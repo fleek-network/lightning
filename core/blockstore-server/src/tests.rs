@@ -182,9 +182,13 @@ async fn get_peers(
         };
         let blockstore = Blockstore::init(blockstore_config).unwrap();
 
-        let blockstore_server =
-            BlockStoreServer::<TestBinding>::init(Config::default(), blockstore.clone(), &pool)
-                .unwrap();
+        let blockstore_server = BlockStoreServer::<TestBinding>::init(
+            Config::default(),
+            blockstore.clone(),
+            &pool,
+            rep_aggregator.get_reporter(),
+        )
+        .unwrap();
 
         let peer = Peer::<TestBinding> {
             pool,

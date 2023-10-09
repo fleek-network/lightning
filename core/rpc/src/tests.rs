@@ -129,6 +129,7 @@ fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
         BlockServerConfig::default(),
         blockstore.clone(),
         &pool,
+        rep_aggregator.get_reporter(),
     )
     .unwrap();
 

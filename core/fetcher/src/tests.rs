@@ -244,6 +244,7 @@ async fn get_fetchers(
             BlockServerConfig::default(),
             blockstore.clone(),
             &pool,
+            rep_aggregator.get_reporter(),
         )
         .unwrap();
 

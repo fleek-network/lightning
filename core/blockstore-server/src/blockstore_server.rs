@@ -4,7 +4,7 @@ use std::mem;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use affair::{Socket, Task};
 use anyhow::{anyhow, Result};
@@ -29,6 +29,8 @@ use lightning_interfaces::{
     IncrementalPutInterface,
     PoolInterface,
     RejectReason,
+    ReputationAggregatorInterface,
+    ReputationReporterInterface,
     Request,
     Requester,
     Responder,
@@ -61,6 +63,7 @@ impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
         config: Self::Config,
         blockstore: C::BlockStoreInterface,
         pool: &C::PoolInterface,
+        rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     ) -> Result<Self> {
         let shutdown_notify = Arc::new(Notify::new());
 
@@ -73,6 +76,7 @@ impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
             config.max_conc_res,
             pool_requester,
             pool_responder,
+            rep_reporter,
             shutdown_notify.clone(),
         );
 
@@ -127,6 +131,7 @@ pub struct BlockstoreServerInner<C: Collection> {
     num_responses: Arc<AtomicUsize>,
     pool_requester: c!(C::PoolInterface::Requester),
     pool_responder: Arc<Mutex<Option<c!(C::PoolInterface::Responder)>>>,
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     shutdown_notify: Arc<Notify>,
 }
 
@@ -139,6 +144,7 @@ impl<C: Collection> BlockstoreServerInner<C> {
         max_conc_res: usize,
         pool_requester: c!(C::PoolInterface::Requester),
         pool_responder: c!(C::PoolInterface::Responder),
+        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
         shutdown_notify: Arc<Notify>,
     ) -> Self {
         Self {
@@ -149,6 +155,7 @@ impl<C: Collection> BlockstoreServerInner<C> {
             num_responses: Arc::new(AtomicUsize::new(0)),
             pool_requester,
             pool_responder: Arc::new(Mutex::new(Some(pool_responder))),
+            rep_reporter,
             shutdown_notify,
         }
     }
@@ -201,12 +208,14 @@ impl<C: Collection> BlockstoreServerInner<C> {
                             let blockstore = self.blockstore.clone();
                             let pool_requester = self.pool_requester.clone();
                             let peer_request_ = peer_request.clone();
+                            let rep_reporter = self.rep_reporter.clone();
                             tasks.spawn(async move {
                                 send_request::<C>(
                                     task.request.peer,
                                     peer_request_,
                                     blockstore,
-                                    pool_requester
+                                    pool_requester,
+                                    rep_reporter,
                                 ).await
                             });
                         } else {
@@ -389,6 +398,7 @@ async fn send_request<C: Collection>(
     request: PeerRequest,
     blockstore: C::BlockStoreInterface,
     pool_requester: c!(C::PoolInterface::Requester),
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
 ) -> Result<PeerRequest, ErrorResponse> {
     match timeout(
         REQUEST_TIMEOUT,
@@ -401,6 +411,8 @@ async fn send_request<C: Collection>(
                 Ok(()) => {
                     let mut body = response.body();
                     let mut putter = blockstore.put(Some(request.hash));
+                    let mut bytes_recv = 0;
+                    let instant = Instant::now();
                     while let Some(bytes) = body.next().await {
                         let Ok(bytes) = bytes else {
                             return Err(ErrorResponse {
@@ -408,6 +420,7 @@ async fn send_request<C: Collection>(
                                 request,
                             });
                         };
+                        bytes_recv += bytes.len();
                         let Ok(frame) = Frame::try_from(bytes) else {
                             return Err(ErrorResponse {
                                 error: PeerRequestError::Incomplete,
@@ -426,6 +439,12 @@ async fn send_request<C: Collection>(
                                 let _hash = putter.finalize().await.unwrap();
                                 // TODO(matthias): do we have to compare this hash to the
                                 // requested hash?
+                                let duration = instant.elapsed();
+                                rep_reporter.report_bytes_received(
+                                    peer,
+                                    bytes_recv as u64,
+                                    Some(duration),
+                                );
                                 return Ok(request);
                             },
                         }
