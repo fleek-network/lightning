@@ -25,8 +25,7 @@ use lightning_consensus::consensus::Consensus;
 use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
 use lightning_dht::dht::Dht;
 use lightning_handshake::handshake::{Handshake, HandshakeConfig};
-use lightning_handshake::transports::webrtc::WebRtcConfig;
-use lightning_handshake::{TransportConfig, WorkerMode};
+use lightning_handshake::WorkerMode;
 use lightning_interfaces::types::{Blake3Hash, NodePorts, Staking};
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
@@ -365,10 +364,9 @@ fn build_config(
 
     config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
         workers: vec![WorkerMode::AsyncWorker],
-        transports: vec![TransportConfig::WebRTC(WebRtcConfig {
-            signal_address: ([127, 0, 0, 1], ports.handshake + 1).into(),
-        })],
-        http_addr: ([127, 0, 0, 1], ports.handshake).into(),
+        // TODO: figure out how to have e2e testing for the different transports (browser oriented)
+        transports: vec![],
+        http_address: ([127, 0, 0, 1], ports.handshake).into(),
     });
 
     config.inject::<ServiceExecutor<FinalTypes>>(ServiceExecutorConfig {
