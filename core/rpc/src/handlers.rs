@@ -38,7 +38,6 @@ use crate::eth::{
     eth_estimate_gas,
     eth_gas_price,
     eth_get_code,
-    eth_protocol_version,
     eth_send_raw_transaction,
     eth_transaction_count,
     net_listening,

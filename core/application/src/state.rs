@@ -262,6 +262,7 @@ impl<B: Backend> State<B> {
 
         if to_address == FLEEK_CONTRACT {
             // They are calling one of our state transitions functions
+            #[allow(unused)]
             match FleekContractCalls::decode(&txn.input) {
                 Ok(FleekContractCalls::Deposit(DepositCall { token, amount })) => {
                     todo!()
@@ -1348,7 +1349,7 @@ impl<B: Backend> State<B> {
         Ok(())
     }
 
-    fn verify_ethereum_transaction(&self, txn: &EthersTransaction) -> Result<(), ExecutionError> {
+    fn verify_ethereum_transaction(&self, _txn: &EthersTransaction) -> Result<(), ExecutionError> {
         //todo(dalton)
         Ok(())
     }

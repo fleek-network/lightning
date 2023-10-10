@@ -30,18 +30,24 @@ pub async fn eth_send_raw_transaction<C: Collection>(
     trace!(target: "rpc::eth", "Serving eth_sendRawTransaction");
     let tx_data = tx.as_ref();
 
-    let transaction = if tx_data[0] > 0x7f {
-        // legacy transaction
-        match rlp::decode::<Transaction>(tx_data) {
-            Ok(transaction) => transaction,
-            Err(_) => return Err(Error::from("Failed to decode signed transaction")),
-        }
-    } else {
-        let tx = match rlp::decode::<Transaction>(tx_data) {
-            Ok(transaction) => transaction,
-            Err(_) => return Err(Error::from("Failed to decode signed transaction")),
-        };
-        tx
+    // TODO(dalton):
+    //let transaction = if tx_data[0] > 0x7f {
+    //    // legacy transaction
+    //    match rlp::decode::<Transaction>(tx_data) {
+    //        Ok(transaction) => transaction,
+    //        Err(_) => return Err(Error::from("Failed to decode signed transaction")),
+    //    }
+    //} else {
+    //    let tx = match rlp::decode::<Transaction>(tx_data) {
+    //        Ok(transaction) => transaction,
+    //        Err(_) => return Err(Error::from("Failed to decode signed transaction")),
+    //    };
+    //    tx
+    //};
+
+    let transaction = match rlp::decode::<Transaction>(tx_data) {
+        Ok(transaction) => transaction,
+        Err(_) => return Err(Error::from("Failed to decode signed transaction")),
     };
 
     data.0
@@ -170,7 +176,8 @@ pub async fn eth_gas_price<C: Collection>() -> Result<U256> {
 }
 
 // /// Handler for: `eth_maxPriorityFeePerGas`
-async fn max_priority_fee_per_gas<C: Collection>() -> Result<U256> {
+#[allow(unused)]
+async fn max_priority_fee_per_gas() -> Result<U256> {
     trace!(target: "rpc::eth", "Serving eth_maxPriorityFeePerGas");
     Ok(U256::ZERO)
 }
@@ -187,49 +194,53 @@ pub async fn fee_history<C: Collection>(
 }
 
 // /// Handler for: `eth_mining`
-async fn is_mining<C: Collection>() -> Result<bool> {
+#[allow(unused)]
+async fn is_mining() -> Result<bool> {
     Err(Error::from("unimplemented"))
 }
 
 // /// Handler for: `eth_hashrate`
-async fn hashrate<C: Collection>() -> Result<U256> {
+#[allow(unused)]
+async fn hashrate() -> Result<U256> {
     Ok(U256::ZERO)
 }
 
 // /// Handler for: `eth_getWork`
-async fn get_work<C: Collection>() -> Result<()> {
+#[allow(unused)]
+async fn get_work() -> Result<()> {
     Err(Error::from("unimplemented"))
 }
 
 // /// Handler for: `eth_submitHashrate`
-async fn submit_hashrate<C: Collection>(_hashrate: U256, _id: B256) -> Result<bool> {
+#[allow(unused)]
+async fn submit_hashrate(_hashrate: U256, _id: B256) -> Result<bool> {
     Ok(false)
 }
 
 // /// Handler for: `eth_submitWork`
-async fn submit_work<C: Collection>(
-    _nonce: B64,
-    _pow_hash: B256,
-    _mix_digest: B256,
-) -> Result<bool> {
+#[allow(unused)]
+async fn submit_work(_nonce: B64, _pow_hash: B256, _mix_digest: B256) -> Result<bool> {
     Err(Error::from("unimplemented"))
 }
 
 /// Handler for: `eth_sendTransaction`
-async fn send_transaction<C: Collection>(request: TransactionRequest) -> Result<B256> {
+#[allow(unused)]
+async fn send_transaction(request: TransactionRequest) -> Result<B256> {
     trace!(target: "rpc::eth", ?request, "Serving eth_sendTransaction");
     // We shouldnt need to support this ever just eth_sendRawTransaction
     Err(Error::from("unimplemented"))
 }
 
 /// Handler for: `eth_sign`
-async fn sign<C: Collection>(address: Address, message: Bytes) -> Result<Bytes> {
+#[allow(unused)]
+async fn sign(address: Address, message: Bytes) -> Result<Bytes> {
     trace!(target: "rpc::eth", ?address, ?message, "Serving eth_sign");
     Err(Error::from("unimplemented"))
 }
 
 // /// Handler for: `eth_signTransaction`
-async fn sign_transaction<C: Collection>(_transaction: TransactionRequest) -> Result<Bytes> {
+#[allow(unused)]
+async fn sign_transaction(_transaction: TransactionRequest) -> Result<Bytes> {
     Err(Error::from("unimplemented"))
 }
 
