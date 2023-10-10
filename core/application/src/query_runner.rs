@@ -22,8 +22,8 @@ use lightning_interfaces::types::{
     ServiceId,
     ServiceRevenue,
     TotalServed,
+    TransactionRequest,
     TransactionResponse,
-    UpdateRequest,
     Value,
 };
 
@@ -346,14 +346,14 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn validate_txn(&self, txn: UpdateRequest) -> TransactionResponse {
+    fn validate_txn(&self, txn: TransactionRequest) -> TransactionResponse {
         self.inner.run(|ctx| {
             // Create the app/execution enviroment
             let backend = StateTables {
                 table_selector: ctx,
             };
             let app = State::new(backend);
-            app.execute_txn(txn.clone())
+            app.execute_transaction(txn.clone())
         })
     }
 
@@ -454,5 +454,33 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 },
             }
         })
+    }
+
+    fn get_account_nonce(&self, public_key: &EthAddress) -> u64 {
+        self.inner.run(|ctx| {
+            self.account_table
+                .get(ctx)
+                .get(public_key)
+                .map(|account| account.nonce)
+                .unwrap_or_default()
+        })
+    }
+
+    fn get_chain_id(&self) -> u32 {
+        self.inner.run(
+            |ctx| match self.metadata_table.get(ctx).get(&Metadata::ChainId) {
+                Some(Value::ChainId(id)) => id,
+                _ => 0,
+            },
+        )
+    }
+
+    fn get_block_number(&self) -> u128 {
+        self.inner.run(
+            |ctx| match self.metadata_table.get(ctx).get(&Metadata::BlockNumber) {
+                Some(Value::BlockNumber(num)) => num,
+                _ => 0,
+            },
+        )
     }
 }

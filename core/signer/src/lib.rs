@@ -287,7 +287,7 @@ impl SignerInner {
                         signature: signature.into(),
                         payload: update_payload,
                     };
-                    mempool_socket.run(update_request.clone())
+                    mempool_socket.run(update_request.clone().into())
                         .await
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                         .expect("Failed to send transaction to mempool.");
@@ -351,14 +351,14 @@ impl SignerInner {
                     // Resend all transactions with nonce >= base_nonce.
                     for pending_tx in pending_transactions.iter_mut() {
                         if let TransactionResponse::Revert(_) =
-                            query_runner.validate_txn(pending_tx.update_request.clone())
+                            query_runner.validate_txn(pending_tx.update_request.clone().into())
                         {
                             // If transaction reverts, don't retry.
                             continue;
                         }
                         *next_nonce += 1;
                         mempool_socket
-                            .run(pending_tx.update_request.clone())
+                            .run(pending_tx.update_request.clone().into())
                             .await
                             .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                             .expect("Failed to send transaction to mempool.");

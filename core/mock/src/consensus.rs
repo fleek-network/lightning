@@ -10,7 +10,7 @@ use axum::extract::State;
 use axum::routing::post;
 use axum::{Json, Router};
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::types::{Block, UpdateRequest};
+use lightning_interfaces::types::{Block, TransactionRequest};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
@@ -34,7 +34,7 @@ use tokio::sync::{mpsc, Notify};
 /// The mempool it provides also has a configurable success rate that must be from 0.0 to 1.0.
 pub struct MockConsensus<C: Collection> {
     addr: SocketAddr,
-    socket: mpsc::Sender<UpdateRequest>,
+    socket: mpsc::Sender<TransactionRequest>,
     is_running: Arc<AtomicBool>,
     shutdown_notifier: Arc<Notify>,
     block_notifier: Arc<Notify>,
@@ -50,7 +50,7 @@ pub struct Config {
 }
 
 struct MempoolSocketWorker {
-    sender: mpsc::Sender<UpdateRequest>,
+    sender: mpsc::Sender<TransactionRequest>,
     success_distr: Binomial,
     delay_distr: Cauchy<f64>,
     rng: ChaCha20Rng,
@@ -58,7 +58,7 @@ struct MempoolSocketWorker {
 
 #[async_trait]
 impl AsyncWorker for MempoolSocketWorker {
-    type Request = UpdateRequest;
+    type Request = TransactionRequest;
     type Response = ();
 
     async fn handle(&mut self, req: Self::Request) -> Self::Response {
@@ -117,8 +117,8 @@ impl<C: Collection> WithStartAndShutdown for MockConsensus<C> {
             .route(
                 "/tx",
                 post(
-                    |State(sender): State<Arc<mpsc::Sender<UpdateRequest>>>,
-                     Json(payload): Json<UpdateRequest>| async move {
+                    |State(sender): State<Arc<mpsc::Sender<TransactionRequest>>>,
+                     Json(payload): Json<TransactionRequest>| async move {
                         sender.send(payload).await.expect(
                             "MockConsensus: Could not send HTTP request through the sender.",
                         );
@@ -199,12 +199,12 @@ impl<C: Collection> ConfigConsumer for MockConsensus<C> {
 }
 
 async fn run_consensus(
-    mut rx: mpsc::Receiver<UpdateRequest>,
+    mut rx: mpsc::Receiver<TransactionRequest>,
     exec: ExecutionEngineSocket,
     block_notifier: Arc<Notify>,
 ) {
     let mut ticker = tokio::time::interval(Duration::from_millis(1));
-    let mut buffer = Vec::<UpdateRequest>::with_capacity(32);
+    let mut buffer = Vec::<TransactionRequest>::with_capacity(32);
 
     loop {
         tokio::select! {

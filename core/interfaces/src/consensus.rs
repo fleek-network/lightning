@@ -10,7 +10,7 @@ use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
 use crate::signer::SignerInterface;
-use crate::types::UpdateRequest;
+use crate::types::TransactionRequest;
 use crate::{ApplicationInterface, BroadcastInterface, ConfigProviderInterface};
 
 /// A socket that gives services and other sub-systems the required functionality to
@@ -21,7 +21,7 @@ use crate::{ApplicationInterface, BroadcastInterface, ConfigProviderInterface};
 /// This socket is safe to freely pass around, sending transactions through this socket
 /// does not guarantee their execution on the application layer. You can think about
 /// this as if the current node was only an external client to the network.
-pub type MempoolSocket = Socket<UpdateRequest, ()>;
+pub type MempoolSocket = Socket<TransactionRequest, ()>;
 
 #[infusion::service]
 pub trait ConsensusInterface<C: Collection>:

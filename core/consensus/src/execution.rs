@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use fastcrypto::hash::HashFunction;
 use fleek_blake3 as blake3;
-use lightning_interfaces::types::{Block, NodeIndex, UpdateRequest};
+use lightning_interfaces::types::{Block, NodeIndex, TransactionRequest};
 use lightning_interfaces::{
     ExecutionEngineSocket,
     SyncQueryRunnerInterface,
@@ -91,7 +91,7 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
 
         let transactions = payload
             .iter()
-            .filter_map(|txn| bincode::deserialize::<UpdateRequest>(txn).ok())
+            .filter_map(|txn| bincode::deserialize::<TransactionRequest>(txn).ok())
             .collect::<Vec<_>>();
 
         let block = Block {

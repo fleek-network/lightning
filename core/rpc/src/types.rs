@@ -7,6 +7,12 @@ pub struct PublicKeyParam {
 }
 
 #[derive(Deserialize)]
+pub struct PublicKeyLatestParam {
+    pub public_key: EthAddress,
+    pub tag: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct NodeKeyParam {
     pub public_key: NodePublicKey,
 }

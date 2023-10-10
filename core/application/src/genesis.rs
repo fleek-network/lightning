@@ -3,6 +3,7 @@ use std::net::IpAddr;
 
 use anyhow::{Context, Result};
 use fleek_crypto::{ConsensusPublicKey, EthAddress, NodePublicKey};
+use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
     CommodityTypes,
     Epoch,
@@ -16,6 +17,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Genesis {
+    pub chain_id: u32,
     pub epoch_start: u64,
     pub epoch_time: u64,
     pub committee_size: u64,
@@ -43,7 +45,7 @@ pub struct Genesis {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenesisAccount {
     pub public_key: EthAddress,
-    pub flk_balance: u64,
+    pub flk_balance: HpUfixed<18>,
     pub stables_balance: u64,
     pub bandwidth_balance: u64,
 }

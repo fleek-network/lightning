@@ -12,7 +12,7 @@ use anyhow::{bail, Result};
 use async_trait::async_trait;
 use fastcrypto::bls12381::min_sig::BLS12381PublicKey;
 use fleek_crypto::ConsensusPublicKey;
-use lightning_interfaces::types::{Epoch, EpochInfo, NodeInfo, UpdateRequest};
+use lightning_interfaces::types::{Epoch, EpochInfo, NodeInfo, TransactionRequest};
 use lightning_interfaces::SyncQueryRunnerInterface;
 use log::error;
 use narwhal_types::{TransactionProto, TransactionsClient};
@@ -55,7 +55,7 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
         }
     }
 
-    async fn handle_forward(&mut self, req: &UpdateRequest) -> Result<()> {
+    async fn handle_forward(&mut self, req: &TransactionRequest) -> Result<()> {
         // Grab the epoch
         let epoch = self.query_runner.get_epoch();
 
@@ -172,7 +172,7 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
 
 #[async_trait]
 impl<Q: SyncQueryRunnerInterface + 'static> AsyncWorker for Forwarder<Q> {
-    type Request = UpdateRequest;
+    type Request = TransactionRequest;
     type Response = ();
 
     async fn handle(&mut self, req: Self::Request) -> Self::Response {

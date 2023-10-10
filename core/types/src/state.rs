@@ -62,7 +62,9 @@ pub struct ReportedReputationMeasurements {
 /// Metadata, state stored in the blockchain that applies to the current block
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Metadata {
+    ChainId,
     Epoch,
+    BlockNumber,
     SupplyYearStart,
     TotalSupply,
     ProtocolFundAddress,
@@ -76,7 +78,9 @@ pub enum Metadata {
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Value {
+    ChainId(u32),
     Epoch(u64),
+    BlockNumber(u128),
     String(String),
     HpUfixed(HpUfixed<18>),
     AccountPublicKey(EthAddress),

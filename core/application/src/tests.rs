@@ -26,6 +26,7 @@ use lightning_interfaces::types::{
     ProtocolParams,
     Tokens,
     TotalServed,
+    TransactionRequest,
     TransactionResponse,
     UpdateMethod,
     UpdatePayload,
@@ -234,7 +235,7 @@ async fn simple_epoch_change(
             &node.node_secret_key,
             nonce,
         );
-        let res = run_transaction(vec![req], update_socket).await?;
+        let res = run_transaction(vec![req.into()], update_socket).await?;
         // check epoch change
         if index == required_signals - 1 {
             assert!(res.change_epoch);
@@ -304,7 +305,7 @@ fn pod_request(
 }
 
 async fn run_transaction(
-    requests: Vec<UpdateRequest>,
+    requests: Vec<TransactionRequest>,
     update_socket: &Socket<Block, BlockExecutionResponse>,
 ) -> Result<BlockExecutionResponse> {
     let res = update_socket
@@ -334,7 +335,9 @@ async fn deposit(
         secret_key,
         nonce,
     );
-    run_transaction(vec![req], update_socket).await.unwrap();
+    run_transaction(vec![req.into()], update_socket)
+        .await
+        .unwrap();
 }
 
 async fn stake_lock(
@@ -350,7 +353,9 @@ async fn stake_lock(
         secret_key,
         nonce,
     );
-    run_transaction(vec![req], update_socket).await.unwrap();
+    run_transaction(vec![req.into()], update_socket)
+        .await
+        .unwrap();
 }
 
 async fn stake(
@@ -374,7 +379,7 @@ async fn stake(
         secret_key,
         nonce,
     );
-    if let TransactionResponse::Revert(error) = run_transaction(vec![update], update_socket)
+    if let TransactionResponse::Revert(error) = run_transaction(vec![update.into()], update_socket)
         .await
         .unwrap()
         .txn_receipts[0]
@@ -424,7 +429,9 @@ async fn test_epoch_change() {
             1,
         );
 
-        let res = run_transaction(vec![req], &update_socket).await.unwrap();
+        let res = run_transaction(vec![req.into()], &update_socket)
+            .await
+            .unwrap();
         // Make sure epoch didnt change
         assert!(!res.change_epoch);
     }
@@ -437,7 +444,9 @@ async fn test_epoch_change() {
         &keystore[required_signals].node_secret_key,
         1,
     );
-    let res = run_transaction(vec![req], &update_socket).await.unwrap();
+    let res = run_transaction(vec![req.into()], &update_socket)
+        .await
+        .unwrap();
     assert!(res.change_epoch);
 
     // Query epoch info and make sure it incremented to new epoch
@@ -472,7 +481,7 @@ async fn test_stake() {
         2,
     );
     // Put 2 of the transaction in the block just to also test block exucution a bit
-    run_transaction(vec![update1, update2], &update_socket)
+    run_transaction(vec![update1.into(), update2.into()], &update_socket)
         .await
         .unwrap();
 
@@ -498,7 +507,9 @@ async fn test_stake() {
         &owner_secret_key,
         3,
     );
-    let res = run_transaction(vec![update], &update_socket).await.unwrap();
+    let res = run_transaction(vec![update.into()], &update_socket)
+        .await
+        .unwrap();
 
     assert_eq!(
         TransactionResponse::Revert(ExecutionError::InsufficientNodeDetails),
@@ -520,7 +531,7 @@ async fn test_stake() {
         4,
     );
 
-    if let TransactionResponse::Revert(error) = run_transaction(vec![update], &update_socket)
+    if let TransactionResponse::Revert(error) = run_transaction(vec![update.into()], &update_socket)
         .await
         .unwrap()
         .txn_receipts[0]
@@ -550,7 +561,7 @@ async fn test_stake() {
         &owner_secret_key,
         5,
     );
-    if let TransactionResponse::Revert(error) = run_transaction(vec![update], &update_socket)
+    if let TransactionResponse::Revert(error) = run_transaction(vec![update.into()], &update_socket)
         .await
         .unwrap()
         .txn_receipts[0]
@@ -574,7 +585,9 @@ async fn test_stake() {
         &owner_secret_key,
         6,
     );
-    run_transaction(vec![update], &update_socket).await.unwrap();
+    run_transaction(vec![update.into()], &update_socket)
+        .await
+        .unwrap();
 
     // Check that his locked is 1000 and his remaining stake is 1000
     assert_eq!(
@@ -600,7 +613,7 @@ async fn test_stake() {
         &owner_secret_key,
         7,
     );
-    let res = run_transaction(vec![update], &update_socket)
+    let res = run_transaction(vec![update.into()], &update_socket)
         .await
         .unwrap()
         .txn_receipts[0]
@@ -654,7 +667,7 @@ async fn test_stake_lock() {
     );
 
     if let TransactionResponse::Revert(error) =
-        run_transaction(vec![stake_lock_req], &update_socket)
+        run_transaction(vec![stake_lock_req.into()], &update_socket)
             .await
             .unwrap()
             .txn_receipts[0]
@@ -675,7 +688,7 @@ async fn test_stake_lock() {
         &owner_secret_key,
         4,
     );
-    let res = run_transaction(vec![unstake_req], &update_socket)
+    let res = run_transaction(vec![unstake_req.into()], &update_socket)
         .await
         .unwrap()
         .txn_receipts[0]
@@ -705,7 +718,12 @@ async fn test_pod_without_proof() {
     let compute_pod = pod_request(&keystore[0].node_secret_key, 2000, 1, 2);
 
     // run the delivery ack transaction
-    if let Err(e) = run_transaction(vec![bandwidth_pod, compute_pod], &update_socket).await {
+    if let Err(e) = run_transaction(
+        vec![bandwidth_pod.into(), compute_pod.into()],
+        &update_socket,
+    )
+    .await
+    {
         panic!("{e}");
     }
 
@@ -823,7 +841,12 @@ async fn test_distribute_rewards() {
         HpUfixed::from(1720_u64) / HpUfixed::from(3000_u64),
     ];
     // run the delivery ack transaction
-    if let Err(e) = run_transaction(vec![pod_10, pod11, pod_21], &update_socket).await {
+    if let Err(e) = run_transaction(
+        vec![pod_10.into(), pod11.into(), pod_21.into()],
+        &update_socket,
+    )
+    .await
+    {
         panic!("{e}");
     }
 
@@ -925,7 +948,7 @@ async fn test_submit_rep_measurements() {
         &keystore[0].node_secret_key,
         1,
     );
-    if let Err(e) = run_transaction(vec![req], &update_socket).await {
+    if let Err(e) = run_transaction(vec![req.into()], &update_socket).await {
         panic!("{e}");
     }
 
@@ -975,7 +998,7 @@ async fn test_rep_scores() {
         1,
     );
 
-    if let Err(e) = run_transaction(vec![req], &update_socket).await {
+    if let Err(e) = run_transaction(vec![req.into()], &update_socket).await {
         panic!("{e}");
     }
 
@@ -992,7 +1015,7 @@ async fn test_rep_scores() {
         1,
     );
 
-    if let Err(e) = run_transaction(vec![req], &update_socket).await {
+    if let Err(e) = run_transaction(vec![req.into()], &update_socket).await {
         panic!("{e}");
     }
 
@@ -1005,7 +1028,9 @@ async fn test_rep_scores() {
             &node.node_secret_key,
             nonce,
         );
-        run_transaction(vec![req], &update_socket).await.unwrap();
+        run_transaction(vec![req.into()], &update_socket)
+            .await
+            .unwrap();
     }
 
     assert!(query_runner.get_reputation(&peer_index1).is_some());
@@ -1092,11 +1117,12 @@ async fn test_supply_across_epoch() {
             .nonce;
         let pod_10 = pod_request(&node_secret_key, 10000, 0, nonce + 1);
         // run the delivery ack transaction
-        if let TransactionResponse::Revert(error) = run_transaction(vec![pod_10], &update_socket)
-            .await
-            .unwrap()
-            .txn_receipts[0]
-            .clone()
+        if let TransactionResponse::Revert(error) =
+            run_transaction(vec![pod_10.into()], &update_socket)
+                .await
+                .unwrap()
+                .txn_receipts[0]
+                .clone()
         {
             panic!("{error:?}");
         }
@@ -1141,7 +1167,7 @@ async fn test_validate_txn() {
         &keystore[0].node_secret_key,
         1,
     );
-    let res = run_transaction(vec![req.clone()], &update_socket)
+    let res = run_transaction(vec![req.clone().into()], &update_socket)
         .await
         .unwrap();
     let req = get_update_request_node(
@@ -1149,7 +1175,7 @@ async fn test_validate_txn() {
         &keystore[0].node_secret_key,
         2,
     );
-    assert_eq!(res.txn_receipts[0], query_runner.validate_txn(req));
+    assert_eq!(res.txn_receipts[0], query_runner.validate_txn(req.into()));
 
     // Submit a ChangeEpoch transaction that will succeed and ensure that the
     // `validate_txn` method of the query runner returns the same response as the update runner.
@@ -1158,13 +1184,15 @@ async fn test_validate_txn() {
         &keystore[0].node_secret_key,
         2,
     );
-    let res = run_transaction(vec![req], &update_socket).await.unwrap();
+    let res = run_transaction(vec![req.into()], &update_socket)
+        .await
+        .unwrap();
     let req = get_update_request_node(
         UpdateMethod::ChangeEpoch { epoch: 0 },
         &keystore[1].node_secret_key,
         1,
     );
-    assert_eq!(res.txn_receipts[0], query_runner.validate_txn(req));
+    assert_eq!(res.txn_receipts[0], query_runner.validate_txn(req.into()));
 }
 
 #[test]
@@ -1349,7 +1377,7 @@ async fn test_change_protocol_params() {
         value: 5,
     };
     let update_request = get_update_request_account(update_method, &governance_secret_key, 1);
-    run_transaction(vec![update_request], &update_socket)
+    run_transaction(vec![update_request.into()], &update_socket)
         .await
         .unwrap();
     assert_eq!(
@@ -1361,7 +1389,7 @@ async fn test_change_protocol_params() {
         value: 8,
     };
     let update_request = get_update_request_account(update_method, &governance_secret_key, 2);
-    run_transaction(vec![update_request], &update_socket)
+    run_transaction(vec![update_request.into()], &update_socket)
         .await
         .unwrap();
     assert_eq!(
@@ -1386,7 +1414,7 @@ async fn test_change_protocol_params() {
         value: 1,
     };
     let update_request = get_update_request_account(update_method, &some_secret_key, 2);
-    let response = run_transaction(vec![update_request], &update_socket)
+    let response = run_transaction(vec![update_request.into()], &update_socket)
         .await
         .unwrap();
     assert_eq!(

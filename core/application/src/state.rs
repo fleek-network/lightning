@@ -1,8 +1,11 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::net::IpAddr;
+use std::str::FromStr;
 use std::time::Duration;
 
+use ethers::abi::AbiDecode;
+use ethers::types::{Transaction as EthersTransaction, H160};
 use fleek_blake3::Hasher;
 use fleek_crypto::{
     ClientPublicKey,
@@ -13,11 +16,13 @@ use fleek_crypto::{
 };
 use hp_fixed::unsigned::HpUfixed;
 use lazy_static::lazy_static;
+use lightning_interfaces::types::fleek_contract::FleekContractCalls;
 use lightning_interfaces::types::{
     AccountInfo,
     Committee,
     CommodityTypes,
     DeliveryAcknowledgment,
+    DepositCall,
     Epoch,
     ExecutionData,
     ExecutionError,
@@ -34,14 +39,19 @@ use lightning_interfaces::types::{
     Service,
     ServiceId,
     ServiceRevenue,
+    StakeCall,
     Staking,
     TestnetAdmin,
     Tokens,
     TotalServed,
+    TransactionRequest,
     TransactionResponse,
+    UnstakeCall,
     UpdateMethod,
     UpdateRequest,
     Value,
+    WithdrawCall,
+    WithdrawUnstakedCall,
 };
 use lightning_interfaces::ToDigest;
 use lightning_reputation::statistics;
@@ -72,6 +82,11 @@ const DEFAULT_REP_QUANTILE: f64 = 0.15;
 /// epochs and 30% is based on the current epoch.
 const REP_EWMA_WEIGHT: f64 = 0.7;
 
+/// To support ethereum tooling, all signed ethereum transactions will be pointed to this address
+/// otherwise, if there is a value and a different address they are trying to transfer the native
+/// token FLK
+const FLEEK_CONTRACT: H160 = H160([6; 20]);
+
 lazy_static! {
     static ref BIG_HUNDRED: HpUfixed<18> = HpUfixed::<18>::from(100_u64);
 }
@@ -79,7 +94,7 @@ lazy_static! {
 /// The state of the Application
 ///
 /// The functions implemented on this struct are the "Smart Contracts" of the application layer
-/// All state changes come from Transactions and start at execute_txn
+/// All state changes come from Transactions and start at execute_transaction
 pub struct State<B: Backend> {
     pub metadata: B::Ref<Metadata, Value>,
     pub account_info: B::Ref<EthAddress, AccountInfo>,
@@ -125,8 +140,17 @@ impl<B: Backend> State<B> {
         }
     }
 
+    pub fn execute_transaction(&self, txn: TransactionRequest) -> TransactionResponse {
+        match txn {
+            TransactionRequest::UpdateRequest(payload) => self.execute_fleek_transaction(payload),
+            TransactionRequest::EthereumRequest(payload) => {
+                self.execute_ethereum_transaction(payload)
+            },
+        }
+    }
+
     /// This function is the entry point of a transaction
-    pub fn execute_txn(&self, txn: UpdateRequest) -> TransactionResponse {
+    fn execute_fleek_transaction(&self, txn: UpdateRequest) -> TransactionResponse {
         // Execute transaction
         let response = match txn.payload.method {
             UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
@@ -147,6 +171,10 @@ impl<B: Backend> State<B> {
                 token,
                 amount,
             } => self.deposit(txn.sender, proof, amount, token),
+
+            UpdateMethod::Transfer { amount, token, to } => {
+                self.transfer(txn.sender, amount, token, to)
+            },
 
             UpdateMethod::Stake {
                 amount,
@@ -218,6 +246,58 @@ impl<B: Backend> State<B> {
         self.increment_nonce(txn.sender);
         // Return the response
         response
+    }
+
+    fn execute_ethereum_transaction(&self, txn: EthersTransaction) -> TransactionResponse {
+        let to_address = match txn.to {
+            Some(address) => address,
+            // Either the transaction is going to the "Fleek Contract" for a state transition or its
+            // to another address for a transfer
+            None => return TransactionResponse::Revert(ExecutionError::InvalidStateFunction),
+        };
+        let sender: EthAddress = txn.from.0.into();
+
+        if to_address == FLEEK_CONTRACT {
+            // They are calling one of our state transitions functions
+            match FleekContractCalls::decode(&txn.input) {
+                Ok(FleekContractCalls::Deposit(DepositCall { token, amount })) => {
+                    todo!()
+                },
+                Ok(FleekContractCalls::Withdraw(WithdrawCall {
+                    amount,
+                    token,
+                    recipient,
+                })) => todo!(),
+                Ok(FleekContractCalls::Unstake(UnstakeCall {
+                    amount,
+                    node_public_key,
+                })) => todo!(),
+                Ok(FleekContractCalls::WithdrawUnstaked(WithdrawUnstakedCall {
+                    node_public_key,
+                    recipient,
+                })) => todo!(),
+                Ok(FleekContractCalls::Stake(StakeCall {
+                    amount,
+                    node_public_key,
+                    consensus_key,
+                    domain,
+                    worker_public_key,
+                    worker_domain,
+                })) => {
+                    todo!()
+                },
+                _ => return TransactionResponse::Revert(ExecutionError::InvalidStateFunction),
+            }
+        } else {
+            // They are trying to transfer FLK
+            self.transfer(
+                sender.into(),
+                HpUfixed::from_str(&txn.value.to_string()).unwrap_or_default(),
+                Tokens::FLK,
+                to_address.0.into(),
+            );
+        }
+        todo!()
     }
 
     /*********** External Update Functions ********** */
@@ -334,6 +414,44 @@ impl<B: Backend> State<B> {
         }
 
         self.account_info.set(sender, account);
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    fn transfer(
+        &self,
+        sender: TransactionSender,
+        amount: HpUfixed<18>,
+        _token: Tokens,
+        to: EthAddress,
+    ) -> TransactionResponse {
+        // Todo(Dalton): Figure out if we should support transfering other tokens like usdc within
+        // our network for now im going to treat this function as just transfering FLK
+
+        // This transaction is only callable by AccountOwners and not nodes
+        // So revert if the sender is a node public key
+        let sender = match self.only_account_owner(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+        let mut sender_account = self.account_info.get(&sender).unwrap_or_default();
+
+        // Check that they have the funds
+        if sender_account.flk_balance < amount {
+            return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
+        }
+        // todo(dal)
+        sender_account.flk_balance -= amount.clone();
+
+        // Increment the to address balance
+        let mut to_account = self.account_info.get(&to).unwrap_or_default();
+
+        to_account.flk_balance += amount;
+
+        // set both fields in our tables
+
+        self.account_info.set(sender, sender_account);
+        self.account_info.set(to, to_account);
+
         TransactionResponse::Success(ExecutionData::None)
     }
 
@@ -1172,7 +1290,16 @@ impl<B: Backend> State<B> {
     /// This function takes in the Transaction and verifies the Signature matches the Sender. It
     /// also checks the nonce of the sender and makes sure it is equal to the account nonce + 1,
     /// to prevent replay attacks and enforce ordering
-    pub fn verify_transaction(&self, txn: &UpdateRequest) -> Result<(), ExecutionError> {
+    pub fn verify_transaction(&self, txn: &TransactionRequest) -> Result<(), ExecutionError> {
+        match txn {
+            TransactionRequest::UpdateRequest(payload) => self.verify_fleek_transaction(payload),
+            TransactionRequest::EthereumRequest(payload) => {
+                self.verify_ethereum_transaction(payload)
+            },
+        }
+    }
+
+    fn verify_fleek_transaction(&self, txn: &UpdateRequest) -> Result<(), ExecutionError> {
         // Check nonce
         match txn.sender {
             // Todo Sunday(dalton): Clean up this match nesting
@@ -1215,6 +1342,11 @@ impl<B: Backend> State<B> {
         if !txn.sender.verify(txn.signature, &digest) {
             return Err(ExecutionError::InvalidSignature);
         }
+        Ok(())
+    }
+
+    fn verify_ethereum_transaction(&self, txn: &EthersTransaction) -> Result<(), ExecutionError> {
+        //todo(dalton)
         Ok(())
     }
 
@@ -1302,6 +1434,24 @@ impl<B: Backend> State<B> {
             },
         }
     }
+
+    /// Increments block number after executing a block
+    pub fn increment_block_number(&self, is_new_epoch: bool) {
+        // Safe unwrap seeded during state
+        let new_block_number = if is_new_epoch {
+            let epoch = self.get_epoch() as u128;
+
+            // Block numbers are epoch number followed by block number for that epoch
+            // We start every new epoch at epoch + 12 zeroes
+            epoch * 1_000_000_000_000
+        } else {
+            self.get_block_number() + 1
+        };
+
+        self.metadata
+            .set(Metadata::BlockNumber, Value::BlockNumber(new_block_number));
+    }
+
     // Useful for transaction that nodes cannot call but an account owner can
     // Does not panic
     fn only_account_owner(
@@ -1349,6 +1499,25 @@ impl<B: Backend> State<B> {
                 }
             },
             TransactionSender::AccountOwner(_) => None,
+        }
+    }
+
+    fn get_block_number(&self) -> u128 {
+        // Safe unwrap this value is set on genesis and never removed
+        if let Value::BlockNumber(block_number) = self.metadata.get(&Metadata::BlockNumber).unwrap()
+        {
+            block_number
+        } else {
+            0
+        }
+    }
+
+    fn get_epoch(&self) -> u64 {
+        // Safe unwrap this value is set on genesis and never removed
+        if let Value::Epoch(epoch) = self.metadata.get(&Metadata::Epoch).unwrap() {
+            epoch
+        } else {
+            0
         }
     }
 }

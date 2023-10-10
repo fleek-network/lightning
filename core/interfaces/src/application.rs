@@ -5,7 +5,7 @@ use affair::Socket;
 use anyhow::Result;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use lightning_types::{AccountInfo, NodeIndex};
+use lightning_types::{AccountInfo, NodeIndex, TransactionRequest};
 
 use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
@@ -23,7 +23,6 @@ use crate::types::{
     ServiceId,
     TotalServed,
     TransactionResponse,
-    UpdateRequest,
 };
 use crate::{BlockStoreInterface, ConfigProviderInterface};
 
@@ -168,7 +167,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_protocol_params(&self, param: ProtocolParams) -> u128;
 
     /// Validates the passed in transaction
-    fn validate_txn(&self, txn: UpdateRequest) -> TransactionResponse;
+    fn validate_txn(&self, txn: TransactionRequest) -> TransactionResponse;
 
     /// Return all latencies measurements for the current epoch.
     fn get_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration>;
@@ -191,6 +190,15 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Returns last executed block hash. [0;32] is genesis
     fn get_last_block(&self) -> [u8; 32];
+
+    /// Returns an accounts current nonce
+    fn get_account_nonce(&self, public_key: &EthAddress) -> u64;
+
+    /// Returns the chain id
+    fn get_chain_id(&self) -> u32;
+
+    /// Returns the current block number
+    fn get_block_number(&self) -> u128;
 }
 
 #[derive(Clone, Debug)]

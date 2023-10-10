@@ -24,10 +24,27 @@ use lightning_interfaces::types::{
     ProtocolParams,
     ReportedReputationMeasurements,
     TotalServed,
-    UpdateRequest,
+    TransactionRequest,
 };
 use lightning_interfaces::SyncQueryRunnerInterface;
 
+use crate::eth::{
+    eth_accounts,
+    eth_author,
+    eth_balance,
+    eth_block_by_number,
+    eth_block_number,
+    eth_chain_id,
+    eth_estimate_gas,
+    eth_gas_price,
+    eth_get_code,
+    eth_protocol_version,
+    eth_send_raw_transaction,
+    eth_transaction_count,
+    net_listening,
+    net_peer_count,
+    net_version,
+};
 use crate::server::RpcData;
 use crate::types::{NodeKeyParam, PublicKeyParam};
 static OPEN_RPC_DOCS: &str = "../../docs/rpc/openrpc.json";
@@ -38,6 +55,7 @@ pub async fn rpc_handler(
     Extension(rpc): Extension<RpcServer>,
     Json(req): Json<RequestObject>,
 ) -> Json<ResponseObjects> {
+    log::error!("Someone called: {}", req.method_ref());
     let res = rpc.0.handle(req).await;
     Json(res)
 }
@@ -106,7 +124,22 @@ impl RpcServer {
             .with_method("flk_get_latencies", get_latencies_handler::<C>)
             .with_method("flk_get_last_epoch_hash", get_last_epoch_hash_handler::<C>)
             .with_method("flk_send_txn", send_txn::<C>)
-            .with_method("flk_put", put::<C>);
+            .with_method("flk_put", put::<C>)
+            // .with_method("eth_protocolVersion", eth_protocol_version::<C>)
+            .with_method("eth_getTransactionCount", eth_transaction_count::<C>)
+            .with_method("eth_chainId", eth_chain_id::<C>)
+            .with_method("eth_author", eth_author::<C>)
+            .with_method("eth_accounts", eth_accounts::<C>)
+            .with_method("eth_getBalance", eth_balance::<C>)
+            .with_method("net_version", net_version::<C>)
+            .with_method("net_peerCount", net_peer_count::<C>)
+            .with_method("net_listening", net_listening::<C>)
+            .with_method("eth_blockNumber", eth_block_number::<C>)
+            .with_method("eth_getBlockByNumber", eth_block_by_number::<C>)
+            .with_method("eth_gasPrice", eth_gas_price::<C>)
+            .with_method("eth_estimateGas", eth_estimate_gas::<C>)
+            .with_method("eth_sendRawTransaction", eth_send_raw_transaction::<C>)
+            .with_method("eth_getCode", eth_get_code::<C>);
 
         RpcServer(server.finish())
     }
@@ -313,7 +346,7 @@ pub async fn get_last_epoch_hash_handler<C: Collection>(
 
 pub async fn send_txn<C: Collection>(
     data: Data<Arc<RpcData<C>>>,
-    Params(param): Params<UpdateRequest>,
+    Params(param): Params<TransactionRequest>,
 ) -> Result<()> {
     data.0
         .mempool_socket

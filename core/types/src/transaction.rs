@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::net::IpAddr;
 
+use ethers::types::Transaction as EthersTransaction;
 use fleek_crypto::{
     ConsensusPublicKey,
     EthAddress,
@@ -35,7 +36,7 @@ const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";
 /// block.
 #[derive(Debug)]
 pub struct Block {
-    pub transactions: Vec<UpdateRequest>,
+    pub transactions: Vec<TransactionRequest>,
     // Digest of the narwhal certificate that included this
     pub digest: [u8; 32],
 }
@@ -53,7 +54,25 @@ pub struct UpdateRequest {
     pub payload: UpdatePayload,
 }
 
-/// The payload data of an update request.
+impl From<UpdateRequest> for TransactionRequest {
+    fn from(value: UpdateRequest) -> Self {
+        Self::UpdateRequest(value)
+    }
+}
+
+impl From<EthersTransaction> for TransactionRequest {
+    fn from(value: EthersTransaction) -> Self {
+        Self::EthereumRequest(value)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TransactionRequest {
+    UpdateRequest(UpdateRequest),
+    EthereumRequest(EthersTransaction),
+}
+
+/// The payload data of FN transaction
 #[derive(Debug, Hash, Clone, Serialize, Deserialize)]
 pub struct UpdatePayload {
     /// The counter or nonce of this request.
@@ -95,6 +114,15 @@ pub enum UpdateMethod {
         token: Tokens,
         /// Amount bridged
         amount: HpUfixed<18>,
+    },
+    /// Transfer tokens to another address
+    Transfer {
+        /// The amount to transfer
+        amount: HpUfixed<18>,
+        /// Which token to transfer
+        token: Tokens,
+        /// The address to transfer to
+        to: EthAddress,
     },
     /// Stake FLK in network
     Stake {
@@ -228,6 +256,14 @@ impl ToDigest for UpdatePayload {
                     .with("amount", &HpUfixedWrapper(amount.clone()))
                     .with("token", token)
                     .with("receiving_address", &receiving_address.0);
+            },
+            UpdateMethod::Transfer { amount, token, to } => {
+                transcript_builder = transcript_builder
+                    .with("transaction_name", &"transfer")
+                    .with_prefix("input".to_owned())
+                    .with("token", token)
+                    .with("amount", &HpUfixedWrapper(amount.clone()))
+                    .with("to", &to.0);
             },
             UpdateMethod::Stake {
                 amount,

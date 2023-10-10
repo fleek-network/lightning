@@ -9,7 +9,7 @@ use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::SignerInterface;
-use lightning_interfaces::types::{Block, UpdateRequest};
+use lightning_interfaces::types::{Block, TransactionRequest};
 use lightning_interfaces::{ApplicationInterface, BroadcastInterface, WithStartAndShutdown};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -20,10 +20,10 @@ use tokio::time::{interval, sleep};
 #[allow(clippy::type_complexity)]
 pub struct MockConsensus<C: Collection> {
     inner: Arc<MockConsensusInner<c![C::ApplicationInterface::SyncExecutor]>>,
-    socket: Socket<UpdateRequest, ()>,
+    socket: Socket<TransactionRequest, ()>,
     is_running: Arc<Mutex<bool>>,
     shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
-    rx: Arc<Mutex<Option<mpsc::Receiver<Task<UpdateRequest, ()>>>>>,
+    rx: Arc<Mutex<Option<mpsc::Receiver<Task<TransactionRequest, ()>>>>>,
     new_block_notify: Arc<Notify>,
 }
 
@@ -121,7 +121,7 @@ impl<C: Collection> ConfigConsumer for MockConsensus<C> {
 impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
     async fn handle(
         self: Arc<Self>,
-        mut rx: mpsc::Receiver<Task<UpdateRequest, ()>>,
+        mut rx: mpsc::Receiver<Task<TransactionRequest, ()>>,
         mut shutdown_rx: mpsc::Receiver<()>,
     ) {
         let mut tx_count = 0;

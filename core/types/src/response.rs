@@ -37,6 +37,7 @@ pub enum ExecutionError {
     InvalidProof,
     InvalidInternetAddress,
     InsufficientNodeDetails,
+    InvalidStateFunction,
     NoLockedTokens,
     TokensLocked,
     NotNodeOwner,

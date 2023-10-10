@@ -142,7 +142,7 @@ impl Env<UpdatePerm> {
             // Execute each transaction and add the results to the block response
             for txn in &block.transactions {
                 let receipt = match app.verify_transaction(txn) {
-                    Ok(_) => app.execute_txn(txn.clone()),
+                    Ok(_) => app.execute_transaction(txn.clone()),
                     Err(err) => TransactionResponse::Revert(err),
                 };
 
@@ -157,6 +157,8 @@ impl Env<UpdatePerm> {
             }
             // Set the last executed block hash
             app.set_last_block(block.digest);
+            // increment the block_number
+            app.increment_block_number(response.change_epoch);
 
             // Return the response
             response
@@ -243,6 +245,10 @@ impl Env<UpdatePerm> {
 
             // TODO(matthias): should we hash the genesis state instead?
             metadata_table.insert(Metadata::LastEpochHash, Value::Hash([0; 32]));
+
+            metadata_table.insert(Metadata::ChainId, Value::ChainId(genesis.chain_id));
+
+            metadata_table.insert(Metadata::BlockNumber, Value::BlockNumber(0));
 
             metadata_table.insert(
                 Metadata::ProtocolFundAddress,
@@ -351,8 +357,9 @@ impl Env<UpdatePerm> {
             }
 
             for account in genesis.account {
+                log::error!("{:?}", account);
                 let info = AccountInfo {
-                    flk_balance: account.flk_balance.into(),
+                    flk_balance: account.flk_balance,
                     stables_balance: account.stables_balance.into(),
                     bandwidth_balance: account.bandwidth_balance.into(),
                     nonce: 0,

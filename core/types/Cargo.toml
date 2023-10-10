@@ -10,9 +10,10 @@ anyhow.workspace = true
 serde.workspace = true
 ink-quill.workspace = true
 fleek-crypto.workspace = true
+ethers.workspace = true
 hp-fixed.workspace = true
 multiaddr = "0.17.1"
-num-bigint = { workspace = true, features=["serde"]}
+num-bigint = { workspace = true, features = ["serde"] }
 num-traits.workspace = true
 num-derive.workspace = true
 derive_more = "0.99"

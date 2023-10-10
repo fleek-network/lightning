@@ -14,7 +14,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             addr: "0.0.0.0".parse().unwrap(),
-            port: 4069,
+            port: 8545,
         }
     }
 }

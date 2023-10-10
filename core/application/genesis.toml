@@ -1,3 +1,4 @@
+chain_id = 1337
 epoch_start = 1684276288383
 epoch_time = 120000
 committee_size = 10
@@ -112,7 +113,7 @@ commodity_type = "Compute"
 
 [[account]]
 public_key = "0x959807B8D94B324A74117956731F09E2893aCd72"
-flk_balance = 100
+flk_balance = "100690000000000000000"
 stables_balance = 100
 bandwidth_balance = 100
 
