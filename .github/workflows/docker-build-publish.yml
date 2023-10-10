@@ -4,7 +4,7 @@ on:
   push:
     # TODO: enable for main only after testnet
     branches:
-      - testnet-**
+      - testnet-*
     paths:
       - core/**
       - etc/**
