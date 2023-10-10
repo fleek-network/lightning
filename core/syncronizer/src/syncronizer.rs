@@ -16,6 +16,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     BlockStoreServerInterface,
     BlockStoreServerSocket,
+    ConfigConsumer,
     Notification,
     SyncQueryRunnerInterface,
     SyncronizerInterface,
@@ -28,12 +29,8 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
+use crate::config::Config;
 use crate::rpc::{rpc_epoch, rpc_last_epoch_hash, rpc_request};
-
-#[cfg(all(not(test), not(feature = "e2e-test")))]
-const EPOCH_CHANGE_DELTA: Duration = Duration::from_secs(300);
-#[cfg(any(test, feature = "e2e-test"))]
-const EPOCH_CHANGE_DELTA: Duration = Duration::from_secs(5);
 
 pub struct Syncronizer<C: Collection> {
     inner: Mutex<Option<SyncronizerInner<C>>>,
@@ -48,6 +45,7 @@ pub struct SyncronizerInner<C: Collection> {
     rx_epoch_change: Receiver<Notification>,
     genesis_committee: Vec<(NodeIndex, NodeInfo)>,
     rpc_client: reqwest::Client,
+    epoch_change_delta: Duration,
 }
 
 #[async_trait]
@@ -97,11 +95,17 @@ impl<C: Collection> WithStartAndShutdown for Syncronizer<C> {
 impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
     /// Create a syncronizer service for quickly syncronizing the node state with the chain
     fn init(
+        config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore_server: &C::BlockStoreServerInterface,
         rx_epoch_change: Receiver<Notification>,
     ) -> Result<Self> {
-        let inner = SyncronizerInner::new(query_runner, blockstore_server, rx_epoch_change);
+        let inner = SyncronizerInner::new(
+            query_runner,
+            blockstore_server,
+            rx_epoch_change,
+            config.epoch_change_delta,
+        );
 
         Ok(Self {
             inner: Mutex::new(Some(inner)),
@@ -123,6 +127,7 @@ impl<C: Collection> SyncronizerInner<C> {
         query_runner: c![C::ApplicationInterface::SyncExecutor],
         blockstore_server: &C::BlockStoreServerInterface,
         rx_epoch_change: Receiver<Notification>,
+        epoch_change_delta: Duration,
     ) -> Self {
         let mut genesis_committee = query_runner.genesis_committee();
         // Shuffle this since we often hit this list in order until one responds. This will give our
@@ -137,6 +142,7 @@ impl<C: Collection> SyncronizerInner<C> {
             rx_epoch_change,
             genesis_committee,
             rpc_client,
+            epoch_change_delta,
         }
     }
 
@@ -162,7 +168,8 @@ impl<C: Collection> SyncronizerInner<C> {
             let until_epoch_ends: u64 = (epoch_end as u128).saturating_sub(now).try_into().unwrap();
             let time_until_epoch_change = Duration::from_millis(until_epoch_ends);
 
-            let time_to_check = tokio::time::sleep(time_until_epoch_change + EPOCH_CHANGE_DELTA);
+            let time_to_check =
+                tokio::time::sleep(time_until_epoch_change + self.epoch_change_delta);
 
             let epoch_change_future = self.rx_epoch_change.recv();
 
@@ -257,4 +264,10 @@ impl<C: Collection> SyncronizerInner<C> {
     async fn get_current_epoch(&self) -> Result<Epoch> {
         self.ask_bootstrap_nodes(rpc_epoch().to_string()).await
     }
+}
+
+impl<C: Collection> ConfigConsumer for Syncronizer<C> {
+    const KEY: &'static str = "syncronizer";
+
+    type Config = Config;
 }

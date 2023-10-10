@@ -8,14 +8,13 @@ use lightning_application::app::Application;
 use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
 use lightning_dht::dht::{Builder as DhtBuilder, Dht};
 use lightning_e2e::swarm::Swarm;
+use lightning_e2e::utils::logging;
 use lightning_e2e::utils::networking::{PortAssigner, Transport};
-use lightning_e2e::utils::{logging, rpc};
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::{Blake3Hash, TableEntry};
-use lightning_interfaces::{partial, WithStartAndShutdown};
+use lightning_interfaces::types::{Blake3Hash, DhtRequest, DhtResponse, KeyPrefix};
+use lightning_interfaces::{partial, DhtSocket, WithStartAndShutdown};
 use lightning_topology::Topology;
 use resolved_pathbuf::ResolvedPathBuf;
-use serde_json::json;
 use serial_test::serial;
 use tokio::sync::Notify;
 
@@ -107,44 +106,45 @@ async fn e2e_dht_put_and_get() -> Result<()> {
     let key: Blake3Hash = rand::random();
     let value: [u8; 4] = rand::random();
 
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_dht_put",
-        "params": {"key": key.to_vec(), "value": value.to_vec()},
-        "id":1,
-    });
+    #[allow(clippy::filter_map_identity)]
+    let dht_sockets: Vec<DhtSocket> = swarm
+        .get_dht_sockets()
+        .into_iter()
+        .filter_map(|s| s)
+        .collect();
 
     // Send DHT put to an arbitrary node in the swarm
-    let rpc_addresses: Vec<String> = swarm.get_rpc_addresses().into_values().collect();
-    let response = rpc::rpc_request(rpc_addresses[0].clone(), request.to_string())
+    dht_sockets[0]
+        .run(DhtRequest::Put {
+            prefix: KeyPrefix::ContentRegistry,
+            key: key.to_vec(),
+            value: value.to_vec(),
+        })
         .await
         .unwrap();
-    rpc::parse_response::<()>(response)
-        .await
-        .expect("Failed to parse response.");
 
     // Wait some time for the DHT to do its magic
     tokio::time::sleep(Duration::from_secs(5)).await;
 
     // Perform a DHT lookup on every node in the swarm
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_dht_get",
-        "params": {"key": key.to_vec()},
-        "id":1,
-    });
-    for (_, address) in swarm.get_rpc_addresses() {
-        let response = rpc::rpc_request(address, request.to_string())
+    for dht_socket in dht_sockets {
+        let res = dht_socket
+            .run(DhtRequest::Get {
+                prefix: KeyPrefix::ContentRegistry,
+                key: key.to_vec(),
+            })
             .await
             .unwrap();
 
-        let entry = rpc::parse_response::<Option<TableEntry>>(response)
-            .await
-            .expect("Failed to parse response.");
-        let entry = entry.expect("Value not found in DHT");
-        // Make sure the retrieved value equals the value we stored
-        assert_eq!(value.to_vec(), entry.value);
+        match res {
+            DhtResponse::Get(Some(entry)) => {
+                // Make sure the retrieved value equals the value we stored
+                assert_eq!(value.to_vec(), entry.value);
+            },
+            _ => panic!("Unexpected response"),
+        }
     }
+
     bootstrap_shutdown_notify.notify_one();
     swarm.shutdown();
     Ok(())

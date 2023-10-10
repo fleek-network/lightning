@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::time::Duration;
 
 use fleek_crypto::{
     AccountOwnerSecretKey,
@@ -27,7 +28,7 @@ use lightning_dht::dht::Dht;
 use lightning_handshake::handshake::{Handshake, HandshakeConfig};
 use lightning_handshake::WorkerMode;
 use lightning_interfaces::types::{Blake3Hash, NodePorts, Staking};
-use lightning_interfaces::ConfigProviderInterface;
+use lightning_interfaces::{ConfigProviderInterface, DhtSocket};
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
 use lightning_pool::{Config as PoolConfig, Pool};
@@ -39,6 +40,8 @@ use lightning_rpc::config::Config as RpcConfig;
 use lightning_rpc::server::Rpc;
 use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
 use lightning_signer::{utils, Config as SignerConfig, Signer};
+use lightning_syncronizer::config::Config as SyncronizerConfig;
+use lightning_syncronizer::syncronizer::Syncronizer;
 use resolved_pathbuf::ResolvedPathBuf;
 use tokio::sync::oneshot;
 
@@ -115,12 +118,32 @@ impl Swarm {
             .collect()
     }
 
-    pub fn get_non_genesis_committee_ckpt_rx(&self) -> Vec<Option<oneshot::Receiver<Blake3Hash>>> {
+    pub fn get_non_genesis_committee_ckpt_rx(
+        &self,
+    ) -> Vec<(NodePublicKey, Option<oneshot::Receiver<Blake3Hash>>)> {
+        self.nodes
+            .iter()
+            .filter(|(_pubkey, node)| !node.is_genesis_committee())
+            .map(|(pubkey, node)| (*pubkey, node.take_ckpt_rx()))
+            .collect()
+    }
+
+    pub fn get_dht_sockets(&self) -> Vec<Option<DhtSocket>> {
         self.nodes
             .values()
-            .filter(|node| !node.is_genesis_committee())
-            .map(|node| node.take_ckpt_rx())
+            .map(|node| node.take_dht_socket())
             .collect()
+    }
+
+    pub fn get_blockstores(&self) -> Vec<Option<Blockstore<FinalTypes>>> {
+        self.nodes
+            .values()
+            .map(|node| node.take_blockstore())
+            .collect()
+    }
+
+    pub fn get_blockstore(&self, node: &NodePublicKey) -> Option<Blockstore<FinalTypes>> {
+        self.nodes.get(node).and_then(|node| node.take_blockstore())
     }
 
     fn shutdown_internal(&mut self) {
@@ -380,6 +403,10 @@ fn build_config(
     config.inject::<Pool<FinalTypes>>(PoolConfig {
         address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
         ..Default::default()
+    });
+
+    config.inject::<Syncronizer<FinalTypes>>(SyncronizerConfig {
+        epoch_change_delta: Duration::from_secs(5),
     });
 
     config

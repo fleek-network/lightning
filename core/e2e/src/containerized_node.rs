@@ -1,8 +1,9 @@
 use std::sync::Mutex;
 
 use fleek_crypto::AccountOwnerSecretKey;
+use lightning_blockstore::blockstore::Blockstore;
 use lightning_interfaces::types::Blake3Hash;
-use lightning_interfaces::ConfigProviderInterface;
+use lightning_interfaces::{ConfigProviderInterface, DhtSocket};
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
 use lightning_rpc::server::Rpc;
@@ -72,6 +73,30 @@ impl ContainerizedNode {
             let ckpt_rx = container.take_ckpt_rx();
             *self.container.lock().unwrap() = Some(container);
             ckpt_rx
+        } else {
+            *self.container.lock().unwrap() = None;
+            None
+        }
+    }
+
+    pub fn take_dht_socket(&self) -> Option<DhtSocket> {
+        let container = self.container.lock().unwrap().take();
+        if let Some(mut container) = container {
+            let dht_socket = container.take_dht_socket();
+            *self.container.lock().unwrap() = Some(container);
+            dht_socket
+        } else {
+            *self.container.lock().unwrap() = None;
+            None
+        }
+    }
+
+    pub fn take_blockstore(&self) -> Option<Blockstore<FinalTypes>> {
+        let container = self.container.lock().unwrap().take();
+        if let Some(mut container) = container {
+            let blockstore = container.take_blockstore();
+            *self.container.lock().unwrap() = Some(container);
+            blockstore
         } else {
             *self.container.lock().unwrap() = None;
             None

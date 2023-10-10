@@ -7,10 +7,12 @@ use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::Blake3Hash;
 use lightning_interfaces::{
     ApplicationInterface,
+    ConfigConsumer,
     Notification,
     SyncronizerInterface,
     WithStartAndShutdown,
 };
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot;
 
@@ -37,6 +39,7 @@ impl<C: Collection> WithStartAndShutdown for MockSyncronizer<C> {
 
 impl<C: Collection> SyncronizerInterface<C> for MockSyncronizer<C> {
     fn init(
+        _config: Self::Config,
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
         _blockstore_server: &C::BlockStoreServerInterface,
         _rx_epoch_change: Receiver<Notification>,
@@ -52,4 +55,13 @@ impl<C: Collection> SyncronizerInterface<C> for MockSyncronizer<C> {
     fn checkpoint_socket(&self) -> oneshot::Receiver<Blake3Hash> {
         self.rx_checkpoint_ready.lock().unwrap().take().unwrap()
     }
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct Config {}
+
+impl<C: Collection> ConfigConsumer for MockSyncronizer<C> {
+    const KEY: &'static str = "syncronizer";
+
+    type Config = Config;
 }

@@ -7,6 +7,8 @@ use crate::infu_collection::Collection;
 use crate::{
     ApplicationInterface,
     BlockStoreServerInterface,
+    ConfigConsumer,
+    ConfigProviderInterface,
     Notification,
     NotifierInterface,
     WithStartAndShutdown,
@@ -15,8 +17,11 @@ use crate::{
 pub type CheckpointSocket = Socket<Blake3Hash, ()>;
 
 #[infusion::service]
-pub trait SyncronizerInterface<C: Collection>: WithStartAndShutdown + Sized {
+pub trait SyncronizerInterface<C: Collection>:
+    WithStartAndShutdown + Sized + ConfigConsumer
+{
     fn _init(
+        config: ::ConfigProviderInterface,
         app: ::ApplicationInterface,
         blockstore_server: ::BlockStoreServerInterface,
         notifier: ::NotifierInterface,
@@ -24,11 +29,17 @@ pub trait SyncronizerInterface<C: Collection>: WithStartAndShutdown + Sized {
         let sqr = app.sync_query();
         let (tx_epoch_change, rx_epoch_change) = tokio::sync::mpsc::channel(10);
         notifier.notify_on_new_epoch(tx_epoch_change);
-        Self::init(sqr, blockstore_server, rx_epoch_change)
+        Self::init(
+            config.get::<Self>(),
+            sqr,
+            blockstore_server,
+            rx_epoch_change,
+        )
     }
 
     /// Create a syncronizer service for quickly syncronizing the node state with the chain
     fn init(
+        config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore_server: &C::BlockStoreServerInterface,
         rx_epoch_change: Receiver<Notification>,

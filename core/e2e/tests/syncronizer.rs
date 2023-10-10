@@ -5,6 +5,7 @@ use anyhow::Result;
 use fleek_blake3 as blake3;
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::{logging, rpc};
+use lightning_interfaces::BlockStoreInterface;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
 use serial_test::serial;
@@ -62,35 +63,16 @@ async fn e2e_syncronize_state() -> Result<()> {
 
     // Get the checkpoint receivers from the syncronizer for the node that is not on the genesis
     // committee.
-    let ckpt_rx = swarm
-        .get_non_genesis_committee_ckpt_rx()
-        .pop()
-        .unwrap()
-        .unwrap();
-    let (_, rpc_address) = swarm
-        .get_non_genesis_committee_rpc_addresses()
-        .into_iter()
-        .next()
-        .unwrap();
+    let (pubkey, ckpt_rx) = swarm.get_non_genesis_committee_ckpt_rx().pop().unwrap();
+    let ckpt_rx = ckpt_rx.unwrap();
 
     // Wait for the syncronizer to detect that we are behind and send the checkpoint hash.
     let ckpt_hash = ckpt_rx.await.expect("Failed to receive checkpoint hash");
 
     // Get the hash for this checkpoint from our blockstore. The syncronizer should have downloaded
     // it.
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method": "flk_get",
-        "params": ckpt_hash,
-        "id":1,
-    });
-    let response = rpc::rpc_request(rpc_address, request.to_string())
-        .await
-        .unwrap();
-
-    let checkpoint = rpc::parse_response::<Vec<u8>>(response)
-        .await
-        .expect("Failed to parse response.");
+    let blockstore = swarm.get_blockstore(&pubkey).unwrap();
+    let checkpoint = blockstore.read_all_to_vec(&ckpt_hash).await.unwrap();
 
     // Make sure the checkpoint matches the hash.
     let hash = blake3::hash(&checkpoint);
