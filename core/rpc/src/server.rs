@@ -1,8 +1,6 @@
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-#[cfg(feature = "e2e-test")]
-use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::routing::{get, post};
@@ -17,8 +15,6 @@ use lightning_interfaces::{
     MempoolSocket,
     RpcInterface,
 };
-#[cfg(feature = "e2e-test")]
-use lightning_interfaces::{DhtInterface, DhtSocket};
 use log::info;
 use tokio::sync::Notify;
 use tokio::task;
@@ -39,8 +35,6 @@ pub struct RpcData<C: Collection> {
     pub mempool_socket: MempoolSocket,
     pub fetcher_socket: FetcherSocket,
     pub blockstore: C::BlockStoreInterface,
-    #[cfg(feature = "e2e-test")]
-    pub dht_socket: Arc<Mutex<Option<DhtSocket>>>,
 }
 
 #[async_trait]
@@ -95,14 +89,6 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
 
 #[async_trait]
 impl<C: Collection> RpcInterface<C> for Rpc<C> {
-    infusion::infu!(impl<C> {
-        #[cfg(feature = "e2e-test")]
-        fn post(this, dht: DhtInterface) {
-            let dht_socket = dht.get_socket();
-            *this.data.dht_socket.lock().unwrap() = Some(dht_socket);
-        }
-    });
-
     /// Initialize the *RPC* server, with the given parameters.
     fn init(
         config: Self::Config,
@@ -111,8 +97,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         blockstore: C::BlockStoreInterface,
         fetcher: &C::FetcherInterface,
     ) -> anyhow::Result<Self> {
-        #[cfg(not(feature = "e2e-test"))]
-        let rpc = Ok(Self {
+        Ok(Self {
             data: Arc::new(RpcData {
                 mempool_socket: mempool,
                 fetcher_socket: fetcher.get_socket(),
@@ -122,21 +107,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
             config,
             is_running: Arc::new(AtomicBool::new(false)),
             shutdown_notify: Arc::new(Notify::new()),
-        });
-        #[cfg(feature = "e2e-test")]
-        let rpc = Ok(Self {
-            data: Arc::new(RpcData {
-                mempool_socket: mempool,
-                query_runner,
-                dht_socket: Arc::new(Mutex::new(None)),
-                blockstore,
-                fetcher_socket: fetcher.get_socket(),
-            }),
-            config,
-            is_running: Arc::new(AtomicBool::new(false)),
-            shutdown_notify: Arc::new(Notify::new()),
-        });
-        rpc
+        })
     }
 }
 

@@ -35,5 +35,3 @@ lightning-notifier = { path="../notifier" }
 lightning-pool = { path = "../pool" }
 lightning-rep-collector = { path = "../rep-collector" }
 
-[features]
-e2e-test = []

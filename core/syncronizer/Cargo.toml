@@ -16,5 +16,3 @@ serde.workspace = true
 tokio.workspace = true
 rand.workspace = true
 
-[features]
-e2e-test = []

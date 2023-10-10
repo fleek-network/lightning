@@ -26,15 +26,9 @@ use lightning_interfaces::types::{
     TotalServed,
     UpdateRequest,
 };
-#[cfg(feature = "e2e-test")]
-use lightning_interfaces::types::{DhtRequest, DhtResponse, KeyPrefix, TableEntry};
-#[cfg(feature = "e2e-test")]
-use lightning_interfaces::BlockStoreInterface;
 use lightning_interfaces::SyncQueryRunnerInterface;
 
 use crate::server::RpcData;
-#[cfg(feature = "e2e-test")]
-use crate::types::{DhtGetParam, DhtPutParam};
 use crate::types::{NodeKeyParam, PublicKeyParam};
 static OPEN_RPC_DOCS: &str = "../../docs/rpc/openrpc.json";
 
@@ -64,8 +58,7 @@ impl RpcServer {
     where
         C: Collection + 'static,
     {
-        #[allow(unused_mut)]
-        let mut server = Server::new()
+        let server = Server::new()
             .with_data(Data::new(interface))
             .with_method("rpc.discover", rpc_discovery_handler::<C>)
             .with_method("flk_ping", ping_handler::<C>)
@@ -115,14 +108,6 @@ impl RpcServer {
             .with_method("flk_send_txn", send_txn::<C>)
             .with_method("flk_put", put::<C>);
 
-        #[cfg(feature = "e2e-test")]
-        {
-            server = server
-                .with_method("flk_get", get::<C>)
-                .with_method("flk_dht_put", dht_put::<C>)
-                .with_method("flk_dht_get", dht_get::<C>);
-        }
-
         RpcServer(server.finish())
     }
 }
@@ -131,17 +116,6 @@ pub async fn rpc_discovery_handler<C: Collection>() -> Result<String> {
     match fs::read_to_string(OPEN_RPC_DOCS) {
         Ok(contents) => Ok(contents),
         Err(e) => Err(Error::internal(e)),
-    }
-}
-
-#[cfg(feature = "e2e-test")]
-pub async fn get<C: Collection>(
-    data: Data<Arc<RpcData<C>>>,
-    Params(params): Params<Blake3Hash>,
-) -> Result<Vec<u8>> {
-    match data.blockstore.read_all_to_vec(&params).await {
-        Some(content) => Ok(content),
-        None => Err(Error::INTERNAL_ERROR),
     }
 }
 
@@ -346,53 +320,4 @@ pub async fn send_txn<C: Collection>(
         .run(param)
         .await
         .map_err(Error::internal)
-}
-
-#[cfg(feature = "e2e-test")]
-pub async fn dht_put<C: Collection>(
-    data: Data<Arc<RpcData<C>>>,
-    Params(param): Params<DhtPutParam>,
-) -> Result<()> {
-    let dht_socket = match data.0.dht_socket.lock().unwrap().clone() {
-        Some(dht_socket) => dht_socket,
-        None => panic!("Dht socket not provided"),
-    };
-
-    let res = dht_socket
-        .run(DhtRequest::Put {
-            prefix: KeyPrefix::ContentRegistry,
-            key: param.key,
-            value: param.value,
-        })
-        .await
-        .expect("sending put request failed.");
-    if let DhtResponse::Put(()) = res {
-        Ok(())
-    } else {
-        Err(Error::INTERNAL_ERROR)
-    }
-}
-
-#[cfg(feature = "e2e-test")]
-pub async fn dht_get<C: Collection>(
-    data: Data<Arc<RpcData<C>>>,
-    Params(param): Params<DhtGetParam>,
-) -> Result<Option<TableEntry>> {
-    let dht_socket = match data.0.dht_socket.lock().unwrap().clone() {
-        Some(dht_socket) => dht_socket,
-        None => panic!("Dht socket not provided"),
-    };
-
-    let res = dht_socket
-        .run(DhtRequest::Get {
-            prefix: KeyPrefix::ContentRegistry,
-            key: param.key,
-        })
-        .await
-        .expect("sending get request failed.");
-    if let DhtResponse::Get(value) = res {
-        Ok(value)
-    } else {
-        Err(Error::INTERNAL_ERROR)
-    }
 }
