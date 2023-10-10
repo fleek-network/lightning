@@ -141,12 +141,18 @@ impl<B: Backend> State<B> {
     }
 
     pub fn execute_transaction(&self, txn: TransactionRequest) -> TransactionResponse {
-        match txn {
-            TransactionRequest::UpdateRequest(payload) => self.execute_fleek_transaction(payload),
-            TransactionRequest::EthereumRequest(payload) => {
-                self.execute_ethereum_transaction(payload)
+        let (sender, response) = match txn {
+            TransactionRequest::UpdateRequest(payload) => {
+                (payload.sender, self.execute_fleek_transaction(payload))
             },
-        }
+            TransactionRequest::EthereumRequest(payload) => (
+                TransactionSender::AccountOwner(EthAddress(payload.from.0)),
+                self.execute_ethereum_transaction(payload),
+            ),
+        };
+        // Increment nonce of the sender
+        self.increment_nonce(sender);
+        response
     }
 
     /// This function is the entry point of a transaction
@@ -242,9 +248,6 @@ impl<B: Backend> State<B> {
             assert_eq!(pub_key_to_index_len, consensus_key_to_index_len);
         }
 
-        // Increment nonce of the sender
-        self.increment_nonce(txn.sender);
-        // Return the response
         response
     }
 
