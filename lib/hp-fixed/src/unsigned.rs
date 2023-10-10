@@ -421,8 +421,31 @@ impl<const P: usize> TryFrom<HpUfixed<P>> for U256 {
     }
 }
 
+impl<const P: usize> TryFrom<HpUfixed<P>> for ethers::types::U256 {
+    type Error = HpFixedConversionError;
+
+    fn try_from(value: HpUfixed<P>) -> Result<Self, Self::Error> {
+        let bytes = value.0.to_bytes_le();
+        if bytes.len() > 32 {
+            return Err(HpFixedConversionError::Overflow);
+        }
+        Ok(ethers::types::U256::from_little_endian(&bytes))
+    }
+}
+
+impl<const P: usize> From<ethers::types::U256> for HpUfixed<P> {
+    fn from(value: ethers::types::U256) -> Self {
+        let mut bytes = vec![0; 32];
+        value.to_little_endian(&mut bytes);
+        let value_to_big: BigUint = BigUint::from_bytes_le(&bytes);
+        HpUfixed(value_to_big)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+
+    use ethers::types::U256;
 
     use super::*;
 
@@ -599,5 +622,41 @@ mod tests {
         let deserialized: HpUfixed<18> =
             bincode::deserialize(&serialized).expect("Failed to deserialize using bincode");
         assert_eq!(decimal, deserialized);
+    }
+
+    #[test]
+    fn test_ethers_u256_try_from_ufixed() {
+        let fixed: HpUfixed<18> = HpUfixed::from(999393993_u32);
+        let uint = U256::try_from(fixed.clone()).unwrap();
+        let fixed_r = HpUfixed::<18>::try_from(uint).unwrap();
+        assert_eq!(fixed, fixed_r);
+
+        let fixed: HpUfixed<18> = HpUfixed::from(10123.323452_f64);
+        let uint = U256::try_from(fixed.clone()).unwrap();
+        let fixed_r = HpUfixed::<18>::try_from(uint).unwrap();
+        assert_eq!(fixed, fixed_r);
+
+        let fixed: HpUfixed<18> = HpUfixed::from(0_u32);
+        let uint = U256::try_from(fixed.clone()).unwrap();
+        let fixed_r = HpUfixed::<18>::try_from(uint).unwrap();
+        assert_eq!(fixed, fixed_r);
+    }
+
+    #[test]
+    fn test_ufixed_from_ethers_u256() {
+        let uint = U256::from(329399399321_u64);
+        let fixed: HpUfixed<18> = HpUfixed::from(uint);
+        let uint_r = U256::try_from(fixed).unwrap();
+        assert_eq!(uint, uint_r);
+
+        let uint = U256::from(0_u64);
+        let fixed: HpUfixed<18> = HpUfixed::from(uint);
+        let uint_r = U256::try_from(fixed).unwrap();
+        assert_eq!(uint, uint_r);
+
+        let uint = U256::from(938563839392332232455_u128);
+        let fixed: HpUfixed<18> = HpUfixed::from(uint);
+        let uint_r = U256::try_from(fixed).unwrap();
+        assert_eq!(uint, uint_r);
     }
 }

@@ -10,6 +10,7 @@ num-bigint = {version = "0.4.3", features=["serde"]}
 num-traits ="0.2.15"
 serde = { version = "1.0", features = ["derive"] }
 ruint = { version = "1.10", features = ["num-bigint"], optional = true }
+ethers = "2.0.10"
 
 [dev-dependencies]
 serde_json.workspace = true
