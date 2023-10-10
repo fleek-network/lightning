@@ -183,12 +183,15 @@ impl<C: Collection> BlockstoreServerInner<C> {
                             } else {
                                 let blockstore = self.blockstore.clone();
                                 let num_responses = self.num_responses.clone();
+                                let rep_reporter = self.rep_reporter.clone();
                                 tokio::spawn(async move {
                                     handle_request::<C>(
+                                        req_header.peer,
                                         request,
                                         blockstore,
                                         responder,
-                                        num_responses
+                                        num_responses,
+                                        rep_reporter,
                                     ).await;
                                 });
                             }
@@ -345,13 +348,17 @@ impl std::fmt::Display for ErrorResponse {
 }
 
 async fn handle_request<C: Collection>(
+    peer: NodeIndex,
     peer_request: PeerRequest,
     blockstore: C::BlockStoreInterface,
     mut request: <c!(C::PoolInterface::Responder) as Responder>::Request,
     num_responses: Arc<AtomicUsize>,
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
 ) {
     num_responses.fetch_add(1, Ordering::Relaxed);
     if let Some(tree) = blockstore.get_tree(&peer_request.hash).await {
+        let mut num_bytes = 0;
+        let instant = Instant::now();
         for block in 0..tree.len() {
             let compr = CompressionAlgoSet::default(); // rustfmt
             let Some(chunk) = blockstore.get(block as u32, &tree[block], compr).await else {
@@ -365,6 +372,7 @@ async fn handle_request<C: Collection>(
             };
 
             if !proof.is_empty() {
+                num_bytes += proof.len();
                 if let Err(e) = request
                     .send(Bytes::from(Frame::Proof(Cow::Borrowed(proof.as_slice()))))
                     .await
@@ -375,6 +383,7 @@ async fn handle_request<C: Collection>(
                 }
             }
 
+            num_bytes += chunk.content.len();
             if let Err(e) = request
                 .send(Bytes::from(Frame::Chunk(Cow::Borrowed(
                     chunk.content.as_slice(),
@@ -389,6 +398,7 @@ async fn handle_request<C: Collection>(
         if let Err(e) = request.send(Bytes::from(Frame::Eos)).await {
             error!("Failed to send eos: {e:?}");
         }
+        rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
     }
     num_responses.fetch_sub(1, Ordering::Relaxed);
 }
