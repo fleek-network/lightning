@@ -11,7 +11,7 @@ on:
       - lib/**
       - services/**
       - Cargo.*
-      - .github/workflows/docker-publish.yml
+      - .github/workflows/docker-build-publish.yml
       - Dockerfile
   workflow_dispatch:
 
