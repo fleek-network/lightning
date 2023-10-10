@@ -1,4 +1,4 @@
-//! A custom serde serialize deserialize that uses base64 encoding when dealing with a
+//! A custom serde serialize deserialize that uses base58 encoding when dealing with a
 //! human readable serializer/deserialize. And uses a fixed size array when dealing
 //! dealing with other things.
 //!
