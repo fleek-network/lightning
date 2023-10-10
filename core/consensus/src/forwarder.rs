@@ -71,7 +71,7 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
         }
 
         // serialize transaction
-        let txn_bytes = bincode::serialize(&req)?;
+        let txn_bytes: Vec<u8> = req.try_into()?;
 
         let request = TransactionProto {
             transaction: txn_bytes.into(),

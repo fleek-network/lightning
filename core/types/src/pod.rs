@@ -4,5 +4,5 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Hash)]
 pub struct DeliveryAcknowledgmentBatch;
 
-#[derive(Serialize, Deserialize, Debug, Hash, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Hash, Clone, Default, Eq, PartialEq)]
 pub struct DeliveryAcknowledgment;

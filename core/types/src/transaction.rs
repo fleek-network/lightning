@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::net::IpAddr;
 
 use ethers::types::Transaction as EthersTransaction;
+use ethers::utils::rlp;
 use fleek_crypto::{
     ConsensusPublicKey,
     EthAddress,
@@ -43,7 +44,7 @@ pub struct Block {
 
 /// An update transaction, sent from users to the consensus to migrate the application
 /// from one state to the next state.
-#[derive(Debug, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct UpdateRequest {
     /// The sender of the transaction.
     pub sender: TransactionSender,
@@ -66,14 +67,52 @@ impl From<EthersTransaction> for TransactionRequest {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum TransactionRequest {
     UpdateRequest(UpdateRequest),
     EthereumRequest(EthersTransaction),
 }
 
+impl TryFrom<&TransactionRequest> for Vec<u8> {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &TransactionRequest) -> Result<Self, Self::Error> {
+        match value {
+            TransactionRequest::UpdateRequest(update_req) => {
+                let mut bytes = bincode::serialize(update_req)?;
+                bytes.push(0x00);
+                Ok(bytes)
+            },
+            TransactionRequest::EthereumRequest(eth_tx) => {
+                let mut bytes = eth_tx.rlp().to_vec();
+                bytes.push(0x01);
+                Ok(bytes)
+            },
+        }
+    }
+}
+
+impl TryFrom<Vec<u8>> for TransactionRequest {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        let magic_byte = value[value.len() - 1];
+        match magic_byte {
+            0x00 => {
+                let update_req = bincode::deserialize::<UpdateRequest>(&value[0..value.len() - 1])?;
+                Ok(TransactionRequest::UpdateRequest(update_req))
+            },
+            0x01 => {
+                let eth_tx = rlp::decode::<EthersTransaction>(&value[0..value.len() - 1])?;
+                Ok(TransactionRequest::EthereumRequest(eth_tx))
+            },
+            _ => Err(anyhow::anyhow!("Invalid magic byte: {magic_byte}")),
+        }
+    }
+}
+
 /// The payload data of FN transaction
-#[derive(Debug, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct UpdatePayload {
     /// The counter or nonce of this request.
     pub nonce: u64,
@@ -82,7 +121,7 @@ pub struct UpdatePayload {
 }
 
 /// All of the update functions in our logic, along their parameters.
-#[derive(Debug, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum UpdateMethod {
     /// The main function of the application layer. After aggregating ProofOfAcknowledgements a
     /// node will submit this transaction to get paid.
@@ -195,7 +234,7 @@ pub enum UpdateMethod {
 }
 
 // only for testnet
-#[derive(Debug, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum TestnetAdmin {
     Kill,
 }
@@ -410,5 +449,45 @@ impl<const P: usize> TranscriptBuilderInput for HpUfixedWrapper<P> {
         input.extend_from_slice(&data_bytes);
 
         input
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fleek_crypto::AccountOwnerSignature;
+
+    use super::*;
+
+    #[test]
+    fn test_transaction_request_eth() {
+        let tx = EthersTransaction::default();
+        let tx_req = TransactionRequest::EthereumRequest(tx);
+        let bytes: Vec<u8> = (&tx_req).try_into().unwrap();
+        let tx_req_r = TransactionRequest::try_from(bytes).unwrap();
+
+        let bytes: Vec<u8> = (&tx_req_r).try_into().unwrap();
+        let tx_req_rr = TransactionRequest::try_from(bytes).unwrap();
+        assert_eq!(tx_req_r, tx_req_rr);
+    }
+
+    #[test]
+    fn test_transaction_request_fleek() {
+        let update_method = UpdateMethod::ChangeProtocolParam {
+            param: ProtocolParams::CommitteeSize,
+            value: 4,
+        };
+        let payload = UpdatePayload {
+            nonce: 0,
+            method: update_method,
+        };
+        let update_req = UpdateRequest {
+            sender: TransactionSender::AccountOwner(EthAddress([0; 20])),
+            signature: TransactionSignature::AccountOwner(AccountOwnerSignature([0; 65])),
+            payload,
+        };
+        let tx = TransactionRequest::UpdateRequest(update_req);
+        let bytes: Vec<u8> = (&tx).try_into().unwrap();
+        let tx_r = TransactionRequest::try_from(bytes).unwrap();
+        assert_eq!(tx, tx_r);
     }
 }

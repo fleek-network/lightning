@@ -20,7 +20,7 @@ pub type Epoch = u64;
 /// A nodes index
 pub type NodeIndex = u32;
 
-#[derive(Serialize, Deserialize, Hash, Debug, Clone)]
+#[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq)]
 pub enum Tokens {
     USDC,
     FLK,
@@ -181,7 +181,7 @@ pub struct Worker {
 
 /// Placeholder
 /// Information about the services
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct Service {
     /// the owner address that deploys the service and also recieves reward share
     pub owner: EthAddress,

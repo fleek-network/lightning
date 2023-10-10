@@ -4,5 +4,5 @@ use serde::{Deserialize, Serialize};
 
 /// Placeholder
 /// This is the proof used to operate our PoC bridges
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct ProofOfConsensus {}

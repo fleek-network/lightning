@@ -5170,6 +5170,7 @@ name = "lightning-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bincode",
  "derive_more",
  "ethers",
  "fleek-crypto",

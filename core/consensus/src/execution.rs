@@ -90,8 +90,8 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
         let mut change_epoch = false;
 
         let transactions = payload
-            .iter()
-            .filter_map(|txn| bincode::deserialize::<TransactionRequest>(txn).ok())
+            .into_iter()
+            .filter_map(|txn| TransactionRequest::try_from(txn).ok())
             .collect::<Vec<_>>();
 
         let block = Block {
