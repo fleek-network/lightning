@@ -36,9 +36,21 @@ use crate::eth::{
     eth_block_number,
     eth_chain_id,
     eth_estimate_gas,
+    eth_fee_history,
     eth_gas_price,
     eth_get_code,
+    eth_get_work,
+    eth_hashrate,
+    eth_is_mining,
+    eth_max_priority_fee_per_gas,
+    eth_protocol_version,
     eth_send_raw_transaction,
+    eth_send_transaction,
+    eth_sign,
+    eth_sign_transaction,
+    eth_submit_hashrate,
+    eth_submit_work,
+    eth_syncing,
     eth_transaction_count,
     net_listening,
     net_peer_count,
@@ -124,10 +136,11 @@ impl RpcServer {
             .with_method("flk_get_last_epoch_hash", get_last_epoch_hash_handler::<C>)
             .with_method("flk_send_txn", send_txn::<C>)
             .with_method("flk_put", put::<C>)
-            // .with_method("eth_protocolVersion", eth_protocol_version::<C>)
+            .with_method("eth_protocolVersion", eth_protocol_version::<C>)
             .with_method("eth_getTransactionCount", eth_transaction_count::<C>)
             .with_method("eth_chainId", eth_chain_id::<C>)
-            .with_method("eth_author", eth_author::<C>)
+            .with_method("eth_syncing", eth_syncing::<C>)
+            .with_method("eth_coinbase", eth_author::<C>)
             .with_method("eth_accounts", eth_accounts::<C>)
             .with_method("eth_getBalance", eth_balance::<C>)
             .with_method("net_version", net_version::<C>)
@@ -138,7 +151,20 @@ impl RpcServer {
             .with_method("eth_gasPrice", eth_gas_price::<C>)
             .with_method("eth_estimateGas", eth_estimate_gas::<C>)
             .with_method("eth_sendRawTransaction", eth_send_raw_transaction::<C>)
-            .with_method("eth_getCode", eth_get_code::<C>);
+            .with_method("eth_getCode", eth_get_code::<C>)
+            .with_method(
+                "eth_maxPriorityFeePerGas",
+                eth_max_priority_fee_per_gas::<C>,
+            )
+            .with_method("eth_feeHistory", eth_fee_history::<C>)
+            .with_method("eth_mining", eth_is_mining::<C>)
+            .with_method("eth_hashrate", eth_hashrate::<C>)
+            .with_method("eth_getWork", eth_get_work::<C>)
+            .with_method("eth_submitHashrate", eth_submit_hashrate::<C>)
+            .with_method("eth_submitWork", eth_submit_work::<C>)
+            .with_method("eth_sendTransaction", eth_send_transaction::<C>)
+            .with_method("eth_sign", eth_sign::<C>)
+            .with_method("eth_signTransaction", eth_sign_transaction::<C>);
 
         RpcServer(server.finish())
     }

@@ -55,7 +55,7 @@ pub async fn eth_send_raw_transaction<C: Collection>(
 /// Handler for: `eth_protocolVersion`
 pub async fn eth_protocol_version<C: Collection>() -> Result<U64> {
     trace!(target: "rpc::eth", "Serving eth_protocolVersion");
-    todo!()
+    Ok(U64::from(0x41))
 }
 
 /// Handler for: `eth_syncing`
@@ -172,17 +172,18 @@ pub async fn eth_gas_price<C: Collection>() -> Result<U256> {
 }
 
 // /// Handler for: `eth_maxPriorityFeePerGas`
-#[allow(unused)]
-async fn max_priority_fee_per_gas() -> Result<U256> {
+pub async fn eth_max_priority_fee_per_gas<C: Collection>() -> Result<U256> {
     trace!(target: "rpc::eth", "Serving eth_maxPriorityFeePerGas");
     Ok(U256::ZERO)
 }
 
 // /// Handler for: `eth_feeHistory`
-pub async fn fee_history<C: Collection>(
-    block_count: U256,
-    newest_block: BlockNumber,
-    reward_percentiles: Option<Vec<f64>>,
+pub async fn eth_fee_history<C: Collection>(
+    Params((block_count, newest_block, reward_percentiles)): Params<(
+        U256,
+        BlockNumber,
+        Option<Vec<f64>>,
+    )>,
 ) -> Result<FeeHistory> {
     trace!(target: "rpc::eth", ?block_count, ?newest_block,
   ?reward_percentiles, "Serving eth_feeHistory");
@@ -190,53 +191,55 @@ pub async fn fee_history<C: Collection>(
 }
 
 // /// Handler for: `eth_mining`
-#[allow(unused)]
-async fn is_mining() -> Result<bool> {
+pub async fn eth_is_mining<C: Collection>() -> Result<bool> {
     Err(Error::from("unimplemented"))
 }
 
 // /// Handler for: `eth_hashrate`
-#[allow(unused)]
-async fn hashrate() -> Result<U256> {
+pub async fn eth_hashrate<C: Collection>() -> Result<U256> {
     Ok(U256::ZERO)
 }
 
 // /// Handler for: `eth_getWork`
-#[allow(unused)]
-async fn get_work() -> Result<()> {
+pub async fn eth_get_work<C: Collection>() -> Result<()> {
     Err(Error::from("unimplemented"))
 }
 
 // /// Handler for: `eth_submitHashrate`
-#[allow(unused)]
-async fn submit_hashrate(_hashrate: U256, _id: B256) -> Result<bool> {
+pub async fn eth_submit_hashrate<C: Collection>(
+    Params((_hashrate, _id)): Params<(U256, B256)>,
+) -> Result<bool> {
     Ok(false)
 }
 
 // /// Handler for: `eth_submitWork`
-#[allow(unused)]
-async fn submit_work(_nonce: B64, _pow_hash: B256, _mix_digest: B256) -> Result<bool> {
+pub async fn eth_submit_work<C: Collection>(
+    Params((_nonce, __pow_hash, _mix_digest)): Params<(B64, B256, B256)>,
+) -> Result<bool> {
     Err(Error::from("unimplemented"))
 }
 
 /// Handler for: `eth_sendTransaction`
-#[allow(unused)]
-async fn send_transaction(request: TransactionRequest) -> Result<B256> {
+pub async fn eth_send_transaction<C: Collection>(
+    Params(request): Params<TransactionRequest>,
+) -> Result<B256> {
     trace!(target: "rpc::eth", ?request, "Serving eth_sendTransaction");
     // We shouldnt need to support this ever just eth_sendRawTransaction
     Err(Error::from("unimplemented"))
 }
 
 /// Handler for: `eth_sign`
-#[allow(unused)]
-async fn sign(address: Address, message: Bytes) -> Result<Bytes> {
+pub async fn eth_sign<C: Collection>(
+    Params((address, message)): Params<(Address, Bytes)>,
+) -> Result<Bytes> {
     trace!(target: "rpc::eth", ?address, ?message, "Serving eth_sign");
     Err(Error::from("unimplemented"))
 }
 
 // /// Handler for: `eth_signTransaction`
-#[allow(unused)]
-async fn sign_transaction(_transaction: TransactionRequest) -> Result<Bytes> {
+pub async fn eth_sign_transaction<C: Collection>(
+    Params(_transaction): Params<TransactionRequest>,
+) -> Result<Bytes> {
     Err(Error::from("unimplemented"))
 }
 
