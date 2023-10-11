@@ -75,7 +75,7 @@ impl SecretKey for NodeSecretKey {
         .unwrap()
     }
 
-    fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
+    fn sign(&self, digest: &[u8]) -> <Self::PublicKey as PublicKey>::Signature {
         let secret: Ed25519PrivateKey = self.into();
         let pair: Ed25519KeyPair = secret.into();
         pair.sign(digest).into()

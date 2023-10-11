@@ -42,7 +42,7 @@ macro_rules! impl_pk_sig {
         impl PublicKey for $pk_name {
             type Signature = $sig_name;
 
-            fn verify(&self, signature: &Self::Signature, digest: &[u8; 32]) -> bool {
+            fn verify(&self, signature: &Self::Signature, digest: &[u8]) -> bool {
                 let pubkey: $pk_fc = self.into();
                 let signature: $sig_fc = signature.into();
                 pubkey.$verify(digest, &signature.into()).is_ok()

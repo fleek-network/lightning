@@ -5,7 +5,7 @@ pub trait PublicKey: Sized {
     type Signature;
 
     /// Verify a signature against this public key.
-    fn verify(&self, signature: &Self::Signature, digest: &[u8; 32]) -> bool;
+    fn verify(&self, signature: &Self::Signature, digest: &[u8]) -> bool;
 
     /// Encode and return this public key as a string.
     fn to_base58(&self) -> String;
@@ -27,7 +27,7 @@ pub trait SecretKey: Sized + ZeroizeOnDrop {
     fn encode_pem(&self) -> String;
 
     /// Sign a raw digest of a message.
-    fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature;
+    fn sign(&self, digest: &[u8]) -> <Self::PublicKey as PublicKey>::Signature;
 
     /// Returns the public key associated with this secret key.
     fn to_pk(&self) -> Self::PublicKey;
