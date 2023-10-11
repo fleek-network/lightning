@@ -4465,6 +4465,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-archive"
+version = "0.1.0"
+dependencies = [
+ "affair 0.1.2",
+ "anyhow",
+ "async-trait",
+ "lightning-interfaces",
+ "resolved-pathbuf",
+ "serde",
+]
+
+[[package]]
 name = "lightning-blockstore"
 version = "0.0.0"
 dependencies = [

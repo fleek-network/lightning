@@ -1,4 +1,5 @@
 pub mod application;
+pub mod archive;
 pub mod blockstore;
 pub mod blockstore_server;
 pub mod broadcast;
@@ -23,6 +24,7 @@ pub mod topology;
 pub mod types;
 
 pub use application::*;
+pub use archive::*;
 pub use blockstore::*;
 pub use blockstore_server::*;
 pub use broadcast::*;
