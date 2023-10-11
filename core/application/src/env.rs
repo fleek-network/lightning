@@ -119,7 +119,7 @@ impl Env<UpdatePerm> {
     }
 
     #[autometrics::autometrics]
-    async fn run<F, P>(&mut self, block: Block, get_putter: F) -> BlockExecutionResponse
+    async fn run<F, P>(&mut self, mut block: Block, get_putter: F) -> BlockExecutionResponse
     where
         F: FnOnce() -> P,
         P: IncrementalPutInterface,
@@ -140,7 +140,7 @@ impl Env<UpdatePerm> {
             };
 
             // Execute each transaction and add the results to the block response
-            for txn in &block.transactions {
+            for txn in &mut block.transactions {
                 let receipt = match app.verify_transaction(txn) {
                     Ok(_) => app.execute_transaction(txn.clone()),
                     Err(err) => TransactionResponse::Revert(err),

@@ -1,10 +1,10 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::net::IpAddr;
-use std::str::FromStr;
 use std::time::Duration;
 
 use ethers::abi::AbiDecode;
+use ethers::types::transaction::eip2718::TypedTransaction;
 use ethers::types::{Transaction as EthersTransaction, H160};
 use fleek_blake3::Hasher;
 use fleek_crypto::{
@@ -290,18 +290,17 @@ impl<B: Backend> State<B> {
                 })) => {
                     todo!()
                 },
-                _ => return TransactionResponse::Revert(ExecutionError::InvalidStateFunction),
+                _ => TransactionResponse::Revert(ExecutionError::InvalidStateFunction),
             }
         } else {
             // They are trying to transfer FLK
             self.transfer(
                 sender.into(),
-                HpUfixed::from_str(&txn.value.to_string()).unwrap_or_default(),
+                txn.value.into(),
                 Tokens::FLK,
                 to_address.0.into(),
-            );
+            )
         }
-        todo!()
     }
 
     /*********** External Update Functions ********** */
@@ -1294,7 +1293,7 @@ impl<B: Backend> State<B> {
     /// This function takes in the Transaction and verifies the Signature matches the Sender. It
     /// also checks the nonce of the sender and makes sure it is equal to the account nonce + 1,
     /// to prevent replay attacks and enforce ordering
-    pub fn verify_transaction(&self, txn: &TransactionRequest) -> Result<(), ExecutionError> {
+    pub fn verify_transaction(&self, txn: &mut TransactionRequest) -> Result<(), ExecutionError> {
         match txn {
             TransactionRequest::UpdateRequest(payload) => self.verify_fleek_transaction(payload),
             TransactionRequest::EthereumRequest(payload) => {
@@ -1349,9 +1348,37 @@ impl<B: Backend> State<B> {
         Ok(())
     }
 
-    fn verify_ethereum_transaction(&self, _txn: &EthersTransaction) -> Result<(), ExecutionError> {
-        //todo(dalton)
-        Ok(())
+    fn verify_ethereum_transaction(
+        &self,
+        txn: &mut EthersTransaction,
+    ) -> Result<(), ExecutionError> {
+        // Recover public key from signature
+        // todo(Dalton) I am pretty sure this right here is enough to verify the signature and the
+        //      extra verify we do at the bottom is unneeded
+        let sender: EthAddress = if let Ok(address) = txn.recover_from_mut() {
+            address.0.into()
+        } else {
+            return Err(ExecutionError::InvalidSignature);
+        };
+
+        // Verify nonce is correct
+        let account_info = self.account_info.get(&sender).unwrap_or_default();
+        if txn.nonce.as_u64() != account_info.nonce + 1 {
+            return Err(ExecutionError::InvalidNonce);
+        }
+
+        let typed_txn: TypedTransaction = (&*txn).into();
+
+        let mut sig = [0u8; 65];
+        txn.r.to_big_endian(&mut sig[0..32]);
+        txn.s.to_big_endian(&mut sig[32..64]);
+        sig[64] = normalize_recovery_id(txn.v.as_u64());
+
+        if sender.verify(&sig.into(), typed_txn.rlp().as_ref()) {
+            Ok(())
+        } else {
+            Err(ExecutionError::InvalidSignature)
+        }
     }
 
     /// Takes in a zk Proof Of Delivery and returns true if valid
@@ -1432,7 +1459,7 @@ impl<B: Backend> State<B> {
                 self.node_info.set(index, node_info);
             },
             TransactionSender::AccountOwner(account) => {
-                let mut account_info = self.account_info.get(&account).unwrap();
+                let mut account_info = self.account_info.get(&account).unwrap_or_default();
                 account_info.nonce += 1;
                 self.account_info.set(account, account_info);
             },
@@ -1523,5 +1550,16 @@ impl<B: Backend> State<B> {
         } else {
             0
         }
+    }
+}
+
+fn normalize_recovery_id(v: u64) -> u8 {
+    match v {
+        0 => 0,
+        1 => 1,
+        27 => 0,
+        28 => 1,
+        v if v >= 35 => ((v - 1) % 2) as _,
+        _ => 4,
     }
 }

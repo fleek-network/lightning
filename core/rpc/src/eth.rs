@@ -9,6 +9,7 @@ use ethers::types::{
     FeeHistory,
     Transaction,
     TransactionRequest,
+    H256,
     H256 as EthH256,
 };
 use ethers::utils::rlp;
@@ -24,31 +25,23 @@ use crate::server::RpcData;
 
 /// Handler for: `eth_sendRawTransaction`
 pub async fn eth_send_raw_transaction<C: Collection>(
+    ///////
     data: Data<Arc<RpcData<C>>>,
     Params((tx,)): Params<(Bytes,)>,
-) -> Result<B256> {
+) -> Result<H256> {
     trace!(target: "rpc::eth", "Serving eth_sendRawTransaction");
     let tx_data = tx.as_ref();
 
-    // TODO(dalton):
-    //let transaction = if tx_data[0] > 0x7f {
-    //    // legacy transaction
-    //    match rlp::decode::<Transaction>(tx_data) {
-    //        Ok(transaction) => transaction,
-    //        Err(_) => return Err(Error::from("Failed to decode signed transaction")),
-    //    }
-    //} else {
-    //    let tx = match rlp::decode::<Transaction>(tx_data) {
-    //        Ok(transaction) => transaction,
-    //        Err(_) => return Err(Error::from("Failed to decode signed transaction")),
-    //    };
-    //    tx
-    //};
-
-    let transaction = match rlp::decode::<Transaction>(tx_data) {
+    let mut transaction = match rlp::decode::<Transaction>(tx_data) {
         Ok(transaction) => transaction,
         Err(_) => return Err(Error::from("Failed to decode signed transaction")),
     };
+
+    transaction
+        .recover_from_mut()
+        .map_err(|_| Error::from("Invalid transaction signature"))?;
+
+    let hash = transaction.hash();
 
     data.0
         .mempool_socket
@@ -56,8 +49,7 @@ pub async fn eth_send_raw_transaction<C: Collection>(
         .await
         .map_err(Error::internal)?;
 
-    // todo(dalton return the transaction hash)
-    Ok(B256::ZERO)
+    Ok(hash)
 }
 
 /// Handler for: `eth_protocolVersion`
@@ -88,6 +80,10 @@ pub async fn eth_accounts<C: Collection>() -> Result<Vec<EthAddress>> {
 /// Handler for: `eth_blockNumber`
 pub async fn eth_block_number<C: Collection>(data: Data<Arc<RpcData<C>>>) -> Result<U256> {
     trace!(target: "rpc::eth", "Serving eth_blockNumber");
+    log::error!(
+        "the block number is {:?}",
+        data.0.query_runner.get_block_number(),
+    );
     Ok(U256::from(data.0.query_runner.get_block_number()))
 }
 

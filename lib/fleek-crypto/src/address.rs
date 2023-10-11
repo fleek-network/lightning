@@ -19,11 +19,14 @@ use crate::keys::{AccountOwnerPublicKey, AccountOwnerSignature};
 pub struct EthAddress(#[serde(with = "hex_array")] pub [u8; 20]);
 
 impl EthAddress {
-    pub fn verify(&self, signature: &AccountOwnerSignature, digest: &[u8; 32]) -> bool {
+    pub fn verify(&self, signature: &AccountOwnerSignature, digest: &[u8]) -> bool {
         let signature: Secp256k1RecoverableSignature = signature.into();
-        match signature.recover(digest) {
+        match signature.recover_with_hash::<Keccak256>(digest) {
             Ok(public_key) => {
-                if public_key.verify_recoverable(digest, &signature).is_err() {
+                if public_key
+                    .verify_recoverable_with_hash::<Keccak256>(digest, &signature)
+                    .is_err()
+                {
                     return false;
                 }
                 let public_key: AccountOwnerPublicKey = public_key.into();
