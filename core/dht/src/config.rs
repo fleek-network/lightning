@@ -18,7 +18,7 @@ pub struct Bootstrapper {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            address: "0.0.0.0:8101".parse().unwrap(),
+            address: "0.0.0.0:4340".parse().unwrap(),
             bootstrappers: vec![],
         }
     }

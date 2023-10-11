@@ -29,7 +29,7 @@ pub struct WebRtcConfig {
 impl Default for WebRtcConfig {
     fn default() -> Self {
         Self {
-            udp_address: ([127, 0, 0, 1], 4221).into(),
+            udp_address: ([127, 0, 0, 1], 4320).into(),
         }
     }
 }

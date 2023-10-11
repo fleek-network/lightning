@@ -20,7 +20,7 @@ impl WebTransportConfig {
 impl Default for WebTransportConfig {
     fn default() -> Self {
         Self {
-            address: ([0, 0, 0, 0], 4240).into(),
+            address: ([0, 0, 0, 0], 4321).into(),
             keep_alive: None,
             certificate: None,
         }
