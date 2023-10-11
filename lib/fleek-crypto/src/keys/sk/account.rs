@@ -1,4 +1,5 @@
 use arrayref::array_ref;
+use fastcrypto::hash::Keccak256;
 use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1PrivateKey, Secp256k1PublicKey};
 use fastcrypto::traits::{KeyPair, RecoverableSigner, ToFromBytes};
 use rand::rngs::ThreadRng;
@@ -68,7 +69,7 @@ impl SecretKey for AccountOwnerSecretKey {
     fn sign(&self, digest: &[u8; 32]) -> <Self::PublicKey as PublicKey>::Signature {
         let secret: Secp256k1PrivateKey = self.into();
         let pair: Secp256k1KeyPair = secret.into();
-        pair.sign_recoverable(digest).into()
+        pair.sign_recoverable_with_hash::<Keccak256>(digest).into()
     }
 
     fn to_pk(&self) -> Self::PublicKey {
