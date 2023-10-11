@@ -177,7 +177,7 @@ impl Connection {
                 contents,
                 ..
             }) => {
-                let payload = contents.as_ref();
+                let payload: &[u8] = contents.as_ref();
                 let len = payload.len();
                 let sent = socket.send_to(payload, destination).await?;
                 debug_assert_eq!(len, sent);
