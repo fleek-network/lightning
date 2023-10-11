@@ -144,8 +144,8 @@ pub struct NodeInfo {
     pub nonce: u64,
 }
 
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
-/// The ports a node has open for its proccesses
+/// The ports a node has open for its processes
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
 pub struct NodePorts {
     pub primary: u16,
     pub worker: u16,
@@ -153,8 +153,39 @@ pub struct NodePorts {
     pub rpc: u16,
     pub pool: u16,
     pub dht: u16,
-    pub handshake: u16,
-    pub blockstore: u16,
+    pub handshake: HandshakePorts,
+}
+
+impl Default for NodePorts {
+    fn default() -> Self {
+        Self {
+            pool: 4300,
+            primary: 4310,
+            worker: 4311,
+            mempool: 4210,
+            handshake: Default::default(),
+            rpc: 4230,
+            dht: 4340,
+        }
+    }
+}
+
+/// The ports a node has open for the handshake server
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
+pub struct HandshakePorts {
+    pub http: u16,
+    pub webrtc: u16,
+    pub webtransport: u16,
+}
+
+impl Default for HandshakePorts {
+    fn default() -> Self {
+        Self {
+            http: 4220,
+            webrtc: 4320,
+            webtransport: 4321,
+        }
+    }
 }
 
 /// Struct that stores the information about the stake of amount of a node.
