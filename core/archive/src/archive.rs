@@ -66,11 +66,7 @@ impl<C: Collection> ArchiveInterface<C> for Archive {
 #[async_trait]
 impl WithStartAndShutdown for Archive {
     fn is_running(&self) -> bool {
-        if self.archive_socket.lock().unwrap().is_some() {
-            true
-        } else {
-            false
-        }
+        self.archive_socket.lock().unwrap().is_some()
     }
 
     async fn start(&self) {

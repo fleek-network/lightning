@@ -18,6 +18,5 @@ impl WorkerTrait for IndexWorker {
 
     async fn handle(&mut self, _req: Self::Request) -> Self::Response {
         // todo
-        ()
     }
 }
