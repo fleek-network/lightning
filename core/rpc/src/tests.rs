@@ -30,7 +30,7 @@ use lightning_interfaces::types::{
     ProtocolParams,
     Staking,
     TotalServed,
-    UpdateRequest,
+    TransactionRequest,
 };
 use lightning_interfaces::{
     partial,
@@ -79,7 +79,7 @@ impl MockWorker {
 }
 
 impl Worker for MockWorker {
-    type Request = UpdateRequest;
+    type Request = TransactionRequest;
     type Response = ();
 
     fn handle(&mut self, _req: Self::Request) -> Self::Response {}
@@ -271,7 +271,7 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
     let mut genesis = Genesis::load().unwrap();
     genesis.account.push(GenesisAccount {
         public_key: owner_public_key.into(),
-        flk_balance: 1000,
+        flk_balance: 1000u64.into(),
         stables_balance: 0,
         bandwidth_balance: 0,
     });
@@ -463,7 +463,7 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
     let mut genesis = Genesis::load().unwrap();
     genesis.account.push(GenesisAccount {
         public_key: owner_public_key.into(),
-        flk_balance: 0,
+        flk_balance: 0u64.into(),
         stables_balance: 200,
         bandwidth_balance: 0,
     });
@@ -734,7 +734,7 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
     let mut genesis = Genesis::load().unwrap();
     genesis.account.push(GenesisAccount {
         public_key: owner_public_key.into(),
-        flk_balance: 0,
+        flk_balance: 0u64.into(),
         stables_balance: 0,
         bandwidth_balance: 10_000,
     });
