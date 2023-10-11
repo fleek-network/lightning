@@ -4,11 +4,12 @@ use fleek_crypto::NodePublicKey;
 use hp_fixed::unsigned::HpUfixed;
 use serde::{Deserialize, Serialize};
 
-use super::TransactionResponse;
+use crate::TransactionReceipt;
 
 /// The response generated from executing an entire batch of transactions (aka a block).
-#[derive(Debug, PartialEq, PartialOrd, Hash, Eq)]
+#[derive(Debug, Hash)]
 pub struct BlockExecutionResponse {
+    pub block_number: u128,
     /// The new block hash
     pub block_hash: [u8; 32],
     /// This *flag* is only set to `true` if performing a transaction in the block
@@ -17,7 +18,7 @@ pub struct BlockExecutionResponse {
     /// The changes to the node registry.
     pub node_registry_delta: Vec<(NodePublicKey, NodeRegistryChange)>,
     /// Receipts of all executed transactions
-    pub txn_receipts: Vec<TransactionResponse>,
+    pub txn_receipts: Vec<TransactionReceipt>,
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Hash, Eq)]

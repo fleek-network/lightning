@@ -35,7 +35,7 @@ const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";
 /// the block is the atomic view into the network, meaning that queries do not view
 /// the intermediary state within a block, but only have the view to the latest executed
 /// block.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Block {
     pub transactions: Vec<TransactionRequest>,
     // Digest of the narwhal certificate that included this
@@ -71,6 +71,22 @@ impl From<EthersTransaction> for TransactionRequest {
 pub enum TransactionRequest {
     UpdateRequest(UpdateRequest),
     EthereumRequest(EthersTransaction),
+}
+
+impl TransactionRequest {
+    pub fn sender(&self) -> TransactionSender {
+        match self {
+            Self::UpdateRequest(payload) => payload.sender,
+            Self::EthereumRequest(payload) => EthAddress::from(payload.from.0).into(),
+        }
+    }
+
+    pub fn hash(&self) -> [u8; 32] {
+        match self {
+            Self::UpdateRequest(payload) => payload.payload.to_digest(),
+            Self::EthereumRequest(payload) => payload.hash().0,
+        }
+    }
 }
 
 impl TryFrom<&TransactionRequest> for Vec<u8> {

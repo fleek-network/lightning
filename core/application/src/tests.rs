@@ -387,6 +387,7 @@ async fn stake(
         .await
         .unwrap()
         .txn_receipts[0]
+        .response
         .clone()
     {
         panic!("Stake reverted: {error:?}");
@@ -517,7 +518,7 @@ async fn test_stake() {
 
     assert_eq!(
         TransactionResponse::Revert(ExecutionError::InsufficientNodeDetails),
-        res.txn_receipts[0]
+        res.txn_receipts[0].response
     );
 
     // Now try with the correct details for a new node
@@ -539,6 +540,7 @@ async fn test_stake() {
         .await
         .unwrap()
         .txn_receipts[0]
+        .response
         .clone()
     {
         panic!("Stake reverted: {error:?}");
@@ -569,6 +571,7 @@ async fn test_stake() {
         .await
         .unwrap()
         .txn_receipts[0]
+        .response
         .clone()
     {
         panic!("Stake reverted: {error:?}");
@@ -621,6 +624,7 @@ async fn test_stake() {
         .await
         .unwrap()
         .txn_receipts[0]
+        .response
         .clone();
     assert_eq!(
         TransactionResponse::Revert(ExecutionError::TokensLocked),
@@ -675,6 +679,7 @@ async fn test_stake_lock() {
             .await
             .unwrap()
             .txn_receipts[0]
+            .response
             .clone()
     {
         panic!("Stake locking reverted: {error:?}");
@@ -696,6 +701,7 @@ async fn test_stake_lock() {
         .await
         .unwrap()
         .txn_receipts[0]
+        .response
         .clone();
 
     assert_eq!(
@@ -1126,6 +1132,7 @@ async fn test_supply_across_epoch() {
                 .await
                 .unwrap()
                 .txn_receipts[0]
+                .response
                 .clone()
         {
             panic!("{error:?}");
@@ -1179,7 +1186,10 @@ async fn test_validate_txn() {
         &keystore[0].node_secret_key,
         2,
     );
-    assert_eq!(res.txn_receipts[0], query_runner.validate_txn(req.into()));
+    assert_eq!(
+        res.txn_receipts[0].response,
+        query_runner.validate_txn(req.into())
+    );
 
     // Submit a ChangeEpoch transaction that will succeed and ensure that the
     // `validate_txn` method of the query runner returns the same response as the update runner.
@@ -1196,7 +1206,10 @@ async fn test_validate_txn() {
         &keystore[1].node_secret_key,
         1,
     );
-    assert_eq!(res.txn_receipts[0], query_runner.validate_txn(req.into()));
+    assert_eq!(
+        res.txn_receipts[0].response,
+        query_runner.validate_txn(req.into())
+    );
 }
 
 #[test]
@@ -1422,7 +1435,7 @@ async fn test_change_protocol_params() {
         .await
         .unwrap();
     assert_eq!(
-        response.txn_receipts[0],
+        response.txn_receipts[0].response,
         TransactionResponse::Revert(ExecutionError::OnlyGovernance)
     );
     // Lock time should still be 8.

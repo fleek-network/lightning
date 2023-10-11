@@ -148,6 +148,7 @@ fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
         app.sync_query(),
         blockstore,
         &fetcher,
+        None,
     )?;
     Ok(rpc)
 }

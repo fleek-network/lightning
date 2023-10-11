@@ -151,6 +151,7 @@ async fn test_query() {
         update_socket.clone(),
         query_runner.clone(),
         infusion::Blank::default(),
+        None,
     )
     .unwrap();
 
@@ -303,6 +304,7 @@ async fn test_submit_measurements() {
         update_socket.clone(),
         query_runner.clone(),
         infusion::Blank::default(),
+        None,
     )
     .unwrap();
 
@@ -483,6 +485,7 @@ async fn test_reputation_calculation_and_query() {
         update_socket.clone(),
         query_runner.clone(),
         infusion::Blank::default(),
+        None,
     )
     .unwrap();
     let consensus2 = MockConsensus::<TestBinding>::init(
@@ -491,6 +494,7 @@ async fn test_reputation_calculation_and_query() {
         update_socket.clone(),
         query_runner.clone(),
         infusion::Blank::default(),
+        None,
     )
     .unwrap();
 

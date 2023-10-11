@@ -28,6 +28,7 @@ use lightning_interfaces::types::{
     ServiceId,
     ServiceRevenue,
     TotalServed,
+    TransactionReceipt,
     TransactionResponse,
     Value,
 };
@@ -130,26 +131,38 @@ impl Env<UpdatePerm> {
                 table_selector: ctx,
             };
             let app = State::new(backend);
+            let block_number = app.get_block_number();
 
             // Create block response
             let mut response = BlockExecutionResponse {
-                block_hash: Default::default(),
+                block_hash: block.digest,
                 change_epoch: false,
                 node_registry_delta: Vec::new(),
                 txn_receipts: Vec::with_capacity(block.transactions.len()),
+                block_number,
             };
 
             // Execute each transaction and add the results to the block response
-            for txn in &mut block.transactions {
-                let receipt = match app.verify_transaction(txn) {
+            for (index, txn) in &mut block.transactions.iter_mut().enumerate() {
+                let results = match app.verify_transaction(txn) {
                     Ok(_) => app.execute_transaction(txn.clone()),
                     Err(err) => TransactionResponse::Revert(err),
                 };
 
                 // If the transaction moved the epoch forward, aknowledge that in the block response
-                if let TransactionResponse::Success(ExecutionData::EpochChange) = receipt {
+                if let TransactionResponse::Success(ExecutionData::EpochChange) = results {
                     response.change_epoch = true;
                 }
+
+                let receipt = TransactionReceipt {
+                    block_hash: block.digest,
+                    block_number,
+                    transaction_index: index as u64,
+                    transaction_hash: txn.hash(),
+                    from: txn.sender(),
+                    response: results,
+                };
+
                 /* Todo(dalton): Check if the transaction resulted in the committee change(Like a current validator getting slashed)
                     if so aknowledge that in the block response
                 */

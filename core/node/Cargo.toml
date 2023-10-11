@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 lightning-application = { path = "../application" }
+lightning-archive = { path = "../archive" }
 lightning-blockstore = { path = "../blockstore" }
 lightning-blockstore-server = { path = "../blockstore-server" }
 lightning-broadcast = { path = "../broadcast" }

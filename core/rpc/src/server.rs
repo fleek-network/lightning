@@ -10,6 +10,7 @@ use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::{
     ApplicationInterface,
+    ArchiveSocket,
     FetcherInterface,
     FetcherSocket,
     MempoolSocket,
@@ -96,6 +97,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore: C::BlockStoreInterface,
         fetcher: &C::FetcherInterface,
+        _archive_socket: Option<ArchiveSocket>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             data: Arc::new(RpcData {

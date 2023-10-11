@@ -16,6 +16,7 @@ use lightning_interfaces::types::{Epoch, EpochInfo, UpdateMethod};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
+    IndexSocket,
     PubSub,
     SyncQueryRunnerInterface,
 };
@@ -355,6 +356,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         executor: ExecutionEngineSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
+        indexer_socket: Option<IndexSocket>,
     ) -> anyhow::Result<Self> {
         // Spawn the registry for narwhal
         let registry = Registry::new();
@@ -383,6 +385,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             new_block_notify.clone(),
             tx_narwhal_batches,
             query_runner.clone(),
+            indexer_socket,
         ));
         let epoch_state = EpochState::new(
             query_runner,

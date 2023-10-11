@@ -207,6 +207,7 @@ async fn get_fetchers(
             update_socket.clone(),
             query_runner,
             broadcast.get_pubsub(Topic::Consensus),
+            None,
         )
         .unwrap();
 

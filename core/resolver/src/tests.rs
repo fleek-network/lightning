@@ -117,6 +117,7 @@ async fn test_start_shutdown() {
         update_socket.clone(),
         query_runner,
         broadcast.get_pubsub(Topic::Consensus),
+        None,
     )
     .unwrap();
 

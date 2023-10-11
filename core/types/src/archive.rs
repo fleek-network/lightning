@@ -1,4 +1,4 @@
-use crate::{BlockExecutionResponse, TransactionRequest};
+use crate::{Block, BlockExecutionResponse};
 
 pub enum ArchiveRequest {
     GetBlock([u8; 32]),
@@ -10,7 +10,7 @@ pub enum ArchiveResponse {
     TransactionReceipt,
 }
 
-pub enum IndexRequest {
-    BlockReciept(BlockExecutionResponse),
-    Transactions(Vec<TransactionRequest>),
+pub struct IndexRequest {
+    pub block: Block,
+    pub receipt: BlockExecutionResponse,
 }

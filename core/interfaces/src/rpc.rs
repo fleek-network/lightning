@@ -6,6 +6,8 @@ use crate::consensus::MempoolSocket;
 use crate::infu_collection::Collection;
 use crate::{
     ApplicationInterface,
+    ArchiveInterface,
+    ArchiveSocket,
     BlockStoreInterface,
     ConfigProviderInterface,
     ConsensusInterface,
@@ -24,6 +26,7 @@ pub trait RpcInterface<C: Collection>:
         app: ::ApplicationInterface,
         blockstore: ::BlockStoreInterface,
         fetcher: ::FetcherInterface,
+        archive: ::ArchiveInterface,
     ) {
         Self::init(
             config.get::<Self>(),
@@ -31,6 +34,7 @@ pub trait RpcInterface<C: Collection>:
             app.sync_query(),
             blockstore.clone(),
             fetcher,
+            archive.archive_socket(),
         )
     }
 
@@ -41,5 +45,6 @@ pub trait RpcInterface<C: Collection>:
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore: C::BlockStoreInterface,
         fetcher: &C::FetcherInterface,
+        archive_socket: Option<ArchiveSocket>,
     ) -> anyhow::Result<Self>;
 }

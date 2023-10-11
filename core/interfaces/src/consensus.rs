@@ -11,7 +11,13 @@ use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
 use crate::signer::SignerInterface;
 use crate::types::TransactionRequest;
-use crate::{ApplicationInterface, BroadcastInterface, ConfigProviderInterface};
+use crate::{
+    ApplicationInterface,
+    ArchiveInterface,
+    BroadcastInterface,
+    ConfigProviderInterface,
+    IndexSocket,
+};
 
 /// A socket that gives services and other sub-systems the required functionality to
 /// submit messages/transactions to the consensus.
@@ -32,11 +38,19 @@ pub trait ConsensusInterface<C: Collection>:
         signer: ::SignerInterface,
         app: ::ApplicationInterface,
         broadcast: ::BroadcastInterface,
+        archive: ::ArchiveInterface,
     ) {
         let executor = app.transaction_executor();
         let sqr = app.sync_query();
         let pubsub = broadcast.get_pubsub(crate::types::Topic::Consensus);
-        Self::init(config.get::<Self>(), signer, executor, sqr, pubsub)
+        Self::init(
+            config.get::<Self>(),
+            signer,
+            executor,
+            sqr,
+            pubsub,
+            archive.index_socket(),
+        )
     }
 
     type Certificate: LightningMessage + Clone;
@@ -48,6 +62,7 @@ pub trait ConsensusInterface<C: Collection>:
         executor: ExecutionEngineSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
+        indexer_socket: Option<IndexSocket>,
     ) -> anyhow::Result<Self>;
 
     /// Returns a socket that can be used to submit transactions to the consensus,

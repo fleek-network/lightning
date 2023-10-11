@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::sync::Mutex;
 
 use affair::{Executor, TokioSpawn};
@@ -16,7 +17,7 @@ use crate::config::Config;
 use crate::indexer::IndexWorker;
 use crate::query::QueryWorker;
 
-pub struct Archive {
+pub struct Archive<C: Collection> {
     /// This socket can be given out to other proccess to query the data that has been archived.
     /// Will be None if this node is not currently in archive mode
     archive_socket: Mutex<Option<ArchiveSocket>>,
@@ -30,9 +31,10 @@ pub struct Archive {
     /// The worker that can be turned into a socket, kept on the struct so we can support the
     /// init/start flow and be restartable
     index_worker: Option<IndexWorker>,
+    collection: PhantomData<C>,
 }
 
-impl<C: Collection> ArchiveInterface<C> for Archive {
+impl<C: Collection> ArchiveInterface<C> for Archive<C> {
     fn init(
         config: Self::Config,
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
@@ -43,6 +45,7 @@ impl<C: Collection> ArchiveInterface<C> for Archive {
                 index_socket: Mutex::new(None),
                 archive_worker: Some(QueryWorker::new()),
                 index_worker: Some(IndexWorker::new()),
+                collection: PhantomData,
             })
         } else {
             Ok(Self {
@@ -50,6 +53,7 @@ impl<C: Collection> ArchiveInterface<C> for Archive {
                 index_socket: Mutex::new(None),
                 archive_worker: None,
                 index_worker: None,
+                collection: PhantomData,
             })
         }
     }
@@ -64,7 +68,7 @@ impl<C: Collection> ArchiveInterface<C> for Archive {
 }
 
 #[async_trait]
-impl WithStartAndShutdown for Archive {
+impl<C: Collection> WithStartAndShutdown for Archive<C> {
     fn is_running(&self) -> bool {
         self.archive_socket.lock().unwrap().is_some()
     }
@@ -90,7 +94,7 @@ impl WithStartAndShutdown for Archive {
     }
 }
 
-impl ConfigConsumer for Archive {
+impl<C: Collection> ConfigConsumer for Archive<C> {
     const KEY: &'static str = "archive";
 
     type Config = Config;

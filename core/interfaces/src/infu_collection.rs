@@ -14,6 +14,7 @@ collection!([
     SyncronizerInterface,
     BroadcastInterface,
     TopologyInterface,
+    ArchiveInterface,
     ConsensusInterface,
     HandshakeInterface,
     NotifierInterface,
@@ -78,6 +79,7 @@ impl<C: Collection> Node<C> {
         provider.get::<C::BlockStoreInterface>();
         provider.get::<C::BroadcastInterface>();
         provider.get::<C::TopologyInterface>();
+        provider.get::<C::ArchiveInterface>();
         provider.get::<C::ConsensusInterface>();
         provider.get::<C::HandshakeInterface>();
         provider.get::<C::OriginProviderInterface>();
@@ -101,6 +103,7 @@ forward!(async fn start_or_shutdown_node(this, start: bool) on [
     ReputationAggregatorInterface,
     BroadcastInterface,
     HandshakeInterface,
+    ArchiveInterface,
     ConsensusInterface,
     DhtInterface,
     ResolverInterface,

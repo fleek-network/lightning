@@ -94,6 +94,7 @@ async fn test_send_two_txs_in_a_row() {
         update_socket.clone(),
         query_runner.clone(),
         infusion::Blank::default(),
+        None,
     )
     .unwrap();
 
@@ -186,6 +187,7 @@ async fn test_retry_send() {
         update_socket.clone(),
         query_runner.clone(),
         infusion::Blank::default(),
+        None,
     )
     .unwrap();
 
@@ -233,6 +235,7 @@ async fn test_shutdown() {
         update_socket.clone(),
         query_runner.clone(),
         infusion::Blank::default(),
+        None,
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());
@@ -259,6 +262,7 @@ async fn test_shutdown_and_start_again() {
         update_socket.clone(),
         query_runner.clone(),
         infusion::Blank::default(),
+        None,
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());
@@ -291,6 +295,7 @@ async fn test_sign_raw_digest() {
         update_socket.clone(),
         query_runner.clone(),
         infusion::Blank::default(),
+        None,
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());

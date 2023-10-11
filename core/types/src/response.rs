@@ -1,3 +1,4 @@
+use fleek_crypto::TransactionSender;
 use serde::{Deserialize, Serialize};
 
 use super::{Epoch, NodeInfo};
@@ -17,6 +18,22 @@ pub struct EpochInfo {
 pub enum TransactionResponse {
     Success(ExecutionData),
     Revert(ExecutionError),
+}
+
+#[derive(Clone, Debug, Hash, Serialize, Deserialize)]
+pub struct TransactionReceipt {
+    /// The hash of the block where the given transaction was included.
+    pub block_hash: [u8; 32],
+    /// The number of the block where the given transaction was included.
+    pub block_number: u128,
+    /// The index of the transaction within the block.
+    pub transaction_index: u64,
+    /// Hash of the transaction
+    pub transaction_hash: [u8; 32],
+    /// The sender of the transaction
+    pub from: TransactionSender,
+    /// The results of the transaction
+    pub response: TransactionResponse,
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize)]

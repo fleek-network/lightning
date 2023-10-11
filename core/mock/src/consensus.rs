@@ -17,6 +17,7 @@ use lightning_interfaces::{
     ConfigConsumer,
     ConsensusInterface,
     ExecutionEngineSocket,
+    IndexSocket,
     MempoolSocket,
     SignerInterface,
     WithStartAndShutdown,
@@ -158,6 +159,7 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
         executor: ExecutionEngineSocket,
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
         _pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
+        _indexer_socket: Option<IndexSocket>,
     ) -> anyhow::Result<Self> {
         let (tx, rx) = mpsc::channel(128);
         let block_notifier = Arc::new(Notify::new());

@@ -10,7 +10,12 @@ use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::SignerInterface;
 use lightning_interfaces::types::{Block, TransactionRequest};
-use lightning_interfaces::{ApplicationInterface, BroadcastInterface, WithStartAndShutdown};
+use lightning_interfaces::{
+    ApplicationInterface,
+    BroadcastInterface,
+    IndexSocket,
+    WithStartAndShutdown,
+};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Notify};
@@ -45,6 +50,7 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
         executor: ExecutionEngineSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         _pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
+        _indexer_socket: Option<IndexSocket>,
     ) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
         let new_block_notify = Arc::new(Notify::new());

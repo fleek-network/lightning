@@ -1,6 +1,7 @@
 pub mod config;
 
 use lightning_application::app::Application;
+use lightning_archive::archive::Archive;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore_server::BlockStoreServer;
 use lightning_broadcast::Broadcast;
@@ -40,6 +41,7 @@ impl CollectionBase for FinalTypes {
     type SyncronizerInterface<C: Collection> = Syncronizer<C>;
     type BroadcastInterface<C: Collection> = Broadcast<C>;
     type TopologyInterface<C: Collection> = Topology<C>;
+    type ArchiveInterface<C: Collection> = Archive<C>;
     type ConsensusInterface<C: Collection> = Consensus<C>;
     type HandshakeInterface<C: Collection> = Handshake<C>;
     type NotifierInterface<C: Collection> = Notifier<C>;

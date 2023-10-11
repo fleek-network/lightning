@@ -3,9 +3,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use fastcrypto::hash::HashFunction;
 use fleek_blake3 as blake3;
-use lightning_interfaces::types::{Block, NodeIndex, TransactionRequest};
+use lightning_interfaces::types::{Block, IndexRequest, NodeIndex, TransactionRequest};
 use lightning_interfaces::{
     ExecutionEngineSocket,
+    IndexSocket,
     SyncQueryRunnerInterface,
     ToDigest,
     TranscriptBuilder,
@@ -66,6 +67,9 @@ pub struct Execution<Q: SyncQueryRunnerInterface> {
     /// Query runner to check application state, mainly used to make sure the last executed block
     /// is up to date from time we were an edge node
     query_runner: Q,
+    /// If this socket is present it means the node is in archive node and should send all blocks
+    /// and transactions it executes to the archiver to be indexed
+    index_socket: Option<IndexSocket>,
 }
 
 impl<Q: SyncQueryRunnerInterface> Execution<Q> {
@@ -75,6 +79,7 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
         new_block_notify: Arc<Notify>,
         tx_narwhal_batches: mpsc::Sender<(AuthenticStampedParcel, bool)>,
         query_runner: Q,
+        index_socket: Option<IndexSocket>,
     ) -> Self {
         Self {
             executor,
@@ -82,6 +87,7 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
             new_block_notify,
             tx_narwhal_batches,
             query_runner,
+            index_socket,
         }
     }
 
@@ -99,12 +105,32 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
             digest,
         };
 
+        let archive_block = if self.index_socket.is_some() {
+            Some(block.clone())
+        } else {
+            None
+        };
+
         // Unfailable
         let results = self.executor.run(block).await.unwrap();
         info!("Consensus submitted new block to application");
 
         if results.change_epoch {
             change_epoch = true;
+        }
+
+        // If we have the archive socket that means our node is in archive node and we should send
+        // the block and the reciept to be indexed
+        if let (Some(block), Some(socket)) = (archive_block, &self.index_socket) {
+            if let Err(e) = socket
+                .run(IndexRequest {
+                    block,
+                    receipt: results,
+                })
+                .await
+            {
+                error!("We could not send a message to the archiver: {e}");
+            }
         }
 
         self.new_block_notify.notify_waiters();
