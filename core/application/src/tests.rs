@@ -21,6 +21,7 @@ use lightning_interfaces::types::{
     DeliveryAcknowledgment,
     Epoch,
     ExecutionError,
+    HandshakePorts,
     NodePorts,
     ProofOfConsensus,
     ProtocolParams,
@@ -66,7 +67,7 @@ struct GenesisCommitteeKeystore {
 fn get_genesis_committee(num_members: usize) -> (Vec<GenesisNode>, Vec<GenesisCommitteeKeystore>) {
     let mut keystore = Vec::new();
     let mut committee = Vec::new();
-    (0..num_members).for_each(|i| {
+    (0..num_members as u16).for_each(|i| {
         let node_secret_key = NodeSecretKey::generate();
         let consensus_secret_key = ConsensusSecretKey::generate();
         let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -76,7 +77,7 @@ fn get_genesis_committee(num_members: usize) -> (Vec<GenesisNode>, Vec<GenesisCo
             node_secret_key,
             consensus_secret_key,
             owner_secret_key,
-            i as u32,
+            i,
         )
     });
     (committee, keystore)
@@ -88,7 +89,7 @@ fn add_to_committee(
     node_secret_key: NodeSecretKey,
     consensus_secret_key: ConsensusSecretKey,
     owner_secret_key: AccountOwnerSecretKey,
-    index: u32,
+    index: u16,
 ) {
     let node_public_key = node_secret_key.to_pk();
     let consensus_public_key = consensus_secret_key.to_pk();
@@ -101,14 +102,17 @@ fn add_to_committee(
         "127.0.0.1".parse().unwrap(),
         node_public_key,
         NodePorts {
-            primary: 8000 + index as u16,
-            worker: 9000 + index as u16,
-            mempool: 7000 + index as u16,
-            rpc: 6000 + index as u16,
-            pool: 5000 + index as u16,
-            dht: 4000 + index as u16,
-            handshake: 3000 + index as u16,
-            blockstore: 2000 + index as u16,
+            primary: 8000 + index,
+            worker: 9000 + index,
+            mempool: 7000 + index,
+            rpc: 6000 + index,
+            pool: 5000 + index,
+            dht: 4000 + index,
+            handshake: HandshakePorts {
+                http: 5000 + index,
+                webrtc: 6000 + index,
+                webtransport: 7000 + index,
+            },
         },
         None,
         true,

@@ -98,8 +98,8 @@ async fn get_pools(
                 rpc: 48300_u16,
                 pool: port_offset + i as u16,
                 dht: 48500_u16,
-                handshake: 48600_u16,
-                blockstore: 48700_u16,
+                // handshake is unused so the defaults are fine
+                handshake: Default::default(),
             },
             None,
             true,

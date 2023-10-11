@@ -26,7 +26,8 @@ use lightning_consensus::consensus::Consensus;
 use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
 use lightning_dht::dht::Dht;
 use lightning_handshake::handshake::{Handshake, HandshakeConfig};
-use lightning_handshake::WorkerMode;
+use lightning_handshake::transports::webrtc::WebRtcConfig;
+use lightning_handshake::{TransportConfig, WorkerMode};
 use lightning_interfaces::types::{Blake3Hash, NodePorts, Staking};
 use lightning_interfaces::{ConfigProviderInterface, DhtSocket};
 use lightning_node::config::TomlConfigProvider;
@@ -267,12 +268,17 @@ impl SwarmBuilder {
                 dht: port_assigner
                     .get_port(min_port, max_port, Transport::Udp)
                     .expect("Could not get port"),
-                handshake: port_assigner
-                    .get_port(min_port, max_port, Transport::Tcp)
-                    .expect("Could not get port"),
-                blockstore: port_assigner
-                    .get_port(min_port, max_port, Transport::Tcp)
-                    .expect("Could not get port"),
+                handshake: lightning_interfaces::types::HandshakePorts {
+                    http: port_assigner
+                        .get_port(min_port, max_port, Transport::Tcp)
+                        .expect("Could not get port"),
+                    webrtc: port_assigner
+                        .get_port(min_port, max_port, Transport::Udp)
+                        .expect("Could not get port"),
+                    webtransport: port_assigner
+                        .get_port(min_port, max_port, Transport::Udp)
+                        .expect("Could not get port"),
+                },
             };
             let config = build_config(&root, ports.clone(), bootstrappers.clone());
 
@@ -388,8 +394,10 @@ fn build_config(
     config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
         workers: vec![WorkerMode::AsyncWorker],
         // TODO: figure out how to have e2e testing for the different transports (browser oriented)
-        transports: vec![],
-        http_address: ([127, 0, 0, 1], ports.handshake).into(),
+        transports: vec![TransportConfig::WebRTC(WebRtcConfig {
+            udp_address: ([127, 0, 0, 1], ports.handshake.webrtc).into(),
+        })],
+        http_address: ([127, 0, 0, 1], ports.handshake.http).into(),
     });
 
     config.inject::<ServiceExecutor<FinalTypes>>(ServiceExecutorConfig {
