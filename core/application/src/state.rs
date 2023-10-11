@@ -429,7 +429,7 @@ impl<B: Backend> State<B> {
         _amount: HpUfixed<18>,
         _token: Tokens,
     ) -> TransactionResponse {
-        todo!()
+        TransactionResponse::Revert(ExecutionError::Unimplemented)
     }
 
     fn deposit(
@@ -1000,7 +1000,7 @@ impl<B: Backend> State<B> {
         _service: Service,
         _service_id: ServiceId,
     ) -> TransactionResponse {
-        todo!()
+        TransactionResponse::Revert(ExecutionError::Unimplemented)
     }
 
     fn remove_service(
@@ -1008,7 +1008,7 @@ impl<B: Backend> State<B> {
         _sender: TransactionSender,
         _service_id: ServiceId,
     ) -> TransactionResponse {
-        todo!()
+        TransactionResponse::Revert(ExecutionError::Unimplemented)
     }
 
     fn slash(
@@ -1018,7 +1018,7 @@ impl<B: Backend> State<B> {
         _service_id: ServiceId,
         _node: NodePublicKey,
     ) -> TransactionResponse {
-        todo!()
+        TransactionResponse::Revert(ExecutionError::Unimplemented)
     }
 
     // only for testnet

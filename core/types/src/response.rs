@@ -57,4 +57,5 @@ pub enum ExecutionError {
     EpochAlreadyChanged,
     EpochHasNotStarted,
     ConsensusKeyAlreadyIndexed,
+    Unimplemented,
 }
