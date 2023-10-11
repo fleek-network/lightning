@@ -311,17 +311,7 @@ impl<B: Backend> State<B> {
                     };
                     let consensus_key: ConsensusPublicKey = consensus_key_bytes.into();
                     let node_public_key: NodePublicKey = node_public_key.into();
-                    // TODO(matthias): allow senders to specify ports?
-                    let ports = NodePorts {
-                        primary: 18000,
-                        worker: 18101,
-                        mempool: 18102,
-                        rpc: 4069,
-                        pool: 4200,
-                        dht: 8101,
-                        handshake: 4210,
-                        blockstore: 4211,
-                    };
+
                     self.stake(
                         sender.into(),
                         amount.into(),
@@ -330,7 +320,8 @@ impl<B: Backend> State<B> {
                         Some(node_domain),
                         Some(node_public_key),
                         Some(node_domain),
-                        Some(ports),
+                        // TODO(matthias): allow senders to specify ports?
+                        Some(NodePorts::default()),
                     )
                 },
                 _ => TransactionResponse::Revert(ExecutionError::InvalidStateFunction),
