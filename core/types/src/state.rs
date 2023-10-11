@@ -2,6 +2,7 @@
 
 use std::net::IpAddr;
 
+use anyhow::anyhow;
 use fleek_crypto::{ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use ink_quill::TranscriptBuilderInput;
@@ -227,6 +228,18 @@ impl TranscriptBuilderInput for CommodityTypes {
             CommodityTypes::Bandwidth => b"Bandwidth".to_vec(),
             CommodityTypes::Compute => b"Compute".to_vec(),
             CommodityTypes::Gpu => b"Gpu".to_vec(),
+        }
+    }
+}
+
+impl TryFrom<String> for Tokens {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "flk" | "FLK" => Ok(Tokens::FLK),
+            "usdc" | "USDC" => Ok(Tokens::USDC),
+            _ => Err(anyhow!("Invalid token: {value}")),
         }
     }
 }

@@ -265,21 +265,30 @@ impl<B: Backend> State<B> {
             #[allow(unused)]
             match FleekContractCalls::decode(&txn.input) {
                 Ok(FleekContractCalls::Deposit(DepositCall { token, amount })) => {
-                    todo!()
+                    // TODO(matthias): add proof of consensus to abi once we know its format
+                    let Ok(token) = Tokens::try_from(token) else {
+                        return TransactionResponse::Revert(ExecutionError::InvalidToken);
+                    };
+                    self.deposit(sender.into(), ProofOfConsensus {}, amount.into(), token)
                 },
                 Ok(FleekContractCalls::Withdraw(WithdrawCall {
                     amount,
                     token,
                     recipient,
-                })) => todo!(),
+                })) => {
+                    let Ok(token) = Tokens::try_from(token) else {
+                        return TransactionResponse::Revert(ExecutionError::InvalidToken);
+                    };
+                    self.withdraw(sender.into(), recipient.0.into(), amount.into(), token)
+                },
                 Ok(FleekContractCalls::Unstake(UnstakeCall {
                     amount,
                     node_public_key,
-                })) => todo!(),
+                })) => self.unstake(sender.into(), amount.into(), node_public_key.into()),
                 Ok(FleekContractCalls::WithdrawUnstaked(WithdrawUnstakedCall {
                     node_public_key,
                     recipient,
-                })) => todo!(),
+                })) => self.withdrawl_unstaked(sender.into(), node_public_key.into(), None),
                 Ok(FleekContractCalls::Stake(StakeCall {
                     amount,
                     node_public_key,
@@ -288,7 +297,41 @@ impl<B: Backend> State<B> {
                     worker_public_key,
                     worker_domain,
                 })) => {
-                    todo!()
+                    let node_domain: IpAddr = domain.parse().unwrap();
+                    let Ok(node_domain) = domain.parse() else {
+                        return TransactionResponse::Revert(ExecutionError::InvalidInternetAddress);
+                    };
+                    let consensus_key_bytes: [u8; 96] = match consensus_key.to_vec().try_into() {
+                        Ok(bytes) => bytes,
+                        Err(_) => {
+                            return TransactionResponse::Revert(
+                                ExecutionError::InvalidConsensusKey,
+                            );
+                        },
+                    };
+                    let consensus_key: ConsensusPublicKey = consensus_key_bytes.into();
+                    let node_public_key: NodePublicKey = node_public_key.into();
+                    // TODO(matthias): allow senders to specify ports?
+                    let ports = NodePorts {
+                        primary: 18000,
+                        worker: 18101,
+                        mempool: 18102,
+                        rpc: 4069,
+                        pool: 4200,
+                        dht: 8101,
+                        handshake: 4210,
+                        blockstore: 4211,
+                    };
+                    self.stake(
+                        sender.into(),
+                        amount.into(),
+                        node_public_key,
+                        Some(consensus_key),
+                        Some(node_domain),
+                        Some(node_public_key),
+                        Some(node_domain),
+                        Some(ports),
+                    )
                 },
                 _ => TransactionResponse::Revert(ExecutionError::InvalidStateFunction),
             }

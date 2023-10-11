@@ -38,6 +38,8 @@ pub enum ExecutionError {
     InvalidInternetAddress,
     InsufficientNodeDetails,
     InvalidStateFunction,
+    InvalidConsensusKey,
+    InvalidToken,
     NoLockedTokens,
     TokensLocked,
     NotNodeOwner,
