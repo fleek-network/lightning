@@ -8,6 +8,7 @@ use lightning_application::config::Config as AppConfig;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     ArchiveRequest,
+    ArchiveResponse,
     Block,
     BlockExecutionResponse,
     ExecutionData,
@@ -158,6 +159,69 @@ async fn test_get_block_by_num_and_hash() {
         .unwrap();
 
     assert_eq!(block1, block2);
+
+    if path.exists() {
+        std::fs::remove_dir_all(path).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn test_get_tx() {
+    let (archive, _app, path) = init_archive("lightning-test-get-tx").await;
+    let index_socket = archive.index_socket().unwrap();
+    let archive_socket = archive.archive_socket().unwrap();
+    archive.start().await;
+
+    let index_req = get_index_request(1, [1; 32]);
+
+    let target_tx = index_req.block.transactions[0].clone();
+    let tx_receipt = index_req.receipt.txn_receipts[0].clone();
+
+    index_socket.run(index_req).await.unwrap().unwrap();
+
+    let tx = archive_socket
+        .run(ArchiveRequest::GetTransaction(tx_receipt.transaction_hash))
+        .await
+        .unwrap()
+        .unwrap();
+
+    match tx {
+        ArchiveResponse::Transaction(tx) => assert_eq!(tx, target_tx),
+        _ => panic!("Unexpected response"),
+    }
+
+    if path.exists() {
+        std::fs::remove_dir_all(path).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn test_get_tx_receipt() {
+    let (archive, _app, path) = init_archive("lightning-test-get-tx-receipt").await;
+    let index_socket = archive.index_socket().unwrap();
+    let archive_socket = archive.archive_socket().unwrap();
+    archive.start().await;
+
+    let index_req = get_index_request(1, [1; 32]);
+
+    let target_tx_receipt = index_req.receipt.txn_receipts[0].clone();
+
+    index_socket.run(index_req).await.unwrap().unwrap();
+
+    let tx_receipt = archive_socket
+        .run(ArchiveRequest::GetTransactionReceipt(
+            target_tx_receipt.transaction_hash,
+        ))
+        .await
+        .unwrap()
+        .unwrap();
+
+    match tx_receipt {
+        ArchiveResponse::TransactionReceipt(tx_receipt) => {
+            assert_eq!(tx_receipt, target_tx_receipt)
+        },
+        _ => panic!("Unexpected response"),
+    }
 
     if path.exists() {
         std::fs::remove_dir_all(path).unwrap();
