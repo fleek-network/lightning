@@ -74,12 +74,21 @@ impl TransactionStore {
 
         while let Some(parcel) = self.parcels.get(&last_digest) {
             parcel_chain.push(last_digest);
-            for batch in &parcel.transactions {
-                txn_chain.push_front(batch.clone());
-            }
+
+            txn_chain.push_front((parcel.transactions.clone(), last_digest));
+
+            // for batch in &parcel.transactions {
+            //     txn_chain.push_front(batch.clone());
+            // }
             if parcel.last_executed == head {
+                let mut epoch_changed = false;
+
                 // We connected the chain now execute all the transactions
-                let epoch_changed = execution.submit_batch(txn_chain.into(), digest).await;
+                for (batch, digest) in txn_chain {
+                    if execution.submit_batch(batch, digest).await {
+                        epoch_changed = true;
+                    }
+                }
 
                 // mark all parcels in chain as executed
                 for digest in parcel_chain {
