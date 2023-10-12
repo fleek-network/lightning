@@ -1,6 +1,6 @@
 //! The types used by the Application interface.
 
-use ethers::types::{Block as EthersBlock, H256, U256, U64};
+use ethers::types::{Block as EthersBlock, H256, U64};
 use fleek_crypto::NodePublicKey;
 use hp_fixed::unsigned::HpUfixed;
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,7 @@ use crate::TransactionReceipt;
 /// The response generated from executing an entire batch of transactions (aka a block).
 #[derive(Debug, Hash)]
 pub struct BlockExecutionResponse {
+    /// The number of the block
     pub block_number: u128,
     /// The new block hash
     pub block_hash: [u8; 32],
@@ -24,38 +25,51 @@ pub struct BlockExecutionResponse {
     pub txn_receipts: Vec<TransactionReceipt>,
 }
 
-impl From<BlockExecutionResponse> for EthersBlock<H256> {
-    fn from(value: BlockExecutionResponse) -> Self {
+pub struct BlockReceipt {
+    pub block_number: u128,
+    /// The new block hash
+    pub block_hash: [u8; 32],
+    /// The hash of the previous block
+    pub parent_hash: [u8; 32],
+    /// This *flag* is only set to `true` if performing a transaction in the block
+    /// has determined that we should move the epoch forward.
+    pub change_epoch: bool,
+    /// The changes to the node registry.
+    pub node_registry_delta: Vec<(NodePublicKey, NodeRegistryChange)>,
+    /// The hashes of the transactions included in the block
+    pub txn_hashes: Vec<[u8; 32]>,
+}
+
+impl BlockExecutionResponse {
+    /// Consumes self returning a block receipt  all of the txn_receipts
+    pub fn to_receipts(self) -> (BlockReceipt, Vec<TransactionReceipt>) {
+        let block_receipt = BlockReceipt {
+            block_number: self.block_number,
+            block_hash: self.block_hash,
+            parent_hash: self.parent_hash,
+            change_epoch: self.change_epoch,
+            node_registry_delta: self.node_registry_delta,
+            txn_hashes: self
+                .txn_receipts
+                .iter()
+                .map(|txn| txn.transaction_hash)
+                .collect(),
+        };
+
+        let txn_receipts = self.txn_receipts.clone();
+
+        (block_receipt, txn_receipts)
+    }
+}
+
+impl From<BlockReceipt> for EthersBlock<H256> {
+    fn from(value: BlockReceipt) -> Self {
         Self {
             hash: Some(value.block_hash.into()),
             parent_hash: value.parent_hash.into(),
-            uncles_hash: H256::zero(),
-            author: None,
-            state_root: H256::zero(),
-            transactions_root: H256::zero(),
-            receipts_root: H256::zero(),
             number: Some(U64::from(value.block_number as u64)),
-            gas_used: U256::zero(),
-            gas_limit: U256::zero(),
-            extra_data: Default::default(),
-            logs_bloom: None,
-            timestamp: U256::zero(),
-            difficulty: U256::zero(),
-            total_difficulty: None,
-            seal_fields: Default::default(),
-            uncles: Default::default(),
-            transactions: value
-                .txn_receipts
-                .iter()
-                .map(|txn| H256(txn.transaction_hash))
-                .collect(),
-            size: None,
-            mix_hash: None,
-            nonce: None,
-            base_fee_per_gas: None,
-            withdrawals_root: None,
-            withdrawals: None,
-            other: Default::default(),
+            transactions: value.txn_hashes.iter().map(|t| H256(*t)).collect(),
+            ..Default::default()
         }
     }
 }
