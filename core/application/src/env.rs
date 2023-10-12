@@ -132,10 +132,12 @@ impl Env<UpdatePerm> {
             };
             let app = State::new(backend);
             let block_number = app.get_block_number();
+            let last_block_hash = app.get_block_hash();
 
             // Create block response
             let mut response = BlockExecutionResponse {
                 block_hash: block.digest,
+                parent_hash: last_block_hash,
                 change_epoch: false,
                 node_registry_delta: Vec::new(),
                 txn_receipts: Vec::with_capacity(block.transactions.len()),

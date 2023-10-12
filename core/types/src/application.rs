@@ -12,6 +12,8 @@ pub struct BlockExecutionResponse {
     pub block_number: u128,
     /// The new block hash
     pub block_hash: [u8; 32],
+    /// The hash of the previous block
+    pub parent_hash: [u8; 32],
     /// This *flag* is only set to `true` if performing a transaction in the block
     /// has determined that we should move the epoch forward.
     pub change_epoch: bool,

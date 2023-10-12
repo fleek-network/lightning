@@ -1573,15 +1573,25 @@ impl<B: Backend> State<B> {
         {
             block_number
         } else {
+            // unreachable
             0
         }
     }
 
+    pub fn get_block_hash(&self) -> [u8; 32] {
+        if let Some(Value::Hash(hash)) = self.metadata.get(&Metadata::LastBlockHash) {
+            hash
+        } else {
+            // unreachable set at genesis
+            [0; 32]
+        }
+    }
+
     fn get_epoch(&self) -> u64 {
-        // Safe unwrap this value is set on genesis and never removed
-        if let Value::Epoch(epoch) = self.metadata.get(&Metadata::Epoch).unwrap() {
+        if let Some(Value::Epoch(epoch)) = self.metadata.get(&Metadata::Epoch) {
             epoch
         } else {
+            // unreachable set at genesis
             0
         }
     }
