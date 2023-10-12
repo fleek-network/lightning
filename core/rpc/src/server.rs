@@ -36,6 +36,8 @@ pub struct RpcData<C: Collection> {
     pub mempool_socket: MempoolSocket,
     pub fetcher_socket: FetcherSocket,
     pub blockstore: C::BlockStoreInterface,
+    /// If this is some it means the node is in archive mode
+    pub archive_socket: Option<ArchiveSocket>,
 }
 
 #[async_trait]
@@ -97,7 +99,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore: C::BlockStoreInterface,
         fetcher: &C::FetcherInterface,
-        _archive_socket: Option<ArchiveSocket>,
+        archive_socket: Option<ArchiveSocket>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             data: Arc::new(RpcData {
@@ -105,6 +107,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
                 fetcher_socket: fetcher.get_socket(),
                 blockstore,
                 query_runner,
+                archive_socket,
             }),
             config,
             is_running: Arc::new(AtomicBool::new(false)),

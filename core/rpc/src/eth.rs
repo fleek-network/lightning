@@ -8,6 +8,7 @@ use ethers::types::{
     Bytes,
     FeeHistory,
     Transaction,
+    TransactionReceipt as EthersTxnReceipt,
     TransactionRequest,
     H256,
     H256 as EthH256,
@@ -16,6 +17,7 @@ use ethers::utils::rlp;
 use fleek_crypto::EthAddress;
 use jsonrpc_v2::{Data, Error, Params};
 use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::types::{ArchiveRequest, ArchiveResponse};
 use lightning_interfaces::SyncQueryRunnerInterface;
 use ruint::aliases::{B256, B64, U256, U64};
 use tracing::trace;
@@ -87,6 +89,27 @@ pub async fn eth_block_number<C: Collection>(data: Data<Arc<RpcData<C>>>) -> Res
     Ok(U256::from(data.0.query_runner.get_block_number()))
 }
 
+/// Handler for: `eth_getTransactionReceipt`
+pub async fn eth_transaction_receipt<C: Collection>(
+    data: Data<Arc<RpcData<C>>>,
+    Params((hash,)): Params<(H256,)>,
+) -> Result<Option<EthersTxnReceipt>> {
+    trace!(target: "rpc::eth", ?hash, "Serving eth_getTransactionReceipt");
+
+    if let Some(socket) = &data.archive_socket {
+        match socket
+            .run(ArchiveRequest::GetTransactionReceipt(hash.0))
+            .await
+        {
+            Ok(ArchiveResponse::TransactionReceipt(txn)) => Ok(Some(txn.into())),
+            Ok(ArchiveResponse::None) => Ok(None),
+            _ => Err(Error::from("unimplemented")),
+        }
+    } else {
+        Err(Error::from("unimplemented"))
+    }
+}
+
 /// Handler for: `eth_chainId`
 pub async fn eth_chain_id<C: Collection>(data: Data<Arc<RpcData<C>>>) -> Result<Option<U64>> {
     trace!(target: "rpc::eth", "Serving eth_chainId");
@@ -122,11 +145,40 @@ pub async fn eth_get_code<C: Collection>(
 
 // /// Handler for: `eth_getBlockByNumber`
 pub async fn eth_block_by_number<C: Collection>(
+    data: Data<Arc<RpcData<C>>>,
     Params((number, full)): Params<(BlockNumber, bool)>,
 ) -> Result<Option<Block<EthH256>>> {
     trace!(target: "rpc::eth", ?number, ?full, "Serving
   eth_getBlockByNumber");
-    Ok(Some(Block::default()))
+    if let Some(socket) = &data.archive_socket {
+        match socket.run(ArchiveRequest::GetBlockByNumber(number)).await {
+            Ok(ArchiveResponse::Block(block)) => Ok(Some(block.into())),
+            Ok(ArchiveResponse::None) => Ok(None),
+            _ => Err(Error::from("Error querying block")),
+        }
+    } else {
+        Err(Error::from("unimplemented"))
+    }
+}
+
+/// Handler for: `eth_getBlockByHash`
+pub async fn eth_block_by_hash<C: Collection>(
+    data: Data<Arc<RpcData<C>>>,
+    Params((hash, full)): Params<(EthH256, bool)>,
+) -> Result<Option<Block<EthH256>>> {
+    trace!(target: "rpc::eth", ?hash, ?full, "Serving eth_getBlockByHash");
+    if let Some(socket) = &data.archive_socket {
+        match socket
+            .run(ArchiveRequest::GetBlockByHash(hash.into()))
+            .await
+        {
+            Ok(ArchiveResponse::Block(block)) => Ok(Some(block.into())),
+            Ok(ArchiveResponse::None) => Ok(None),
+            _ => Err(Error::from("Error querying block")),
+        }
+    } else {
+        Err(Error::from("unimplemented"))
+    }
 }
 
 /// Handler for: `eth_getBalance` will return FLK balance
@@ -256,12 +308,6 @@ pub async fn eth_sign_transaction<C: Collection>(
 //   eth_getBlockReceipts"); Ok(EthApi::block_receipts(self, number).await?)
 // }
 
-// /// Handler for: `eth_getTransactionReceipt`
-// async fn transaction_receipt<C: Collection>(hash: B256) -> Result<Option<TransactionReceipt>> {
-//     trace!(target: "rpc::eth", ?hash, "Serving eth_getTransactionReceipt");
-//     Ok(EthTransactions::transaction_receipt(self, hash).await?)
-// }
-
 // /// Handler for: `eth_getTransactionByHash`
 // async fn transaction_by_hash<C: Collection>(
 //     hash: B256,
@@ -289,12 +335,6 @@ pub async fn eth_sign_transaction<C: Collection>(
 // ) -> Result<Vec<EthCallResponse>> { trace!(target: "rpc::eth", ?bundle, ?state_context,
 //   ?state_override, "Serving eth_callMany"); Ok(EthApi::call_many(self, bundle, state_context,
 //   state_override).await?)
-// }
-
-// /// Handler for: `eth_getBlockByHash`
-// async fn block_by_hash<C: Collection>(hash: B256, full: bool) -> Result<Option<RichBlock>> {
-//     trace!(target: "rpc::eth", ?hash, ?full, "Serving eth_getBlockByHash");
-//     Ok(EthApi::rpc_block(self, hash, full).await?)
 // }
 
 // /// Handler for: `eth_createAccessList`

@@ -1,5 +1,6 @@
 //! The types used by the Application interface.
 
+use ethers::types::{Block as EthersBlock, H256, U256, U64};
 use fleek_crypto::NodePublicKey;
 use hp_fixed::unsigned::HpUfixed;
 use serde::{Deserialize, Serialize};
@@ -21,6 +22,42 @@ pub struct BlockExecutionResponse {
     pub node_registry_delta: Vec<(NodePublicKey, NodeRegistryChange)>,
     /// Receipts of all executed transactions
     pub txn_receipts: Vec<TransactionReceipt>,
+}
+
+impl From<BlockExecutionResponse> for EthersBlock<H256> {
+    fn from(value: BlockExecutionResponse) -> Self {
+        Self {
+            hash: Some(value.block_hash.into()),
+            parent_hash: value.parent_hash.into(),
+            uncles_hash: H256::zero(),
+            author: None,
+            state_root: H256::zero(),
+            transactions_root: H256::zero(),
+            receipts_root: H256::zero(),
+            number: Some(U64::from(value.block_number as u64)),
+            gas_used: U256::zero(),
+            gas_limit: U256::zero(),
+            extra_data: Default::default(),
+            logs_bloom: None,
+            timestamp: U256::zero(),
+            difficulty: U256::zero(),
+            total_difficulty: None,
+            seal_fields: Default::default(),
+            uncles: Default::default(),
+            transactions: value
+                .txn_receipts
+                .iter()
+                .map(|txn| H256(txn.transaction_hash))
+                .collect(),
+            size: None,
+            mix_hash: None,
+            nonce: None,
+            base_fee_per_gas: None,
+            withdrawals_root: None,
+            withdrawals: None,
+            other: Default::default(),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Hash, Eq)]

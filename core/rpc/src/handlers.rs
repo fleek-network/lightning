@@ -32,6 +32,7 @@ use crate::eth::{
     eth_accounts,
     eth_author,
     eth_balance,
+    eth_block_by_hash,
     eth_block_by_number,
     eth_block_number,
     eth_chain_id,
@@ -52,6 +53,7 @@ use crate::eth::{
     eth_submit_work,
     eth_syncing,
     eth_transaction_count,
+    eth_transaction_receipt,
     net_listening,
     net_peer_count,
     net_version,
@@ -148,6 +150,7 @@ impl RpcServer {
             .with_method("net_listening", net_listening::<C>)
             .with_method("eth_blockNumber", eth_block_number::<C>)
             .with_method("eth_getBlockByNumber", eth_block_by_number::<C>)
+            .with_method("eth_getBlockByHash", eth_block_by_hash::<C>)
             .with_method("eth_gasPrice", eth_gas_price::<C>)
             .with_method("eth_estimateGas", eth_estimate_gas::<C>)
             .with_method("eth_sendRawTransaction", eth_send_raw_transaction::<C>)
@@ -164,7 +167,8 @@ impl RpcServer {
             .with_method("eth_submitWork", eth_submit_work::<C>)
             .with_method("eth_sendTransaction", eth_send_transaction::<C>)
             .with_method("eth_sign", eth_sign::<C>)
-            .with_method("eth_signTransaction", eth_sign_transaction::<C>);
+            .with_method("eth_signTransaction", eth_sign_transaction::<C>)
+            .with_method("eth_getTransactionReceipt", eth_transaction_receipt::<C>);
 
         RpcServer(server.finish())
     }

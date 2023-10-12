@@ -4834,6 +4834,7 @@ dependencies = [
  "anyhow",
  "infusion",
  "lightning-application",
+ "lightning-archive",
  "lightning-blockstore",
  "lightning-blockstore-server",
  "lightning-broadcast",

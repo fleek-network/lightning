@@ -1,13 +1,17 @@
-use crate::{Block, BlockExecutionResponse};
+use ethers::types::BlockNumber;
+
+use crate::{Block, BlockExecutionResponse, TransactionReceipt};
 
 pub enum ArchiveRequest {
-    GetBlock([u8; 32]),
+    GetBlockByHash([u8; 32]),
+    GetBlockByNumber(BlockNumber),
     GetTransactionReceipt([u8; 32]),
 }
 
 pub enum ArchiveResponse {
-    Block,
-    TransactionReceipt,
+    Block(BlockExecutionResponse),
+    TransactionReceipt(TransactionReceipt),
+    None,
 }
 
 pub struct IndexRequest {

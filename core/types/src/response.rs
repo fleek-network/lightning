@@ -1,3 +1,4 @@
+use ethers::types::{TransactionReceipt as EthersTxnReceipt, U64};
 use fleek_crypto::TransactionSender;
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +21,16 @@ pub enum TransactionResponse {
     Revert(ExecutionError),
 }
 
+impl TransactionResponse {
+    pub fn is_success(&self) -> bool {
+        match self {
+            Self::Success(_) => true,
+            Self::Revert(_) => false,
+        }
+    }
+}
+
+// todo(dalton): Get something in here to indicate which function it called
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
 pub struct TransactionReceipt {
     /// The hash of the block where the given transaction was included.
@@ -34,6 +45,31 @@ pub struct TransactionReceipt {
     pub from: TransactionSender,
     /// The results of the transaction
     pub response: TransactionResponse,
+}
+
+impl From<TransactionReceipt> for EthersTxnReceipt {
+    fn from(value: TransactionReceipt) -> Self {
+        let sender = if let TransactionSender::AccountOwner(address) = value.from {
+            address.0.into()
+        } else {
+            [0u8; 20].into()
+        };
+        Self {
+            transaction_hash: value.transaction_hash.into(),
+            transaction_index: value.transaction_index.into(),
+            block_hash: Some(value.block_hash.into()),
+            block_number: Some((value.block_number as u64).into()),
+            from: sender,
+            // todo
+            to: None,
+            status: Some(if value.response.is_success() {
+                U64::one()
+            } else {
+                U64::zero()
+            }),
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize)]
