@@ -111,6 +111,7 @@ async fn main() -> Result<()> {
         .with_committee_size(args.committee_size as u64)
         .with_epoch_time(args.epoch_time)
         .with_epoch_start(epoch_start)
+        .with_archiver()
         .with_bootstrappers(vec![Bootstrapper {
             address: bootstrapper_address,
             network_public_key: bootstrap_secret_key.to_pk(),

@@ -17,6 +17,8 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
+use lightning_archive::archive::Archive;
+use lightning_archive::config::Config as ArchiveConfig;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::{BlockStoreServer, Config as BlockStoreServerConfig};
@@ -165,6 +167,7 @@ pub struct SwarmBuilder {
     epoch_time: Option<u64>,
     port_assigner: Option<PortAssigner>,
     bootstrappers: Option<Vec<Bootstrapper>>,
+    archiver: bool,
     use_persistence: bool,
     committee_size: Option<u64>,
 }
@@ -217,6 +220,11 @@ impl SwarmBuilder {
 
     pub fn with_max_port(mut self, port: u16) -> Self {
         self.max_port = Some(port);
+        self
+    }
+
+    pub fn with_archiver(mut self) -> Self {
+        self.archiver = true;
         self
     }
 
@@ -280,7 +288,7 @@ impl SwarmBuilder {
                         .expect("Could not get port"),
                 },
             };
-            let config = build_config(&root, ports.clone(), bootstrappers.clone());
+            let config = build_config(&root, ports.clone(), bootstrappers.clone(), self.archiver);
 
             // Generate and store the node public key.
             let (node_pk, consensus_pk) = generate_and_store_node_secret(&config);
@@ -343,6 +351,7 @@ fn build_config(
     root: &Path,
     ports: NodePorts,
     bootstrappers: Vec<Bootstrapper>,
+    archiver: bool,
 ) -> TomlConfigProvider<FinalTypes> {
     let config = TomlConfigProvider::<FinalTypes>::default();
 
@@ -417,6 +426,13 @@ fn build_config(
         epoch_change_delta: Duration::from_secs(5),
     });
 
+    config.inject::<Archive<FinalTypes>>(ArchiveConfig {
+        is_archive: archiver,
+        store_path: root
+            .join("data/archive")
+            .try_into()
+            .expect("Failed to resolve path"),
+    });
     config
 }
 
