@@ -71,7 +71,7 @@ impl<C: Collection> ArchiveInterface<C> for Archive<C> {
             db_options.create_if_missing(true);
             db_options.create_missing_column_families(true);
 
-            let cf = vec![BLKHASH_TO_BLKNUM, BLKNUM_TO_BLK, TXHASH_TO_TXRCT];
+            let cf = vec![BLKHASH_TO_BLKNUM, BLKNUM_TO_BLK, TXHASH_TO_TXRCT, MISC];
             let db = Arc::new(
                 DB::open_cf(&db_options, config.store_path, cf)
                     .expect("Failed to create archive db"),

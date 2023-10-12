@@ -31,7 +31,7 @@ impl TransactionResponse {
 }
 
 // todo(dalton): Get something in here to indicate which function it called
-#[derive(Clone, Debug, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Serialize, Deserialize, Eq, PartialEq)]
 pub struct TransactionReceipt {
     /// The hash of the block where the given transaction was included.
     pub block_hash: [u8; 32],

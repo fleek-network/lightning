@@ -22,3 +22,4 @@ rocksdb = "0.21"
 [dev-dependencies]
 lightning-application = { path="../application", features = ["test"] }
 infusion.workspace = true
+fleek-crypto.workspace = true

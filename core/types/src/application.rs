@@ -25,7 +25,7 @@ pub struct BlockExecutionResponse {
     pub txn_receipts: Vec<TransactionReceipt>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct BlockReceipt {
     pub block_number: u128,
     /// The new block hash
