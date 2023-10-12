@@ -56,7 +56,7 @@ impl BlockExecutionResponse {
                 .collect(),
         };
 
-        let txn_receipts = self.txn_receipts.clone();
+        let txn_receipts = self.txn_receipts;
 
         (block_receipt, txn_receipts)
     }
