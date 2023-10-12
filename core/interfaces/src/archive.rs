@@ -7,8 +7,8 @@ use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
 use crate::{ApplicationInterface, ConfigProviderInterface};
 
-pub type ArchiveSocket = Socket<ArchiveRequest, ArchiveResponse>;
-pub type IndexSocket = Socket<IndexRequest, ()>;
+pub type ArchiveSocket = Socket<ArchiveRequest, anyhow::Result<ArchiveResponse>>;
+pub type IndexSocket = Socket<IndexRequest, anyhow::Result<()>>;
 
 #[infusion::service]
 pub trait ArchiveInterface<C: Collection>:

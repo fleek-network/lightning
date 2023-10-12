@@ -3,9 +3,17 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use affair::{Socket, Task};
+use anyhow::{Context, Result};
 use async_trait::async_trait;
+use ethers::types::BlockNumber;
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::types::{ArchiveRequest, ArchiveResponse, IndexRequest};
+use lightning_interfaces::types::{
+    ArchiveRequest,
+    ArchiveResponse,
+    Block,
+    BlockReceipt,
+    IndexRequest,
+};
 use lightning_interfaces::{
     ApplicationInterface,
     ArchiveInterface,
@@ -16,16 +24,23 @@ use lightning_interfaces::{
 };
 use log::error;
 use rocksdb::{Options, DB};
+use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Notify};
 
 use crate::config::Config;
 
+type ArchiveTask = Task<ArchiveRequest, Result<ArchiveResponse>>;
+type IndexTask = Task<IndexRequest, Result<()>>;
+
+// Column families
 const BLKHASH_TO_BLKNUM: &str = "blkhash_to_blknum";
 const BLKNUM_TO_BLK: &str = "blknum_to_blk";
 const TXHASH_TO_TXRCT: &str = "txhash_to_txrct";
+const MISC: &str = "misc";
 
-type ArchiveTask = Task<ArchiveRequest, ArchiveResponse>;
-type IndexTask = Task<IndexRequest, ()>;
+// Special keys
+const LATEST: &str = "latest";
+const EARLIEST: &str = "earliest";
 
 pub struct Archive<C: Collection> {
     inner: Option<Arc<ArchiveInner<C>>>,
@@ -47,9 +62,6 @@ impl<C: Collection> ArchiveInterface<C> for Archive<C> {
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self> {
         if config.is_archive {
-            let db_path = config
-                .store_path
-                .expect("Must specify db path if archive service is enabled");
             let shutdown_notify = Arc::new(Notify::new());
             let (archive_socket, archive_rx) = Socket::raw_bounded(2048);
             let (index_socket, index_rx) = Socket::raw_bounded(2048);
@@ -60,7 +72,8 @@ impl<C: Collection> ArchiveInterface<C> for Archive<C> {
 
             let cf = vec![BLKHASH_TO_BLKNUM, BLKNUM_TO_BLK, TXHASH_TO_TXRCT];
             let db = Arc::new(
-                DB::open_cf(&db_options, db_path, cf).expect("Failed to create archive db"),
+                DB::open_cf(&db_options, config.store_path, cf)
+                    .expect("Failed to create archive db"),
             );
 
             let inner = ArchiveInner::<C>::new(archive_rx, index_rx, db, shutdown_notify.clone());
@@ -131,8 +144,8 @@ struct ArchiveInner<C: Collection> {
 
 impl<C: Collection> ArchiveInner<C> {
     fn new(
-        archive_rx: mpsc::Receiver<Task<ArchiveRequest, ArchiveResponse>>,
-        index_rx: mpsc::Receiver<Task<IndexRequest, ()>>,
+        archive_rx: mpsc::Receiver<Task<ArchiveRequest, Result<ArchiveResponse>>>,
+        index_rx: mpsc::Receiver<Task<IndexRequest, Result<()>>>,
         db: Arc<DB>,
         shutdown_notify: Arc<Notify>,
     ) -> Self {
@@ -154,11 +167,12 @@ impl<C: Collection> ArchiveInner<C> {
                     break;
                 }
                 Some(archive_task) = archive_rx.recv() => {
-                    self.archive_request(archive_task).await;
+                    let res = self.handle_archive_request(&archive_task.request).await;
+                    archive_task.respond(res);
                 }
                 Some(index_task) = index_rx.recv() => {
-                    self.index_request(index_task).await;
-
+                    let res = self.handle_index_request(index_task.request.clone()).await;
+                    index_task.respond(res);
                 }
             }
         }
@@ -166,9 +180,154 @@ impl<C: Collection> ArchiveInner<C> {
         *self.index_rx.lock().unwrap() = Some(index_rx);
     }
 
-    async fn archive_request(&self, archive_task: ArchiveTask) {}
+    async fn handle_archive_request(
+        &self,
+        archive_request: &ArchiveRequest,
+    ) -> Result<ArchiveResponse> {
+        match archive_request {
+            ArchiveRequest::GetBlockByHash(hash) => match self.get_block_by_hash(hash) {
+                Ok(Some(block)) => Ok(ArchiveResponse::Block(block.receipt)),
+                Ok(None) => Ok(ArchiveResponse::None),
+                Err(e) => Err(e),
+            },
+            ArchiveRequest::GetBlockByNumber(blk_num) => {
+                match self.get_block_by_block_number(blk_num) {
+                    Ok(Some(block)) => Ok(ArchiveResponse::Block(block.receipt)),
+                    Ok(None) => Ok(ArchiveResponse::None),
+                    Err(e) => Err(e),
+                }
+            },
+            ArchiveRequest::GetTransactionReceipt(_hash) => {
+                todo!()
+            },
+            ArchiveRequest::GetTransaction(_hash) => {
+                todo!()
+            },
+        }
+    }
 
-    async fn index_request(&self, index_task: IndexTask) {}
+    fn get_block_by_hash(&self, blk_hash: &[u8; 32]) -> Result<Option<BlockInfo>> {
+        let blkhash_cf = self
+            .db
+            .cf_handle(BLKHASH_TO_BLKNUM)
+            .context("Column family `blkhash_to_blknum` not found in db")?;
+        let Some(blk_num) = self.db.get_cf(&blkhash_cf, blk_hash)? else {
+            return Ok(None);
+        };
+        self.get_block_by_num(&blk_num)
+    }
+
+    fn get_block_by_block_number(&self, blk_num: &BlockNumber) -> Result<Option<BlockInfo>> {
+        let get_block_by_key = |key| {
+            let misc_cf = self
+                .db
+                .cf_handle(MISC)
+                .context("Column family `misc` not found in db")?;
+            let Some(blk_num) = self.db.get_cf(&misc_cf, key)? else {
+                return Ok(None);
+            };
+            self.get_block_by_num(&blk_num)
+        };
+        match blk_num {
+            BlockNumber::Latest | BlockNumber::Finalized | BlockNumber::Safe => {
+                //let misc_cf = self
+                //    .db
+                //    .cf_handle(MISC)
+                //    .context("Column family `misc` not found in db")?;
+                //let Some(blk_num) = self.db.get_cf(&misc_cf, LATEST)? else {
+                //    return Ok(None);
+                //};
+                //self.get_block_by_num(&blk_num)
+                get_block_by_key(LATEST)
+            },
+            BlockNumber::Earliest => {
+                //let misc_cf = self
+                //    .db
+                //    .cf_handle(MISC)
+                //    .context("Column family `misc` not found in db")?;
+                //let Some(blk_num) = self.db.get_cf(&misc_cf, EARLIEST)? else {
+                //    return Ok(None);
+                //};
+                //self.get_block_by_num(&blk_num)
+                get_block_by_key(EARLIEST)
+            },
+            BlockNumber::Number(num) => {
+                let mut blk_num = vec![0; 8];
+                num.to_little_endian(&mut blk_num);
+                self.get_block_by_num(&blk_num)
+            },
+            BlockNumber::Pending => Ok(None),
+        }
+    }
+
+    fn get_block_by_num(&self, blk_num: &[u8]) -> Result<Option<BlockInfo>> {
+        let blknum_cf = self
+            .db
+            .cf_handle(BLKNUM_TO_BLK)
+            .context("Column family `blknum_to_blk` not found in db")?;
+        let Some(blk_info_bytes) = self.db.get_cf(&blknum_cf, blk_num)? else {
+            return Ok(None);
+        };
+        let blk_info: BlockInfo = bincode::deserialize(&blk_info_bytes)?;
+        Ok(Some(blk_info))
+    }
+
+    async fn handle_index_request(&self, index_request: IndexRequest) -> Result<()> {
+        let (blk_receipt, txn_receipts) = index_request.receipt.to_receipts();
+        let blk_info = BlockInfo {
+            block: index_request.block,
+            receipt: blk_receipt,
+        };
+
+        // Store BlockNum => BlockInfo
+        let blknum_cf = self
+            .db
+            .cf_handle(BLKNUM_TO_BLK)
+            .context("Column family `blknum_to_blk` not found in db")?;
+        let blk_num = blk_info.receipt.block_number.to_le_bytes();
+        let blk_info_bytes = bincode::serialize(&blk_info)?;
+        self.db.put_cf(&blknum_cf, blk_num, blk_info_bytes)?;
+
+        // Store the latest block number
+        let misc_cf = self
+            .db
+            .cf_handle(MISC)
+            .context("Column family `misc` not found in db")?;
+        self.db.put_cf(&misc_cf, LATEST, blk_num)?;
+
+        // Store the first block, if we haven't already
+        if self.db.get_cf(&misc_cf, blk_num)?.is_none() {
+            // Once we prune old blocks from the archiver, we have to store the actual block info
+            // here.
+            self.db.put_cf(&misc_cf, EARLIEST, blk_num)?;
+        }
+
+        // Store BlockHash => BlockNum
+        let blkhash_cf = self
+            .db
+            .cf_handle(BLKHASH_TO_BLKNUM)
+            .context("Column family `blkhash_to_blknum` not found in db")?;
+        self.db
+            .put_cf(&blkhash_cf, blk_info.receipt.block_hash, blk_num)?;
+
+        // Store TxHash => TxReceipt for each tx in the block
+        let txhash_cf = self
+            .db
+            .cf_handle(TXHASH_TO_TXRCT)
+            .context("Column family `txhash_to_txrct` not found in db")?;
+        for txn_receipt in txn_receipts {
+            let txn_receipt_bytes = bincode::serialize(&txn_receipt)?;
+            self.db
+                .put_cf(&txhash_cf, txn_receipt.transaction_hash, txn_receipt_bytes)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct BlockInfo {
+    pub block: Block,
+    pub receipt: BlockReceipt,
 }
 
 impl<C: Collection> ConfigConsumer for Archive<C> {

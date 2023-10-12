@@ -22,7 +22,7 @@ async fn test_shutdown_and_start_again() {
     let archive = Archive::<TestBinding>::init(
         Config {
             is_archive: true,
-            store_path: Some(path.clone().try_into().unwrap()),
+            store_path: path.clone().try_into().unwrap(),
         },
         query_runner,
     )

@@ -101,8 +101,8 @@ pub async fn eth_transaction_receipt<C: Collection>(
             .run(ArchiveRequest::GetTransactionReceipt(hash.0))
             .await
         {
-            Ok(ArchiveResponse::TransactionReceipt(txn)) => Ok(Some(txn.into())),
-            Ok(ArchiveResponse::None) => Ok(None),
+            Ok(Ok(ArchiveResponse::TransactionReceipt(txn))) => Ok(Some(txn.into())),
+            Ok(Ok(ArchiveResponse::None)) => Ok(None),
             _ => Err(Error::from("unimplemented")),
         }
     } else {
@@ -152,8 +152,8 @@ pub async fn eth_block_by_number<C: Collection>(
   eth_getBlockByNumber");
     if let Some(socket) = &data.archive_socket {
         match socket.run(ArchiveRequest::GetBlockByNumber(number)).await {
-            Ok(ArchiveResponse::Block(block)) => Ok(Some(block.into())),
-            Ok(ArchiveResponse::None) => Ok(None),
+            Ok(Ok(ArchiveResponse::Block(block))) => Ok(Some(block.into())),
+            Ok(Ok(ArchiveResponse::None)) => Ok(None),
             _ => Err(Error::from("Error querying block")),
         }
     } else {
@@ -172,8 +172,8 @@ pub async fn eth_block_by_hash<C: Collection>(
             .run(ArchiveRequest::GetBlockByHash(hash.into()))
             .await
         {
-            Ok(ArchiveResponse::Block(block)) => Ok(Some(block.into())),
-            Ok(ArchiveResponse::None) => Ok(None),
+            Ok(Ok(ArchiveResponse::Block(block))) => Ok(Some(block.into())),
+            Ok(Ok(ArchiveResponse::None)) => Ok(None),
             _ => Err(Error::from("Error querying block")),
         }
     } else {

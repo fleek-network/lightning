@@ -35,7 +35,7 @@ const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";
 /// the block is the atomic view into the network, meaning that queries do not view
 /// the intermediary state within a block, but only have the view to the latest executed
 /// block.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Block {
     pub transactions: Vec<TransactionRequest>,
     // Digest of the narwhal certificate that included this

@@ -15,6 +15,7 @@ pub enum ArchiveResponse {
     None,
 }
 
+#[derive(Clone)]
 pub struct IndexRequest {
     pub block: Block,
     pub receipt: BlockExecutionResponse,

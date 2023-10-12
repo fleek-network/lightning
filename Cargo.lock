@@ -4471,6 +4471,8 @@ dependencies = [
  "affair 0.1.2",
  "anyhow",
  "async-trait",
+ "bincode",
+ "ethers",
  "infusion",
  "lightning-application",
  "lightning-interfaces",

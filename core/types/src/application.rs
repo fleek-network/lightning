@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::TransactionReceipt;
 
 /// The response generated from executing an entire batch of transactions (aka a block).
-#[derive(Debug, Hash)]
+#[derive(Debug, Hash, Clone)]
 pub struct BlockExecutionResponse {
     /// The number of the block
     pub block_number: u128,
@@ -25,6 +25,7 @@ pub struct BlockExecutionResponse {
     pub txn_receipts: Vec<TransactionReceipt>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct BlockReceipt {
     pub block_number: u128,
     /// The new block hash
@@ -74,7 +75,7 @@ impl From<BlockReceipt> for EthersBlock<H256> {
     }
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Hash, Eq)]
+#[derive(Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize, Clone)]
 pub enum NodeRegistryChange {
     New,
     Removed,
