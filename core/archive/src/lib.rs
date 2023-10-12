@@ -1,4 +1,4 @@
 pub mod archive;
 mod config;
-mod indexer;
-mod query;
+#[cfg(test)]
+mod tests;

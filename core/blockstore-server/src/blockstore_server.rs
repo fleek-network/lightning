@@ -112,7 +112,7 @@ impl<C: Collection> WithStartAndShutdown for BlockStoreServer<C> {
             });
             self.is_running.store(true, Ordering::Relaxed);
         } else {
-            error!("Can not start blockstore server because it already running");
+            error!("Can not start blockstore server because it is already running");
         }
     }
 

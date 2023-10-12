@@ -4471,9 +4471,14 @@ dependencies = [
  "affair 0.1.2",
  "anyhow",
  "async-trait",
+ "infusion",
+ "lightning-application",
  "lightning-interfaces",
+ "log",
  "resolved-pathbuf",
+ "rocksdb",
  "serde",
+ "tokio",
 ]
 
 [[package]]
