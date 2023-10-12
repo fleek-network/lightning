@@ -1,6 +1,6 @@
 use ethers::types::BlockNumber;
 
-use crate::{Block, BlockExecutionResponse, BlockReceipt, TransactionReceipt};
+use crate::{Block, BlockExecutionResponse, BlockReceipt, TransactionReceipt, TransactionRequest};
 
 pub enum ArchiveRequest {
     GetBlockByHash([u8; 32]),
@@ -12,6 +12,7 @@ pub enum ArchiveRequest {
 pub enum ArchiveResponse {
     Block(BlockReceipt),
     TransactionReceipt(TransactionReceipt),
+    Transaction(TransactionRequest),
     None,
 }
 

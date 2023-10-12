@@ -13,6 +13,7 @@ use lightning_interfaces::types::{
     Block,
     BlockReceipt,
     IndexRequest,
+    TransactionReceipt,
 };
 use lightning_interfaces::{
     ApplicationInterface,
@@ -197,11 +198,32 @@ impl<C: Collection> ArchiveInner<C> {
                     Err(e) => Err(e),
                 }
             },
-            ArchiveRequest::GetTransactionReceipt(_hash) => {
-                todo!()
+            ArchiveRequest::GetTransactionReceipt(tx_hash) => {
+                match self.get_transaction_receipt(tx_hash) {
+                    Ok(Some(recepit)) => Ok(ArchiveResponse::TransactionReceipt(recepit)),
+                    Ok(None) => Ok(ArchiveResponse::None),
+                    Err(e) => Err(e),
+                }
             },
-            ArchiveRequest::GetTransaction(_hash) => {
-                todo!()
+            ArchiveRequest::GetTransaction(tx_hash) => {
+                let receipt = match self.get_transaction_receipt(tx_hash) {
+                    Ok(Some(recepit)) => recepit,
+                    Ok(None) => return Ok(ArchiveResponse::None),
+                    Err(e) => return Err(e),
+                };
+                let blk_info = match self.get_block_by_hash(&receipt.block_hash) {
+                    Ok(Some(block)) => block,
+                    Ok(None) => return Ok(ArchiveResponse::None),
+                    Err(e) => return Err(e),
+                };
+                match blk_info
+                    .block
+                    .transactions
+                    .get(receipt.transaction_index as usize)
+                {
+                    Some(tx) => Ok(ArchiveResponse::Transaction(tx.clone())),
+                    None => Ok(ArchiveResponse::None),
+                }
             },
         }
     }
@@ -217,6 +239,7 @@ impl<C: Collection> ArchiveInner<C> {
         self.get_block_by_num(&blk_num)
     }
 
+    // Gets the block for the BlockNumber type from ethers
     fn get_block_by_block_number(&self, blk_num: &BlockNumber) -> Result<Option<BlockInfo>> {
         let get_block_by_key = |key| {
             let misc_cf = self
@@ -230,27 +253,9 @@ impl<C: Collection> ArchiveInner<C> {
         };
         match blk_num {
             BlockNumber::Latest | BlockNumber::Finalized | BlockNumber::Safe => {
-                //let misc_cf = self
-                //    .db
-                //    .cf_handle(MISC)
-                //    .context("Column family `misc` not found in db")?;
-                //let Some(blk_num) = self.db.get_cf(&misc_cf, LATEST)? else {
-                //    return Ok(None);
-                //};
-                //self.get_block_by_num(&blk_num)
                 get_block_by_key(LATEST)
             },
-            BlockNumber::Earliest => {
-                //let misc_cf = self
-                //    .db
-                //    .cf_handle(MISC)
-                //    .context("Column family `misc` not found in db")?;
-                //let Some(blk_num) = self.db.get_cf(&misc_cf, EARLIEST)? else {
-                //    return Ok(None);
-                //};
-                //self.get_block_by_num(&blk_num)
-                get_block_by_key(EARLIEST)
-            },
+            BlockNumber::Earliest => get_block_by_key(EARLIEST),
             BlockNumber::Number(num) => {
                 let mut blk_num = vec![0; 8];
                 num.to_little_endian(&mut blk_num);
@@ -260,6 +265,7 @@ impl<C: Collection> ArchiveInner<C> {
         }
     }
 
+    // Gets the block for an actual block number (integer)
     fn get_block_by_num(&self, blk_num: &[u8]) -> Result<Option<BlockInfo>> {
         let blknum_cf = self
             .db
@@ -270,6 +276,20 @@ impl<C: Collection> ArchiveInner<C> {
         };
         let blk_info: BlockInfo = bincode::deserialize(&blk_info_bytes)?;
         Ok(Some(blk_info))
+    }
+
+    fn get_transaction_receipt(&self, tx_hash: &[u8; 32]) -> Result<Option<TransactionReceipt>> {
+        let txhash_cf = self
+            .db
+            .cf_handle(TXHASH_TO_TXRCT)
+            .context("Column family `txhash_to_txrct` not found in db")?;
+        match self.db.get_cf(&txhash_cf, tx_hash)? {
+            Some(receipt_bytes) => {
+                let receipt = bincode::deserialize(&receipt_bytes)?;
+                Ok(Some(receipt))
+            },
+            None => Ok(None),
+        }
     }
 
     async fn handle_index_request(&self, index_request: IndexRequest) -> Result<()> {
@@ -284,7 +304,7 @@ impl<C: Collection> ArchiveInner<C> {
             .db
             .cf_handle(BLKNUM_TO_BLK)
             .context("Column family `blknum_to_blk` not found in db")?;
-        let blk_num = blk_info.receipt.block_number.to_le_bytes();
+        let blk_num = (blk_info.receipt.block_number as u64).to_le_bytes();
         let blk_info_bytes = bincode::serialize(&blk_info)?;
         self.db.put_cf(&blknum_cf, blk_num, blk_info_bytes)?;
 
