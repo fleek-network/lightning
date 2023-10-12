@@ -66,10 +66,11 @@ impl SecretKey for AccountOwnerSecretKey {
         .unwrap()
     }
 
-    fn sign(&self, digest: &[u8]) -> <Self::PublicKey as PublicKey>::Signature {
+    /// Sign a raw message, hashed with Keccak256.
+    fn sign(&self, msg: &[u8]) -> <Self::PublicKey as PublicKey>::Signature {
         let secret: Secp256k1PrivateKey = self.into();
         let pair: Secp256k1KeyPair = secret.into();
-        pair.sign_recoverable_with_hash::<Keccak256>(digest).into()
+        pair.sign_recoverable_with_hash::<Keccak256>(msg).into()
     }
 
     fn to_pk(&self) -> Self::PublicKey {

@@ -26,8 +26,8 @@ pub trait SecretKey: Sized + ZeroizeOnDrop {
     /// Encode pem data
     fn encode_pem(&self) -> String;
 
-    /// Sign a raw digest of a message.
-    fn sign(&self, digest: &[u8]) -> <Self::PublicKey as PublicKey>::Signature;
+    /// Sign a raw message, hashed according to the signature algorithm.
+    fn sign(&self, msg: &[u8]) -> <Self::PublicKey as PublicKey>::Signature;
 
     /// Returns the public key associated with this secret key.
     fn to_pk(&self) -> Self::PublicKey;

@@ -58,13 +58,15 @@ impl SecretKey for ConsensusSecretKey {
         pem::encode_string(BLS12_381_PEM_LABEL, LineEnding::LF, &self.0).unwrap()
     }
 
-    fn sign(&self, digest: &[u8]) -> <Self::PublicKey as PublicKey>::Signature {
+    /// Sign a raw message.
+    fn sign(&self, msg: &[u8]) -> <Self::PublicKey as PublicKey>::Signature {
         let secret: BLS12381PrivateKey = self.into();
-        secret.sign(digest).into()
+        secret.sign(msg).into()
     }
 
     fn to_pk(&self) -> Self::PublicKey {
-        let secret: BLS12381PrivateKey = self.into();
-        Into::<BLS12381PublicKey>::into(&secret).into()
+        let secret: &BLS12381PrivateKey = &self.into();
+        let pubkey: BLS12381PublicKey = secret.into();
+        pubkey.into()
     }
 }

@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use arrayref::array_ref;
 use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PrivateKey, Ed25519PublicKey};
-use fastcrypto::traits::{KeyPair, Signer, ToFromBytes};
+use fastcrypto::traits::{KeyPair, ToFromBytes};
 use rand::rngs::ThreadRng;
 use sec1::der::EncodePem;
 use sec1::pkcs8::{AlgorithmIdentifierRef, ObjectIdentifier, PrivateKeyInfo};
@@ -63,6 +63,7 @@ impl SecretKey for NodeSecretKey {
 
     fn encode_pem(&self) -> String {
         let algorithm = AlgorithmIdentifierRef {
+            // http://oid-info.com/get/1.3.101.112
             oid: ObjectIdentifier::from_str("1.3.101.112").unwrap(),
             parameters: None,
         };
@@ -75,10 +76,10 @@ impl SecretKey for NodeSecretKey {
         .unwrap()
     }
 
-    fn sign(&self, digest: &[u8]) -> <Self::PublicKey as PublicKey>::Signature {
+    /// Sign a raw message, hashed with Sha512.
+    fn sign(&self, msg: &[u8]) -> <Self::PublicKey as PublicKey>::Signature {
         let secret: Ed25519PrivateKey = self.into();
-        let pair: Ed25519KeyPair = secret.into();
-        pair.sign(digest).into()
+        secret.0.sign(msg).to_bytes().into()
     }
 
     fn to_pk(&self) -> Self::PublicKey {
