@@ -42,6 +42,11 @@ async fn init_archive(path: &str) -> (Archive<TestBinding>, Application<TestBind
     app.start().await;
 
     let path = std::env::temp_dir().join(path);
+
+    if path.exists() {
+        std::fs::remove_dir_all(&path).unwrap();
+    }
+
     let archive = Archive::<TestBinding>::init(
         Config {
             is_archive: true,
@@ -222,6 +227,86 @@ async fn test_get_tx_receipt() {
         },
         _ => panic!("Unexpected response"),
     }
+
+    if path.exists() {
+        std::fs::remove_dir_all(path).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn test_get_latest_earliest() {
+    let (archive, _app, path) = init_archive("lightning-test-get-latest-earliest").await;
+    let index_socket = archive.index_socket().unwrap();
+    let archive_socket = archive.archive_socket().unwrap();
+    archive.start().await;
+
+    let index_req1 = get_index_request(0, [0; 32]);
+    index_socket.run(index_req1.clone()).await.unwrap().unwrap();
+
+    let block = archive_socket
+        .run(ArchiveRequest::GetBlockByNumber(BlockNumber::Latest))
+        .await
+        .unwrap()
+        .unwrap();
+
+    match block {
+        ArchiveResponse::Block(block) => {
+            assert_eq!(block.block_hash, index_req1.receipt.block_hash);
+        },
+        _ => panic!("Unexpected response"),
+    }
+
+    let index_req2 = get_index_request(1, [1; 32]);
+    index_socket.run(index_req2.clone()).await.unwrap().unwrap();
+
+    let block = archive_socket
+        .run(ArchiveRequest::GetBlockByNumber(BlockNumber::Latest))
+        .await
+        .unwrap()
+        .unwrap();
+
+    match block {
+        ArchiveResponse::Block(block) => {
+            assert_eq!(block.block_hash, index_req2.receipt.block_hash);
+        },
+        _ => panic!("Unexpected response"),
+    }
+
+    let block = archive_socket
+        .run(ArchiveRequest::GetBlockByNumber(BlockNumber::Earliest))
+        .await
+        .unwrap()
+        .unwrap();
+
+    match block {
+        ArchiveResponse::Block(block) => {
+            assert_eq!(block.block_hash, index_req1.receipt.block_hash);
+        },
+        _ => panic!("Unexpected response"),
+    }
+
+    if path.exists() {
+        std::fs::remove_dir_all(path).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn test_get_pending() {
+    let (archive, _app, path) = init_archive("lightning-test-get-pending").await;
+    let index_socket = archive.index_socket().unwrap();
+    let archive_socket = archive.archive_socket().unwrap();
+    archive.start().await;
+
+    let index_req = get_index_request(0, [0; 32]);
+    index_socket.run(index_req.clone()).await.unwrap().unwrap();
+
+    let block = archive_socket
+        .run(ArchiveRequest::GetBlockByNumber(BlockNumber::Pending))
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(block, ArchiveResponse::None);
 
     if path.exists() {
         std::fs::remove_dir_all(path).unwrap();

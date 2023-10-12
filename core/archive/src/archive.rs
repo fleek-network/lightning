@@ -162,6 +162,7 @@ impl<C: Collection> ArchiveInner<C> {
     async fn start(&self) {
         let mut archive_rx = self.archive_rx.lock().unwrap().take().unwrap();
         let mut index_rx = self.index_rx.lock().unwrap().take().unwrap();
+
         loop {
             tokio::select! {
                 _ = self.shutdown_notify.notified() => {
@@ -308,19 +309,20 @@ impl<C: Collection> ArchiveInner<C> {
         let blk_info_bytes = bincode::serialize(&blk_info)?;
         self.db.put_cf(&blknum_cf, blk_num, blk_info_bytes)?;
 
-        // Store the latest block number
         let misc_cf = self
             .db
             .cf_handle(MISC)
             .context("Column family `misc` not found in db")?;
-        self.db.put_cf(&misc_cf, LATEST, blk_num)?;
 
         // Store the first block, if we haven't already
-        if self.db.get_cf(&misc_cf, blk_num)?.is_none() {
+        if self.db.get_cf(&misc_cf, EARLIEST)?.is_none() {
             // Once we prune old blocks from the archiver, we have to store the actual block info
             // here.
             self.db.put_cf(&misc_cf, EARLIEST, blk_num)?;
         }
+
+        // Store the latest block number
+        self.db.put_cf(&misc_cf, LATEST, blk_num)?;
 
         // Store BlockHash => BlockNum
         let blkhash_cf = self
