@@ -10451,8 +10451,9 @@ dependencies = [
 
 [[package]]
 name = "wtransport"
-version = "0.1.4"
-source = "git+https://github.com/kckeiks/wtransport.git?branch=lightning-wtransport#6d96f53e6bce6a92013bc5e3a45ce4e9df8d01fd"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c14e2f72e73898b8369710f9ab04b52671ecd5c234453594e5e25838a91bccc3"
 dependencies = [
  "bytes",
  "quinn",
@@ -10469,8 +10470,9 @@ dependencies = [
 
 [[package]]
 name = "wtransport-proto"
-version = "0.1.4"
-source = "git+https://github.com/kckeiks/wtransport.git?branch=lightning-wtransport#6d96f53e6bce6a92013bc5e3a45ce4e9df8d01fd"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79dd49f3326280fb4b7a09638d563d84ea7ad225eb5324e91a0db7169caa94a3"
 dependencies = [
  "ls-qpack",
  "octets",
