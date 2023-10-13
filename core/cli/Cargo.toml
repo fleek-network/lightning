@@ -24,25 +24,19 @@ lightning-rpc = { path = "../rpc" }
 lightning-service-executor = { path = "../service-executor" }
 lightning-topology = { path = "../topology" }
 lightning-types = { path = "../types" }
-mock = { path = "../mock" }
-tokio.workspace = true
 lightning-pool = { path = "../pool" }
-anyhow.workspace = true
-resolved-pathbuf.workspace = true
-tracing.workspace = true
-infusion.workspace = true
-serde.workspace = true
-lightning-node = { path = "../node" }
-clap = { version = "4.4.2", features = ["derive"] }
-fleek-crypto.workspace = true
 lightning-signer = { path = "../signer" }
-log4rs = { version = "1.2.0", features = [
-  "rolling_file_appender",
-  "compound_policy",
-  "size_trigger",
-  "fixed_window_roller",
-  "gzip",
-] }
+lightning-node = { path = "../node" }
+mock = { path = "../mock" }
+fleek-crypto.workspace = true
+resolved-pathbuf.workspace = true
+infusion.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+clap = { version = "4.4.2", features = ["derive"] }
+tracing.workspace = true
+tracing-subscriber = "0.3"
 console-subscriber = { version = "0.2.0" }
 
 [[bin]]
