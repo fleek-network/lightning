@@ -5,9 +5,9 @@ use crate::genesis::Genesis;
 
 #[derive(Serialize, Deserialize, Default)]
 pub enum Mode {
-    #[default]
     Dev,
     Test,
+    #[default]
     Prod,
 }
 
@@ -38,7 +38,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             genesis: None,
-            mode: Mode::Dev,
+            mode: Mode::Prod,
             testnet: true,
             storage: StorageConfig::RocksDb,
             db_path: Some(
