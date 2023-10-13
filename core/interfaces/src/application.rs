@@ -198,7 +198,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_chain_id(&self) -> u32;
 
     /// Returns the current block number
-    fn get_block_number(&self) -> u128;
+    fn get_block_number(&self) -> u64;
 }
 
 #[derive(Clone, Debug)]

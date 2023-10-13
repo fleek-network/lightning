@@ -132,6 +132,8 @@ impl Env<UpdatePerm> {
             };
             let app = State::new(backend);
             let last_block_hash = app.get_block_hash();
+            // increment the block_number
+            let block_number = app.increment_block_number();
 
             // Create block response
             let mut response = BlockExecutionResponse {
@@ -140,7 +142,7 @@ impl Env<UpdatePerm> {
                 change_epoch: false,
                 node_registry_delta: Vec::new(),
                 txn_receipts: Vec::with_capacity(block.transactions.len()),
-                block_number: 0,
+                block_number,
             };
 
             // Execute each transaction and add the results to the block response
@@ -157,7 +159,7 @@ impl Env<UpdatePerm> {
 
                 let receipt = TransactionReceipt {
                     block_hash: block.digest,
-                    block_number: 0,
+                    block_number,
                     transaction_index: index as u64,
                     transaction_hash: txn.hash(),
                     from: txn.sender(),
@@ -171,14 +173,6 @@ impl Env<UpdatePerm> {
             }
             // Set the last executed block hash
             app.set_last_block(block.digest);
-            // increment the block_number
-            let block_number = app.increment_block_number(response.change_epoch);
-
-            response.block_number = block_number;
-
-            for txn in response.txn_receipts.iter_mut() {
-                txn.block_number = block_number;
-            }
 
             // Return the response
             response

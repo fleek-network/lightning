@@ -475,7 +475,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
         )
     }
 
-    fn get_block_number(&self) -> u128 {
+    fn get_block_number(&self) -> u64 {
         self.inner.run(
             |ctx| match self.metadata_table.get(ctx).get(&Metadata::BlockNumber) {
                 Some(Value::BlockNumber(num)) => num,

@@ -37,7 +37,7 @@ pub struct TransactionReceipt {
     /// The hash of the block where the given transaction was included.
     pub block_hash: [u8; 32],
     /// The number of the block where the given transaction was included.
-    pub block_number: u128,
+    pub block_number: u64,
     /// The index of the transaction within the block.
     pub transaction_index: u64,
     /// Hash of the transaction
@@ -79,7 +79,7 @@ impl From<TransactionReceipt> for EthersTxnReceipt {
             transaction_hash: value.transaction_hash.into(),
             transaction_index: value.transaction_index.into(),
             block_hash: Some(value.block_hash.into()),
-            block_number: Some((value.block_number as u64).into()),
+            block_number: Some((value.block_number).into()),
             from: sender,
             to: Some(value.to.to_eth_address().0.into()),
             gas_used: Some(U256::zero()),

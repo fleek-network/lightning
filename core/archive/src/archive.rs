@@ -304,7 +304,7 @@ impl<C: Collection> ArchiveInner<C> {
             .db
             .cf_handle(BLKNUM_TO_BLK)
             .context("Column family `blknum_to_blk` not found in db")?;
-        let blk_num = (blk_info.receipt.block_number as u64).to_le_bytes();
+        let blk_num = blk_info.receipt.block_number.to_le_bytes();
         let blk_info_bytes: Vec<u8> = (&blk_info).try_into()?;
         self.db.put_cf(&blknum_cf, blk_num, blk_info_bytes)?;
 

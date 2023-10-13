@@ -81,7 +81,7 @@ pub enum Metadata {
 pub enum Value {
     ChainId(u32),
     Epoch(u64),
-    BlockNumber(u128),
+    BlockNumber(u64),
     String(String),
     HpUfixed(HpUfixed<18>),
     AccountPublicKey(EthAddress),

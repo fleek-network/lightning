@@ -1500,17 +1500,8 @@ impl<B: Backend> State<B> {
     }
 
     /// Increments block number after executing a block and returns the new number
-    pub fn increment_block_number(&self, is_new_epoch: bool) -> u128 {
-        // Safe unwrap seeded during state
-        let new_block_number = if is_new_epoch {
-            let epoch = self.get_epoch() as u128;
-
-            // Block numbers are epoch number followed by block number for that epoch
-            // We start every new epoch at epoch + 12 zeroes
-            epoch * 1_000_000_000_000
-        } else {
-            self.get_block_number() + 1
-        };
+    pub fn increment_block_number(&self) -> u64 {
+        let new_block_number = self.get_block_number() + 1;
 
         self.metadata
             .set(Metadata::BlockNumber, Value::BlockNumber(new_block_number));
@@ -1567,7 +1558,7 @@ impl<B: Backend> State<B> {
         }
     }
 
-    pub fn get_block_number(&self) -> u128 {
+    pub fn get_block_number(&self) -> u64 {
         // Safe unwrap this value is set on genesis and never removed
         if let Value::BlockNumber(block_number) = self.metadata.get(&Metadata::BlockNumber).unwrap()
         {
@@ -1587,7 +1578,7 @@ impl<B: Backend> State<B> {
         }
     }
 
-    fn get_epoch(&self) -> u64 {
+    fn _get_epoch(&self) -> u64 {
         if let Some(Value::Epoch(epoch)) = self.metadata.get(&Metadata::Epoch) {
             epoch
         } else {

@@ -81,7 +81,7 @@ async fn test_get_block_by_num_and_hash() {
 
     let block2 = archive_socket
         .run(ArchiveRequest::GetBlockByNumber(BlockNumber::Number(
-            U64::from(index_req.receipt.block_number as u64),
+            U64::from(index_req.receipt.block_number),
         )))
         .await
         .unwrap()

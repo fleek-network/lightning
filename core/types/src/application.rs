@@ -11,7 +11,7 @@ use crate::TransactionReceipt;
 #[derive(Debug, Hash, Clone)]
 pub struct BlockExecutionResponse {
     /// The number of the block
-    pub block_number: u128,
+    pub block_number: u64,
     /// The new block hash
     pub block_hash: [u8; 32],
     /// The hash of the previous block
@@ -27,7 +27,7 @@ pub struct BlockExecutionResponse {
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct BlockReceipt {
-    pub block_number: u128,
+    pub block_number: u64,
     /// The new block hash
     pub block_hash: [u8; 32],
     /// The hash of the previous block
@@ -68,7 +68,7 @@ impl From<BlockReceipt> for EthersBlock<H256> {
         Self {
             hash: Some(value.block_hash.into()),
             parent_hash: value.parent_hash.into(),
-            number: Some(U64::from(value.block_number as u64)),
+            number: Some(U64::from(value.block_number)),
             transactions: value.txn_hashes.iter().map(|t| H256(*t)).collect(),
             ..Default::default()
         }

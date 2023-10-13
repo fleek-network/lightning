@@ -57,7 +57,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
     for (i, tx) in update_txns.iter().enumerate() {
         txn_receipts.push(TransactionReceipt {
             block_hash: digest,
-            block_number: block_index as u128,
+            block_number: block_index as u64,
             transaction_index: i as u64,
             transaction_hash: tx.payload.to_digest(), // dummy hash
             from: tx.sender,
@@ -69,7 +69,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
     for (i, tx) in eth_txns.iter().enumerate() {
         txn_receipts.push(TransactionReceipt {
             block_hash: digest,
-            block_number: block_index as u128,
+            block_number: block_index as u64,
             transaction_index: i as u64,
             transaction_hash: tx.hash.0, // dummy hash
             from: TransactionSender::AccountOwner(EthAddress(tx.from.0)),
@@ -84,7 +84,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
         .map(|(i, tx)| {
             TransactionReceipt {
                 block_hash: digest,
-                block_number: block_index as u128,
+                block_number: block_index as u64,
                 transaction_index: i as u64,
                 transaction_hash: tx.payload.to_digest(), // dummy hash
                 from: tx.sender,
@@ -107,7 +107,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
     };
 
     let receipt = BlockExecutionResponse {
-        block_number: block_index as u128,
+        block_number: block_index as u64,
         block_hash: digest,
         parent_hash,
         change_epoch: false,
