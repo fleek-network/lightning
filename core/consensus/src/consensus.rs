@@ -21,7 +21,6 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
 };
 use lightning_schema::AutoImplSerde;
-use log::{error, info};
 use mysten_metrics::RegistryService;
 use mysten_network::Multiaddr;
 use narwhal_config::{Committee, CommitteeBuilder, WorkerCache, WorkerIndex, WorkerInfo};
@@ -33,6 +32,7 @@ use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Mutex, Notify};
 use tokio::{pin, select, task, time};
+use tracing::{error, info};
 use typed_store::DBMetrics;
 
 use crate::config::Config;

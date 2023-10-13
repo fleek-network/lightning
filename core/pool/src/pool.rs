@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
+use tracing::error;
 
 use crate::config::Config;
 use crate::endpoint::Endpoint;
@@ -118,7 +119,7 @@ where
                 let mut endpoint = endpoint.take().expect("There to be an Endpoint");
                 tokio::spawn(async move {
                     if let Err(e) = endpoint.start(shutdown).await {
-                        log::error!("unexpected endpoint failure: {e:?}");
+                        error!("unexpected endpoint failure: {e:?}");
                     }
                     endpoint
                 })

@@ -31,4 +31,4 @@ toml = "0.7"
 infusion.workspace = true
 anyhow.workspace = true
 resolved-pathbuf.workspace = true
-log.workspace = true
+tracing.workspace = true

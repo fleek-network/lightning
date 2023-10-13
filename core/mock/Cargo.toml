@@ -17,10 +17,9 @@ serde.workspace = true
 tokio.workspace = true
 scc.workspace = true
 hp-fixed.workspace = true
-
 axum.workspace = true
 serde_json.workspace = true
-log.workspace = true
+tracing.workspace = true
 rand_distr = "0.4.3"
 rand_chacha = "0.3"
 

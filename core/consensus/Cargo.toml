@@ -15,7 +15,7 @@ lightning-interfaces = { path = "../interfaces" }
 lightning-schema = { path = "../schema" }
 futures.workspace = true
 anyhow.workspace = true
-log.workspace = true
+tracing.workspace = true
 serde.workspace = true
 tokio.workspace = true
 

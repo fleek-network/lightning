@@ -12,7 +12,7 @@ crate-type = ["cdylib", "lib"]
 fn-sdk = { path = "../../lib/sdk" }
 lazy_static = "1.4"
 hex-literal = "0.4.1"
-log.workspace = true
+tracing.workspace = true
 arrayref = "0.3"
 tokio = { version = "1.32", features = ["sync"] }
 dashmap = "5.5"

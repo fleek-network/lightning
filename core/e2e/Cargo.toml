@@ -39,7 +39,7 @@ rand.workspace = true
 hp-fixed.workspace = true
 serial_test = "2.0.0"
 simplelog = "0.12.1"
-log.workspace = true
+tracing.workspace = true
 chrono = "0.4.26"
 fleek-blake3 = "1.5"
 

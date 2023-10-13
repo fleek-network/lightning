@@ -7,6 +7,7 @@ use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::{SinkExt, StreamExt};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use tracing::{error, info};
 use wtransport::endpoint::endpoint_side::Server;
 use wtransport::endpoint::IncomingSession;
 use wtransport::{Endpoint, RecvStream, SendStream};
@@ -41,7 +42,7 @@ pub async fn main_loop(ctx: Context) {
                 let accept_tx = ctx.accept_tx.clone();
                 tokio::spawn(async move  {
                     if let Err(e) = handle_incoming_session(incoming, accept_tx).await {
-                        log::error!("failed to handle incoming WebTransport session: {e:?}");
+                        error!("failed to handle incoming WebTransport session: {e:?}");
                     }
                 });
             }
@@ -56,17 +57,17 @@ pub async fn main_loop(ctx: Context) {
                                 *ctx.published_cert_hash.write().unwrap() = cert_hash;
                             }
                             Err(e) => {
-                                log::error!("failed to reload server configuration: {e:?}");
+                                error!("failed to reload server configuration: {e:?}");
                             }
                         }
                     },
                     Err(e) => {
-                        log::error!("failed to reload server configuration: {e:?}");
+                        error!("failed to reload server configuration: {e:?}");
                     }
                 }
             }
             _ = ctx.shutdown.wait_for_shutdown() => {
-                log::info!("shutting down WebTransport server");
+                info!("shutting down WebTransport server");
                 break;
             }
         }
@@ -97,10 +98,10 @@ pub async fn handle_incoming_session(
 
         match reader.next().await {
             None => {
-                log::error!("failed to get handshake request frame");
+                error!("failed to get handshake request frame");
             },
             Some(Err(e)) => {
-                log::error!("unexpected error: {e:?}");
+                error!("unexpected error: {e:?}");
             },
             Some(Ok(bytes)) => match HandshakeRequestFrame::decode(&bytes) {
                 Ok(frame) => {
@@ -111,12 +112,12 @@ pub async fn handle_incoming_session(
                             .await
                             .is_err()
                         {
-                            log::error!("failed to send new WebTransport bi-directional stream")
+                            error!("failed to send new WebTransport bi-directional stream")
                         }
                     });
                 },
                 Err(e) => {
-                    log::error!("failed to decode frame: {e:?}");
+                    error!("failed to decode frame: {e:?}");
                 },
             },
         }
@@ -126,7 +127,7 @@ pub async fn handle_incoming_session(
 pub async fn sender_loop(mut data_rx: Receiver<Vec<u8>>, mut network_tx: FramedStreamTx) {
     while let Some(data) = data_rx.recv().await {
         if let Err(e) = network_tx.send(Bytes::from(data)).await {
-            log::error!("failed to send data: {e:?}");
+            error!("failed to send data: {e:?}");
         }
     }
 }

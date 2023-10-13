@@ -3316,7 +3316,7 @@ dependencies = [
  "fn-sdk",
  "hex-literal",
  "lazy_static",
- "log",
+ "tracing",
 ]
 
 [[package]]
@@ -3329,8 +3329,8 @@ dependencies = [
  "fxhash",
  "hex-literal",
  "lazy_static",
- "log",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -4454,7 +4454,6 @@ dependencies = [
  "lightning-interfaces",
  "lightning-reputation",
  "lightning-test-utils",
- "log",
  "multiaddr",
  "num-traits",
  "rand 0.8.5",
@@ -4462,6 +4461,7 @@ dependencies = [
  "serde",
  "tokio",
  "toml 0.7.8",
+ "tracing",
 ]
 
 [[package]]
@@ -4477,11 +4477,11 @@ dependencies = [
  "infusion",
  "lightning-application",
  "lightning-interfaces",
- "log",
  "resolved-pathbuf",
  "rocksdb",
  "serde",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -4497,7 +4497,6 @@ dependencies = [
  "derive_more",
  "infusion",
  "lightning-interfaces",
- "log",
  "parking_lot",
  "rand 0.8.5",
  "resolved-pathbuf",
@@ -4505,6 +4504,7 @@ dependencies = [
  "tempdir",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -4526,11 +4526,11 @@ dependencies = [
  "lightning-rep-collector",
  "lightning-signer",
  "lightning-topology",
- "log",
  "serde",
  "thiserror",
  "tokio",
  "tokio-stream",
+ "tracing",
 ]
 
 [[package]]
@@ -4552,7 +4552,6 @@ dependencies = [
  "ink-quill",
  "lightning-interfaces",
  "lightning-metrics",
- "log",
  "mini-moka",
  "rand 0.8.5",
  "serde",
@@ -4592,7 +4591,6 @@ dependencies = [
  "lightning-signer",
  "lightning-topology",
  "lightning-types",
- "log",
  "log4rs",
  "mock",
  "resolved-pathbuf",
@@ -4619,7 +4617,6 @@ dependencies = [
  "fxhash",
  "lightning-interfaces",
  "lightning-schema",
- "log",
  "multiaddr",
  "mysten-metrics",
  "mysten-network",
@@ -4639,6 +4636,7 @@ dependencies = [
  "sui-protocol-config",
  "tokio",
  "tonic 0.8.3",
+ "tracing",
  "typed-store",
 ]
 
@@ -4700,7 +4698,6 @@ dependencies = [
  "lightning-signer",
  "lightning-syncronizer",
  "lightning-topology",
- "log",
  "mock",
  "rand 0.8.5",
  "reqwest",
@@ -4712,6 +4709,7 @@ dependencies = [
  "simplelog",
  "tokio",
  "toml 0.7.8",
+ "tracing",
 ]
 
 [[package]]
@@ -4739,11 +4737,11 @@ dependencies = [
  "lightning-signer",
  "lightning-test-utils",
  "lightning-topology",
- "log",
  "serde",
  "thiserror",
  "tokio",
  "tokio-stream",
+ "tracing",
 ]
 
 [[package]]
@@ -4776,7 +4774,6 @@ dependencies = [
  "lightning-service-executor",
  "lightning-signer",
  "lightning-test-utils",
- "log",
  "mock",
  "rand 0.8.5",
  "rcgen 0.11.3",
@@ -4790,6 +4787,7 @@ dependencies = [
  "tokio-util 0.7.9",
  "tower",
  "tower-http 0.4.4",
+ "tracing",
  "triomphe",
  "wtransport",
 ]
@@ -4811,12 +4809,12 @@ dependencies = [
  "ink-quill",
  "lightning-schema",
  "lightning-types",
- "log",
  "serde",
  "serde-big-array",
  "thiserror",
  "tokio",
  "tokio-stream",
+ "tracing",
  "zeroize",
 ]
 
@@ -4829,11 +4827,11 @@ dependencies = [
  "axum",
  "dashmap",
  "lightning-types",
- "log",
  "once_cell",
  "prometheus",
  "stdext",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -4862,10 +4860,10 @@ dependencies = [
  "lightning-signer",
  "lightning-syncronizer",
  "lightning-topology",
- "log",
  "mock",
  "resolved-pathbuf",
  "toml 0.7.8",
+ "tracing",
 ]
 
 [[package]]
@@ -4913,13 +4911,13 @@ dependencies = [
  "lightning-blockstore",
  "lightning-interfaces",
  "lightning-test-utils",
- "log",
  "multihash 0.19.1",
  "rustls 0.21.7",
  "serde",
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.9",
+ "tracing",
 ]
 
 [[package]]
@@ -4953,7 +4951,6 @@ dependencies = [
  "lightning-rep-collector",
  "lightning-signer",
  "lightning-topology",
- "log",
  "quinn",
  "rcgen 0.11.3",
  "ring 0.16.20",
@@ -4982,12 +4979,12 @@ dependencies = [
  "lightning-reputation",
  "lightning-signer",
  "lightning-test-utils",
- "log",
  "lru",
  "rand 0.8.5",
  "scc",
  "serde",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -5017,11 +5014,11 @@ dependencies = [
  "lightning-rep-collector",
  "lightning-signer",
  "lightning-test-utils",
- "log",
  "resolved-pathbuf",
  "rocksdb",
  "serde",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -5049,7 +5046,6 @@ dependencies = [
  "lightning-pool",
  "lightning-rep-collector",
  "lightning-signer",
- "log",
  "reqwest",
  "ruint",
  "serde",
@@ -5084,10 +5080,10 @@ dependencies = [
  "fn-sdk",
  "fxhash",
  "lightning-interfaces",
- "log",
  "resolved-pathbuf",
  "serde",
  "tokio",
+ "tracing",
  "triomphe",
 ]
 
@@ -5105,10 +5101,10 @@ dependencies = [
  "lightning-application",
  "lightning-interfaces",
  "lightning-test-utils",
- "log",
  "resolved-pathbuf",
  "serde",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -5118,12 +5114,12 @@ dependencies = [
  "anyhow",
  "async-trait",
  "lightning-interfaces",
- "log",
  "rand 0.8.5",
  "reqwest",
  "serde",
  "serde_json",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -5549,7 +5545,6 @@ dependencies = [
  "lightning-rep-collector",
  "lightning-schema",
  "lightning-signer",
- "log",
  "rand 0.8.5",
  "rand_chacha",
  "rand_distr",
@@ -5557,6 +5552,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

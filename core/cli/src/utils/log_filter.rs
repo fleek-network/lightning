@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use log::{LevelFilter, Record};
 use log4rs::filter::{Filter, Response};
+use tracing::log::{LevelFilter, Record};
 
 #[derive(Debug, Clone)]
 pub struct CustomLogFilter {

@@ -33,7 +33,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
-use log::warn;
+use tracing::{error, warn};
 
 use crate::config::{Config, Mode, StorageConfig};
 use crate::genesis::{Genesis, GenesisPrices};
@@ -372,7 +372,7 @@ impl Env<UpdatePerm> {
             }
 
             for account in genesis.account {
-                log::error!("{:?}", account);
+                error!("{:?}", account);
                 let info = AccountInfo {
                     flk_balance: account.flk_balance,
                     stables_balance: account.stables_balance.into(),

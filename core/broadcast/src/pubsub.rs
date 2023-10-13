@@ -5,6 +5,7 @@ use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{NodeIndex, Topic};
 use lightning_interfaces::{BroadcastEventInterface, PubSub};
 use tokio::sync::oneshot;
+use tracing::{debug, info};
 
 use crate::command::{Command, CommandSender, RecvCmd, SendCmd};
 use crate::Digest;
@@ -53,7 +54,7 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
     type Event = Event<T>;
 
     async fn send(&self, msg: &T) {
-        log::debug!("sending a message on topic {:?}", self.topic);
+        debug!("sending a message on topic {:?}", self.topic);
 
         let mut payload = Vec::with_capacity(512);
         msg.encode(&mut payload)
@@ -68,7 +69,7 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
     /// behavior of the broadcast. We may miss messages if there is a very long delay in between
     /// calls to recv.
     async fn recv(&mut self) -> Option<T> {
-        log::debug!("brodcast::recv called on topic {:?}", self.topic);
+        debug!("brodcast::recv called on topic {:?}", self.topic);
 
         if !self.is_alive {
             return None;
@@ -84,7 +85,7 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
 
             // Wait for the response. If we get an error just return `None`. We're never going to
             // get anything again.
-            log::debug!("awaiting for a message in topic {:?}", self.topic);
+            debug!("awaiting for a message in topic {:?}", self.topic);
 
             let Ok((id, msg)) = rx.await else {
                 self.is_alive = false;
@@ -98,7 +99,7 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
                 let _ = self.command_sender.send(Command::Propagate(msg.digest));
                 return Some(decoded);
             } else {
-                log::info!(
+                info!(
                     "received an invalid message which we couldnt not deserialize {:?}",
                     msg
                 );
@@ -107,7 +108,7 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
     }
 
     async fn recv_event(&mut self) -> Option<Self::Event> {
-        log::debug!("brodcast::recv_event called on topic {:?}", self.topic);
+        debug!("brodcast::recv_event called on topic {:?}", self.topic);
 
         if !self.is_alive {
             return None;
@@ -123,7 +124,7 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
 
             // Wait for the response. If we get an error just return `None`. We're never going to
             // get anything again.
-            log::debug!("awaiting for a message in topic {:?}", self.topic);
+            debug!("awaiting for a message in topic {:?}", self.topic);
 
             let Ok((id, msg)) = rx.await else {
                 self.is_alive = false;
@@ -142,7 +143,7 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
                 };
                 return Some(event);
             } else {
-                log::info!(
+                info!(
                     "received an invalid message which we couldnt not deserialize {:?}",
                     msg
                 );

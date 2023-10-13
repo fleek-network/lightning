@@ -17,8 +17,8 @@ use lightning_interfaces::{
     Weight,
     WithStartAndShutdown,
 };
-use log::{error, info};
 use tokio::sync::{mpsc, Notify};
+use tracing::{error, info};
 
 use crate::buffered_mpsc;
 use crate::config::Config;

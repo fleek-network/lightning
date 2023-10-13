@@ -1,10 +1,10 @@
 use dashmap::DashMap;
 use lightning_types::DEFAULT_HISTOGRAM_BUCKETS;
-use log::error;
 use once_cell::sync::Lazy;
 use prometheus::core::Collector;
 use prometheus::{register_histogram_vec, HistogramVec};
 pub use stdext::function_name;
+use tracing::error;
 
 use crate::labels::Labels;
 

@@ -20,7 +20,7 @@ lightning-reputation = { path = "../reputation" }
 num-traits.workspace = true
 rand.workspace = true
 fleek-blake3 = "1.5"
-log.workspace = true
+tracing.workspace = true
 
 
 # Our libraries

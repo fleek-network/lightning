@@ -10,7 +10,7 @@ use lightning_interfaces::{
     ExecutionEngineSocket,
     WithStartAndShutdown,
 };
-use log::{error, info};
+use tracing::{error, info};
 
 use crate::config::{Config, StorageConfig};
 use crate::env::{Env, UpdateWorker};

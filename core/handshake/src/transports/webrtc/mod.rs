@@ -6,10 +6,10 @@ use std::net::{IpAddr, SocketAddr};
 use async_trait::async_trait;
 use axum::Router;
 use dashmap::DashMap;
-use log::warn;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{channel, Receiver};
 use tokio::sync::Notify;
+use tracing::{info, warn};
 use triomphe::Arc;
 
 use self::driver::{ConnectionMap, WebRtcDriver};
@@ -56,7 +56,7 @@ impl Transport for WebRtcTransport {
         waiter: ShutdownWaiter,
         config: Self::Config,
     ) -> anyhow::Result<(Self, Option<Router>)> {
-        log::info!("Binding WebRTC transport on {}", config.udp_address);
+        info!("Binding WebRTC transport on {}", config.udp_address);
         let conns = Arc::new(DashMap::new());
 
         // Bind the driver to the udp socket

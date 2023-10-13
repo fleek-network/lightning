@@ -27,6 +27,7 @@ use lightning_interfaces::types::{
     TransactionRequest,
 };
 use lightning_interfaces::SyncQueryRunnerInterface;
+use tracing::error;
 
 use crate::eth::{
     eth_accounts,
@@ -68,7 +69,7 @@ pub async fn rpc_handler(
     Extension(rpc): Extension<RpcServer>,
     Json(req): Json<RequestObject>,
 ) -> Json<ResponseObjects> {
-    log::error!("Someone called: {}", req.method_ref());
+    error!("Someone called: {}", req.method_ref());
     let res = rpc.0.handle(req).await;
     Json(res)
 }

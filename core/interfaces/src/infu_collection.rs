@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 pub use infusion::c;
 use infusion::collection;
+use tracing::info;
 
 use super::*;
 
@@ -114,10 +115,10 @@ forward!(async fn start_or_shutdown_node(this, start: bool) on [
     RpcInterface,
 ] {
     if start {
-        log::info!("starting {}", get_name(&this));
+        info!("starting {}", get_name(&this));
         this.start().await;
     } else {
-        log::info!("shutting down {}", get_name(&this));
+        info!("shutting down {}", get_name(&this));
         this.shutdown().await;
     }
 });

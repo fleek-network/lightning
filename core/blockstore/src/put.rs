@@ -11,6 +11,7 @@ use lightning_interfaces::{
     PutWriteError,
 };
 use tokio::task::JoinSet;
+use tracing::error;
 
 use crate::blockstore::BLOCK_SIZE;
 use crate::config::{BLOCK_DIR, INTERNAL_DIR};
@@ -227,7 +228,7 @@ where
 
         while let Some(res) = self.write_tasks.join_next().await {
             if let Err(e) = res {
-                log::error!("write task failed: {e:?}");
+                error!("write task failed: {e:?}");
                 return Err(PutFinalizeError::WriteFailed);
             }
         }
@@ -242,7 +243,7 @@ where
             .insert(INTERNAL_DIR, hash, &encoded_tree, None)
             .await
             .map_err(|e| {
-                log::error!("failed to write tree to store: {e:?}");
+                error!("failed to write tree to store: {e:?}");
                 PutFinalizeError::WriteFailed
             })?;
 

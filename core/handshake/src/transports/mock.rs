@@ -3,10 +3,10 @@ use axum::routing::get;
 use axum::Router;
 use bytes::Bytes;
 use dashmap::DashMap;
-use log::error;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::OnceCell;
+use tracing::error;
 
 use super::{Transport, TransportReceiver, TransportSender};
 use crate::schema;

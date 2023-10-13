@@ -22,12 +22,12 @@ use lightning_interfaces::{
     SyncronizerInterface,
     WithStartAndShutdown,
 };
-use log::info;
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
+use tracing::info;
 
 use crate::config::Config;
 use crate::rpc::{rpc_epoch, rpc_last_epoch_hash, rpc_request};

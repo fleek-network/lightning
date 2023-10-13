@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::{BroadcastEventInterface, PubSub, SyncQueryRunnerInterface, ToDigest};
-use log::info;
 use tokio::pin;
 use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinHandle;
+use tracing::info;
 
 use super::transaction_store::TransactionStore;
 use crate::consensus::PubSubMsg;

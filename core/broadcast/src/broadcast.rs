@@ -15,6 +15,7 @@ use lightning_interfaces::{
 };
 use tokio::sync::{oneshot, Mutex};
 use tokio::task::JoinHandle;
+use tracing::debug;
 
 use crate::command::CommandSender;
 use crate::config::Config;
@@ -121,7 +122,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
     }
 
     fn get_pubsub<T: LightningMessage + Clone>(&self, topic: Topic) -> Self::PubSub<T> {
-        log::debug!("get_pubsub for topic {topic:?} was called.");
+        debug!("get_pubsub for topic {topic:?} was called.");
         PubSubI::new(topic, self.command_sender.clone())
     }
 }

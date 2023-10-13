@@ -22,7 +22,6 @@ use lightning_interfaces::{
     PutFinalizeError,
     PutWriteError,
 };
-use log::error;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use tempdir::TempDir;
@@ -30,6 +29,7 @@ use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::task::JoinSet;
+use tracing::{error, trace};
 
 use crate::config::{Config, BLOCK_DIR, INTERNAL_DIR, TMP_DIR};
 use crate::put::Putter;
@@ -120,7 +120,7 @@ where
             None => format!("{}", Hash::from(*key).to_hex()),
         };
         let path = self.root.to_path_buf().join(location).join(filename);
-        log::trace!("Fetch {path:?}");
+        trace!("Fetch {path:?}");
         fs::read(path).await.ok()
     }
 
@@ -145,7 +145,7 @@ where
 
             let store_path = self.root.to_path_buf().join(location).join(filename);
 
-            log::trace!("Inserting {store_path:?}");
+            trace!("Inserting {store_path:?}");
 
             fs::rename(tmp_file_path, store_path).await?;
         }

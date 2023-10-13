@@ -20,7 +20,7 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{ArchiveRequest, ArchiveResponse};
 use lightning_interfaces::SyncQueryRunnerInterface;
 use ruint::aliases::{B256, B64, U256, U64};
-use tracing::trace;
+use tracing::{error, trace};
 
 use crate::handlers::Result;
 use crate::server::RpcData;
@@ -82,7 +82,7 @@ pub async fn eth_accounts<C: Collection>() -> Result<Vec<EthAddress>> {
 /// Handler for: `eth_blockNumber`
 pub async fn eth_block_number<C: Collection>(data: Data<Arc<RpcData<C>>>) -> Result<U256> {
     trace!(target: "rpc::eth", "Serving eth_blockNumber");
-    log::error!(
+    error!(
         "the block number is {:?}",
         data.0.query_runner.get_block_number(),
     );

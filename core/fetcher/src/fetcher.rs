@@ -24,8 +24,8 @@ use lightning_interfaces::{
     ResolverInterface,
     WithStartAndShutdown,
 };
-use log::error;
 use tokio::sync::{mpsc, oneshot};
+use tracing::error;
 
 use crate::config::Config;
 use crate::origin::{OriginFetcher, OriginRequest};

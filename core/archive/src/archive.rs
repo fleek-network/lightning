@@ -23,10 +23,10 @@ use lightning_interfaces::{
     IndexSocket,
     WithStartAndShutdown,
 };
-use log::error;
 use rocksdb::{Options, DB};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Notify};
+use tracing::error;
 
 use crate::config::Config;
 

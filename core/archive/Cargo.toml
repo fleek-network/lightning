@@ -14,11 +14,10 @@ async-trait.workspace = true
 resolved-pathbuf.workspace = true
 serde.workspace = true
 tokio.workspace = true
-log.workspace = true
+tracing.workspace = true
 bincode.workspace = true
 ethers.workspace = true
 rocksdb = "0.21"
-
 
 [dev-dependencies]
 lightning-application = { path="../application", features = ["test"] }

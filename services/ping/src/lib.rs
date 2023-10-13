@@ -11,6 +11,7 @@ use fn_sdk::internal::{
 };
 use fxhash::FxBuildHasher;
 use lazy_static::lazy_static;
+use tracing::error;
 
 // --- SDK Setup
 
@@ -45,7 +46,7 @@ pub fn on_connected(args: OnConnectedArgs) {
 pub fn on_message(args: OnMessageArgs) {
     fn_sdk::api::spawn(async move {
         let Some(mut conn) = CONNECTIONS.get_mut(&args.connection_id) else {
-            log::error!("connection not found.");
+            error!("connection not found.");
             return;
         };
 

@@ -9,6 +9,7 @@ use dashmap::DashMap;
 use fleek_crypto::{ClientPublicKey, NodeSecretKey};
 use lightning_interfaces::{ConnectionWork, ExecutorProviderInterface, ServiceHandleInterface};
 use rand::{thread_rng, Rng};
+use tracing::error;
 use triomphe::Arc;
 
 use crate::gc::{Gc, GcSender};
@@ -295,7 +296,7 @@ impl<P: ExecutorProviderInterface> StateData<P> {
 
     fn handle_payload_frame(&self, _perm: TransportPermission, connection_id: u64, bytes: Bytes) {
         let Some(connection) = self.connections.get(&connection_id) else {
-            log::error!("payload for connection '{connection_id}' dropped.");
+            error!("payload for connection '{connection_id}' dropped.");
             return;
         };
 
@@ -310,7 +311,7 @@ impl<P: ExecutorProviderInterface> StateData<P> {
 
     fn handle_access_token_frame(&self, perm: TransportPermission, connection_id: u64, ttl: u64) {
         let Some(mut connection) = self.connections.get_mut(&connection_id) else {
-            log::error!("AccessToken frame for connection '{connection_id}' dropped.");
+            error!("AccessToken frame for connection '{connection_id}' dropped.");
             return;
         };
 
@@ -349,7 +350,7 @@ impl<P: ExecutorProviderInterface> StateData<P> {
         ttl: u64,
     ) {
         let Some(mut connection) = self.connections.get_mut(&connection_id) else {
-            log::error!("ExtendAccessToken frame for connection '{connection_id}' dropped.");
+            error!("ExtendAccessToken frame for connection '{connection_id}' dropped.");
             return;
         };
 
@@ -366,7 +367,7 @@ impl<P: ExecutorProviderInterface> StateData<P> {
     }
 
     fn handle_delivery_acknowledgment_frame(&self, _perm: TransportPermission, _cid: u64) {
-        log::error!("TODO: Delivery Acknowledgment");
+        error!("TODO: Delivery Acknowledgment");
     }
 
     /// Called by any of the transports connected to a trance

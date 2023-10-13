@@ -9,10 +9,9 @@ edition = "2021"
 lightning-interfaces = { path = "../interfaces" }
 anyhow.workspace = true
 async-trait.workspace = true
-log.workspace = true
+tracing.workspace = true
 serde.workspace = true
 tokio.workspace = true
-
 fleek-crypto.workspace = true
 affair.workspace = true
 resolved-pathbuf.workspace = true

@@ -10,7 +10,7 @@ autometrics = { workspace = true, features = ["prometheus"] }
 axum.workspace = true
 dashmap = "5.5.0"
 lightning-types = { path = "../types" }
-log.workspace = true
+tracing.workspace = true
 once_cell = "1.18.0"
 prometheus = "0.13.3"
 stdext = "0.3.1"

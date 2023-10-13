@@ -10,6 +10,7 @@ pub use config::WebTransportConfig;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::StreamExt;
 use tokio::sync::mpsc::{self, Receiver, Sender};
+use tracing::error;
 use wtransport::tls::Certificate;
 use wtransport::{Endpoint, ServerConfig};
 
@@ -90,7 +91,7 @@ macro_rules! webtransport_send {
         let bytes = $t2.encode();
         tokio::spawn(async move {
             if let Err(e) = tx.send(bytes.to_vec()).await {
-                log::error!("failed to send payload to connection loop: {e}");
+                error!("failed to send payload to connection loop: {e}");
             };
         });
     };
@@ -116,14 +117,14 @@ impl TransportReceiver for WebTransportReceiver {
         let data = match self.rx.next().await? {
             Ok(data) => data,
             Err(e) => {
-                log::error!("failed to get next frame: {e:?}");
+                error!("failed to get next frame: {e:?}");
                 return None;
             },
         };
         match RequestFrame::decode(&data) {
             Ok(data) => Some(data),
             Err(e) => {
-                log::error!("failed to decode request frame: {e:?}");
+                error!("failed to decode request frame: {e:?}");
                 None
             },
         }

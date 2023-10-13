@@ -3,9 +3,9 @@ use std::collections::{HashMap, VecDeque};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, OriginProvider};
 use lightning_interfaces::{OriginProviderSocket, ResolverInterface};
-use log::error;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinSet;
+use tracing::error;
 
 use crate::fetcher::Uri;
 

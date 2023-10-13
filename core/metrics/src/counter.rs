@@ -1,8 +1,8 @@
 use dashmap::DashMap;
-use log::error;
 use once_cell::sync::Lazy;
 use prometheus::core::Collector;
 use prometheus::{register_int_counter_vec, IntCounterVec};
+use tracing::error;
 
 use crate::labels::Labels;
 

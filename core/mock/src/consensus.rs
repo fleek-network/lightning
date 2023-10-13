@@ -22,12 +22,12 @@ use lightning_interfaces::{
     SignerInterface,
     WithStartAndShutdown,
 };
-use log::{debug, info};
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use rand_distr::{Binomial, Cauchy, Distribution};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Notify};
+use tracing::{debug, info};
 
 /// A mock consensus that listens to an HTTP endpoint and accepts transactions using its `/tx`
 /// post endpoint. Transactions can be sent as JSON values.

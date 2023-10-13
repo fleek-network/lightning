@@ -1,13 +1,15 @@
 mod config;
 pub mod utils;
+
+#[cfg(test)]
+pub mod tests;
+
 use std::collections::VecDeque;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
-#[cfg(test)]
-pub mod tests;
 
 use affair::{Socket, Task};
 use anyhow::anyhow;

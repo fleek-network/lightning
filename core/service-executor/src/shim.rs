@@ -15,6 +15,7 @@ use lightning_interfaces::{
 };
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 use triomphe::Arc;
 
 use crate::callback::make_callback;
@@ -97,7 +98,7 @@ impl<C: Collection> WithStartAndShutdown for ServiceExecutor<C> {
         for handle in get_all_services() {
             let id = handle.get_service_id();
             if self.config.services.contains(&id) {
-                log::info!("Enabling service {id}");
+                info!("Enabling service {id}");
                 self.collection.insert(handle);
             }
         }

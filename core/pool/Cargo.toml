@@ -15,13 +15,11 @@ hp-fixed.workspace = true
 fleek-crypto.workspace = true
 futures.workspace = true
 lightning-interfaces = {path="../interfaces"}
-log.workspace = true
+tracing.workspace = true
 serde.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
 tokio-util = { workspace = true, features = ["codec"] }
-
-
 affair = "0.1.2"
 der = { version = "0.7", features = ["alloc", "derive"] }
 fleek-blake3 = "1.5"
@@ -30,7 +28,6 @@ rustls = { version = "0.21", default-features = false, features = ["dangerous_co
 rcgen = "0.11.1"
 quinn = "0.10"
 thiserror = "1.0"
-tracing = "0.1"
 webpki = { version = "0.22", features = ["std"] }
 x509-parser = "0.15.1"
 

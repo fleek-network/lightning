@@ -28,6 +28,7 @@ use lightning_interfaces::{
 use lightning_metrics::{histogram, increment_counter};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
+use tracing::{debug, error, info, trace};
 
 use crate::command::{Command, CommandReceiver, CommandSender, SharedMessage};
 use crate::db::Database;
@@ -115,9 +116,9 @@ impl<C: Collection> Context<C> {
     pub fn spawn(self) -> (oneshot::Sender<()>, JoinHandle<Self>) {
         let (shutdown_tx, shutdown) = oneshot::channel();
         let handle = tokio::spawn(async move {
-            log::info!("spawning broadcast event loop");
+            info!("spawning broadcast event loop");
             let tmp = main_loop(shutdown, self).await;
-            log::info!("broadcast shut down sucessfully");
+            info!("broadcast shut down sucessfully");
             tmp
         });
         (shutdown_tx, handle)
@@ -138,7 +139,7 @@ impl<C: Collection> Context<C> {
             return;
         };
 
-        log::debug!("recivied frame '{frame:?}' from {sender}");
+        debug!("recivied frame '{frame:?}' from {sender}");
 
         match frame {
             Frame::Advr(advr) => {
@@ -158,7 +159,7 @@ impl<C: Collection> Context<C> {
 
         // If we have already propagated a message we really don't care about it anymore.
         if self.db.is_propagated(&digest) {
-            log::trace!("skipping {digest:?}");
+            trace!("skipping {digest:?}");
             return;
         }
 
@@ -195,13 +196,13 @@ impl<C: Collection> Context<C> {
     }
 
     fn handle_want(&mut self, sender: NodeIndex, req: Want) {
-        log::trace!("got want from {sender} for {}", req.interned_id);
+        trace!("got want from {sender} for {}", req.interned_id);
         let id = req.interned_id;
         let Some(digest) = self.interner.get(id) else {
-            log::trace!("invalid interned id {id}");
+            trace!("invalid interned id {id}");
             return; };
         let Some(message) = self.db.get_message(digest) else {
-            log::trace!("failed to find message");
+            trace!("failed to find message");
             return; };
         self.send(sender, Frame::Message(message));
     }
@@ -277,7 +278,7 @@ impl<C: Collection> Context<C> {
     /// Handle a command sent from the mainland. Can be the broadcast object or
     /// a pubsub object.
     fn handle_command(&mut self, command: Command) {
-        log::debug!("handling broadcast command {command:?}");
+        debug!("handling broadcast command {command:?}");
 
         match command {
             Command::Recv(cmd) => {
@@ -335,7 +336,7 @@ impl<C: Collection> Context<C> {
                 )
             },
             Command::MarkInvalidSender(_digest) => {
-                log::error!("Received message from invalid sender");
+                error!("Received message from invalid sender");
                 // TODO(qti3e): There is more to do here.
             },
         }
@@ -351,7 +352,7 @@ impl<C: Collection> Context<C> {
         .encode(&mut message)
         .is_err()
         {
-            log::error!("failed to encode advertisement");
+            error!("failed to encode advertisement");
             return;
         };
 
@@ -370,7 +371,7 @@ impl<C: Collection> Context<C> {
     fn send(&self, destination: NodeIndex, frame: Frame) {
         let mut message = Vec::new();
         if frame.encode(&mut message).is_err() {
-            log::error!("failed to encode outgoing message.");
+            error!("failed to encode outgoing message.");
             return;
         };
 
@@ -395,7 +396,7 @@ async fn main_loop<C: Collection>(
     mut shutdown: tokio::sync::oneshot::Receiver<()>,
     mut ctx: Context<C>,
 ) -> Context<C> {
-    log::info!("Starting broadcast for {}", ctx.pk);
+    info!("Starting broadcast for {}", ctx.pk);
 
     // During initialization the application state might have not had loaded, and at
     // that point we might not have inserted the node index of the currently running
@@ -408,7 +409,7 @@ async fn main_loop<C: Collection>(
     }
 
     loop {
-        log::debug!("waiting for next event.");
+        debug!("waiting for next event.");
 
         tokio::select! {
             // We kind of care about the priority of these events. Or do we?
@@ -417,13 +418,13 @@ async fn main_loop<C: Collection>(
 
             // Prioritize the shutdown signal over everything.
             _ = &mut shutdown => {
-                log::info!("exiting event loop");
+                info!("exiting event loop");
                 break;
             },
 
             // A command has been sent from the mainland. Process it.
             Some(command) = ctx.command_rx.recv() => {
-                log::trace!("received command in event loop");
+                trace!("received command in event loop");
                 ctx.handle_command(command);
             },
             Some((sender, payload)) = ctx.event_handler.receive() => {

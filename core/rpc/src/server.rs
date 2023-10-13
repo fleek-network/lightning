@@ -16,9 +16,9 @@ use lightning_interfaces::{
     MempoolSocket,
     RpcInterface,
 };
-use log::info;
 use tokio::sync::Notify;
 use tokio::task;
+use tracing::info;
 
 use super::config::Config;
 use crate::handlers::{get_metrics, rpc_handler, RpcServer};

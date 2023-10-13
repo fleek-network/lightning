@@ -17,9 +17,9 @@ use lightning_interfaces::{
     ToDigest,
     WithStartAndShutdown,
 };
-use log::{error, warn};
 use rocksdb::{Options, DB};
 use tokio::sync::{Notify, OnceCell};
+use tracing::{error, warn};
 
 use crate::config::Config;
 use crate::origin_finder::OriginFinder;

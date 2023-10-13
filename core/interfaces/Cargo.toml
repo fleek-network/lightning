@@ -16,7 +16,7 @@ tokio-stream.workspace = true
 bytes.workspace = true
 thiserror.workspace = true
 zeroize.workspace = true
-log.workspace = true
+tracing.workspace = true
 
 # Our libraries
 lightning-schema = { path = "../schema/" }

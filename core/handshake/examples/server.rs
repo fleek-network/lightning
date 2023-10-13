@@ -17,6 +17,7 @@ use lightning_node::config::TomlConfigProvider;
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 use mock::syncronizer::MockSyncronizer;
+use tracing::info;
 
 partial!(ExampleBinding {
     ConfigProviderInterface = TomlConfigProvider<Self>;
@@ -32,10 +33,10 @@ forward!(async fn start_or_shutdown_node(this, start: bool) on [
     ServiceExecutorInterface,
 ] {
     if start {
-        log::info!("starting {}", get_name(&this));
+        info!("starting {}", get_name(&this));
         this.start().await;
     } else {
-        log::info!("shutting down {}", get_name(&this));
+        info!("shutting down {}", get_name(&this));
         this.shutdown().await;
     }
 });

@@ -3,12 +3,12 @@ use arrayref::array_ref;
 use async_trait::async_trait;
 use axum::Router;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
+use tracing::{info, warn};
 use triomphe::Arc;
 
 use super::{Transport, TransportReceiver, TransportSender};

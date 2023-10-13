@@ -11,12 +11,12 @@ use lightning_interfaces::{
     ToDigest,
     TranscriptBuilder,
 };
-use log::{error, info};
 use narwhal_crypto::DefaultHashFunction;
 use narwhal_executor::ExecutionState;
 use narwhal_types::{BatchAPI, BatchDigest, ConsensusOutput, Transaction};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Notify};
+use tracing::{error, info};
 
 pub type Digest = [u8; 32];
 

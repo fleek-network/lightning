@@ -3,7 +3,6 @@ use std::fs::File;
 use std::str::FromStr;
 
 use chrono::Local;
-use log::LevelFilter;
 use simplelog::{
     ColorChoice,
     CombinedLogger,
@@ -14,6 +13,7 @@ use simplelog::{
     ThreadPadding,
     WriteLogger,
 };
+use tracing::log::LevelFilter;
 
 pub fn setup() {
     let log_filter = match env::var("RUST_LOG") {

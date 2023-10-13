@@ -4,7 +4,6 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::{FinalTypes, WithMockConsensus};
 use lightning_signer::Signer;
-use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
 use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
@@ -15,6 +14,8 @@ use log4rs::config::{Appender, Config, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use log4rs::filter::threshold::ThresholdFilter;
 use resolved_pathbuf::ResolvedPathBuf;
+use tracing::info;
+use tracing::log::LevelFilter;
 
 use crate::args::{Args, Command};
 use crate::commands::run::CustomStartShutdown;
@@ -42,7 +43,7 @@ impl Cli {
         let config_path = self.resolve_config_path()?;
         match self.args.with_mock_consensus {
             true => {
-                log::info!("Using MockConsensus");
+                info!("Using MockConsensus");
                 self.run::<WithMockConsensus>(config_path, None).await
             },
             false => self.run::<FinalTypes>(config_path, None).await,

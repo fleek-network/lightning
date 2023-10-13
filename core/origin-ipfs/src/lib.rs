@@ -19,10 +19,10 @@ use lightning_interfaces::{
     OriginProviderSocket,
     WithStartAndShutdown,
 };
-use log::{error, info};
 use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, Notify};
 use tokio::time::timeout;
+use tracing::{error, info};
 pub mod config;
 pub use config::Config;
 use config::Gateway;

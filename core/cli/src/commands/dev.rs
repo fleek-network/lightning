@@ -8,6 +8,7 @@ use lightning_interfaces::types::CompressionAlgorithm;
 use lightning_interfaces::{BlockStoreInterface, ConfigProviderInterface, IncrementalPutInterface};
 use lightning_node::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
+use tracing::error;
 
 use crate::args::DevSubCmd;
 
@@ -71,7 +72,7 @@ async fn store<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
 
     'outer: for path in &input {
         let Ok(mut file) = File::open(path) else {
-            log::error!("Could not open the file {path:?}");
+            error!("Could not open the file {path:?}");
             continue;
         };
 
@@ -79,7 +80,7 @@ async fn store<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
 
         loop {
             let Ok(size) = file.read(&mut block) else {
-                log::error!("read error");
+                error!("read error");
                 break 'outer;
             };
 
@@ -97,7 +98,7 @@ async fn store<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
                 println!("{:x}\t{path:?}", ByteBuf(&hash));
             },
             Err(e) => {
-                log::error!("Failed: {e}");
+                error!("Failed: {e}");
             },
         }
     }

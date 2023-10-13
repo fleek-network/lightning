@@ -3,13 +3,13 @@ use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
 use dashmap::DashMap;
-use log::{error, trace, warn};
 use str0m::channel::{ChannelData, ChannelId};
 use str0m::net::{Receive, Transmit};
 use str0m::{Event, IceConnectionState, Input, Output, Rtc};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::Notify;
+use tracing::{error, trace, warn};
 use triomphe::Arc;
 
 use crate::schema::{HandshakeRequestFrame, RequestFrame};

@@ -7,6 +7,7 @@ use fn_sdk::internal::{
 };
 use hex_literal::hex;
 use lazy_static::lazy_static;
+use tracing::error;
 
 // --- SDK Setup
 
@@ -25,7 +26,7 @@ static HASH: [u8; 32] = hex!("1065b2fd8291ee2d37b490fa47791b1fc99043e0b3243456f2
 lazy_static! {
     static ref CONTENT_HANDLE: Option<fn_sdk::blockstore::ContentHandle> = {
         let Ok(handle) = fn_sdk::blockstore::ContentHandle::load_sync(&HASH) else {
-            log::error!("How could we? To not have Big Buck Bunny is a crime.");
+            error!("How could we? To not have Big Buck Bunny is a crime.");
             return None;
         };
 

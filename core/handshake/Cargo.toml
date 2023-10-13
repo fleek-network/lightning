@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
 fn-sdk = { path = "../../lib/sdk" }
-log.workspace = true
+tracing.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 infusion.workspace = true

@@ -38,12 +38,12 @@ use lightning_interfaces::{
     ServiceScope,
     WithStartAndShutdown,
 };
-use log::error;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, Notify};
 use tokio::task::JoinSet;
 use tokio::time::timeout;
 use tokio_stream::StreamExt;
+use tracing::error;
 
 use crate::config::Config;
 
