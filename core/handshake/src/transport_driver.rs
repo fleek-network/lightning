@@ -11,8 +11,9 @@ use crate::transports::{self, Transport, TransportReceiver};
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum TransportConfig {
-    WebRTC(transports::webrtc::WebRtcConfig),
     Mock(transports::mock::MockTransportConfig),
+    Tcp(transports::tcp::TcpConfig),
+    WebRTC(transports::webrtc::WebRtcConfig),
     WebTransport(transports::webtransport::WebTransportConfig),
 }
 
@@ -21,17 +22,23 @@ pub async fn attach_transport_by_config<P: ExecutorProviderInterface>(
     config: TransportConfig,
 ) -> anyhow::Result<(JoinHandle<()>, Option<Router>)> {
     match config {
+        TransportConfig::Mock(config) => {
+            let (transport, router) =
+                transports::mock::MockTransport::bind(state.shutdown.clone(), config).await?;
+            Ok((attach_transport_to_state(state, transport), router))
+        },
+        TransportConfig::Tcp(config) => {
+            let (transport, router) =
+                transports::tcp::TcpTransport::bind(state.shutdown.clone(), config).await?;
+            Ok((attach_transport_to_state(state, transport), router))
+        },
         TransportConfig::WebRTC(config) => {
             let (transport, router) =
                 transports::webrtc::WebRtcTransport::bind(state.shutdown.clone(), config).await?;
 
             Ok((attach_transport_to_state(state, transport), router))
         },
-        TransportConfig::Mock(config) => {
-            let (transport, router) =
-                transports::mock::MockTransport::bind(state.shutdown.clone(), config).await?;
-            Ok((attach_transport_to_state(state, transport), router))
-        },
+
         TransportConfig::WebTransport(config) => {
             let (transport, router) =
                 transports::webtransport::WebTransport::bind(state.shutdown.clone(), config)
