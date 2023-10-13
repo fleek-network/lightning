@@ -24,7 +24,6 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use rocksdb::{Options, DB};
-use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Notify};
 use tracing::error;
 
@@ -275,7 +274,7 @@ impl<C: Collection> ArchiveInner<C> {
         let Some(blk_info_bytes) = self.db.get_cf(&blknum_cf, blk_num)? else {
             return Ok(None);
         };
-        let blk_info: BlockInfo = bincode::deserialize(&blk_info_bytes)?;
+        let blk_info: BlockInfo = blk_info_bytes.try_into()?;
         Ok(Some(blk_info))
     }
 
@@ -306,7 +305,7 @@ impl<C: Collection> ArchiveInner<C> {
             .cf_handle(BLKNUM_TO_BLK)
             .context("Column family `blknum_to_blk` not found in db")?;
         let blk_num = (blk_info.receipt.block_number as u64).to_le_bytes();
-        let blk_info_bytes = bincode::serialize(&blk_info)?;
+        let blk_info_bytes: Vec<u8> = (&blk_info).try_into()?;
         self.db.put_cf(&blknum_cf, blk_num, blk_info_bytes)?;
 
         let misc_cf = self
@@ -346,10 +345,49 @@ impl<C: Collection> ArchiveInner<C> {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct BlockInfo {
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) struct BlockInfo {
     pub block: Block,
     pub receipt: BlockReceipt,
+}
+
+impl TryFrom<&BlockInfo> for Vec<u8> {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &BlockInfo) -> std::result::Result<Self, Self::Error> {
+        let mut bytes = Vec::new();
+        let block_bytes: Vec<u8> = (&value.block).try_into()?;
+        let block_len = block_bytes.len() as u64;
+        bytes.extend_from_slice(&block_len.to_le_bytes());
+        bytes.extend_from_slice(&block_bytes);
+        let receipt_bytes = bincode::serialize(&value.receipt)?;
+        let receipt_len = receipt_bytes.len() as u64;
+        bytes.extend_from_slice(&receipt_len.to_le_bytes());
+        bytes.extend_from_slice(&receipt_bytes);
+        Ok(bytes)
+    }
+}
+
+impl TryFrom<Vec<u8>> for BlockInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Vec<u8>) -> std::result::Result<Self, Self::Error> {
+        let block_len_bytes: [u8; 8] = value.get(0..8).context("Out of bounds")?.try_into()?;
+        let block_len = u64::from_le_bytes(block_len_bytes) as usize;
+        let block_bytes = value.get(8..block_len + 8).context("Out of bounds")?;
+        let block = Block::try_from(block_bytes.to_vec())?;
+
+        let receipt_len_bytes: [u8; 8] = value
+            .get(block_len + 8..block_len + 16)
+            .context("Out of bounds")?
+            .try_into()?;
+        let receipt_len = u64::from_le_bytes(receipt_len_bytes) as usize;
+        let receipt_bytes = value
+            .get(block_len + 16..block_len + receipt_len + 16)
+            .context("Out of bounds")?;
+        let receipt: BlockReceipt = bincode::deserialize(receipt_bytes)?;
+        Ok(BlockInfo { block, receipt })
+    }
 }
 
 impl<C: Collection> ConfigConsumer for Archive<C> {

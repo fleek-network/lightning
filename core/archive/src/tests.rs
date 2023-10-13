@@ -2,33 +2,14 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use ethers::types::{BlockNumber, U64};
-use fleek_crypto::{NodeSecretKey, SecretKey, TransactionSender, TransactionSignature};
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::{
-    ArchiveRequest,
-    ArchiveResponse,
-    Block,
-    BlockExecutionResponse,
-    ExecutionData,
-    IndexRequest,
-    TransactionReceipt,
-    TransactionRequest,
-    TransactionResponse,
-    UpdateMethod,
-    UpdatePayload,
-    UpdateRequest,
-};
-use lightning_interfaces::{
-    partial,
-    ApplicationInterface,
-    ArchiveInterface,
-    ToDigest,
-    WithStartAndShutdown,
-};
+use lightning_interfaces::types::{ArchiveRequest, ArchiveResponse};
+use lightning_interfaces::{partial, ApplicationInterface, ArchiveInterface, WithStartAndShutdown};
+use lightning_test_utils::transaction::get_index_request;
 
-use crate::archive::Archive;
+use crate::archive::{Archive, BlockInfo};
 use crate::config::Config;
 
 partial!(TestBinding {
@@ -56,63 +37,6 @@ async fn init_archive(path: &str) -> (Archive<TestBinding>, Application<TestBind
     )
     .unwrap();
     (archive, app, path)
-}
-
-fn get_transactions(num_txns: usize) -> Vec<UpdateRequest> {
-    (0..num_txns)
-        .map(|i| {
-            let secret_key = NodeSecretKey::generate();
-            let public_key = secret_key.to_pk();
-            let sender = TransactionSender::NodeMain(public_key);
-            let method = UpdateMethod::ChangeEpoch { epoch: i as u64 };
-            let payload = UpdatePayload { nonce: 0, method };
-            let digest = payload.to_digest();
-            UpdateRequest {
-                sender,
-                signature: TransactionSignature::NodeMain(secret_key.sign(&digest)),
-                payload,
-            }
-        })
-        .collect()
-}
-
-fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest {
-    let transactions = get_transactions(5);
-    let digest = [block_index; 32];
-
-    let txn_receipts: Vec<TransactionReceipt> = transactions
-        .iter()
-        .enumerate()
-        .map(|(i, tx)| {
-            TransactionReceipt {
-                block_hash: digest,
-                block_number: block_index as u128,
-                transaction_index: i as u64,
-                transaction_hash: tx.payload.to_digest(), // dummy hash
-                from: tx.sender,
-                response: TransactionResponse::Success(ExecutionData::None),
-            }
-        })
-        .collect();
-
-    let block = Block {
-        transactions: transactions
-            .into_iter()
-            .map(TransactionRequest::UpdateRequest)
-            .collect(),
-        digest,
-    };
-
-    let receipt = BlockExecutionResponse {
-        block_number: block_index as u128,
-        block_hash: digest,
-        parent_hash,
-        change_epoch: false,
-        node_registry_delta: vec![],
-        txn_receipts,
-    };
-
-    IndexRequest { block, receipt }
 }
 
 #[tokio::test]
@@ -311,4 +235,17 @@ async fn test_get_pending() {
     if path.exists() {
         std::fs::remove_dir_all(path).unwrap();
     }
+}
+
+#[test]
+fn test_block_info_ser_deser() {
+    let index_request = get_index_request(0, [0; 32]);
+    let (blk_receipt, _txn_receipts) = index_request.receipt.to_receipts();
+    let blk_info = BlockInfo {
+        block: index_request.block,
+        receipt: blk_receipt,
+    };
+    let bytes: Vec<u8> = (&blk_info).try_into().unwrap();
+    let blk_info_r = BlockInfo::try_from(bytes).unwrap();
+    assert_eq!(blk_info, blk_info_r);
 }

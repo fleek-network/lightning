@@ -5,3 +5,4 @@ pub mod json_config;
 pub mod keys;
 pub mod random;
 pub mod reputation;
+pub mod transaction;

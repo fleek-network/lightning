@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::net::IpAddr;
 
+use anyhow::Context;
 use ethers::types::Transaction as EthersTransaction;
 use ethers::utils::rlp;
 use fleek_crypto::{
@@ -35,7 +36,7 @@ const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";
 /// the block is the atomic view into the network, meaning that queries do not view
 /// the intermediary state within a block, but only have the view to the latest executed
 /// block.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Block {
     pub transactions: Vec<TransactionRequest>,
     // Digest of the narwhal certificate that included this
@@ -124,6 +125,56 @@ impl TryFrom<Vec<u8>> for TransactionRequest {
             },
             _ => Err(anyhow::anyhow!("Invalid magic byte: {magic_byte}")),
         }
+    }
+}
+
+impl TryFrom<&Block> for Vec<u8> {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &Block) -> Result<Self, Self::Error> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&value.digest);
+        let num_txns = value.transactions.len() as u64;
+        bytes.extend_from_slice(&num_txns.to_le_bytes());
+        for tx in &value.transactions {
+            // TODO(matthias): would be good to serialize to borrowed bytes here instead
+            let tx_bytes: Vec<u8> = tx.try_into()?;
+            let tx_len = tx_bytes.len() as u64;
+            bytes.extend_from_slice(&tx_len.to_le_bytes());
+            bytes.extend_from_slice(&tx_bytes);
+        }
+        Ok(bytes)
+    }
+}
+
+impl TryFrom<Vec<u8>> for Block {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        let digest: [u8; 32] = value.get(0..32).context("Out of bounds")?.try_into()?;
+        let num_txns_bytes: [u8; 8] = value.get(32..40).context("Out of bounds")?.try_into()?;
+        let num_txns = u64::from_le_bytes(num_txns_bytes);
+        let mut pointer = 40;
+        let mut transactions = Vec::with_capacity(num_txns as usize);
+        for _ in 0..num_txns {
+            let tx_len_bytes: [u8; 8] = value
+                .get(pointer..pointer + 8)
+                .context("Out of bounds")?
+                .try_into()?;
+            let tx_len = u64::from_le_bytes(tx_len_bytes) as usize;
+            pointer += 8;
+            let tx_bytes = value
+                .get(pointer..pointer + tx_len)
+                .context("Out of bounds")?;
+            // TODO(matthias): can we get rid of this allocation?
+            let tx: TransactionRequest = tx_bytes.to_vec().try_into()?;
+            transactions.push(tx);
+            pointer += tx_len;
+        }
+        Ok(Block {
+            transactions,
+            digest,
+        })
     }
 }
 
@@ -481,9 +532,43 @@ impl<const P: usize> TranscriptBuilderInput for HpUfixedWrapper<P> {
 
 #[cfg(test)]
 mod tests {
-    use fleek_crypto::AccountOwnerSignature;
+    use ethers::types::U256;
+    use fleek_crypto::{AccountOwnerSignature, NodeSecretKey, SecretKey};
 
     use super::*;
+
+    fn get_block(num_txns: usize) -> Block {
+        let transactions: Vec<TransactionRequest> = (0..num_txns)
+            .map(|i| {
+                if i % 2 == 0 {
+                    let secret_key = NodeSecretKey::generate();
+                    let public_key = secret_key.to_pk();
+                    let sender = TransactionSender::NodeMain(public_key);
+                    let method = UpdateMethod::ChangeEpoch { epoch: i as u64 };
+                    let payload = UpdatePayload { nonce: 0, method };
+                    let digest = payload.to_digest();
+                    TransactionRequest::UpdateRequest(UpdateRequest {
+                        sender,
+                        signature: TransactionSignature::NodeMain(secret_key.sign(&digest)),
+                        payload,
+                    })
+                } else {
+                    let tx = EthersTransaction {
+                        nonce: U256::from(i),
+                        ..Default::default()
+                    };
+                    let bytes = tx.rlp().to_vec();
+                    let tx = rlp::decode::<EthersTransaction>(&bytes).unwrap();
+                    TransactionRequest::EthereumRequest(tx)
+                }
+            })
+            .collect();
+        let digest = [1; 32];
+        Block {
+            transactions,
+            digest,
+        }
+    }
 
     #[test]
     fn test_transaction_request_eth() {
@@ -516,5 +601,14 @@ mod tests {
         let bytes: Vec<u8> = (&tx).try_into().unwrap();
         let tx_r = TransactionRequest::try_from(bytes).unwrap();
         assert_eq!(tx, tx_r);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_block() {
+        let block = get_block(100);
+
+        let bytes: Vec<u8> = (&block).try_into().unwrap();
+        let block_r = Block::try_from(bytes).unwrap();
+        assert_eq!(block, block_r);
     }
 }
