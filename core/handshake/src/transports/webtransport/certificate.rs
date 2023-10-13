@@ -3,7 +3,7 @@ use fleek_crypto::{NodeSecretKey, SecretKey};
 use rcgen::{CertificateParams, DistinguishedName, DnType, KeyPair, PKCS_ED25519};
 use time::{Duration, OffsetDateTime};
 
-const COMMON_NAME: &str = "localhost";
+const COMMON_NAME: &str = "lightning";
 
 pub fn generate_certificate(sk: NodeSecretKey) -> Result<rcgen::Certificate> {
     let mut dname = DistinguishedName::new();

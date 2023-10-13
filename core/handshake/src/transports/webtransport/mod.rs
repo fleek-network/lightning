@@ -42,6 +42,14 @@ impl Transport for WebTransport {
             Some(cert) => (cert.certificate, cert.key),
         };
 
+        let cert_hash = ring::digest::digest(&ring::digest::SHA256, &cert_der)
+            .as_ref()
+            .to_vec();
+        let router = Router::new().route(
+            "certificate-hash",
+            axum::routing::get(move || async { cert_hash }),
+        );
+
         let config = ServerConfig::builder()
             .with_bind_address(config.address)
             .with_certificate(Certificate::new(vec![cert_der], pk))
@@ -57,7 +65,7 @@ impl Transport for WebTransport {
         };
         tokio::spawn(connection::main_loop(ctx));
 
-        Ok((Self { conn_rx }, None))
+        Ok((Self { conn_rx }, Some(router)))
     }
 
     async fn accept(&mut self) -> Option<(HandshakeRequestFrame, Self::Sender, Self::Receiver)> {
