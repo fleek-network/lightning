@@ -71,9 +71,9 @@ async fn store<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
 
     'outer: for path in &input {
         let Ok(mut file) = File::open(path) else {
-                        log::error!("Could not open the file {path:?}");
-                        continue;
-                    };
+            log::error!("Could not open the file {path:?}");
+            continue;
+        };
 
         let mut putter = store.put(None);
 
