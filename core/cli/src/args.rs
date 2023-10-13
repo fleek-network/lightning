@@ -25,9 +25,9 @@ pub struct Args {
 pub enum Command {
     /// Start the node.
     Run,
-    /// Handle key
+    /// Key management utilities.
     #[command(subcommand)]
-    Key(KeySubCmd),
+    Keys(KeySubCmd),
     /// Print the loaded configuration.
     ///
     /// By default this command prints the loaded configuration.

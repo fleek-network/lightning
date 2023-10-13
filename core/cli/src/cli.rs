@@ -18,7 +18,7 @@ use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::args::{Args, Command};
 use crate::commands::run::CustomStartShutdown;
-use crate::commands::{dev, key, print_config, run};
+use crate::commands::{dev, keys, print_config, run};
 use crate::utils::fs::ensure_parent_exist;
 use crate::utils::log_filter::CustomLogFilter;
 
@@ -68,7 +68,7 @@ impl Cli {
     {
         match self.args.cmd {
             Command::Run => run::exec::<C>(config_path, custom_start_shutdown).await,
-            Command::Key(cmd) => key::exec::<C>(cmd, config_path).await,
+            Command::Keys(cmd) => keys::exec::<C>(cmd, config_path).await,
             Command::PrintConfig { default } => print_config::exec::<C>(default, config_path).await,
             Command::Dev(cmd) => dev::exec::<C>(cmd, config_path).await,
         }
