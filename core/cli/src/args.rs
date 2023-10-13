@@ -2,11 +2,19 @@ use std::path::PathBuf;
 
 use clap::{arg, ArgAction, Parser, Subcommand};
 
+/// Get the configuration directory for the current user
+fn default_config_dir() -> String {
+    format!(
+        "{}/.lightning/config.toml",
+        std::env::var("HOME").expect("failed to get $HOME directory")
+    )
+}
+
 #[derive(Parser)]
 #[command(about, version)]
 pub struct Args {
     /// Path to the toml configuration file
-    #[arg(short, long, global = true, default_value_t = format!("{}/.lightning/config.toml", env!("HOME")))]
+    #[arg(short, long, global = true, default_value_t = default_config_dir() )]
     pub config: String,
     /// Determines that we should be using the mock consensus backend.
     #[arg(long, global = true)]
