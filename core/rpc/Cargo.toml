@@ -31,8 +31,7 @@ lightning-fetcher = { path = "../fetcher" }
 lightning-blockstore = { path = "../blockstore" }
 lightning-blockstore-server = { path = "../blockstore-server" }
 lightning-origin-ipfs = { path = "../origin-ipfs" }
-lightning-signer = { path="../signer" }
-lightning-notifier = { path="../notifier" }
+lightning-signer = { path = "../signer" }
+lightning-notifier = { path = "../notifier" }
 lightning-pool = { path = "../pool" }
 lightning-rep-collector = { path = "../rep-collector" }
-

@@ -6,6 +6,7 @@ use lightning_interfaces::types::{
     BlockExecutionResponse,
     ExecutionData,
     IndexRequest,
+    TransactionDestination,
     TransactionReceipt,
     TransactionRequest,
     TransactionResponse,
@@ -50,6 +51,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
     let digest = [block_index; 32];
     let update_txns = get_update_transactions(5);
     let eth_txns = get_eth_transactions(5);
+    let to = TransactionDestination::Ethereum(EthAddress([0; 20]));
 
     let mut txn_receipts = Vec::new();
     for (i, tx) in update_txns.iter().enumerate() {
@@ -59,6 +61,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
             transaction_index: i as u64,
             transaction_hash: tx.payload.to_digest(), // dummy hash
             from: tx.sender,
+            to: to.clone(),
             response: TransactionResponse::Success(ExecutionData::None),
         });
     }
@@ -70,6 +73,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
             transaction_index: i as u64,
             transaction_hash: tx.hash.0, // dummy hash
             from: TransactionSender::AccountOwner(EthAddress(tx.from.0)),
+            to: to.clone(),
             response: TransactionResponse::Success(ExecutionData::None),
         });
     }
@@ -84,6 +88,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
                 transaction_index: i as u64,
                 transaction_hash: tx.payload.to_digest(), // dummy hash
                 from: tx.sender,
+                to: to.clone(),
                 response: TransactionResponse::Success(ExecutionData::None),
             }
         })

@@ -33,7 +33,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
-use tracing::{error, warn};
+use tracing::warn;
 
 use crate::config::{Config, Mode, StorageConfig};
 use crate::genesis::{Genesis, GenesisPrices};
@@ -131,7 +131,6 @@ impl Env<UpdatePerm> {
                 table_selector: ctx,
             };
             let app = State::new(backend);
-            let block_number = app.get_block_number();
             let last_block_hash = app.get_block_hash();
 
             // Create block response
@@ -141,7 +140,7 @@ impl Env<UpdatePerm> {
                 change_epoch: false,
                 node_registry_delta: Vec::new(),
                 txn_receipts: Vec::with_capacity(block.transactions.len()),
-                block_number,
+                block_number: 0,
             };
 
             // Execute each transaction and add the results to the block response
@@ -158,13 +157,13 @@ impl Env<UpdatePerm> {
 
                 let receipt = TransactionReceipt {
                     block_hash: block.digest,
-                    block_number,
+                    block_number: 0,
                     transaction_index: index as u64,
                     transaction_hash: txn.hash(),
                     from: txn.sender(),
+                    to: txn.to(),
                     response: results,
                 };
-
                 /* Todo(dalton): Check if the transaction resulted in the committee change(Like a current validator getting slashed)
                     if so aknowledge that in the block response
                 */
@@ -173,7 +172,13 @@ impl Env<UpdatePerm> {
             // Set the last executed block hash
             app.set_last_block(block.digest);
             // increment the block_number
-            app.increment_block_number(response.change_epoch);
+            let block_number = app.increment_block_number(response.change_epoch);
+
+            response.block_number = block_number;
+
+            for txn in response.txn_receipts.iter_mut() {
+                txn.block_number = block_number;
+            }
 
             // Return the response
             response
@@ -372,7 +377,6 @@ impl Env<UpdatePerm> {
             }
 
             for account in genesis.account {
-                error!("{:?}", account);
                 let info = AccountInfo {
                     flk_balance: account.flk_balance,
                     stables_balance: account.stables_balance.into(),

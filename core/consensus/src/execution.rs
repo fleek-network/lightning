@@ -118,7 +118,6 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
         if results.change_epoch {
             change_epoch = true;
         }
-
         // If we have the archive socket that means our node is in archive node and we should send
         // the block and the reciept to be indexed
         if let (Some(block), Some(socket)) = (archive_block, &self.index_socket) {

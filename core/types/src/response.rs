@@ -1,8 +1,9 @@
-use ethers::types::{TransactionReceipt as EthersTxnReceipt, U64};
-use fleek_crypto::TransactionSender;
+use ethers::types::{TransactionReceipt as EthersTxnReceipt, U256, U64};
+use fleek_crypto::{EthAddress, TransactionSender};
 use serde::{Deserialize, Serialize};
 
 use super::{Epoch, NodeInfo};
+use crate::UpdateMethod;
 
 /// Info on a Narwhal epoch
 #[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize)]
@@ -43,8 +44,28 @@ pub struct TransactionReceipt {
     pub transaction_hash: [u8; 32],
     /// The sender of the transaction
     pub from: TransactionSender,
+    /// Which state function or address a transaction was headed to
+    pub to: TransactionDestination,
     /// The results of the transaction
     pub response: TransactionResponse,
+}
+
+/// What state function a transaction was calling. If an ethereum transaction it will either be
+/// Fleek Contract address or another ethereum address, if its another ethereum address it would
+/// indicate that the transaction was a transfer
+#[derive(Clone, Debug, Hash, Serialize, Deserialize, Eq, PartialEq)]
+pub enum TransactionDestination {
+    Fleek(UpdateMethod),
+    Ethereum(EthAddress),
+}
+
+impl TransactionDestination {
+    fn to_eth_address(&self) -> EthAddress {
+        match self {
+            Self::Ethereum(address) => *address,
+            _ => [0; 20].into(),
+        }
+    }
 }
 
 impl From<TransactionReceipt> for EthersTxnReceipt {
@@ -60,8 +81,10 @@ impl From<TransactionReceipt> for EthersTxnReceipt {
             block_hash: Some(value.block_hash.into()),
             block_number: Some((value.block_number as u64).into()),
             from: sender,
-            // todo
-            to: None,
+            to: Some(value.to.to_eth_address().0.into()),
+            gas_used: Some(U256::zero()),
+            transaction_type: Some(U64::one()),
+            effective_gas_price: Some(U256::zero()),
             status: Some(if value.response.is_success() {
                 U64::one()
             } else {

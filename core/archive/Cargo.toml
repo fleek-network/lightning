@@ -20,6 +20,6 @@ ethers.workspace = true
 rocksdb = "0.21"
 
 [dev-dependencies]
-lightning-application = { path="../application", features = ["test"] }
+lightning-application = { path = "../application", features = ["test"] }
 lightning-test-utils = { path = "../test-utils" }
 infusion.workspace = true

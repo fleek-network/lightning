@@ -22,7 +22,6 @@ rand.workspace = true
 fleek-blake3 = "1.5"
 tracing.workspace = true
 
-
 # Our libraries
 affair.workspace = true
 atomo.workspace = true

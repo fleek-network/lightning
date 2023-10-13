@@ -27,7 +27,7 @@ use super::{
     ServiceId,
     Tokens,
 };
-use crate::{NodeIndex, NodePorts};
+use crate::{NodeIndex, NodePorts, TransactionDestination};
 
 // TODO: Change this to capital and non-abrv version.
 const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";
@@ -86,6 +86,22 @@ impl TransactionRequest {
         match self {
             Self::UpdateRequest(payload) => payload.payload.to_digest(),
             Self::EthereumRequest(payload) => payload.hash().0,
+        }
+    }
+
+    pub fn to(&self) -> TransactionDestination {
+        match self {
+            Self::UpdateRequest(payload) => {
+                TransactionDestination::Fleek(payload.payload.method.clone())
+            },
+            Self::EthereumRequest(payload) => {
+                let address = if let Some(to_address) = payload.to {
+                    to_address.0.into()
+                } else {
+                    [0; 20].into()
+                };
+                TransactionDestination::Ethereum(address)
+            },
         }
     }
 }

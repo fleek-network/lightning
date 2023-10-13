@@ -297,7 +297,6 @@ impl<B: Backend> State<B> {
                     worker_public_key,
                     worker_domain,
                 })) => {
-                    let node_domain: IpAddr = domain.parse().unwrap();
                     let Ok(node_domain) = domain.parse() else {
                         return TransactionResponse::Revert(ExecutionError::InvalidInternetAddress);
                     };
@@ -1501,7 +1500,7 @@ impl<B: Backend> State<B> {
     }
 
     /// Increments block number after executing a block and returns the new number
-    pub fn increment_block_number(&self, is_new_epoch: bool) {
+    pub fn increment_block_number(&self, is_new_epoch: bool) -> u128 {
         // Safe unwrap seeded during state
         let new_block_number = if is_new_epoch {
             let epoch = self.get_epoch() as u128;
@@ -1515,6 +1514,7 @@ impl<B: Backend> State<B> {
 
         self.metadata
             .set(Metadata::BlockNumber, Value::BlockNumber(new_block_number));
+        new_block_number
     }
 
     // Useful for transaction that nodes cannot call but an account owner can

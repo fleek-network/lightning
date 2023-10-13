@@ -20,7 +20,8 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{ArchiveRequest, ArchiveResponse};
 use lightning_interfaces::SyncQueryRunnerInterface;
 use ruint::aliases::{B256, B64, U256, U64};
-use tracing::{error, trace};
+use serde::{Deserialize, Serialize};
+use tracing::trace;
 
 use crate::handlers::Result;
 use crate::server::RpcData;
@@ -82,10 +83,7 @@ pub async fn eth_accounts<C: Collection>() -> Result<Vec<EthAddress>> {
 /// Handler for: `eth_blockNumber`
 pub async fn eth_block_number<C: Collection>(data: Data<Arc<RpcData<C>>>) -> Result<U256> {
     trace!(target: "rpc::eth", "Serving eth_blockNumber");
-    error!(
-        "the block number is {:?}",
-        data.0.query_runner.get_block_number(),
-    );
+
     Ok(U256::from(data.0.query_runner.get_block_number()))
 }
 
@@ -204,17 +202,32 @@ pub async fn eth_transaction_count<C: Collection>(
     trace!(target: "rpc::eth", ?public_key, "Serving
   eth_getTransactionCount");
     Ok(U256::from(
-        data.0.query_runner.get_account_nonce(&public_key),
+        data.0.query_runner.get_account_nonce(&public_key) + 1,
     ))
 }
 
-// /// Handler for: `eth_estimateGas`
+/// Call request for `eth_call` and adjacent methods.
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct CallRequest {
+    /// From
+    pub from: Option<Address>,
+    /// To
+    pub to: Option<Address>,
+    /// Transaction data
+    pub input: Option<Bytes>,
+    /// Transaction data
+    /// This is the same as `input` but is used for backwards compatibility: <https://github.com/ethereum/go-ethereum/issues/15628>
+    pub data: Option<Bytes>,
+}
+
+/// Handler for: `eth_estimateGas`
 pub async fn eth_estimate_gas<C: Collection>(
-    Params((request, block_number)): Params<(TransactionRequest, BlockId)>,
+    Params((request,)): Params<(CallRequest,)>,
 ) -> Result<U256> {
-    trace!(target: "rpc::eth", ?request, ?block_number, "Serving
+    trace!(target: "rpc::eth", ?request, "Serving
   eth_estimateGas");
-    Ok(U256::ZERO)
+    Ok(U256::from(0))
 }
 
 /// Handler for: `eth_gasPrice`
