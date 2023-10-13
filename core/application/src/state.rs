@@ -799,9 +799,10 @@ impl<B: Backend> State<B> {
             let new_epoch_end = current_committee.epoch_end_timestamp + epoch_duration as u64;
 
             // Save the old committee so we can see who signaled
+            let new_committee = current_committee.members.clone();
             self.committee_info.set(current_epoch, current_committee);
             // Get new committee
-            let new_committee = self.choose_new_committee();
+            //let new_committee = self.choose_new_committee();
             // increment epoch
             current_epoch += 1;
 
@@ -1259,7 +1260,7 @@ impl<B: Backend> State<B> {
         HpUfixed::<3>::min(&max_boost, &boost).to_owned()
     }
 
-    fn choose_new_committee(&self) -> Vec<NodeIndex> {
+    fn _choose_new_committee(&self) -> Vec<NodeIndex> {
         let epoch = match self.metadata.get(&Metadata::Epoch) {
             Some(Value::Epoch(epoch)) => epoch,
             _ => 0,
