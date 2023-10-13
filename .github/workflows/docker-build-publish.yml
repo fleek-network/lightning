@@ -4,8 +4,7 @@ on:
   push:
     # TODO: enable for main only after testnet
     branches:
-      - testnet-alpha-0
-      - main
+      - testnet-*
     paths:
       - core/**
       - etc/**
@@ -58,7 +57,6 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          #platforms: linux/arm64, linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
