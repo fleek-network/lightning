@@ -264,6 +264,9 @@ impl Env<UpdatePerm> {
 
             metadata_table.insert(Metadata::BlockNumber, Value::BlockNumber(0));
 
+            // ONLY TESTNET
+            metadata_table.insert(Metadata::AllowMinting, Value::Boolean(true));
+
             metadata_table.insert(
                 Metadata::ProtocolFundAddress,
                 Value::AccountPublicKey(genesis.protocol_fund_address),

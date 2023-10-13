@@ -74,6 +74,8 @@ pub enum Metadata {
     LastEpochHash,
     LastBlockHash,
     GenesisCommittee,
+    // ONLY TESTNET
+    AllowMinting,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -88,6 +90,8 @@ pub enum Value {
     NextNodeIndex(u32),
     Hash([u8; 32]),
     GenesisCommittee(Vec<NodeIndex>),
+    // ONLY TESTNET
+    Boolean(bool),
 }
 
 /// Adjustable parameters that are stored in the blockchain

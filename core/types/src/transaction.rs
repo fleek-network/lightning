@@ -312,6 +312,11 @@ pub enum UpdateMethod {
         param: ProtocolParams,
         value: u128,
     },
+    // ONLY TESTNET
+    SetAllowMinting {
+        allow: bool,
+    },
+    Mint,
 }
 
 impl ToDigest for UpdatePayload {
@@ -499,6 +504,15 @@ impl ToDigest for UpdatePayload {
                     .with_prefix("input".to_owned())
                     .with("param", &(param.clone() as u8))
                     .with("value", value);
+            },
+            UpdateMethod::SetAllowMinting { allow } => {
+                let allow = if *allow { 1 } else { 0 };
+                transcript_builder = transcript_builder
+                    .with("transaction_name", &"set_allow_minting")
+                    .with("allow", &allow)
+            },
+            UpdateMethod::Mint => {
+                transcript_builder = transcript_builder.with("transaction_name", &"mint")
             },
         }
 

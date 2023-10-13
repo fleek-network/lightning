@@ -483,4 +483,13 @@ impl SyncQueryRunnerInterface for QueryRunner {
             },
         )
     }
+
+    fn get_allow_mint(&self) -> bool {
+        self.inner.run(
+            |ctx| match self.metadata_table.get(ctx).get(&Metadata::AllowMinting) {
+                Some(Value::Boolean(allow)) => allow,
+                _ => false,
+            },
+        )
+    }
 }

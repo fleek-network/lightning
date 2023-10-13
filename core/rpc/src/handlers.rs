@@ -5,7 +5,13 @@ use std::time::Duration;
 
 use autometrics::autometrics;
 use axum::{http, Extension, Json};
-use fleek_crypto::{EthAddress, NodePublicKey};
+use fleek_crypto::{
+    AccountOwnerSignature,
+    EthAddress,
+    NodePublicKey,
+    TransactionSender,
+    TransactionSignature,
+};
 use hp_fixed::unsigned::HpUfixed;
 use http::StatusCode;
 use jsonrpc_v2::{Data, Error, MapRouter, Params, RequestObject, ResponseObjects, Server};
@@ -25,6 +31,9 @@ use lightning_interfaces::types::{
     ReportedReputationMeasurements,
     TotalServed,
     TransactionRequest,
+    UpdateMethod,
+    UpdatePayload,
+    UpdateRequest,
 };
 use lightning_interfaces::SyncQueryRunnerInterface;
 use tracing::error;
@@ -92,6 +101,8 @@ impl RpcServer {
     {
         let server = Server::new()
             .with_data(Data::new(interface))
+            // ONLY TESTNET
+            .with_method("flk_mint", mint_handler::<C>)
             .with_method("rpc.discover", rpc_discovery_handler::<C>)
             .with_method("flk_ping", ping_handler::<C>)
             .with_method("flk_get_flk_balance", get_flk_balance_handler::<C>)
@@ -200,6 +211,40 @@ pub async fn put<C: Collection>(
         Ok(hash)
     } else {
         Err(Error::INTERNAL_ERROR)
+    }
+}
+
+// ONLY TESTNET
+pub async fn mint_handler<C: Collection>(
+    data: Data<Arc<RpcData<C>>>,
+    Params(params): Params<PublicKeyParam>,
+) -> Result<String> {
+    if data.query_runner.get_allow_mint() {
+        let balance = data.query_runner.get_account_balance(&params.public_key);
+        if balance > 1010 {
+            return Ok("already minted".to_string());
+        }
+        let nonce = data.query_runner.get_account_nonce(&params.public_key) + 1;
+        let method = UpdateMethod::Mint;
+        let payload = UpdatePayload { method, nonce };
+        let request = UpdateRequest {
+            payload,
+            sender: TransactionSender::AccountOwner(params.public_key),
+            signature: TransactionSignature::AccountOwner(AccountOwnerSignature([0; 65])),
+        };
+
+        if let Err(e) = data
+            .0
+            .mempool_socket
+            .run(TransactionRequest::UpdateRequest(request))
+            .await
+        {
+            error!("Failed to send mint transaction: {e:?}");
+            return Ok("failed to mint".to_string());
+        }
+        Ok("minted".to_string())
+    } else {
+        Ok("minting deactivated".to_string())
     }
 }
 

@@ -199,6 +199,8 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Returns the current block number
     fn get_block_number(&self) -> u64;
+
+    fn get_allow_mint(&self) -> bool;
 }
 
 #[derive(Clone, Debug)]

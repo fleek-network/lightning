@@ -232,6 +232,8 @@ impl<B: Backend> State<B> {
             UpdateMethod::ChangeProtocolParam { param, value } => {
                 self.change_protocol_param(txn.sender, param, value)
             },
+            UpdateMethod::SetAllowMinting { allow } => self.set_allow_minting(txn.sender, allow),
+            UpdateMethod::Mint => self.mint(txn.sender),
         };
 
         #[cfg(debug_assertions)]
@@ -1350,6 +1352,11 @@ impl<B: Backend> State<B> {
             },
         }
 
+        // ONLY TESTNET
+        if let UpdateMethod::Mint = txn.payload.method {
+            return Ok(());
+        }
+
         // Check signature
         let payload = txn.payload.clone();
         let digest = payload.to_digest();
@@ -1564,6 +1571,48 @@ impl<B: Backend> State<B> {
             // unreachable set at genesis
             0
         }
+    }
+
+    // TESTNET ADMIN
+    fn set_allow_minting(&self, sender: TransactionSender, allow: bool) -> TransactionResponse {
+        let sender = match self.only_account_owner(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+        // Since the governance address will be
+        // seeded though genesis, this should never happen.
+        let governance_address = match self.metadata.get(&Metadata::GovernanceAddress) {
+            Some(Value::AccountPublicKey(address)) => address,
+            _ => panic!("Governance address is missing from state."),
+        };
+        if sender != governance_address {
+            return TransactionResponse::Revert(ExecutionError::OnlyGovernance);
+        }
+        self.metadata
+            .set(Metadata::AllowMinting, Value::Boolean(allow));
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    fn mint(&self, sender: TransactionSender) -> TransactionResponse {
+        let sender = match self.only_account_owner(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+
+        let allow_minting = match self.metadata.get(&Metadata::AllowMinting) {
+            Some(Value::Boolean(allow)) => allow,
+            _ => false,
+        };
+
+        if !allow_minting {
+            return TransactionResponse::Revert(ExecutionError::Unimplemented);
+        }
+
+        let mut to_account = self.account_info.get(&sender).unwrap_or_default();
+        to_account.flk_balance += HpUfixed::from(1010_u32);
+        self.account_info.set(sender, to_account);
+
+        TransactionResponse::Success(ExecutionData::None)
     }
 }
 
