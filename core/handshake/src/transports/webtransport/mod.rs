@@ -2,8 +2,10 @@ mod certificate;
 mod config;
 mod connection;
 
+use std::sync::{Arc, RwLock};
+
 use async_trait::async_trait;
-use axum::Router;
+use axum::{Extension, Router};
 pub use config::WebTransportConfig;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::StreamExt;
@@ -30,42 +32,40 @@ impl Transport for WebTransport {
         shutdown: ShutdownWaiter,
         config: Self::Config,
     ) -> anyhow::Result<(Self, Option<Router>)> {
-        let (cert_der, pk) = match config.certificate {
-            None => {
-                log::warn!("no certificate found in config so generating one from random secret");
-                let certificate = certificate::generate_certificate(NodeSecretKey::generate())?;
-                (
-                    certificate.serialize_der()?,
-                    certificate.serialize_private_key_der(),
-                )
-            },
-            Some(cert) => (cert.certificate, cert.key),
-        };
+        let (cert_hash, server_config) =
+            create_cert_hash_and_server_config(NodeSecretKey::generate(), config.clone())?;
 
-        let cert_hash = ring::digest::digest(&ring::digest::SHA256, &cert_der)
-            .as_ref()
-            .to_vec();
-        let router = Router::new().route(
-            "certificate-hash",
-            axum::routing::get(move || async { cert_hash }),
-        );
+        let shared_cert_hash = Arc::new(RwLock::new(cert_hash));
+        let router = Router::new()
+            .route(
+                "certificate-hash",
+                axum::routing::get(
+                    |Extension(cert_hash): Extension<Arc<RwLock<Vec<u8>>>>| async move {
+                        cert_hash.read().unwrap().to_vec()
+                    },
+                ),
+            )
+            .layer(Extension(shared_cert_hash.clone()));
 
-        let config = ServerConfig::builder()
-            .with_bind_address(config.address)
-            .with_certificate(Certificate::new(vec![cert_der], pk))
-            .keep_alive_interval(config.keep_alive)
-            .build();
+        let endpoint = Endpoint::server(server_config)?;
 
-        let endpoint = Endpoint::server(config)?;
-        let (conn_tx, conn_rx) = mpsc::channel(2048);
+        let (conn_event_tx, conn_event_rx) = mpsc::channel(2048);
+
         let ctx = Context {
             endpoint,
-            accept_tx: conn_tx,
+            accept_tx: conn_event_tx,
+            published_cert_hash: shared_cert_hash,
+            transport_config: config,
             shutdown,
         };
         tokio::spawn(connection::main_loop(ctx));
 
-        Ok((Self { conn_rx }, Some(router)))
+        Ok((
+            Self {
+                conn_rx: conn_event_rx,
+            },
+            Some(router),
+        ))
     }
 
     async fn accept(&mut self) -> Option<(HandshakeRequestFrame, Self::Sender, Self::Receiver)> {
@@ -128,4 +128,28 @@ impl TransportReceiver for WebTransportReceiver {
             },
         }
     }
+}
+
+pub fn create_cert_hash_and_server_config(
+    sk: NodeSecretKey,
+    config: WebTransportConfig,
+) -> anyhow::Result<(Vec<u8>, ServerConfig)> {
+    let cert = certificate::generate_certificate(sk)?;
+    let cert_der = cert.serialize_der()?;
+
+    let cert_hash = ring::digest::digest(&ring::digest::SHA256, &cert_der)
+        .as_ref()
+        .to_vec();
+
+    Ok((
+        cert_hash,
+        ServerConfig::builder()
+            .with_bind_address(config.address)
+            .with_certificate(Certificate::new(
+                vec![cert_der],
+                cert.serialize_private_key_der(),
+            ))
+            .keep_alive_interval(config.keep_alive)
+            .build(),
+    ))
 }

@@ -1,5 +1,9 @@
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
+
 use anyhow::Result;
 use bytes::Bytes;
+use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::{SinkExt, StreamExt};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
@@ -9,18 +13,28 @@ use wtransport::{Endpoint, RecvStream, SendStream};
 
 use crate::schema::HandshakeRequestFrame;
 use crate::shutdown::ShutdownWaiter;
+use crate::transports::webtransport::{self, WebTransportConfig};
 
 pub type FramedStreamTx = FramedWrite<SendStream, LengthDelimitedCodec>;
 pub type FramedStreamRx = FramedRead<RecvStream, LengthDelimitedCodec>;
+
+const CERTIFICATE_RENEWAL_PERIOD: u64 = 1166400; // 13.5 days.
 
 /// The execution context of the WebTransport server.
 pub struct Context {
     pub endpoint: Endpoint<Server>,
     pub accept_tx: Sender<(HandshakeRequestFrame, (FramedStreamTx, FramedStreamRx))>,
+    pub published_cert_hash: Arc<RwLock<Vec<u8>>>,
+    pub transport_config: WebTransportConfig,
     pub shutdown: ShutdownWaiter,
 }
 
 pub async fn main_loop(ctx: Context) {
+    // Timer used to manage the self-signed certificate.
+    let mut timer = tokio::time::interval(Duration::from_secs(CERTIFICATE_RENEWAL_PERIOD));
+    // The first tick completes immediately.
+    timer.tick().await;
+
     loop {
         tokio::select! {
             incoming = ctx.endpoint.accept() => {
@@ -30,6 +44,26 @@ pub async fn main_loop(ctx: Context) {
                         log::error!("failed to handle incoming WebTransport session: {e:?}");
                     }
                 });
+            }
+            _ = timer.tick() => {
+                match webtransport::create_cert_hash_and_server_config(
+                    NodeSecretKey::generate(),
+                    ctx.transport_config.clone()
+                ) {
+                    Ok((cert_hash, server_config)) => {
+                        match ctx.endpoint.reload_config(server_config, false) {
+                            Ok(_) => {
+                                *ctx.published_cert_hash.write().unwrap() = cert_hash;
+                            }
+                            Err(e) => {
+                                log::error!("failed to reload server configuration: {e:?}");
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        log::error!("failed to reload server configuration: {e:?}");
+                    }
+                }
             }
             _ = ctx.shutdown.wait_for_shutdown() => {
                 log::info!("shutting down WebTransport server");
