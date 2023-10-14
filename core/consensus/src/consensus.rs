@@ -90,6 +90,8 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     pub_sub: P,
     /// Narhwal sends payloads ready for broadcast to this reciever
     rx_narwhal_batches: Option<mpsc::Receiver<(AuthenticStampedParcel, bool)>>,
+    /// To notify when consensus is shutting down
+    shutdown_notify: Arc<Notify>,
 }
 
 impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, P> {
@@ -101,6 +103,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         txn_socket: SubmitTxSocket,
         pub_sub: P,
         rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
+        shutdown_notify: Arc<Notify>,
     ) -> Self {
         Self {
             consensus: None,
@@ -111,6 +114,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             txn_socket,
             pub_sub,
             rx_narwhal_batches: Some(rx_narwhal_batches),
+            shutdown_notify,
         }
     }
 
@@ -225,29 +229,38 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         (narwhal_committee, worker_cache, epoch, epoch_end)
     }
 
-    async fn wait_to_signal_epoch_change(&self, time_until_change: Duration, epoch: Epoch) {
+    async fn wait_to_signal_epoch_change(
+        &self,
+        mut time_until_change: Duration,
+        epoch: Epoch,
+        shutdown_notify: Arc<Notify>,
+    ) {
         let txn_socket = self.txn_socket.clone();
         let query_runner = self.query_runner.clone();
         task::spawn(async move {
-            time::sleep(time_until_change).await;
-            info!("Narwhal: Signalling ready to change epoch");
-            // We shouldnt panic here lets repeatedly try.
             loop {
-                while txn_socket
-                    .run(UpdateMethod::ChangeEpoch { epoch })
-                    .await
-                    .is_err()
-                {
-                    error!(
-                        "Error sending change epoch transaction to signer interface, trying again..."
-                    );
-                    time::sleep(Duration::from_secs(1)).await;
-                }
+                let time_to_sleep = time::sleep(time_until_change);
 
-                time::sleep(Duration::from_secs(120)).await;
-                let new_epoch = query_runner.get_epoch();
-                if new_epoch != epoch {
-                    break;
+                tokio::select! {
+                    _ = time_to_sleep => {
+                        let new_epoch = query_runner.get_epoch();
+                        if new_epoch != epoch {
+                            break;
+                        }
+
+                        info!("Narwhal: Signalling ready to change epoch");
+
+                        if let Err(e) = txn_socket
+                        .run(UpdateMethod::ChangeEpoch { epoch })
+                        .await {
+                            error!("Error sending change epoch signal to socket {}", e);
+                        }
+
+                        time_until_change = Duration::from_secs(120);
+                    },
+                    _ = shutdown_notify.notified() => {
+                        break;
+                    }
                 }
             }
         });
@@ -278,8 +291,12 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         let until_epoch_ends: u64 = (epoch_end as u128).saturating_sub(now).try_into().unwrap();
         let time_until_epoch_change = Duration::from_millis(until_epoch_ends);
 
-        self.wait_to_signal_epoch_change(time_until_epoch_change, epoch)
-            .await;
+        self.wait_to_signal_epoch_change(
+            time_until_epoch_change,
+            epoch,
+            self.shutdown_notify.clone(),
+        )
+        .await;
 
         self.consensus = Some(service)
     }
@@ -387,6 +404,9 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             query_runner.clone(),
             indexer_socket,
         ));
+
+        let shutdown_notify = Arc::new(Notify::new());
+
         let epoch_state = EpochState::new(
             query_runner,
             narwhal_args,
@@ -395,6 +415,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             signer.get_socket(),
             pubsub,
             rx_narwhal_batches,
+            shutdown_notify.clone(),
         );
 
         Ok(Self {
@@ -402,7 +423,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             mempool_socket: TokioSpawn::spawn_async(forwarder),
             reconfigure_notify,
             new_block_notify,
-            shutdown_notify: Arc::new(Notify::new()),
+            shutdown_notify,
             is_running: AtomicBool::new(false),
         })
     }

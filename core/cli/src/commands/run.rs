@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use infusion::tag;
@@ -13,6 +14,7 @@ use lightning_interfaces::{
 use lightning_node::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 use tokio::pin;
+use tracing::warn;
 
 use crate::shutdown::ShutdownController;
 
@@ -65,8 +67,12 @@ where
                 } else {
                     node.shutdown().await;
                 }
-                //
+
                 std::mem::drop(node);
+
+                // Sleep for a bit but provide some feedback, some of our proccesses take a few milliseconds to drop from memory
+                warn!("Preparing to load checkpoint, Restarting services");
+                tokio::time::sleep(Duration::from_secs(3)).await;
                 // start local env in checkpoint mode to seed database with the new checkpoint
                 C::ApplicationInterface::load_from_checkpoint(
                     &app_config, checkpoint, checkpoint_hash)?;
