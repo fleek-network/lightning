@@ -5016,6 +5016,7 @@ dependencies = [
  "ethers",
  "fleek-crypto",
  "hp-fixed",
+ "http",
  "infusion",
  "jsonrpc-v2",
  "lightning-application",
@@ -5033,6 +5034,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tower-http 0.4.4",
  "tracing",
 ]
 

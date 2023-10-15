@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
 axum.workspace = true
+tower-http = { version = "0.4", features = ["cors"] }
+http = "0.2"
 anyhow.workspace = true
 jsonrpc-v2.workspace = true
 serde.workspace = true

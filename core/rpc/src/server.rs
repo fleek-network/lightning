@@ -6,6 +6,8 @@ use async_trait::async_trait;
 use axum::routing::{get, post};
 use axum::{Extension, Router};
 use fleek_crypto::NodeSecretKey;
+use http::header::CONTENT_TYPE;
+use http::Method;
 use lightning_interfaces::common::WithStartAndShutdown;
 use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::infu_collection::{c, Collection};
@@ -20,6 +22,7 @@ use lightning_interfaces::{
 };
 use tokio::sync::Notify;
 use tokio::task;
+use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
 use super::config::Config;
@@ -59,13 +62,18 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
 
         info!("RPC server starting up");
 
+        // TODO(matthias): we probably want to make this configurable
+        let cors = CorsLayer::new()
+            .allow_methods([Method::GET, Method::POST])
+            .allow_headers([CONTENT_TYPE])
+            .allow_origin(Any);
         let server = RpcServer::new(self.data.clone());
-
         let app = Router::new()
             .route("/health", get(|| async { "OK" }))
             .route("/metrics", get(get_metrics))
             .route("/rpc/v0", post(rpc_handler))
-            .layer(Extension(server));
+            .layer(Extension(server))
+            .layer(cors);
 
         self.is_running.store(true, Ordering::Relaxed);
         let http_address = SocketAddr::from((self.config.addr, self.config.port));
