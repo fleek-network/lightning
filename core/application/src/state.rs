@@ -233,7 +233,7 @@ impl<B: Backend> State<B> {
                 self.change_protocol_param(txn.sender, param, value)
             },
             UpdateMethod::SetAllowMinting { allow } => self.set_allow_minting(txn.sender, allow),
-            UpdateMethod::Mint => self.mint(txn.sender),
+            UpdateMethod::Mint { recipient } => self.mint(txn.sender, recipient),
         };
 
         #[cfg(debug_assertions)]
@@ -1352,11 +1352,6 @@ impl<B: Backend> State<B> {
             },
         }
 
-        // ONLY TESTNET
-        if let UpdateMethod::Mint = txn.payload.method {
-            return Ok(());
-        }
-
         // Check signature
         let payload = txn.payload.clone();
         let digest = payload.to_digest();
@@ -1593,9 +1588,9 @@ impl<B: Backend> State<B> {
         TransactionResponse::Success(ExecutionData::None)
     }
 
-    fn mint(&self, sender: TransactionSender) -> TransactionResponse {
-        let sender = match self.only_account_owner(sender) {
-            Ok(account) => account,
+    fn mint(&self, sender: TransactionSender, recipient: EthAddress) -> TransactionResponse {
+        let sender = match self.only_node(sender) {
+            Ok(node) => node,
             Err(e) => return e,
         };
 
@@ -1608,9 +1603,18 @@ impl<B: Backend> State<B> {
             return TransactionResponse::Revert(ExecutionError::Unimplemented);
         }
 
-        let mut to_account = self.account_info.get(&sender).unwrap_or_default();
+        let current_epoch = match self.metadata.get(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        };
+        let current_committee = self.committee_info.get(&current_epoch).unwrap_or_default();
+        if !current_committee.members.contains(&sender) {
+            return TransactionResponse::Revert(ExecutionError::NotCommitteeMember);
+        }
+
+        let mut to_account = self.account_info.get(&recipient).unwrap_or_default();
         to_account.flk_balance += HpUfixed::from(1010_u32);
-        self.account_info.set(sender, to_account);
+        self.account_info.set(recipient, to_account);
 
         TransactionResponse::Success(ExecutionData::None)
     }

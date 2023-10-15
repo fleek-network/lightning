@@ -5,13 +5,7 @@ use std::time::Duration;
 
 use autometrics::autometrics;
 use axum::{http, Extension, Json};
-use fleek_crypto::{
-    AccountOwnerSignature,
-    EthAddress,
-    NodePublicKey,
-    TransactionSender,
-    TransactionSignature,
-};
+use fleek_crypto::{EthAddress, NodePublicKey, SecretKey, TransactionSender, TransactionSignature};
 use hp_fixed::unsigned::HpUfixed;
 use http::StatusCode;
 use jsonrpc_v2::{Data, Error, MapRouter, Params, RequestObject, ResponseObjects, Server};
@@ -35,7 +29,7 @@ use lightning_interfaces::types::{
     UpdatePayload,
     UpdateRequest,
 };
-use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_interfaces::{SyncQueryRunnerInterface, ToDigest};
 use tracing::error;
 
 use crate::eth::{
@@ -225,12 +219,16 @@ pub async fn mint_handler<C: Collection>(
             return Ok("already minted".to_string());
         }
         let nonce = data.query_runner.get_account_nonce(&params.public_key) + 1;
-        let method = UpdateMethod::Mint;
+        let method = UpdateMethod::Mint {
+            recipient: params.public_key,
+        };
         let payload = UpdatePayload { method, nonce };
+        let digest = payload.to_digest();
+        let signature = data.node_secret_key.sign(&digest);
         let request = UpdateRequest {
             payload,
-            sender: TransactionSender::AccountOwner(params.public_key),
-            signature: TransactionSignature::AccountOwner(AccountOwnerSignature([0; 65])),
+            sender: TransactionSender::NodeMain(data.node_secret_key.to_pk()),
+            signature: TransactionSignature::NodeMain(signature),
         };
 
         if let Err(e) = data

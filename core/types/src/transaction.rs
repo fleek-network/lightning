@@ -316,7 +316,9 @@ pub enum UpdateMethod {
     SetAllowMinting {
         allow: bool,
     },
-    Mint,
+    Mint {
+        recipient: EthAddress,
+    },
 }
 
 impl ToDigest for UpdatePayload {
@@ -511,8 +513,10 @@ impl ToDigest for UpdatePayload {
                     .with("transaction_name", &"set_allow_minting")
                     .with("allow", &allow)
             },
-            UpdateMethod::Mint => {
-                transcript_builder = transcript_builder.with("transaction_name", &"mint")
+            UpdateMethod::Mint { recipient } => {
+                transcript_builder = transcript_builder
+                    .with("transaction_name", &"mint")
+                    .with("recipient", &recipient.to_string())
             },
         }
 

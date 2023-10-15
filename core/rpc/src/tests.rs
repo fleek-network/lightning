@@ -149,6 +149,7 @@ fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
         blockstore,
         &fetcher,
         None,
+        &signer,
     )?;
     Ok(rpc)
 }

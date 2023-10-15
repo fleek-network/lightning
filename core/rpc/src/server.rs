@@ -5,6 +5,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use axum::routing::{get, post};
 use axum::{Extension, Router};
+use fleek_crypto::NodeSecretKey;
 use lightning_interfaces::common::WithStartAndShutdown;
 use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::infu_collection::{c, Collection};
@@ -15,6 +16,7 @@ use lightning_interfaces::{
     FetcherSocket,
     MempoolSocket,
     RpcInterface,
+    SignerInterface,
 };
 use tokio::sync::Notify;
 use tokio::task;
@@ -38,6 +40,7 @@ pub struct RpcData<C: Collection> {
     pub blockstore: C::BlockStoreInterface,
     /// If this is some it means the node is in archive mode
     pub archive_socket: Option<ArchiveSocket>,
+    pub node_secret_key: NodeSecretKey,
 }
 
 #[async_trait]
@@ -100,7 +103,9 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         blockstore: C::BlockStoreInterface,
         fetcher: &C::FetcherInterface,
         archive_socket: Option<ArchiveSocket>,
+        signer: &C::SignerInterface,
     ) -> anyhow::Result<Self> {
+        let (_, node_secret_key) = signer.get_sk();
         Ok(Self {
             data: Arc::new(RpcData {
                 mempool_socket: mempool,
@@ -108,6 +113,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
                 blockstore,
                 query_runner,
                 archive_socket,
+                node_secret_key,
             }),
             config,
             is_running: Arc::new(AtomicBool::new(false)),
