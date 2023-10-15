@@ -55,7 +55,10 @@ impl Default for HandshakeConfig {
                 WorkerMode::AsyncWorker,
                 WorkerMode::AsyncWorker,
             ],
-            transports: vec![TransportConfig::WebRTC(Default::default())],
+            transports: vec![
+                TransportConfig::WebRTC(Default::default()),
+                TransportConfig::Tcp(Default::default()),
+            ],
             http_address: ([0, 0, 0, 0], 4220).into(),
         }
     }
