@@ -6,7 +6,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Mutex, Notify};
 use tracing::{info, warn};
 use triomphe::Arc;
@@ -47,55 +47,17 @@ impl Transport for TcpTransport {
 
         // Spawn the main loop accepting connections until shutdown
         tokio::spawn(async move {
-            while !shutdown.is_shutdown() {
+            loop {
                 // Accept a new stream from the listener
-                let Ok((mut stream, _)) = listener.accept().await else { break };
-
-                // Spawn a task for driving the connection until we've received a handshake request
-                let tx = tx.clone();
-                tokio::spawn(async move {
-                    let mut buf = BytesMut::with_capacity(4);
-
-                    // Read until we have enough for the length delimiter
-                    while buf.len() < 4 {
-                        match stream.read_buf(&mut buf).await {
-                            Ok(len) if len == 0 => return,
-                            Err(_) => return,
-                            Ok(_) => {},
+                tokio::select! {
+                    res = listener.accept() => {
+                        match res {
+                            Ok((stream, _)) => spawn_handshake_task(stream, tx.clone()),
+                            _ => break,
                         }
-                    }
-
-                    // Parse the length delimiter
-                    // TODO: Do better, there are only 3 different handshake request variants/sizes
-                    let len = u32::from_be_bytes(*array_ref!(buf, 0, 4)) as usize;
-                    if len > 157 {
-                        warn!("dropping connection, handshake request delimiter is too large");
-                        return;
-                    }
-                    buf.reserve(len);
-                    buf.advance(4);
-
-                    // Read until we have enough for the handshake frame
-                    while buf.len() < len {
-                        match stream.read_buf(&mut buf).await {
-                            Ok(len) if len == 0 => return,
-                            Err(_) => return,
-                            Ok(_) => {},
-                        }
-                    }
-
-                    // Parse the handshake frame
-                    let Ok(frame) = schema::HandshakeRequestFrame::decode(&buf) else {
-                        return
-                    };
-
-                    let (reader, writer) = stream.into_split();
-
-                    // Send the frame and the new connection over the channel
-                    tx.send((frame, TcpSender::new(writer), TcpReceiver::new(reader)))
-                        .await
-                        .ok();
-                });
+                    },
+                    _ = shutdown.wait_for_shutdown() => break,
+                }
             }
         });
 
@@ -108,6 +70,55 @@ impl Transport for TcpTransport {
     ) -> Option<(schema::HandshakeRequestFrame, Self::Sender, Self::Receiver)> {
         self.rx.recv().await
     }
+}
+
+fn spawn_handshake_task(
+    mut stream: TcpStream,
+    tx: mpsc::Sender<(schema::HandshakeRequestFrame, TcpSender, TcpReceiver)>,
+) {
+    tokio::spawn(async move {
+        let mut buf = BytesMut::with_capacity(4);
+
+        // Read until we have enough for the length delimiter
+        while buf.len() < 4 {
+            match stream.read_buf(&mut buf).await {
+                Ok(len) if len == 0 => return,
+                Err(_) => return,
+                Ok(_) => {},
+            }
+        }
+
+        // Parse the length delimiter
+        // TODO: Do better, there are only 3 different handshake request variants/sizes
+        let len = u32::from_be_bytes(*array_ref!(buf, 0, 4)) as usize;
+        if len > 157 {
+            warn!("dropping connection, handshake request delimiter is too large");
+            return;
+        }
+        buf.reserve(len);
+        buf.advance(4);
+
+        // Read until we have enough for the handshake frame
+        while buf.len() < len {
+            match stream.read_buf(&mut buf).await {
+                Ok(len) if len == 0 => return,
+                Err(_) => return,
+                Ok(_) => {},
+            }
+        }
+
+        // Parse the handshake frame
+        let Ok(frame) = schema::HandshakeRequestFrame::decode(&buf) else {
+                        return
+                    };
+
+        let (reader, writer) = stream.into_split();
+
+        // Send the frame and the new connection over the channel
+        tx.send((frame, TcpSender::new(writer), TcpReceiver::new(reader)))
+            .await
+            .ok();
+    });
 }
 
 // TODO: Remove the lock.
@@ -238,7 +249,7 @@ mod tests {
     async fn handshake() -> Result<()> {
         // Bind the server
         let notifier = ShutdownNotifier::default();
-        let config = TcpConfig::default();
+        let config = TcpConfig { port: 20000 };
         let (mut transport, _) = TcpTransport::bind(notifier.waiter(), config.clone()).await?;
 
         // Connect a dummy client

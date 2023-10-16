@@ -3,6 +3,7 @@ mod signal;
 
 use std::net::{IpAddr, SocketAddr};
 
+use anyhow::Result;
 use async_trait::async_trait;
 use axum::Router;
 use dashmap::DashMap;
@@ -52,10 +53,7 @@ impl Transport for WebRtcTransport {
     type Sender = WebRtcSender;
     type Receiver = WebRtcReceiver;
 
-    async fn bind(
-        waiter: ShutdownWaiter,
-        config: Self::Config,
-    ) -> anyhow::Result<(Self, Option<Router>)> {
+    async fn bind(waiter: ShutdownWaiter, config: Self::Config) -> Result<(Self, Option<Router>)> {
         info!("Binding WebRTC transport on {}", config.udp_address);
         let conns = Arc::new(DashMap::new());
 
@@ -103,7 +101,6 @@ impl Transport for WebRtcTransport {
 /// Sender for a webrtc connection.
 pub struct WebRtcSender {
     addr: IpAddr,
-
     conns: ConnectionMap,
     notify: Arc<Notify>,
 }

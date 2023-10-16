@@ -88,6 +88,9 @@ impl WebRtcDriver {
                 _ = tokio::time::sleep(timeout) => {}
                 // Waker for outgoing data written to the state
                 _ = notify.notified() => {}
+                // Shutdown has been received
+                _ = shutdown_waiter.wait_for_shutdown() => break,
+
             }
 
             // Drive time forward in all clients.
