@@ -218,7 +218,11 @@ pub async fn mint_handler<C: Collection>(
         if balance > 1010 {
             return Ok("already minted".to_string());
         }
-        let nonce = data.query_runner.get_account_nonce(&params.public_key) + 1;
+        let node_pk = data.node_secret_key.to_pk();
+        let Some(node_index) = data.query_runner.pubkey_to_index(node_pk) else {
+            return Ok("rpc node is not staked".to_string());
+        };
+        let nonce = data.query_runner.get_node_nonce(&node_index) + 1;
         let method = UpdateMethod::Mint {
             recipient: params.public_key,
         };

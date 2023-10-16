@@ -191,8 +191,11 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Returns last executed block hash. [0;32] is genesis
     fn get_last_block(&self) -> [u8; 32];
 
-    /// Returns an accounts current nonce
+    /// Returns an account's current nonce
     fn get_account_nonce(&self, public_key: &EthAddress) -> u64;
+
+    /// Returns a node's current nonce
+    fn get_node_nonce(&self, node_index: &NodeIndex) -> u64;
 
     /// Returns the chain id
     fn get_chain_id(&self) -> u32;

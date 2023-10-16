@@ -466,6 +466,16 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
+    fn get_node_nonce(&self, node_index: &NodeIndex) -> u64 {
+        self.inner.run(|ctx| {
+            self.node_table
+                .get(ctx)
+                .get(node_index)
+                .map(|node| node.nonce)
+                .unwrap_or_default()
+        })
+    }
+
     fn get_chain_id(&self) -> u32 {
         self.inner.run(
             |ctx| match self.metadata_table.get(ctx).get(&Metadata::ChainId) {
