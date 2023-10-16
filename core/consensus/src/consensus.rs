@@ -94,6 +94,7 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     shutdown_notify: Arc<Notify>,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, P> {
     fn new(
         query_runner: Q,
