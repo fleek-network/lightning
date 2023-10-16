@@ -79,6 +79,7 @@ impl Cli {
                 .into(),
             )
             .from_env_lossy()
+            // Ignore traces from spammy dependencies
             .add_directive("quinn=warn".parse().unwrap())
             .add_directive("anemo=warn".parse().unwrap())
             .add_directive("rustls=warn".parse().unwrap())
@@ -96,7 +97,7 @@ impl Cli {
             // Spawn tokio_console server
             let console_layer = console_subscriber::Builder::default()
                 .with_default_env()
-                .server_addr(([0, 0, 0, 0], 9001))
+                .server_addr(([0, 0, 0, 0], 6669))
                 .spawn();
             registry.with(console_layer).init();
         } else {
