@@ -68,13 +68,7 @@ impl Cli {
     }
 
     fn setup(&self) {
-        // Spawn tokio_console server
-        let console_layer = console_subscriber::Builder::default()
-            .with_default_env()
-            .server_addr(([0, 0, 0, 0], 9001))
-            .spawn();
-
-        // Build the filter from cli args, or environment variable
+        // Build the filter from cli args, or override if environment variable is set.
         let env_filter = EnvFilter::builder()
             .with_default_directive(
                 match self.args.verbose {
@@ -85,15 +79,29 @@ impl Cli {
                 .into(),
             )
             .from_env_lossy()
-            .add_directive("quinn=off".parse().unwrap())
-            .add_directive("anemo=off".parse().unwrap());
+            .add_directive("quinn=warn".parse().unwrap())
+            .add_directive("anemo=warn".parse().unwrap())
+            .add_directive("rustls=warn".parse().unwrap())
+            .add_directive("tokio=warn".parse().unwrap())
+            .add_directive("runtime=warn".parse().unwrap());
 
-        // Initialize the registry for logging events
-        tracing_subscriber::registry()
-            .with(console_layer)
-            .with(tracing_subscriber::fmt::layer().with_file(true))
-            .with(env_filter)
-            .init();
+        // Initialize the base logging registry
+        let registry = tracing_subscriber::registry().with(
+            tracing_subscriber::fmt::layer()
+                .with_file(self.args.with_log_locations)
+                .with_filter(env_filter),
+        );
+
+        if self.args.with_console {
+            // Spawn tokio_console server
+            let console_layer = console_subscriber::Builder::default()
+                .with_default_env()
+                .server_addr(([0, 0, 0, 0], 9001))
+                .spawn();
+            registry.with(console_layer).init();
+        } else {
+            registry.init();
+        }
     }
 
     fn resolve_config_path(&self) -> Result<ResolvedPathBuf> {
