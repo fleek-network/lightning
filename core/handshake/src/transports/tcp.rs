@@ -4,10 +4,10 @@ use async_trait::async_trait;
 use axum::Router;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use tokio::net::TcpListener;
-use tokio::sync::mpsc;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::{mpsc, Mutex, Notify};
 use tracing::{info, warn};
 use triomphe::Arc;
 
@@ -47,53 +47,17 @@ impl Transport for TcpTransport {
 
         // Spawn the main loop accepting connections until shutdown
         tokio::spawn(async move {
-            while !shutdown.is_shutdown() {
+            loop {
                 // Accept a new stream from the listener
-                let Ok((mut stream, _)) = listener.accept().await else { break };
-
-                // Spawn a task for driving the connection until we've received a handshake request
-                let tx = tx.clone();
-                tokio::spawn(async move {
-                    let mut buf = BytesMut::with_capacity(157 + 4);
-
-                    // Read until we have enough for the length delimiter
-                    while buf.len() < 4 {
-                        match stream.read_buf(&mut buf).await {
-                            Ok(len) if len == 0 => return,
-                            Err(_) => return,
-                            Ok(_) => {},
+                tokio::select! {
+                    res = listener.accept() => {
+                        match res {
+                            Ok((stream, _)) => spawn_handshake_task(stream, tx.clone()),
+                            _ => break,
                         }
-                    }
-
-                    // Parse the length delimiter
-                    let len = u32::from_be_bytes(*array_ref!(buf, 0, 4)) as usize;
-                    if len > 157 {
-                        return;
-                    }
-                    buf.reserve(len);
-                    buf.advance(4);
-
-                    // Read until we have enough for the handshake frame
-                    while buf.len() < len {
-                        match stream.read_buf(&mut buf).await {
-                            Ok(len) if len == 0 => return,
-                            Err(_) => return,
-                            Ok(_) => {},
-                        }
-                    }
-
-                    // Parse the handshake frame
-                    let Ok(frame) = schema::HandshakeRequestFrame::decode(&buf) else {
-                        return
-                    };
-
-                    let (reader, writer) = stream.into_split();
-
-                    // Send the frame and the new connection over the channel
-                    tx.send((frame, TcpSender(Arc::new(writer)), TcpReceiver::new(reader)))
-                        .await
-                        .ok();
-                });
+                    },
+                    _ = shutdown.wait_for_shutdown() => break,
+                }
             }
         });
 
@@ -108,38 +72,105 @@ impl Transport for TcpTransport {
     }
 }
 
-pub struct TcpSender(Arc<OwnedWriteHalf>);
+fn spawn_handshake_task(
+    mut stream: TcpStream,
+    tx: mpsc::Sender<(schema::HandshakeRequestFrame, TcpSender, TcpReceiver)>,
+) {
+    tokio::spawn(async move {
+        let mut buf = BytesMut::with_capacity(4);
+
+        // Read until we have enough for the length delimiter
+        while buf.len() < 4 {
+            match stream.read_buf(&mut buf).await {
+                Ok(len) if len == 0 => return,
+                Err(_) => return,
+                Ok(_) => {},
+            }
+        }
+
+        // Parse the length delimiter
+        // TODO: Do better, there are only 3 different handshake request variants/sizes
+        let len = u32::from_be_bytes(*array_ref!(buf, 0, 4)) as usize;
+        if len > 157 {
+            warn!("dropping connection, handshake request delimiter is too large");
+            return;
+        }
+        buf.reserve(len);
+        buf.advance(4);
+
+        // Read until we have enough for the handshake frame
+        while buf.len() < len {
+            match stream.read_buf(&mut buf).await {
+                Ok(len) if len == 0 => return,
+                Err(_) => return,
+                Ok(_) => {},
+            }
+        }
+
+        // Parse the handshake frame
+        let Ok(frame) = schema::HandshakeRequestFrame::decode(&buf) else {
+                        return
+                    };
+
+        let (reader, writer) = stream.into_split();
+
+        // Send the frame and the new connection over the channel
+        tx.send((frame, TcpSender::new(writer), TcpReceiver::new(reader)))
+            .await
+            .ok();
+    });
+}
+
+// TODO: Remove the lock.
+pub struct TcpSender {
+    writer: Arc<Mutex<OwnedWriteHalf>>,
+    notify: Arc<Notify>,
+}
 
 impl TcpSender {
     #[inline(always)]
+    pub fn new(writer: OwnedWriteHalf) -> Self {
+        Self {
+            writer: Arc::new(Mutex::new(writer)),
+            notify: Arc::new(Notify::new()),
+        }
+    }
+
+    /// Spawn a task to write the bytes to the stream
+    #[inline(always)]
     fn send_inner(&mut self, bytes: Bytes) {
-        let writer = self.0.clone();
+        let writer = self.writer.clone();
+        let notify = self.notify.clone();
         tokio::spawn(async move {
-            if let Err(e) = writer.writable().await {
-                warn!("failed to get writable: {e}");
-            }
-            let mut written = 0;
-            while written < bytes.len() {
-                match writer.try_write(&bytes[written..]) {
-                    Ok(len) => written += len,
-                    Err(e) => warn!("failed to write bytes to stream: {e}"),
-                }
+            tokio::select! {
+                mut writer = writer.lock() => {
+                    if let Err(e) = writer.write_all(&delimit_frame(bytes)).await {
+                        warn!("Dropping payload, failed to write to stream: {e}");
+                    };
+                },
+                _ = notify.notified() => {}
             }
         });
     }
 }
 
+impl Drop for TcpSender {
+    fn drop(&mut self) {
+        // Release all pending write tasks immediately
+        self.notify.notify_waiters()
+    }
+}
+
 impl TransportSender for TcpSender {
     fn send_handshake_response(&mut self, response: schema::HandshakeResponse) {
-        let bytes = delimit_frame(response.encode());
-        self.send_inner(bytes);
+        self.send_inner(response.encode());
     }
 
-    /// Should not send a payload > u32::MAX - 1
+    /// Should not send a payload greater than u32::MAX - 1
     fn send(&mut self, frame: schema::ResponseFrame) {
         let bytes = frame.encode();
         assert!(bytes.len() < u32::MAX as usize);
-        self.send_inner(delimit_frame(bytes));
+        self.send_inner(bytes);
     }
 }
 
@@ -152,41 +183,46 @@ impl TcpReceiver {
     pub fn new(reader: OwnedReadHalf) -> Self {
         Self {
             reader,
-            buffer: BytesMut::with_capacity(257 << 10),
+            buffer: BytesMut::with_capacity(4),
         }
     }
 }
 
 #[async_trait]
 impl TransportReceiver for TcpReceiver {
-    /// Async Safety: This method is cancel safe
     async fn recv(&mut self) -> Option<schema::RequestFrame> {
         loop {
-            if self.buffer.len() >= 4 {
-                // parse the length delimiter
+            if self.buffer.len() < 4 {
+                // Read more bytes for the length delimiter
+                if self.reader.read_buf(&mut self.buffer).await.ok()? == 0 {
+                    return None;
+                };
+            } else {
+                // Parse the length delimiter
                 let len = u32::from_be_bytes(*array_ref!(self.buffer, 0, 4)) as usize + 4;
-
-                // if we need more bytes, read until we have enough
-                while self.buffer.len() < len {
-                    self.reader.read_buf(&mut self.buffer).await.ok()?;
-                }
-
-                // take the frame bytes from the buffer, and reserve for the next delimiter
-                self.buffer.advance(4);
-                let bytes = self.buffer.split_to(len - 4);
+                // TODO: Don't re-allocate here if the future is canceled.
                 self.buffer.reserve(len);
 
+                // If we need more bytes, read until we have enough
+                while self.buffer.len() < len {
+                    if self.reader.read_buf(&mut self.buffer).await.ok()? == 0 {
+                        return None;
+                    };
+                }
+
+                // Take the frame bytes from the buffer
+                let bytes = self.buffer.split_to(len);
+                // Allocate for the next delimiter
+                self.buffer.reserve(4);
+
                 // decode the frame
-                match schema::RequestFrame::decode(&bytes) {
+                match schema::RequestFrame::decode(&bytes[4..]) {
                     Ok(frame) => return Some(frame),
                     Err(_) => {
                         warn!("invalid frame from client, dropping payload");
                         continue;
                     },
                 }
-            } else {
-                // Read more bytes for the length delimiter
-                self.reader.read_buf(&mut self.buffer).await.ok()?;
             }
         }
     }
@@ -213,7 +249,7 @@ mod tests {
     async fn handshake() -> Result<()> {
         // Bind the server
         let notifier = ShutdownNotifier::default();
-        let config = TcpConfig::default();
+        let config = TcpConfig { port: 20000 };
         let (mut transport, _) = TcpTransport::bind(notifier.waiter(), config.clone()).await?;
 
         // Connect a dummy client
