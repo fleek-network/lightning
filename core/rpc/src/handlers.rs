@@ -214,7 +214,11 @@ pub async fn mint_handler<C: Collection>(
     Params(params): Params<PublicKeyParam>,
 ) -> Result<String> {
     if data.query_runner.get_allow_mint() {
-        let balance = data.query_runner.get_account_balance(&params.public_key);
+        let balance: u128 = data
+            .query_runner
+            .get_flk_balance(&params.public_key)
+            .try_into()
+            .unwrap();
         if balance > 1010 {
             return Ok("already minted".to_string());
         }
