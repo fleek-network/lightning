@@ -144,3 +144,72 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use affair::{Executor, TokioSpawn, Worker};
+    use anyhow::Result;
+    use infusion::Blank;
+    use lightning_blockstore::blockstore::Blockstore;
+    use lightning_interfaces::types::TransactionRequest;
+    use lightning_interfaces::{partial, BlockStoreInterface};
+    use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
+    use lightning_signer::Signer;
+    use tokio::sync::Notify;
+
+    use super::*;
+
+    partial!(TestBinding {
+        HandshakeInterface = Handshake<Self>;
+        ServiceExecutorInterface = ServiceExecutor<Self>;
+        SignerInterface = Signer<Self>;
+        BlockStoreInterface = Blockstore<Self>;
+    });
+
+    struct DummyWorker;
+    impl Worker for DummyWorker {
+        type Request = TransactionRequest;
+        type Response = ();
+        fn handle(&mut self, _: Self::Request) -> Self::Response {
+            todo!()
+        }
+    }
+
+    #[tokio::test]
+    async fn restart() -> Result<()> {
+        let mut signer = Signer::init(lightning_signer::Config::test(), Blank::default())?;
+        let socket = TokioSpawn::spawn(DummyWorker);
+        signer.provide_mempool(socket);
+        signer.provide_new_block_notify(Notify::default().into());
+        let blockstore = Blockstore::init(lightning_blockstore::config::Config::default())?;
+        let service_executor =
+            ServiceExecutor::<TestBinding>::init(ServiceExecutorConfig::default(), &blockstore)?;
+        signer.start().await;
+        service_executor.start().await;
+
+        // Startup handshake
+        let handshake = Handshake::<TestBinding>::init(
+            HandshakeConfig::default(),
+            &signer,
+            service_executor.get_provider(),
+        )?;
+        handshake.start().await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        // Shutdown and drop it
+        handshake.shutdown().await;
+        drop(handshake);
+
+        // Start handshake again
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        let handshake = Handshake::<TestBinding>::init(
+            HandshakeConfig::default(),
+            &signer,
+            service_executor.get_provider(),
+        )?;
+        handshake.start().await;
+
+        Ok(())
+    }
+}
