@@ -45,7 +45,7 @@ if [[ ! -d /root/.lightning/keystore ]]; then
   lgtn keys generate
 fi
 
-lgtn -v run
+lgtn -vv run
 EOF
 
 RUN chmod +x /root/init
