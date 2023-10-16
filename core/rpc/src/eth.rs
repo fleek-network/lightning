@@ -227,7 +227,7 @@ pub async fn eth_estimate_gas<C: Collection>(
 ) -> Result<U256> {
     trace!(target: "rpc::eth", ?request, "Serving
   eth_estimateGas");
-    Ok(U256::from(0))
+    Ok(U256::from(10000))
 }
 
 /// Handler for: `eth_gasPrice`
