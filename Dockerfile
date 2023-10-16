@@ -42,7 +42,7 @@ COPY <<EOF /root/init
 #!/usr/bin/bash
 
 if [[ ! -d /root/.lightning/keystore ]]; then
-  lgtn key generate
+  lgtn keys generate
 fi
 
 lgtn -v run
