@@ -5,14 +5,9 @@ use bytes::Bytes;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-use crate::context::Context;
-use crate::schema::{RequestFrame, ResponseFrame, TerminationReason};
+use crate::schema::{RequestFrame, ResponseFrame};
 
 pub type Response = ResponseFrame;
-
-pub trait Driver: Send + 'static {
-    fn drive(&mut self, _: Event<'_>, _: &mut Context) {}
-}
 
 pub enum Request {
     /// Raw message to be sent to the service implementation.
@@ -21,12 +16,6 @@ pub enum Request {
     AccessToken { ttl: u64 },
     /// Extend the access token associated with this connection.
     ExtendAccessToken { ttl: u64 },
-}
-
-pub enum Event<'a> {
-    Connection { success: bool },
-    PayloadReceived { bytes: &'a [u8] },
-    Disconnect { reason: Option<TerminationReason> },
 }
 
 pub struct RequestResponse {
@@ -62,10 +51,6 @@ impl Handle {
                 response.map_err(|e| anyhow::anyhow!("failed to receive response: {e:?}"))
             }
         }
-    }
-
-    pub fn disconnect(self) {
-        // Dropping the senders will cause the connection to disconnect.
     }
 }
 

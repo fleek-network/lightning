@@ -4,52 +4,35 @@ use futures::{SinkExt, StreamExt};
 use tokio::sync::mpsc::Receiver;
 
 use crate::context::Context;
-use crate::driver::{Driver, Event, RequestResponse};
+use crate::handle::RequestResponse;
 use crate::mode::{ModeSetting, PrimaryMode, SecondaryMode};
 use crate::schema::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
 use crate::transport::Transport;
 
-pub async fn connect_and_drive<T: Transport, D: Driver>(
+pub async fn connect_and_drive<T: Transport>(
     transport: T,
-    mut driver: D,
     request_rx: Receiver<RequestResponse>,
-    mut ctx: Context,
+    ctx: Context,
 ) -> anyhow::Result<()> {
     let (mut tx, mut rx) = transport.connect().await?;
 
-    let success = handshake::<T>((&mut tx, &mut rx), &ctx).await?;
-
-    driver.drive(Event::Connection { success }, &mut ctx);
-
-    if success {
-        bail!("handshake failed");
+    match ctx.mode() {
+        ModeSetting::Primary(setting) => {
+            start_handshake::<T>((&mut tx, &mut rx), setting, *ctx.pk()).await?
+        },
+        ModeSetting::Secondary(setting) => {
+            join_connection::<T>((&mut tx, &mut rx), setting).await?
+        },
     }
 
-    let _ = connection_loop::<T, D>((tx, rx), request_rx, &mut ctx, &mut driver).await;
-
-    // Todo: Add termination reason if applicable.
-    driver.drive(Event::Disconnect { reason: None }, &mut ctx);
-
-    Ok(())
-}
-
-async fn handshake<T: Transport>(
-    (tx, rx): (&mut T::Sender, &mut T::Receiver),
-    ctx: &Context,
-) -> anyhow::Result<bool> {
-    let success = match ctx.mode() {
-        ModeSetting::Primary(setting) => start_handshake::<T>((tx, rx), setting, *ctx.pk()).await?,
-        ModeSetting::Secondary(setting) => join_connection::<T>((tx, rx), setting).await?,
-    };
-
-    Ok(success)
+    connection_loop::<T>((tx, rx), request_rx).await
 }
 
 async fn start_handshake<T: Transport>(
     (tx, _): (&mut T::Sender, &mut T::Receiver),
     setting: &PrimaryMode,
     pk: ClientPublicKey,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<()> {
     tx.send(
         HandshakeRequestFrame::Handshake {
             retry: None,
@@ -64,13 +47,13 @@ async fn start_handshake<T: Transport>(
 
     // Todo: Complete HANDSHAKE.
 
-    Ok(true)
+    Ok(())
 }
 
 async fn join_connection<T: Transport>(
     (tx, _): (&mut T::Sender, &mut T::Receiver),
     setting: &SecondaryMode,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<()> {
     tx.send(
         HandshakeRequestFrame::JoinRequest {
             access_token: setting.access_token,
@@ -81,17 +64,15 @@ async fn join_connection<T: Transport>(
 
     // Todo: Complete JOIN.
 
-    Ok(true)
+    Ok(())
 }
 
-async fn connection_loop<T: Transport, D: Driver>(
+async fn connection_loop<T: Transport>(
     (mut tx, mut rx): (T::Sender, T::Receiver),
     mut request_rx: Receiver<RequestResponse>,
-    ctx: &mut Context,
-    driver: &mut D,
 ) -> anyhow::Result<()> {
     while let Some(request) = request_rx.recv().await {
-        // Todo: If (tx, rx) was a individual (QUIC) stream,
+        // Todo: If (tx, rx) was an individual (QUIC) stream,
         // we could move this pair in a separate task and
         // avoid waiting.
         tx.send(RequestFrame::from(request.payload).encode())
@@ -100,13 +81,6 @@ async fn connection_loop<T: Transport, D: Driver>(
         let Some(bytes) = rx.next().await else {
           bail!("connection closed unexpectedly");
         };
-
-        driver.drive(
-            Event::PayloadReceived {
-                bytes: bytes.as_ref(),
-            },
-            ctx,
-        );
 
         tokio::spawn(async move {
             match ResponseFrame::decode(bytes.as_ref()) {

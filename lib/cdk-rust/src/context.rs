@@ -4,17 +4,13 @@ use crate::mode::ModeSetting;
 
 pub struct Context {
     mode: ModeSetting,
+    // The provider's public key.
     pk: ClientPublicKey,
-    shutdown: bool,
 }
 
 impl Context {
     pub fn new(mode: ModeSetting, pk: ClientPublicKey) -> Self {
-        Self {
-            mode,
-            pk,
-            shutdown: false,
-        }
+        Self { mode, pk }
     }
 
     /// Returns the mode setting of the connection.
@@ -24,10 +20,5 @@ impl Context {
 
     pub fn pk(&self) -> &ClientPublicKey {
         &self.pk
-    }
-
-    // Shut downs the connection.
-    pub fn shutdown(&mut self) {
-        self.shutdown = true;
     }
 }
