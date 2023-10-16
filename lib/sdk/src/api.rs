@@ -19,6 +19,14 @@ pub fn setup(args: OnStartArgs) {
     }
 }
 
+#[doc(hidden)]
+pub fn unregister() {
+    unsafe {
+        SENDER = None;
+        BLOCKSTORE = None;
+    }
+}
+
 pub(crate) fn blockstore_root() -> &'static PathBuf {
     unsafe { BLOCKSTORE.as_ref().expect("setup not completed") }
 }
