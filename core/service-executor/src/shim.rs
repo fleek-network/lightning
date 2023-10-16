@@ -105,6 +105,7 @@ impl<C: Collection> WithStartAndShutdown for ServiceExecutor<C> {
     }
 
     async fn shutdown(&self) {
+        fn_sdk::api::unregister();
         self.is_running.store(false, Ordering::Relaxed)
     }
 }
