@@ -9,7 +9,7 @@ use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::ConfigConsumer;
 use resolved_pathbuf::ResolvedPathBuf;
 use toml::{Table, Value};
-use tracing::info;
+use tracing::debug;
 
 /// The implementation of a configuration loader that uses the `toml` backend.
 pub struct TomlConfigProvider<C: Collection> {
@@ -93,7 +93,7 @@ impl<C: Collection> TomlConfigProvider<C> {
 
 impl<C: Collection> ConfigProviderInterface<C> for TomlConfigProvider<C> {
     fn get<S: lightning_interfaces::config::ConfigConsumer>(&self) -> S::Config {
-        info!("Getting the config for {}", std::any::type_name::<S>());
+        debug!("Getting the config for {}", std::any::type_name::<S>());
 
         let mut table = self.table.lock().expect("failed to acquire lock");
 
