@@ -10,6 +10,7 @@ use ethers::types::{
     Transaction,
     TransactionReceipt as EthersTxnReceipt,
     TransactionRequest,
+    H160,
     H256,
     H256 as EthH256,
 };
@@ -25,6 +26,10 @@ use tracing::trace;
 
 use crate::handlers::Result;
 use crate::server::RpcData;
+
+const FLEEK_CONTRACT: H160 = H160([6; 20]);
+
+const FLEEK_CONTRACT_BYTES: &[u8; 172] = b"73000000000000000000000000000000000000000030146080604052600080fdfea264697066735822122012d3570051ca11eb882745693b7b2af91a10ad5074b3486da80280731d9af73164736f6c63430008120033";
 
 /// Handler for: `eth_sendRawTransaction`
 pub async fn eth_send_raw_transaction<C: Collection>(
@@ -138,7 +143,11 @@ pub async fn eth_get_code<C: Collection>(
 ) -> Result<Bytes> {
     trace!(target: "rpc::eth", ?address, ?block_number, "Serving eth_getCode");
 
-    Ok(Bytes::default())
+    if address == FLEEK_CONTRACT {
+        Ok(Bytes::from_static(FLEEK_CONTRACT_BYTES))
+    } else {
+        Ok(Bytes::default())
+    }
 }
 
 // /// Handler for: `eth_getBlockByNumber`
