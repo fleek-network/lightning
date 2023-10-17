@@ -1,4 +1,5 @@
 use affair::Socket;
+use fleek_crypto::NodePublicKey;
 use infusion::c;
 use lightning_types::Blake3Hash;
 use tokio::sync::mpsc::Receiver;
@@ -11,6 +12,7 @@ use crate::{
     ConfigProviderInterface,
     Notification,
     NotifierInterface,
+    SignerInterface,
     WithStartAndShutdown,
 };
 
@@ -25,6 +27,7 @@ pub trait SyncronizerInterface<C: Collection>:
         app: ::ApplicationInterface,
         blockstore_server: ::BlockStoreServerInterface,
         notifier: ::NotifierInterface,
+        signer: ::SignerInterface,
     ) {
         let sqr = app.sync_query();
         let (tx_epoch_change, rx_epoch_change) = tokio::sync::mpsc::channel(10);
@@ -34,6 +37,7 @@ pub trait SyncronizerInterface<C: Collection>:
             sqr,
             blockstore_server,
             rx_epoch_change,
+            signer.get_ed25519_pk(),
         )
     }
 
@@ -43,6 +47,7 @@ pub trait SyncronizerInterface<C: Collection>:
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore_server: &C::BlockStoreServerInterface,
         rx_epoch_change: Receiver<Notification>,
+        node_public_key: NodePublicKey,
     ) -> anyhow::Result<Self>;
 
     /// Returns a socket that will send accross the blake3hash of the checkpoint

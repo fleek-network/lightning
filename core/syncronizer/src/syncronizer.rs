@@ -3,6 +3,7 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
+use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{
     Blake3Hash,
@@ -27,10 +28,10 @@ use serde::de::DeserializeOwned;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
-use tracing::info;
+use tracing::{error, info};
 
 use crate::config::Config;
-use crate::rpc::{rpc_epoch, rpc_last_epoch_hash, rpc_request};
+use crate::rpc::{rpc_epoch_testnet, rpc_last_epoch_hash, rpc_request, RequestError};
 
 pub struct Syncronizer<C: Collection> {
     inner: Mutex<Option<SyncronizerInner<C>>>,
@@ -46,6 +47,7 @@ pub struct SyncronizerInner<C: Collection> {
     genesis_committee: Vec<(NodeIndex, NodeInfo)>,
     rpc_client: reqwest::Client,
     epoch_change_delta: Duration,
+    node_public_key: NodePublicKey,
 }
 
 #[async_trait]
@@ -99,12 +101,14 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore_server: &C::BlockStoreServerInterface,
         rx_epoch_change: Receiver<Notification>,
+        node_public_key: NodePublicKey,
     ) -> Result<Self> {
         let inner = SyncronizerInner::new(
             query_runner,
             blockstore_server,
             rx_epoch_change,
             config.epoch_change_delta,
+            node_public_key,
         );
 
         Ok(Self {
@@ -128,6 +132,7 @@ impl<C: Collection> SyncronizerInner<C> {
         blockstore_server: &C::BlockStoreServerInterface,
         rx_epoch_change: Receiver<Notification>,
         epoch_change_delta: Duration,
+        node_public_key: NodePublicKey,
     ) -> Self {
         let mut genesis_committee = query_runner.genesis_committee();
         // Shuffle this since we often hit this list in order until one responds. This will give our
@@ -143,6 +148,7 @@ impl<C: Collection> SyncronizerInner<C> {
             genesis_committee,
             rpc_client,
             epoch_change_delta,
+            node_public_key,
         }
     }
 
@@ -199,7 +205,16 @@ impl<C: Collection> SyncronizerInner<C> {
         let current_epoch = self.query_runner.get_epoch();
 
         // Get the epoch the bootstrap nodes are at
-        let bootstrap_epoch = self.get_current_epoch().await?;
+        let bootstrap_epoch = match self.get_current_epoch().await {
+            Ok(bootstrap_epoch) => bootstrap_epoch,
+            Err(e) => {
+                if let Some(e) = e.downcast_ref::<RequestError>() {
+                    // node not staked or invalid version
+                    error!("{e:?}");
+                }
+                return Err(e);
+            },
+        };
 
         if bootstrap_epoch <= current_epoch {
             bail!("Bootstrap nodes are on the same epoch");
@@ -262,7 +277,8 @@ impl<C: Collection> SyncronizerInner<C> {
 
     /// Returns the epoch the bootstrap nodes are on
     async fn get_current_epoch(&self) -> Result<Epoch> {
-        self.ask_bootstrap_nodes(rpc_epoch().to_string()).await
+        self.ask_bootstrap_nodes(rpc_epoch_testnet(self.node_public_key).to_string())
+            .await
     }
 }
 

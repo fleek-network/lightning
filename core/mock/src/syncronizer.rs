@@ -3,6 +3,7 @@ use std::sync::Mutex;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::Blake3Hash;
 use lightning_interfaces::{
@@ -43,6 +44,7 @@ impl<C: Collection> SyncronizerInterface<C> for MockSyncronizer<C> {
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
         _blockstore_server: &C::BlockStoreServerInterface,
         _rx_epoch_change: Receiver<Notification>,
+        _node_public_key: NodePublicKey,
     ) -> Result<Self> {
         let (tx, rx) = oneshot::channel();
         Ok(Self {

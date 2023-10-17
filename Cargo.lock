@@ -5097,6 +5097,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "fleek-crypto",
  "lightning-interfaces",
  "rand 0.8.5",
  "reqwest",

@@ -23,6 +23,12 @@ pub struct ClientKeyParam {
 }
 
 #[derive(Deserialize)]
+pub struct VersionedNodeKeyParam {
+    pub public_key: NodePublicKey,
+    pub version: u8,
+}
+
+#[derive(Deserialize)]
 pub struct DhtPutParam {
     pub key: Vec<u8>,
     pub value: Vec<u8>,

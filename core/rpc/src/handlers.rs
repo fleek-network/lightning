@@ -63,8 +63,10 @@ use crate::eth::{
     net_version,
 };
 use crate::server::RpcData;
-use crate::types::{NodeKeyParam, PublicKeyParam};
+use crate::types::{NodeKeyParam, PublicKeyParam, VersionedNodeKeyParam};
 static OPEN_RPC_DOCS: &str = "../../docs/rpc/openrpc.json";
+
+pub const RPC_VERSION: u8 = 1;
 
 pub type Result<T> = anyhow::Result<T, Error>;
 
@@ -120,6 +122,7 @@ impl RpcServer {
                 get_committee_members_handler::<C>,
             )
             .with_method("flk_get_epoch", get_epoch_handler::<C>)
+            .with_method("flk_get_epoch_testnet", get_epoch_testnet_handler::<C>)
             .with_method("flk_get_epoch_info", get_epoch_info_handler::<C>)
             .with_method("flk_get_total_supply", get_total_supply_handler::<C>)
             .with_method(
@@ -358,6 +361,31 @@ pub async fn get_committee_members_handler<C: Collection>(
 }
 
 pub async fn get_epoch_handler<C: Collection>(data: Data<Arc<RpcData<C>>>) -> Result<u64> {
+    Ok(data.0.query_runner.get_epoch())
+}
+
+pub async fn get_epoch_testnet_handler<C: Collection>(
+    data: Data<Arc<RpcData<C>>>,
+    Params(params): Params<VersionedNodeKeyParam>,
+) -> Result<u64> {
+    let Some(node_info) = data.query_runner.get_node_info(&params.public_key) else {
+        return Err(jsonrpc_v2::Error::Provided { code: 123, message: "Node is not staked" });
+    };
+    let min_amount = data.query_runner.get_staking_amount();
+    if node_info.stake.staked < min_amount.into() {
+        return Err(jsonrpc_v2::Error::Provided {
+            code: 123,
+            message: "Node is not staked",
+        });
+    }
+
+    if params.version != RPC_VERSION {
+        return Err(Error::Provided {
+            code: 69,
+            message: "Version Mismatch",
+        });
+    }
+
     Ok(data.0.query_runner.get_epoch())
 }
 
