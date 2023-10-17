@@ -1,6 +1,7 @@
-use std::future::Future;
+use std::path::PathBuf;
 
-use fn_sdk::internal::{OnConnectedArgs, OnDisconnectedArgs, OnMessageArgs};
+use async_trait::async_trait;
+use tokio::net::UnixStream;
 
 use crate::blockstore::BlockStoreInterface;
 use crate::infu_collection::Collection;
@@ -26,55 +27,23 @@ pub trait ServiceExecutorInterface<C: Collection>:
     /// Initialize the service executor.
     fn init(config: Self::Config, blockstore: &C::BlockStoreInterface) -> anyhow::Result<Self>;
 
-    /// Returns the service handle provider which can be used to query and get a handle to a
-    /// service that is running.
+    /// Returns the service handle provider which can be used establish connections to the
+    /// services.
     fn get_provider(&self) -> Self::Provider;
+
+    /// Run the code for the given service. This is a top level function that is assumed to
+    /// take ownership over the entire binary. Must be called from the `main` function when
+    /// the following environment variables exists:
+    ///
+    /// 1. `SERVICE_NAME`
+    /// 2. `BLOCKSTORE_PATH`
+    /// 3. `IPC_PATH`
+    fn run_service(name: String, blockstore_path: PathBuf, ipc_socket: PathBuf);
 }
 
+#[async_trait]
 #[infusion::blank]
 pub trait ExecutorProviderInterface: Clone + Send + Sync + 'static {
-    type Handle: ServiceHandleInterface;
-    type Stealer: ConnectionWorkStealer;
-
-    /// Returns the handle to a specific service.
-    fn get_service_handle(&self, service_id: ServiceId) -> Option<Self::Handle>;
-
-    /// Return an instance of work stealer.
-    fn get_work_stealer(&self) -> Self::Stealer;
-}
-
-/// A handle to a service. The handshake can use this to send I/O related events a
-/// service that is running.
-#[infusion::blank]
-pub trait ServiceHandleInterface: Clone + Send + Sync + 'static {
-    fn get_service_id(&self) -> u32;
-    fn connected(&self, args: OnConnectedArgs);
-    fn disconnected(&self, args: OnDisconnectedArgs);
-    fn message(&self, args: OnMessageArgs);
-}
-
-/// A work stealer is job stealer side of worker pool that is responsible
-/// for getting connection related commands coming from services and sending
-/// them.
-#[infusion::blank]
-pub trait ConnectionWorkStealer: Clone + Send + Sync + 'static {
-    type AsyncFuture<'a>: Future<Output = Option<ConnectionWork>> + Send + Sync + 'a =
-        infusion::Blank<Option<ConnectionWork>>;
-
-    /// Returns a future which return a command or `None` if there we're closing.
-    fn next(&mut self) -> Self::AsyncFuture<'_>;
-
-    /// Blocking version of the next.
-    fn next_blocking(&mut self) -> Option<ConnectionWork>;
-}
-
-pub enum ConnectionWork {
-    Send {
-        connection_id: u64,
-        sequence_id: u16,
-        payload: Vec<u8>,
-    },
-    Close {
-        connection_id: u64,
-    },
+    /// Make a connection to the provided service.
+    async fn connect(&self, service_id: ServiceId) -> Option<UnixStream>;
 }
