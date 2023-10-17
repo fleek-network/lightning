@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["core/*", "lib/*", "services/*"]
+members = ["core/*", "lib/*"]
 exclude = ["etc/global-metrics", "lib/cdk", "lib/blake3-js"]
 
 

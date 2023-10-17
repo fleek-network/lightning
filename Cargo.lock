@@ -3592,6 +3592,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "garcon"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e83fb8961dcd3c26123863998521ae4d07e5e5aa8fb50b503380448f2e0ea069"
+
+[[package]]
 name = "gcc"
 version = "0.3.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5057,10 +5063,9 @@ dependencies = [
  "async-channel",
  "async-trait",
  "dashmap",
- "fleek-service-big-buck-bunny",
- "fleek-service-ping-example",
  "fn-sdk",
  "fxhash",
+ "garcon",
  "lightning-interfaces",
  "resolved-pathbuf",
  "serde",
