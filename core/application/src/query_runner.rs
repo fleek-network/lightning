@@ -26,6 +26,7 @@ use lightning_interfaces::types::{
     TransactionResponse,
     Value,
 };
+use lightning_interfaces::PagingParams;
 
 use crate::state::State;
 use crate::storage::AtomoStorage;
@@ -176,16 +177,35 @@ impl SyncQueryRunnerInterface for QueryRunner {
         self.inner.run(|ctx| self.account_table.get(ctx).get(id))
     }
 
-    fn get_node_registry(&self) -> Vec<NodeInfo> {
+    fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfo> {
         let staking_amount: HpUfixed<18> = self.get_staking_amount().into();
-        self.inner.run(|ctx| {
-            let node_table = self.node_table.get(ctx);
-            node_table
-                .keys()
-                .map(|index| node_table.get(index).unwrap())
-                .filter(|node| node.stake.staked >= staking_amount)
-                .collect()
-        })
+        match paging {
+            None => self.inner.run(|ctx| {
+                let node_table = self.node_table.get(ctx);
+                node_table
+                    .keys()
+                    .map(|index| node_table.get(index).unwrap())
+                    .filter(|node| node.stake.staked >= staking_amount)
+                    .collect()
+            }),
+            Some(PagingParams {
+                ignore_stake,
+                limit,
+                start,
+            }) => {
+                let staking_amount: HpUfixed<18> = self.get_staking_amount().into();
+                self.inner.run(|ctx| {
+                    let node_table = self.node_table.get(ctx);
+                    node_table
+                        .keys()
+                        .filter(|index| index >= &start)
+                        .map(|index| node_table.get(index).unwrap())
+                        .filter(|node| ignore_stake || node.stake.staked >= staking_amount)
+                        .take(limit)
+                        .collect()
+                })
+            },
+        }
     }
 
     fn is_valid_node(&self, id: &NodePublicKey) -> bool {

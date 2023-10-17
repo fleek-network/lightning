@@ -41,6 +41,7 @@ use lightning_interfaces::{
     MempoolSocket,
     NotifierInterface,
     OriginProviderInterface,
+    PagingParams,
     PoolInterface,
     ReputationAggregatorInterface,
     RpcInterface,
@@ -1400,7 +1401,6 @@ async fn test_rpc_get_node_registry() -> Result<()> {
     let req = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_node_registry",
-        "params": [],
         "id":1,
     });
 
@@ -1413,6 +1413,34 @@ async fn test_rpc_get_node_registry() -> Result<()> {
             let success_response: RpcSuccessResponse<Vec<NodeInfo>> =
                 serde_json::from_value(value)?;
             assert_eq!(success_response.result.len(), committee_size + 1);
+            assert!(
+                success_response
+                    .result
+                    .contains(&NodeInfo::from(&node_info))
+            );
+        } else {
+            panic!("Rpc Error: {value}")
+        }
+    } else {
+        panic!("Request failed with status: {}", response.status());
+    }
+
+    let req = json!({
+        "jsonrpc": "2.0",
+        "method":"flk_get_node_registry",
+        "params": PagingParams{ ignore_stake: true, start: committee_size as u32, limit: 10 },
+        "id":1,
+    });
+
+    let response = make_request(port, req.to_string()).await?;
+
+    if response.status().is_success() {
+        let value: Value = response.json().await?;
+        if value.get("result").is_some() {
+            // Parse the response as a successful response
+            let success_response: RpcSuccessResponse<Vec<NodeInfo>> =
+                serde_json::from_value(value)?;
+            assert_eq!(success_response.result.len(), 1);
             assert!(
                 success_response
                     .result

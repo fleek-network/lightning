@@ -55,7 +55,7 @@ impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
         let latencies = self.query.get_latencies();
         let valid_pubkeys: BTreeSet<NodePublicKey> = self
             .query
-            .get_node_registry()
+            .get_node_registry(None)
             .into_iter()
             .map(|node_info| node_info.public_key)
             .collect();

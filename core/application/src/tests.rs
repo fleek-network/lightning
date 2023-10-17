@@ -33,7 +33,13 @@ use lightning_interfaces::types::{
     UpdatePayload,
     UpdateRequest,
 };
-use lightning_interfaces::{partial, ApplicationInterface, SyncQueryRunnerInterface, ToDigest};
+use lightning_interfaces::{
+    partial,
+    ApplicationInterface,
+    PagingParams,
+    SyncQueryRunnerInterface,
+    ToDigest,
+};
 use lightning_test_utils::{random, reputation};
 use tokio::test;
 
@@ -1352,7 +1358,7 @@ async fn test_get_node_registry() {
     )
     .await;
 
-    let valid_nodes = query_runner.get_node_registry();
+    let valid_nodes = query_runner.get_node_registry(None);
     // We added two valid nodes, so the node registry should contain 2 nodes plus the committee.
     assert_eq!(valid_nodes.len(), 2 + keystore.len());
     let node_info1 = query_runner
@@ -1370,6 +1376,61 @@ async fn test_get_node_registry() {
         .unwrap();
     // Node registry contains the second valid node
     assert!(valid_nodes.contains(&node_info3));
+
+    // Given some pagination parameters.
+    let params = PagingParams {
+        ignore_stake: true,
+        start: 0,
+        limit: keystore.len() + 3,
+    };
+    let nodes = query_runner.get_node_registry(Some(params));
+    // We added 3 nodes, so the node registry should contain 3 nodes plus the committee.
+    assert_eq!(nodes.len(), 3 + keystore.len());
+
+    let params = PagingParams {
+        ignore_stake: false,
+        start: 0,
+        limit: keystore.len() + 3,
+    };
+    let nodes = query_runner.get_node_registry(Some(params));
+    // We added 2 valid nodes, so the node registry should contain 2 nodes plus the committee.
+    assert_eq!(nodes.len(), 2 + keystore.len());
+
+    let params = PagingParams {
+        ignore_stake: true,
+        start: 0,
+        limit: keystore.len(),
+    };
+    let nodes = query_runner.get_node_registry(Some(params));
+    // We get the first 4 nodes.
+    assert_eq!(nodes.len(), keystore.len());
+
+    let params = PagingParams {
+        ignore_stake: true,
+        start: 4,
+        limit: keystore.len(),
+    };
+    let nodes = query_runner.get_node_registry(Some(params));
+    // The first 4 nodes are the committee and we added 3 nodes.
+    assert_eq!(nodes.len(), 3);
+
+    let params = PagingParams {
+        ignore_stake: false,
+        start: keystore.len() as u32,
+        limit: keystore.len(),
+    };
+    let valid_nodes = query_runner.get_node_registry(Some(params));
+    // The first 4 nodes are the committee and we added 2 valid nodes.
+    assert_eq!(valid_nodes.len(), 2);
+
+    let params = PagingParams {
+        ignore_stake: false,
+        start: keystore.len() as u32,
+        limit: 1,
+    };
+    let valid_nodes = query_runner.get_node_registry(Some(params));
+    // The first 4 nodes are the committee and we added 3 nodes.
+    assert_eq!(valid_nodes.len(), 1);
 }
 
 #[test]

@@ -26,7 +26,7 @@ use lightning_interfaces::types::{
     TotalServed,
     TransactionRequest,
 };
-use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_interfaces::{PagingParams, SyncQueryRunnerInterface};
 use tracing::error;
 
 use crate::eth::{
@@ -364,8 +364,9 @@ pub async fn is_valid_node_handler<C: Collection>(
 
 pub async fn get_node_registry_handler<C: Collection>(
     data: Data<Arc<RpcData<C>>>,
+    Params(params): Params<Option<PagingParams>>,
 ) -> Result<Vec<NodeInfo>> {
-    Ok(data.0.query_runner.get_node_registry())
+    Ok(data.0.query_runner.get_node_registry(params))
 }
 
 pub async fn get_last_epoch_hash_handler<C: Collection>(
