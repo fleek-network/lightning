@@ -289,6 +289,7 @@ impl<P: ExecutorProviderInterface> StateData<P> {
     ) -> Option<ProcessHandshakeResult> {
         if let schema::HandshakeRequestFrame::Handshake { pk, .. } = &frame {
             if self.check_connection_limits(pk) {
+                sender.terminate(schema::TerminationReason::ResourcesUnavailable);
                 return None;
             }
         }
