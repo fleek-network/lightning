@@ -13,8 +13,6 @@ repository = "https://github.com/fleek-network/lightning"
 derive_more = "0.99"
 fleek-crypto = { path = "../fleek-crypto/" }
 triomphe = "0.1.9"
-futures = "0.3"
-tokio = { version = "1.32", features = ["rt", "sync", "fs"] }
-fleek-blake3 = "1.5"
-blake3-tree = { path = "../blake3-tree" }
-arrayref = "0.3"
+tokio = { version = "1.32", features = ["rt", "sync", "fs", "net"] }
+arrayvec = "0.7"
+ringbuf = "0.3"
