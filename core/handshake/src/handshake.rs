@@ -44,6 +44,8 @@ pub struct HandshakeConfig {
     #[serde(rename = "transport")]
     pub transports: Vec<TransportConfig>,
     pub http_address: SocketAddr,
+    pub max_client_connection_limit: usize,
+    pub max_global_connection_limit: usize,
 }
 
 impl Default for HandshakeConfig {
@@ -60,6 +62,8 @@ impl Default for HandshakeConfig {
                 TransportConfig::Tcp(Default::default()),
             ],
             http_address: ([0, 0, 0, 0], 4220).into(),
+            max_client_connection_limit: 254,
+            max_global_connection_limit: 10_000,
         }
     }
 }
@@ -72,7 +76,14 @@ impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
     ) -> anyhow::Result<Self> {
         let shutdown = ShutdownNotifier::default();
         let (_, sk) = signer.get_sk();
-        let state = StateRef::new(CONNECTION_TIMEOUT, shutdown.waiter(), sk, provider);
+        let state = StateRef::new(
+            CONNECTION_TIMEOUT,
+            shutdown.waiter(),
+            sk,
+            provider,
+            config.max_client_connection_limit,
+            config.max_global_connection_limit,
+        );
 
         Ok(Self {
             status: Mutex::new(Some(Run {

@@ -34,7 +34,9 @@ async fn demo() -> anyhow::Result<()> {
             "type": "AsyncWorker"
           },
         ],
-        "http_addr": "0.0.0.0:4210"
+        "http_addr": "0.0.0.0:4210",
+        "max_client_connection_limit": 254,
+        "max_global_connection_limit": 10_000,
       },
       "service-executor": {
         "services": [0]

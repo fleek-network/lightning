@@ -35,6 +35,8 @@ impl<P: ExecutorProviderInterface> StateRef<P> {
         waiter: ShutdownWaiter,
         sk: NodeSecretKey,
         provider: P,
+        max_client_connection_limit: usize,
+        max_global_connection_limit: usize,
     ) -> Self {
         let gc = Gc::default();
 
@@ -44,6 +46,9 @@ impl<P: ExecutorProviderInterface> StateRef<P> {
             shutdown: waiter,
             provider,
             connections: Default::default(),
+            connection_count: Default::default(),
+            max_client_connection_limit,
+            max_global_connection_limit,
             gc_sender: gc.sender(),
         }));
 
@@ -63,6 +68,9 @@ pub struct StateData<P: ExecutorProviderInterface> {
     pub provider: P,
     /// Map each connection to the information we have about it.
     pub connections: DashMap<u64, Connection<P::Handle>, fxhash::FxBuildHasher>,
+    pub connection_count: DashMap<ClientPublicKey, usize>,
+    pub max_client_connection_limit: usize,
+    pub max_global_connection_limit: usize,
     pub gc_sender: GcSender,
 }
 
@@ -172,6 +180,9 @@ impl<P: ExecutorProviderInterface> StateData<P> {
         };
 
         self.connections.insert(connection_id, connection);
+        self.connection_count
+            .entry(pk)
+            .and_modify(|count| *count += 1);
 
         // Let the service know we got the connection.
         handle.connected(fn_sdk::internal::OnConnectedArgs {
@@ -276,6 +287,12 @@ impl<P: ExecutorProviderInterface> StateData<P> {
         frame: schema::HandshakeRequestFrame,
         sender: StaticSender,
     ) -> Option<ProcessHandshakeResult> {
+        if let schema::HandshakeRequestFrame::Handshake { pk, .. } = &frame {
+            if self.check_connection_limits(pk) {
+                return None;
+            }
+        }
+
         match frame {
             schema::HandshakeRequestFrame::Handshake {
                 retry: Some(conn_id),
@@ -444,6 +461,8 @@ impl<P: ExecutorProviderInterface> StateData<P> {
             return;
         };
 
+        self.update_client_connection_count(connection.pk);
+
         for sender in connection.senders.into_iter().flatten() {
             sender.terminate(schema::TerminationReason::ServiceTerminated);
         }
@@ -482,11 +501,33 @@ impl<P: ExecutorProviderInterface> StateData<P> {
                 return;
             }
 
+            self.update_client_connection_count(connection.pk);
+
             let connection = entry.remove();
             connection
                 .handle
                 .disconnected(fn_sdk::internal::OnDisconnectedArgs { connection_id });
         }
+    }
+
+    #[inline]
+    fn update_client_connection_count(&self, pk: ClientPublicKey) {
+        if let Entry::Occupied(mut entry) = self.connection_count.entry(pk) {
+            if *entry.get() > 1 {
+                *entry.get_mut() -= 1;
+            } else {
+                entry.remove();
+            }
+        }
+    }
+
+    #[inline]
+    fn check_connection_limits(&self, pk: &ClientPublicKey) -> bool {
+        self.connection_count
+            .get(pk)
+            .map(|count| *count.value() >= self.max_client_connection_limit)
+            .unwrap_or(false)
+            || self.connections.len() >= self.max_global_connection_limit
     }
 }
 
