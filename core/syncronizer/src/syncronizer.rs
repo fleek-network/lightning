@@ -243,8 +243,13 @@ impl<C: Collection> SyncronizerInner<C> {
             {
                 Ok(res) => return Ok(res.result),
                 Err(err) => {
-                    if err.downcast_ref::<RequestError>().is_some() {
-                        return Err(err);
+                    if let Some(error) = err.downcast_ref::<RequestError>() {
+                        match error {
+                            RequestError::VersionMismatch => {
+                                panic!("Version mismatch: Please update your node");
+                            },
+                            RequestError::NotStaked => return Err(err),
+                        }
                     }
                 },
             }
