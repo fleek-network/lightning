@@ -12,8 +12,14 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 use crate::transport::{Message, Transport};
 
-struct TcpTransport {
+pub struct TcpTransport {
     target: SocketAddr,
+}
+
+impl TcpTransport {
+    pub fn new(target: SocketAddr) -> Self {
+        Self { target }
+    }
 }
 
 #[async_trait]
