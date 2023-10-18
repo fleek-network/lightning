@@ -21,10 +21,6 @@ pub struct IpcRequest {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub enum IpcMessage {
-    Connected {
-        connection_id: u64,
-        client: ClientPublicKeyBytes,
-    },
     Response {
         request_ctx: RequestCtxU64,
         response: Response,

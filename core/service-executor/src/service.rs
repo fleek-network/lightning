@@ -58,11 +58,12 @@ where
     let kill_notify = cx.kill.clone();
     let cmd_permit = Arc::new(Notify::new());
     let permit = cmd_permit.clone();
+    let conn_path = ipc_dir.join("conn");
     tokio::spawn(async move {
         // Wait until we have the UDS listener listening.
         permit.notified().await;
         tracing::trace!("Got UDS signal for '{id}'. Starting the service process");
-        run_command(format!("service-{id}"), command, kill_notify).await;
+        run_command(format!("service-{id}"), command, kill_notify, conn_path).await;
         tracing::trace!("Task {id} was killed.");
     });
 
@@ -229,7 +230,12 @@ where
 }
 
 /// Run the given command until the kill signal has been received. Restarting the child on failure.
-async fn run_command(name: String, mut command: Command, kill: Arc<Notify>) {
+async fn run_command(
+    name: String,
+    mut command: Command,
+    kill: Arc<Notify>,
+    conn_uds_path: PathBuf,
+) {
     pin! {
         let kill_fut = kill.notified();
     };
@@ -241,6 +247,9 @@ async fn run_command(name: String, mut command: Command, kill: Arc<Notify>) {
 
     let mut wait_time = 1000;
     loop {
+        // Remove the `/ipc/conn` file before (re-)running the service.
+        let _ = tokio::fs::remove_file(&conn_uds_path).await;
+
         let last_start = Instant::now();
         tracing::trace!("Running command for '{name}");
 

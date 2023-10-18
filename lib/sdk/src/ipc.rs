@@ -9,35 +9,38 @@
 //! future, but for now it works for our use cases.
 
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use fleek_crypto::ClientPublicKey;
 use tokio::io::{self, Interest};
-use tokio::net::UnixStream;
+use tokio::net::{UnixListener, UnixStream};
 
 use crate::futures::future_callback;
 use crate::ipc_types::{IpcMessage, IpcRequest, Request, Response};
 
 static mut SENDER: Option<tokio::sync::mpsc::Sender<IpcRequest>> = None;
+pub(crate) static mut IPC_PATH: Option<PathBuf> = None;
 pub(crate) static mut BLOCKSTORE: Option<PathBuf> = None;
 
-pub trait ServiceHandlers {
-    /// Handle the new connection.
-    fn connected(socket: UnixStream, pk: ClientPublicKey);
+/// Bind to the connection stream.
+pub async fn conn_bind() -> UnixListener {
+    let path = unsafe { IPC_PATH.as_ref() }
+        .expect("Service setupt not complete.")
+        .join("conn");
+    UnixListener::bind(path).expect("IPC bind failed.")
 }
 
 /// Spawn a service with the given connection handler.
-pub async fn spawn_service_loop<H: ServiceHandlers>(
+pub async fn spawn_service_loop(
     ipc_path: PathBuf,
     blockstore_path: PathBuf,
 ) -> Result<(), Box<dyn Error>> {
     let ipc_stream = UnixStream::connect(ipc_path.join("ctrl")).await?;
-    spawn_service_loop_inner::<H>(ipc_stream, ipc_path, blockstore_path).await
+    spawn_service_loop_inner(ipc_stream, ipc_path, blockstore_path).await
 }
 
-pub(crate) async fn spawn_service_loop_inner<H: ServiceHandlers>(
+pub(crate) async fn spawn_service_loop_inner(
     ipc_stream: UnixStream,
-    ipc_path: PathBuf,
+    _ipc_path: PathBuf,
     blockstore_path: PathBuf,
 ) -> Result<(), Box<dyn Error>> {
     const IPC_REQUEST_SIZE: usize = std::mem::size_of::<IpcRequest>();
@@ -148,26 +151,15 @@ pub(crate) async fn spawn_service_loop_inner<H: ServiceHandlers>(
                 let message = unsafe {
                     std::mem::transmute_copy::<[u8; IPC_MESSAGE_SIZE], IpcMessage>(&read_buffer)
                 };
-                handle_message::<H>(&ipc_path, message);
+                handle_message(message);
             }
         }
     }
 }
 
 #[inline]
-fn handle_message<H: ServiceHandlers>(ipc_dir: &Path, message: IpcMessage) {
+fn handle_message(message: IpcMessage) {
     match message {
-        IpcMessage::Connected {
-            connection_id,
-            client,
-        } => {
-            let path = ipc_dir.join(format!("{}.socks", connection_id));
-            tokio::spawn(async move {
-                let socket = UnixStream::connect(path).await.unwrap();
-                let pk = ClientPublicKey(client);
-                H::connected(socket, pk);
-            });
-        },
         IpcMessage::Response {
             request_ctx,
             response,
@@ -221,19 +213,12 @@ pub async fn send_and_await_response(request: Request) -> Response {
 mod tests {
     use super::*;
 
-    struct S {}
-    impl ServiceHandlers for S {
-        fn connected(_socket: UnixStream, _pk: ClientPublicKey) {
-            unreachable!()
-        }
-    }
-
     #[tokio::test]
     async fn test_message_flow() {
         let (s1, s2) = tokio::net::UnixStream::pair().unwrap();
         tokio::spawn(async move {
             let path = std::env::temp_dir().join("test");
-            spawn_service_loop_inner::<S>(s1, path.clone(), path)
+            spawn_service_loop_inner(s1, path.clone(), path)
                 .await
                 .unwrap();
         });

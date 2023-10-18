@@ -35,7 +35,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
     /// take ownership over the entire binary. Must be called from the `main` function when
     /// the following environment variables exists:
     ///
-    /// 1. `SERVICE_NAME`
+    /// 1. `SERVICE_ID`
     /// 2. `BLOCKSTORE_PATH`
     /// 3. `IPC_PATH`
     fn run_service(name: String, blockstore_path: PathBuf, ipc_socket: PathBuf);
