@@ -2,6 +2,7 @@ use std::net::IpAddr;
 
 use anyhow::{anyhow, Context, Result};
 use fleek_crypto::{NodePublicKey, PublicKey};
+use lightning_interfaces::types::VERSION;
 use serde::de::DeserializeOwned;
 
 pub async fn rpc_request<T: DeserializeOwned>(
@@ -70,7 +71,7 @@ pub fn rpc_epoch_testnet(node_public_key: NodePublicKey) -> serde_json::Value {
     serde_json::json!({
         "jsonrpc": "2.0",
         "method":"flk_get_epoch_testnet",
-        "params": {"public_key": node_public_key.to_base58(), "version": 1},
+        "params": {"public_key": node_public_key.to_base58(), "version": VERSION},
         "id":1,
     })
 }

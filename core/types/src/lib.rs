@@ -61,3 +61,6 @@ pub enum InternetAddress {
     Ipv4([u8; 4]),
     Ipv6([u8; 16]),
 }
+
+// Version of the binary
+pub const VERSION: u8 = 1;
