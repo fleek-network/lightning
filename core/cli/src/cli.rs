@@ -71,7 +71,7 @@ impl Cli {
                 .expect("Expected IPC_PATH env")
                 .try_into()
                 .expect("IPC_PATH to be a valid path.");
-            <C::ServiceExecutorInterface as ServiceExecutorInterface>::run_service(
+            <C::ServiceExecutorInterface as ServiceExecutorInterface<C>>::run_service(
                 service_id.parse().expect("SERVICE_ID to be a number"),
                 blockstore_path,
                 ipc_path,
