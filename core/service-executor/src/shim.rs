@@ -10,26 +10,19 @@ use lightning_interfaces::{
     ConfigConsumer,
     ExecutorProviderInterface,
     ServiceExecutorInterface,
-    ServiceHandleInterface,
     WithStartAndShutdown,
 };
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tokio::net::UnixStream;
 use triomphe::Arc;
 
-use crate::callback::make_callback;
-use crate::collection::ServiceCollection;
-use crate::deque::{CommandSender, CommandStealer};
-use crate::handle;
-use crate::handle::ServiceHandle;
+use crate::service::ServiceCollection;
 
 pub struct ServiceExecutor<C: Collection> {
     config: ServiceExecutorConfig,
     is_running: Arc<AtomicBool>,
     collection: ServiceCollection,
-    sender: CommandSender,
-    stealer: CommandStealer,
     blockstore: ResolvedPathBuf,
     p: PhantomData<C>,
 }
@@ -37,12 +30,18 @@ pub struct ServiceExecutor<C: Collection> {
 #[derive(Serialize, Deserialize)]
 pub struct ServiceExecutorConfig {
     pub services: FxHashSet<ServiceId>,
+    /// The IPC directory is used to contain the Unix domain sockets that we use to communicate
+    /// with the different services.
+    pub ipc_path: ResolvedPathBuf,
 }
 
 impl Default for ServiceExecutorConfig {
     fn default() -> Self {
         Self {
             services: [0, 1].into_iter().collect(),
+            ipc_path: "~/.lightning/ipc"
+                .try_into()
+                .expect("Failed to resolve path"),
         }
     }
 }
@@ -50,20 +49,16 @@ impl Default for ServiceExecutorConfig {
 #[derive(Clone)]
 pub struct Provider {
     collection: ServiceCollection,
-    stealer: CommandStealer,
 }
 
 impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     type Provider = Provider;
 
     fn init(config: Self::Config, blockstore: &C::BlockStoreInterface) -> anyhow::Result<Self> {
-        let (sender, stealer) = crate::deque::chan();
         Ok(ServiceExecutor {
             config,
             is_running: Arc::new(AtomicBool::new(false)),
             collection: ServiceCollection::default(),
-            sender,
-            stealer,
             blockstore: blockstore.get_root_dir().try_into()?,
             p: PhantomData,
         })
@@ -72,8 +67,15 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     fn get_provider(&self) -> Self::Provider {
         Provider {
             collection: self.collection.clone(),
-            stealer: self.stealer.clone(),
         }
+    }
+
+    fn run_service(
+        name: String,
+        blockstore_path: std::path::PathBuf,
+        ipc_socket: std::path::PathBuf,
+    ) {
+        todo!()
     }
 }
 
@@ -86,26 +88,16 @@ impl<C: Collection> WithStartAndShutdown for ServiceExecutor<C> {
     async fn start(&self) {
         self.is_running.store(true, Ordering::Relaxed);
 
-        if !self.config.services.is_empty() {
-            let request_sender = make_callback(self.sender.clone(), fn_sdk::api::on_event_response);
-
-            fn_sdk::api::setup(fn_sdk::internal::OnStartArgs {
-                request_sender,
-                block_store_path: self.blockstore.clone(),
-            });
-        }
-
-        for handle in get_all_services() {
-            let id = handle.get_service_id();
-            if self.config.services.contains(&id) {
-                info!("Enabling service {id}");
-                self.collection.insert(handle);
-            }
-        }
+        // for handle in get_all_services() {
+        //     let id = handle.get_service_id();
+        //     if self.config.services.contains(&id) {
+        //         info!("Enabling service {id}");
+        //         self.collection.insert(handle);
+        //     }
+        // }
     }
 
     async fn shutdown(&self) {
-        fn_sdk::api::unregister();
         self.is_running.store(false, Ordering::Relaxed)
     }
 }
@@ -115,27 +107,10 @@ impl<C: Collection> ConfigConsumer for ServiceExecutor<C> {
     type Config = ServiceExecutorConfig;
 }
 
+#[async_trait]
 impl ExecutorProviderInterface for Provider {
-    type Handle = ServiceHandle;
-    type Stealer = CommandStealer;
-
-    #[inline(always)]
-    fn get_work_stealer(&self) -> Self::Stealer {
-        self.stealer.clone()
+    /// Make a connection to the provided service.
+    async fn connect(&self, service_id: ServiceId) -> Option<UnixStream> {
+        todo!()
     }
-
-    #[inline(always)]
-    fn get_service_handle(
-        &self,
-        service_id: lightning_interfaces::types::ServiceId,
-    ) -> Option<Self::Handle> {
-        self.collection.get_handle(service_id)
-    }
-}
-
-fn get_all_services() -> Vec<ServiceHandle> {
-    vec![
-        handle!(0, fleek_service_ping_example),
-        handle!(1, fleek_service_big_buck_bunny),
-    ]
 }

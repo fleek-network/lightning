@@ -18,7 +18,7 @@ triomphe = "0.1.9"
 dashmap = "5.5"
 fxhash = "0.2"
 resolved-pathbuf.workspace = true
-garcon = "0.2"
+affair.workspace = true
 
 # Built-in services
 # fleek-service-ping-example = { path = "../../services/ping" }

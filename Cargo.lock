@@ -3291,31 +3291,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fleek-service-big-buck-bunny"
-version = "0.1.0"
-dependencies = [
- "arrayref",
- "fn-sdk",
- "hex-literal",
- "lazy_static",
- "tracing",
-]
-
-[[package]]
-name = "fleek-service-ping-example"
-version = "0.1.0"
-dependencies = [
- "arrayref",
- "dashmap",
- "fn-sdk",
- "fxhash",
- "hex-literal",
- "lazy_static",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "flexbuffers"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3347,12 +3322,10 @@ checksum = "7bad48618fdb549078c333a7a8528acb57af271d0433bdecd523eb620628364e"
 name = "fn-sdk"
 version = "0.0.0"
 dependencies = [
- "arrayref",
- "blake3-tree",
+ "arrayvec",
  "derive_more",
- "fleek-blake3",
  "fleek-crypto",
- "futures",
+ "ringbuf",
  "tokio",
  "triomphe",
 ]
@@ -3590,12 +3563,6 @@ checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
 dependencies = [
  "byteorder",
 ]
-
-[[package]]
-name = "garcon"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e83fb8961dcd3c26123863998521ae4d07e5e5aa8fb50b503380448f2e0ea069"
 
 [[package]]
 name = "gcc"
@@ -3843,12 +3810,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-
-[[package]]
-name = "hex-literal"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fe2267d4ed49bc07b63801559be28c718ea06c4738b7a03c94df7386d2cde46"
 
 [[package]]
 name = "hkdf"
@@ -5059,13 +5020,13 @@ dependencies = [
 name = "lightning-service-executor"
 version = "0.1.0"
 dependencies = [
+ "affair 0.1.2",
  "anyhow",
  "async-channel",
  "async-trait",
  "dashmap",
  "fn-sdk",
  "fxhash",
- "garcon",
  "lightning-interfaces",
  "resolved-pathbuf",
  "serde",
@@ -7797,6 +7758,15 @@ dependencies = [
  "spin 0.9.8",
  "untrusted 0.9.0",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "ringbuf"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79abed428d1fd2a128201cec72c5f6938e2da607c6f3745f769fabea399d950a"
+dependencies = [
+ "crossbeam-utils",
 ]
 
 [[package]]
