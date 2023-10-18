@@ -239,10 +239,14 @@ impl<C: Collection> SyncronizerInner<C> {
     /// This function will rpc request genesis nodes in sequence and stop when one of them responds
     async fn ask_bootstrap_nodes<T: DeserializeOwned>(&self, req: String) -> Result<T> {
         for (_, node) in &self.genesis_committee {
-            if let Ok(res) =
-                rpc_request::<T>(&self.rpc_client, node.domain, node.ports.rpc, req.clone()).await
+            match rpc_request::<T>(&self.rpc_client, node.domain, node.ports.rpc, req.clone()).await
             {
-                return Ok(res.result);
+                Ok(res) => return Ok(res.result),
+                Err(err) => {
+                    if err.downcast_ref::<RequestError>().is_some() {
+                        return Err(err);
+                    }
+                },
             }
         }
         Err(anyhow!("Unable to get a responce from bootstrap nodes"))
