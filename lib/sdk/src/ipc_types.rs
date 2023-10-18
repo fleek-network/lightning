@@ -8,7 +8,7 @@ pub type ClientPublicKeyBytes = [u8; 96];
 
 pub type RequestCtxU64 = u64;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct IpcRequest {
     /// A pointer to the request context.
@@ -18,7 +18,7 @@ pub struct IpcRequest {
 }
 
 /// A message sent from the core process to the service.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub enum IpcMessage {
     Connected {
