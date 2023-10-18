@@ -16,17 +16,29 @@ use triomphe::Arc;
 
 /// The shared object with every service.
 pub struct Context {
-    kill: Arc<Notify>,
-    blockstore_path: PathBuf,
-    ipc_path: PathBuf,
+    pub kill: Arc<Notify>,
+    pub blockstore_path: PathBuf,
+    pub ipc_path: PathBuf,
 }
 
 /// Collection of every service that we have.
 #[derive(Clone, Default)]
 pub struct ServiceCollection {
-    services: Arc<DashMap<u32, Arc<ServiceHandle>, fxhash::FxBuildHasher>>,
+    services: Arc<DashMap<u32, ServiceHandle, fxhash::FxBuildHasher>>,
 }
 
+impl ServiceCollection {
+    #[inline]
+    pub fn get(&self, id: u32) -> Option<ServiceHandle> {
+        self.services.get(&id).map(|v| *v)
+    }
+
+    pub fn insert(&self, id: u32, handle: ServiceHandle) {
+        self.services.insert(id, handle);
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct ServiceHandle {}
 
 pub async fn spawn_service<E, F>(id: u32, cx: Arc<Context>, executor: E) -> ServiceHandle
@@ -247,7 +259,7 @@ async fn run_command(
 
     let mut wait_time = 1000;
     loop {
-        // Remove the `/ipc/conn` file before (re-)running the service.
+        // Remove the `/ipc/conn` file before (re-)running
         let _ = tokio::fs::remove_file(&conn_uds_path).await;
 
         let last_start = Instant::now();

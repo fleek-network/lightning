@@ -38,7 +38,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
     /// 1. `SERVICE_ID`
     /// 2. `BLOCKSTORE_PATH`
     /// 3. `IPC_PATH`
-    fn run_service(name: String, blockstore_path: PathBuf, ipc_socket: PathBuf);
+    fn run_service(id: u32, blockstore_path: PathBuf, ipc_path: PathBuf);
 }
 
 #[async_trait]
