@@ -38,6 +38,9 @@ pub struct RequestFuture {
     state: StateContainer,
 }
 
+unsafe impl Send for RequestFuture {}
+unsafe impl Sync for RequestFuture {}
+
 impl Future for RequestFuture {
     type Output = Response;
 
