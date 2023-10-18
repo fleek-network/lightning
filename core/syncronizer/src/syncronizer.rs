@@ -210,7 +210,7 @@ impl<C: Collection> SyncronizerInner<C> {
             Err(e) => {
                 if let Some(e) = e.downcast_ref::<RequestError>() {
                     // node not staked or invalid version
-                    error!("{e:?}");
+                    error!("{e}");
                 }
                 return Err(e);
             },
