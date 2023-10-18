@@ -1,7 +1,7 @@
 mod builder;
 mod connection;
 mod context;
-mod handle;
+mod frame;
 mod mode;
 mod schema;
 mod tls;
