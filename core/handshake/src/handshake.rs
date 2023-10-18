@@ -1,4 +1,3 @@
-use std::net::SocketAddr;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -7,20 +6,20 @@ use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
     ConfigConsumer,
+    ExecutorProviderInterface,
     HandshakeInterface,
     ServiceExecutorInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
-use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
+use triomphe::Arc;
 
+use crate::config::HandshakeConfig;
 use crate::http::spawn_http_server;
-use crate::shutdown::ShutdownNotifier;
-use crate::state::StateRef;
-use crate::transport_driver::{attach_transport_by_config, TransportConfig};
-use crate::worker::{attach_worker, WorkerMode};
+use crate::proxy::Proxy;
+use crate::shutdown::{ShutdownNotifier, ShutdownWaiter};
+use crate::transports::{spawn_transport_by_config, TransportReceiver, TransportSender};
 
 /// Default connection timeout. This is the amount of time we will wait
 /// to close a connection after all transports have dropped.
@@ -32,40 +31,8 @@ pub struct Handshake<C: Collection> {
 }
 
 struct Run<C: Collection> {
+    ctx: Arc<Context<c![C::ServiceExecutorInterface::Provider]>>,
     shutdown: ShutdownNotifier,
-    state: StateRef<c![C::ServiceExecutorInterface::Provider]>,
-    transports: Vec<JoinHandle<()>>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct HandshakeConfig {
-    #[serde(rename = "worker")]
-    pub workers: Vec<WorkerMode>,
-    #[serde(rename = "transport")]
-    pub transports: Vec<TransportConfig>,
-    pub http_address: SocketAddr,
-    pub max_client_connection_limit: usize,
-    pub max_global_connection_limit: usize,
-}
-
-impl Default for HandshakeConfig {
-    fn default() -> Self {
-        Self {
-            workers: vec![
-                WorkerMode::AsyncWorker,
-                WorkerMode::AsyncWorker,
-                WorkerMode::AsyncWorker,
-                WorkerMode::AsyncWorker,
-            ],
-            transports: vec![
-                TransportConfig::WebRTC(Default::default()),
-                TransportConfig::Tcp(Default::default()),
-            ],
-            http_address: ([0, 0, 0, 0], 4220).into(),
-            max_client_connection_limit: 254,
-            max_global_connection_limit: 10_000,
-        }
-    }
 }
 
 impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
@@ -75,22 +42,11 @@ impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
         provider: c![C::ServiceExecutorInterface::Provider],
     ) -> anyhow::Result<Self> {
         let shutdown = ShutdownNotifier::default();
-        let (_, sk) = signer.get_sk();
-        let state = StateRef::new(
-            CONNECTION_TIMEOUT,
-            shutdown.waiter(),
-            sk,
-            provider,
-            config.max_client_connection_limit,
-            config.max_global_connection_limit,
-        );
+        let (_, _) = signer.get_sk();
+        let ctx = Context::new(provider, shutdown.waiter()).into();
 
         Ok(Self {
-            status: Mutex::new(Some(Run {
-                shutdown,
-                state,
-                transports: vec![],
-            })),
+            status: Mutex::new(Some(Run::<C> { ctx, shutdown })),
             config,
         })
     }
@@ -111,20 +67,14 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
         let mut guard = self.status.lock().await;
         let run = guard.as_mut().expect("restart not implemented.");
 
-        // Attach workers
-        for mode in &self.config.workers {
-            attach_worker(run.state.clone(), *mode);
-        }
-
-        // Attach transports
+        // Spawn transport listeners to accept incoming handshakes
         let mut routers = vec![];
         for config in &self.config.transports {
-            let (handle, router) = attach_transport_by_config(run.state.clone(), config.clone())
-                .await
-                .expect("Faild to setup transport");
-
-            run.transports.push(handle);
-            if let Some(router) = router {
+            if let Some(router) =
+                spawn_transport_by_config(run.shutdown.waiter(), run.ctx.clone(), config.clone())
+                    .await
+                    .expect("Failed to setup transport")
+            {
                 routers.push(router)
             }
         }
@@ -144,15 +94,37 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
     async fn shutdown(&self) {
         let run = self.status.lock().await.take().expect("already shutdown.");
         run.shutdown.shutdown();
+    }
+}
 
-        // give time to transports and then abort.
-        tokio::spawn(async {
-            tokio::time::sleep(Duration::from_secs(3)).await;
+pub struct Context<P: ExecutorProviderInterface> {
+    /// Service unix socket provider
+    provider: P,
+    pub(crate) shutdown: ShutdownWaiter,
+}
 
-            for handle in run.transports {
-                handle.abort();
-            }
-        });
+impl<P: ExecutorProviderInterface> Context<P> {
+    pub fn new(provider: P, waiter: ShutdownWaiter) -> Self {
+        Self {
+            provider,
+            shutdown: waiter,
+        }
+    }
+
+    pub async fn handle_new_connection<S: TransportSender, R: TransportReceiver>(
+        &self,
+        service_id: u32,
+        tx: S,
+        rx: R,
+    ) {
+        // Attempt to connect to the service, getting the unix socket.
+        let Some(socket) = self.provider.connect(service_id).await else {
+            tx.terminate(crate::schema::TerminationReason::InvalidService);
+            return;
+        };
+
+        // Spawn a new proxy for this connection
+        Proxy::new(tx, rx, socket, self.shutdown.clone()).spawn();
     }
 }
 

@@ -22,24 +22,17 @@ partial!(TestBinding {
 async fn demo() -> anyhow::Result<()> {
     let config: JsonConfigProvider = json!({
       "handshake": {
-        "http_address": "127.0.0.1:4220",
         "transport": [
           {
             "type": "Mock",
             "port": 69
           },
         ],
-        "worker": [
-          {
-            "type": "AsyncWorker"
-          },
-        ],
-        "http_addr": "0.0.0.0:4210",
-        "max_client_connection_limit": 254,
-        "max_global_connection_limit": 10_000,
+        "http_address": "0.0.0.0:4220"
       },
       "service-executor": {
-        "services": [0]
+        "services": [0],
+        "ipc_path": "./ipc"
       },
 
     })

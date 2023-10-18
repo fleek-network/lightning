@@ -1,9 +1,13 @@
 use async_trait::async_trait;
 use axum::Router;
-use enum_dispatch::enum_dispatch;
+use lightning_interfaces::ExecutorProviderInterface;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use tracing::warn;
+use triomphe::Arc;
 
+use crate::config::TransportConfig;
+use crate::handshake::Context;
 use crate::schema;
 use crate::shutdown::ShutdownWaiter;
 
@@ -15,8 +19,7 @@ pub mod webtransport;
 #[async_trait]
 pub trait Transport: Sized + Send + Sync + 'static {
     type Config: Default + Serialize + DeserializeOwned;
-
-    type Sender: TransportSender + Into<StaticSender>;
+    type Sender: TransportSender;
     type Receiver: TransportReceiver;
 
     /// Bind the transport with the provided config.
@@ -31,7 +34,6 @@ pub trait Transport: Sized + Send + Sync + 'static {
     ) -> Option<(schema::HandshakeRequestFrame, Self::Sender, Self::Receiver)>;
 }
 
-#[enum_dispatch(StaticSender)]
 pub trait TransportSender: Sized + Send + Sync + 'static {
     /// Send the initial handshake response to the client.
     fn send_handshake_response(&mut self, response: schema::HandshakeResponse);
@@ -46,18 +48,68 @@ pub trait TransportSender: Sized + Send + Sync + 'static {
 }
 
 #[async_trait]
-pub trait TransportReceiver: Sized + Send + Sync + 'static {
+pub trait TransportReceiver: Send + Sync + 'static {
     /// Receive a frame from the connection. Returns `None` when the connection
     /// is closed.
     async fn recv(&mut self) -> Option<schema::RequestFrame>;
 }
 
-/// This enum is supposed to help us with avoiding dynamic dispatch over different
-/// sender objects.
-#[enum_dispatch]
-pub enum StaticSender {
-    MockTransport(mock::MockTransportSender),
-    TcpTransport(tcp::TcpSender),
-    WebRtcTransport(webrtc::WebRtcSender),
-    WebTransport(webtransport::WebTransportSender),
+pub async fn spawn_transport_by_config<P: ExecutorProviderInterface>(
+    shutdown: ShutdownWaiter,
+    ctx: Arc<Context<P>>,
+    config: TransportConfig,
+) -> anyhow::Result<Option<Router>> {
+    match config {
+        TransportConfig::Mock(config) => {
+            let (transport, router) = mock::MockTransport::bind(shutdown.clone(), config).await?;
+            spawn_listener_task(transport, ctx);
+            Ok(router)
+        },
+        TransportConfig::Tcp(config) => {
+            let (transport, router) = tcp::TcpTransport::bind(shutdown.clone(), config).await?;
+            spawn_listener_task(transport, ctx);
+            Ok(router)
+        },
+        TransportConfig::WebRTC(config) => {
+            let (transport, router) =
+                webrtc::WebRtcTransport::bind(shutdown.clone(), config).await?;
+            spawn_listener_task(transport, ctx);
+            Ok(router)
+        },
+        TransportConfig::WebTransport(config) => {
+            let (transport, router) =
+                webtransport::WebTransport::bind(shutdown.clone(), config).await?;
+            spawn_listener_task(transport, ctx);
+            Ok(router)
+        },
+    }
+}
+
+/// Spawn a thread loop accepting connections and initializing the connection to the service.
+fn spawn_listener_task<T: Transport, P: ExecutorProviderInterface>(
+    mut transport: T,
+    ctx: Arc<Context<P>>,
+) {
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                res = transport.accept() => match res {
+                    // Connection established with a handshake frame
+                    Some((req, tx, rx)) => {
+                        match req {
+                            schema::HandshakeRequestFrame::Handshake {
+                                retry: None,
+                                service,
+                                ..
+                            } => ctx.handle_new_connection(service, tx, rx).await,
+                            _ => warn!("TODO: support resumption and secondary connections"),
+                        }
+                    },
+                    // The transport listener has closed
+                    None => break,
+                },
+                _ = ctx.shutdown.wait_for_shutdown() => break,
+            }
+        }
+    });
 }

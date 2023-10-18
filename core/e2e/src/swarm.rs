@@ -27,9 +27,9 @@ use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
 use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
 use lightning_dht::dht::Dht;
-use lightning_handshake::handshake::{Handshake, HandshakeConfig};
+use lightning_handshake::config::{HandshakeConfig, TransportConfig};
+use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::webrtc::WebRtcConfig;
-use lightning_handshake::{TransportConfig, WorkerMode};
 use lightning_interfaces::types::{Blake3Hash, NodePorts, Staking};
 use lightning_interfaces::{ConfigProviderInterface, DhtSocket};
 use lightning_node::config::TomlConfigProvider;
@@ -401,7 +401,6 @@ fn build_config(
     config.inject::<BlockStoreServer<FinalTypes>>(BlockStoreServerConfig::default());
 
     config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
-        workers: vec![WorkerMode::AsyncWorker],
         // TODO: figure out how to have e2e testing for the different transports (browser oriented)
         transports: vec![TransportConfig::WebRTC(WebRtcConfig {
             udp_address: ([127, 0, 0, 1], ports.handshake.webrtc).into(),
@@ -413,6 +412,7 @@ fn build_config(
 
     config.inject::<ServiceExecutor<FinalTypes>>(ServiceExecutorConfig {
         services: Default::default(),
+        ..Default::default()
     });
 
     config.inject::<ReputationAggregator<FinalTypes>>(RepAggConfig {
