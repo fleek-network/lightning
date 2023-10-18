@@ -6,6 +6,7 @@ use anyhow::Result;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_types::{AccountInfo, NodeIndex, TransactionRequest};
+use serde::{Deserialize, Serialize};
 
 use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
@@ -125,7 +126,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Returns a full copy of the entire node-registry, but only contains the nodes that
     /// are still a valid node and have enough stake.
-    fn get_node_registry(&self) -> Vec<NodeInfo>;
+    fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfo>;
 
     /// Returns true if the node is a valid node in the network, with enough stake.
     fn is_valid_node(&self, id: &NodePublicKey) -> bool;
@@ -216,4 +217,17 @@ pub enum ExecutionError {
     NodeDoesNotExist,
     AlreadySignaled,
     NonExistingService,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct PagingParams {
+    // Since some nodes may be in state without
+    // having staked the minimum and if at any point
+    // they stake the minimum amount, this would
+    // cause inconsistent results.
+    // This flag allows you to query for all nodes
+    // to keep returned results consistent.
+    pub ignore_stake: bool,
+    pub start: NodeIndex,
+    pub limit: usize,
 }

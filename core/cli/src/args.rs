@@ -9,14 +9,18 @@ pub struct Args {
     #[arg(short, long, global = true, default_value_t = String::from("~/.lightning/config.toml") )]
     pub config: String,
     /// Determines that we should be using the mock consensus backend.
-    #[arg(long, global = true)]
+    #[arg(long, global = true, default_value_t = false)]
     pub with_mock_consensus: bool,
+    /// Enable the Tokio Console asynchronous debugger.
+    #[arg(long, global = true, default_value_t = false)]
+    pub with_console: bool,
+    /// Enable code locations when printing logs.
+    #[arg(long, global = true, default_value_t = true)]
+    pub with_log_locations: bool,
     /// Increases the level of verbosity (the max level is -vvv).
     #[arg(short, global = true, action = ArgAction::Count)]
     pub verbose: u8,
-    /// Print code location on console logs
-    #[arg(long, global = true)]
-    pub log_location: bool,
+
     #[command(subcommand)]
     pub cmd: Command,
 }

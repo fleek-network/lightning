@@ -1,11 +1,11 @@
 mod builder;
 mod connection;
 mod context;
-mod driver;
+mod frame;
 mod mode;
-mod schema;
 mod tls;
 
+pub mod schema;
 pub mod transport;
 
 pub use builder::Builder;

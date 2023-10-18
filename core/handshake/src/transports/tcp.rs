@@ -212,10 +212,7 @@ impl TransportReceiver for TcpReceiver {
 
                 // Take the frame bytes from the buffer
                 let bytes = self.buffer.split_to(len);
-                // Allocate for the next delimiter
-                self.buffer.reserve(4);
-
-                // decode the frame
+                // Decode the frame
                 match schema::RequestFrame::decode(&bytes[4..]) {
                     Ok(frame) => return Some(frame),
                     Err(_) => {
