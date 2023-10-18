@@ -262,7 +262,7 @@ mod tests {
             let mut to_write = res_buffer.as_slice();
             while !to_write.is_empty() {
                 s2.writable().await.unwrap();
-                match s2.try_write(&to_write) {
+                match s2.try_write(to_write) {
                     Ok(n) => {
                         to_write = &to_write[n..];
                     },

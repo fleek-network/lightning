@@ -83,7 +83,7 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
 
     fn run_service(id: u32, _blockstore_path: std::path::PathBuf, _ipc_path: std::path::PathBuf) {
         println!("running service {id}");
-        todo!()
+        loop {}
     }
 }
 

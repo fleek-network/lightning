@@ -83,7 +83,7 @@ where
         run_ctrl_loop(&ipc_dir, cx, cmd_permit, executor).await;
     });
 
-    todo!()
+    ServiceHandle {}
 }
 
 async fn run_ctrl_loop<E, F>(
@@ -96,10 +96,11 @@ async fn run_ctrl_loop<E, F>(
     F: Future<Output = ipc_types::Response> + Send + 'static,
 {
     let ctrl_path = ipc_path.join("ctrl");
-    // The file might not exist.
-    let _ = tokio::fs::remove_file(ctrl_path).await;
 
-    let listener = UnixListener::bind(ipc_path).expect("Failed to bind to IPC socket.");
+    // The file might not exist so ignore the error.
+    let _ = tokio::fs::remove_file(&ctrl_path).await;
+
+    let listener = UnixListener::bind(ctrl_path).expect("Failed to bind to IPC socket.");
     cmd_permit.notify_one();
 
     pin! {
