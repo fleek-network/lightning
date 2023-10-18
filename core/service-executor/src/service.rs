@@ -1,23 +1,22 @@
+use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use fn_sdk::ipc_types::{self, IpcMessage};
-use tokio::io::Interest;
+use futures::Future;
+use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::process::Command;
-use tokio::sync::{mpsc, Notify};
-use tokio::task::JoinHandle;
+use tokio::sync::Notify;
+use tokio::task::JoinSet;
 use tokio::{pin, select};
 use triomphe::Arc;
-
-type WorkerSocket = affair::Socket<ipc_types::Request, ipc_types::Response>;
 
 /// The shared object with every service.
 pub struct Context {
     kill: Arc<Notify>,
-    worker: WorkerSocket,
     blockstore_path: PathBuf,
     ipc_path: PathBuf,
 }
@@ -28,11 +27,13 @@ pub struct ServiceCollection {
     services: Arc<DashMap<u32, Arc<ServiceHandle>, fxhash::FxBuildHasher>>,
 }
 
-pub struct ServiceHandle {
-    sender: mpsc::Sender<ipc_types::IpcMessage>,
-}
+pub struct ServiceHandle {}
 
-pub async fn spawn_service(id: u32, cx: Arc<Context>) -> ServiceHandle {
+pub async fn spawn_service<E, F>(id: u32, cx: Arc<Context>, executor: E) -> ServiceHandle
+where
+    E: Fn(ipc_types::Request) -> F + Clone + Send + 'static,
+    F: Future<Output = ipc_types::Response> + Send + 'static,
+{
     let ipc_dir = cx.ipc_path.join(format!("service-{id}"));
     tracing::trace!("Spawning service {id} [IPC={ipc_dir:?}.");
 
@@ -65,21 +66,22 @@ pub async fn spawn_service(id: u32, cx: Arc<Context>) -> ServiceHandle {
         tracing::trace!("Task {id} was killed.");
     });
 
-    let (tx, rx) = mpsc::channel::<IpcMessage>(128);
-
     tokio::spawn(async move {
-        run_ctrl_loop(&ipc_dir, cx, cmd_permit, rx).await;
+        run_ctrl_loop(&ipc_dir, cx, cmd_permit, executor).await;
     });
 
     todo!()
 }
 
-async fn run_ctrl_loop(
+async fn run_ctrl_loop<E, F>(
     ipc_path: &Path,
     cx: Arc<Context>,
     cmd_permit: Arc<Notify>,
-    rx: mpsc::Receiver<ipc_types::IpcMessage>,
-) {
+    executor: E,
+) where
+    E: Fn(ipc_types::Request) -> F + Clone + Send + 'static,
+    F: Future<Output = ipc_types::Response> + Send + 'static,
+{
     let ctrl_path = ipc_path.join("ctrl");
     // The file might not exist.
     let _ = tokio::fs::remove_file(ctrl_path).await;
@@ -91,13 +93,6 @@ async fn run_ctrl_loop(
         let kill_fut = cx.kill.notified();
     };
 
-    enum Status {
-        NotRunning(mpsc::Receiver<ipc_types::IpcMessage>),
-        Running(JoinHandle<mpsc::Receiver<ipc_types::IpcMessage>>),
-    }
-
-    let killer = Arc::new(Notify::new());
-
     // Every time the service process is restarted (due to failures). The next one will attempt to
     // create a new connection to the same socket and here we will catch it.
     loop {
@@ -106,7 +101,13 @@ async fn run_ctrl_loop(
                 break;
             },
             Ok((stream, _)) = listener.accept() => {
-                tokio::spawn(handle_stream(stream, cx.worker.clone(), ));
+                let executor = executor.clone();
+                let kill = cx.kill.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = handle_stream(stream, kill, executor).await {
+                        tracing::error!("Error while handling the unix stream: {e:?}");
+                    }
+                });
             }
         }
     }
@@ -115,15 +116,116 @@ async fn run_ctrl_loop(
     drop(listener);
 }
 
-async fn handle_stream(
+async fn handle_stream<E, F>(
     stream: UnixStream,
-    _worker: WorkerSocket,
-    mut rx: mpsc::Receiver<ipc_types::IpcMessage>,
     kill: Arc<Notify>,
-) -> mpsc::Receiver<ipc_types::IpcMessage> {
-    let _ = stream.ready(Interest::WRITABLE).await;
+    executor: E,
+) -> Result<(), Box<dyn Error>>
+where
+    E: Fn(ipc_types::Request) -> F + 'static,
+    F: Future<Output = ipc_types::Response> + Send + 'static,
+{
+    const IPC_MESSAGE_SIZE: usize = std::mem::size_of::<ipc_types::IpcMessage>();
+    const IPC_REQUEST_SIZE: usize = std::mem::size_of::<ipc_types::IpcRequest>();
 
-    rx
+    pin! {
+        let kill_fut = kill.notified();
+    }
+
+    let mut read_buffer = [0u8; IPC_REQUEST_SIZE];
+    let mut read_pos = 0;
+    let mut write_buffer = [0u8; IPC_MESSAGE_SIZE];
+    let mut write_pos = IPC_MESSAGE_SIZE;
+    let mut task_set = JoinSet::<IpcMessage>::new();
+    let mut is_writable = false;
+    let mut is_readable = false;
+
+    'outer: loop {
+        // First check to see if we have something to write to the socket. If so we would be
+        // interested in writing to the UnixStream. Otherwise we would only be interested in
+        // reading. But would listen for new completed tasks at the same time.
+
+        if write_pos == IPC_MESSAGE_SIZE {
+            tokio::select! {
+                biased;
+                _ = &mut kill_fut => {
+                    break;
+                },
+                Some(msg) = task_set.join_next() => {
+                    write_buffer = unsafe { std::mem::transmute(msg) };
+                    write_pos = 0;
+
+                    if !is_writable {
+                        // Jump back to the beginning of the outer loop. This time message will be
+                        // there and we would also be interested in `WRITABLE` status. This will
+                        // give us opportunity to turn the `is_writable` flag on.
+                        continue 'outer;
+                    }
+                },
+                ready_result = stream.ready(Interest::READABLE) => {
+                    let ready = ready_result?;
+                    is_readable |= ready.is_readable();
+                },
+            }
+        } else {
+            let ready = stream
+                .ready(Interest::READABLE | Interest::WRITABLE)
+                .await?;
+            is_writable |= ready.is_writable();
+            is_readable |= ready.is_readable();
+        }
+
+        // While the stream is writable and we have a message to write try to write the message.
+        // Only turning the is_writable flag off once we get a WouldBlock error.
+        while is_writable && write_pos < IPC_MESSAGE_SIZE {
+            match stream.try_write(&write_buffer[write_pos..]) {
+                Ok(n) => {
+                    write_pos += n;
+                },
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    is_writable = false;
+                },
+                Err(e) => {
+                    return Err(e.into());
+                },
+            }
+        }
+
+        while is_readable {
+            match stream.try_read(&mut read_buffer[read_pos..]) {
+                Ok(n) => {
+                    read_pos += n;
+                },
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    is_readable = false;
+                },
+                Err(e) => {
+                    return Err(e.into());
+                },
+            }
+
+            if read_pos == IPC_REQUEST_SIZE {
+                read_pos = 0;
+                let request: ipc_types::IpcRequest =
+                    unsafe { std::mem::transmute_copy(&read_buffer) };
+
+                if let Some(ctx) = request.request_ctx {
+                    let future = executor(request.request);
+                    task_set.spawn(async move {
+                        IpcMessage::Response {
+                            request_ctx: ctx,
+                            response: future.await,
+                        }
+                    });
+                } else {
+                    // Only enqueue the request. We don't need to send the response back.
+                    tokio::spawn(executor(request.request));
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Run the given command until the kill signal has been received. Restarting the child on failure.

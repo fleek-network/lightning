@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use tokio::net::UnixStream;
 use triomphe::Arc;
 
-use crate::service::ServiceCollection;
+use crate::service::{spawn_service, Context, ServiceCollection};
 
 pub struct ServiceExecutor<C: Collection> {
     config: ServiceExecutorConfig,
@@ -86,7 +86,15 @@ impl<C: Collection> WithStartAndShutdown for ServiceExecutor<C> {
     }
 
     async fn start(&self) {
+        fn c() -> Arc<Context> {
+            todo!()
+        }
         self.is_running.store(true, Ordering::Relaxed);
+        // spawn_service(0, c(), |r| async {
+        //     println!("Req");
+        //     todo!()
+        // })
+        // .await;
 
         // for handle in get_all_services() {
         //     let id = handle.get_service_id();
