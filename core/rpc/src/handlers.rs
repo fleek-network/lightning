@@ -30,6 +30,7 @@ use lightning_interfaces::types::{
     UpdateRequest,
 };
 use lightning_interfaces::{PagingParams, SyncQueryRunnerInterface, ToDigest};
+use reqwest::ClientBuilder;
 use tracing::error;
 
 use crate::eth::{
@@ -64,6 +65,8 @@ use crate::eth::{
 };
 use crate::server::RpcData;
 use crate::types::{NodeKeyParam, PublicKeyParam, VersionedNodeKeyParam};
+use crate::utils;
+
 static OPEN_RPC_DOCS: &str = "../../docs/rpc/openrpc.json";
 
 pub const RPC_VERSION: u8 = 1;
@@ -77,6 +80,37 @@ pub async fn rpc_handler(
     error!("Someone called: {}", req.method_ref());
     let res = rpc.0.handle(req).await;
     Json(res)
+}
+
+pub async fn health_check(
+    Extension(node_pk): Extension<String>,
+    Extension(genesis_nodes): Extension<Vec<String>>,
+) -> (StatusCode, String) {
+    let req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method":"flk_is_valid_node",
+        "params": {"public_key": node_pk},
+        "id":1,
+    });
+    let client = ClientBuilder::new()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .unwrap();
+    for address in genesis_nodes {
+        let res = utils::rpc_request::<bool>(&client, address, req.to_string()).await;
+
+        if let Ok(res) = res {
+            if res.result {
+                return (StatusCode::OK, "running and staked".to_string());
+            } else {
+                return (StatusCode::OK, "running".to_string());
+            }
+        }
+    }
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "cannot reach bootstrap nodes".to_string(),
+    )
 }
 
 /// Export metrics for Prometheus to scrape

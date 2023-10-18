@@ -25,9 +25,9 @@ fleek-crypto.workspace = true
 hp-fixed.workspace = true
 ethers = "2.0.10"
 ruint = { version = "1.10", features = ["num-bigint", "serde"] }
+reqwest = { workspace = true, features = ["json"] }
 
 [dev-dependencies]
-reqwest = { workspace = true, features = ["json"] }
 lightning-application = { path = "../application" }
 lightning-fetcher = { path = "../fetcher" }
 lightning-blockstore = { path = "../blockstore" }

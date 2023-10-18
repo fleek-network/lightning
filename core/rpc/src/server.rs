@@ -5,7 +5,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use axum::routing::{get, post};
 use axum::{Extension, Router};
-use fleek_crypto::NodeSecretKey;
+use fleek_crypto::{NodeSecretKey, PublicKey, SecretKey};
 use http::header::CONTENT_TYPE;
 use http::Method;
 use lightning_interfaces::common::WithStartAndShutdown;
@@ -19,6 +19,7 @@ use lightning_interfaces::{
     MempoolSocket,
     RpcInterface,
     SignerInterface,
+    SyncQueryRunnerInterface,
 };
 use tokio::sync::Notify;
 use tokio::task;
@@ -26,7 +27,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
 use super::config::Config;
-use crate::handlers::{get_metrics, rpc_handler, RpcServer};
+use crate::handlers::{get_metrics, health_check, rpc_handler, RpcServer};
 
 pub struct Rpc<C: Collection> {
     /// Data available to the rpc handler during a request
@@ -62,6 +63,15 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
 
         info!("RPC server starting up");
 
+        let node_pk = self.data.node_secret_key.to_pk().to_base58();
+        let genesis_nodes: Vec<String> = self
+            .data
+            .query_runner
+            .genesis_committee()
+            .into_iter()
+            .map(|(_, node)| format!("http://{}:{}/rpc/v0", node.domain, node.ports.rpc))
+            .collect();
+
         // TODO(matthias): we probably want to make this configurable
         let cors = CorsLayer::new()
             .allow_methods([Method::GET, Method::POST])
@@ -69,7 +79,10 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
             .allow_origin(Any);
         let server = RpcServer::new(self.data.clone());
         let app = Router::new()
-            .route("/health", get(|| async { "OK" }))
+            //.route("/health", get(|| async { "OK" }))
+            .route("/health", get(health_check))
+            .layer(Extension(node_pk))
+            .layer(Extension(genesis_nodes))
             .route("/metrics", get(get_metrics))
             .route("/rpc/v0", post(rpc_handler))
             .layer(Extension(server))

@@ -54,20 +54,13 @@ use lightning_origin_ipfs::{Config as OriginIPFSConfig, IPFSOrigin};
 use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{Config as SignerConfig, Signer};
-use reqwest::{Client, Response};
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use reqwest::Client;
+use serde_json::json;
 use tokio::{task, test};
 
 use crate::config::Config as RpcConfig;
 use crate::server::Rpc;
-
-#[derive(Serialize, Deserialize, Debug)]
-struct RpcSuccessResponse<T> {
-    jsonrpc: String,
-    id: usize,
-    result: T,
-}
+use crate::utils;
 
 /// get mempool socket for test cases that do not require consensus
 #[derive(Default)]
@@ -195,25 +188,31 @@ async fn init_rpc_app_test() -> Result<(Rpc<TestBinding>, QueryRunner)> {
 }
 
 async fn wait_for_server_start(port: u16) -> Result<()> {
-    let client = Client::new();
     let mut retries = 10; // Maximum number of retries
 
+    let req = json!({
+        "jsonrpc": "2.0",
+        "method":"flk_ping",
+        "params":[],
+        "id":1,
+    });
+    let client = Client::new();
     while retries > 0 {
-        let response = client
-            .get(format!("http://127.0.0.1:{port}/health"))
-            .send()
-            .await;
-        match response {
-            Ok(res) if res.status().is_success() => {
-                println!("Server is ready!");
-                break;
-            },
-            _ => {
-                retries -= 1;
-                // Delay between retries
-                thread::sleep(Duration::from_secs(1));
-            },
+        let res = utils::rpc_request::<String>(
+            &client,
+            format!("http://127.0.0.1:{port}/rpc/v0"),
+            req.to_string(),
+        )
+        .await;
+
+        if res.is_ok() {
+            println!("Server is ready!");
+            break;
         }
+
+        retries -= 1;
+        // Delay between retries
+        thread::sleep(Duration::from_secs(1));
     }
 
     if retries > 0 {
@@ -221,16 +220,6 @@ async fn wait_for_server_start(port: u16) -> Result<()> {
     } else {
         panic!("Server did not become ready within the specified time");
     }
-}
-
-async fn make_request(port: u16, req: String) -> Result<Response> {
-    let client = Client::new();
-    Ok(client
-        .post(format!("http://127.0.0.1:{port}/rpc/v0"))
-        .header("Content-Type", "application/json")
-        .body(req)
-        .send()
-        .await?)
 }
 
 #[test]
@@ -251,7 +240,8 @@ async fn test_rpc_ping() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let response =
+        utils::make_request(format!("http://127.0.0.1:{port}/rpc/v0"), req.to_string()).await?;
 
     if response.status().is_success() {
         let response_body = response.text().await?;
@@ -295,20 +285,15 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let client = Client::new();
+    let response = utils::rpc_request::<HpUfixed<18>>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(HpUfixed::<18>::from(1_000_u32), response.result);
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<HpUfixed<18>> = serde_json::from_value(value)?;
-            assert_eq!(HpUfixed::<18>::from(1_000_u32), success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
     Ok(())
 }
 
@@ -364,20 +349,15 @@ async fn test_rpc_get_reputation() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let client = Client::new();
+    let response = utils::rpc_request::<Option<u8>>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(Some(46), response.result);
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<Option<u8>> = serde_json::from_value(value)?;
-            assert_eq!(Some(46), success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
     Ok(())
 }
 
@@ -438,20 +418,15 @@ async fn test_rpc_get_staked() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let client = Client::new();
+    let response = utils::rpc_request::<HpUfixed<18>>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(HpUfixed::<18>::from(1_000_u32), response.result);
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            //Parse the response as a successful response
-            let success_response: RpcSuccessResponse<HpUfixed<18>> = serde_json::from_value(value)?;
-            assert_eq!(HpUfixed::<18>::from(1_000_u32), success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
     Ok(())
 }
 
@@ -487,20 +462,15 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let client = Client::new();
+    let response = utils::rpc_request::<HpUfixed<6>>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(HpUfixed::<6>::from(2_00_u32), response.result);
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<HpUfixed<6>> = serde_json::from_value(value)?;
-            assert_eq!(HpUfixed::<6>::from(2_00_u32), success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
     Ok(())
 }
 
@@ -561,20 +531,15 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let client = Client::new();
+    let response = utils::rpc_request::<u64>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(365, response.result);
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<u64> = serde_json::from_value(value)?;
-            assert_eq!(365, success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
     Ok(())
 }
 
@@ -635,20 +600,15 @@ async fn test_rpc_get_locked_time() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let client = Client::new();
+    let response = utils::rpc_request::<u64>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(2, response.result);
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<u64> = serde_json::from_value(value)?;
-            assert_eq!(2, success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
     Ok(())
 }
 
@@ -709,20 +669,14 @@ async fn test_rpc_get_locked() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
-
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<HpUfixed<18>> = serde_json::from_value(value)?;
-            assert_eq!(HpUfixed::<18>::from(500_u32), success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
+    let client = Client::new();
+    let response = utils::rpc_request::<HpUfixed<18>>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(HpUfixed::<18>::from(500_u32), response.result);
     Ok(())
 }
 
@@ -758,20 +712,15 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let client = Client::new();
+    let response = utils::rpc_request::<u128>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(10_000, response.result);
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<u128> = serde_json::from_value(value)?;
-            assert_eq!(10_000, success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
     Ok(())
 }
 
@@ -832,21 +781,15 @@ async fn test_rpc_get_node_info() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let client = Client::new();
+    let response = utils::rpc_request::<Option<NodeInfo>>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(Some(NodeInfo::from(&node_info)), response.result);
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<Option<NodeInfo>> =
-                serde_json::from_value(value)?;
-            assert_eq!(Some(NodeInfo::from(&node_info)), success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
     Ok(())
 }
 
@@ -868,20 +811,14 @@ async fn test_rpc_get_staking_amount() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
-
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<u128> = serde_json::from_value(value)?;
-            assert_eq!(query_runner.get_staking_amount(), success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
+    let client = Client::new();
+    let response = utils::rpc_request::<u128>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(query_runner.get_staking_amount(), response.result);
 
     Ok(())
 }
@@ -904,24 +841,14 @@ async fn test_rpc_get_committee_members() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
-
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<Vec<NodePublicKey>> =
-                serde_json::from_value(value)?;
-            assert_eq!(
-                query_runner.get_committee_members(),
-                success_response.result
-            );
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
+    let client = Client::new();
+    let response = utils::rpc_request::<Vec<NodePublicKey>>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(query_runner.get_committee_members(), response.result);
 
     Ok(())
 }
@@ -944,20 +871,14 @@ async fn test_rpc_get_epoch() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
-
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<u64> = serde_json::from_value(value)?;
-            assert_eq!(query_runner.get_epoch(), success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
+    let client = Client::new();
+    let response = utils::rpc_request::<u64>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(query_runner.get_epoch(), response.result);
 
     Ok(())
 }
@@ -980,20 +901,14 @@ async fn test_rpc_get_epoch_info() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
-
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<EpochInfo> = serde_json::from_value(value)?;
-            assert_eq!(query_runner.get_epoch_info(), success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
+    let client = Client::new();
+    let response = utils::rpc_request::<EpochInfo>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(query_runner.get_epoch_info(), response.result);
 
     Ok(())
 }
@@ -1016,20 +931,14 @@ async fn test_rpc_get_total_supply() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
-
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<HpUfixed<18>> = serde_json::from_value(value)?;
-            assert_eq!(query_runner.get_total_supply(), success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
+    let client = Client::new();
+    let response = utils::rpc_request::<HpUfixed<18>>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(query_runner.get_total_supply(), response.result);
 
     Ok(())
 }
@@ -1052,23 +961,15 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let client = Client::new();
+    let response = utils::rpc_request::<HpUfixed<18>>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<HpUfixed<18>> = serde_json::from_value(value)?;
-            assert_eq!(
-                query_runner.get_year_start_supply(),
-                success_response.result
-            );
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
+    assert_eq!(query_runner.get_year_start_supply(), response.result);
 
     Ok(())
 }
@@ -1091,23 +992,14 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
-
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<EthAddress> = serde_json::from_value(value)?;
-            assert_eq!(
-                query_runner.get_protocol_fund_address(),
-                success_response.result
-            );
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
+    let client = Client::new();
+    let response = utils::rpc_request::<EthAddress>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(query_runner.get_protocol_fund_address(), response.result);
 
     Ok(())
 }
@@ -1132,23 +1024,14 @@ async fn test_rpc_get_protocol_params() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
-
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<u128> = serde_json::from_value(value)?;
-            assert_eq!(
-                query_runner.get_protocol_params(params),
-                success_response.result
-            );
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
+    let client = Client::new();
+    let response = utils::rpc_request::<u128>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(query_runner.get_protocol_params(params), response.result);
 
     Ok(())
 }
@@ -1180,20 +1063,15 @@ async fn test_rpc_get_total_served() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let client = Client::new();
+    let response = utils::rpc_request::<TotalServed>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(total_served, response.result);
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<TotalServed> = serde_json::from_value(value)?;
-            assert_eq!(total_served, success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
     Ok(())
 }
 
@@ -1250,20 +1128,15 @@ async fn test_rpc_get_node_served() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let client = Client::new();
+    let response = utils::rpc_request::<NodeServed>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(vec![1000], response.result.served);
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<NodeServed> = serde_json::from_value(value)?;
-            assert_eq!(vec![1000], success_response.result.served);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
     Ok(())
 }
 
@@ -1324,20 +1197,15 @@ async fn test_rpc_is_valid_node() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let client = Client::new();
+    let response = utils::rpc_request::<bool>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert!(response.result);
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<bool> = serde_json::from_value(value)?;
-            assert!(success_response.result);
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
     Ok(())
 }
 
@@ -1405,26 +1273,15 @@ async fn test_rpc_get_node_registry() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
-
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<Vec<NodeInfo>> =
-                serde_json::from_value(value)?;
-            assert_eq!(success_response.result.len(), committee_size + 1);
-            assert!(
-                success_response
-                    .result
-                    .contains(&NodeInfo::from(&node_info))
-            );
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
+    let client = Client::new();
+    let response = utils::rpc_request::<Vec<NodeInfo>>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(response.result.len(), committee_size + 1);
+    assert!(response.result.contains(&NodeInfo::from(&node_info)));
 
     let req = json!({
         "jsonrpc": "2.0",
@@ -1433,25 +1290,14 @@ async fn test_rpc_get_node_registry() -> Result<()> {
         "id":1,
     });
 
-    let response = make_request(port, req.to_string()).await?;
+    let response = utils::rpc_request::<Vec<NodeInfo>>(
+        &client,
+        format!("http://127.0.0.1:{port}/rpc/v0"),
+        req.to_string(),
+    )
+    .await?;
+    assert_eq!(response.result.len(), 1);
+    assert!(response.result.contains(&NodeInfo::from(&node_info)));
 
-    if response.status().is_success() {
-        let value: Value = response.json().await?;
-        if value.get("result").is_some() {
-            // Parse the response as a successful response
-            let success_response: RpcSuccessResponse<Vec<NodeInfo>> =
-                serde_json::from_value(value)?;
-            assert_eq!(success_response.result.len(), 1);
-            assert!(
-                success_response
-                    .result
-                    .contains(&NodeInfo::from(&node_info))
-            );
-        } else {
-            panic!("Rpc Error: {value}")
-        }
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
     Ok(())
 }
