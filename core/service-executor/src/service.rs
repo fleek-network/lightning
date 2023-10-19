@@ -74,9 +74,9 @@ where
     tokio::spawn(async move {
         // Wait until we have the UDS listener listening.
         permit.notified().await;
-        tracing::trace!("Got UDS signal for '{id}'. Starting the service process");
+        tracing::trace!("Starting the child process for service '{id}'.");
         run_command(format!("service-{id}"), command, kill_notify, conn_path).await;
-        tracing::trace!("Task {id} was killed.");
+        tracing::trace!("Exiting service '{id}' execution loop.");
     });
 
     tokio::spawn(async move {
@@ -111,6 +111,7 @@ async fn run_ctrl_loop<E, F>(
     // create a new connection to the same socket and here we will catch it.
     loop {
         tokio::select! {
+            biased;
             _ = &mut kill_fut => {
                 break;
             },
@@ -155,6 +156,8 @@ where
     let mut is_readable = false;
 
     'outer: loop {
+        tracing::trace!("awaiting an event");
+
         // First check to see if we have something to write to the socket. If so we would be
         // interested in writing to the UnixStream. Otherwise we would only be interested in
         // reading. But would listen for new completed tasks at the same time.
@@ -163,7 +166,8 @@ where
             tokio::select! {
                 biased;
                 _ = &mut kill_fut => {
-                    break;
+                    tracing::trace!("exiting loop");
+                    break 'outer;
                 },
                 Some(msg) = task_set.join_next() => {
                     write_buffer = unsafe { std::mem::transmute(msg) };
@@ -182,12 +186,21 @@ where
                 },
             }
         } else {
-            let ready = stream
-                .ready(Interest::READABLE | Interest::WRITABLE)
-                .await?;
-            is_writable |= ready.is_writable();
-            is_readable |= ready.is_readable();
+            tokio::select! {
+                biased;
+                _ = &mut kill_fut => {
+                    tracing::trace!("exiting loop");
+                    break 'outer;
+                },
+                ready_result = stream.ready(Interest::READABLE) => {
+                    let ready = ready_result?;
+                    is_writable |= ready.is_writable();
+                    is_readable |= ready.is_readable();
+                },
+            }
         }
+
+        tracing::trace!("is_writable={is_writable},is_readable={is_readable}");
 
         // While the stream is writable and we have a message to write try to write the message.
         // Only turning the is_writable flag off once we get a WouldBlock error.
@@ -197,6 +210,7 @@ where
                     write_pos += n;
                 },
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    tracing::trace!("is_writable=false");
                     is_writable = false;
                 },
                 Err(e) => {
@@ -207,10 +221,15 @@ where
 
         while is_readable {
             match stream.try_read(&mut read_buffer[read_pos..]) {
+                Ok(0) => {
+                    tracing::trace!("Got 0 bytes. Returning.");
+                    break 'outer;
+                },
                 Ok(n) => {
                     read_pos += n;
                 },
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    tracing::trace!("is_readable=false");
                     is_readable = false;
                 },
                 Err(e) => {
@@ -269,6 +288,7 @@ async fn run_command(
         let mut child = command.spawn().expect("Command failed to start.");
 
         select! {
+            biased;
             _ = &mut kill_fut => {
                 tracing::trace!("Got the signal to kill. Killing '{name}'");
                 child.kill().await.expect("Failed to kill the child.");
@@ -290,6 +310,7 @@ async fn run_command(
         tracing::info!("Waiting for {wait_dur:?} before restarting '{name}'");
 
         select! {
+            biased;
             _ = &mut kill_fut => {
                 tracing::trace!("Got the signal to stop '{name}'");
                 break;
@@ -299,4 +320,6 @@ async fn run_command(
             }
         }
     }
+
+    tracing::info!("Exiting service execution loop [sid={name}]")
 }

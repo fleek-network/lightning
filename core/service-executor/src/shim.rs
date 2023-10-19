@@ -55,6 +55,7 @@ pub struct Provider {
     collection: ServiceCollection,
 }
 
+#[async_trait]
 impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     type Provider = Provider;
 
@@ -81,9 +82,14 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
         }
     }
 
-    fn run_service(id: u32, _blockstore_path: std::path::PathBuf, _ipc_path: std::path::PathBuf) {
-        println!("running service {id}");
-        loop {}
+    async fn run_service(id: u32) {
+        match id {
+            1001 => {
+                crate::test_services::io_stress::main().await;
+                println!("END");
+            },
+            _ => eprintln!("Service {id} not found."),
+        }
     }
 }
 
@@ -96,12 +102,10 @@ impl<C: Collection> WithStartAndShutdown for ServiceExecutor<C> {
     async fn start(&self) {
         self.is_running.store(true, Ordering::Relaxed);
 
-        for id in get_all_services() {
-            if self.config.services.contains(&id) {
-                info!("Enabling service {id}");
-                let handle = spawn_service(id, self.ctx.clone(), |_| async { todo!() }).await;
-                self.collection.insert(id, handle);
-            }
+        for &id in self.config.services.iter() {
+            info!("Enabling service {id}");
+            let handle = spawn_service(id, self.ctx.clone(), |_| async { todo!() }).await;
+            self.collection.insert(id, handle);
         }
     }
 
@@ -124,8 +128,4 @@ impl ExecutorProviderInterface for Provider {
         let path = self.ipc_dir.join(format!("{service_id}/conn"));
         UnixStream::connect(path).await.ok()
     }
-}
-
-fn get_all_services() -> Vec<u32> {
-    vec![0]
 }

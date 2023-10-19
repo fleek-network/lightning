@@ -29,6 +29,23 @@ pub async fn conn_bind() -> UnixListener {
     UnixListener::bind(path).expect("IPC bind failed.")
 }
 
+/// Init the service event loop using environment variables. This method *MUST* only be called
+/// once.
+pub fn init_from_env() {
+    let blockstore_path = std::env::var("BLOCKSTORE_PATH")
+        .expect("Expected BLOCKSTORE_PATH env")
+        .try_into()
+        .expect("BLOCKSTORE_PATH to be a valid path.");
+    let ipc_path = std::env::var("IPC_PATH")
+        .expect("Expected IPC_PATH env")
+        .try_into()
+        .expect("IPC_PATH to be a valid path.");
+
+    tokio::spawn(async {
+        let _ = spawn_service_loop(ipc_path, blockstore_path).await;
+    });
+}
+
 /// Spawn a service with the given connection handler.
 pub async fn spawn_service_loop(
     ipc_path: PathBuf,

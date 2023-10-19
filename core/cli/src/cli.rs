@@ -63,19 +63,10 @@ impl Cli {
         // In case of spawning the binary with the `SERVICE_ID` env abort the default flow and
         // instead run the code for that service.
         if let Ok(service_id) = std::env::var("SERVICE_ID") {
-            let blockstore_path = std::env::var("BLOCKSTORE_PATH")
-                .expect("Expected BLOCKSTORE_PATH env")
-                .try_into()
-                .expect("BLOCKSTORE_PATH to be a valid path.");
-            let ipc_path = std::env::var("IPC_PATH")
-                .expect("Expected IPC_PATH env")
-                .try_into()
-                .expect("IPC_PATH to be a valid path.");
             <C::ServiceExecutorInterface as ServiceExecutorInterface<C>>::run_service(
                 service_id.parse().expect("SERVICE_ID to be a number"),
-                blockstore_path,
-                ipc_path,
-            );
+            )
+            .await;
             std::process::exit(0);
         }
 

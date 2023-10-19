@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use async_trait::async_trait;
 use tokio::net::UnixStream;
 
@@ -13,6 +11,7 @@ use crate::{ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown};
 ///
 /// Currently, we are hard coding some services and there is no API on this interface to
 /// load services.
+#[async_trait]
 #[infusion::service]
 pub trait ServiceExecutorInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
@@ -38,7 +37,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
     /// 1. `SERVICE_ID`
     /// 2. `BLOCKSTORE_PATH`
     /// 3. `IPC_PATH`
-    fn run_service(id: u32, blockstore_path: PathBuf, ipc_path: PathBuf);
+    async fn run_service(id: u32);
 }
 
 #[async_trait]

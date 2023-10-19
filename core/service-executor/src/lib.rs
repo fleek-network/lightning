@@ -3,3 +3,4 @@
 
 pub mod service;
 pub mod shim;
+pub mod test_services;
