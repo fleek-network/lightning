@@ -37,10 +37,13 @@ struct Run<C: Collection> {
 
 impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
     fn init(
-        config: Self::Config,
+        mut config: Self::Config,
         signer: &C::SignerInterface,
         provider: c![C::ServiceExecutorInterface::Provider],
     ) -> anyhow::Result<Self> {
+        // TEMP: Hardcode enable webrtc and tcp
+        config.transports = Default::default();
+
         let shutdown = ShutdownNotifier::default();
         let (_, _) = signer.get_sk();
         let ctx = Context::new(provider, shutdown.waiter()).into();
