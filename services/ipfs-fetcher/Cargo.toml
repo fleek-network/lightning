@@ -1,0 +1,10 @@
+[package]
+name = "ipfs-fetcher"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+fn-sdk = { path = "../../lib/sdk" }
+tokio.workspace = true
+bytes.workspace = true
+anyhow.workspace = true
