@@ -47,8 +47,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Stream the remaining content
     for _ in 0..num_blocks {
+        println!("receiving block");
         // Read payloads until we have the length of this block
         while buffer.len() < 4 {
+            println!("reading delimiter");
             let Some(ResponseFrame::ServicePayload { bytes }) = client.recv().await else {
                 panic!("invalid or no response received");
             };
@@ -58,6 +60,7 @@ async fn main() -> anyhow::Result<()> {
         // Read payloads until we have the entire block
         let len = u32::from_be_bytes(*array_ref![buffer, 0, 4]) as usize + 4;
         while buffer.len() < len {
+            println!("reading content ({}/{})", buffer.len(), len);
             let Some(ResponseFrame::ServicePayload { bytes }) = client.recv().await else {
                 panic!("invalid or no response received");
             };
