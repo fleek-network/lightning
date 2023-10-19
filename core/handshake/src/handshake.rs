@@ -160,7 +160,11 @@ mod tests {
 
     #[tokio::test]
     async fn restart() -> Result<()> {
-        let signer = <KeyOnlySigner as SignerInterface<TestBinding>>::init(Default::default(), Default::default()).unwrap();
+        let signer = <KeyOnlySigner as SignerInterface<TestBinding>>::init(
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
         let socket2 = TokioSpawn::spawn(DummyWorker2);
         let blockstore = Blockstore::init(lightning_blockstore::config::Config::default())?;
         let service_executor = ServiceExecutor::<TestBinding>::init(

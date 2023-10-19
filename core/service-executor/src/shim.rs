@@ -61,7 +61,6 @@ impl ServiceExecutorConfig {
     }
 }
 
-
 #[derive(Clone)]
 pub struct Provider {
     ipc_dir: PathBuf,
