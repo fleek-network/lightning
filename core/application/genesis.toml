@@ -1,5 +1,5 @@
 chain_id = 1337
-epoch_start = 1697643910690
+epoch_start = 1697720100012
 epoch_time = 1800000
 committee_size = 4
 min_stake = 1000
