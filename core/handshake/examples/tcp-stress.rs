@@ -92,7 +92,7 @@ async fn handshake_only() -> Result<()> {
     writer
         .send_handshake(HandshakeRequestFrame::Handshake {
             retry: None,
-            service: 10001,
+            service: 1001,
             pk: ClientPublicKey([1; 96]),
             pop: ClientSignature([2; 48]),
         })
