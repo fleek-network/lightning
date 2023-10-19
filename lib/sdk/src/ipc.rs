@@ -13,6 +13,7 @@ use std::path::PathBuf;
 
 use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
+use tokio::sync::mpsc;
 
 use crate::futures::future_callback;
 use crate::ipc_types::{IpcMessage, IpcRequest, Request, Response};
@@ -32,45 +33,45 @@ pub async fn conn_bind() -> UnixListener {
 /// Init the service event loop using environment variables. This method *MUST* only be called
 /// once.
 pub fn init_from_env() {
-    let blockstore_path = std::env::var("BLOCKSTORE_PATH")
+    let blockstore_path: PathBuf = std::env::var("BLOCKSTORE_PATH")
         .expect("Expected BLOCKSTORE_PATH env")
         .try_into()
         .expect("BLOCKSTORE_PATH to be a valid path.");
-    let ipc_path = std::env::var("IPC_PATH")
+
+    let ipc_path: PathBuf = std::env::var("IPC_PATH")
         .expect("Expected IPC_PATH env")
         .try_into()
         .expect("IPC_PATH to be a valid path.");
 
+    let (tx, rx) = mpsc::channel::<IpcRequest>(1024);
+
+    // SAFETY: `init_from_env` is the entry function of the entire service process.
+    unsafe {
+        SENDER = Some(tx);
+        BLOCKSTORE = Some(blockstore_path);
+        IPC_PATH = Some(ipc_path.clone());
+    }
+
     tokio::spawn(async {
-        let _ = spawn_service_loop(ipc_path, blockstore_path).await;
+        let _ = spawn_service_loop(ipc_path, rx).await;
     });
 }
 
 /// Spawn a service with the given connection handler.
 pub async fn spawn_service_loop(
     ipc_path: PathBuf,
-    blockstore_path: PathBuf,
+    rx: mpsc::Receiver<IpcRequest>,
 ) -> Result<(), Box<dyn Error>> {
     let ipc_stream = UnixStream::connect(ipc_path.join("ctrl")).await?;
-    spawn_service_loop_inner(ipc_stream, ipc_path, blockstore_path).await
+    spawn_service_loop_inner(ipc_stream, rx).await
 }
 
 pub(crate) async fn spawn_service_loop_inner(
     ipc_stream: UnixStream,
-    ipc_path: PathBuf,
-    blockstore_path: PathBuf,
+    mut rx: mpsc::Receiver<IpcRequest>,
 ) -> Result<(), Box<dyn Error>> {
     const IPC_REQUEST_SIZE: usize = std::mem::size_of::<IpcRequest>();
     const IPC_MESSAGE_SIZE: usize = std::mem::size_of::<IpcMessage>();
-
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<IpcRequest>(1024);
-
-    // SAFETY: `spawn_service_loop` is the entry function of the entire service process.
-    unsafe {
-        SENDER = Some(tx);
-        BLOCKSTORE = Some(blockstore_path);
-        BLOCKSTORE = Some(ipc_path);
-    }
 
     // IpcRequest
     let mut write_buffer = [0; IPC_REQUEST_SIZE];
@@ -238,12 +239,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_message_flow() {
+        let (tx, rx) = mpsc::channel::<IpcRequest>(1024);
+        unsafe {
+            SENDER = Some(tx);
+        }
         let (s1, s2) = tokio::net::UnixStream::pair().unwrap();
         tokio::spawn(async move {
-            let path = std::env::temp_dir().join("test");
-            spawn_service_loop_inner(s1, path.clone(), path)
-                .await
-                .unwrap();
+            spawn_service_loop_inner(s1, rx).await.unwrap();
         });
 
         let started = std::time::Instant::now();
