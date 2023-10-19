@@ -17,7 +17,7 @@ use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::net::UnixStream;
 use tokio::sync::Notify;
-use tracing::info;
+use tracing::{error, info, trace};
 use triomphe::Arc;
 
 use crate::service::{spawn_service, Context, ServiceCollection};
@@ -125,7 +125,15 @@ impl ExecutorProviderInterface for Provider {
     /// Make a connection to the provided service.
     async fn connect(&self, service_id: ServiceId) -> Option<UnixStream> {
         let _ = self.collection.get(service_id)?;
-        let path = self.ipc_dir.join(format!("{service_id}/conn"));
-        UnixStream::connect(path).await.ok()
+        let path = self.ipc_dir.join(format!("service-{service_id}/conn"));
+
+        trace!("called connect for {path:?}");
+        match UnixStream::connect(path).await {
+            Ok(s) => Some(s),
+            Err(e) => {
+                error!("failed to connect to service: {e}");
+                None
+            },
+        }
     }
 }
