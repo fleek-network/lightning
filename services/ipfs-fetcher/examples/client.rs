@@ -4,9 +4,7 @@ use cid::Cid;
 use lightning_handshake::schema::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
 use tcp_client::TcpClient;
 
-//const ADDRESS: &str = "127.0.0.1:4221";
-//const ADDRESS: &str = "161.35.208.183:4221";
-const ADDRESS: &str = "167.71.102.115:4221";
+const ADDRESS: &str = "127.0.0.1:4221";
 const CID: &str = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
 const SERVICE_ID: u32 = 0;
 
