@@ -16,3 +16,4 @@ triomphe = "0.1.9"
 tokio = { version = "1.32", features = ["rt", "sync", "fs", "net", "time"] }
 arrayvec = "0.7"
 ringbuf = "0.3"
+blake3-tree = { path = "../blake3-tree" }

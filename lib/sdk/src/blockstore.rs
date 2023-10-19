@@ -1,6 +1,8 @@
+use std::io::ErrorKind;
 use std::path::PathBuf;
 
 use arrayvec::ArrayString;
+use blake3_tree::utils::HashTree;
 
 use crate::ipc::BLOCKSTORE;
 
@@ -32,4 +34,38 @@ fn to_hex(slice: &[u8; 32]) -> ArrayString<64> {
         s.push(table[(b & 0xf) as usize] as char);
     }
     s
+}
+
+/// A handle to some content in the blockstore, providing an easy to use utility for accessing
+/// the hash tree and its blocks from the file system.
+pub struct ContentHandle {
+    pub tree: HashTree,
+}
+
+impl ContentHandle {
+    /// Load a new content handle, immediately reading the hash tree from the file system.
+    pub async fn load(hash: &[u8; 32]) -> std::io::Result<Self> {
+        let path = get_internal_path(hash);
+        let proof = std::fs::read(path)?.into_boxed_slice();
+        if proof.len() & 31 != 0 {
+            return Err(ErrorKind::InvalidData.into());
+        }
+
+        let vec = blake3_tree::utils::HashVec::from_inner(proof);
+        let tree = HashTree::from_inner(vec);
+
+        Ok(Self { tree })
+    }
+
+    /// Get the number of blocks for the content.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.tree.len()
+    }
+
+    /// Read a block from the file system.
+    pub async fn read(&self, block: usize) -> std::io::Result<Vec<u8>> {
+        let path = get_block_path(block, &self.tree[block]);
+        std::fs::read(path)
+    }
 }
