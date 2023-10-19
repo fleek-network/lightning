@@ -19,6 +19,7 @@ use lightning_interfaces::types::{
     ImmutablePointer,
     NodeIndex,
     NodeInfo,
+    NodeInfoWithIndex,
     NodeServed,
     OriginProvider,
     ProtocolParams,
@@ -172,6 +173,10 @@ impl RpcServer {
             .with_method("flk_get_node_served", get_node_served_handler::<C>)
             .with_method("flk_is_valid_node", is_valid_node_handler::<C>)
             .with_method("flk_get_node_registry", get_node_registry_handler::<C>)
+            .with_method(
+                "flk_get_node_registry_index",
+                get_node_registry_handler_index::<C>,
+            )
             .with_method("flk_get_reputation", get_reputation_handler::<C>)
             .with_method(
                 "flk_get_reputation_measurements",
@@ -480,6 +485,13 @@ pub async fn get_node_registry_handler<C: Collection>(
     Params(params): Params<Option<PagingParams>>,
 ) -> Result<Vec<NodeInfo>> {
     Ok(data.0.query_runner.get_node_registry(params))
+}
+
+pub async fn get_node_registry_handler_index<C: Collection>(
+    data: Data<Arc<RpcData<C>>>,
+    Params(params): Params<Option<PagingParams>>,
+) -> Result<Vec<NodeInfoWithIndex>> {
+    Ok(data.0.query_runner.get_node_registry_with_index(params))
 }
 
 pub async fn get_last_epoch_hash_handler<C: Collection>(

@@ -148,6 +148,12 @@ pub struct NodeInfo {
     pub nonce: u64,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NodeInfoWithIndex {
+    pub index: NodeIndex,
+    pub info: NodeInfo,
+}
+
 /// The ports a node has open for its processes
 #[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
 pub struct NodePorts {

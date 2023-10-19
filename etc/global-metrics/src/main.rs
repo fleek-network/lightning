@@ -4,6 +4,7 @@ mod types;
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use axum::http::StatusCode;
@@ -13,13 +14,14 @@ use hyper::{Body, Client, Method, Request};
 use hyper_tls::HttpsConnector;
 use lazy_static::lazy_static;
 use lightning_types::NodeInfo;
+use moka::sync::Cache;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::{json, Value};
 use sled::Db;
 use tracing::{error, info};
 
 use crate::config::Config;
-use crate::ip_api::get_ip_info;
+use crate::ip_api::{get_ip_info, IpInfoResponse};
 use crate::types::{PrometheusDiscoveryChunk, RpcResponse};
 
 lazy_static! {
@@ -41,10 +43,16 @@ async fn main() {
     let config = Config::default();
     let path = ResolvedPathBuf::try_from(config.db_path.as_ref()).unwrap();
     let store = sled::open(path).unwrap();
+    let cache: Cache<String, IpInfoResponse> = Cache::builder()
+        .max_capacity(10_000)
+        .time_to_live(Duration::from_secs(72 * 60 * 60))
+        .time_to_idle(Duration::from_secs(15 * 60))
+        .build();
     let app = Router::new()
         .route("/http_sd", get(service_discovery))
         .layer(Extension(store))
-        .layer(Extension(config));
+        .layer(Extension(config))
+        .layer(Extension(cache));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 4000));
     info!("metrics service discovery listening on {addr}");
@@ -59,6 +67,7 @@ async fn main() {
 async fn service_discovery(
     Extension(config): Extension<Config>,
     Extension(store): Extension<Db>,
+    Extension(cache): Extension<Cache<String, IpInfoResponse>>,
 ) -> (StatusCode, Json<Value>) {
     let nodes = match get_node_registry(&config).await {
         Ok(n) => n,
@@ -87,26 +96,34 @@ async fn service_discovery(
             },
             _ => None,
         };
-        if chunk.is_none() {
-            match get_ip_info(&config.ipinfo_token, node.domain.to_string()).await {
-                Ok(ip_info) => {
-                    let targets = vec![node_target];
-                    let mut labels = HashMap::new();
-                    labels.insert("public_key".to_string(), node.public_key.to_string());
-                    labels.insert("geohash".to_string(), ip_info.geo.clone());
-                    labels.insert("country_code".to_string(), ip_info.country.clone());
-                    labels.insert("timezone".to_string(), ip_info.timezone.clone());
 
-                    let local_chunk = PrometheusDiscoveryChunk::new(targets, labels);
-                    let chunk_to_bytes = bincode::serialize(&local_chunk).unwrap();
-                    batch.insert(node.public_key.0.to_vec(), chunk_to_bytes);
-                    chunk = Some(local_chunk)
+        if chunk.is_none() {
+            let domain = node.domain.to_string();
+            let ip_info = match cache.get(&domain) {
+                Some(info) => info,
+                None => match get_ip_info(&config.ipinfo_token, node.domain.to_string()).await {
+                    Ok(ip_info) => {
+                        cache.insert(domain, ip_info.clone());
+                        ip_info
+                    },
+                    Err(e) => {
+                        error!("Lookup failed for IP: {}, due to {}", node.domain, e);
+                        continue;
+                    },
                 },
-                Err(e) => {
-                    error!("Lookup failed for IP: {}, due to {}", node.domain, e);
-                    continue;
-                },
-            }
+            };
+
+            let targets = vec![node_target];
+            let mut labels = HashMap::new();
+            labels.insert("public_key".to_string(), node.public_key.to_string());
+            labels.insert("geohash".to_string(), ip_info.geo.clone());
+            labels.insert("country_code".to_string(), ip_info.country.clone());
+            labels.insert("timezone".to_string(), ip_info.timezone.clone());
+
+            let local_chunk = PrometheusDiscoveryChunk::new(targets, labels);
+            let chunk_to_bytes = bincode::serialize(&local_chunk).unwrap();
+            batch.insert(node.public_key.0.to_vec(), chunk_to_bytes);
+            chunk = Some(local_chunk)
         }
         discovery_chunk.push(chunk.unwrap());
     }

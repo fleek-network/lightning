@@ -15,6 +15,7 @@ use lightning_interfaces::types::{
     Metadata,
     NodeIndex,
     NodeInfo,
+    NodeInfoWithIndex,
     NodeServed,
     ProtocolParams,
     ReportedReputationMeasurements,
@@ -178,33 +179,43 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfo> {
+        self.get_node_registry_with_index(paging)
+            .into_iter()
+            .map(|node| node.info)
+            .collect()
+    }
+
+    fn get_node_registry_with_index(&self, paging: Option<PagingParams>) -> Vec<NodeInfoWithIndex> {
         let staking_amount: HpUfixed<18> = self.get_staking_amount().into();
         match paging {
             None => self.inner.run(|ctx| {
                 let node_table = self.node_table.get(ctx);
                 node_table
                     .keys()
-                    .map(|index| node_table.get(index).unwrap())
-                    .filter(|node| node.stake.staked >= staking_amount)
+                    .map(|index| NodeInfoWithIndex {
+                        index,
+                        info: node_table.get(index).unwrap(),
+                    })
+                    .filter(|node| node.info.stake.staked >= staking_amount)
                     .collect()
             }),
             Some(PagingParams {
                 ignore_stake,
                 limit,
                 start,
-            }) => {
-                let staking_amount: HpUfixed<18> = self.get_staking_amount().into();
-                self.inner.run(|ctx| {
-                    let node_table = self.node_table.get(ctx);
-                    node_table
-                        .keys()
-                        .filter(|index| index >= &start)
-                        .map(|index| node_table.get(index).unwrap())
-                        .filter(|node| ignore_stake || node.stake.staked >= staking_amount)
-                        .take(limit)
-                        .collect()
-                })
-            },
+            }) => self.inner.run(|ctx| {
+                let node_table = self.node_table.get(ctx);
+                node_table
+                    .keys()
+                    .filter(|index| index >= &start)
+                    .map(|index| NodeInfoWithIndex {
+                        index,
+                        info: node_table.get(index).unwrap(),
+                    })
+                    .filter(|node| ignore_stake || node.info.stake.staked >= staking_amount)
+                    .take(limit)
+                    .collect()
+            }),
         }
     }
 

@@ -3,7 +3,6 @@ resolver = "2"
 members = ["core/*", "lib/*", "services/*"]
 exclude = ["etc/global-metrics", "lib/cdk", "lib/blake3-js"]
 
-
 [workspace.package]
 version = "0.1.0"
 edition = "2021"

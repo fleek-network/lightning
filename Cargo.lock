@@ -246,7 +246,7 @@ name = "affair"
 version = "0.1.2"
 dependencies = [
  "async-trait",
- "criterion 0.5.1",
+ "criterion",
  "crossbeam",
  "futures",
  "tokio",
@@ -719,17 +719,6 @@ dependencies = [
  "proc-macro2 1.0.69",
  "quote 1.0.33",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "async-channel"
-version = "1.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81953c529336010edd6d8e358f886d9581267795c61b19475b71314bffa46d35"
-dependencies = [
- "concurrent-queue",
- "event-listener",
- "futures-core",
 ]
 
 [[package]]
@@ -1212,7 +1201,7 @@ version = "0.1.0"
 dependencies = [
  "arrayref",
  "arrayvec",
- "criterion 0.5.1",
+ "criterion",
  "fleek-blake3",
  "rand 0.8.5",
  "thiserror",
@@ -1594,21 +1583,9 @@ dependencies = [
  "atty",
  "bitflags 1.3.2",
  "strsim 0.8.0",
- "textwrap 0.11.0",
+ "textwrap",
  "unicode-width",
  "vec_map",
-]
-
-[[package]]
-name = "clap"
-version = "3.2.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ea181bf566f71cb9a5d17a59e1871af638180a18fb0035c92ae62b705207123"
-dependencies = [
- "bitflags 1.3.2",
- "clap_lex 0.2.4",
- "indexmap 1.9.3",
- "textwrap 0.16.0",
 ]
 
 [[package]]
@@ -1629,7 +1606,7 @@ checksum = "0e231faeaca65ebd1ea3c737966bf858971cd38c3849107aa3ea7de90a804e45"
 dependencies = [
  "anstream",
  "anstyle",
- "clap_lex 0.5.1",
+ "clap_lex",
  "strsim 0.10.0",
 ]
 
@@ -1643,15 +1620,6 @@ dependencies = [
  "proc-macro2 1.0.69",
  "quote 1.0.33",
  "syn 2.0.38",
-]
-
-[[package]]
-name = "clap_lex"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2850f2f5a82cbf437dd5af4d49848fbdfc27c157c3d010345776f952765261c5"
-dependencies = [
- "os_str_bytes",
 ]
 
 [[package]]
@@ -1756,15 +1724,6 @@ checksum = "35ed6e9d84f0b51a7f52daf1c7d71dd136fd7a3f41a8462b8cdb8c78d920fad4"
 dependencies = [
  "bytes",
  "memchr",
-]
-
-[[package]]
-name = "concurrent-queue"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f057a694a54f12365049b0958a1685bb52d567f5593b355fbf685838e873d400"
-dependencies = [
- "crossbeam-utils",
 ]
 
 [[package]]
@@ -1971,34 +1930,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b540bd8bc810d3885c6ea91e2018302f68baba2129ab3e88f32389ee9370880d"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "criterion"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7c76e09c1aae2bc52b3d2f29e13c6572553b30c4aa1b8a49fd70de6412654cb"
-dependencies = [
- "anes",
- "atty",
- "cast",
- "ciborium",
- "clap 3.2.25",
- "criterion-plot",
- "futures",
- "itertools 0.10.5",
- "lazy_static",
- "num-traits",
- "oorandom",
- "plotters",
- "rayon",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
- "tinytemplate",
- "tokio",
- "walkdir",
 ]
 
 [[package]]
@@ -3096,12 +3027,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "event-listener"
-version = "2.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
-
-[[package]]
 name = "extensions"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3291,28 +3216,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "fleek-service-big-buck-bunny"
+name = "fleek-service-ipfs-fetcher"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arrayref",
+ "bytes",
+ "cid",
  "fn-sdk",
- "hex-literal",
- "lazy_static",
- "tracing",
-]
-
-[[package]]
-name = "fleek-service-ping-example"
-version = "0.1.0"
-dependencies = [
- "arrayref",
- "dashmap",
- "fn-sdk",
- "fxhash",
- "hex-literal",
- "lazy_static",
+ "lightning-handshake",
  "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -3347,12 +3260,11 @@ checksum = "7bad48618fdb549078c333a7a8528acb57af271d0433bdecd523eb620628364e"
 name = "fn-sdk"
 version = "0.0.0"
 dependencies = [
- "arrayref",
+ "arrayvec",
  "blake3-tree",
  "derive_more",
- "fleek-blake3",
  "fleek-crypto",
- "futures",
+ "ringbuf",
  "tokio",
  "triomphe",
 ]
@@ -3837,12 +3749,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-
-[[package]]
-name = "hex-literal"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fe2267d4ed49bc07b63801559be28c718ea06c4738b7a03c94df7386d2cde46"
 
 [[package]]
 name = "hkdf"
@@ -4738,7 +4644,7 @@ dependencies = [
  "async-trait",
  "axum",
  "bytes",
- "criterion 0.4.0",
+ "criterion",
  "dashmap",
  "derive_more",
  "enum_dispatch",
@@ -5055,13 +4961,16 @@ dependencies = [
 name = "lightning-service-executor"
 version = "0.1.0"
 dependencies = [
+ "affair 0.1.2",
  "anyhow",
- "async-channel",
+ "arrayref",
  "async-trait",
+ "bincode",
+ "bytes",
  "dashmap",
- "fleek-service-big-buck-bunny",
- "fleek-service-ping-example",
+ "fleek-service-ipfs-fetcher",
  "fn-sdk",
+ "futures",
  "fxhash",
  "lightning-interfaces",
  "resolved-pathbuf",
@@ -5132,7 +5041,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.21.4",
- "criterion 0.5.1",
+ "criterion",
  "csv",
  "fleek-crypto",
  "fxhash",
@@ -6536,12 +6445,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "os_str_bytes"
-version = "6.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d5d9eb14b174ee9aa2ef96dc2b94637a2d4b6e7cb873c7e171f0c20c6cf3eac"
-
-[[package]]
 name = "ouroboros"
 version = "0.15.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7795,6 +7698,15 @@ dependencies = [
  "spin 0.9.8",
  "untrusted 0.9.0",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "ringbuf"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79abed428d1fd2a128201cec72c5f6938e2da607c6f3745f769fabea399d950a"
+dependencies = [
+ "crossbeam-utils",
 ]
 
 [[package]]
@@ -9165,12 +9077,6 @@ checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 dependencies = [
  "unicode-width",
 ]
-
-[[package]]
-name = "textwrap"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "222a222a5bfe1bba4a77b45ec488a741b3cb8872e5e499451fd7d0129c9c7c3d"
 
 [[package]]
 name = "thiserror"

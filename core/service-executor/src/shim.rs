@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
@@ -9,62 +10,84 @@ use lightning_interfaces::{
     BlockStoreInterface,
     ConfigConsumer,
     ExecutorProviderInterface,
+    FetcherSocket,
     ServiceExecutorInterface,
-    ServiceHandleInterface,
     WithStartAndShutdown,
 };
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tokio::net::UnixStream;
+use tokio::sync::Notify;
+use tracing::{error, info, trace};
 use triomphe::Arc;
 
-use crate::callback::make_callback;
-use crate::collection::ServiceCollection;
-use crate::deque::{CommandSender, CommandStealer};
-use crate::handle;
-use crate::handle::ServiceHandle;
+use crate::service::{spawn_service, Context, ServiceCollection};
 
 pub struct ServiceExecutor<C: Collection> {
     config: ServiceExecutorConfig,
     is_running: Arc<AtomicBool>,
     collection: ServiceCollection,
-    sender: CommandSender,
-    stealer: CommandStealer,
-    blockstore: ResolvedPathBuf,
+    ctx: Arc<Context>,
     p: PhantomData<C>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ServiceExecutorConfig {
     pub services: FxHashSet<ServiceId>,
+    /// The IPC directory is used to contain the Unix domain sockets that we use to communicate
+    /// with the different services.
+    pub ipc_path: ResolvedPathBuf,
 }
 
 impl Default for ServiceExecutorConfig {
     fn default() -> Self {
         Self {
-            services: [0, 1].into_iter().collect(),
+            services: [0].into_iter().collect(),
+            ipc_path: "~/.lightning/ipc"
+                .try_into()
+                .expect("Failed to resolve path"),
+        }
+    }
+}
+
+impl ServiceExecutorConfig {
+    pub fn test_default() -> Self {
+        Self {
+            services: Default::default(),
+            ipc_path: "~/.lightning/ipc"
+                .try_into()
+                .expect("Failed to resolve path"),
         }
     }
 }
 
 #[derive(Clone)]
 pub struct Provider {
+    ipc_dir: PathBuf,
     collection: ServiceCollection,
-    stealer: CommandStealer,
 }
 
+#[async_trait]
 impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     type Provider = Provider;
 
-    fn init(config: Self::Config, blockstore: &C::BlockStoreInterface) -> anyhow::Result<Self> {
-        let (sender, stealer) = crate::deque::chan();
+    fn init(
+        config: Self::Config,
+        blockstore: &C::BlockStoreInterface,
+        fetcher_socket: FetcherSocket,
+    ) -> anyhow::Result<Self> {
+        let ctx = Arc::new(Context {
+            kill: Arc::new(Notify::new()),
+            blockstore_path: blockstore.get_root_dir(),
+            ipc_path: config.ipc_path.clone(),
+            fetcher_socket,
+        });
+
         Ok(ServiceExecutor {
             config,
             is_running: Arc::new(AtomicBool::new(false)),
             collection: ServiceCollection::default(),
-            sender,
-            stealer,
-            blockstore: blockstore.get_root_dir().try_into()?,
+            ctx,
             p: PhantomData,
         })
     }
@@ -72,7 +95,19 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     fn get_provider(&self) -> Self::Provider {
         Provider {
             collection: self.collection.clone(),
-            stealer: self.stealer.clone(),
+            ipc_dir: self.config.ipc_path.clone(),
+        }
+    }
+
+    async fn run_service(id: u32) {
+        match id {
+            0 => {
+                fleek_service_ipfs_fetcher::main().await;
+            },
+            1001 => {
+                crate::test_services::io_stress::main().await;
+            },
+            _ => eprintln!("Service {id} not found."),
         }
     }
 }
@@ -86,27 +121,16 @@ impl<C: Collection> WithStartAndShutdown for ServiceExecutor<C> {
     async fn start(&self) {
         self.is_running.store(true, Ordering::Relaxed);
 
-        if !self.config.services.is_empty() {
-            let request_sender = make_callback(self.sender.clone(), fn_sdk::api::on_event_response);
-
-            fn_sdk::api::setup(fn_sdk::internal::OnStartArgs {
-                request_sender,
-                block_store_path: self.blockstore.clone(),
-            });
-        }
-
-        for handle in get_all_services() {
-            let id = handle.get_service_id();
-            if self.config.services.contains(&id) {
-                info!("Enabling service {id}");
-                self.collection.insert(handle);
-            }
+        for &id in self.config.services.iter() {
+            info!("Enabling service {id}");
+            let handle = spawn_service(id, self.ctx.clone()).await;
+            self.collection.insert(id, handle);
         }
     }
 
     async fn shutdown(&self) {
-        fn_sdk::api::unregister();
-        self.is_running.store(false, Ordering::Relaxed)
+        self.is_running.store(false, Ordering::Relaxed);
+        self.ctx.kill.notify_waiters();
     }
 }
 
@@ -115,27 +139,20 @@ impl<C: Collection> ConfigConsumer for ServiceExecutor<C> {
     type Config = ServiceExecutorConfig;
 }
 
+#[async_trait]
 impl ExecutorProviderInterface for Provider {
-    type Handle = ServiceHandle;
-    type Stealer = CommandStealer;
+    /// Make a connection to the provided service.
+    async fn connect(&self, service_id: ServiceId) -> Option<UnixStream> {
+        let _ = self.collection.get(service_id)?;
+        let path = self.ipc_dir.join(format!("service-{service_id}/conn"));
 
-    #[inline(always)]
-    fn get_work_stealer(&self) -> Self::Stealer {
-        self.stealer.clone()
+        trace!("called connect for {path:?}");
+        match UnixStream::connect(path).await {
+            Ok(s) => Some(s),
+            Err(e) => {
+                error!("failed to connect to service: {e}");
+                None
+            },
+        }
     }
-
-    #[inline(always)]
-    fn get_service_handle(
-        &self,
-        service_id: lightning_interfaces::types::ServiceId,
-    ) -> Option<Self::Handle> {
-        self.collection.get_handle(service_id)
-    }
-}
-
-fn get_all_services() -> Vec<ServiceHandle> {
-    vec![
-        handle!(0, fleek_service_ping_example),
-        handle!(1, fleek_service_big_buck_bunny),
-    ]
 }

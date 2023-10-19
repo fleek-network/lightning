@@ -19,7 +19,7 @@ macro_rules! ReqRes {
         ),*
         $(,)?
     } => (
-    #[derive(Clone, Debug, IsVariant)]
+    #[derive(Clone, Copy, Debug, IsVariant, PartialEq, Eq)]
     #[repr(C)]
     #[non_exhaustive]
     pub enum Request {
@@ -33,7 +33,7 @@ macro_rules! ReqRes {
     }),*
     }
 
-    #[derive(Clone, Copy, Debug, IsVariant)]
+    #[derive(Clone, Copy, Debug, IsVariant, PartialEq, Eq)]
     #[repr(C)]
     #[non_exhaustive]
     pub enum Response {
