@@ -83,7 +83,7 @@ impl<C: Collection> OriginFetcher<C> {
                                     if let Some(tx) = pending_requests.remove(&uri) {
                                         tx.send(Err(OriginError)).expect("Failed to send response");
                                     }
-                                    error!("Failed to fetch dada from origin");
+                                    error!("Failed to fetch data from origin");
                                 },
                             }
                         },
@@ -105,7 +105,10 @@ impl<C: Collection> OriginFetcher<C> {
             match &pointer.origin {
                 OriginProvider::IPFS => match origin_socket.run(pointer.uri.clone()).await {
                     Ok(Ok(hash)) => Ok(SuccessResponse { pointer, hash }),
-                    Ok(Err(_)) => Err(ErrorResponse::OriginFetchError(pointer.uri)),
+                    Ok(Err(e)) => {
+                        error!("Failed to fetch data: {e:?}");
+                        Err(ErrorResponse::OriginFetchError(pointer.uri))
+                    },
                     Err(_) => Err(ErrorResponse::OriginSocketError),
                 },
                 _ => unreachable!(),
