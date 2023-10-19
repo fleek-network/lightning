@@ -44,6 +44,7 @@ async fn main() -> anyhow::Result<()> {
         buffer.put(&bytes[8..]);
     }
     let num_blocks = u32::from_be_bytes(*array_ref![bytes, 4, 4]);
+    println!("Expecting {num_blocks} block(s) of content");
 
     // Stream the remaining content
     for _ in 0..num_blocks {

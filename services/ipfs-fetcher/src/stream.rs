@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
+use tracing::trace;
 
 pub struct ServiceStream {
     socket: UnixStream,
@@ -47,6 +48,7 @@ impl ServiceStream {
 
     pub async fn send(&mut self, bytes: &[u8]) -> Result<()> {
         let len = bytes.len();
+        trace!("sending {len} bytes");
         let mut buf = BytesMut::with_capacity(4 + len);
         buf.put_u32(len as u32);
         buf.put(bytes);
