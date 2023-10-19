@@ -4659,7 +4659,6 @@ dependencies = [
  "lightning-interfaces",
  "lightning-node",
  "lightning-service-executor",
- "lightning-signer",
  "lightning-test-utils",
  "mock",
  "rand 0.8.5",

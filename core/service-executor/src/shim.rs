@@ -31,7 +31,7 @@ pub struct ServiceExecutor<C: Collection> {
     p: PhantomData<C>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ServiceExecutorConfig {
     pub services: FxHashSet<ServiceId>,
     /// The IPC directory is used to contain the Unix domain sockets that we use to communicate
@@ -49,6 +49,18 @@ impl Default for ServiceExecutorConfig {
         }
     }
 }
+
+impl ServiceExecutorConfig {
+    pub fn test_default() -> Self {
+        Self {
+            services: Default::default(),
+            ipc_path: "~/.lightning/ipc"
+                .try_into()
+                .expect("Failed to resolve path"),
+        }
+    }
+}
+
 
 #[derive(Clone)]
 pub struct Provider {
