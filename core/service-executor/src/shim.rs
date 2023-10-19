@@ -104,7 +104,7 @@ impl<C: Collection> WithStartAndShutdown for ServiceExecutor<C> {
 
         for &id in self.config.services.iter() {
             info!("Enabling service {id}");
-            let handle = spawn_service(id, self.ctx.clone(), |_| async { todo!() }).await;
+            let handle = spawn_service(id, self.ctx.clone()).await;
             self.collection.insert(id, handle);
         }
     }

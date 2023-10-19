@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use fn_sdk::ipc_types::{self, IpcMessage};
-use futures::Future;
 use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::process::Command;
@@ -21,6 +20,12 @@ pub struct Context {
     pub ipc_path: PathBuf,
 }
 
+impl Context {
+    pub async fn run(&self, _request: ipc_types::Request) -> ipc_types::Response {
+        todo!()
+    }
+}
+
 /// Collection of every service that we have.
 #[derive(Clone, Default)]
 pub struct ServiceCollection {
@@ -33,6 +38,7 @@ impl ServiceCollection {
         self.services.get(&id).map(|v| *v)
     }
 
+    #[inline]
     pub fn insert(&self, id: u32, handle: ServiceHandle) {
         self.services.insert(id, handle);
     }
@@ -41,11 +47,7 @@ impl ServiceCollection {
 #[derive(Clone, Copy)]
 pub struct ServiceHandle {}
 
-pub async fn spawn_service<E, F>(id: u32, cx: Arc<Context>, executor: E) -> ServiceHandle
-where
-    E: Fn(ipc_types::Request) -> F + Clone + Send + 'static,
-    F: Future<Output = ipc_types::Response> + Send + 'static,
-{
+pub async fn spawn_service(id: u32, cx: Arc<Context>) -> ServiceHandle {
     let ipc_dir = cx.ipc_path.join(format!("service-{id}"));
     tracing::trace!("Spawning service {id} [IPC={ipc_dir:?}.");
 
@@ -80,21 +82,13 @@ where
     });
 
     tokio::spawn(async move {
-        run_ctrl_loop(&ipc_dir, cx, cmd_permit, executor).await;
+        run_ctrl_loop(&ipc_dir, cx, cmd_permit).await;
     });
 
     ServiceHandle {}
 }
 
-async fn run_ctrl_loop<E, F>(
-    ipc_path: &Path,
-    cx: Arc<Context>,
-    cmd_permit: Arc<Notify>,
-    executor: E,
-) where
-    E: Fn(ipc_types::Request) -> F + Clone + Send + 'static,
-    F: Future<Output = ipc_types::Response> + Send + 'static,
-{
+async fn run_ctrl_loop(ipc_path: &Path, ctx: Arc<Context>, cmd_permit: Arc<Notify>) {
     let ctrl_path = ipc_path.join("ctrl");
 
     // The file might not exist so ignore the error.
@@ -104,7 +98,7 @@ async fn run_ctrl_loop<E, F>(
     cmd_permit.notify_one();
 
     pin! {
-        let kill_fut = cx.kill.notified();
+        let kill_fut = ctx.kill.notified();
     };
 
     // Every time the service process is restarted (due to failures). The next one will attempt to
@@ -116,10 +110,9 @@ async fn run_ctrl_loop<E, F>(
                 break;
             },
             Ok((stream, _)) = listener.accept() => {
-                let executor = executor.clone();
-                let kill = cx.kill.clone();
+                let ctx = ctx.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = handle_stream(stream, kill, executor).await {
+                    if let Err(e) = handle_stream(stream, ctx).await {
                         tracing::error!("Error while handling the unix stream: {e:?}");
                     }
                 });
@@ -131,20 +124,12 @@ async fn run_ctrl_loop<E, F>(
     drop(listener);
 }
 
-async fn handle_stream<E, F>(
-    stream: UnixStream,
-    kill: Arc<Notify>,
-    executor: E,
-) -> Result<(), Box<dyn Error>>
-where
-    E: Fn(ipc_types::Request) -> F + 'static,
-    F: Future<Output = ipc_types::Response> + Send + 'static,
-{
+async fn handle_stream(stream: UnixStream, ctx: Arc<Context>) -> Result<(), Box<dyn Error>> {
     const IPC_MESSAGE_SIZE: usize = std::mem::size_of::<ipc_types::IpcMessage>();
     const IPC_REQUEST_SIZE: usize = std::mem::size_of::<ipc_types::IpcRequest>();
 
     pin! {
-        let kill_fut = kill.notified();
+        let kill_fut = ctx.kill.notified();
     }
 
     let mut read_buffer = [0u8; IPC_REQUEST_SIZE];
@@ -242,17 +227,21 @@ where
                 let request: ipc_types::IpcRequest =
                     unsafe { std::mem::transmute_copy(&read_buffer) };
 
-                if let Some(ctx) = request.request_ctx {
-                    let future = executor(request.request);
+                if let Some(request_ctx) = request.request_ctx {
+                    let ctx = ctx.clone();
                     task_set.spawn(async move {
+                        let response = ctx.run(request.request).await;
                         IpcMessage::Response {
-                            request_ctx: ctx,
-                            response: future.await,
+                            request_ctx,
+                            response,
                         }
                     });
                 } else {
                     // Only enqueue the request. We don't need to send the response back.
-                    tokio::spawn(executor(request.request));
+                    let ctx = ctx.clone();
+                    tokio::spawn(async move {
+                        ctx.run(request.request).await;
+                    });
                 }
             }
         }
