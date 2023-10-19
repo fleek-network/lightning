@@ -57,7 +57,7 @@ pub async fn spawn_service_loop(
 
 pub(crate) async fn spawn_service_loop_inner(
     ipc_stream: UnixStream,
-    _ipc_path: PathBuf,
+    ipc_path: PathBuf,
     blockstore_path: PathBuf,
 ) -> Result<(), Box<dyn Error>> {
     const IPC_REQUEST_SIZE: usize = std::mem::size_of::<IpcRequest>();
@@ -69,6 +69,7 @@ pub(crate) async fn spawn_service_loop_inner(
     unsafe {
         SENDER = Some(tx);
         BLOCKSTORE = Some(blockstore_path);
+        BLOCKSTORE = Some(ipc_path);
     }
 
     // IpcRequest
