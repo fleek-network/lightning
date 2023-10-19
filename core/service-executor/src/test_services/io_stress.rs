@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use arrayref::array_ref;
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
@@ -8,7 +8,6 @@ use tokio::net::UnixStream;
 #[derive(Serialize, Deserialize)]
 pub enum Message {
     Request { chunk_len: usize, chunks: usize },
-    Response { bytes: Box<[u8]> },
 }
 
 impl Message {
@@ -70,18 +69,10 @@ impl ServiceStream {
         }
     }
 
-    async fn send(&mut self, msg: Message) -> Result<()> {
-        // Encode the message with bincode
-        let bytes = msg.encode();
-
-        // Delimit the payload
-        let mut buf = BytesMut::with_capacity(4 + bytes.len());
-        buf.put_u32(bytes.len() as u32);
-        buf.put(bytes);
-
+    async fn send(&mut self, size: usize) -> Result<()> {
         // Write the buffer to the socket
         self.socket
-            .write_all(&buf)
+            .write_all(&vec![17; size])
             .await
             .context("failed to write frame to socket")
     }
@@ -89,21 +80,13 @@ impl ServiceStream {
 
 async fn connection_loop(socket: UnixStream) {
     let mut stream = ServiceStream::new(socket);
-    stream
-        .send(Message::Response {
-            bytes: Box::new([0; 32]),
-        })
-        .await
-        .expect("failed to send hello message");
+    stream.send(32).await.expect("failed to send hello message");
 
     while let Some(Message::Request { chunk_len, chunks }) = stream.recv().await {
         // send n chunks with a certain length
         for _ in 0..chunks {
-            let msg = Message::Response {
-                bytes: vec![0; chunk_len].into_boxed_slice(),
-            };
             stream
-                .send(msg)
+                .send(chunk_len)
                 .await
                 .expect("failed to send chunk message");
         }

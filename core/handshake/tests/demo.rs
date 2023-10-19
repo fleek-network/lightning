@@ -49,7 +49,7 @@ async fn demo() -> anyhow::Result<()> {
         tx.send(
             schema::HandshakeRequestFrame::Handshake {
                 retry: None,
-                service: 0,
+                service: 1001,
                 pk: ClientPublicKey([1; 96]),
                 pop: ClientSignature([2; 48]),
             }
@@ -57,8 +57,9 @@ async fn demo() -> anyhow::Result<()> {
         )
         .await?;
 
-        // let response = rx.recv().await;
-        // println!("handshake response {response:?}");
+        let response = rx.recv().await.unwrap();
+        let response = schema::ResponseFrame::decode(&response).unwrap();
+        println!("handshake response {response:?}");
 
         // send a message.
         tx.send(

@@ -37,12 +37,20 @@ pub async fn dial_mock(port: u16) -> Option<(Sender<Bytes>, Receiver<Bytes>)> {
 
 /// Mock memory transport backed by tokio channels
 pub struct MockTransport {
+    port: u16,
     conn_rx: tokio::sync::mpsc::Receiver<(MockTransportSender, MockTransportReceiver)>,
 }
 
 #[derive(Default, Serialize, Deserialize, Clone)]
 pub struct MockTransportConfig {
     port: u16,
+}
+
+impl Drop for MockTransport {
+    fn drop(&mut self) {
+        let map = LISTENERS.get().unwrap();
+        map.remove(&self.port);
+    }
 }
 
 #[async_trait]
@@ -62,7 +70,10 @@ impl Transport for MockTransport {
         map.insert(config.port, conn_tx);
 
         Ok((
-            Self { conn_rx },
+            Self {
+                port: config.port,
+                conn_rx,
+            },
             Some(Router::new().route("/mock", get(|| async { "mock is enabled" }))),
         ))
     }

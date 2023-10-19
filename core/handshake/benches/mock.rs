@@ -1,6 +1,7 @@
+#![feature(result_option_inspect)]
 use std::time::Duration;
 
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use criterion::{criterion_group, BenchmarkId, Criterion};
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use lightning_blockstore::blockstore::Blockstore;
@@ -28,8 +29,16 @@ partial!(TestBinding {
     ServiceExecutorInterface = ServiceExecutor<Self>;
 });
 
+pub fn delimit_frame(bytes: Bytes) -> Bytes {
+    let mut buf = BytesMut::with_capacity(4 + bytes.len());
+    buf.put_u32(bytes.len() as u32);
+    buf.put(bytes);
+    buf.into()
+}
+
 /// Setup the node.
 async fn setup_node() -> Node<TestBinding> {
+    let _ = tokio::fs::remove_dir_all("./ipc").await;
     let config: JsonConfigProvider = json!({
       "handshake": {
         "http_address": "127.0.0.1:4220",
@@ -61,7 +70,7 @@ async fn perform_handshake(tx: &Sender<Bytes>, rx: &mut Receiver<Bytes>) {
     tx.send(
         schema::HandshakeRequestFrame::Handshake {
             retry: None,
-            service: 10001,
+            service: 1001,
             pk: ClientPublicKey([1; 96]),
             pop: ClientSignature([2; 48]),
         }
@@ -82,16 +91,16 @@ async fn io_stress_write(
 ) {
     tx.send(
         schema::RequestFrame::ServicePayload {
-            bytes: io_stress::Message::Request { chunk_len, chunks }.encode(),
+            bytes: delimit_frame(io_stress::Message::Request { chunk_len, chunks }.encode()),
         }
         .encode(),
     )
     .await
     .unwrap();
 
-    let mut remaining = chunks * (chunk_len + 4);
+    let mut remaining = chunks * chunk_len;
     while remaining > 0 {
-        remaining -= rx.recv().await.unwrap().len();
+        remaining -= rx.recv().await.unwrap().len() - 1;
     }
 }
 
@@ -110,7 +119,7 @@ fn run_clients(n: usize) -> Vec<JoinHandle<()>> {
                     .send(
                         schema::HandshakeRequestFrame::Handshake {
                             retry: None,
-                            service: 10001,
+                            service: 1001,
                             pk: ClientPublicKey([1; 96]),
                             pop: ClientSignature([2; 48]),
                         }
@@ -127,11 +136,13 @@ fn run_clients(n: usize) -> Vec<JoinHandle<()>> {
                 if tx
                     .send(
                         schema::RequestFrame::ServicePayload {
-                            bytes: io_stress::Message::Request {
-                                chunk_len: 8,
-                                chunks: 1024,
-                            }
-                            .encode(),
+                            bytes: delimit_frame(
+                                io_stress::Message::Request {
+                                    chunk_len: 8,
+                                    chunks: 1024,
+                                }
+                                .encode(),
+                            ),
                         }
                         .encode(),
                     )
@@ -141,10 +152,10 @@ fn run_clients(n: usize) -> Vec<JoinHandle<()>> {
                     break;
                 }
 
-                let mut remaining = 1024 * (8 + 4);
+                let mut remaining = 1024 * 8;
                 while remaining > 0 {
                     if let Some(bytes) = rx.recv().await {
-                        remaining -= bytes.len();
+                        remaining -= bytes.len() - 1;
                     } else {
                         return;
                     }
