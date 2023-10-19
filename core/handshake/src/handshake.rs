@@ -135,7 +135,7 @@ mod tests {
     use affair::{Executor, TokioSpawn, Worker};
     use anyhow::Result;
     use lightning_blockstore::blockstore::Blockstore;
-    use lightning_interfaces::types::{FetcherRequest, FetcherResponse, TransactionRequest};
+    use lightning_interfaces::types::{FetcherRequest, FetcherResponse};
     use lightning_interfaces::{partial, BlockStoreInterface};
     use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
     use lightning_test_utils::keys::KeyOnlySigner;
