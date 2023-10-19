@@ -28,6 +28,12 @@ pub async fn connection_loop(socket: UnixStream) {
             return
         };
 
+        let bytes = (handle.len() as u32).to_be_bytes();
+        if let Err(e) = stream.send(bytes.as_slice()).await {
+            eprintln!("failed to send number of blocks: {e}");
+            return;
+        }
+
         for block in 0..handle.len() {
             let Ok(bytes) = handle.read(block).await else {
                 eprintln!("failed to read content from the blockstore :(");
