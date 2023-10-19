@@ -151,6 +151,9 @@ pub(crate) async fn spawn_service_loop_inner(
             'read: loop {
                 while read_buffer_pos < IPC_MESSAGE_SIZE {
                     match ipc_stream.try_read(&mut read_buffer[read_buffer_pos..]) {
+                        Ok(0) => {
+                            break 'outer;
+                        },
                         Ok(n) => {
                             read_buffer_pos += n;
                         },
@@ -172,6 +175,8 @@ pub(crate) async fn spawn_service_loop_inner(
             }
         }
     }
+
+    Ok(())
 }
 
 #[inline]
@@ -251,6 +256,9 @@ mod tests {
             while pos < buffer.len() {
                 s2.readable().await.unwrap();
                 match s2.try_read(&mut buffer) {
+                    Ok(0) => {
+                        break;
+                    },
                     Ok(n) => {
                         pos += n;
                     },
