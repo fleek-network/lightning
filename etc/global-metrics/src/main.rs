@@ -181,7 +181,7 @@ async fn get_node_registry_with_index(
 
     let uri = format!("http://{address}:{port}/rpc/v0");
 
-    let params = format!("{{ ignore_stake=true, start={index}, limit={limit} }}");
+    let params = format!("{{ ignore_stake: true, start: {index}, limit: {limit} }}");
     let json_request: Value = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_node_registry_index",
