@@ -24,7 +24,7 @@ impl ServiceStream {
         }
 
         // Parse and allocate for the length
-        let len = self.buffer[1] as usize + 1;
+        let len = self.buffer[0] as usize + 1;
         if len == 1 {
             // If the client specified it's going to send 0 bytes, this is an error
             return None;
