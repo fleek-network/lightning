@@ -42,7 +42,7 @@ pub struct ServiceExecutorConfig {
 impl Default for ServiceExecutorConfig {
     fn default() -> Self {
         Self {
-            services: [0].into_iter().collect(),
+            services: [0, 1001].into_iter().collect(),
             ipc_path: "~/.lightning/ipc"
                 .try_into()
                 .expect("Failed to resolve path"),
@@ -72,10 +72,11 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     type Provider = Provider;
 
     fn init(
-        config: Self::Config,
+        mut config: Self::Config,
         blockstore: &C::BlockStoreInterface,
         fetcher_socket: FetcherSocket,
     ) -> anyhow::Result<Self> {
+        config.services = [0, 1001].into_iter().collect();
         let ctx = Arc::new(Context {
             kill: Arc::new(Notify::new()),
             blockstore_path: blockstore.get_root_dir(),
