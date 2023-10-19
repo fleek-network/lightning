@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use fn_sdk::ipc_types::{self, IpcMessage};
+use lightning_interfaces::FetcherSocket;
 use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::process::Command;
@@ -18,6 +19,7 @@ pub struct Context {
     pub kill: Arc<Notify>,
     pub blockstore_path: PathBuf,
     pub ipc_path: PathBuf,
+    pub fetcher_socket: FetcherSocket,
 }
 
 impl Context {

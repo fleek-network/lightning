@@ -136,7 +136,7 @@ mod tests {
     use anyhow::Result;
     use infusion::Blank;
     use lightning_blockstore::blockstore::Blockstore;
-    use lightning_interfaces::types::TransactionRequest;
+    use lightning_interfaces::types::{FetcherRequest, FetcherResponse, TransactionRequest};
     use lightning_interfaces::{partial, BlockStoreInterface};
     use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
     use lightning_signer::Signer;
@@ -159,16 +159,28 @@ mod tests {
             todo!()
         }
     }
+    struct DummyWorker2;
+    impl Worker for DummyWorker2 {
+        type Request = FetcherRequest;
+        type Response = FetcherResponse;
+        fn handle(&mut self, _: Self::Request) -> Self::Response {
+            todo!()
+        }
+    }
 
     #[tokio::test]
     async fn restart() -> Result<()> {
         let mut signer = Signer::init(lightning_signer::Config::test(), Blank::default())?;
         let socket = TokioSpawn::spawn(DummyWorker);
+        let socket2 = TokioSpawn::spawn(DummyWorker2);
         signer.provide_mempool(socket);
         signer.provide_new_block_notify(Notify::default().into());
         let blockstore = Blockstore::init(lightning_blockstore::config::Config::default())?;
-        let service_executor =
-            ServiceExecutor::<TestBinding>::init(ServiceExecutorConfig::default(), &blockstore)?;
+        let service_executor = ServiceExecutor::<TestBinding>::init(
+            ServiceExecutorConfig::default(),
+            &blockstore,
+            socket2,
+        )?;
         signer.start().await;
         service_executor.start().await;
 

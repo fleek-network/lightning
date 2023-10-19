@@ -10,6 +10,7 @@ use lightning_interfaces::{
     BlockStoreInterface,
     ConfigConsumer,
     ExecutorProviderInterface,
+    FetcherSocket,
     ServiceExecutorInterface,
     WithStartAndShutdown,
 };
@@ -59,11 +60,16 @@ pub struct Provider {
 impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     type Provider = Provider;
 
-    fn init(config: Self::Config, blockstore: &C::BlockStoreInterface) -> anyhow::Result<Self> {
+    fn init(
+        config: Self::Config,
+        blockstore: &C::BlockStoreInterface,
+        fetcher_socket: FetcherSocket,
+    ) -> anyhow::Result<Self> {
         let ctx = Arc::new(Context {
             kill: Arc::new(Notify::new()),
             blockstore_path: blockstore.get_root_dir(),
             ipc_path: config.ipc_path.clone(),
+            fetcher_socket,
         });
 
         Ok(ServiceExecutor {
