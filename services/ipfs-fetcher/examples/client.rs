@@ -40,6 +40,8 @@ async fn main() -> anyhow::Result<()> {
     let Some(ResponseFrame::ServicePayload { bytes }) = client.recv().await else {
         panic!("invalid or no response received");
     };
+
+    println!("first frame was {} bytes long", bytes.len());
     if bytes.len() > 8 {
         buffer.put(&bytes[8..]);
     }

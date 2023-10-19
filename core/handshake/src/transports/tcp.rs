@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{mpsc, Mutex, Notify};
+use tokio::sync::{mpsc, Notify};
 use tracing::{info, warn};
 use triomphe::Arc;
 
@@ -115,23 +115,33 @@ fn spawn_handshake_task(
         let (reader, writer) = stream.into_split();
 
         // Send the frame and the new connection over the channel
-        tx.send((frame, TcpSender::new(writer), TcpReceiver::new(reader)))
+        tx.send((frame, TcpSender::spawn(writer), TcpReceiver::new(reader)))
             .await
             .ok();
     });
 }
 
-// TODO: Remove the lock.
+async fn spawn_write_driver(mut writer: OwnedWriteHalf, rx: async_channel::Receiver<Bytes>) {
+    while let Ok(bytes) = rx.recv().await {
+        if let Err(e) = writer.write_all(&delimit_frame(bytes)).await {
+            warn!("Dropping payload, failed to write to stream: {e}");
+        };
+    }
+}
+
 pub struct TcpSender {
-    writer: Arc<Mutex<OwnedWriteHalf>>,
+    sender: async_channel::Sender<Bytes>,
     notify: Arc<Notify>,
 }
 
 impl TcpSender {
     #[inline(always)]
-    pub fn new(writer: OwnedWriteHalf) -> Self {
+    pub fn spawn(writer: OwnedWriteHalf) -> Self {
+        let (sender, receiver) = async_channel::unbounded();
+        tokio::spawn(spawn_write_driver(writer, receiver));
+
         Self {
-            writer: Arc::new(Mutex::new(writer)),
+            sender,
             notify: Arc::new(Notify::new()),
         }
     }
@@ -139,18 +149,9 @@ impl TcpSender {
     /// Spawn a task to write the bytes to the stream
     #[inline(always)]
     fn send_inner(&mut self, bytes: Bytes) {
-        let writer = self.writer.clone();
-        let notify = self.notify.clone();
-        tokio::spawn(async move {
-            tokio::select! {
-                mut writer = writer.lock() => {
-                    if let Err(e) = writer.write_all(&delimit_frame(bytes)).await {
-                        warn!("Dropping payload, failed to write to stream: {e}");
-                    };
-                },
-                _ = notify.notified() => {}
-            }
-        });
+        if let Err(e) = self.sender.try_send(bytes) {
+            warn!("payload dropped, failed to send to write loop: {e}");
+        }
     }
 }
 

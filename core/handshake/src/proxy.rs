@@ -2,7 +2,7 @@ use anyhow::Result;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
 use tokio::task::JoinHandle;
-use tracing::error;
+use tracing::{error, trace};
 
 use crate::schema::RequestFrame;
 use crate::shutdown::ShutdownWaiter;
@@ -47,6 +47,7 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
                     if n == 0 {
                         break Ok(())
                     }
+                    trace!("sending out {n} bytes");
                     // TODO: OS like write api
                     self.tx.send(crate::schema::ResponseFrame::ServicePayload {
                         bytes: buffer[0..n].to_vec().into(),
