@@ -3226,6 +3226,7 @@ dependencies = [
  "fn-sdk",
  "lightning-handshake",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

@@ -3,6 +3,7 @@ mod stream;
 use fn_sdk::api::Origin;
 use stream::ServiceStream;
 use tokio::net::UnixStream;
+use tracing::trace;
 
 pub async fn main() {
     fn_sdk::ipc::init_from_env();
@@ -30,7 +31,7 @@ pub async fn connection_loop(socket: UnixStream) {
             return
         };
 
-        println!("----- sending {} blocks", handle.len());
+        trace!("streaming {} blocks to the client", handle.len());
 
         let bytes = (handle.len() as u32).to_be_bytes();
         if let Err(e) = stream.send(bytes.as_slice()).await {
