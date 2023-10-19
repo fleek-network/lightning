@@ -23,8 +23,47 @@ pub struct Context {
 }
 
 impl Context {
-    pub async fn run(&self, _request: ipc_types::Request) -> ipc_types::Response {
-        todo!()
+    pub async fn run(&self, request: ipc_types::Request) -> ipc_types::Response {
+        match request {
+            ipc_types::Request::QueryClientBalance { pk: _ } => {
+                // TODO(qti3e)
+                ipc_types::Response::QueryClientBalance { balance: 27 }
+            },
+            ipc_types::Request::FetchFromOrigin { origin, uri } => {
+                let hash = match self
+                    .fetcher_socket
+                    .run(lightning_interfaces::types::FetcherRequest::Put {
+                        pointer: lightning_interfaces::types::ImmutablePointer {
+                            origin: match origin {
+                                0 => lightning_interfaces::types::OriginProvider::IPFS,
+                                _ => unreachable!(),
+                            },
+                            uri: Vec::from(&uri),
+                        },
+                    })
+                    .await
+                    .unwrap()
+                {
+                    lightning_interfaces::types::FetcherResponse::Put(hash) => hash.ok(),
+                    lightning_interfaces::types::FetcherResponse::Fetch(_) => unreachable!(),
+                };
+
+                ipc_types::Response::FetchFromOrigin { hash }
+            },
+            ipc_types::Request::FetchBlake3 { hash } => {
+                let succeeded = match self
+                    .fetcher_socket
+                    .run(lightning_interfaces::types::FetcherRequest::Fetch { hash })
+                    .await
+                    .unwrap()
+                {
+                    lightning_interfaces::types::FetcherResponse::Put(_) => unreachable!(),
+                    lightning_interfaces::types::FetcherResponse::Fetch(v) => v.is_ok(),
+                };
+                ipc_types::Response::FetchBlake3 { succeeded }
+            },
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -179,7 +218,7 @@ async fn handle_stream(stream: UnixStream, ctx: Arc<Context>) -> Result<(), Box<
                     tracing::trace!("exiting loop");
                     break 'outer;
                 },
-                ready_result = stream.ready(Interest::READABLE) => {
+                ready_result = stream.ready(Interest::READABLE | Interest::WRITABLE) => {
                     let ready = ready_result?;
                     is_writable |= ready.is_writable();
                     is_readable |= ready.is_readable();

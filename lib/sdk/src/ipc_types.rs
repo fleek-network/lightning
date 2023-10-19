@@ -33,6 +33,13 @@ impl<const CAP: usize> StaticVec<CAP> {
         Self { size, buffer }
     }
 }
+impl<const CAP: usize> From<&StaticVec<CAP>> for Vec<u8> {
+    fn from(value: &StaticVec<CAP>) -> Self {
+        let mut vec = Vec::with_capacity(value.size);
+        vec.extend_from_slice(&value[0..value.size]);
+        vec
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
