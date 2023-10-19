@@ -50,7 +50,7 @@ async fn main() {
         .time_to_live(Duration::from_secs(72 * 60 * 60))
         .time_to_idle(Duration::from_secs(15 * 60))
         .build();
-    let highest_index_seen = Arc::new(Mutex::new(0));
+    let highest_index_seen: Arc<Mutex<NodeIndex>> = Arc::new(Mutex::new(0));
     let app = Router::new()
         .route("/http_sd", get(service_discovery))
         .route("/http_sd_v2", get(service_discovery_v2))
@@ -70,8 +70,8 @@ async fn main() {
 
 /// handler for HTTP-based service discovery for prometheus
 async fn service_discovery(
-    Extension(config): Extension<Config>,
     Extension(store): Extension<Db>,
+    Extension(config): Extension<Config>,
     Extension(cache): Extension<Cache<String, IpInfoResponse>>,
     Extension(_): Extension<Arc<Mutex<NodeIndex>>>,
 ) -> (StatusCode, Json<Value>) {
@@ -227,8 +227,8 @@ async fn get_node_registry_with_index(
 /// This handler rotates over the entire state using pagination features
 /// of the edge node's RPC.
 async fn service_discovery_v2(
-    Extension(config): Extension<Config>,
     Extension(store): Extension<Db>,
+    Extension(config): Extension<Config>,
     Extension(cache): Extension<Cache<String, IpInfoResponse>>,
     Extension(current_index): Extension<Arc<Mutex<NodeIndex>>>,
 ) -> (StatusCode, Json<Value>) {
