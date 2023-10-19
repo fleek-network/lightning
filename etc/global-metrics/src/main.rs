@@ -30,7 +30,6 @@ lazy_static! {
     static ref NODE_REGISTRY_REQUEST: serde_json::Value = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_node_registry",
-        "params":[],
         "id":1,
     });
 }
@@ -69,7 +68,7 @@ async fn main() {
 }
 
 /// handler for HTTP-based service discovery for prometheus
-async fn service_discovery(
+    async fn service_discovery(
     Extension(store): Extension<Db>,
     Extension(config): Extension<Config>,
     Extension(cache): Extension<Cache<String, IpInfoResponse>>,
