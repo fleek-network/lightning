@@ -41,7 +41,7 @@ tower-http = { version = "0.4.4", features = ["cors"] }
 hyper = "0.14"
 
 [dev-dependencies]
-criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.5.0", features = ["html_reports", "async_tokio"] }
 affair.workspace = true
 lightning-node = { path = "../node" } # for TomlConfigProvider
 lightning-cli = { path = "../cli" }
@@ -51,3 +51,7 @@ lightning-blockstore = { path = "../blockstore/" }
 serde_json.workspace = true
 lightning-test-utils = { path = "../test-utils" }
 mock = { path = "../mock" }
+
+[[bench]]
+name = "mock"
+harness = false

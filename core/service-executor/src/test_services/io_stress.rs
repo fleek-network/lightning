@@ -6,17 +6,17 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
 
 #[derive(Serialize, Deserialize)]
-enum Message {
+pub enum Message {
     Request { chunk_len: usize, chunks: usize },
     Response { bytes: Box<[u8]> },
 }
 
 impl Message {
-    fn decode(bytes: &[u8]) -> Result<Self> {
+    pub fn decode(bytes: &[u8]) -> Result<Self> {
         bincode::deserialize(bytes).context("failed to decode message")
     }
 
-    fn encode(&self) -> Bytes {
+    pub fn encode(&self) -> Bytes {
         bincode::serialize(self)
             .expect("failed to serialize message")
             .into()
