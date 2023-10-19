@@ -39,10 +39,10 @@ async fn setup_node() -> Node<TestBinding> {
             "port": 69
           },
         ],
-        "http_addr": "0.0.0.0:4210"
       },
       "service-executor": {
-        "services": [1001]
+        "services": [1001],
+        "ipc_path": "./ipc"
       },
     })
     .into();
