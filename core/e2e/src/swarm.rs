@@ -406,8 +406,6 @@ fn build_config(
             udp_address: ([127, 0, 0, 1], ports.handshake.webrtc).into(),
         })],
         http_address: ([127, 0, 0, 1], ports.handshake.http).into(),
-        max_client_connection_limit: 254,
-        max_global_connection_limit: 10_000,
     });
 
     config.inject::<ServiceExecutor<FinalTypes>>(ServiceExecutorConfig {
