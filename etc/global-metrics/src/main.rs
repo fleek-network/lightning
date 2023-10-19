@@ -185,7 +185,7 @@ async fn get_node_registry_with_index(
     let json_request: Value = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_node_registry_index",
-        "params": params,
+        "pagingParams": params,
         "id":1,
     });
 
