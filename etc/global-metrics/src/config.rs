@@ -7,6 +7,7 @@ pub struct Config {
     pub tracker_port: u16,
     pub lgtn_node_address: String,
     pub lgtn_node_port: u16,
+    pub pagination_limit: usize,
 }
 
 impl Default for Config {
@@ -26,6 +27,7 @@ impl Default for Config {
                 .expect("LGTN_PORT should be set")
                 .parse()
                 .expect("LGTN_PORT should be an integer"),
+            pagination_limit: 500,
         }
     }
 }

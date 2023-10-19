@@ -14,7 +14,7 @@ geo-types = "0.7.11"
 hyper = "0.14.27"
 hyper-tls = "0.5.0"
 lazy_static = "1.4.0"
-lightning-types = { git = "https://github.com/fleek-network/lightning.git", rev = "fb0fbdd80592312163eac594e9531f0f526a684f" }
+lightning-types = { git = "https://github.com/fleek-network/lightning.git", branch = "b/add-registry-with-index"}
 moka = { version = "0.11", features = ["sync"] }
 serde = {version = "1.0.188", features = ["derive"]}
 serde_derive = "1.0.186"
