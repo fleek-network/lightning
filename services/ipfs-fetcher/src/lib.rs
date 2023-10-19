@@ -20,13 +20,17 @@ pub async fn connection_loop(socket: UnixStream) {
     while let Some(uri) = stream.recv().await {
         // Fetch the content from the origin
         let Some(hash) = fn_sdk::api::fetch_from_origin(Origin::IPFS, uri).await else {
+            println!("failed to fetch from origin");
             return
         };
 
         // Get the content from the blockstore
         let Ok(handle) = fn_sdk::blockstore::ContentHandle::load(&hash).await else {
+            eprintln!("failed to load content handle from the blockstore");
             return
         };
+
+        println!("----- sending {} blocks", handle.len());
 
         let bytes = (handle.len() as u32).to_be_bytes();
         if let Err(e) = stream.send(bytes.as_slice()).await {

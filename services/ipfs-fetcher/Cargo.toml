@@ -12,3 +12,4 @@ anyhow.workspace = true
 [dev-dependencies]
 lightning-handshake = { path = "../../core/handshake" }
 arrayref = "0.3.7"
+cid = "0.10"

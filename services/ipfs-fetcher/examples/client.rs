@@ -1,10 +1,11 @@
 use arrayref::array_ref;
 use bytes::{Buf, BufMut, BytesMut};
+use cid::Cid;
 use lightning_handshake::schema::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
 use tcp_client::TcpClient;
 
 const ADDRESS: &str = "127.0.0.1:4221";
-const CID: &str = "bafybeibi5vlbuz3jstustlxbxk7tmxsyjjrxak6us4yqq6z2df3jwidiwi";
+const CID: &str = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
 const SERVICE_ID: u32 = 0;
 
 #[tokio::main]
@@ -20,13 +21,17 @@ async fn main() -> anyhow::Result<()> {
         })
         .await?;
 
+    println!("send handshake");
+
     // Send a request for the CID.
-    let mut buf = BytesMut::with_capacity(1 + CID.len());
-    buf.put_u8(CID.len() as u8);
-    buf.put(CID.as_bytes());
+    let cid = Cid::try_from(CID).expect("valid cid").to_bytes();
+    let mut buf = BytesMut::with_capacity(1 + cid.len());
+    buf.put_u8(cid.len() as u8);
+    buf.put(cid.as_slice());
     client
         .send(RequestFrame::ServicePayload { bytes: buf.into() })
         .await?;
+    println!("sent request for cid");
 
     let mut buffer = BytesMut::new();
     let mut total = 0;
@@ -39,11 +44,14 @@ async fn main() -> anyhow::Result<()> {
         buffer.put(&bytes[4..]);
     }
     let num_blocks = u32::from_be_bytes(*array_ref![bytes, 0, 4]);
+    println!("receiving {num_blocks}");
 
     // Stream the remaining content
     for _ in 0..num_blocks {
+        println!("receiving block");
         // Read payloads until we have the length of this block
         while buffer.len() < 4 {
+            println!("reading");
             let Some(ResponseFrame::ServicePayload { bytes }) = client.recv().await else {
                 panic!("invalid or no response received");
             };
@@ -53,6 +61,7 @@ async fn main() -> anyhow::Result<()> {
         // Read payloads until we have the entire block
         let len = u32::from_be_bytes(*array_ref![buffer, 0, 4]) as usize + 4;
         while buffer.len() < len {
+            println!("reading 1");
             let Some(ResponseFrame::ServicePayload { bytes }) = client.recv().await else {
                 panic!("invalid or no response received");
             };

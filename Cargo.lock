@@ -3222,6 +3222,7 @@ dependencies = [
  "anyhow",
  "arrayref",
  "bytes",
+ "cid",
  "fn-sdk",
  "lightning-handshake",
  "tokio",
