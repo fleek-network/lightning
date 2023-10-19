@@ -42,7 +42,7 @@ pub struct ServiceExecutorConfig {
 impl Default for ServiceExecutorConfig {
     fn default() -> Self {
         Self {
-            services: [0, 1].into_iter().collect(),
+            services: [0].into_iter().collect(),
             ipc_path: "~/.lightning/ipc"
                 .try_into()
                 .expect("Failed to resolve path"),
@@ -90,9 +90,11 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
 
     async fn run_service(id: u32) {
         match id {
+            0 => {
+                fleek_service_ipfs_fetcher::main().await;
+            },
             1001 => {
                 crate::test_services::io_stress::main().await;
-                println!("END");
             },
             _ => eprintln!("Service {id} not found."),
         }
