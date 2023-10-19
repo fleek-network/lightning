@@ -4,6 +4,7 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::ServiceExecutorInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::{FinalTypes, WithMockConsensus};
+use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 use resolved_pathbuf::ResolvedPathBuf;
 use tracing::info;
@@ -32,6 +33,17 @@ impl Cli {
     }
 
     pub async fn exec(self) -> Result<()> {
+        // In case of spawning the binary with the `SERVICE_ID` env abort the default flow and
+        // instead run the code for that service.
+        if let Ok(service_id) = std::env::var("SERVICE_ID") {
+            tracing_subscriber::fmt::init();
+            ServiceExecutor::<FinalTypes>::run_service(
+                service_id.parse().expect("SERVICE_ID to be a number"),
+            )
+            .await;
+            std::process::exit(0);
+        }
+
         self.setup();
         let config_path = self.resolve_config_path()?;
         match self.args.with_mock_consensus {
@@ -60,16 +72,6 @@ impl Cli {
     where
         C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterface = Signer<C>>,
     {
-        // In case of spawning the binary with the `SERVICE_ID` env abort the default flow and
-        // instead run the code for that service.
-        if let Ok(service_id) = std::env::var("SERVICE_ID") {
-            <C::ServiceExecutorInterface as ServiceExecutorInterface<C>>::run_service(
-                service_id.parse().expect("SERVICE_ID to be a number"),
-            )
-            .await;
-            std::process::exit(0);
-        }
-
         match self.args.cmd {
             Command::Run => run::exec::<C>(config_path, custom_start_shutdown).await,
             Command::Keys(cmd) => keys::exec::<C>(cmd, config_path).await,
