@@ -4672,6 +4672,7 @@ dependencies = [
  "async-trait",
  "axum",
  "bytes",
+ "clap 4.4.6",
  "criterion",
  "dashmap",
  "derive_more",

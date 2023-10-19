@@ -1,16 +1,17 @@
 use std::io::Write;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use anyhow::Result;
 use bytes::BytesMut;
+use clap::Parser;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use lightning_handshake::schema::{HandshakeRequestFrame, ResponseFrame};
 use tcp_client::*;
 use tokio::net::TcpStream;
 use tokio::time::Instant;
 
-const NUM_WORKERS: usize = 1;
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 mod tcp_client {
@@ -80,8 +81,21 @@ mod tcp_client {
     }
 }
 
-async fn handshake_only() -> Result<()> {
-    let (r, w) = TcpStream::connect(("127.0.0.1", 4221)).await?.into_split();
+#[derive(Parser, Debug)]
+struct Args {
+    /// Address of the node to stress test
+    #[arg(short, long, default_value = "127.0.0.1")]
+    address: IpAddr,
+    /// Port of the node to stress test
+    #[arg(short, long, default_value_t = 4221)]
+    port: u16,
+    /// Number of concurrent workers to send requests with
+    #[arg(short, long, default_value_t = 8)]
+    workers: usize,
+}
+
+async fn handshake_only(address: SocketAddr) -> Result<()> {
+    let (r, w) = TcpStream::connect(address).await?.into_split();
     let mut reader = TcpReader {
         reader: r,
         buffer: BytesMut::with_capacity(4),
@@ -112,11 +126,14 @@ async fn handshake_only() -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("spawning {NUM_WORKERS} workers");
-    for _ in 0..NUM_WORKERS {
+    let args = Args::parse();
+    let address: SocketAddr = (args.address, args.port).into();
+
+    println!("spawning {} workers for {address}", args.workers);
+    for _ in 0..args.workers {
         tokio::spawn(async move {
             loop {
-                if let Err(e) = handshake_only().await {
+                if let Err(e) = handshake_only(address).await {
                     panic!("Failed to handshake: {e}");
                 }
             }
