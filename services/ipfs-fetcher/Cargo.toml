@@ -8,3 +8,7 @@ fn-sdk = { path = "../../lib/sdk" }
 tokio.workspace = true
 bytes.workspace = true
 anyhow.workspace = true
+
+[dev-dependencies]
+lightning-handshake = { path = "../../core/handshake" }
+arrayref = "0.3.7"
