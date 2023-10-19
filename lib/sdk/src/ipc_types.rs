@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use derive_more::IsVariant;
 
 use crate::ReqRes;
@@ -7,6 +9,30 @@ use crate::ReqRes;
 pub type ClientPublicKeyBytes = [u8; 96];
 
 pub type RequestCtxU64 = u64;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StaticVec<const CAP: usize> {
+    size: usize,
+    buffer: [u8; CAP],
+}
+
+impl<const CAP: usize> Deref for StaticVec<CAP> {
+    type Target = [u8];
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.buffer[0..self.size]
+    }
+}
+
+impl<const CAP: usize> StaticVec<CAP> {
+    pub fn new(src: &[u8]) -> Self {
+        let size = src.len();
+        assert!(size <= CAP);
+        let mut buffer = [0; CAP];
+        buffer[0..size].copy_from_slice(src);
+        Self { size, buffer }
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
@@ -35,6 +61,14 @@ ReqRes! {
         =>
         /// The balance of the user.
         balance: u128,
+    },
+    FetchFromOrigin {
+        origin: u8,
+        /// The encoded URI.
+        uri: StaticVec<256>,
+        =>
+        /// Returns the hash of the content on successful fetch.
+        hash: Option<[u8; 32]>,
     },
     /// Fetch a content via a blake3 digest.
     FetchBlake3 {
