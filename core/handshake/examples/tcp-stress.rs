@@ -112,9 +112,9 @@ async fn handshake_only() -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    for i in 0..NUM_WORKERS {
+    println!("spawning {NUM_WORKERS} workers");
+    for _ in 0..NUM_WORKERS {
         tokio::spawn(async move {
-            println!("Spawned worker task {i}");
             loop {
                 if let Err(e) = handshake_only().await {
                     panic!("Failed to handshake: {e}");
