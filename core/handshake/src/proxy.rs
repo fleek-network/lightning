@@ -38,9 +38,15 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
         loop {
             tokio::select! {
                 // if we have an incoming payload, handle it
-                Some(req) = self.rx.recv() => self.handle_incoming(req).await?,
+                res = self.rx.recv() => match res {
+                    Some(req) => self.handle_incoming(req).await?,
+                    None => break Ok(()),
+                },
                 // If we read any bytes from the socket, send it over the transport
                 Ok(n) = self.socket.read(&mut buffer) => {
+                    if n == 0 {
+                        break Ok(())
+                    }
                     // TODO: OS like write api
                     self.tx.send(crate::schema::ResponseFrame::ServicePayload {
                         bytes: buffer[0..n].to_vec().into(),
