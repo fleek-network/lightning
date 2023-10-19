@@ -5,7 +5,7 @@ use affair::Socket;
 use anyhow::Result;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use lightning_types::{AccountInfo, NodeIndex, TransactionRequest};
+use lightning_types::{AccountInfo, NodeIndex, NodeInfoWithIndex, TransactionRequest};
 use serde::{Deserialize, Serialize};
 
 use crate::common::WithStartAndShutdown;
@@ -127,6 +127,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Returns a full copy of the entire node-registry, but only contains the nodes that
     /// are still a valid node and have enough stake.
     fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfo>;
+
+    /// Same as `get_node_registry` but it includes the node index in the result.
+    fn get_node_registry_with_index(&self, paging: Option<PagingParams>) -> Vec<NodeInfoWithIndex>;
 
     /// Returns true if the node is a valid node in the network, with enough stake.
     fn is_valid_node(&self, id: &NodePublicKey) -> bool;
