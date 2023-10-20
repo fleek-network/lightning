@@ -54,7 +54,13 @@ impl Transport for WebRtcTransport {
     type Sender = WebRtcSender;
     type Receiver = WebRtcReceiver;
 
-    async fn bind(waiter: ShutdownWaiter, config: Self::Config) -> Result<(Self, Option<Router>)> {
+    async fn bind(
+        waiter: ShutdownWaiter,
+        mut config: Self::Config,
+    ) -> Result<(Self, Option<Router>)> {
+        // TEMP: Hardcode the listening address to avoid older testnet configs
+        config.udp_address.set_ip([0, 0, 0, 0].into());
+
         info!("Binding WebRTC transport on {}", config.udp_address);
         let conns = Arc::new(DashMap::new());
 
