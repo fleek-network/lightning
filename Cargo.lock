@@ -4484,6 +4484,7 @@ dependencies = [
  "anyhow",
  "clap 4.4.6",
  "console-subscriber",
+ "fleek-blake3",
  "fleek-crypto",
  "infusion",
  "lightning-application",
