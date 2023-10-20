@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cp /build/target/release/lightning-node /build
 
 FROM ubuntu:latest
-ARG LIGHTNING_PORTS="4069 4200 6969 18000 18101 18102"
+ARG LIGHTNING_PORTS="4200-4299 4300-4399"
 WORKDIR /root
 SHELL ["/bin/bash", "-c"] 
 
