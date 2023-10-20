@@ -174,8 +174,10 @@ impl<C: Collection> BlockstoreServerInner<C> {
                 _ = self.shutdown_notify.notified() => {
                     break;
                 }
-                Ok((req_header, responder)) = pool_responder.get_next_request() => {
-                    // TODO(matthias): find out which peer the request came from
+                res = pool_responder.get_next_request() => {
+                    match res {
+                        Ok((req_header, responder)) => {
+                             // TODO(matthias): find out which peer the request came from
                     match PeerRequest::try_from(req_header.bytes) {
                         Ok(request) => {
                             if self.num_responses.load(Ordering::Relaxed) > self.max_conc_res {
@@ -198,10 +200,16 @@ impl<C: Collection> BlockstoreServerInner<C> {
                         }
                         Err(e) => error!("Failed to decode request from peer: {e:?}"),
                     }
+                        }
+                        Err(e) => error!("The responder had a fatal error")
+                    }
+
                 }
-                Some(task) = request_rx.recv() => {
-                    let peer_request = PeerRequest { hash: task.request.hash };
-                    let rx = if let Some(tx) = pending_requests.get(&peer_request) {
+                res = request_rx.recv() => {
+                    match res {
+                        Some(task) => {
+                        let peer_request = PeerRequest { hash: task.request.hash };
+                            let rx = if let Some(tx) = pending_requests.get(&peer_request) {
                         // If a request for this hash is currently pending, subscribe to get
                         // notified about the result.
                         tx.subscribe()
@@ -229,22 +237,32 @@ impl<C: Collection> BlockstoreServerInner<C> {
                         rx
                     };
                     task.respond(rx);
-                }
-                Some(res) = tasks.join_next() => {
-                    match res {
-                        Ok(Ok(peer_request)) => {
-                            if let Some(tx) = pending_requests.remove(&peer_request) {
-                                tx.send(Ok(())).expect("Failed to send response");
-                            }
-                        },
-                        Ok(Err(error_res)) => {
-                            if let Some(tx) = pending_requests.remove(&error_res.request) {
-                                tx.send(Err(error_res.error)).expect("Failed to send response");
-                            }
-                            error!("Failed to fetch data from peer");
-                        },
-                        Err(e) => error!("Failed to join task: {e:?}"),
+                        }
+                        None => error!("request_rx returned None")
                     }
+
+                }
+                task = tasks.join_next() => {
+                    match task {
+                        Some(res)=> {
+                            match res {
+                                Ok(Ok(peer_request)) => {
+                                    if let Some(tx) = pending_requests.remove(&peer_request) {
+                                        tx.send(Ok(())).expect("Failed to send response");
+                                    }
+                                },
+                                Ok(Err(error_res)) => {
+                                    if let Some(tx) = pending_requests.remove(&error_res.request) {
+                                        tx.send(Err(error_res.error)).expect("Failed to send response");
+                                    }
+                                    error!("Failed to fetch data from peer");
+                                },
+                                Err(e) => error!("Failed to join task: {e:?}"),
+                            }
+                        }
+                        None => error!("tasks returned None")
+                    }
+
                 }
             }
         }
