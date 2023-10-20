@@ -248,10 +248,10 @@ impl<C: Collection> BlockstoreServerInner<C> {
                             }
                         },
                         Ok(Err(error_res)) => {
+                            error!("Failed to fetch data from peer: {:?}", error_res.error);
                             if let Some(tx) = pending_requests.remove(&error_res.request) {
                                 tx.send(Err(error_res.error)).expect("Failed to send response");
                             }
-                            error!("Failed to fetch data from peer");
                         },
                         Err(e) => error!("Failed to join task: {e:?}"),
                     }
