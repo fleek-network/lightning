@@ -45,6 +45,7 @@ impl TryFrom<u8> for ServiceScope {
 pub enum RejectReason {
     Other,
     TooManyRequests,
+    ContentNotFound,
 }
 
 #[derive(Clone, Debug)]
