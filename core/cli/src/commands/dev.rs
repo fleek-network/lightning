@@ -116,14 +116,37 @@ async fn fetch<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
     hash_string: String,
     peer: u32,
 ) -> Result<()> {
-    let hash = fleek_blake3::Hash::from_hex(hash_string.as_bytes())
-        .context("Invalid blake3 hash.")?
-        .into();
+    let hash: [u8; 32] = if hash_string.starts_with('[') {
+        let pat: &[_] = &['[', ']'];
+        let numbers: Vec<u8> = hash_string
+            .trim_matches(pat)
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.parse().expect("expected number"))
+            .collect();
+
+        if numbers.len() != 32 {
+            anyhow::bail!("Failed to parse hash.");
+        }
+
+        let mut result = [0u8; 32];
+        result.copy_from_slice(&numbers);
+        result
+    } else {
+        fleek_blake3::Hash::from_hex(hash_string.as_bytes())
+            .context("Invalid blake3 hash.")?
+            .into()
+    };
+    let hash_string = fleek_blake3::Hash::from(hash).to_string();
 
     let config = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
     let node = Node::<C>::init(config)
         .map_err(|e| anyhow::anyhow!("Node Initialization failed: {e:?}"))
         .context("Could not start the node.")?;
+
+    tracing::info!("Starting the node.");
+    node.start().await;
 
     let blockstore = node
         .container
@@ -147,6 +170,9 @@ async fn fetch<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
             return Err(e.into());
         },
     }
+
+    tracing::info!("Shutting the node down.");
+    node.shutdown().await;
 
     Ok(())
 }
