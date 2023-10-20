@@ -174,95 +174,87 @@ impl<C: Collection> BlockstoreServerInner<C> {
                 _ = self.shutdown_notify.notified() => {
                     break;
                 }
-                res = pool_responder.get_next_request() => {
-                    match res {
+                req = pool_responder.get_next_request() => {
+                    match req {
                         Ok((req_header, responder)) => {
-                             // TODO(matthias): find out which peer the request came from
-                    match PeerRequest::try_from(req_header.bytes) {
-                        Ok(request) => {
-                            if self.num_responses.load(Ordering::Relaxed) > self.max_conc_res {
-                                responder.reject(RejectReason::TooManyRequests);
-                            } else {
-                                let blockstore = self.blockstore.clone();
-                                let num_responses = self.num_responses.clone();
-                                let rep_reporter = self.rep_reporter.clone();
-                                tokio::spawn(async move {
-                                    handle_request::<C>(
-                                        req_header.peer,
-                                        request,
-                                        blockstore,
-                                        responder,
-                                        num_responses,
-                                        rep_reporter,
-                                    ).await;
-                                });
+                            // TODO(matthias): find out which peer the request came from
+                            match PeerRequest::try_from(req_header.bytes) {
+                                Ok(request) => {
+                                    let num_res = self.num_responses.load(Ordering::Relaxed);
+                                    if num_res > self.max_conc_res {
+                                        responder.reject(RejectReason::TooManyRequests);
+                                    } else {
+                                        let blockstore = self.blockstore.clone();
+                                        let num_responses = self.num_responses.clone();
+                                        let rep_reporter = self.rep_reporter.clone();
+                                        tokio::spawn(async move {
+                                            handle_request::<C>(
+                                                req_header.peer,
+                                                request,
+                                                blockstore,
+                                                responder,
+                                                num_responses,
+                                                rep_reporter,
+                                            ).await;
+                                        });
+                                    }
+                                }
+                                Err(e) => error!("Failed to decode request from peer: {e:?}"),
                             }
                         }
-                        Err(e) => error!("Failed to decode request from peer: {e:?}"),
-                    }
+                        Err(e) => {
+                            error!("Failed to receive request from pool: {e:?}");
                         }
-                        Err(e) => error!("The responder had a fatal error: {e:?}")
                     }
-
                 }
-                res = request_rx.recv() => {
-                    match res {
-                        Some(task) => {
+                task = request_rx.recv() => {
+                    if let Some(task) = task {
                         let peer_request = PeerRequest { hash: task.request.hash };
-                            let rx = if let Some(tx) = pending_requests.get(&peer_request) {
-                        // If a request for this hash is currently pending, subscribe to get
-                        // notified about the result.
-                        tx.subscribe()
-                    } else {
-                        // If no request for this hash currently exists, create new request.
-                        if tasks.len() < self.max_conc_req {
-                            let blockstore = self.blockstore.clone();
-                            let pool_requester = self.pool_requester.clone();
-                            let peer_request_ = peer_request.clone();
-                            let rep_reporter = self.rep_reporter.clone();
-                            tasks.spawn(async move {
-                                send_request::<C>(
-                                    task.request.peer,
-                                    peer_request_,
-                                    blockstore,
-                                    pool_requester,
-                                    rep_reporter,
-                                ).await
-                            });
+                        let rx = if let Some(tx) = pending_requests.get(&peer_request) {
+                            // If a request for this hash is currently pending, subscribe to get
+                            // notified about the result.
+                            tx.subscribe()
                         } else {
-                            queue.push_back(peer_request.clone());
-                        }
-                        let (tx, rx) = broadcast::channel(1);
-                        pending_requests.insert(peer_request, tx);
-                        rx
-                    };
-                    task.respond(rx);
-                        }
-                        None => ()
-                    }
-
-                }
-                task = tasks.join_next() => {
-                    match task {
-                        Some(res)=> {
-                            match res {
-                                Ok(Ok(peer_request)) => {
-                                    if let Some(tx) = pending_requests.remove(&peer_request) {
-                                        tx.send(Ok(())).expect("Failed to send response");
-                                    }
-                                },
-                                Ok(Err(error_res)) => {
-                                    if let Some(tx) = pending_requests.remove(&error_res.request) {
-                                        tx.send(Err(error_res.error)).expect("Failed to send response");
-                                    }
-                                    error!("Failed to fetch data from peer");
-                                },
-                                Err(e) => error!("Failed to join task: {e:?}"),
+                            // If no request for this hash currently exists, create new request.
+                            if tasks.len() < self.max_conc_req {
+                                let blockstore = self.blockstore.clone();
+                                let pool_requester = self.pool_requester.clone();
+                                let peer_request_ = peer_request.clone();
+                                let rep_reporter = self.rep_reporter.clone();
+                                tasks.spawn(async move {
+                                    send_request::<C>(
+                                        task.request.peer,
+                                        peer_request_,
+                                        blockstore,
+                                        pool_requester,
+                                        rep_reporter,
+                                    ).await
+                                });
+                            } else {
+                                queue.push_back(peer_request.clone());
                             }
-                        }
-                        None => ()
+                            let (tx, rx) = broadcast::channel(1);
+                            pending_requests.insert(peer_request, tx);
+                            rx
+                        };
+                        task.respond(rx);
                     }
-
+                }
+                Some(res) = tasks.join_next() => {
+                    match res {
+                        Ok(Ok(peer_request)) => {
+                            if let Some(tx) = pending_requests.remove(&peer_request) {
+                                tx.send(Ok(())).expect("Failed to send response");
+                            }
+                        },
+                        Ok(Err(error_res)) => {
+                            if let Some(tx) = pending_requests.remove(&error_res.request) {
+                                tx.send(Err(error_res.error)).expect("Failed to send response");
+                            }
+                            error!("Failed to fetch data from peer");
+                        },
+                        Err(e) => error!("Failed to join task: {e:?}"),
+                    }
                 }
             }
         }
@@ -417,6 +409,8 @@ async fn handle_request<C: Collection>(
             error!("Failed to send eos: {e:?}");
         }
         rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
+    } else {
+        request.reject(RejectReason::ContentNotFound);
     }
     num_responses.fetch_sub(1, Ordering::Relaxed);
 }
