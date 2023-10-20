@@ -5,7 +5,12 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Context, Result};
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::CompressionAlgorithm;
-use lightning_interfaces::{BlockStoreInterface, ConfigProviderInterface, IncrementalPutInterface};
+use lightning_interfaces::{
+    BlockStoreInterface,
+    BlockStoreServerInterface,
+    ConfigProviderInterface,
+    IncrementalPutInterface,
+};
 use lightning_node::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 use tracing::error;
@@ -21,6 +26,7 @@ where
         DevSubCmd::ShowOrder => show_order::<C>().await,
         DevSubCmd::DepGraph => dep_graph::<C>().await,
         DevSubCmd::Store { input } => store::<C>(input, config_path).await,
+        DevSubCmd::Fetch { remote, hash } => fetch::<C>(config_path, hash, remote).await,
     }
 }
 
@@ -102,6 +108,46 @@ async fn store<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
             },
         }
     }
+    Ok(())
+}
+
+async fn fetch<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
+    config_path: ResolvedPathBuf,
+    hash_string: String,
+    peer: u32,
+) -> Result<()> {
+    let hash = fleek_blake3::Hash::from_hex(hash_string.as_bytes())
+        .context("Invalid blake3 hash.")?
+        .into();
+
+    let config = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
+    let node = Node::<C>::init(config)
+        .map_err(|e| anyhow::anyhow!("Node Initialization failed: {e:?}"))
+        .context("Could not start the node.")?;
+
+    let blockstore = node
+        .container
+        .get::<C::BlockStoreServerInterface>(infusion::tag!(C::BlockStoreServerInterface));
+
+    let socket = blockstore.get_socket();
+
+    tracing::info!("Downloading {hash_string} from peer {peer}");
+    let mut result = socket
+        .run(lightning_types::ServerRequest { hash, peer })
+        .await
+        .expect("Failed to send task.");
+
+    tracing::info!("Submitted the request to the socket and waiting for response.");
+    match result.recv().await {
+        Ok(_) => {
+            tracing::info!("Got OK throught the socket. Download complete.");
+        },
+        Err(e) => {
+            tracing::error!("Got an error from the socket. Download incomplete. {e:?}");
+            return Err(e.into());
+        },
+    }
+
     Ok(())
 }
 

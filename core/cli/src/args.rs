@@ -53,6 +53,15 @@ pub enum DevSubCmd {
     DepGraph,
     /// Store the provided files to the blockstore.
     Store { input: Vec<PathBuf> },
+    /// Fetch a content from the blockstore server of the remote.
+    Fetch {
+        /// The node index of the node.
+        #[arg(short, long)]
+        remote: u32,
+        /// The Blake3 hash of the content that we want to download.
+        #[arg(short, long)]
+        hash: String,
+    },
 }
 
 #[derive(Subcommand)]

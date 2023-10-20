@@ -38,6 +38,7 @@ clap = { version = "4.4.2", features = ["derive"] }
 tracing.workspace = true
 tracing-subscriber = "0.3"
 console-subscriber = { version = "0.2.0" }
+fleek-blake3 = "1.5"
 
 [[bin]]
 name = "lightning-node"
