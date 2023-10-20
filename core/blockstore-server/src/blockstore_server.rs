@@ -49,7 +49,7 @@ use crate::config::Config;
 
 type ServerRequestTask = Task<ServerRequest, broadcast::Receiver<Result<(), PeerRequestError>>>;
 
-const REQUEST_TIMEOUT: Duration = Duration::from_millis(100);
+const REQUEST_TIMEOUT: Duration = Duration::from_millis(1000);
 
 pub struct BlockStoreServer<C: Collection> {
     inner: Arc<BlockstoreServerInner<C>>,
