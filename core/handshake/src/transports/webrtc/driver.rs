@@ -71,7 +71,10 @@ impl WebRtcDriver {
                                     Instant::now(),
                                     Receive {
                                         source,
-                                        destination: self.socket.local_addr().unwrap(),
+                                        destination: (
+                                            [127,0,0,1],
+                                            self.socket.local_addr().unwrap().port()
+                                        ).into(),
                                         contents: buf[..n].try_into().unwrap(),
                                     },
                                 )) {
