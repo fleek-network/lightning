@@ -201,7 +201,7 @@ impl<C: Collection> BlockstoreServerInner<C> {
                         Err(e) => error!("Failed to decode request from peer: {e:?}"),
                     }
                         }
-                        Err(e) => error!("The responder had a fatal error")
+                        Err(e) => error!("The responder had a fatal error: {e:?}")
                     }
 
                 }

@@ -162,11 +162,15 @@ async fn fetch<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
 
     tracing::info!("Submitted the request to the socket and waiting for response.");
     match result.recv().await {
-        Ok(_) => {
+        Ok(Ok(())) => {
             tracing::info!("Got OK throught the socket. Download complete.");
         },
-        Err(e) => {
+        Ok(Err(e)) => {
             tracing::error!("Got an error from the socket. Download incomplete. {e:?}");
+            return Err(e.into());
+        },
+        Err(e) => {
+            tracing::error!("Failed to receive response from socket: {e:?}");
             return Err(e.into());
         },
     }
