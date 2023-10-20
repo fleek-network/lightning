@@ -1,16 +1,17 @@
 mod driver;
 mod signal;
 
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 
 use anyhow::Result;
 use async_trait::async_trait;
 use axum::Router;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
+use stunclient::StunClient;
 use tokio::sync::mpsc::{channel, Receiver};
 use tokio::sync::Notify;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use triomphe::Arc;
 
 use self::driver::{ConnectionMap, WebRtcDriver};
@@ -30,7 +31,7 @@ pub struct WebRtcConfig {
 impl Default for WebRtcConfig {
     fn default() -> Self {
         Self {
-            udp_address: ([127, 0, 0, 1], 4320).into(),
+            udp_address: ([0, 0, 0, 0], 4320).into(),
         }
     }
 }
@@ -60,8 +61,20 @@ impl Transport for WebRtcTransport {
         // Bind the driver to the udp socket
         let driver = WebRtcDriver::bind(config.udp_address, conns.clone()).await?;
 
-        // TODO: Get public address from config, and/or stun
-        let local_addr = driver.socket.local_addr()?;
+        let stun = StunClient::new(
+            "stun.l.google.com:19302"
+                .to_socket_addrs()
+                .unwrap()
+                .find(|x| x.is_ipv4())
+                .expect("failed to get stun server"),
+        );
+        let mut local_addr = driver.socket.local_addr()?;
+        if local_addr.ip() == IpAddr::from([0, 0, 0, 0]) {
+            local_addr.set_ip(IpAddr::from([127, 0, 0, 1]));
+        }
+
+        let public_addr = stun.query_external_address_async(&driver.socket).await?;
+        debug!("Got public address via STUN: {public_addr}");
 
         // Spawn the IO loop
         let notify = Arc::new(Notify::new());
@@ -70,7 +83,7 @@ impl Transport for WebRtcTransport {
         // A bounded channel is used to provide some back pressure for incoming client handshakes.
         let (conn_tx, conn_rx) = channel(1024);
         // Construct our http router for negotiating via SDP.
-        let router = router(local_addr, conns.clone(), conn_tx)?;
+        let router = router(vec![public_addr, local_addr], conns.clone(), conn_tx)?;
 
         Ok((
             Self {

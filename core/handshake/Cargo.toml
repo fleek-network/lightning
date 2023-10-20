@@ -40,6 +40,7 @@ tower = "0.4"
 tower-http = { version = "0.4.4", features = ["cors"] }
 hyper = "0.14"
 async-channel = "1.9.0"
+stunclient = "0.4"
 
 [dev-dependencies]
 criterion = { version = "0.5.0", features = ["html_reports", "async_tokio"] }
