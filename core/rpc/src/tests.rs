@@ -9,6 +9,7 @@ use fleek_crypto::{
     EthAddress,
     NodePublicKey,
     NodeSecretKey,
+    PublicKey,
     SecretKey,
 };
 use hp_fixed::unsigned::HpUfixed;
@@ -332,8 +333,7 @@ async fn test_rpc_get_reputation() -> Result<()> {
     genesis_node.reputation = Some(46);
     genesis.node_info.push(genesis_node);
 
-    let (mut rpc, query_runner) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
-    let node_index = query_runner.pubkey_to_index(node_public_key).unwrap();
+    let (mut rpc, _query_runner) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30002;
     rpc.config.port = port;
 
@@ -345,7 +345,7 @@ async fn test_rpc_get_reputation() -> Result<()> {
     let req = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_reputation",
-        "params": node_index,
+        "params": {"public_key": node_public_key.to_base58()},
         "id":1,
     });
 

@@ -60,7 +60,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "rand 0.8.5",
- "sha1",
+ "sha1 0.10.6",
  "smallvec",
  "tokio",
  "tokio-util 0.7.9",
@@ -1343,6 +1343,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3ac9f8b63eca6fd385229b3675f6cc0dc5c8a5c8a54a59d4f52ffd670d87b0c"
 
 [[package]]
+name = "bytecodec"
+version = "0.4.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adf4c9d0bbf32eea58d7c0f812058138ee8edaf0f2802b6d03561b504729a325"
+dependencies = [
+ "byteorder",
+ "trackable 0.2.24",
+]
+
+[[package]]
 name = "bytecount"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1930,12 +1940,27 @@ dependencies = [
 
 [[package]]
 name = "crc"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49fc9a695bca7f35f5f4c15cddc84415f66a74ea78eef08e90c5024f2b540e23"
+dependencies = [
+ "crc-catalog 1.1.1",
+]
+
+[[package]]
+name = "crc"
 version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86ec7a15cbe22e59248fc7eadb1907dab5ba09372595da4d73dd805ed4417dfe"
 dependencies = [
- "crc-catalog",
+ "crc-catalog 2.2.0",
 ]
+
+[[package]]
+name = "crc-catalog"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccaeedb56da03b09f598226e25e80088cb4cd25f316e6e4df7d695f0feeb1403"
 
 [[package]]
 name = "crc-catalog"
@@ -3725,7 +3750,7 @@ dependencies = [
  "http",
  "httpdate",
  "mime",
- "sha1",
+ "sha1 0.10.6",
 ]
 
 [[package]]
@@ -3793,6 +3818,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
  "digest 0.10.7",
+]
+
+[[package]]
+name = "hmac-sha1"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1333fad8d94b82cab989da428b0b36a3435db3870d85e971a1d6dc0a8576722"
+dependencies = [
+ "sha1 0.2.0",
 ]
 
 [[package]]
@@ -4700,6 +4734,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "str0m",
+ "stunclient",
  "time",
  "tokio",
  "tokio-util 0.7.9",
@@ -5288,6 +5323,12 @@ dependencies = [
  "cfg-if",
  "digest 0.10.7",
 ]
+
+[[package]]
+name = "md5"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "memchr"
@@ -8095,7 +8136,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "514eb06a3f6b1f119b6a00a9a87afac072894817d3283b0d36adc8f8a135886a"
 dependencies = [
  "bytes",
- "crc",
+ "crc 3.0.1",
  "fxhash",
  "log",
  "rand 0.8.5",
@@ -8399,6 +8440,12 @@ dependencies = [
  "digest 0.10.7",
  "sha1-asm",
 ]
+
+[[package]]
+name = "sha1"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc30b1e1e8c40c121ca33b86c23308a090d19974ef001b4bf6e61fd1a0fb095c"
 
 [[package]]
 name = "sha1"
@@ -8764,7 +8811,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "959ba881f3e4a040ab65886ca6bcaaead8f06ce18ab4b1599b799c501d5335cc"
 dependencies = [
  "combine",
- "crc",
+ "crc 3.0.1",
  "hmac",
  "once_cell",
  "openssl",
@@ -8844,6 +8891,32 @@ dependencies = [
  "quote 1.0.33",
  "rustversion",
  "syn 2.0.38",
+]
+
+[[package]]
+name = "stun_codec"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f1df6c4e592afc1ffed8f4bc50ab9f4d70cfccb42829662b7d276247cbef3b1"
+dependencies = [
+ "bytecodec",
+ "byteorder",
+ "crc 2.1.0",
+ "hmac-sha1",
+ "md5",
+ "trackable 1.3.0",
+]
+
+[[package]]
+name = "stunclient"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92ff24a850e0e53c373cbb348f3ba8393207409fe7f2f55efc9b5a46e58652ad"
+dependencies = [
+ "bytecodec",
+ "rand 0.8.5",
+ "stun_codec",
+ "tokio",
 ]
 
 [[package]]
@@ -9651,6 +9724,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "trackable"
+version = "0.2.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b98abb9e7300b9ac902cc04920945a874c1973e08c310627cc4458c04b70dd32"
+dependencies = [
+ "trackable 1.3.0",
+ "trackable_derive",
+]
+
+[[package]]
+name = "trackable"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b15bd114abb99ef8cee977e517c8f37aee63f184f2d08e3e6ceca092373369ae"
+dependencies = [
+ "trackable_derive",
+]
+
+[[package]]
+name = "trackable_derive"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebeb235c5847e2f82cfe0f07eb971d1e5f6804b18dac2ae16349cc604380f82f"
+dependencies = [
+ "quote 1.0.33",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "triomphe"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9686,7 +9788,7 @@ dependencies = [
  "log",
  "rand 0.8.5",
  "rustls 0.21.7",
- "sha1",
+ "sha1 0.10.6",
  "thiserror",
  "url",
  "utf-8",
@@ -10428,7 +10530,7 @@ dependencies = [
  "flate2",
  "hmac",
  "pbkdf2 0.11.0",
- "sha1",
+ "sha1 0.10.6",
  "time",
  "zstd 0.11.2+zstd.1.5.2",
 ]

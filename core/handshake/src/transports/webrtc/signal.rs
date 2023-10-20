@@ -19,11 +19,11 @@ struct SignalState {
     // Sender for incoming connections (given to each connection)
     conn_tx: Sender<(HandshakeRequestFrame, IpAddr, Receiver<RequestFrame>)>,
     // Our address candidate used for the sdp response
-    host: Candidate,
+    host: Vec<Candidate>,
 }
 
 pub fn router(
-    udp_addr: SocketAddr,
+    udp_addrs: Vec<SocketAddr>,
     client_map: ConnectionMap,
     conn_tx: Sender<(HandshakeRequestFrame, IpAddr, Receiver<RequestFrame>)>,
 ) -> Result<Router> {
@@ -33,7 +33,10 @@ pub fn router(
         .with_state(Arc::new(SignalState {
             client_map,
             conn_tx,
-            host: Candidate::host(udp_addr)?,
+            host: udp_addrs
+                .into_iter()
+                .map(|s| Candidate::host(s).expect("failed to parse candidate from socket address"))
+                .collect(),
         })))
 }
 
@@ -43,7 +46,9 @@ async fn handler(
     Json(offer): Json<SdpOffer>,
 ) -> Result<Json<SdpAnswer>, String> {
     let mut rtc = Rtc::new();
-    rtc.add_local_candidate(state.host.clone());
+    for host in &state.host {
+        rtc.add_local_candidate(host.clone());
+    }
     let answer = rtc
         .sdp_api()
         .accept_offer(offer)
