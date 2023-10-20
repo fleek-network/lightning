@@ -59,7 +59,6 @@ pub enum DevSubCmd {
         #[arg(short, long)]
         remote: u32,
         /// The Blake3 hash of the content that we want to download.
-        #[arg(short, long)]
         hash: String,
     },
 }
