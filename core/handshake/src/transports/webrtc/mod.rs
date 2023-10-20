@@ -68,13 +68,13 @@ impl Transport for WebRtcTransport {
                 .find(|x| x.is_ipv4())
                 .expect("failed to get stun server"),
         );
+        let public_addr = stun.query_external_address_async(&driver.socket).await?;
+        debug!("Got public address via STUN: {public_addr}");
+
         let mut local_addr = driver.socket.local_addr()?;
         if local_addr.ip() == IpAddr::from([0, 0, 0, 0]) {
             local_addr.set_ip(IpAddr::from([127, 0, 0, 1]));
         }
-
-        let public_addr = stun.query_external_address_async(&driver.socket).await?;
-        debug!("Got public address via STUN: {public_addr}");
 
         // Spawn the IO loop
         let notify = Arc::new(Notify::new());

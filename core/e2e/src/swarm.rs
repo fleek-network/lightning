@@ -27,8 +27,9 @@ use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
 use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
 use lightning_dht::dht::Dht;
-use lightning_handshake::config::HandshakeConfig;
+use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
+use lightning_handshake::transports::webrtc::WebRtcConfig;
 use lightning_interfaces::types::{Blake3Hash, NodePorts, Staking};
 use lightning_interfaces::{ConfigProviderInterface, DhtSocket};
 use lightning_node::config::TomlConfigProvider;
@@ -401,8 +402,9 @@ fn build_config(
 
     config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
         // TODO: figure out how to have e2e testing for the different transports (browser oriented)
-        // TODO: re-enable webrtc
-        transports: vec![],
+        transports: vec![TransportConfig::WebRTC(WebRtcConfig {
+            udp_address: ([0, 0, 0, 0], ports.handshake.webrtc).into(),
+        })],
         http_address: ([127, 0, 0, 1], ports.handshake.http).into(),
     });
 
