@@ -79,7 +79,7 @@ where
     fn register_stream_service(
         &self,
         service: ServiceScope,
-    ) -> (Sender<StreamRequest>, Receiver<(NodeIndex, Channel)>) {
+    ) -> (Sender<StreamRequest>, Receiver<(RequestHeader, Channel)>) {
         let mut guard = self.state.lock().unwrap();
         match guard.as_mut().expect("Pool to have a state") {
             State::Running { .. } => {
@@ -366,7 +366,7 @@ impl Stream for Body {
 }
 
 pub struct Responder {
-    inner: Receiver<(NodeIndex, Channel)>,
+    inner: Receiver<(RequestHeader, Channel)>,
 }
 
 #[async_trait]
@@ -375,20 +375,11 @@ impl lightning_interfaces::pool::Responder for Responder {
 
     async fn get_next_request(&mut self) -> io::Result<(RequestHeader, Self::Request)> {
         // Received a new stream so a request is incoming.
-        let (peer, mut channel) = self
+        let (header, channel) = self
             .inner
             .recv()
             .await
             .ok_or_else(|| io::Error::from(io::ErrorKind::BrokenPipe))?;
-
-        // Get the header.
-        let bytes = channel
-            .next()
-            .await
-            .ok_or(io::ErrorKind::BrokenPipe)?
-            .map(Bytes::from)?;
-
-        let header = RequestHeader { peer, bytes };
 
         Ok((
             header,

@@ -10,9 +10,15 @@ use hp_fixed::unsigned::HpUfixed;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{ApplicationInterface, ServiceScope, SyncQueryRunnerInterface};
+use lightning_interfaces::{
+    ApplicationInterface,
+    RequestHeader,
+    ServiceScope,
+    SyncQueryRunnerInterface,
+};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
+use tokio_stream::StreamExt;
 use x509_parser::nom::AsBytes;
 
 use crate::endpoint::NodeAddress;
@@ -34,7 +40,7 @@ where
     /// Sender to return to users as they register with the broadcast service.
     broadcast_request_tx: Sender<BroadcastRequest<F>>,
     /// Service handles.
-    stream_handles: HashMap<ServiceScope, Sender<(NodeIndex, Channel)>>,
+    stream_handles: HashMap<ServiceScope, Sender<(RequestHeader, Channel)>>,
     /// Receive requests for a multiplexed stream.
     stream_request_rx: Receiver<StreamRequest>,
     /// Send handle to return to users as they register with the stream service.
@@ -84,7 +90,7 @@ where
     pub fn register_stream_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<StreamRequest>, Receiver<(NodeIndex, Channel)>) {
+    ) -> (Sender<StreamRequest>, Receiver<(RequestHeader, Channel)>) {
         let (tx, rx) = mpsc::channel(1024);
         self.stream_handles.insert(service_scope, tx);
         (self.stream_request_tx.clone(), rx)
@@ -113,7 +119,7 @@ where
         &mut self,
         peer: NodeIndex,
         service_scope: ServiceScope,
-        stream: Channel,
+        mut stream: Channel,
     ) {
         match self.stream_handles.get(&service_scope).cloned() {
             None => {
@@ -125,8 +131,17 @@ where
                         self.pin_connection(peer, address);
                     }
                     tokio::spawn(async move {
-                        if tx.send((peer, stream)).await.is_err() {
-                            tracing::error!("failed to send incoming stream to user");
+                        // Get the header.
+                        if let Ok(bytes) = stream
+                            .next()
+                            .await
+                            .unwrap_or(Err(io::ErrorKind::BrokenPipe.into()))
+                            .map(Bytes::from)
+                        {
+                            let header = RequestHeader { peer, bytes };
+                            if tx.send((header, stream)).await.is_err() {
+                                tracing::error!("failed to send incoming stream to user");
+                            }
                         }
                     });
                 }

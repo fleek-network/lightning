@@ -15,6 +15,7 @@ use lightning_interfaces::{
     Notification,
     ReputationAggregatorInterface,
     ReputationReporterInterface,
+    RequestHeader,
     ServiceScope,
     TopologyInterface,
 };
@@ -155,7 +156,7 @@ where
     pub fn register_stream_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<StreamRequest>, Receiver<(NodeIndex, Channel)>) {
+    ) -> (Sender<StreamRequest>, Receiver<(RequestHeader, Channel)>) {
         self.network_overlay.register_stream_service(service_scope)
     }
 
