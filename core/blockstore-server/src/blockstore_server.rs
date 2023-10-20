@@ -238,7 +238,7 @@ impl<C: Collection> BlockstoreServerInner<C> {
                     };
                     task.respond(rx);
                         }
-                        None => error!("request_rx returned None")
+                        None => ()
                     }
 
                 }
@@ -260,7 +260,7 @@ impl<C: Collection> BlockstoreServerInner<C> {
                                 Err(e) => error!("Failed to join task: {e:?}"),
                             }
                         }
-                        None => error!("tasks returned None")
+                        None => ()
                     }
 
                 }
