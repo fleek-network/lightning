@@ -68,7 +68,7 @@ async fn main() {
 }
 
 /// handler for HTTP-based service discovery for prometheus
-    async fn service_discovery(
+async fn service_discovery(
     Extension(store): Extension<Db>,
     Extension(config): Extension<Config>,
     Extension(cache): Extension<Cache<String, IpInfoResponse>>,
@@ -180,11 +180,11 @@ async fn get_node_registry_with_index(
 
     let uri = format!("http://{address}:{port}/rpc/v0");
 
-    let params = format!("{{ ignore_stake: true, start: {index}, limit: {limit} }}");
+    let params = format!("{{ \"ignore_stake\": true, \"start\": {index}, \"limit\": {limit} }}");
     let json_request: Value = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_node_registry_index",
-        "pagingParams": params,
+        "params": params,
         "id":1,
     });
 
