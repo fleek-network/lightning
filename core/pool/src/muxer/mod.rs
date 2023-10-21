@@ -32,7 +32,7 @@ pub trait MuxerInterface: Clone + Send + Sync + 'static {
     fn init(config: Self::Config) -> io::Result<Self>;
     async fn connect(&self, peer: NodeAddress, server_name: &str) -> io::Result<Self::Connecting>;
     async fn accept(&self) -> Option<Self::Connecting>;
-    fn close(&self);
+    async fn close(&self);
 }
 
 /// Connection over a multiplexed transport.

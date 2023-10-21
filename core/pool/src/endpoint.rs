@@ -440,7 +440,8 @@ where
         self.muxer
             .take()
             .expect("start method to have been called")
-            .close();
+            .close()
+            .await;
     }
 
     // Todo: Return metrics.

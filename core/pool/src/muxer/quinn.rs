@@ -64,8 +64,10 @@ impl MuxerInterface for QuinnMuxer {
         self.endpoint.accept().await.map(Connecting)
     }
 
-    fn close(&self) {
+    async fn close(&self) {
         self.endpoint.close(0u8.into(), b"server shutted down");
+        // Wait for all connections to cleanly shut down.
+        self.endpoint.wait_idle().await;
     }
 }
 
