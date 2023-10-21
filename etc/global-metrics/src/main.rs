@@ -1,5 +1,4 @@
 mod config;
-mod ip_api;
 mod maxmind;
 mod types;
 mod utils;
@@ -220,7 +219,7 @@ async fn service_discovery_v2(
     Extension(maxmind): Extension<Maxmind>,
     Extension(current_index): Extension<Arc<Mutex<NodeIndex>>>,
 ) -> (StatusCode, Json<Value>) {
-    let index = { current_index.lock().await.clone() };
+    let index = { *current_index.lock().await };
 
     let nodes = match get_node_registry_with_index(&config, index, config.pagination_limit).await {
         Ok((new_index, nodes)) => {
