@@ -437,7 +437,10 @@ where
         while self.driver_set.join_next().await.is_some() {}
 
         // We drop the muxer to unbind the address.
-        self.muxer.take();
+        self.muxer
+            .take()
+            .expect("start method to have been called")
+            .close();
     }
 
     // Todo: Return metrics.

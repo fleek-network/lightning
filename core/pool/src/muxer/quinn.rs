@@ -63,6 +63,10 @@ impl MuxerInterface for QuinnMuxer {
     async fn accept(&self) -> Option<Self::Connecting> {
         self.endpoint.accept().await.map(Connecting)
     }
+
+    fn close(&self) {
+        self.endpoint.close(0u8.into(), b"server shutted down");
+    }
 }
 
 pub struct Connecting(quinn::Connecting);
