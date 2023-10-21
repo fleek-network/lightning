@@ -1,11 +1,12 @@
 mod config;
 mod ip_api;
+mod maxmind;
 mod types;
+mod utils;
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use axum::http::StatusCode;
@@ -15,7 +16,6 @@ use hyper::{Body, Client, Method, Request};
 use hyper_tls::HttpsConnector;
 use lazy_static::lazy_static;
 use lightning_types::{NodeIndex, NodeInfo, NodeInfoWithIndex};
-use moka::sync::Cache;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::{json, Value};
 use sled::Db;
@@ -23,7 +23,7 @@ use tokio::sync::Mutex;
 use tracing::{error, info};
 
 use crate::config::Config;
-use crate::ip_api::{get_ip_info, IpInfoResponse};
+use crate::maxmind::Maxmind;
 use crate::types::{PrometheusDiscoveryChunk, RpcResponse};
 
 lazy_static! {
@@ -44,18 +44,14 @@ async fn main() {
     let config = Config::default();
     let path = ResolvedPathBuf::try_from(config.db_path.as_ref()).unwrap();
     let store = sled::open(path).unwrap();
-    let cache: Cache<String, IpInfoResponse> = Cache::builder()
-        .max_capacity(10_000)
-        .time_to_live(Duration::from_secs(72 * 60 * 60))
-        .time_to_idle(Duration::from_secs(15 * 60))
-        .build();
     let highest_index_seen: Arc<Mutex<NodeIndex>> = Arc::new(Mutex::new(0));
+    let maxmind = Maxmind::new(config.maxmind_db_path.clone()).unwrap();
     let app = Router::new()
         .route("/http_sd", get(service_discovery))
         .route("/http_sd_v2", get(service_discovery_v2))
         .layer(Extension(store))
         .layer(Extension(config))
-        .layer(Extension(cache))
+        .layer(Extension(maxmind))
         .layer(Extension(highest_index_seen));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 4000));
@@ -71,7 +67,7 @@ async fn main() {
 async fn service_discovery(
     Extension(store): Extension<Db>,
     Extension(config): Extension<Config>,
-    Extension(cache): Extension<Cache<String, IpInfoResponse>>,
+    Extension(maxmind): Extension<Maxmind>,
     Extension(_): Extension<Arc<Mutex<NodeIndex>>>,
 ) -> (StatusCode, Json<Value>) {
     let nodes = match get_node_registry(&config).await {
@@ -103,18 +99,11 @@ async fn service_discovery(
         };
 
         if chunk.is_none() {
-            let domain = node.domain.to_string();
-            let ip_info = match cache.get(&domain) {
-                Some(info) => info,
-                None => match get_ip_info(&config.ipinfo_token, node.domain.to_string()).await {
-                    Ok(ip_info) => {
-                        cache.insert(domain, ip_info.clone());
-                        ip_info
-                    },
-                    Err(e) => {
-                        error!("Lookup failed for IP: {}, due to {}", node.domain, e);
-                        continue;
-                    },
+            let ip_info = match maxmind.get_ip_info(node.domain.to_string()).await {
+                Ok(city) => city,
+                Err(e) => {
+                    error!("Lookup failed for IP: {}, due to {}", node.domain, e);
+                    continue;
                 },
             };
 
@@ -228,7 +217,7 @@ async fn get_node_registry_with_index(
 async fn service_discovery_v2(
     Extension(store): Extension<Db>,
     Extension(config): Extension<Config>,
-    Extension(cache): Extension<Cache<String, IpInfoResponse>>,
+    Extension(maxmind): Extension<Maxmind>,
     Extension(current_index): Extension<Arc<Mutex<NodeIndex>>>,
 ) -> (StatusCode, Json<Value>) {
     let index = { current_index.lock().await.clone() };
@@ -270,18 +259,11 @@ async fn service_discovery_v2(
         };
 
         if chunk.is_none() {
-            let domain = node.domain.to_string();
-            let ip_info = match cache.get(&domain) {
-                Some(info) => info,
-                None => match get_ip_info(&config.ipinfo_token, node.domain.to_string()).await {
-                    Ok(ip_info) => {
-                        cache.insert(domain, ip_info.clone());
-                        ip_info
-                    },
-                    Err(e) => {
-                        error!("Lookup failed for IP: {}, due to {}", node.domain, e);
-                        continue;
-                    },
+            let ip_info = match maxmind.get_ip_info(node.domain.to_string()).await {
+                Ok(city) => city,
+                Err(e) => {
+                    error!("Lookup failed for IP: {}, due to {}", node.domain, e);
+                    continue;
                 },
             };
 
