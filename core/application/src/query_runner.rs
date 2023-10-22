@@ -205,8 +205,11 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 start,
             }) => self.inner.run(|ctx| {
                 let node_table = self.node_table.get(ctx);
-                node_table
-                    .keys()
+                let mut keys = node_table.keys().collect::<Vec<NodeIndex>>();
+                // Keys are returned unsorted so sort them here.
+                keys.sort();
+
+                keys.into_iter()
                     .filter(|index| index >= &start)
                     .map(|index| NodeInfoWithIndex {
                         index,
