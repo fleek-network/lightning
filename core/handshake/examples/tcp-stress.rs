@@ -176,17 +176,19 @@ async fn request_loop(
     iters: usize,
 ) -> Result<()> {
     let mut file = std::fs::File::create(out.join(format!("{address}-{worker}-{total}.json")))?;
-    write!(file, "[")?;
+    writeln!(file, "[")?;
 
     for n in 1..=iters {
-        run_request(address, &mut file, chunks, chunk_len).await?;
+        let data = run_request(address, &mut file, chunks, chunk_len).await?;
 
         if n != iters {
-            write!(file, ",")?;
+            writeln!(file, "{data},")?;
+        } else {
+            writeln!(file, "{data}")?;
         }
     }
 
-    write!(file, "\n]")?;
+    writeln!(file, "]")?;
     file.flush()?;
 
     Ok(())
@@ -197,22 +199,22 @@ async fn run_request(
     file: &mut File,
     chunks: usize,
     chunk_len: usize,
-) -> Result<()> {
+) -> Result<String> {
     macro_rules! data {
-        ($file:expr, $name:expr, $instant:expr) => {
-            write!($file, "\"{}\": {}, ", $name, $instant.elapsed().as_nanos())?;
+        ($line:expr, $name:expr, $instant:expr) => {
+            $line.push_str(&format!(
+                "\"{}\": {}, ",
+                $name,
+                $instant.elapsed().as_nanos()
+            ));
         };
     }
 
-    // Start the json data point
-    write!(
-        file,
-        "\n\t{{\"chunks\": {chunks}, \"chunk_len\": {chunk_len}, "
-    )?;
+    let mut line = format!("\t{{\"chunks\": {chunks}, \"chunk_len\": {chunk_len}, ");
+    let timer = Instant::now();
 
-    let start = Instant::now();
     let mut client = TcpClient::new(TcpStream::connect(address).await?);
-    data!(file, "established", start);
+    data!(line, "established", timer);
 
     // Send the handshake
     client
@@ -223,21 +225,21 @@ async fn run_request(
             pop: ClientSignature([2; 48]),
         })
         .await?;
-    data!(file, "handshake_sent", start);
+    data!(line, "handshake_sent", timer);
 
     // Read hello frame from the io_stress service
     let ResponseFrame::ServicePayload { bytes } = client.recv().await.ok_or(anyhow!("failed to get first byte"))? else { unreachable!() };
     assert_eq!(bytes.len(), 32);
-    data!(file, "handshake_recv", start);
+    data!(line, "handshake_recv", timer);
 
     client.request(chunk_len, chunks).await?;
-    data!(file, "request_sent", start);
+    data!(line, "request_sent", timer);
 
     let mut received = {
         let ResponseFrame::ServicePayload { bytes } = client.recv().await.ok_or(anyhow!("failed to get first byte"))? else { unreachable!() };
         bytes.len()
     };
-    data!(file, "first_byte_recv", start);
+    data!(line, "first_byte_recv", timer);
 
     let total_bytes = chunks * chunk_len;
     while received < total_bytes {
@@ -248,12 +250,11 @@ async fn run_request(
     }
 
     // Finish the json data point
-    write!(
-        file,
+    line.push_str(&format!(
         "\"last_byte_recv\": {} }}",
-        start.elapsed().as_nanos()
-    )?;
+        timer.elapsed().as_nanos()
+    ));
     file.flush()?;
 
-    Ok(())
+    Ok(line)
 }
