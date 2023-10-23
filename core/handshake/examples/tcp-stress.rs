@@ -176,7 +176,7 @@ async fn request_loop(
     iters: usize,
 ) -> Result<()> {
     let mut file = std::fs::File::create(out.join(format!("{address}-{worker}-{total}.json")))?;
-    write!(file, "[\n")?;
+    write!(file, "[")?;
 
     for n in 1..=iters {
         run_request(address, &mut file, chunks, chunk_len).await?;
@@ -186,7 +186,7 @@ async fn request_loop(
         }
     }
 
-    write!(file, "]")?;
+    write!(file, "\n]")?;
     file.flush()?;
 
     Ok(())
@@ -207,7 +207,7 @@ async fn run_request(
     // Start the json data point
     write!(
         file,
-        "\t{{\"chunks\": {chunks}, \"chunk_len\": {chunk_len}, "
+        "\n\t{{\"chunks\": {chunks}, \"chunk_len\": {chunk_len}, "
     )?;
 
     let start = Instant::now();
@@ -250,7 +250,7 @@ async fn run_request(
     // Finish the json data point
     write!(
         file,
-        "\"last_byte_recv\": {} }}\n",
+        "\"last_byte_recv\": {} }}",
         start.elapsed().as_nanos()
     )?;
     file.flush()?;
