@@ -4706,6 +4706,7 @@ dependencies = [
  "async-channel",
  "async-trait",
  "axum",
+ "bincode",
  "bytes",
  "clap 4.4.6",
  "criterion",
