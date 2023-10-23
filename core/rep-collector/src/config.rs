@@ -8,7 +8,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            reporter_buffer_size: 2,
+            reporter_buffer_size: 1,
         }
     }
 }
