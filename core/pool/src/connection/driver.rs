@@ -58,7 +58,9 @@ pub async fn start_driver<C: ConnectionInterface>(mut ctx: Context<C>) -> Result
                             connection_event_tx
                         ).await
                     {
-                        tracing::error!("failed to handle incoming stream: {e:?}");
+                        tracing::error!(
+                            "failed to handle incoming bi-stream with peer with index {peer}: {e:?}"
+                        );
                     }
                 });
             }
@@ -74,34 +76,48 @@ pub async fn start_driver<C: ConnectionInterface>(mut ctx: Context<C>) -> Result
                             connection_event_tx
                         ).await
                     {
-                        tracing::error!("failed to handle incoming stream: {e:?}");
+                        tracing::error!(
+                            "failed to handle incoming uni-stream from peer with index {peer}: {e:?}"
+                        );
                     }
                 });
             }
             driver_request = ctx.service_request_rx.recv() => {
                 match driver_request {
                     Some(DriverRequest::Message(message)) => {
-                        tracing::trace!("received a broadcast message request");
+                        tracing::trace!("handling a broadcast message request");
                         // We need to create a new stream on the connection.
                         let connection = ctx.connection.clone();
+                        let peer = ctx.peer;
                         tokio::spawn(async move{
                             if let Err(e) = create_uni_stream(connection, message).await {
-                                tracing::error!("failed to send message: {e:?}");
+                                tracing::error!(
+                                    "failed to send message to peer with index {peer}: {e:?}"
+                                );
                             }
                         });
                     },
-                    Some(DriverRequest::NewStream { service, respond }) => {
+                    Some(DriverRequest::NewChannel { service, respond }) => {
                         tracing::trace!("received a stream request");
                         // We need to create a new stream on the connection.
                         let connection = ctx.connection.clone();
+                        let peer = ctx.peer;
                         tokio::spawn(async move {
                             if let Err(e) = create_stream(connection, service, respond).await {
-                                tracing::error!("failed to create stream: {e:?}");
+                                // This may happen if `Requester::request` drops the future
+                                // because of a timeout for example. In this case, it's not
+                                // an issue with the connection.
+                                tracing::error!(
+                                    "failed to process channel request with peer with index {peer}: {e:?}"
+                                );
                             }
                         });
                     }
                     None => {
-                        tracing::trace!("channel was dropped: closing the connection");
+                        tracing::trace!(
+                            "channel was dropped: closing the connection with peer {}",
+                            ctx.peer
+                        );
                         ctx.connection.close(0u8, b"close from disconnect");
                         break
                     },
@@ -176,7 +192,7 @@ async fn create_stream<C: ConnectionInterface>(
 /// Requests for a driver worker.
 pub enum DriverRequest {
     Message(Message),
-    NewStream {
+    NewChannel {
         service: ServiceScope,
         respond: oneshot::Sender<io::Result<Channel>>,
     },

@@ -32,7 +32,7 @@ use crate::config::Config;
 use crate::endpoint::Endpoint;
 use crate::muxer::quinn::QuinnMuxer;
 use crate::muxer::{Channel, MuxerInterface};
-use crate::overlay::{BroadcastRequest, Param, StreamRequest};
+use crate::overlay::{BroadcastRequest, ChannelRequest, Param};
 use crate::{muxer, tls};
 
 pub struct Pool<C, M = QuinnMuxer>
@@ -79,7 +79,7 @@ where
     fn register_stream_service(
         &self,
         service: ServiceScope,
-    ) -> (Sender<StreamRequest>, Receiver<(NodeIndex, Channel)>) {
+    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, Channel)>) {
         let mut guard = self.state.lock().unwrap();
         match guard.as_mut().expect("Pool to have a state") {
             State::Running { .. } => {
@@ -280,7 +280,7 @@ impl lightning_interfaces::pool::EventHandler for EventHandler {
 }
 
 pub struct Requester {
-    request_tx: Sender<StreamRequest>,
+    request_tx: Sender<ChannelRequest>,
     service_scope: ServiceScope,
 }
 
@@ -301,7 +301,7 @@ impl lightning_interfaces::pool::Requester for Requester {
         let (respond_tx, respond_rx) = oneshot::channel();
         // Request a stream.
         self.request_tx
-            .send(StreamRequest {
+            .send(ChannelRequest {
                 peer,
                 service_scope: self.service_scope,
                 respond: respond_tx,
