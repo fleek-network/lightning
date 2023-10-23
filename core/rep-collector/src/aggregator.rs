@@ -209,6 +209,8 @@ impl<C: Collection> ReputationAggregatorInner<C> {
                     error!("Submitting reputation measurements failed: {e:?}");
                 }
             });
+        } else {
+            info!("No reputation measurements to submit");
         }
     }
 
