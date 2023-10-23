@@ -15,7 +15,7 @@ use lightning_interfaces::{
 use tokio::sync::Mutex;
 use triomphe::Arc;
 
-use crate::config::HandshakeConfig;
+use crate::config::{HandshakeConfig, TransportConfig};
 use crate::http::spawn_http_server;
 use crate::proxy::Proxy;
 use crate::shutdown::{ShutdownNotifier, ShutdownWaiter};
@@ -42,7 +42,10 @@ impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
         provider: c![C::ServiceExecutorInterface::Provider],
     ) -> anyhow::Result<Self> {
         // TEMP: Hardcode enable webrtc and tcp
-        config.transports = Default::default();
+        config.transports = vec![
+            TransportConfig::WebRTC(Default::default()),
+            TransportConfig::Tcp(Default::default()),
+        ];
 
         let shutdown = ShutdownNotifier::default();
         let (_, _) = signer.get_sk();
