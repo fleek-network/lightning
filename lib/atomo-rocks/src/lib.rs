@@ -1,8 +1,8 @@
 //! A [`rocksdb`] storage backend implementation for [`atomo`].
 
 mod serialization;
+use std::fs;
 use std::path::PathBuf;
-use std::{env, fs};
 
 use anyhow::Result;
 use atomo::batch::Operation;
