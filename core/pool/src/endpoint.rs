@@ -29,11 +29,11 @@ use crate::muxer::{Channel, ConnectionInterface, MuxerInterface};
 use crate::overlay::{
     BroadcastRequest,
     BroadcastTask,
+    ChannelRequest,
+    ChannelTask,
     Message,
     NetworkOverlay,
     PoolTask,
-    StreamRequest,
-    StreamTask,
 };
 
 type ConnectionId = usize;
@@ -156,12 +156,12 @@ where
     pub fn register_stream_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<StreamRequest>, Receiver<(RequestHeader, Channel)>) {
+    ) -> (Sender<ChannelRequest>, Receiver<(RequestHeader, Channel)>) {
         self.network_overlay.register_stream_service(service_scope)
     }
 
-    pub fn handle_stream_request(&mut self, task: StreamTask) -> Result<()> {
-        let StreamTask {
+    pub fn handle_stream_request(&mut self, task: ChannelTask) -> Result<()> {
+        let ChannelTask {
             peer,
             respond,
             service_scope,
@@ -177,9 +177,7 @@ where
                         .expect("Endpoint is always initialized on start"),
                 )?;
 
-                // Todo: possible optimization would be to give more priority to
-                // NewStream requests.
-                let request = DriverRequest::NewStream {
+                let request = DriverRequest::NewChannel {
                     service: service_scope,
                     respond,
                 };
@@ -188,7 +186,7 @@ where
             Some(handle) => {
                 let driver_tx = handle.tx.clone();
                 tokio::spawn(async move {
-                    let request = DriverRequest::NewStream {
+                    let request = DriverRequest::NewChannel {
                         service: service_scope,
                         respond,
                     };
@@ -233,10 +231,15 @@ where
                     payload: message.to_vec(),
                 };
 
+                tracing::debug!(
+                    "received broadcast send request for peers not in the overlay: {not_connected:?}"
+                );
+                tracing::debug!(
+                    "received broadcast send request for connected peers: {connected:?}"
+                );
+
                 // We will enqueue a dial task for these peers.
                 for info in not_connected {
-                    tracing::debug!("received send request for peers not in the overlay");
-
                     let peer_index = info.address.index;
                     if let Err(e) = self.connector.enqueue_dial_task(
                         info.address,
@@ -266,7 +269,9 @@ where
                     let request = DriverRequest::Message(message.clone());
                     tokio::spawn(async move {
                         if driver_tx.send(request).await.is_err() {
-                            tracing::error!("failed to send driver an outgoing broadcast request");
+                            tracing::error!(
+                                "failed to send broadcast request to driver for node with index: {index:?}"
+                            );
                         }
                     });
                 }
@@ -278,9 +283,17 @@ where
                     .retain(|index, _| peers.contains_key(index));
 
                 for info in peers.into_values() {
+                    tracing::debug!(
+                        "broadcast update: peer with index: {:?}",
+                        info.address.index
+                    );
                     // We do not want to connect to peers we're already connected to
                     // and to peers that should be connecting to us during an update.
                     if self.pool.contains_key(&info.address.index) || !info.connect {
+                        tracing::debug!(
+                            "broadcast update: skip peer with index {:?}",
+                            info.address.index
+                        );
                         continue;
                     }
 
@@ -299,12 +312,12 @@ where
 
     fn handle_connection(&mut self, connection: M::Connection) {
         let Some(pk) = connection.peer_identity() else {
-            tracing::debug!("failed to get peer identity from connection");
+            tracing::error!("failed to get peer identity from connection");
             return;
         };
 
         if !self.network_overlay.validate_stake(pk) {
-            tracing::info!("peer {pk} failed stake validation: rejecting connection");
+            tracing::info!("peer with pk {pk} failed stake validation: rejecting connection");
             return;
         }
 
@@ -349,9 +362,14 @@ where
 
             // Handle requests that were waiting for a connection to be established.
             if let Some(pending_requests) = self.pending_task.remove(&peer_index) {
+                tracing::debug!(
+                    "there are {} pending requests that will be executed now",
+                    pending_requests.len()
+                );
+
                 for req in pending_requests {
-                    // We need to pin the connection if used by stream service.
-                    should_pin = matches!(req, DriverRequest::NewStream { .. });
+                    // We need to pin the connection if used by channel service.
+                    should_pin = matches!(req, DriverRequest::NewChannel { .. });
 
                     let request_tx_clone = request_tx.clone();
                     tokio::spawn(async move {
@@ -380,7 +398,11 @@ where
 
             match self.pool.entry(peer_index) {
                 Entry::Occupied(_) => {
-                    self.redundant_pool.insert(peer_index, handle);
+                    if self.redundant_pool.insert(peer_index, handle).is_some() {
+                        tracing::info!(
+                            "replacing connection with node with index {peer_index} in redundant pool"
+                        );
+                    }
                 },
                 Entry::Vacant(vacant) => {
                     vacant.insert(handle);
@@ -438,7 +460,11 @@ where
         while self.driver_set.join_next().await.is_some() {}
 
         // We drop the muxer to unbind the address.
-        self.muxer.take();
+        self.muxer
+            .take()
+            .expect("start method to have been called")
+            .close()
+            .await;
     }
 
     // Todo: Return metrics.
@@ -508,16 +534,16 @@ where
                                 tracing::error!("failed to handle broadcast task: {e:?}");
                             }
                         }
-                        PoolTask::Stream(task) => {
+                        PoolTask::Channel(task) => {
                             if let Err(e) = self.handle_stream_request(task) {
                                 tracing::error!("failed to handle stream request: {e:?}");
                             }
                         }
                     }
                 }
-                Some(epoch_event) = self.notifier.recv() => {
+                epoch_event = self.notifier.recv() => {
                     match epoch_event {
-                        Notification::NewEpoch => {
+                        Some(Notification::NewEpoch) => {
                             let new_connections = self
                                 .topology
                                 .suggest_connections()
@@ -533,11 +559,19 @@ where
                                 tracing::error!("failed to handle broadcast task after an update: {e:?}");
                             }
                         }
-                        Notification::BeforeEpochChange => {
+                        Some(Notification::BeforeEpochChange) => {
                             unreachable!("we're only registered for new epoch events")
+                        }
+                        None => {
+                            tracing::info!("notifier was dropped");
+                            break;
                         }
                     }
                 }
+                // It's safe to match on Some(_) here because `poll_next`
+                // will return None when there are no ongoing connections
+                // and thus, it should be disabled to allow other branches
+                // to process new connections.
                 Some(peer) = self.driver_set.join_next() => {
                     match peer {
                         Ok((index, id)) => {
@@ -569,7 +603,7 @@ pub enum ConnectionEvent {
 }
 
 /// Address of a peer node.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NodeAddress {
     pub index: NodeIndex,
     pub pk: NodePublicKey,

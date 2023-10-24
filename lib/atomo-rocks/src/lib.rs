@@ -1,8 +1,8 @@
 //! A [`rocksdb`] storage backend implementation for [`atomo`].
 
 mod serialization;
+use std::fs;
 use std::path::PathBuf;
-use std::{env, fs};
 
 use anyhow::Result;
 use atomo::batch::Operation;
@@ -110,10 +110,13 @@ impl StorageBackendConstructor for RocksBackendBuilder {
         let db = match self.checkpoint {
             Some((hash, checkpoint)) => {
                 // We try to build the db from a checkpoint in a temporary dir.
-                let tmp_path = env::temp_dir().join("lightning_checkpoint_tmp");
+                let mut tmp_path = self.path.clone();
+                tmp_path.pop();
+                tmp_path.push("tmp");
                 if tmp_path.exists() {
                     fs::remove_dir_all(&tmp_path)?;
                 }
+                fs::create_dir_all(&tmp_path)?;
                 let (_db, column_names) =
                     build_db_from_checkpoint(&tmp_path, hash, &checkpoint, self.options.clone())?;
                 // If the build was successful, we move the db over to the actual directory.

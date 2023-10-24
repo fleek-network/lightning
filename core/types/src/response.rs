@@ -121,6 +121,7 @@ pub enum ExecutionError {
     NotNodeOwner,
     NotCommitteeMember,
     NodeDoesNotExist,
+    CantSendToYourself,
     AlreadySignaled,
     NonExistingService,
     OnlyAccountOwner,

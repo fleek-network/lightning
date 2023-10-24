@@ -42,9 +42,9 @@ where
     /// Service handles.
     stream_handles: HashMap<ServiceScope, Sender<(RequestHeader, Channel)>>,
     /// Receive requests for a multiplexed stream.
-    stream_request_rx: Receiver<StreamRequest>,
+    stream_request_rx: Receiver<ChannelRequest>,
     /// Send handle to return to users as they register with the stream service.
-    stream_request_tx: Sender<StreamRequest>,
+    stream_request_tx: Sender<ChannelRequest>,
     /// Sync query runner.
     sync_query: c![C::ApplicationInterface::SyncExecutor],
     /// Local node index.
@@ -90,7 +90,7 @@ where
     pub fn register_stream_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<StreamRequest>, Receiver<(RequestHeader, Channel)>) {
+    ) -> (Sender<ChannelRequest>, Receiver<(RequestHeader, Channel)>) {
         let (tx, rx) = mpsc::channel(1024);
         self.stream_handles.insert(service_scope, tx);
         (self.stream_request_tx.clone(), rx)
@@ -157,8 +157,15 @@ where
     #[inline]
     pub fn update_connections(&mut self, peers: HashSet<NodeIndex>) -> BroadcastTask {
         // We keep pinned connections.
-        self.peers
-            .retain(|index, info| peers.contains(index) || info.pinned);
+        self.peers.retain(|index, info| {
+            let is_in_overlay = peers.contains(index);
+            if is_in_overlay {
+                // We want to update the flag in case it wasn't initially created by a
+                // topology update.
+                info.from_topology = true
+            }
+            is_in_overlay || info.pinned
+        });
 
         // We get information about the peers.
         let peers = peers
@@ -272,7 +279,7 @@ where
                     match self.node_address_from_state(&request.peer) {
                         Some(address) => {
                             self.pin_connection(request.peer, address.clone());
-                            return Some(PoolTask::Stream(StreamTask {
+                            return Some(PoolTask::Channel(ChannelTask {
                                     peer: address,
                                     service_scope: request.service_scope,
                                     respond: request.respond,
@@ -290,28 +297,28 @@ where
                 broadcast_request = self.broadcast_request_rx.recv() => {
                     let request = broadcast_request?;
                     let peers = match request.param {
-                        Param::Filter(filter) => self
-                            .peers
-                            .iter()
-                            .filter(|(index, _)| filter(**index))
-                            .map(|(_, info)| info.clone())
-                            .collect::<Vec<_>>(),
+                        Param::Filter(filter) => {
+                            Some(self
+                                .peers
+                                .iter()
+                                .filter(|(index, _)| filter(**index))
+                                .map(|(_, info)| info.clone())
+                                .collect::<Vec<_>>())
+                        }
                         Param::Index(index) => {
-                            let Some(info) = self.peers.get(&index) else {
-                                tracing::info!("skipping broadcast send for peer {index:?}: unknown peer");
-                                continue;
-                            };
-                            vec![info.clone()]
+                            self.peers.get(&index).map(|info| vec![info.clone()])
                         },
                     };
 
-                    let peers = if peers.is_empty() { None } else { Some(peers) };
+                    if let Some(peers) = peers {
+                        let peers = if peers.is_empty() { None } else { Some(peers) };
 
-                    return Some(PoolTask::Broadcast(BroadcastTask::Send {
-                        service_scope: request.service_scope,
-                        message: request.message,
-                        peers,
-                    }));
+                        return Some(PoolTask::Broadcast(BroadcastTask::Send {
+                            service_scope: request.service_scope,
+                            message: request.message,
+                            peers,
+                        }));
+                    }
                 }
             }
             tokio::task::yield_now().await;
@@ -321,7 +328,7 @@ where
 
 pub enum PoolTask {
     Broadcast(BroadcastTask),
-    Stream(StreamTask),
+    Channel(ChannelTask),
 }
 
 pub struct BroadcastRequest<F = BoxedFilterCallback>
@@ -353,19 +360,19 @@ pub enum BroadcastTask {
     },
 }
 
-pub struct StreamTask {
+pub struct ChannelTask {
     pub peer: NodeAddress,
     pub service_scope: ServiceScope,
     pub respond: oneshot::Sender<io::Result<Channel>>,
 }
 
-pub struct StreamRequest {
+pub struct ChannelRequest {
     pub service_scope: ServiceScope,
     pub peer: NodeIndex,
     pub respond: oneshot::Sender<io::Result<Channel>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ConnectionInfo {
     /// Pinned connections should not be dropped
     /// on topology changes.

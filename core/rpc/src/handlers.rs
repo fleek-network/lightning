@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
 use std::time::Duration;
@@ -379,8 +378,14 @@ pub async fn get_reputation_handler<C: Collection>(
 
 pub async fn get_latencies_handler<C: Collection>(
     data: Data<Arc<RpcData<C>>>,
-) -> Result<HashMap<(NodePublicKey, NodePublicKey), Duration>> {
-    Ok(data.0.query_runner.get_latencies())
+) -> Result<Vec<((NodePublicKey, NodePublicKey), Duration)>> {
+    Ok(data
+        .0
+        .query_runner
+        .get_latencies()
+        .into_iter()
+        .map(|(key, val)| (key, val))
+        .collect())
 }
 
 pub async fn get_reputation_measurements_handler<C: Collection>(
