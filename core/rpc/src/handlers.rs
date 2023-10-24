@@ -68,7 +68,7 @@ use crate::utils;
 
 static OPEN_RPC_DOCS: &str = "../../docs/rpc/openrpc.json";
 
-pub const RPC_VERSION: u8 = 1;
+pub const RPC_VERSION: u8 = 2;
 
 pub type Result<T> = anyhow::Result<T, Error>;
 

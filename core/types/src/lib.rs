@@ -63,4 +63,4 @@ pub enum InternetAddress {
 }
 
 // Version of the binary
-pub const VERSION: u8 = 1;
+pub const VERSION: u8 = 2;

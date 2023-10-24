@@ -170,6 +170,10 @@ impl Env<UpdatePerm> {
                     if so aknowledge that in the block response
                 */
                 response.txn_receipts.push(receipt);
+
+                if response.change_epoch {
+                    break;
+                }
             }
             // Set the last executed block hash
             app.set_last_block(block.digest);
