@@ -155,7 +155,16 @@ impl ConnectionInterface for Connection {
     }
 
     fn metrics(&self) -> Metrics {
-        Metrics { rtt: self.0.rtt() }
+        let stats = self.0.stats();
+
+        Metrics {
+            rtt: self.0.rtt(),
+            lost_packets: stats.path.lost_packets,
+            sent_packets: stats.path.sent_packets,
+            congestion_events: stats.path.congestion_events,
+            cwnd: stats.path.cwnd,
+            black_holes_detected: stats.path.black_holes_detected,
+        }
     }
 
     fn close(&self, error_code: u8, reason: &[u8]) {

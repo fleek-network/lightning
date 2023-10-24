@@ -93,20 +93,20 @@ impl Channel {
             {
                 Either::Left((value1, fut)) => {
                     if let Err(e) = value1 {
-                        tracing::error!("unexpected with error when sending a message: {e:?}");
+                        tracing::error!("broken sending channel: {e:?}");
                     }
 
                     if let Err(e) = fut.await {
-                        tracing::error!("unexpected with error when receiving a message: {e:?}");
+                        tracing::error!("broken receiving channel: {e:?}");
                     }
                 },
                 Either::Right((value2, fut)) => {
                     if let Err(e) = value2 {
-                        tracing::error!("unexpected with error when receiving a message: {e:?}");
+                        tracing::error!("broken receiving channel: {e:?}");
                     }
 
                     if let Err(e) = fut.await {
-                        tracing::error!("unexpected with error when sending a message: {e:?}");
+                        tracing::error!("broken sending channel: {e:?}");
                     }
                 },
             }
@@ -160,4 +160,9 @@ impl Sink<Bytes> for Channel {
 
 pub struct Metrics {
     pub rtt: Duration,
+    pub lost_packets: u64,
+    pub sent_packets: u64,
+    pub congestion_events: u64,
+    pub cwnd: u64,
+    pub black_holes_detected: u64,
 }
