@@ -281,11 +281,14 @@ impl SignerInner {
                     };
                     let update_method = task.request.clone();
                     task.respond(next_nonce);
-                    let update_payload = UpdatePayload { method: update_method, nonce: next_nonce };
+                    let update_payload = UpdatePayload {
+                        sender:  TransactionSender::NodeMain(self.node_public_key),
+                        method: update_method,
+                        nonce: next_nonce
+                    };
                     let digest = update_payload.to_digest();
                     let signature = self.node_secret_key.sign(&digest);
                     let update_request = UpdateRequest {
-                        sender:  TransactionSender::NodeMain(self.node_public_key),
                         signature: signature.into(),
                         payload: update_payload,
                     };

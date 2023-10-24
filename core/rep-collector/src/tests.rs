@@ -588,11 +588,14 @@ async fn test_reputation_calculation_and_query() {
         } else {
             1
         };
-        let payload = UpdatePayload { nonce, method };
+        let payload = UpdatePayload {
+            sender: node.node_secret_key.to_pk().into(),
+            nonce,
+            method,
+        };
         let digest = payload.to_digest();
         let signature = node.node_secret_key.sign(&digest);
         let req = UpdateRequest {
-            sender: node.node_secret_key.to_pk().into(),
             signature: signature.into(),
             payload,
         };
