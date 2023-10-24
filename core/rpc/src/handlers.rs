@@ -270,12 +270,15 @@ pub async fn mint_handler<C: Collection>(
         let method = UpdateMethod::Mint {
             recipient: params.public_key,
         };
-        let payload = UpdatePayload { method, nonce };
+        let payload = UpdatePayload {
+            sender: TransactionSender::NodeMain(data.node_secret_key.to_pk()),
+            method,
+            nonce,
+        };
         let digest = payload.to_digest();
         let signature = data.node_secret_key.sign(&digest);
         let request = UpdateRequest {
             payload,
-            sender: TransactionSender::NodeMain(data.node_secret_key.to_pk()),
             signature: TransactionSignature::NodeMain(signature),
         };
 

@@ -235,8 +235,10 @@ impl<B: Backend> State<B> {
             UpdateMethod::ChangeProtocolParam { param, value } => {
                 self.change_protocol_param(txn.payload.sender, param, value)
             },
-            UpdateMethod::SetAllowMinting { allow } => self.set_allow_minting(txn.sender, allow),
-            UpdateMethod::Mint { recipient } => self.mint(txn.sender, recipient),
+            UpdateMethod::SetAllowMinting { allow } => {
+                self.set_allow_minting(txn.payload.sender, allow)
+            },
+            UpdateMethod::Mint { recipient } => self.mint(txn.payload.sender, recipient),
         };
 
         #[cfg(debug_assertions)]
