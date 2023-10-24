@@ -4900,6 +4900,7 @@ dependencies = [
  "infusion",
  "lightning-application",
  "lightning-interfaces",
+ "lightning-metrics",
  "lightning-notifier",
  "lightning-pool",
  "lightning-rep-collector",

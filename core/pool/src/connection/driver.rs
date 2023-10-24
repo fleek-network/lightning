@@ -5,13 +5,14 @@ use bytes::Bytes;
 use futures::{SinkExt, StreamExt};
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ServiceScope;
+use lightning_metrics::histogram;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 use crate::endpoint::ConnectionEvent;
-use crate::muxer::{Channel, ConnectionInterface};
+use crate::muxer::{Channel, ConnectionInterface, Metrics};
 use crate::overlay::Message;
 
 /// Context for driving the connection.
@@ -47,7 +48,13 @@ pub async fn start_driver<C: ConnectionInterface>(mut ctx: Context<C>) -> Result
     loop {
         tokio::select! {
             accept_result = ctx.connection.accept_stream() => {
-                let (stream_tx, stream_rx) = accept_result?;
+                let (stream_tx, stream_rx) = match accept_result {
+                    Ok(streams) => streams,
+                    Err(e) => {
+                        report_metrics(ctx.connection.metrics());
+                        return Err(e.into());
+                    }
+                };
                 let connection_event_tx = ctx.connection_event_tx.clone();
                 let peer = ctx.peer;
                 tokio::spawn(async move {
@@ -65,7 +72,13 @@ pub async fn start_driver<C: ConnectionInterface>(mut ctx: Context<C>) -> Result
                 });
             }
             accept_result = connection.accept_uni_stream() => {
-                let stream_rx = accept_result?;
+                let stream_rx = match accept_result {
+                    Ok(stream) => stream,
+                    Err(e) => {
+                        report_metrics(ctx.connection.metrics());
+                        return Err(e.into());
+                    }
+                };
                 let connection_event_tx = ctx.connection_event_tx.clone();
                 let peer = ctx.peer;
                 tokio::spawn(async move {
@@ -126,7 +139,37 @@ pub async fn start_driver<C: ConnectionInterface>(mut ctx: Context<C>) -> Result
         }
     }
 
+    report_metrics(ctx.connection.metrics());
+
     Ok(())
+}
+
+fn report_metrics(metrics: Metrics) {
+    histogram!(
+        "lost_packets",
+        Some("Lost packets"),
+        metrics.lost_packets as f64
+    );
+    histogram!(
+        "sent_packets",
+        Some("Sent packets"),
+        metrics.sent_packets as f64
+    );
+    histogram!(
+        "congestion_events",
+        Some("Congestion packets"),
+        metrics.congestion_events as f64
+    );
+    histogram!(
+        "congestion_window",
+        Some("Congestion window"),
+        metrics.cwnd as f64
+    );
+    histogram!(
+        "black_holes_detected",
+        Some("Black holes"),
+        metrics.black_holes_detected as f64
+    );
 }
 
 async fn handle_incoming_uni_stream<C: ConnectionInterface>(
