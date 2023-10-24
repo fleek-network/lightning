@@ -466,7 +466,11 @@ impl<B: Backend> State<B> {
             Err(e) => return e,
         };
         let mut sender_account = self.account_info.get(&sender).unwrap_or_default();
+        let mut to_account = self.account_info.get(&to).unwrap_or_default();
 
+        if sender_account == to_account {
+            return TransactionResponse::Revert(ExecutionError::CantSendToYourself);
+        }
         // Check that they have the funds
         if sender_account.flk_balance < amount {
             return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
@@ -475,14 +479,11 @@ impl<B: Backend> State<B> {
         sender_account.flk_balance -= amount.clone();
 
         // Increment the to address balance
-        let mut to_account = self.account_info.get(&to).unwrap_or_default();
-
         to_account.flk_balance += amount;
 
         // set both fields in our tables
-
-        self.account_info.set(sender, sender_account);
         self.account_info.set(to, to_account);
+        self.account_info.set(sender, sender_account);
 
         TransactionResponse::Success(ExecutionData::None)
     }
