@@ -23,10 +23,13 @@ pub fn get_update_transactions(num_txns: usize) -> Vec<UpdateRequest> {
             let public_key = secret_key.to_pk();
             let sender = TransactionSender::NodeMain(public_key);
             let method = UpdateMethod::ChangeEpoch { epoch: i as u64 };
-            let payload = UpdatePayload { nonce: 0, method };
+            let payload = UpdatePayload {
+                sender,
+                nonce: 0,
+                method,
+            };
             let digest = payload.to_digest();
             UpdateRequest {
-                sender,
                 signature: TransactionSignature::NodeMain(secret_key.sign(&digest)),
                 payload,
             }
@@ -60,7 +63,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
             block_number: block_index as u64,
             transaction_index: i as u64,
             transaction_hash: tx.payload.to_digest(), // dummy hash
-            from: tx.sender,
+            from: tx.payload.sender,
             to: to.clone(),
             response: TransactionResponse::Success(ExecutionData::None),
         });
@@ -87,7 +90,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
                 block_number: block_index as u64,
                 transaction_index: i as u64,
                 transaction_hash: tx.payload.to_digest(), // dummy hash
-                from: tx.sender,
+                from: tx.payload.sender,
                 to: to.clone(),
                 response: TransactionResponse::Success(ExecutionData::None),
             }

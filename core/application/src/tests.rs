@@ -262,11 +262,14 @@ fn get_update_request_node(
     secret_key: &NodeSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
-    let payload = UpdatePayload { nonce, method };
+    let payload = UpdatePayload {
+        sender: secret_key.to_pk().into(),
+        nonce,
+        method,
+    };
     let digest = payload.to_digest();
     let signature = secret_key.sign(&digest);
     UpdateRequest {
-        sender: secret_key.to_pk().into(),
         signature: signature.into(),
         payload,
     }
@@ -278,11 +281,14 @@ fn get_update_request_account(
     secret_key: &AccountOwnerSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
-    let payload = UpdatePayload { nonce, method };
+    let payload = UpdatePayload {
+        sender: secret_key.to_pk().into(),
+        nonce,
+        method,
+    };
     let digest = payload.to_digest();
     let signature = secret_key.sign(&digest);
     UpdateRequest {
-        sender: secret_key.to_pk().into(),
         signature: signature.into(),
         payload,
     }

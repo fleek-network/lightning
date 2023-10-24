@@ -47,8 +47,6 @@ pub struct Block {
 /// from one state to the next state.
 #[derive(Debug, Hash, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct UpdateRequest {
-    /// The sender of the transaction.
-    pub sender: TransactionSender,
     /// The signature by the user signing this payload.
     pub signature: TransactionSignature,
     /// The payload of an update request, which contains a counter (nonce), and
@@ -77,7 +75,7 @@ pub enum TransactionRequest {
 impl TransactionRequest {
     pub fn sender(&self) -> TransactionSender {
         match self {
-            Self::UpdateRequest(payload) => payload.sender,
+            Self::UpdateRequest(payload) => payload.payload.sender,
             Self::EthereumRequest(payload) => EthAddress::from(payload.from.0).into(),
         }
     }
@@ -197,6 +195,8 @@ impl TryFrom<Vec<u8>> for Block {
 /// The payload data of FN transaction
 #[derive(Debug, Hash, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct UpdatePayload {
+    /// The sender of the transaction.
+    pub sender: TransactionSender,
     /// The counter or nonce of this request.
     pub nonce: u64,
     /// The transition function (and parameters) for this update request.
@@ -326,6 +326,18 @@ impl ToDigest for UpdatePayload {
     fn transcript(&self) -> TranscriptBuilder {
         let mut transcript_builder =
             TranscriptBuilder::empty(FN_TXN_PAYLOAD_DOMAIN).with("nonce", &self.nonce);
+
+        match &self.sender {
+            TransactionSender::NodeMain(public_key) => {
+                transcript_builder = transcript_builder.with("sender_node", &public_key.0);
+            },
+            TransactionSender::AccountOwner(address) => {
+                transcript_builder = transcript_builder.with("sender_account", &address.0);
+            },
+            TransactionSender::NodeConsensus(public_key) => {
+                transcript_builder = transcript_builder.with("sender_consensus", &public_key.0);
+            },
+        }
 
         // insert method fields
         match &self.method {
@@ -547,10 +559,13 @@ mod tests {
                     let public_key = secret_key.to_pk();
                     let sender = TransactionSender::NodeMain(public_key);
                     let method = UpdateMethod::ChangeEpoch { epoch: i as u64 };
-                    let payload = UpdatePayload { nonce: 0, method };
+                    let payload = UpdatePayload {
+                        sender,
+                        nonce: 0,
+                        method,
+                    };
                     let digest = payload.to_digest();
                     TransactionRequest::UpdateRequest(UpdateRequest {
-                        sender,
                         signature: TransactionSignature::NodeMain(secret_key.sign(&digest)),
                         payload,
                     })
@@ -591,11 +606,11 @@ mod tests {
             value: 4,
         };
         let payload = UpdatePayload {
+            sender: TransactionSender::AccountOwner(EthAddress([0; 20])),
             nonce: 0,
             method: update_method,
         };
         let update_req = UpdateRequest {
-            sender: TransactionSender::AccountOwner(EthAddress([0; 20])),
             signature: TransactionSignature::AccountOwner(AccountOwnerSignature([0; 65])),
             payload,
         };

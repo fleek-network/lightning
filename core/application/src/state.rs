@@ -141,9 +141,10 @@ impl<B: Backend> State<B> {
 
     pub fn execute_transaction(&self, txn: TransactionRequest) -> TransactionResponse {
         let (sender, response) = match txn {
-            TransactionRequest::UpdateRequest(payload) => {
-                (payload.sender, self.execute_fleek_transaction(payload))
-            },
+            TransactionRequest::UpdateRequest(payload) => (
+                payload.payload.sender,
+                self.execute_fleek_transaction(payload),
+            ),
             TransactionRequest::EthereumRequest(payload) => (
                 TransactionSender::AccountOwner(EthAddress(payload.from.0)),
                 self.execute_ethereum_transaction(payload),
@@ -163,22 +164,22 @@ impl<B: Backend> State<B> {
                 service_id,
                 proofs,
                 metadata: _,
-            } => self.submit_pod(txn.sender, commodity, service_id, proofs),
+            } => self.submit_pod(txn.payload.sender, commodity, service_id, proofs),
 
             UpdateMethod::Withdraw {
                 amount,
                 token,
                 receiving_address,
-            } => self.withdraw(txn.sender, receiving_address, amount, token),
+            } => self.withdraw(txn.payload.sender, receiving_address, amount, token),
 
             UpdateMethod::Deposit {
                 proof,
                 token,
                 amount,
-            } => self.deposit(txn.sender, proof, amount, token),
+            } => self.deposit(txn.payload.sender, proof, amount, token),
 
             UpdateMethod::Transfer { amount, token, to } => {
-                self.transfer(txn.sender, amount, token, to)
+                self.transfer(txn.payload.sender, amount, token, to)
             },
 
             UpdateMethod::Stake {
@@ -190,7 +191,7 @@ impl<B: Backend> State<B> {
                 worker_domain,
                 ports,
             } => self.stake(
-                txn.sender,
+                txn.payload.sender,
                 amount,
                 node_public_key,
                 consensus_key,
@@ -200,37 +201,39 @@ impl<B: Backend> State<B> {
                 ports,
             ),
             UpdateMethod::StakeLock { node, locked_for } => {
-                self.stake_lock(txn.sender, node, locked_for)
+                self.stake_lock(txn.payload.sender, node, locked_for)
             },
 
-            UpdateMethod::Unstake { amount, node } => self.unstake(txn.sender, amount, node),
+            UpdateMethod::Unstake { amount, node } => {
+                self.unstake(txn.payload.sender, amount, node)
+            },
 
             UpdateMethod::WithdrawUnstaked { node, recipient } => {
-                self.withdrawl_unstaked(txn.sender, node, recipient)
+                self.withdrawl_unstaked(txn.payload.sender, node, recipient)
             },
 
-            UpdateMethod::ChangeEpoch { epoch } => self.change_epoch(txn.sender, epoch),
+            UpdateMethod::ChangeEpoch { epoch } => self.change_epoch(txn.payload.sender, epoch),
 
             UpdateMethod::AddService {
                 service,
                 service_id,
-            } => self.add_service(txn.sender, service, service_id),
+            } => self.add_service(txn.payload.sender, service, service_id),
 
             UpdateMethod::RemoveService { service_id } => {
-                self.remove_service(txn.sender, service_id)
+                self.remove_service(txn.payload.sender, service_id)
             },
 
             UpdateMethod::Slash {
                 service_id,
                 node,
                 proof_of_misbehavior,
-            } => self.slash(txn.sender, proof_of_misbehavior, service_id, node),
+            } => self.slash(txn.payload.sender, proof_of_misbehavior, service_id, node),
 
             UpdateMethod::SubmitReputationMeasurements { measurements } => {
-                self.submit_reputation_measurements(txn.sender, measurements)
+                self.submit_reputation_measurements(txn.payload.sender, measurements)
             },
             UpdateMethod::ChangeProtocolParam { param, value } => {
-                self.change_protocol_param(txn.sender, param, value)
+                self.change_protocol_param(txn.payload.sender, param, value)
             },
         };
 
@@ -1316,7 +1319,7 @@ impl<B: Backend> State<B> {
 
     fn verify_fleek_transaction(&self, txn: &UpdateRequest) -> Result<(), ExecutionError> {
         // Check nonce
-        match txn.sender {
+        match txn.payload.sender {
             // Todo Sunday(dalton): Clean up this match nesting
             TransactionSender::NodeMain(node) => {
                 if let Some(index) = self.pub_key_to_index.get(&node) {
@@ -1354,7 +1357,7 @@ impl<B: Backend> State<B> {
         let payload = txn.payload.clone();
         let digest = payload.to_digest();
 
-        if !txn.sender.verify(txn.signature, &digest) {
+        if !txn.payload.sender.verify(txn.signature, &digest) {
             return Err(ExecutionError::InvalidSignature);
         }
         Ok(())
