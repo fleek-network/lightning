@@ -313,7 +313,7 @@ async fn run_command(
         let _ = tokio::fs::remove_file(&conn_uds_path).await;
 
         let last_start = Instant::now();
-        tracing::trace!("Running command for '{name}");
+        tracing::trace!("Running command for '{name}'");
 
         let mut child = command.spawn().expect("Command failed to start.");
 
@@ -328,10 +328,11 @@ async fn run_command(
             _ = child.wait() => {
                 tracing::error!("Child process '{name}' failed.");
                 if Instant::now().duration_since(last_start) >= Duration::from_secs(2) {
-                    tracing::info!("Last run seemed to have been healthy, not waiting...");
+                    tracing::info!("Last run seemed to have been healthy. Waiting for 100ms.");
                     // Restart the wait time.
+                    wait_time = 100;
+                } else if wait_time <= 100 {
                     wait_time = 1000;
-                    continue;
                 }
             }
         }
