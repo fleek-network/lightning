@@ -127,9 +127,7 @@ where
             },
             Some(tx) => {
                 if let Some(address) = self.node_address_from_state(&peer) {
-                    if self.contains(&peer) {
-                        self.pin_connection(peer, address);
-                    }
+                    self.pin_connection(peer, address);
                     tokio::spawn(async move {
                         // Get the header.
                         if let Ok(bytes) = stream
