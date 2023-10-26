@@ -476,8 +476,8 @@ async fn send_request<C: Collection>(
                         request,
                     })
                 },
-                Err(_reason) => Err(ErrorResponse {
-                    error: PeerRequestError::Rejected,
+                Err(reason) => Err(ErrorResponse {
+                    error: PeerRequestError::Rejected(reason),
                     request,
                 }),
             }

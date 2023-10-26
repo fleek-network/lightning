@@ -35,7 +35,7 @@ async fn e2e_checkpoint() -> Result<()> {
     swarm.launch().await.unwrap();
 
     // Wait for the epoch to change.
-    tokio::time::sleep(Duration::from_secs(40)).await;
+    tokio::time::sleep(Duration::from_secs(35)).await;
 
     let request = json!({
         "jsonrpc": "2.0",

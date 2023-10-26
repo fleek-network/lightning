@@ -4,7 +4,7 @@ use anyhow::{bail, Error};
 use async_trait::async_trait;
 use bytes::Bytes;
 use lightning_types::NodeIndex;
-use serde::{Deserialize, Serialize};
+pub use lightning_types::RejectReason;
 use tokio_stream::Stream;
 
 use crate::infu_collection::{c, Collection};
@@ -37,15 +37,6 @@ impl TryFrom<u8> for ServiceScope {
             _ => bail!("invalid scope value: {value:?}"),
         }
     }
-}
-
-#[derive(Clone, Copy, Deserialize, Serialize, Debug)]
-#[repr(u8)]
-#[non_exhaustive]
-pub enum RejectReason {
-    Other,
-    TooManyRequests,
-    ContentNotFound,
 }
 
 #[derive(Clone, Debug)]

@@ -1,4 +1,4 @@
-use crate::{Blake3Hash, NodeIndex};
+use crate::{Blake3Hash, NodeIndex, RejectReason};
 
 #[derive(Clone, Debug)]
 pub struct ServerRequest {
@@ -10,6 +10,6 @@ pub struct ServerRequest {
 #[error("Failed to fetch data from other peers")]
 pub enum PeerRequestError {
     Timeout,
-    Rejected,
+    Rejected(RejectReason),
     Incomplete,
 }
