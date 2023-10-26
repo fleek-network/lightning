@@ -7,8 +7,7 @@ use lightning_node::{FinalTypes, WithMockConsensus};
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 use resolved_pathbuf::ResolvedPathBuf;
-use tracing::info;
-use tracing::level_filters::LevelFilter;
+use tracing::{info, warn};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
 
@@ -82,20 +81,40 @@ impl Cli {
 
     fn setup(&self) {
         // Build the filter from cli args, or override if environment variable is set.
+        let mut did_override = false;
         let env_filter = EnvFilter::builder()
-            .with_default_directive(
-                match self.args.verbose {
-                    0 => LevelFilter::INFO,
-                    1 => LevelFilter::DEBUG,
-                    _2_or_more => LevelFilter::TRACE,
-                }
-                .into(),
-            )
-            .from_env_lossy()
-            // Ignore traces from spammy dependencies
-            .add_directive("quinn=warn".parse().unwrap())
-            .add_directive("anemo=warn".parse().unwrap())
-            .add_directive("rustls=warn".parse().unwrap())
+            .parse_lossy(match std::env::var("RUST_LOG") {
+                // Environment override
+                Ok(filter) => {
+                    did_override = true;
+                    filter
+                },
+                // Default which is directed by the verbosity flag
+                Err(_) => {
+                    if self.args.verbose < 3 {
+                        // Build the filter, explicitly ignoring noisy dependencies
+                        vec![
+                            match self.args.verbose {
+                                0 => "info",
+                                1 => "debug",
+                                2 => "trace",
+                                _ => unreachable!(),
+                            },
+                            // Ignore spammy crates
+                            "quinn=warn",
+                            "anemo=warn",
+                            "rustls=warn",
+                            "h2=warn",
+                        ]
+                        .join(",")
+                    } else {
+                        // Otherwise, trace everything without any explicit ignores
+                        "trace".to_string()
+                    }
+                },
+            })
+            // Ignore traces from tokio and the runtime for log printing. Namely async task
+            // contexts, which are available from tokio console in a human readable way.
             .add_directive("tokio=warn".parse().unwrap())
             .add_directive("runtime=warn".parse().unwrap());
 
@@ -115,6 +134,13 @@ impl Cli {
             registry.with(console_layer).init();
         } else {
             registry.init();
+        }
+
+        if did_override && self.args.verbose != 0 {
+            warn!("-v is useless when RUST_LOG override is present");
+        }
+        if self.args.verbose > 3 {
+            warn!("The maximum verbosity level is 3, Parsa.")
         }
     }
 
