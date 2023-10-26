@@ -110,6 +110,7 @@ impl Channel {
                     }
                 },
             }
+            tracing::debug!("channel task finished");
         });
 
         Self {
