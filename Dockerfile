@@ -28,28 +28,35 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 FROM ubuntu:latest
 ARG LIGHTNING_PORTS="4200-4299 4300-4399"
-WORKDIR /root
+ARG USERNAME="lgtn"
+WORKDIR /home/$USERNAME
 SHELL ["/bin/bash", "-c"] 
 
 RUN apt-get update && \
     apt-get install -y \
     libssl-dev \
-    ca-certificates
+    ca-certificates \
+    curl
 
 COPY --from=build /build/lightning-node /usr/local/bin/lgtn
 
-COPY <<EOF /root/init
+RUN useradd -Um $USERNAME
+
+COPY <<EOF /home/$USERNAME/init
 #!/usr/bin/bash
 
-if [[ ! -d /root/.lightning/keystore ]]; then
+if [[ ! -d /home/$USERNAME/.lightning/keystore ]]; then
   lgtn keys generate
 fi
 
-lgtn -vv run
+lgtn -c /home/$USERNAME/.lightning/config.toml -vv run
 EOF
 
-RUN chmod +x /root/init
+RUN chown $USERNAME:$USERNAME /home/$USERNAME/init
+RUN chmod +x /home/$USERNAME/init
 
 EXPOSE $LIGHTNING_PORTS
 
-ENTRYPOINT ["/root/init"]
+USER $USERNAME
+
+ENTRYPOINT ["/home/lgtn/init"]
