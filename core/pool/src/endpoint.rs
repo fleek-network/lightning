@@ -368,7 +368,9 @@ where
 
                 for req in pending_requests {
                     // We need to pin the connection if used by channel service.
-                    should_pin = matches!(req, DriverRequest::NewChannel { .. });
+                    if matches!(req, DriverRequest::NewChannel { .. }) {
+                        should_pin = true;
+                    }
 
                     let request_tx_clone = request_tx.clone();
                     tokio::spawn(async move {

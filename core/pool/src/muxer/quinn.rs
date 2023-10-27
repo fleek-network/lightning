@@ -20,12 +20,14 @@ pub struct Config {
     pub server_config: ServerConfig,
     pub address: SocketAddr,
     pub sk: NodeSecretKey,
+    pub max_idle_timeout: Duration,
 }
 
 #[derive(Clone)]
 pub struct QuinnMuxer {
     endpoint: Endpoint,
     sk: NodeSecretKey,
+    max_idle_timeout: Duration,
 }
 
 #[async_trait]
@@ -43,6 +45,7 @@ impl MuxerInterface for QuinnMuxer {
         Ok(Self {
             endpoint,
             sk: config.sk,
+            max_idle_timeout: config.max_idle_timeout,
         })
     }
 
@@ -51,7 +54,10 @@ impl MuxerInterface for QuinnMuxer {
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         let mut client_config = ClientConfig::new(Arc::new(tls_config));
         let mut transport_config = TransportConfig::default();
-        transport_config.max_idle_timeout(Some(Duration::from_secs(300).try_into().unwrap()));
+        transport_config.max_idle_timeout(Some(self.max_idle_timeout.try_into().map_err(|e| {
+            tracing::error!("failed to set max idle timeout: {e:?}");
+            io::ErrorKind::Other
+        })?));
         client_config.transport_config(Arc::new(transport_config));
         let connecting = self
             .endpoint

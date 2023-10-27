@@ -189,6 +189,7 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
             server_config,
             address: config.address,
             sk,
+            max_idle_timeout: config.max_idle_timeout,
         };
 
         let (notifier_tx, notifier_rx) = mpsc::channel(32);
