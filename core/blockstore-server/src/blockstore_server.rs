@@ -180,10 +180,8 @@ impl<C: Collection> BlockstoreServerInner<C> {
                             // TODO(matthias): find out which peer the request came from
                             match PeerRequest::try_from(req_header.bytes) {
                                 Ok(request) => {
-                                    let num_res = self.num_responses.load(Ordering::Relaxed);
-                                    if num_res > self.max_conc_res {
-                                        responder.reject(RejectReason::TooManyRequests);
-                                    } else {
+                                    let num_res = self.num_responses.fetch_add(1, Ordering::AcqRel);
+                                    if num_res < self.max_conc_res {
                                         let blockstore = self.blockstore.clone();
                                         let num_responses = self.num_responses.clone();
                                         let rep_reporter = self.rep_reporter.clone();
@@ -197,6 +195,9 @@ impl<C: Collection> BlockstoreServerInner<C> {
                                                 rep_reporter,
                                             ).await;
                                         });
+                                    } else {
+                                        self.num_responses.fetch_sub(1, Ordering::Release);
+                                        responder.reject(RejectReason::TooManyRequests);
                                     }
                                 }
                                 Err(e) => error!("Failed to decode request from peer: {e:?}"),
@@ -365,7 +366,6 @@ async fn handle_request<C: Collection>(
     num_responses: Arc<AtomicUsize>,
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
 ) {
-    num_responses.fetch_add(1, Ordering::Relaxed);
     if let Some(tree) = blockstore.get_tree(&peer_request.hash).await {
         let mut num_bytes = 0;
         let instant = Instant::now();
@@ -388,7 +388,7 @@ async fn handle_request<C: Collection>(
                     .await
                 {
                     error!("Failed to send proof: {e:?}");
-                    num_responses.fetch_sub(1, Ordering::Relaxed);
+                    num_responses.fetch_sub(1, Ordering::Release);
                     return;
                 }
             }
@@ -401,7 +401,7 @@ async fn handle_request<C: Collection>(
                 .await
             {
                 error!("Failed to send chunk: {e:?}");
-                num_responses.fetch_sub(1, Ordering::Relaxed);
+                num_responses.fetch_sub(1, Ordering::Release);
                 return;
             }
         }
@@ -412,7 +412,7 @@ async fn handle_request<C: Collection>(
     } else {
         request.reject(RejectReason::ContentNotFound);
     }
-    num_responses.fetch_sub(1, Ordering::Relaxed);
+    num_responses.fetch_sub(1, Ordering::Release);
 }
 
 async fn send_request<C: Collection>(
@@ -435,6 +435,7 @@ async fn send_request<C: Collection>(
                     let mut putter = blockstore.put(Some(request.hash));
                     let mut bytes_recv = 0;
                     let instant = Instant::now();
+
                     while let Some(bytes) = body.next().await {
                         let Ok(bytes) = bytes else {
                             return Err(ErrorResponse {

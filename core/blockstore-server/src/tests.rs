@@ -69,6 +69,7 @@ struct Peer<C: Collection> {
     pool: C::PoolInterface,
     blockstore: Blockstore<C>,
     blockstore_server: C::BlockStoreServerInterface,
+    _rep_aggregator: C::ReputationAggregatorInterface,
     node_public_key: NodePublicKey,
 }
 
@@ -181,8 +182,12 @@ async fn get_peers(
         };
         let blockstore = Blockstore::init(blockstore_config).unwrap();
 
+        let bs_config = Config {
+            max_conc_req: 10,
+            max_conc_res: 10,
+        };
         let blockstore_server = BlockStoreServer::<TestBinding>::init(
-            Config::default(),
+            bs_config,
             blockstore.clone(),
             &pool,
             rep_aggregator.get_reporter(),
@@ -193,6 +198,7 @@ async fn get_peers(
             pool,
             blockstore,
             blockstore_server,
+            _rep_aggregator: rep_aggregator,
             node_public_key: signer.get_ed25519_pk(),
         };
         peers.push(peer);
