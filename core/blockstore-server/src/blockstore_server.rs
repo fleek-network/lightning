@@ -407,8 +407,9 @@ async fn handle_request<C: Collection>(
         }
         if let Err(e) = request.send(Bytes::from(Frame::Eos)).await {
             error!("Failed to send eos: {e:?}");
+        } else {
+            rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
         }
-        rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
     } else {
         request.reject(RejectReason::ContentNotFound);
     }
