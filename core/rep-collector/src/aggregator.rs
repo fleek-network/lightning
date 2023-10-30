@@ -228,11 +228,18 @@ impl<C: Collection> ReputationAggregatorInner<C> {
                     .unwrap()
                     .report_unsat(peer, weight);
             },
-            ReportMessage::Latency { peer, latency } => {
-                self.measurement_manager
-                    .lock()
-                    .unwrap()
-                    .report_latency(peer, latency);
+            ReportMessage::Ping { peer, latency } => match latency {
+                Some(latency) => {
+                    let mut manager = self.measurement_manager.lock().unwrap();
+                    manager.report_latency(peer, latency);
+                    manager.report_ping(peer, true);
+                },
+                None => {
+                    self.measurement_manager
+                        .lock()
+                        .unwrap()
+                        .report_ping(peer, false);
+                },
             },
             ReportMessage::BytesReceived {
                 peer,
@@ -322,11 +329,8 @@ impl ReputationReporterInterface for MyReputationReporter {
     /// Report a ping interaction with another peer and the latency if the peer responded.
     /// `None` indicates that the peer did not respond.
     fn report_ping(&self, peer: NodeIndex, latency: Option<Duration>) {
-        if let Some(latency) = latency {
-            let message = ReportMessage::Latency { peer, latency };
-            self.send_message(message);
-        }
-        // TODO(matthias): report unsuccessul ping
+        let message = ReportMessage::Ping { peer, latency };
+        self.send_message(message);
     }
 
     /// Report the number of (healthy) bytes which we received from another peer.
@@ -366,9 +370,9 @@ enum ReportMessage {
         peer: NodeIndex,
         weight: Weight,
     },
-    Latency {
+    Ping {
         peer: NodeIndex,
-        latency: Duration,
+        latency: Option<Duration>,
     },
     BytesReceived {
         peer: NodeIndex,

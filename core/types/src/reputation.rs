@@ -14,5 +14,6 @@ pub struct ReputationMeasurements {
     pub outbound_bandwidth: Option<u128>,
     pub bytes_received: Option<u128>,
     pub bytes_sent: Option<u128>,
+    pub uptime: Option<u8>,
     pub hops: Option<u8>,
 }

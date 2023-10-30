@@ -130,6 +130,11 @@ impl MeasurementManager {
         self.update_local_reputation_score(peer);
     }
 
+    pub fn report_ping(&mut self, peer: NodeIndex, responded: bool) {
+        self.insert_if_not_exists(&peer);
+        self.peers.get_mut(&peer).unwrap().register_ping(responded);
+    }
+
     pub fn report_hops(&mut self, peer: NodeIndex, hops: u8) {
         self.insert_if_not_exists(&peer);
         let (old_val, new_val) = self.peers.get_mut(&peer).unwrap().register_hops(hops);
@@ -177,6 +182,10 @@ impl MeasurementManager {
                 score += bytes_sent;
                 count += 1;
             }
+            if let Some(uptime) = norm_measurements.uptime {
+                score += uptime;
+                count += 1;
+            }
             if count != 0 {
                 score /= count as f64;
                 score *= 100.0;
@@ -200,6 +209,7 @@ struct MeasurementStore {
     outbound_bandwidth: Bandwidth,
     bytes_received: BytesTransferred,
     bytes_sent: BytesTransferred,
+    pings: Pings,
     hops: Hops,
 }
 
@@ -212,6 +222,7 @@ impl Default for MeasurementStore {
             outbound_bandwidth: Bandwidth::new(),
             bytes_received: BytesTransferred::new(),
             bytes_sent: BytesTransferred::new(),
+            pings: Pings::new(),
             hops: Hops::new(),
         }
     }
@@ -250,6 +261,10 @@ impl MeasurementStore {
 
     fn register_bytes_sent(&mut self, bytes: u64) -> (u128, u128) {
         self.bytes_sent.register_bytes_transferred(bytes)
+    }
+
+    fn register_ping(&mut self, responded: bool) {
+        self.pings.register_ping(responded);
     }
 
     fn register_hops(&mut self, hops: u8) -> (Option<u8>, Option<u8>) {
@@ -384,6 +399,38 @@ impl BytesTransferred {
     #[allow(dead_code)]
     fn get(&self) -> u128 {
         self.bytes
+    }
+}
+
+#[derive(Clone, Debug)]
+struct Pings {
+    num_pings: usize,
+    num_pings_responded: usize,
+}
+
+impl Pings {
+    fn new() -> Self {
+        Self {
+            num_pings: 0,
+            num_pings_responded: 0,
+        }
+    }
+
+    fn register_ping(&mut self, responded: bool) {
+        self.num_pings += 1;
+        if responded {
+            self.num_pings_responded += 1;
+        }
+    }
+
+    fn get(&self) -> Option<u8> {
+        if self.num_pings == 0 {
+            None
+        } else {
+            // ratio is in range [0, 1]
+            let ratio = self.num_pings_responded as f64 / self.num_pings as f64;
+            Some((ratio * 100.0) as u8)
+        }
     }
 }
 
@@ -646,6 +693,7 @@ impl From<&MeasurementStore> for ReputationMeasurements {
             outbound_bandwidth: value.outbound_bandwidth.get(),
             bytes_received: Some(value.bytes_received.get()),
             bytes_sent: Some(value.bytes_sent.get()),
+            uptime: value.pings.get(),
             hops: value.hops.get(),
         }
     }
@@ -659,6 +707,7 @@ struct NormalizedMeasurements {
     outbound_bandwidth: Option<f64>,
     bytes_received: Option<f64>,
     bytes_sent: Option<f64>,
+    uptime: Option<f64>,
 }
 
 impl NormalizedMeasurements {
@@ -733,6 +782,7 @@ impl NormalizedMeasurements {
             outbound_bandwidth,
             bytes_received,
             bytes_sent,
+            uptime: values.uptime.map(|x| x as f64 / 100.0),
         }
     }
 }
@@ -837,6 +887,20 @@ mod tests {
         let measurements = manager.peers.get(&peer).unwrap();
 
         assert_eq!(measurements.hops.get().unwrap(), 10);
+    }
+
+    #[test]
+    fn test_report_ping() {
+        let mut manager = MeasurementManager::new();
+        let peer = 0;
+        manager.report_ping(peer, false);
+        assert_eq!(manager.peers.get(&peer).unwrap().pings.get(), Some(0));
+        manager.report_ping(peer, true);
+        assert_eq!(manager.peers.get(&peer).unwrap().pings.get(), Some(50));
+        manager.report_ping(peer, true);
+        assert_eq!(manager.peers.get(&peer).unwrap().pings.get(), Some(66));
+        manager.report_ping(peer, false);
+        assert_eq!(manager.peers.get(&peer).unwrap().pings.get(), Some(50));
     }
 
     #[test]
@@ -1087,6 +1151,9 @@ mod tests {
             }
             if let Some(bytes_sent) = normalized_measurements.bytes_sent {
                 assert!((0.0..=1.0).contains(&bytes_sent));
+            }
+            if let Some(uptime) = normalized_measurements.uptime {
+                assert!((0.0..=1.0).contains(&uptime));
             }
         }
     }

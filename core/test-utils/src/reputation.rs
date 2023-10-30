@@ -40,6 +40,11 @@ pub fn generate_reputation_measurements(
     } else {
         Some(rng.gen_range(100_000..1_000_000_000))
     };
+    let uptime = if rng.gen_bool(prob_measurement_present) {
+        None
+    } else {
+        Some(rng.gen_range(0..100))
+    };
     ReputationMeasurements {
         latency,
         interactions,
@@ -47,6 +52,7 @@ pub fn generate_reputation_measurements(
         outbound_bandwidth,
         bytes_received,
         bytes_sent,
+        uptime,
         hops: None,
     }
 }
