@@ -340,7 +340,7 @@ where
 
             // Report the latency of this peer.
             self.rep_reporter
-                .report_latency(peer_index, connection.metrics().rtt / 2);
+                .report_ping(peer_index, Some(connection.metrics().rtt / 2));
 
             // Start worker to drive the connection.
             let (request_tx, request_rx) = mpsc::channel(1024);

@@ -71,8 +71,9 @@ pub trait ReputationReporterInterface: Clone + Send + Sync {
     /// Report a unsatisfactory (happy) interaction with the given peer. Used for down time.
     fn report_unsat(&self, peer: NodeIndex, weight: Weight);
 
-    /// Report a latency which we witnessed from another peer.
-    fn report_latency(&self, peer: NodeIndex, latency: Duration);
+    /// Report a ping interaction with another peer and the latency if the peer responded.
+    /// `None` indicates that the peer did not respond.
+    fn report_ping(&self, peer: NodeIndex, latency: Option<Duration>);
 
     /// Report the number of (healthy) bytes which we received from another peer.
     fn report_bytes_received(&self, peer: NodeIndex, bytes: u64, duration: Option<Duration>);

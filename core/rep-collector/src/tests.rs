@@ -183,10 +183,10 @@ async fn test_query() {
     rep_reporter.report_sat(bob, Weight::Weak);
     rep_reporter.report_unsat(bob, Weight::Strong);
 
-    rep_reporter.report_latency(alice, Duration::from_millis(100));
-    rep_reporter.report_latency(alice, Duration::from_millis(120));
-    rep_reporter.report_latency(bob, Duration::from_millis(300));
-    rep_reporter.report_latency(bob, Duration::from_millis(350));
+    rep_reporter.report_ping(alice, Some(Duration::from_millis(100)));
+    rep_reporter.report_ping(alice, Some(Duration::from_millis(120)));
+    rep_reporter.report_ping(bob, Some(Duration::from_millis(300)));
+    rep_reporter.report_ping(bob, Some(Duration::from_millis(350)));
 
     rep_reporter.report_bytes_sent(bob, 1000, None);
 
@@ -332,8 +332,8 @@ async fn test_submit_measurements() {
     let peer_index = query_runner.pubkey_to_index(peer_public_key).unwrap();
     rep_reporter.report_sat(peer_index, Weight::Weak);
     rep_reporter.report_sat(peer_index, Weight::Strong);
-    rep_reporter.report_latency(peer_index, Duration::from_millis(300));
-    rep_reporter.report_latency(peer_index, Duration::from_millis(100));
+    rep_reporter.report_ping(peer_index, Some(Duration::from_millis(300)));
+    rep_reporter.report_ping(peer_index, Some(Duration::from_millis(100)));
     rep_reporter.report_bytes_sent(peer_index, 10_000, Some(Duration::from_millis(100)));
     rep_reporter.report_bytes_received(peer_index, 20_000, Some(Duration::from_millis(100)));
     rep_reporter.report_hops(peer_index, 4);
@@ -542,22 +542,22 @@ async fn test_reputation_calculation_and_query() {
     let alice = query_runner.pubkey_to_index(node_public_key1).unwrap();
     let bob = query_runner.pubkey_to_index(node_public_key2).unwrap();
     rep_reporter1.report_sat(alice, Weight::Strong);
-    rep_reporter1.report_latency(alice, Duration::from_millis(100));
+    rep_reporter1.report_ping(alice, Some(Duration::from_millis(100)));
     rep_reporter1.report_bytes_sent(alice, 10_000, Some(Duration::from_millis(100)));
     rep_reporter1.report_bytes_received(alice, 20_000, Some(Duration::from_millis(100)));
 
     rep_reporter1.report_sat(bob, Weight::Weak);
-    rep_reporter1.report_latency(bob, Duration::from_millis(300));
+    rep_reporter1.report_ping(bob, Some(Duration::from_millis(300)));
     rep_reporter1.report_bytes_sent(bob, 12_000, Some(Duration::from_millis(300)));
     rep_reporter1.report_bytes_received(bob, 23_000, Some(Duration::from_millis(400)));
 
     rep_reporter2.report_sat(alice, Weight::Strong);
-    rep_reporter2.report_latency(alice, Duration::from_millis(120));
+    rep_reporter2.report_ping(alice, Some(Duration::from_millis(120)));
     rep_reporter2.report_bytes_sent(alice, 11_000, Some(Duration::from_millis(90)));
     rep_reporter2.report_bytes_received(alice, 22_000, Some(Duration::from_millis(110)));
 
     rep_reporter2.report_sat(bob, Weight::Weak);
-    rep_reporter2.report_latency(bob, Duration::from_millis(250));
+    rep_reporter2.report_ping(bob, Some(Duration::from_millis(250)));
     rep_reporter2.report_bytes_sent(bob, 9_000, Some(Duration::from_millis(280)));
     rep_reporter2.report_bytes_received(bob, 19_000, Some(Duration::from_millis(350)));
 

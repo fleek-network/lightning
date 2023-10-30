@@ -319,10 +319,14 @@ impl ReputationReporterInterface for MyReputationReporter {
         self.send_message(message);
     }
 
-    /// Report a latency which we witnessed from another peer.
-    fn report_latency(&self, peer: NodeIndex, latency: Duration) {
-        let message = ReportMessage::Latency { peer, latency };
-        self.send_message(message);
+    /// Report a ping interaction with another peer and the latency if the peer responded.
+    /// `None` indicates that the peer did not respond.
+    fn report_ping(&self, peer: NodeIndex, latency: Option<Duration>) {
+        if let Some(latency) = latency {
+            let message = ReportMessage::Latency { peer, latency };
+            self.send_message(message);
+        }
+        // TODO(matthias): report unsuccessul ping
     }
 
     /// Report the number of (healthy) bytes which we received from another peer.
