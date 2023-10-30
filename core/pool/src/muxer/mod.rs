@@ -8,17 +8,17 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
-use futures::future::Either;
-use futures::{Sink, SinkExt, Stream, StreamExt};
+use futures::{Sink, Stream};
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tokio_util::sync::PollSender;
 
 use crate::endpoint::NodeAddress;
+use crate::muxer::sealed::Sealed;
+
+pub type NetChannel =
+    Box<dyn ChannelInterface<Error = io::Error, Item = io::Result<Bytes>> + Send + Sync + Unpin>;
 
 // Todo: It might be more convenient to move this interface
 // in `/interfaces` so we can pass it to `PoolInterface::init`.
@@ -40,8 +40,8 @@ pub trait MuxerInterface: Clone + Send + Sync + 'static {
 /// Connection over a multiplexed transport.
 #[async_trait]
 pub trait ConnectionInterface: Clone + Send + 'static {
-    type SendStream: AsyncWrite + Send + Unpin;
-    type RecvStream: AsyncRead + Send + Unpin;
+    type SendStream: AsyncWrite + Send + Sync + Unpin;
+    type RecvStream: AsyncRead + Send + Sync + Unpin;
 
     async fn open_stream(&mut self) -> io::Result<(Self::SendStream, Self::RecvStream)>;
     async fn open_uni_stream(&mut self) -> io::Result<Self::SendStream>;
@@ -54,83 +54,50 @@ pub trait ConnectionInterface: Clone + Send + 'static {
     fn close(&self, error_code: u8, reason: &[u8]);
 }
 
-/// A bi-directional channel for sending messages.
-///
-/// Implements `Stream` and `Sink`.
-// This helps us avoid adding generics for abstracting the
-// (AsyncWrite, AsyncWrite) pair that is allocated in a driver
-// and returned to a user.
-pub struct Channel {
-    tx: PollSender<Result<Bytes, io::Error>>,
-    rx: ReceiverStream<BytesMut>,
+/// A bi-directional channel intended for sending/receiving
+/// messages over the network using AsyncRead/AsyncWrites handles.
+// Todo: Implement custom serializer to be able to work with slices and avoid copying.
+// FrameWrite/Read use an internal buffer. Ideally we would like to avoid buffering
+// as much as possible, specially during writes, as data will already be buffered at
+// the transport layer (muxer).
+pub struct Channel<R, W> {
+    tx: FramedWrite<W, LengthDelimitedCodec>,
+    rx: FramedRead<R, LengthDelimitedCodec>,
 }
 
-impl Channel {
-    pub fn new<C: ConnectionInterface>(send: C::SendStream, recv: C::RecvStream) -> Self {
-        let mut framed_write = FramedWrite::new(send, LengthDelimitedCodec::new());
-        let mut framed_read = FramedRead::new(recv, LengthDelimitedCodec::new());
-
-        let (bi_stream_tx, bi_stream_rx) = mpsc::channel(2048);
-        let (worker_tx, worker_rx) = mpsc::channel(2048);
-
-        tokio::spawn(async move {
-            // We can ignore this error because it's the value that was supposed to have been sent.
-            let mut sink =
-                PollSender::new(bi_stream_tx).sink_map_err(|_| io::ErrorKind::BrokenPipe.into());
-            let stream = ReceiverStream::new(worker_rx);
-
-            match futures::future::select(
-                // We receive data from the network on this `Stream`/`FrameRead`.
-                // The sink then sends all the data using a Sender,
-                // we receive the data on a `ReceiverStream`.
-                sink.send_all(&mut framed_read),
-                // Using our PollSender, we send data to this `Stream`,
-                // this stream sends the data on this `Sink`/`FrameWriter`
-                // which sends it on the network.
-                stream.forward(&mut framed_write),
-            )
-            .await
-            {
-                Either::Left((value1, fut)) => {
-                    if let Err(e) = value1 {
-                        tracing::error!("broken sending channel: {e:?}");
-                    }
-
-                    if let Err(e) = fut.await {
-                        tracing::error!("broken receiving channel: {e:?}");
-                    }
-                },
-                Either::Right((value2, fut)) => {
-                    if let Err(e) = value2 {
-                        tracing::error!("broken receiving channel: {e:?}");
-                    }
-
-                    if let Err(e) = fut.await {
-                        tracing::error!("broken sending channel: {e:?}");
-                    }
-                },
-            }
-        });
-
+impl<R, W> Channel<R, W>
+where
+    R: AsyncRead + Send + Unpin,
+    W: AsyncWrite + Send + Unpin,
+{
+    pub fn new(reader: R, writer: W) -> Self {
         Self {
-            tx: PollSender::new(worker_tx),
-            rx: ReceiverStream::new(bi_stream_rx),
+            tx: FramedWrite::new(writer, LengthDelimitedCodec::new()),
+            rx: FramedRead::new(reader, LengthDelimitedCodec::new()),
         }
     }
 }
 
-impl Stream for Channel {
+impl<R, W> Stream for Channel<R, W>
+where
+    R: AsyncRead + Send + Unpin,
+    W: AsyncWrite + Send + Unpin,
+{
     type Item = io::Result<Bytes>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // Sends this is a wrapper for a Stream, the error is consumed.
         Pin::new(&mut self.rx)
             .poll_next(cx)
-            .map(|bytes| bytes.map(|b| Result::<_, io::Error>::Ok(Bytes::from(b))))
+            .map(|bytes| bytes.map(|b| b.map(Bytes::from).map_err(Into::into)))
     }
 }
 
-impl Sink<Bytes> for Channel {
+impl<R, W> Sink<Bytes> for Channel<R, W>
+where
+    R: AsyncRead + Send + Unpin,
+    W: AsyncWrite + Send + Unpin,
+{
     type Error = io::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -141,7 +108,7 @@ impl Sink<Bytes> for Channel {
 
     fn start_send(mut self: Pin<&mut Self>, item: Bytes) -> Result<(), Self::Error> {
         Pin::new(&mut self.tx)
-            .start_send(Ok(item))
+            .start_send(item)
             .map_err(|_| io::ErrorKind::BrokenPipe.into())
     }
 
@@ -165,4 +132,32 @@ pub struct Metrics {
     pub congestion_events: u64,
     pub cwnd: u64,
     pub black_holes_detected: u64,
+}
+
+// This trait is to deal with the only-one-non-auto-trait-allowed restriction.
+pub trait ChannelInterface:
+    Stream<Item = io::Result<Bytes>> + Sink<Bytes, Error = io::Error> + Sealed
+{
+}
+
+impl<R, W> ChannelInterface for Channel<R, W>
+where
+    R: AsyncRead + Send + Sync + Unpin,
+    W: AsyncWrite + Send + Sync + Unpin,
+{
+}
+
+mod sealed {
+    use tokio::io::{AsyncRead, AsyncWrite};
+
+    use crate::muxer::Channel;
+
+    pub trait Sealed {}
+
+    impl<R, W> Sealed for Channel<R, W>
+    where
+        R: AsyncRead + Send + Sync + Unpin,
+        W: AsyncWrite + Send + Sync + Unpin,
+    {
+    }
 }

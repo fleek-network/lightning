@@ -12,7 +12,7 @@ use tokio::sync::oneshot;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 use crate::endpoint::ConnectionEvent;
-use crate::muxer::{Channel, ConnectionInterface, Metrics};
+use crate::muxer::{Channel, ConnectionInterface, Metrics, NetChannel};
 use crate::overlay::Message;
 
 /// Context for driving the connection.
@@ -202,7 +202,7 @@ async fn handle_incoming_streams<C: ConnectionInterface>(
         .send(ConnectionEvent::Stream {
             peer,
             service_scope,
-            stream: Channel::new::<C>(stream_tx, stream_rx),
+            stream: Box::new(Channel::new(stream_rx, stream_tx)),
         })
         .await
         .map_err(|_| anyhow::anyhow!("failed to send incoming network event"))
@@ -220,7 +220,7 @@ async fn create_uni_stream<C: ConnectionInterface>(
 async fn create_stream<C: ConnectionInterface>(
     mut connection: C,
     service: ServiceScope,
-    respond: oneshot::Sender<io::Result<Channel>>,
+    respond: oneshot::Sender<io::Result<NetChannel>>,
 ) -> Result<()> {
     let (mut stream_tx, stream_rx) = connection.open_stream().await?;
     // We send the service scope first so
@@ -228,7 +228,7 @@ async fn create_stream<C: ConnectionInterface>(
     // that this stream belongs to.
     stream_tx.write_all(&[service as u8]).await?;
     respond
-        .send(Ok(Channel::new::<C>(stream_tx, stream_rx)))
+        .send(Ok(Box::new(Channel::new(stream_rx, stream_tx))))
         .map_err(|_| anyhow::anyhow!("failed to send new stream to client"))
 }
 
@@ -237,6 +237,6 @@ pub enum DriverRequest {
     Message(Message),
     NewChannel {
         service: ServiceScope,
-        respond: oneshot::Sender<io::Result<Channel>>,
+        respond: oneshot::Sender<io::Result<NetChannel>>,
     },
 }

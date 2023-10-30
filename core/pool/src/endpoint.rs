@@ -24,7 +24,7 @@ use tokio::task::JoinSet;
 
 use crate::connection::connector::{ConnectionResult, Connector};
 use crate::connection::driver::{self, Context, DriverRequest};
-use crate::muxer::{Channel, ConnectionInterface, MuxerInterface};
+use crate::muxer::{ConnectionInterface, MuxerInterface, NetChannel};
 use crate::overlay::{
     BroadcastRequest,
     BroadcastTask,
@@ -155,7 +155,7 @@ where
     pub fn register_stream_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, Channel)>) {
+    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, NetChannel)>) {
         self.network_overlay.register_stream_service(service_scope)
     }
 
@@ -599,7 +599,7 @@ pub enum ConnectionEvent {
     Stream {
         peer: NodeIndex,
         service_scope: ServiceScope,
-        stream: Channel,
+        stream: NetChannel,
     },
 }
 

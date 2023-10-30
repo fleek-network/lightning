@@ -16,7 +16,7 @@ use tokio::sync::{mpsc, oneshot};
 use x509_parser::nom::AsBytes;
 
 use crate::endpoint::NodeAddress;
-use crate::muxer::{Channel, ConnectionInterface, MuxerInterface};
+use crate::muxer::{ConnectionInterface, MuxerInterface, NetChannel};
 
 pub type BoxedFilterCallback = Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>;
 
@@ -34,7 +34,7 @@ where
     /// Sender to return to users as they register with the broadcast service.
     broadcast_request_tx: Sender<BroadcastRequest<F>>,
     /// Service handles.
-    stream_handles: HashMap<ServiceScope, Sender<(NodeIndex, Channel)>>,
+    stream_handles: HashMap<ServiceScope, Sender<(NodeIndex, NetChannel)>>,
     /// Receive requests for a multiplexed stream.
     stream_request_rx: Receiver<ChannelRequest>,
     /// Send handle to return to users as they register with the stream service.
@@ -84,7 +84,7 @@ where
     pub fn register_stream_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, Channel)>) {
+    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, NetChannel)>) {
         let (tx, rx) = mpsc::channel(1024);
         self.stream_handles.insert(service_scope, tx);
         (self.stream_request_tx.clone(), rx)
@@ -113,7 +113,7 @@ where
         &mut self,
         peer: NodeIndex,
         service_scope: ServiceScope,
-        stream: Channel,
+        stream: NetChannel,
     ) {
         match self.stream_handles.get(&service_scope).cloned() {
             None => {
@@ -346,13 +346,13 @@ pub enum BroadcastTask {
 pub struct ChannelTask {
     pub peer: NodeAddress,
     pub service_scope: ServiceScope,
-    pub respond: oneshot::Sender<io::Result<Channel>>,
+    pub respond: oneshot::Sender<io::Result<NetChannel>>,
 }
 
 pub struct ChannelRequest {
     pub service_scope: ServiceScope,
     pub peer: NodeIndex,
-    pub respond: oneshot::Sender<io::Result<Channel>>,
+    pub respond: oneshot::Sender<io::Result<NetChannel>>,
 }
 
 #[derive(Clone, Debug)]

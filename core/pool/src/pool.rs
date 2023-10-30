@@ -31,7 +31,7 @@ use tracing::error;
 use crate::config::Config;
 use crate::endpoint::Endpoint;
 use crate::muxer::quinn::QuinnMuxer;
-use crate::muxer::{Channel, MuxerInterface};
+use crate::muxer::{MuxerInterface, NetChannel};
 use crate::overlay::{BroadcastRequest, ChannelRequest, Param};
 use crate::{muxer, tls};
 
@@ -79,7 +79,7 @@ where
     fn register_stream_service(
         &self,
         service: ServiceScope,
-    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, Channel)>) {
+    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, NetChannel)>) {
         let mut guard = self.state.lock().unwrap();
         match guard.as_mut().expect("Pool to have a state") {
             State::Running { .. } => {
@@ -328,7 +328,7 @@ impl lightning_interfaces::pool::Requester for Requester {
 
 pub struct Response {
     status: Status,
-    channel: Channel,
+    channel: NetChannel,
 }
 
 #[async_trait]
@@ -349,7 +349,7 @@ impl lightning_interfaces::pool::Response for Response {
 }
 
 pub struct Body {
-    channel: Channel,
+    channel: NetChannel,
 }
 
 impl Stream for Body {
@@ -361,13 +361,12 @@ impl Stream for Body {
     ) -> Poll<Option<Self::Item>> {
         Pin::new(&mut self.channel)
             .poll_next(cx)
-            .map(|item| item.map(|result| result.map(|bytes| Bytes::from(bytes.to_vec()))))
             .map_err(Into::into)
     }
 }
 
 pub struct Responder {
-    inner: Receiver<(NodeIndex, Channel)>,
+    inner: Receiver<(NodeIndex, NetChannel)>,
 }
 
 #[async_trait]
@@ -402,7 +401,7 @@ impl lightning_interfaces::pool::Responder for Responder {
 }
 
 pub struct Request {
-    channel: Channel,
+    channel: NetChannel,
     ok_header_sent: bool,
 }
 
