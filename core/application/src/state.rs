@@ -235,6 +235,8 @@ impl<B: Backend> State<B> {
             UpdateMethod::ChangeProtocolParam { param, value } => {
                 self.change_protocol_param(txn.payload.sender, param, value)
             },
+            UpdateMethod::OptIn {} => self.opt_in(txn.payload.sender),
+            UpdateMethod::OptOut {} => self.opt_out(txn.payload.sender),
         };
 
         #[cfg(debug_assertions)]
@@ -587,6 +589,7 @@ impl<B: Backend> State<B> {
                         domain,
                         worker_domain,
                         ports,
+                        participating: true,
                         nonce: 0,
                     };
                     self.create_node(node);
@@ -958,6 +961,36 @@ impl<B: Backend> State<B> {
         }
         self.parameters.set(param, value);
         TransactionResponse::Success(ExecutionData::None)
+    }
+
+    fn opt_in(&self, sender: TransactionSender) -> TransactionResponse {
+        let index = match self.only_node(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+        match self.node_info.get(&index) {
+            Some(mut node_info) => {
+                node_info.participating = true;
+                self.node_info.set(index, node_info);
+                TransactionResponse::Success(ExecutionData::None)
+            },
+            None => TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
+        }
+    }
+
+    fn opt_out(&self, sender: TransactionSender) -> TransactionResponse {
+        let index = match self.only_node(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+        match self.node_info.get(&index) {
+            Some(mut node_info) => {
+                node_info.participating = false;
+                self.node_info.set(index, node_info);
+                TransactionResponse::Success(ExecutionData::None)
+            },
+            None => TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
+        }
     }
 
     fn get_node_registry(&self) -> BTreeMap<NodeIndex, NodeInfo> {

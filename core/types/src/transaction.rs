@@ -283,9 +283,7 @@ pub enum UpdateMethod {
         recipient: Option<EthAddress>,
     },
     /// Sent by committee member to signal he is ready to change epoch
-    ChangeEpoch {
-        epoch: Epoch,
-    },
+    ChangeEpoch { epoch: Epoch },
     /// Adding a new service to the protocol
     AddService {
         service: Service,
@@ -305,13 +303,16 @@ pub enum UpdateMethod {
         /// Zk proof to be provided to the slash circuit
         proof_of_misbehavior: ProofOfMisbehavior,
     },
+    /// Report reputation measurements
     SubmitReputationMeasurements {
         measurements: BTreeMap<NodeIndex, ReputationMeasurements>,
     },
-    ChangeProtocolParam {
-        param: ProtocolParams,
-        value: u128,
-    },
+    /// Change protocol parameters
+    ChangeProtocolParam { param: ProtocolParams, value: u128 },
+    /// Opt out of participating in the network.
+    OptOut {},
+    /// Opt into participating in the network.
+    OptIn {},
 }
 
 impl ToDigest for UpdatePayload {
@@ -511,6 +512,12 @@ impl ToDigest for UpdatePayload {
                     .with_prefix("input".to_owned())
                     .with("param", &(param.clone() as u8))
                     .with("value", value);
+            },
+            UpdateMethod::OptIn {} => {
+                transcript_builder = transcript_builder.with("transaction_name", &"opt_in");
+            },
+            UpdateMethod::OptOut {} => {
+                transcript_builder = transcript_builder.with("transaction_name", &"opt_out");
             },
         }
 

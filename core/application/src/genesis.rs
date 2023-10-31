@@ -109,6 +109,7 @@ impl From<&GenesisNode> for NodeInfo {
             worker_public_key: value.worker_public_key,
             staked_since: 0,
             stake: value.stake.clone(),
+            participating: true,
             nonce: 0,
             ports: value.ports.clone(),
         }
