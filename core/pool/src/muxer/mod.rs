@@ -17,8 +17,17 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use crate::endpoint::NodeAddress;
 use crate::muxer::sealed::Sealed;
 
-pub type NetChannel =
-    Box<dyn ChannelInterface<Error = io::Error, Item = io::Result<Bytes>> + Send + Sync + Unpin>;
+pub type BoxedChannel =
+    Box<dyn StreamAndSink<Error = io::Error, Item = io::Result<Bytes>> + Send + Sync + Unpin>;
+
+pub struct Stats {
+    pub rtt: Duration,
+    pub lost_packets: u64,
+    pub sent_packets: u64,
+    pub congestion_events: u64,
+    pub cwnd: u64,
+    pub black_holes_detected: u64,
+}
 
 // Todo: It might be more convenient to move this interface
 // in `/interfaces` so we can pass it to `PoolInterface::init`.
@@ -43,14 +52,14 @@ pub trait ConnectionInterface: Clone + Send + 'static {
     type SendStream: AsyncWrite + Send + Sync + Unpin;
     type RecvStream: AsyncRead + Send + Sync + Unpin;
 
-    async fn open_stream(&mut self) -> io::Result<(Self::SendStream, Self::RecvStream)>;
+    async fn open_bi_stream(&mut self) -> io::Result<(Self::SendStream, Self::RecvStream)>;
     async fn open_uni_stream(&mut self) -> io::Result<Self::SendStream>;
-    async fn accept_stream(&mut self) -> io::Result<(Self::SendStream, Self::RecvStream)>;
+    async fn accept_bi_stream(&mut self) -> io::Result<(Self::SendStream, Self::RecvStream)>;
     async fn accept_uni_stream(&mut self) -> io::Result<Self::RecvStream>;
     fn peer_identity(&self) -> Option<NodePublicKey>;
     fn remote_address(&self) -> SocketAddr;
     fn connection_id(&self) -> usize;
-    fn metrics(&self) -> Metrics;
+    fn stats(&self) -> Stats;
     fn close(&self, error_code: u8, reason: &[u8]);
 }
 
@@ -60,12 +69,12 @@ pub trait ConnectionInterface: Clone + Send + 'static {
 // FrameWrite/Read use an internal buffer. Ideally we would like to avoid buffering
 // as much as possible, specially during writes, as data will already be buffered at
 // the transport layer (muxer).
-pub struct Channel<R, W> {
+pub struct NetChannel<R, W> {
     tx: FramedWrite<W, LengthDelimitedCodec>,
     rx: FramedRead<R, LengthDelimitedCodec>,
 }
 
-impl<R, W> Channel<R, W>
+impl<R, W> NetChannel<R, W>
 where
     R: AsyncRead + Send + Unpin,
     W: AsyncWrite + Send + Unpin,
@@ -78,7 +87,7 @@ where
     }
 }
 
-impl<R, W> Stream for Channel<R, W>
+impl<R, W> Stream for NetChannel<R, W>
 where
     R: AsyncRead + Send + Unpin,
     W: AsyncWrite + Send + Unpin,
@@ -93,7 +102,7 @@ where
     }
 }
 
-impl<R, W> Sink<Bytes> for Channel<R, W>
+impl<R, W> Sink<Bytes> for NetChannel<R, W>
 where
     R: AsyncRead + Send + Unpin,
     W: AsyncWrite + Send + Unpin,
@@ -125,22 +134,13 @@ where
     }
 }
 
-pub struct Metrics {
-    pub rtt: Duration,
-    pub lost_packets: u64,
-    pub sent_packets: u64,
-    pub congestion_events: u64,
-    pub cwnd: u64,
-    pub black_holes_detected: u64,
-}
-
 // This trait is to deal with the only-one-non-auto-trait-allowed restriction.
-pub trait ChannelInterface:
+pub trait StreamAndSink:
     Stream<Item = io::Result<Bytes>> + Sink<Bytes, Error = io::Error> + Sealed
 {
 }
 
-impl<R, W> ChannelInterface for Channel<R, W>
+impl<R, W> StreamAndSink for NetChannel<R, W>
 where
     R: AsyncRead + Send + Sync + Unpin,
     W: AsyncWrite + Send + Sync + Unpin,
@@ -150,11 +150,11 @@ where
 mod sealed {
     use tokio::io::{AsyncRead, AsyncWrite};
 
-    use crate::muxer::Channel;
+    use crate::muxer::NetChannel;
 
     pub trait Sealed {}
 
-    impl<R, W> Sealed for Channel<R, W>
+    impl<R, W> Sealed for NetChannel<R, W>
     where
         R: AsyncRead + Send + Sync + Unpin,
         W: AsyncWrite + Send + Sync + Unpin,

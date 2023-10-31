@@ -12,7 +12,7 @@ use tokio::sync::oneshot;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 use crate::endpoint::ConnectionEvent;
-use crate::muxer::{Channel, ConnectionInterface, Metrics, NetChannel};
+use crate::muxer::{BoxedChannel, ConnectionInterface, NetChannel, Stats};
 use crate::overlay::Message;
 
 /// Context for driving the connection.
@@ -47,11 +47,11 @@ pub async fn start_driver<C: ConnectionInterface>(mut ctx: Context<C>) -> Result
     let mut connection = ctx.connection.clone();
     loop {
         tokio::select! {
-            accept_result = ctx.connection.accept_stream() => {
+            accept_result = ctx.connection.accept_bi_stream() => {
                 let (stream_tx, stream_rx) = match accept_result {
                     Ok(streams) => streams,
                     Err(e) => {
-                        report_metrics(ctx.connection.metrics());
+                        report_metrics(ctx.connection.stats());
                         return Err(e.into());
                     }
                 };
@@ -75,7 +75,7 @@ pub async fn start_driver<C: ConnectionInterface>(mut ctx: Context<C>) -> Result
                 let stream_rx = match accept_result {
                     Ok(stream) => stream,
                     Err(e) => {
-                        report_metrics(ctx.connection.metrics());
+                        report_metrics(ctx.connection.stats());
                         return Err(e.into());
                     }
                 };
@@ -97,7 +97,7 @@ pub async fn start_driver<C: ConnectionInterface>(mut ctx: Context<C>) -> Result
             }
             driver_request = ctx.service_request_rx.recv() => {
                 match driver_request {
-                    Some(DriverRequest::Message(message)) => {
+                    Some(DriverRequest::SendMessage(message)) => {
                         tracing::trace!("handling a broadcast message request");
                         // We need to create a new stream on the connection.
                         let connection = ctx.connection.clone();
@@ -111,12 +111,12 @@ pub async fn start_driver<C: ConnectionInterface>(mut ctx: Context<C>) -> Result
                         });
                     },
                     Some(DriverRequest::NewChannel { service, respond }) => {
-                        tracing::trace!("received a stream request");
-                        // We need to create a new stream on the connection.
+                        tracing::trace!("received a channel request");
+                        // We need to create a new stream on the connection for the channel.
                         let connection = ctx.connection.clone();
                         let peer = ctx.peer;
                         tokio::spawn(async move {
-                            if let Err(e) = create_stream(connection, service, respond).await {
+                            if let Err(e) = create_bi_stream(connection, service, respond).await {
                                 // This may happen if `Requester::request` drops the future
                                 // because of a timeout for example. In this case, it's not
                                 // an issue with the connection.
@@ -139,12 +139,12 @@ pub async fn start_driver<C: ConnectionInterface>(mut ctx: Context<C>) -> Result
         }
     }
 
-    report_metrics(ctx.connection.metrics());
+    report_metrics(ctx.connection.stats());
 
     Ok(())
 }
 
-fn report_metrics(metrics: Metrics) {
+fn report_metrics(metrics: Stats) {
     histogram!(
         "lost_packets",
         Some("Lost packets"),
@@ -199,10 +199,10 @@ async fn handle_incoming_streams<C: ConnectionInterface>(
     stream_rx.read_exact(&mut buf).await?;
     let service_scope = ServiceScope::try_from(buf[0])?;
     connection_event_tx
-        .send(ConnectionEvent::Stream {
+        .send(ConnectionEvent::Channel {
             peer,
             service_scope,
-            stream: Box::new(Channel::new(stream_rx, stream_tx)),
+            channel: Box::new(NetChannel::new(stream_rx, stream_tx)),
         })
         .await
         .map_err(|_| anyhow::anyhow!("failed to send incoming network event"))
@@ -217,26 +217,26 @@ async fn create_uni_stream<C: ConnectionInterface>(
     writer.send(Bytes::from(message)).await.map_err(Into::into)
 }
 
-async fn create_stream<C: ConnectionInterface>(
+async fn create_bi_stream<C: ConnectionInterface>(
     mut connection: C,
     service: ServiceScope,
-    respond: oneshot::Sender<io::Result<NetChannel>>,
+    respond: oneshot::Sender<io::Result<BoxedChannel>>,
 ) -> Result<()> {
-    let (mut stream_tx, stream_rx) = connection.open_stream().await?;
+    let (mut stream_tx, stream_rx) = connection.open_bi_stream().await?;
     // We send the service scope first so
     // that the receiver knows the service
     // that this stream belongs to.
     stream_tx.write_all(&[service as u8]).await?;
     respond
-        .send(Ok(Box::new(Channel::new(stream_rx, stream_tx))))
+        .send(Ok(Box::new(NetChannel::new(stream_rx, stream_tx))))
         .map_err(|_| anyhow::anyhow!("failed to send new stream to client"))
 }
 
 /// Requests for a driver worker.
 pub enum DriverRequest {
-    Message(Message),
+    SendMessage(Message),
     NewChannel {
         service: ServiceScope,
-        respond: oneshot::Sender<io::Result<NetChannel>>,
+        respond: oneshot::Sender<io::Result<BoxedChannel>>,
     },
 }

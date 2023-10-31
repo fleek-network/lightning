@@ -31,7 +31,7 @@ use tracing::error;
 use crate::config::Config;
 use crate::endpoint::Endpoint;
 use crate::muxer::quinn::QuinnMuxer;
-use crate::muxer::{MuxerInterface, NetChannel};
+use crate::muxer::{BoxedChannel, MuxerInterface};
 use crate::overlay::{BroadcastRequest, ChannelRequest, Param};
 use crate::{muxer, tls};
 
@@ -76,10 +76,10 @@ where
         }
     }
 
-    fn register_stream_service(
+    fn register_channel_service(
         &self,
         service: ServiceScope,
-    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, NetChannel)>) {
+    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, BoxedChannel)>) {
         let mut guard = self.state.lock().unwrap();
         match guard.as_mut().expect("Pool to have a state") {
             State::Running { .. } => {
@@ -89,7 +89,7 @@ where
                 let endpoint = endpoint
                     .as_mut()
                     .expect("Endpoint to exist before registering");
-                endpoint.register_stream_service(service)
+                endpoint.register_channel_service(service)
             },
         }
     }
@@ -216,7 +216,7 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
     }
 
     fn open_req_res(&self, service: ServiceScope) -> (Self::Requester, Self::Responder) {
-        let (tx, rx) = self.register_stream_service(service);
+        let (tx, rx) = self.register_channel_service(service);
         (
             Requester {
                 request_tx: tx,
@@ -328,7 +328,7 @@ impl lightning_interfaces::pool::Requester for Requester {
 
 pub struct Response {
     status: Status,
-    channel: NetChannel,
+    channel: BoxedChannel,
 }
 
 #[async_trait]
@@ -349,7 +349,7 @@ impl lightning_interfaces::pool::Response for Response {
 }
 
 pub struct Body {
-    channel: NetChannel,
+    channel: BoxedChannel,
 }
 
 impl Stream for Body {
@@ -366,7 +366,7 @@ impl Stream for Body {
 }
 
 pub struct Responder {
-    inner: Receiver<(NodeIndex, NetChannel)>,
+    inner: Receiver<(NodeIndex, BoxedChannel)>,
 }
 
 #[async_trait]
@@ -401,7 +401,7 @@ impl lightning_interfaces::pool::Responder for Responder {
 }
 
 pub struct Request {
-    channel: NetChannel,
+    channel: BoxedChannel,
     ok_header_sent: bool,
 }
 

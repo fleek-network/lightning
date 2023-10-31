@@ -12,7 +12,7 @@ use quinn::{ClientConfig, Endpoint, RecvStream, SendStream, ServerConfig, Transp
 use rustls::Certificate;
 
 use crate::endpoint::NodeAddress;
-use crate::muxer::{ConnectionInterface, Metrics, MuxerInterface};
+use crate::muxer::{ConnectionInterface, MuxerInterface, Stats};
 use crate::tls;
 
 #[derive(Clone)]
@@ -98,7 +98,7 @@ impl ConnectionInterface for Connection {
     type SendStream = SendStream;
     type RecvStream = RecvStream;
 
-    async fn open_stream(&mut self) -> io::Result<(Self::SendStream, Self::RecvStream)> {
+    async fn open_bi_stream(&mut self) -> io::Result<(Self::SendStream, Self::RecvStream)> {
         self.0
             .open_bi()
             .await
@@ -112,7 +112,7 @@ impl ConnectionInterface for Connection {
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
 
-    async fn accept_stream(&mut self) -> io::Result<(Self::SendStream, Self::RecvStream)> {
+    async fn accept_bi_stream(&mut self) -> io::Result<(Self::SendStream, Self::RecvStream)> {
         self.0
             .accept_bi()
             .await
@@ -160,10 +160,10 @@ impl ConnectionInterface for Connection {
         self.0.stable_id()
     }
 
-    fn metrics(&self) -> Metrics {
+    fn stats(&self) -> Stats {
         let stats = self.0.stats();
 
-        Metrics {
+        Stats {
             rtt: self.0.rtt(),
             lost_packets: stats.path.lost_packets,
             sent_packets: stats.path.sent_packets,

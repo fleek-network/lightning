@@ -24,7 +24,7 @@ use tokio::task::JoinSet;
 
 use crate::connection::connector::{ConnectionResult, Connector};
 use crate::connection::driver::{self, Context, DriverRequest};
-use crate::muxer::{ConnectionInterface, MuxerInterface, NetChannel};
+use crate::muxer::{BoxedChannel, ConnectionInterface, MuxerInterface};
 use crate::overlay::{
     BroadcastRequest,
     BroadcastTask,
@@ -152,14 +152,14 @@ where
             .register_broadcast_service(service_scope)
     }
 
-    pub fn register_stream_service(
+    pub fn register_channel_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, NetChannel)>) {
-        self.network_overlay.register_stream_service(service_scope)
+    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, BoxedChannel)>) {
+        self.network_overlay.register_channel_service(service_scope)
     }
 
-    pub fn handle_stream_request(&mut self, task: ChannelTask) -> Result<()> {
+    pub fn handle_channel_request(&mut self, task: ChannelTask) -> Result<()> {
         let ChannelTask {
             peer,
             respond,
@@ -190,7 +190,7 @@ where
                         respond,
                     };
                     if driver_tx.send(request).await.is_err() {
-                        tracing::error!("failed to send driver stream request");
+                        tracing::error!("failed to send driver channel request");
                     }
                 });
             },
@@ -252,7 +252,7 @@ where
                     // Enqueue message for later after we connect.
                     self.enqueue_pending_request(
                         peer_index,
-                        DriverRequest::Message(message.clone()),
+                        DriverRequest::SendMessage(message.clone()),
                     )
                 }
 
@@ -265,7 +265,7 @@ where
                     };
 
                     let driver_tx = handle.tx.clone();
-                    let request = DriverRequest::Message(message.clone());
+                    let request = DriverRequest::SendMessage(message.clone());
                     tokio::spawn(async move {
                         if driver_tx.send(request).await.is_err() {
                             tracing::error!(
@@ -340,7 +340,7 @@ where
 
             // Report the latency of this peer.
             self.rep_reporter
-                .report_ping(peer_index, Some(connection.metrics().rtt / 2));
+                .report_ping(peer_index, Some(connection.stats().rtt / 2));
 
             // Start worker to drive the connection.
             let (request_tx, request_rx) = mpsc::channel(1024);
@@ -504,8 +504,12 @@ where
                         ConnectionEvent::Broadcast { peer, message } => {
                             self.network_overlay.handle_broadcast_message(peer, message);
                         },
-                        ConnectionEvent::Stream { peer, service_scope, stream } => {
-                            self.network_overlay.handle_incoming_stream(peer, service_scope, stream)
+                        ConnectionEvent::Channel { peer, service_scope, channel } => {
+                            self.network_overlay.handle_incoming_channel(
+                                peer,
+                                service_scope,
+                                channel
+                            );
                         }
                     }
                 }
@@ -536,8 +540,8 @@ where
                             }
                         }
                         PoolTask::Channel(task) => {
-                            if let Err(e) = self.handle_stream_request(task) {
-                                tracing::error!("failed to handle stream request: {e:?}");
+                            if let Err(e) = self.handle_channel_request(task) {
+                                tracing::error!("failed to handle channel request: {e:?}");
                             }
                         }
                     }
@@ -596,10 +600,10 @@ pub enum ConnectionEvent {
         peer: NodeIndex,
         message: Message,
     },
-    Stream {
+    Channel {
         peer: NodeIndex,
         service_scope: ServiceScope,
-        stream: NetChannel,
+        channel: BoxedChannel,
     },
 }
 
