@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - chore/docs-rpc-publisher
     paths:
       - docs/rpc
 
