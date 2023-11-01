@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use bytes::Bytes;
 use fleek_crypto::SecretKey;
-use futures::{SinkExt, Stream, StreamExt};
+use futures::{SinkExt, Stream};
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::pool::{PoolInterface, RejectReason, ServiceScope};
@@ -32,7 +32,7 @@ use crate::config::Config;
 use crate::endpoint::Endpoint;
 use crate::muxer::quinn::QuinnMuxer;
 use crate::muxer::{BoxedChannel, MuxerInterface};
-use crate::overlay::{BroadcastRequest, ChannelRequest, Param};
+use crate::overlay::{BroadcastRequest, Param, SendRequest};
 use crate::{muxer, tls};
 
 pub struct Pool<C, M = QuinnMuxer>
@@ -76,10 +76,10 @@ where
         }
     }
 
-    fn register_channel_service(
+    fn register_requester_service(
         &self,
         service: ServiceScope,
-    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, BoxedChannel)>) {
+    ) -> (Sender<SendRequest>, Receiver<(RequestHeader, Request)>) {
         let mut guard = self.state.lock().unwrap();
         match guard.as_mut().expect("Pool to have a state") {
             State::Running { .. } => {
@@ -89,7 +89,7 @@ where
                 let endpoint = endpoint
                     .as_mut()
                     .expect("Endpoint to exist before registering");
-                endpoint.register_channel_service(service)
+                endpoint.register_requester_service(service)
             },
         }
     }
@@ -216,7 +216,7 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
     }
 
     fn open_req_res(&self, service: ServiceScope) -> (Self::Requester, Self::Responder) {
-        let (tx, rx) = self.register_channel_service(service);
+        let (tx, rx) = self.register_requester_service(service);
         (
             Requester {
                 request_tx: tx,
@@ -281,7 +281,7 @@ impl lightning_interfaces::pool::EventHandler for EventHandler {
 }
 
 pub struct Requester {
-    request_tx: Sender<ChannelRequest>,
+    request_tx: Sender<SendRequest>,
     service_scope: ServiceScope,
 }
 
@@ -302,33 +302,30 @@ impl lightning_interfaces::pool::Requester for Requester {
         let (respond_tx, respond_rx) = oneshot::channel();
         // Request a stream.
         self.request_tx
-            .send(ChannelRequest {
+            .send(SendRequest {
                 peer,
                 service_scope: self.service_scope,
+                request,
                 respond: respond_tx,
             })
             .await
             .map_err(|_| io::ErrorKind::BrokenPipe)?;
 
-        let mut channel = respond_rx.await.map_err(|_| io::ErrorKind::BrokenPipe)??;
+        let response = respond_rx.await.map_err(|_| io::ErrorKind::BrokenPipe)??;
 
-        // Send our request.
-        channel.send(request).await?;
-
-        // Read the response header.
-        let header = channel.next().await.ok_or(io::ErrorKind::BrokenPipe)??;
-
-        // Todo: Use something better than bincode.
-        let status: Status =
-            bincode::deserialize(header.as_ref()).map_err(|_| io::ErrorKind::Other)?;
-
-        Ok(Response { status, channel })
+        Ok(response)
     }
 }
 
 pub struct Response {
     status: Status,
     channel: BoxedChannel,
+}
+
+impl Response {
+    pub(crate) fn new(status: Status, channel: BoxedChannel) -> Self {
+        Self { status, channel }
+    }
 }
 
 #[async_trait]
@@ -366,7 +363,7 @@ impl Stream for Body {
 }
 
 pub struct Responder {
-    inner: Receiver<(NodeIndex, BoxedChannel)>,
+    inner: Receiver<(RequestHeader, Request)>,
 }
 
 #[async_trait]
@@ -374,35 +371,25 @@ impl lightning_interfaces::pool::Responder for Responder {
     type Request = Request;
 
     async fn get_next_request(&mut self) -> io::Result<(RequestHeader, Self::Request)> {
-        // Received a new stream so a request is incoming.
-        let (peer, mut channel) = self
-            .inner
+        self.inner
             .recv()
             .await
-            .ok_or_else(|| io::Error::from(io::ErrorKind::BrokenPipe))?;
-
-        // Get the header.
-        let bytes = channel
-            .next()
-            .await
-            .ok_or(io::ErrorKind::BrokenPipe)?
-            .map(Bytes::from)?;
-
-        let header = RequestHeader { peer, bytes };
-
-        Ok((
-            header,
-            Request {
-                ok_header_sent: false,
-                channel,
-            },
-        ))
+            .ok_or_else(|| io::Error::from(io::ErrorKind::BrokenPipe))
     }
 }
 
 pub struct Request {
     channel: BoxedChannel,
     ok_header_sent: bool,
+}
+
+impl Request {
+    pub(crate) fn new(channel: BoxedChannel) -> Self {
+        Self {
+            channel,
+            ok_header_sent: false,
+        }
+    }
 }
 
 #[async_trait]

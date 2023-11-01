@@ -51,6 +51,11 @@ partial!(TestBinding {
 });
 
 struct Peer<C: Collection> {
+    // We hold on to the rep aggregator and notifier so
+    // that they do not get dropped and cause a
+    // race condition which causes the pool to stop.
+    _rep_aggregator: C::ReputationAggregatorInterface,
+    _notifier: C::NotifierInterface,
     pool: C::PoolInterface,
     node_public_key: NodePublicKey,
 }
@@ -142,6 +147,7 @@ fn create_unknown_peer(
     path: PathBuf,
     app: &Application<TestBinding>,
     peer_index: usize,
+    address: SocketAddr,
 ) -> Peer<TestBinding> {
     let node_secret_key = NodeSecretKey::generate();
     let consensus_secret_key = ConsensusSecretKey::generate();
@@ -153,7 +159,7 @@ fn create_unknown_peer(
         node_key_path: node_key_path.try_into().unwrap(),
         consensus_key_path: consensus_key_path.try_into().unwrap(),
     };
-    create_peer(app, signer_config, "0.0.0.0:0".parse().unwrap())
+    create_peer(app, signer_config, address)
 }
 
 fn create_peer(
@@ -185,13 +191,15 @@ fn create_peer(
         config,
         &signer,
         query_runner,
-        notifier,
+        notifier.clone(),
         topology,
         rep_aggregator.get_reporter(),
     )
     .unwrap();
 
     Peer::<TestBinding> {
+        _rep_aggregator: rep_aggregator,
+        _notifier: notifier,
         pool,
         node_public_key: signer.get_ed25519_pk(),
     }
@@ -238,8 +246,16 @@ async fn test_send_to_one() {
 #[tokio::test]
 async fn test_send_to_all() {
     // Given: a list of peers that are in state and some that are not.
-    let (peers, app, path) = get_pools("send_to_all", 49000, 4).await;
-    let unknown_peer = create_unknown_peer(path.clone(), &app, peers.len());
+    let port_offset = 49000;
+    let (peers, app, path) = get_pools("send_to_all", port_offset, 4).await;
+    let unknown_peer = create_unknown_peer(
+        path.clone(),
+        &app,
+        peers.len(),
+        format!("0.0.0.0:{}", port_offset + peers.len() as u16)
+            .parse()
+            .unwrap(),
+    );
     let query_runner = app.sync_query();
 
     // Given: we start known nodes.
@@ -362,18 +378,18 @@ async fn test_open_req_res() {
 
 #[tokio::test]
 async fn test_open_req_res_unknown_peer() {
+    env_logger::init();
     // Give: a peer.
-    let (peers, _, path) = get_pools("test_open_req_res_unknown_peer", 51000, 1).await;
+    let (peers, _, path) = get_pools("test_open_req_res_unknown_peer", 55000, 1).await;
     let (requester1, _responder1) = peers[0].pool.open_req_res(ServiceScope::BlockstoreServer);
-    let peer = peers.first().unwrap();
-    peer.pool.start().await;
+    peers[0].pool.start().await;
 
     // Given: an index for an unknown node.
     let unknown_index = 6969;
 
     // When: we send a request to a node that is not in state.
     let response = requester1
-        .request(unknown_index, Bytes::from("a hash"))
+        .request(unknown_index, Bytes::from("a hasshh"))
         .await;
 
     // Then: our request fails.
@@ -382,7 +398,7 @@ async fn test_open_req_res_unknown_peer() {
     assert!(matches!(response, _expected_err));
 
     // Clean up.
-    peer.pool.shutdown().await;
+    peers[0].pool.shutdown().await;
     if path.exists() {
         std::fs::remove_dir_all(&path).unwrap();
     }

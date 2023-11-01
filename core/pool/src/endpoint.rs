@@ -15,6 +15,7 @@ use lightning_interfaces::{
     Notification,
     ReputationAggregatorInterface,
     ReputationReporterInterface,
+    RequestHeader,
     ServiceScope,
     TopologyInterface,
 };
@@ -23,17 +24,18 @@ use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinSet;
 
 use crate::connection::connector::{ConnectionResult, Connector};
-use crate::connection::driver::{self, Context, DriverRequest};
-use crate::muxer::{BoxedChannel, ConnectionInterface, MuxerInterface};
+use crate::connection::{self, ConnectionRequest, Context};
+use crate::muxer::{ConnectionInterface, MuxerInterface};
 use crate::overlay::{
     BroadcastRequest,
     BroadcastTask,
-    ChannelRequest,
-    ChannelTask,
     Message,
     NetworkOverlay,
     PoolTask,
+    SendRequest,
+    SendRequestTask,
 };
+use crate::pool::Request;
 
 type ConnectionId = usize;
 
@@ -42,7 +44,7 @@ type ConnectionId = usize;
 /// It provides the following features:
 /// - A pool of multiplexed-transport connections.
 /// - Broadcasting.
-/// - [`Channels`] for direct task to task communication over the network.
+/// - A request/response service
 ///
 /// # Overlay
 ///
@@ -60,7 +62,7 @@ type ConnectionId = usize;
 /// of the connection. The driver task will listen for incoming unidirectional
 /// streams, for p2p applications such as broadcasting, and for bidirectional
 /// streams for request/response applications. Bidirectional streams are used
-/// for implementing [`Channel`]s.
+/// for implementing our request/response protocol.
 ///
 /// # Pinning
 ///
@@ -91,7 +93,7 @@ where
     /// Performs dial tasks.
     connector: Connector<M>,
     /// Pending outgoing requests.
-    pending_task: HashMap<NodeIndex, Vec<DriverRequest>>,
+    pending_task: HashMap<NodeIndex, Vec<ConnectionRequest>>,
     /// Ongoing drivers.
     driver_set: JoinSet<(NodeIndex, ConnectionId)>,
     /// Connections that are redundant.
@@ -152,16 +154,18 @@ where
             .register_broadcast_service(service_scope)
     }
 
-    pub fn register_channel_service(
+    pub fn register_requester_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, BoxedChannel)>) {
-        self.network_overlay.register_channel_service(service_scope)
+    ) -> (Sender<SendRequest>, Receiver<(RequestHeader, Request)>) {
+        self.network_overlay
+            .register_requester_service(service_scope)
     }
 
-    pub fn handle_channel_request(&mut self, task: ChannelTask) -> Result<()> {
-        let ChannelTask {
+    pub fn handle_send_request_task(&mut self, task: SendRequestTask) -> Result<()> {
+        let SendRequestTask {
             peer,
+            request,
             respond,
             service_scope,
         } = task;
@@ -176,8 +180,9 @@ where
                         .expect("Endpoint is always initialized on start"),
                 )?;
 
-                let request = DriverRequest::NewChannel {
+                let request = ConnectionRequest::SendRequest {
                     service: service_scope,
+                    request,
                     respond,
                 };
                 self.enqueue_pending_request(peer_index, request);
@@ -185,12 +190,13 @@ where
             Some(handle) => {
                 let driver_tx = handle.tx.clone();
                 tokio::spawn(async move {
-                    let request = DriverRequest::NewChannel {
+                    let request = ConnectionRequest::SendRequest {
                         service: service_scope,
+                        request,
                         respond,
                     };
                     if driver_tx.send(request).await.is_err() {
-                        tracing::error!("failed to send driver channel request");
+                        tracing::error!("failed to send driver a send-request task");
                     }
                 });
             },
@@ -222,6 +228,7 @@ where
                             not_connected,
                         )
                     },
+                    // Todo: have the overlay explicitly send list of peers.
                     None => (self.pool.keys().copied().collect::<Vec<_>>(), vec![]),
                 };
 
@@ -252,7 +259,7 @@ where
                     // Enqueue message for later after we connect.
                     self.enqueue_pending_request(
                         peer_index,
-                        DriverRequest::SendMessage(message.clone()),
+                        ConnectionRequest::SendMessage(message.clone()),
                     )
                 }
 
@@ -265,7 +272,7 @@ where
                     };
 
                     let driver_tx = handle.tx.clone();
-                    let request = DriverRequest::SendMessage(message.clone());
+                    let request = ConnectionRequest::SendMessage(message.clone());
                     tokio::spawn(async move {
                         if driver_tx.send(request).await.is_err() {
                             tracing::error!(
@@ -347,7 +354,7 @@ where
             let connection_event_tx = self.connection_event_tx.clone();
             let ctx = Context::new(connection, peer_index, request_rx, connection_event_tx);
             self.driver_set.spawn(async move {
-                if let Err(e) = driver::start_driver(ctx).await {
+                if let Err(e) = connection::connection_loop(ctx).await {
                     tracing::info!(
                         "driver for connection with {peer_index:?} exited with error: {e:?}"
                     );
@@ -367,8 +374,8 @@ where
                 );
 
                 for req in pending_requests {
-                    // We need to pin the connection if used by channel service.
-                    if matches!(req, DriverRequest::NewChannel { .. }) {
+                    // We need to pin the connection if used by requester service.
+                    if matches!(req, ConnectionRequest::SendRequest { .. }) {
                         should_pin = true;
                     }
 
@@ -414,7 +421,7 @@ where
 
     /// Enqueues requests that will be sent after a connection is established with the peer.
     #[inline]
-    fn enqueue_pending_request(&mut self, peer: NodeIndex, request: DriverRequest) {
+    fn enqueue_pending_request(&mut self, peer: NodeIndex, request: ConnectionRequest) {
         self.pending_task.entry(peer).or_default().push(request);
     }
 
@@ -504,11 +511,11 @@ where
                         ConnectionEvent::Broadcast { peer, message } => {
                             self.network_overlay.handle_broadcast_message(peer, message);
                         },
-                        ConnectionEvent::Channel { peer, service_scope, channel } => {
-                            self.network_overlay.handle_incoming_channel(
+                        ConnectionEvent::IncomingRequest { peer, service_scope, request } => {
+                            self.network_overlay.handle_incoming_request(
                                 peer,
                                 service_scope,
-                                channel
+                                request
                             );
                         }
                     }
@@ -539,9 +546,9 @@ where
                                 tracing::error!("failed to handle broadcast task: {e:?}");
                             }
                         }
-                        PoolTask::Channel(task) => {
-                            if let Err(e) = self.handle_channel_request(task) {
-                                tracing::error!("failed to handle channel request: {e:?}");
+                        PoolTask::SendRequest(task) => {
+                            if let Err(e) = self.handle_send_request_task(task) {
+                                tracing::error!("failed to handle send-request task: {e:?}");
                             }
                         }
                     }
@@ -600,10 +607,10 @@ pub enum ConnectionEvent {
         peer: NodeIndex,
         message: Message,
     },
-    Channel {
+    IncomingRequest {
         peer: NodeIndex,
         service_scope: ServiceScope,
-        channel: BoxedChannel,
+        request: (RequestHeader, Request),
     },
 }
 
@@ -616,6 +623,6 @@ pub struct NodeAddress {
 }
 
 pub struct DriverHandle {
-    tx: Sender<DriverRequest>,
+    tx: Sender<ConnectionRequest>,
     connection_id: usize,
 }

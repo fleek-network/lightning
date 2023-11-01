@@ -10,13 +10,19 @@ use hp_fixed::unsigned::HpUfixed;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{ApplicationInterface, ServiceScope, SyncQueryRunnerInterface};
+use lightning_interfaces::{
+    ApplicationInterface,
+    RequestHeader,
+    ServiceScope,
+    SyncQueryRunnerInterface,
+};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use x509_parser::nom::AsBytes;
 
 use crate::endpoint::NodeAddress;
-use crate::muxer::{BoxedChannel, ConnectionInterface, MuxerInterface};
+use crate::muxer::{ConnectionInterface, MuxerInterface};
+use crate::pool::{Request, Response};
 
 pub type BoxedFilterCallback = Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>;
 
@@ -34,11 +40,11 @@ where
     /// Sender to return to users as they register with the broadcast service.
     broadcast_request_tx: Sender<BroadcastRequest<F>>,
     /// Service handles.
-    channel_service_handles: HashMap<ServiceScope, Sender<(NodeIndex, BoxedChannel)>>,
+    send_request_service_handles: HashMap<ServiceScope, Sender<(RequestHeader, Request)>>,
     /// Receive requests for a multiplexed stream.
-    channel_request_rx: Receiver<ChannelRequest>,
+    send_request_rx: Receiver<SendRequest>,
     /// Send handle to return to users as they register with the stream service.
-    channel_request_tx: Sender<ChannelRequest>,
+    send_request_tx: Sender<SendRequest>,
     /// Sync query runner.
     sync_query: c![C::ApplicationInterface::SyncExecutor],
     /// Local node index.
@@ -60,12 +66,12 @@ where
         let (stream_request_tx, stream_request_rx) = mpsc::channel(1024);
         Self {
             broadcast_service_handles: HashMap::new(),
-            channel_service_handles: HashMap::new(),
+            send_request_service_handles: HashMap::new(),
             peers: HashMap::new(),
             broadcast_request_tx,
             broadcast_request_rx,
-            channel_request_tx: stream_request_tx,
-            channel_request_rx: stream_request_rx,
+            send_request_tx: stream_request_tx,
+            send_request_rx: stream_request_rx,
             sync_query,
             index,
             pk,
@@ -81,13 +87,13 @@ where
         (self.broadcast_request_tx.clone(), rx)
     }
 
-    pub fn register_channel_service(
+    pub fn register_requester_service(
         &mut self,
         service_scope: ServiceScope,
-    ) -> (Sender<ChannelRequest>, Receiver<(NodeIndex, BoxedChannel)>) {
+    ) -> (Sender<SendRequest>, Receiver<(RequestHeader, Request)>) {
         let (tx, rx) = mpsc::channel(1024);
-        self.channel_service_handles.insert(service_scope, tx);
-        (self.channel_request_tx.clone(), rx)
+        self.send_request_service_handles.insert(service_scope, tx);
+        (self.send_request_tx.clone(), rx)
     }
 
     pub fn handle_broadcast_message(&mut self, peer: NodeIndex, event: Message) {
@@ -109,13 +115,17 @@ where
         }
     }
 
-    pub fn handle_incoming_channel(
+    pub fn handle_incoming_request(
         &mut self,
         peer: NodeIndex,
         service_scope: ServiceScope,
-        channel: BoxedChannel,
+        request: (RequestHeader, Request),
     ) {
-        match self.channel_service_handles.get(&service_scope).cloned() {
+        match self
+            .send_request_service_handles
+            .get(&service_scope)
+            .cloned()
+        {
             None => {
                 tracing::warn!("received unknown service scope: {service_scope:?}");
             },
@@ -123,8 +133,8 @@ where
                 if let Some(address) = self.node_address_from_state(&peer) {
                     self.pin_connection(peer, address);
                     tokio::spawn(async move {
-                        if tx.send((peer, channel)).await.is_err() {
-                            tracing::error!("failed to send incoming channel to user");
+                        if tx.send(request).await.is_err() {
+                            tracing::error!("failed to send incoming request to user");
                         }
                     });
                 }
@@ -257,22 +267,23 @@ where
     pub async fn next(&mut self) -> Option<PoolTask> {
         loop {
             tokio::select! {
-                channel_request = self.channel_request_rx.recv() => {
-                    let request = channel_request?;
-                    match self.node_address_from_state(&request.peer) {
+                send_request = self.send_request_rx.recv() => {
+                    let send_request = send_request?;
+                    match self.node_address_from_state(&send_request.peer) {
                         Some(address) => {
-                            self.pin_connection(request.peer, address.clone());
-                            return Some(PoolTask::Channel(ChannelTask {
+                            self.pin_connection(send_request.peer, address.clone());
+                            return Some(PoolTask::SendRequest(SendRequestTask {
                                     peer: address,
-                                    service_scope: request.service_scope,
-                                    respond: request.respond,
+                                    service_scope: send_request.service_scope,
+                                    request: send_request.request,
+                                    respond: send_request.respond,
                                 }));
                         }
                         None => {
-                            if request.respond.send(
+                            if send_request.respond.send(
                                 Err(io::ErrorKind::AddrNotAvailable.into())
                             ).is_err() {
-                                tracing::error!("respond channel was closed")
+                                tracing::error!("requester dropped the channel")
                             }
                         }
                     }
@@ -311,7 +322,7 @@ where
 
 pub enum PoolTask {
     Broadcast(BroadcastTask),
-    Channel(ChannelTask),
+    SendRequest(SendRequestTask),
 }
 
 pub struct BroadcastRequest<F = BoxedFilterCallback>
@@ -343,16 +354,18 @@ pub enum BroadcastTask {
     },
 }
 
-pub struct ChannelTask {
+pub struct SendRequestTask {
     pub peer: NodeAddress,
     pub service_scope: ServiceScope,
-    pub respond: oneshot::Sender<io::Result<BoxedChannel>>,
+    pub request: Bytes,
+    pub respond: oneshot::Sender<io::Result<Response>>,
 }
 
-pub struct ChannelRequest {
-    pub service_scope: ServiceScope,
+pub struct SendRequest {
     pub peer: NodeIndex,
-    pub respond: oneshot::Sender<io::Result<BoxedChannel>>,
+    pub service_scope: ServiceScope,
+    pub request: Bytes,
+    pub respond: oneshot::Sender<io::Result<Response>>,
 }
 
 #[derive(Clone, Debug)]
