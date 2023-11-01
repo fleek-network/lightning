@@ -86,16 +86,16 @@ jobs:
           npm i monaco-editor@0.15.6 -S
           npm install --force
 
+      - name: Fix paths
+        working-directory: ./docs/rpc/docs/gatsby
+        # fix: 🐛 support gatsby path prefix https://github.com/open-rpc/generator/pull/708
+        run: sed -i 's|href="/api-documentation"|href="/lightning/api-documentation"|g' src/pages/index.tsx
+
       - name: Build docs
         working-directory: ./docs/rpc/docs/gatsby
         run: |
           export NODE_OPTIONS="--max_old_space_size=4096"
           npx gatsby build --prefix-paths
-
-      - name: Fix paths
-        working-directory: ./docs/rpc/docs/gatsby
-        # fix: 🐛 support gatsby path prefix https://github.com/open-rpc/generator/pull/708
-        run: find ./public -type f -name "*.html" -exec sed -i 's/\/api-documentation/\/lightning\/api-documentation/g' {} \;
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
