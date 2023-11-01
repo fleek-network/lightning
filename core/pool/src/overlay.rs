@@ -290,28 +290,32 @@ where
                 }
                 broadcast_request = self.broadcast_request_rx.recv() => {
                     let request = broadcast_request?;
-                    let peers = match request.param {
+                    let peers: Vec<ConnectionInfo> = match request.param {
                         Param::Filter(filter) => {
-                            Some(self
+                            self
                                 .peers
                                 .iter()
                                 .filter(|(index, _)| filter(**index))
                                 .map(|(_, info)| info.clone())
-                                .collect::<Vec<_>>())
+                                .collect()
                         }
                         Param::Index(index) => {
-                            self.peers.get(&index).map(|info| vec![info.clone()])
+                            self
+                                .peers
+                                .get(&index)
+                                .map(|info| vec![info.clone()])
+                                .unwrap_or_default()
                         },
                     };
 
-                    if let Some(peers) = peers {
-                        let peers = if peers.is_empty() { None } else { Some(peers) };
-
+                    if !peers.is_empty()  {
                         return Some(PoolTask::Broadcast(BroadcastTask::Send {
                             service_scope: request.service_scope,
                             message: request.message,
                             peers,
                         }));
+                    } else {
+                        tracing::warn!("no peers to send the message to: no peers in state or filter was too restrictive");
                     }
                 }
             }
@@ -346,7 +350,7 @@ pub enum BroadcastTask {
     Send {
         service_scope: ServiceScope,
         message: Bytes,
-        peers: Option<Vec<ConnectionInfo>>,
+        peers: Vec<ConnectionInfo>,
     },
     Update {
         // Nodes that are in our overlay.
@@ -354,6 +358,7 @@ pub enum BroadcastTask {
     },
 }
 
+// Todo: find a way to consolidate with `SendRequest`.
 pub struct SendRequestTask {
     pub peer: NodeAddress,
     pub service_scope: ServiceScope,

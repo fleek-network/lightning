@@ -214,22 +214,17 @@ where
                 // From the all the peers we want to send messages to,
                 // we partition into those we are connected to and those
                 // that we're not.
-                let (connected, not_connected) = match peers {
-                    Some(peers) => {
-                        let (connected, not_connected) =
-                            peers.into_iter().partition::<Vec<_>, _>(|info| {
-                                self.pool.contains_key(&info.address.index)
-                            });
-                        (
-                            connected
-                                .into_iter()
-                                .map(|info| info.address.index)
-                                .collect::<Vec<_>>(),
-                            not_connected,
-                        )
-                    },
-                    // Todo: have the overlay explicitly send list of peers.
-                    None => (self.pool.keys().copied().collect::<Vec<_>>(), vec![]),
+                let (connected, not_connected) = {
+                    let (connected, not_connected) = peers
+                        .into_iter()
+                        .partition::<Vec<_>, _>(|info| self.pool.contains_key(&info.address.index));
+                    (
+                        connected
+                            .into_iter()
+                            .map(|info| info.address.index)
+                            .collect::<Vec<_>>(),
+                        not_connected,
+                    )
                 };
 
                 let message = Message {
