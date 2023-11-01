@@ -60,15 +60,11 @@ impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
             .map(|node_info| node_info.public_key)
             .collect();
 
-        let mut latency_sum = Duration::ZERO;
+        let mut max_latency = Duration::ZERO;
         latencies
             .values()
-            .for_each(|latency| latency_sum += *latency);
-
-        let mean_latency = latency_sum
-            .checked_div(latencies.len() as u32)
-            .unwrap_or_default();
-        let mean_latency: i32 = mean_latency.as_micros().try_into().unwrap_or(i32::MAX);
+            .for_each(|latency| max_latency = max_latency.max(*latency));
+        let max_latency: i32 = max_latency.as_millis().try_into().unwrap_or(i32::MAX);
 
         let mut matrix = Array::zeros((valid_pubkeys.len(), valid_pubkeys.len()));
         let pubkeys: Vec<(usize, NodePublicKey)> =
@@ -83,12 +79,12 @@ impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
             }
             for (index_rhs, pubkey_rhs) in pubkeys[index_lhs + 1..].iter() {
                 if let Some(latency) = latencies.get(&(*pubkey_lhs, *pubkey_rhs)) {
-                    let latency: i32 = latency.as_micros().try_into().unwrap_or(i32::MAX);
+                    let latency: i32 = latency.as_millis().try_into().unwrap_or(i32::MAX);
                     matrix[[*index_lhs, *index_rhs]] = latency;
                     matrix[[*index_rhs, *index_lhs]] = latency;
                 } else {
-                    matrix[[*index_lhs, *index_rhs]] = mean_latency;
-                    matrix[[*index_rhs, *index_lhs]] = mean_latency;
+                    matrix[[*index_lhs, *index_rhs]] = max_latency;
+                    matrix[[*index_rhs, *index_lhs]] = max_latency;
                 }
             }
         }

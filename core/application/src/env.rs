@@ -403,7 +403,7 @@ impl Env<UpdatePerm> {
                         .expect("Invalid latency entry, node doesn't have an index.");
                     latencies_table.insert(
                         (index_lhs, index_rhs),
-                        Duration::from_micros(lat.latency_in_microseconds),
+                        Duration::from_millis(lat.latency_in_millis),
                     );
                 }
             }

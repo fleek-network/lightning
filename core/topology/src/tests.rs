@@ -121,7 +121,7 @@ async fn test_build_latency_matrix() {
     latencies.push(GenesisLatency {
         node_public_key_lhs: node_lhs,
         node_public_key_rhs: node_rhs,
-        latency_in_microseconds: 100000,
+        latency_in_millis: 1000,
     });
 
     let (node_lhs, node_rhs) = if our_public_key < node_public_key2 {
@@ -132,7 +132,7 @@ async fn test_build_latency_matrix() {
     latencies.push(GenesisLatency {
         node_public_key_lhs: node_lhs,
         node_public_key_rhs: node_rhs,
-        latency_in_microseconds: 300000,
+        latency_in_millis: 3000,
     });
 
     let (node_lhs, node_rhs) = if node_public_key1 < node_public_key2 {
@@ -143,7 +143,7 @@ async fn test_build_latency_matrix() {
     latencies.push(GenesisLatency {
         node_public_key_lhs: node_lhs,
         node_public_key_rhs: node_rhs,
-        latency_in_microseconds: 200000,
+        latency_in_millis: 2000,
     });
     genesis.latencies = Some(latencies);
 
@@ -181,7 +181,7 @@ async fn test_build_latency_matrix() {
     let our_index = *pubkey_to_index.get(&our_public_key).unwrap();
     let index1 = *pubkey_to_index.get(&node_public_key1).unwrap();
     let index2 = *pubkey_to_index.get(&node_public_key2).unwrap();
-    assert_eq!(matrix[[our_index, index1]], 100000);
-    assert_eq!(matrix[[our_index, index2]], 300000);
-    assert_eq!(matrix[[index1, index2]], 200000);
+    assert_eq!(matrix[[our_index, index1]], 1000);
+    assert_eq!(matrix[[our_index, index2]], 3000);
+    assert_eq!(matrix[[index1, index2]], 2000);
 }

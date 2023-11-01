@@ -82,7 +82,7 @@ pub struct GenesisPrices {
 pub struct GenesisLatency {
     pub node_public_key_lhs: NodePublicKey,
     pub node_public_key_rhs: NodePublicKey,
-    pub latency_in_microseconds: u64,
+    pub latency_in_millis: u64,
 }
 
 impl Genesis {
