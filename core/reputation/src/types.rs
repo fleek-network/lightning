@@ -128,6 +128,7 @@ pub(crate) struct CollectedMeasurements {
     pub outbound_bandwidth: Vec<WeightedFloat>,
     pub bytes_received: Vec<WeightedFloat>,
     pub bytes_sent: Vec<WeightedFloat>,
+    pub uptime: Vec<WeightedFloat>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -138,6 +139,7 @@ pub(crate) struct NormalizedMeasurements {
     pub outbound_bandwidth: Option<HpFixed<PRECISION>>,
     pub bytes_received: Option<HpFixed<PRECISION>>,
     pub bytes_sent: Option<HpFixed<PRECISION>>,
+    pub uptime: Option<HpFixed<PRECISION>>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -164,6 +166,7 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
         let mut weight_sum_outbound_bandwidth: HpFixed<PRECISION> = 0.0.into();
         let mut weight_sum_bytes_received: HpFixed<PRECISION> = 0.0.into();
         let mut weight_sum_bytes_sent: HpFixed<PRECISION> = 0.0.into();
+        let mut weight_sum_uptime: HpFixed<PRECISION> = 0.0.into();
 
         let mut count_latency = 0;
         let mut count_interactions = 0;
@@ -171,6 +174,7 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
         let mut count_outbound_bandwidth = 0;
         let mut count_bytes_received = 0;
         let mut count_bytes_sent = 0;
+        let mut count_uptime = 0;
         weighted_measurements.iter().for_each(|m| {
             if m.measurements.latency.is_some() {
                 weight_sum_latency += (m.weight as i16).into();
@@ -195,6 +199,10 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
             if m.measurements.bytes_sent.is_some() {
                 weight_sum_bytes_sent += (m.weight as i16).into();
                 count_bytes_sent += 1;
+            }
+            if m.measurements.uptime.is_some() {
+                weight_sum_uptime += (m.weight as i16).into();
+                count_uptime += 1;
             }
         });
         let mut measurements = Self::default();
@@ -272,6 +280,17 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
                 };
                 measurements.bytes_sent.push(WeightedFloat {
                     value: i128::try_from(bytes_sent).unwrap_or(i128::MAX).into(),
+                    weight,
+                });
+            }
+            if let Some(uptime) = m.measurements.uptime {
+                let weight = if weight_sum_uptime == 0.into() {
+                    HpFixed::<PRECISION>::from(1) / HpFixed::<PRECISION>::from(count_uptime)
+                } else {
+                    HpFixed::<PRECISION>::from(m.weight as i16) / weight_sum_uptime.clone()
+                };
+                measurements.uptime.push(WeightedFloat {
+                    value: i128::try_from(uptime).unwrap_or(i128::MAX).into(),
                     weight,
                 });
             }
@@ -409,6 +428,9 @@ impl From<CollectedMeasurements> for NormalizedMeasurements {
             statistics::calculate_z_normalized_weighted_mean(collected_measurements.bytes_received);
         let bytes_sent =
             statistics::calculate_z_normalized_weighted_mean(collected_measurements.bytes_sent);
+        let uptime =
+            statistics::calculate_z_normalized_weighted_mean(collected_measurements.uptime);
+
         Self {
             latency,
             interactions,
@@ -416,12 +438,13 @@ impl From<CollectedMeasurements> for NormalizedMeasurements {
             outbound_bandwidth,
             bytes_received,
             bytes_sent,
+            uptime,
         }
     }
 }
 
 impl NormalizedMeasurements {
-    pub fn min_max_normalize(&mut self, min_max_vals: MinMaxValues) {
+    pub fn normalize(&mut self, min_max_vals: MinMaxValues) {
         if let Some(latency) = self.latency.clone() {
             self.latency = statistics::try_min_max_normalize(
                 latency,
@@ -464,6 +487,11 @@ impl NormalizedMeasurements {
                 min_max_vals.max_values.bytes_sent,
             );
         }
+        if let Some(uptime) = self.uptime.clone() {
+            // All uptimes measurements are in range [0, 100], so we can normalize them by simply
+            // dividing by 100.
+            self.uptime = Some(uptime / HpFixed::<PRECISION>::from(100));
+        }
     }
 
     pub fn calculate_score(&self) -> Option<u8> {
@@ -491,6 +519,10 @@ impl NormalizedMeasurements {
         }
         if let Some(bytes_sent) = &self.bytes_sent {
             score = score + bytes_sent;
+            count += 1;
+        }
+        if let Some(uptime) = &self.uptime {
+            score = score + uptime;
             count += 1;
         }
 

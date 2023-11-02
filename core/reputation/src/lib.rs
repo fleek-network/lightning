@@ -25,7 +25,7 @@ pub fn calculate_reputation_scores(
 
     normalized_measurements_map
         .iter_mut()
-        .for_each(|(_, m)| m.min_max_normalize(min_max_vals.clone()));
+        .for_each(|(_, m)| m.normalize(min_max_vals.clone()));
 
     normalized_measurements_map
         .iter()
@@ -236,6 +236,12 @@ mod tests {
                 collected_measurements.bytes_sent[0].value
             );
         }
+        if let Some(uptime) = weighted_measurements[0].measurements.uptime {
+            assert_eq!(
+                HpFixed::<PRECISION>::from(i128::try_from(uptime).unwrap()),
+                collected_measurements.uptime[0].value
+            );
+        }
     }
 
     #[test]
@@ -276,6 +282,11 @@ mod tests {
         } else {
             assert!(normalized_measurements.bytes_sent.is_some());
         }
+        if collected_measurements.uptime.is_empty() {
+            assert!(normalized_measurements.uptime.is_none());
+        } else {
+            assert!(normalized_measurements.uptime.is_some());
+        }
     }
 
     #[test]
@@ -287,7 +298,7 @@ mod tests {
 
         let min_max_vals: MinMaxValues = (&normalized_measurements_map).into();
         normalized_measurements_map.iter_mut().for_each(|(_, m)| {
-            m.min_max_normalize(min_max_vals.clone());
+            m.normalize(min_max_vals.clone());
             if let Some(latency) = &m.latency {
                 assert!((0.0.into()..=1.0.into()).contains(latency));
             }
@@ -305,6 +316,9 @@ mod tests {
             }
             if let Some(bytes_sent) = &m.bytes_sent {
                 assert!((0.0.into()..=1.0.into()).contains(bytes_sent));
+            }
+            if let Some(uptime) = &m.uptime {
+                assert!((0.0.into()..=1.0.into()).contains(uptime));
             }
         });
     }

@@ -93,6 +93,11 @@ pub(crate) fn generate_normalized_measurements_map(
         } else {
             Some(rng.gen_range(0.0..=1.0).into())
         };
+        let uptime = if rng.gen_bool(PROB_MEASUREMENT_PRESENT) {
+            None
+        } else {
+            Some(rng.gen_range(0.0..=1.0).into())
+        };
         let normalized_measurements = NormalizedMeasurements {
             latency,
             interactions,
@@ -100,6 +105,7 @@ pub(crate) fn generate_normalized_measurements_map(
             outbound_bandwidth,
             bytes_received,
             bytes_sent,
+            uptime,
         };
         let mut array = [0; 32];
         (0..32).for_each(|i| array[i] = rng.gen_range(0..=255));
