@@ -79,6 +79,12 @@ impl<const P: usize> HpUfixed<P> {
     pub fn get_value(&self) -> &BigUint {
         &self.0
     }
+
+    pub fn floor(&self) -> HpUfixed<P> {
+        let scale: BigUint = BigUint::from(10u32).pow(P.try_into().unwrap());
+        let num = &self.0 / &scale;
+        HpUfixed::<P>(num * scale)
+    }
 }
 
 impl<const P: usize> fmt::Display for HpUfixed<P> {
@@ -448,6 +454,16 @@ mod tests {
     use ethers::types::U256;
 
     use super::*;
+
+    #[test]
+    fn test_floor() {
+        let num = HpUfixed::<6>::from(1.3);
+        assert_eq!(num.floor(), HpUfixed::<6>::from(1.0));
+        let num = HpUfixed::<6>::from(12.9);
+        assert_eq!(num.floor(), HpUfixed::<6>::from(12.0));
+        let num = HpUfixed::<6>::from(1223.91323);
+        assert_eq!(num.floor(), HpUfixed::<6>::from(1223.0));
+    }
 
     #[test]
     fn test_try_into() {

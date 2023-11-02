@@ -80,6 +80,12 @@ impl<const P: usize> HpFixed<P> {
         let big_int = BigInt::try_from(self.clone()).ok()?;
         Some(Self::from(big_int.abs()))
     }
+
+    pub fn floor(&self) -> HpFixed<P> {
+        let scale: BigInt = BigUint::from(10u32).pow(P.try_into().unwrap()).into();
+        let num = &self.0 / &scale;
+        HpFixed::<P>(num * scale)
+    }
 }
 
 impl<const P: usize> fmt::Display for HpFixed<P> {
@@ -471,6 +477,16 @@ impl<const P: usize> TryFrom<HpFixed<P>> for f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_floor() {
+        let num = HpFixed::<6>::from(-1.3);
+        assert_eq!(num.floor(), HpFixed::<6>::from(-1.0));
+        let num = HpFixed::<6>::from(12.9);
+        assert_eq!(num.floor(), HpFixed::<6>::from(12.0));
+        let num = HpFixed::<6>::from(1223.91323);
+        assert_eq!(num.floor(), HpFixed::<6>::from(1223.0));
+    }
 
     #[test]
     fn test_try_into() {
