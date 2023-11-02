@@ -18,7 +18,7 @@ use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{NodeIndex, Topic};
 use lightning_interfaces::{
     ApplicationInterface,
-    EventHandler,
+    EventHandlerInterface,
     PoolInterface,
     ReputationAggregatorInterface,
     ReputationReporterInterface,

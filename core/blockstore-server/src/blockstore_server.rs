@@ -31,10 +31,10 @@ use lightning_interfaces::{
     RejectReason,
     ReputationAggregatorInterface,
     ReputationReporterInterface,
-    Request,
-    Requester,
-    Responder,
-    Response,
+    RequestInterface,
+    RequesterInterface,
+    ResponderInterface,
+    ResponseInterface,
     ServiceScope,
     WithStartAndShutdown,
 };
@@ -362,7 +362,7 @@ async fn handle_request<C: Collection>(
     peer: NodeIndex,
     peer_request: PeerRequest,
     blockstore: C::BlockStoreInterface,
-    mut request: <c!(C::PoolInterface::Responder) as Responder>::Request,
+    mut request: <c!(C::PoolInterface::Responder) as ResponderInterface>::Request,
     num_responses: Arc<AtomicUsize>,
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
 ) {

@@ -62,7 +62,7 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                 let peer = ctx.peer;
                 tokio::spawn(async move {
                     if let Err(e) =
-                        handle_incoming_streams::<C>(
+                        handle_incoming_bi_stream::<C>(
                             peer,
                             (stream_tx, stream_rx),
                             connection_event_tx
@@ -193,7 +193,7 @@ async fn handle_incoming_uni_stream<C: ConnectionInterface>(
     Ok(())
 }
 
-async fn handle_incoming_streams<C: ConnectionInterface>(
+async fn handle_incoming_bi_stream<C: ConnectionInterface>(
     peer: NodeIndex,
     (stream_tx, mut stream_rx): (C::SendStream, C::RecvStream),
     connection_event_tx: Sender<ConnectionEvent>,
@@ -229,7 +229,8 @@ async fn handle_incoming_streams<C: ConnectionInterface>(
 async fn send_message<C: ConnectionInterface>(mut connection: C, message: Message) -> Result<()> {
     let stream_tx = connection.open_uni_stream().await?;
     let mut writer = FramedWrite::new(stream_tx, LengthDelimitedCodec::new());
-    writer.send(Bytes::from(message)).await.map_err(Into::into)
+    writer.send(Bytes::from(message)).await?;
+    writer.close().await.map_err(Into::into)
 }
 
 async fn send_request<C: ConnectionInterface>(

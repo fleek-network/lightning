@@ -68,9 +68,9 @@ pub trait PoolInterface<C: Collection>:
         )
     }
 
-    type EventHandler: EventHandler;
-    type Requester: Requester;
-    type Responder: Responder;
+    type EventHandler: EventHandlerInterface;
+    type Requester: RequesterInterface;
+    type Responder: ResponderInterface;
 
     fn init(
         config: Self::Config,
@@ -88,7 +88,7 @@ pub trait PoolInterface<C: Collection>:
 
 #[async_trait]
 #[infusion::blank]
-pub trait EventHandler: Send + Sync {
+pub trait EventHandlerInterface: Send + Sync {
     fn send_to_all<F: Fn(NodeIndex) -> bool + Send + Sync + 'static>(
         &self,
         payload: Bytes,
@@ -100,13 +100,13 @@ pub trait EventHandler: Send + Sync {
 
 #[async_trait]
 #[infusion::blank]
-pub trait Requester: Clone + Send + Sync {
-    type Response: Response;
+pub trait RequesterInterface: Clone + Send + Sync {
+    type Response: ResponseInterface;
     async fn request(&self, destination: NodeIndex, request: Bytes) -> io::Result<Self::Response>;
 }
 
 #[infusion::blank]
-pub trait Response: Send + Sync {
+pub trait ResponseInterface: Send + Sync {
     type Body: Stream<Item = io::Result<Bytes>> + Send + Unpin =
         tokio_stream::Empty<io::Result<Bytes>>;
     fn status_code(&self) -> Result<(), RejectReason>;
@@ -115,14 +115,14 @@ pub trait Response: Send + Sync {
 
 #[async_trait]
 #[infusion::blank]
-pub trait Responder: Send {
-    type Request: Request;
+pub trait ResponderInterface: Send {
+    type Request: RequestInterface;
     async fn get_next_request(&mut self) -> io::Result<(RequestHeader, Self::Request)>;
 }
 
 #[async_trait]
 #[infusion::blank]
-pub trait Request: Send + Sync {
+pub trait RequestInterface: Send + Sync {
     fn reject(self, reason: RejectReason);
     async fn send(&mut self, frame: Bytes) -> io::Result<()>;
 }

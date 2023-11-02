@@ -16,9 +16,14 @@ use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
+    EventHandlerInterface,
     NotifierInterface,
     ReputationAggregatorInterface,
     RequestHeader,
+    RequestInterface,
+    RequesterInterface,
+    ResponderInterface,
+    ResponseInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
@@ -234,7 +239,7 @@ pub struct EventHandler {
 }
 
 #[async_trait]
-impl lightning_interfaces::pool::EventHandler for EventHandler {
+impl EventHandlerInterface for EventHandler {
     fn send_to_all<F: Fn(NodeIndex) -> bool + Send + Sync + 'static>(
         &self,
         message: Bytes,
@@ -275,6 +280,7 @@ impl lightning_interfaces::pool::EventHandler for EventHandler {
         });
     }
 
+    // This method is cancel-safe.
     async fn receive(&mut self) -> Option<(NodeIndex, Bytes)> {
         self.event_rx.recv().await
     }
@@ -295,7 +301,7 @@ impl Clone for Requester {
 }
 
 #[async_trait]
-impl lightning_interfaces::pool::Requester for Requester {
+impl RequesterInterface for Requester {
     type Response = Response;
 
     async fn request(&self, peer: NodeIndex, request: Bytes) -> io::Result<Self::Response> {
@@ -329,7 +335,7 @@ impl Response {
 }
 
 #[async_trait]
-impl lightning_interfaces::pool::Response for Response {
+impl ResponseInterface for Response {
     type Body = Body;
     fn status_code(&self) -> Result<(), RejectReason> {
         match &self.status {
@@ -367,9 +373,10 @@ pub struct Responder {
 }
 
 #[async_trait]
-impl lightning_interfaces::pool::Responder for Responder {
+impl ResponderInterface for Responder {
     type Request = Request;
 
+    // Note: this method is cancel-safe.
     async fn get_next_request(&mut self) -> io::Result<(RequestHeader, Self::Request)> {
         self.inner
             .recv()
@@ -379,38 +386,55 @@ impl lightning_interfaces::pool::Responder for Responder {
 }
 
 pub struct Request {
-    channel: BoxedChannel,
+    // To properly clean up the channel, we need to call an async close method.
+    // Please see Drop impl.
+    channel: Option<BoxedChannel>,
     ok_header_sent: bool,
 }
 
 impl Request {
     pub(crate) fn new(channel: BoxedChannel) -> Self {
         Self {
-            channel,
+            channel: Some(channel),
             ok_header_sent: false,
         }
     }
 }
 
 #[async_trait]
-impl lightning_interfaces::pool::Request for Request {
+impl RequestInterface for Request {
     fn reject(self, reason: RejectReason) {
         let mut us = self;
         let header = bincode::serialize(&Status::Failed(reason)).expect("Typed object");
-        tokio::spawn(async move { us.channel.send(Bytes::from(header)).await });
+        tokio::spawn(async move {
+            let channel = us.channel.as_mut().expect("Channel taken on drop");
+            let _ = channel.send(Bytes::from(header)).await;
+        });
     }
 
     async fn send(&mut self, frame: Bytes) -> io::Result<()> {
+        let channel = self.channel.as_mut().expect("Channel taken on drop");
         if !self.ok_header_sent {
             // We haven't sent the header.
             // Let's send it first and only once.
             let header = bincode::serialize(&Status::Ok)
                 .map(Bytes::from)
                 .expect("Defined object");
-            self.channel.send(header).await?;
+            channel.send(header).await?;
             self.ok_header_sent = true;
         }
-        self.channel.send(frame).await
+        channel.send(frame).await
+    }
+}
+
+impl Drop for Request {
+    fn drop(&mut self) {
+        // Close the channel gracefully.
+        // This will close the underlying QUIC stream gracefully.
+        let mut channel = self.channel.take().expect("Channel taken on drop");
+        tokio::spawn(async move {
+            let _ = channel.close().await;
+        });
     }
 }
 
