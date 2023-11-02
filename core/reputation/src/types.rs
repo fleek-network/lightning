@@ -20,7 +20,7 @@ impl From<usize> for WeightedFloat {
     fn from(value: usize) -> Self {
         WeightedFloat {
             value: (value as i128).into(),
-            weight: 1.0.into(),
+            weight: 1.into(),
         }
     }
 }
@@ -35,7 +35,7 @@ impl Default for WeightedFloat {
     fn default() -> Self {
         WeightedFloat {
             value: 0.0.into(),
-            weight: 1.0.into(),
+            weight: 1.into(),
         }
     }
 }
@@ -84,11 +84,11 @@ impl Sub for WeightedFloat {
     }
 }
 
-impl From<f64> for WeightedFloat {
-    fn from(value: f64) -> Self {
+impl From<i128> for WeightedFloat {
+    fn from(value: i128) -> Self {
         WeightedFloat {
             value: value.into(),
-            weight: 1.0.into(),
+            weight: 1.into(),
         }
     }
 }
@@ -97,7 +97,7 @@ impl From<HpFixed<PRECISION>> for WeightedFloat {
     fn from(value: HpFixed<PRECISION>) -> Self {
         WeightedFloat {
             value,
-            weight: 1.0.into(),
+            weight: 1.into(),
         }
     }
 }
@@ -160,13 +160,13 @@ pub(crate) struct MinMaxValues {
 
 impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
     fn from(weighted_measurements: Vec<WeightedReputationMeasurements>) -> Self {
-        let mut weight_sum_latency: HpFixed<PRECISION> = 0.0.into();
-        let mut weight_sum_interactions: HpFixed<PRECISION> = 0.0.into();
-        let mut weight_sum_inbound_bandwidth: HpFixed<PRECISION> = 0.0.into();
-        let mut weight_sum_outbound_bandwidth: HpFixed<PRECISION> = 0.0.into();
-        let mut weight_sum_bytes_received: HpFixed<PRECISION> = 0.0.into();
-        let mut weight_sum_bytes_sent: HpFixed<PRECISION> = 0.0.into();
-        let mut weight_sum_uptime: HpFixed<PRECISION> = 0.0.into();
+        let mut weight_sum_latency: HpFixed<PRECISION> = 0.into();
+        let mut weight_sum_interactions: HpFixed<PRECISION> = 0.into();
+        let mut weight_sum_inbound_bandwidth: HpFixed<PRECISION> = 0.into();
+        let mut weight_sum_outbound_bandwidth: HpFixed<PRECISION> = 0.into();
+        let mut weight_sum_bytes_received: HpFixed<PRECISION> = 0.into();
+        let mut weight_sum_bytes_sent: HpFixed<PRECISION> = 0.into();
+        let mut weight_sum_uptime: HpFixed<PRECISION> = 0.into();
 
         let mut count_latency = 0;
         let mut count_interactions = 0;
@@ -534,5 +534,16 @@ impl NormalizedMeasurements {
         let score: i128 = (score * HpFixed::<PRECISION>::from(100)).try_into().ok()?;
         // The value of score will be in range [0, 100]
         Some(score.min(100) as u8)
+    }
+
+    pub fn get_uptime(&self) -> Option<u8> {
+        let Some(uptime) = &self.uptime else {
+            return None;
+        };
+        let uptime = uptime * HpFixed::<PRECISION>::from(100);
+        let Ok(uptime) = i128::try_from(uptime) else {
+            return None;
+        };
+        Some(uptime.min(100) as u8)
     }
 }

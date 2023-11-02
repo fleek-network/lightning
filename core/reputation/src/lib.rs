@@ -17,7 +17,7 @@ pub(crate) const PRECISION: usize = 18;
 
 pub fn calculate_reputation_scores(
     weighted_measurements_map: HashMap<NodeIndex, Vec<WeightedReputationMeasurements>>,
-) -> HashMap<NodeIndex, u8> {
+) -> HashMap<NodeIndex, (Option<u8>, Option<u8>)> {
     let mut normalized_measurements_map =
         calculate_normalized_measurements(weighted_measurements_map);
 
@@ -29,7 +29,7 @@ pub fn calculate_reputation_scores(
 
     normalized_measurements_map
         .iter()
-        .filter_map(|(node, m)| m.calculate_score().map(|score| (*node, score)))
+        .map(|(node, m)| (*node, (m.calculate_score(), m.get_uptime())))
         .collect()
 }
 

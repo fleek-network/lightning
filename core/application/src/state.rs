@@ -839,7 +839,7 @@ impl<B: Backend> State<B> {
         });
         let default_score = statistics::approx_quantile(
             rep_scores.values().copied().collect(),
-            DEFAULT_REP_QUANTILE,
+            HpUfixed::<18>::from(DEFAULT_REP_QUANTILE),
         )
         .unwrap_or(15);
 
@@ -868,12 +868,21 @@ impl<B: Backend> State<B> {
         }
         let new_rep_scores = lightning_reputation::calculate_reputation_scores(map);
         // Store new scores in application state.
-        new_rep_scores.iter().for_each(|(node, new_score)| {
-            let old_score = rep_scores.get(node).unwrap_or(&default_score);
-            let score =
-                *old_score as f64 * REP_EWMA_WEIGHT + (1.0 - REP_EWMA_WEIGHT) * *new_score as f64;
-            self.rep_scores.set(*node, score as u8)
-        });
+        new_rep_scores
+            .iter()
+            .for_each(|(node, (new_score, _uptime))| {
+                // TODO(matthias): add uptime to state and set inactive nodes
+                // to participating=false
+                let old_score = rep_scores.get(node).unwrap_or(&default_score);
+                let new_score = new_score.unwrap_or(default_score);
+                let emwa_weight = HpUfixed::<18>::from(REP_EWMA_WEIGHT);
+                let score = HpUfixed::<18>::from(*old_score as u32) * emwa_weight.clone()
+                    + (HpUfixed::<18>::from(1.0) - emwa_weight)
+                        * HpUfixed::<18>::from(new_score as u32);
+                let score: u128 = score.try_into().unwrap_or(default_score as u128);
+                // The value of score will be in range [0, 100]
+                self.rep_scores.set(*node, score as u8)
+            });
 
         // If not in test mode, remove outdated rep scores.
         // TODO(matthias): Maybe we should keep the old rep scores in case a node rejoins?
