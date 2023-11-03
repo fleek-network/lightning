@@ -81,6 +81,10 @@ const DEFAULT_REP_QUANTILE: f64 = 0.15;
 /// epochs and 30% is based on the current epoch.
 const REP_EWMA_WEIGHT: f64 = 0.7;
 
+/// If a node responded to less than 10% of pings from its peers, it will set to inactive until it
+/// submits an OptIn transaction.
+const MINIMUM_UPTIME: u8 = 10;
+
 /// To support ethereum tooling, all signed ethereum transactions will be pointed to this address
 /// otherwise, if there is a value and a different address they are trying to transfer the native
 /// token FLK
@@ -870,9 +874,7 @@ impl<B: Backend> State<B> {
         // Store new scores in application state.
         new_rep_scores
             .iter()
-            .for_each(|(node, (new_score, _uptime))| {
-                // TODO(matthias): add uptime to state and set inactive nodes
-                // to participating=false
+            .for_each(|(node, (new_score, uptime))| {
                 let old_score = rep_scores.get(node).unwrap_or(&default_score);
                 let new_score = new_score.unwrap_or(default_score);
                 let emwa_weight = HpUfixed::<18>::from(REP_EWMA_WEIGHT);
@@ -881,7 +883,16 @@ impl<B: Backend> State<B> {
                         * HpUfixed::<18>::from(new_score as u32);
                 let score: u128 = score.try_into().unwrap_or(default_score as u128);
                 // The value of score will be in range [0, 100]
-                self.rep_scores.set(*node, score as u8)
+                self.rep_scores.set(*node, score as u8);
+
+                uptime.map(|uptime| {
+                    if uptime < MINIMUM_UPTIME {
+                        if let Some(mut node_info) = self.node_info.get(node) {
+                            node_info.participating = false;
+                            self.node_info.set(*node, node_info);
+                        }
+                    }
+                });
             });
 
         // If not in test mode, remove outdated rep scores.

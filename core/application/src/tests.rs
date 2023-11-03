@@ -25,6 +25,7 @@ use lightning_interfaces::types::{
     NodePorts,
     ProofOfConsensus,
     ProtocolParams,
+    ReputationMeasurements,
     Tokens,
     TotalServed,
     TransactionRequest,
@@ -1057,6 +1058,118 @@ async fn test_rep_scores() {
 
     assert!(query_runner.get_reputation(&peer_index1).is_some());
     assert!(query_runner.get_reputation(&peer_index2).is_some());
+}
+
+#[test]
+async fn test_uptime_participation() {
+    let (mut committee, keystore) = get_genesis_committee(4);
+    let committee_len = committee.len();
+    let mut genesis = Genesis::load().unwrap();
+    committee[0].reputation = Some(40);
+    committee[1].reputation = Some(80);
+    genesis.node_info = committee;
+    let (update_socket, query_runner) = init_app(Some(Config {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+        testnet: false,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
+    }));
+    let required_signals = 2 * committee_len / 3 + 1;
+
+    let mut map = BTreeMap::new();
+    let measurements = ReputationMeasurements {
+        latency: None,
+        interactions: None,
+        inbound_bandwidth: None,
+        outbound_bandwidth: None,
+        bytes_received: None,
+        bytes_sent: None,
+        uptime: Some(5),
+        hops: None,
+    };
+    let peer1 = keystore[2].node_secret_key.to_pk();
+    let peer_index1 = query_runner.pubkey_to_index(peer1).unwrap();
+    map.insert(peer_index1, measurements.clone());
+    let measurements = ReputationMeasurements {
+        latency: None,
+        interactions: None,
+        inbound_bandwidth: None,
+        outbound_bandwidth: None,
+        bytes_received: None,
+        bytes_sent: None,
+        uptime: Some(20),
+        hops: None,
+    };
+    let peer2 = keystore[3].node_secret_key.to_pk();
+    let peer_index2 = query_runner.pubkey_to_index(peer2).unwrap();
+    map.insert(peer_index2, measurements.clone());
+
+    let req = get_update_request_node(
+        UpdateMethod::SubmitReputationMeasurements { measurements: map },
+        &keystore[0].node_secret_key,
+        1,
+    );
+
+    if let Err(e) = run_transaction(vec![req.into()], &update_socket).await {
+        panic!("{e}");
+    }
+
+    let mut map = BTreeMap::new();
+    let measurements = ReputationMeasurements {
+        latency: None,
+        interactions: None,
+        inbound_bandwidth: None,
+        outbound_bandwidth: None,
+        bytes_received: None,
+        bytes_sent: None,
+        uptime: Some(9),
+        hops: None,
+    };
+    map.insert(peer_index1, measurements.clone());
+
+    let measurements = ReputationMeasurements {
+        latency: None,
+        interactions: None,
+        inbound_bandwidth: None,
+        outbound_bandwidth: None,
+        bytes_received: None,
+        bytes_sent: None,
+        uptime: Some(25),
+        hops: None,
+    };
+    map.insert(peer_index2, measurements.clone());
+
+    let req = get_update_request_node(
+        UpdateMethod::SubmitReputationMeasurements { measurements: map },
+        &keystore[1].node_secret_key,
+        1,
+    );
+
+    if let Err(e) = run_transaction(vec![req.into()], &update_socket).await {
+        panic!("{e}");
+    }
+
+    // Change epoch so that rep scores will be calculated from the measurements.
+    for (i, node) in keystore.iter().enumerate().take(required_signals) {
+        // Not the prettiest solution but we have to keep track of the nonces somehow.
+        let nonce = if i == 0 || i == 1 { 2 } else { 1 };
+        let req = get_update_request_node(
+            UpdateMethod::ChangeEpoch { epoch: 0 },
+            &node.node_secret_key,
+            nonce,
+        );
+        run_transaction(vec![req.into()], &update_socket)
+            .await
+            .unwrap();
+    }
+
+    let node_info1 = query_runner.get_node_info(&peer1).unwrap();
+    let node_info2 = query_runner.get_node_info(&peer2).unwrap();
+
+    assert!(!node_info1.participating);
+    assert!(node_info2.participating);
 }
 
 #[test]
