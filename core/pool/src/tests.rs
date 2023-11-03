@@ -399,7 +399,6 @@ async fn test_open_req_res() {
 
 #[tokio::test]
 async fn test_open_req_res_unknown_peer() {
-    env_logger::init();
     // Give: a peer.
     let (peers, _app, path) = get_pools("test_open_req_res_unknown_peer", 55000, 1).await;
     let (requester1, _responder1) = peers[0].pool.open_req_res(ServiceScope::BlockstoreServer);
