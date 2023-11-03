@@ -312,7 +312,7 @@ async fn test_send_to_all() {
     assert!(
         tokio::time::timeout(
             Duration::from_secs(5),
-            event_handlers_unknown_peer.receive()
+            event_handlers_unknown_peer.receive(),
         )
         .await
         .is_err()
@@ -675,7 +675,7 @@ async fn test_overlay_only_broadcast_to_peers_in_topology_cluster() {
         }) => {
             let peers_to_broadcast = peers_to_broadcast
                 .into_iter()
-                .map(|info| info.address.index)
+                .map(|info| info.node_info.index)
                 .collect::<HashSet<_>>();
             assert_eq!(peers_to_broadcast, peers_to_connect);
             assert!(!peers_to_broadcast.contains(&peers[3].node_index))
@@ -684,6 +684,83 @@ async fn test_overlay_only_broadcast_to_peers_in_topology_cluster() {
             unreachable!("invalid value expected a broadcast task")
         },
     }
+
+    if path.exists() {
+        std::fs::remove_dir_all(&path).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn test_overlay_only_broadcast_to_one_peer() {
+    // Given: a network of 4 nodes.
+    let (peers, app, path) = get_pools(
+        "test_overlay_only_broadcast_to_one_peer",
+        8000, // We never bind.
+        4,
+    )
+    .await;
+    let query_runner = app.sync_query();
+    let mut overlay = NetworkOverlay::<TestBinding>::new(
+        query_runner.clone(),
+        peers[0].node_public_key,
+        OnceCell::from(peers[0].node_index),
+    );
+
+    // Given: we connect to all peers.
+    let peers_to_connect = peers[1..]
+        .iter()
+        .map(|peer| peer.node_index)
+        .collect::<HashSet<_>>();
+    overlay.update_connections(peers_to_connect.clone());
+    assert_eq!(overlay.peers.len(), 3);
+
+    // When: we send a broadcast message to one peer.
+    let (send_request_tx, _) = overlay.register_broadcast_service(ServiceScope::Broadcast);
+    send_request_tx
+        .send(BroadcastRequest {
+            service_scope: ServiceScope::Broadcast,
+            message: Bytes::new(),
+            param: Param::Index(peers[1].node_index),
+        })
+        .await
+        .unwrap();
+
+    // Then: the message would be sent to that peer only.
+    let task = overlay.next().await.unwrap();
+    match task {
+        PoolTask::Broadcast(BroadcastTask::Send {
+            peers: peers_to_broadcast,
+            ..
+        }) => {
+            let peers_to_broadcast = peers_to_broadcast
+                .into_iter()
+                .map(|info| info.node_info.index)
+                .collect::<HashSet<_>>();
+            assert_eq!(peers_to_broadcast.len(), 1);
+            assert!(peers_to_broadcast.contains(&peers[1].node_index))
+        },
+        _ => {
+            unreachable!("invalid value expected a broadcast task")
+        },
+    }
+
+    // When: we send a broadcast message to a peer that is not in state.
+    let (send_request_tx, _) = overlay.register_broadcast_service(ServiceScope::Broadcast);
+    send_request_tx
+        .send(BroadcastRequest {
+            service_scope: ServiceScope::Broadcast,
+            message: Bytes::new(),
+            param: Param::Index(6969),
+        })
+        .await
+        .unwrap();
+
+    // Then: the broadcast request gets ignored.
+    assert!(
+        tokio::time::timeout(Duration::from_secs(5), overlay.next())
+            .await
+            .is_err()
+    );
 
     if path.exists() {
         std::fs::remove_dir_all(&path).unwrap();

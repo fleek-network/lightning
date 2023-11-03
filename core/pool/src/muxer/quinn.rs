@@ -11,7 +11,7 @@ use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use quinn::{ClientConfig, Endpoint, RecvStream, SendStream, ServerConfig, TransportConfig};
 use rustls::Certificate;
 
-use crate::endpoint::NodeAddress;
+use crate::endpoint::NodeInfo;
 use crate::muxer::{ConnectionInterface, MuxerInterface, Stats};
 use crate::tls;
 
@@ -49,7 +49,7 @@ impl MuxerInterface for QuinnMuxer {
         })
     }
 
-    async fn connect(&self, peer: NodeAddress, server_name: &str) -> io::Result<Self::Connecting> {
+    async fn connect(&self, peer: NodeInfo, server_name: &str) -> io::Result<Self::Connecting> {
         let tls_config = tls::make_client_config(&self.sk, Some(peer.pk))
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         let mut client_config = ClientConfig::new(Arc::new(tls_config));

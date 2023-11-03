@@ -14,7 +14,7 @@ use futures::{Sink, Stream};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-use crate::endpoint::NodeAddress;
+use crate::endpoint::NodeInfo;
 use crate::muxer::sealed::Sealed;
 
 pub type BoxedChannel =
@@ -39,7 +39,7 @@ pub trait MuxerInterface: Clone + Send + Sync + 'static {
     type Config: Clone;
 
     fn init(config: Self::Config) -> io::Result<Self>;
-    async fn connect(&self, peer: NodeAddress, server_name: &str) -> io::Result<Self::Connecting>;
+    async fn connect(&self, peer: NodeInfo, server_name: &str) -> io::Result<Self::Connecting>;
 
     // The implementation must be cancel-safe.
     async fn accept(&self) -> Option<Self::Connecting>;

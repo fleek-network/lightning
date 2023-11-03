@@ -25,7 +25,7 @@ pub struct Context<C> {
     /// The peer's index.
     peer: NodeIndex,
     /// Receive requests to perform on connection.
-    service_request_rx: Receiver<ConnectionRequest>,
+    service_request_rx: Receiver<ServiceRequest>,
     /// Send events from this connection.
     connection_event_tx: Sender<ConnectionEvent>,
 }
@@ -34,7 +34,7 @@ impl<C: ConnectionInterface> Context<C> {
     pub fn new(
         connection: C,
         peer: NodeIndex,
-        service_request_rx: Receiver<ConnectionRequest>,
+        service_request_rx: Receiver<ServiceRequest>,
         connection_event_tx: Sender<ConnectionEvent>,
     ) -> Self {
         Self {
@@ -98,9 +98,9 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                     }
                 });
             }
-            driver_request = ctx.service_request_rx.recv() => {
-                match driver_request {
-                    Some(ConnectionRequest::SendMessage(message)) => {
+            request = ctx.service_request_rx.recv() => {
+                match request {
+                    Some(ServiceRequest::SendMessage(message)) => {
                         tracing::trace!("handling a broadcast message request");
                         // We need to create a new stream on the connection.
                         let connection = ctx.connection.clone();
@@ -113,7 +113,7 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                             }
                         });
                     },
-                    Some(ConnectionRequest::SendRequest { service, request, respond }) => {
+                    Some(ServiceRequest::SendRequest { service, request, respond }) => {
                         tracing::trace!("handling new outgoing request");
                         // We need to create a new stream on the connection for the channel.
                         let connection = ctx.connection.clone();
@@ -278,8 +278,8 @@ async fn send_request<C: ConnectionInterface>(
     Ok(())
 }
 
-/// Requests that will performed on the connection.
-pub enum ConnectionRequest {
+/// Requests that will be performed on a connection.
+pub enum ServiceRequest {
     SendMessage(Message),
     SendRequest {
         service: ServiceScope,

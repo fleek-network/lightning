@@ -24,7 +24,7 @@ use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinSet;
 
 use crate::connection::connector::{ConnectionResult, Connector};
-use crate::connection::{self, ConnectionRequest, Context};
+use crate::connection::{self, Context, ServiceRequest};
 use crate::muxer::{ConnectionInterface, MuxerInterface};
 use crate::overlay::{
     BroadcastRequest,
@@ -58,11 +58,10 @@ type ConnectionId = usize;
 ///
 /// The endpoint has a pool of transport connections which implement
 /// the [`MuxerInterface`] trait. When a transport connection is
-/// established with a peer, a driver tasks is spawned and given ownership
-/// of the connection. The driver task will listen for incoming unidirectional
+/// established with a peer, a task is spawned and given ownership
+/// of the connection. The connection task will listen for incoming unidirectional
 /// streams, for p2p applications such as broadcasting, and for bidirectional
-/// streams for request/response applications. Bidirectional streams are used
-/// for implementing our request/response protocol.
+/// streams for request/response applications.
 ///
 /// # Pinning
 ///
@@ -77,7 +76,7 @@ where
     M: MuxerInterface,
 {
     /// Pool of connections.
-    pool: HashMap<NodeIndex, DriverHandle>,
+    pool: HashMap<NodeIndex, OngoingConnectionHandle>,
     /// Network overlay.
     network_overlay: NetworkOverlay<C>,
     /// Source of network topology.
@@ -93,9 +92,9 @@ where
     /// Performs dial tasks.
     connector: Connector<M>,
     /// Pending outgoing requests.
-    pending_task: HashMap<NodeIndex, Vec<ConnectionRequest>>,
-    /// Ongoing drivers.
-    driver_set: JoinSet<(NodeIndex, ConnectionId)>,
+    pending_task: HashMap<NodeIndex, Vec<ServiceRequest>>,
+    /// Ongoing connection tasks.
+    ongoing_connection_tasks: JoinSet<(NodeIndex, ConnectionId)>,
     /// Connections that are redundant.
     // There may be edge cases when two peers connect
     // to each other at the same time. During resolution,
@@ -106,7 +105,7 @@ where
     // themselves when the idle-timeout triggers.
     // These will need to be garbage collected.
     // Todo: Look into avoiding to maintain two tables.
-    redundant_pool: HashMap<NodeIndex, DriverHandle>,
+    redundant_pool: HashMap<NodeIndex, OngoingConnectionHandle>,
     /// Multiplexed transport.
     muxer: Option<M>,
     /// Config for the multiplexed transport.
@@ -139,7 +138,7 @@ where
             connection_event_tx,
             connector: Connector::new(),
             pending_task: HashMap::new(),
-            driver_set: JoinSet::new(),
+            ongoing_connection_tasks: JoinSet::new(),
             muxer: None,
             config,
             redundant_pool: HashMap::new(),
@@ -180,7 +179,7 @@ where
                         .expect("Endpoint is always initialized on start"),
                 )?;
 
-                let request = ConnectionRequest::SendRequest {
+                let request = ServiceRequest::SendRequest {
                     service: service_scope,
                     request,
                     respond,
@@ -188,15 +187,15 @@ where
                 self.enqueue_pending_request(peer_index, request);
             },
             Some(handle) => {
-                let driver_tx = handle.tx.clone();
+                let ongoing_conn_tx = handle.service_request_tx.clone();
                 tokio::spawn(async move {
-                    let request = ConnectionRequest::SendRequest {
+                    let request = ServiceRequest::SendRequest {
                         service: service_scope,
                         request,
                         respond,
                     };
-                    if driver_tx.send(request).await.is_err() {
-                        tracing::error!("failed to send driver a send-request task");
+                    if ongoing_conn_tx.send(request).await.is_err() {
+                        tracing::error!("failed to send connection loop a send-request task");
                     }
                 });
             },
@@ -215,13 +214,14 @@ where
                 // we partition into those we are connected to and those
                 // that we're not.
                 let (connected, not_connected) = {
-                    let (connected, not_connected) = peers
-                        .into_iter()
-                        .partition::<Vec<_>, _>(|info| self.pool.contains_key(&info.address.index));
+                    let (connected, not_connected) =
+                        peers.into_iter().partition::<Vec<_>, _>(|info| {
+                            self.pool.contains_key(&info.node_info.index)
+                        });
                     (
                         connected
                             .into_iter()
-                            .map(|info| info.address.index)
+                            .map(|info| info.node_info.index)
                             .collect::<Vec<_>>(),
                         not_connected,
                     )
@@ -241,9 +241,9 @@ where
 
                 // We will enqueue a dial task for these peers.
                 for info in not_connected {
-                    let peer_index = info.address.index;
+                    let peer_index = info.node_info.index;
                     if let Err(e) = self.connector.enqueue_dial_task(
-                        info.address,
+                        info.node_info,
                         self.muxer
                             .clone()
                             .expect("Endpoint is always initialized on start"),
@@ -254,7 +254,7 @@ where
                     // Enqueue message for later after we connect.
                     self.enqueue_pending_request(
                         peer_index,
-                        ConnectionRequest::SendMessage(message.clone()),
+                        ServiceRequest::SendMessage(message.clone()),
                     )
                 }
 
@@ -266,12 +266,12 @@ where
                         continue;
                     };
 
-                    let driver_tx = handle.tx.clone();
-                    let request = ConnectionRequest::SendMessage(message.clone());
+                    let ongoing_conn_tx = handle.service_request_tx.clone();
+                    let request = ServiceRequest::SendMessage(message.clone());
                     tokio::spawn(async move {
-                        if driver_tx.send(request).await.is_err() {
+                        if ongoing_conn_tx.send(request).await.is_err() {
                             tracing::error!(
-                                "failed to send broadcast request to driver for node with index: {index:?}"
+                                "failed to send broadcast request to connection task for node with index: {index:?}"
                             );
                         }
                     });
@@ -286,21 +286,21 @@ where
                 for info in peers.into_values() {
                     tracing::debug!(
                         "broadcast update: peer with index: {:?}",
-                        info.address.index
+                        info.node_info.index
                     );
                     // We do not want to connect to peers we're already connected to
                     // and to peers that should be connecting to us during an update.
-                    if self.pool.contains_key(&info.address.index) || !info.connect {
+                    if self.pool.contains_key(&info.node_info.index) || !info.connect {
                         tracing::debug!(
                             "broadcast update: skip peer with index {:?}",
-                            info.address.index
+                            info.node_info.index
                         );
                         continue;
                     }
 
                     if let Err(e) = self
                         .connector
-                        .enqueue_dial_task(info.address, self.muxer.clone().unwrap())
+                        .enqueue_dial_task(info.node_info, self.muxer.clone().unwrap())
                     {
                         tracing::error!("failed to enqueue the dial task: {e:?}");
                     }
@@ -348,10 +348,10 @@ where
             let (request_tx, request_rx) = mpsc::channel(1024);
             let connection_event_tx = self.connection_event_tx.clone();
             let ctx = Context::new(connection, peer_index, request_rx, connection_event_tx);
-            self.driver_set.spawn(async move {
+            self.ongoing_connection_tasks.spawn(async move {
                 if let Err(e) = connection::connection_loop(ctx).await {
                     tracing::info!(
-                        "driver for connection with {peer_index:?} exited with error: {e:?}"
+                        "task for connection with {peer_index:?} exited with error: {e:?}"
                     );
                 }
                 (peer_index, connection_id)
@@ -370,14 +370,14 @@ where
 
                 for req in pending_requests {
                     // We need to pin the connection if used by requester service.
-                    if matches!(req, ConnectionRequest::SendRequest { .. }) {
+                    if matches!(req, ServiceRequest::SendRequest { .. }) {
                         should_pin = true;
                     }
 
                     let request_tx_clone = request_tx.clone();
                     tokio::spawn(async move {
                         if request_tx_clone.send(req).await.is_err() {
-                            tracing::error!("failed to send pending request to driver");
+                            tracing::error!("failed to send pending request to connection task");
                         }
                     });
                 }
@@ -388,14 +388,14 @@ where
             // We pin it now because we don't want an update from
             // topology to drop it.
             if should_pin {
-                if let Some(address) = self.network_overlay.node_address_from_state(&peer_index) {
-                    self.network_overlay.pin_connection(peer_index, address);
+                if let Some(info) = self.network_overlay.node_info_from_state(&peer_index) {
+                    self.network_overlay.pin_connection(peer_index, info);
                 }
             }
 
-            // Save a handle to the driver to send requests.
-            let handle = DriverHandle {
-                tx: request_tx,
+            // Save a handle to the connection task to send requests.
+            let handle = OngoingConnectionHandle {
+                service_request_tx: request_tx,
                 connection_id,
             };
 
@@ -416,7 +416,7 @@ where
 
     /// Enqueues requests that will be sent after a connection is established with the peer.
     #[inline]
-    fn enqueue_pending_request(&mut self, peer: NodeIndex, request: ConnectionRequest) {
+    fn enqueue_pending_request(&mut self, peer: NodeIndex, request: ServiceRequest) {
         self.pending_task.entry(peer).or_default().push(request);
     }
 
@@ -458,9 +458,9 @@ where
         self.pending_task.clear();
         self.connector.clear();
 
-        // All driver tasks should finished since we dropped all
+        // All connection tasks should finished since we dropped all
         // Senders above.
-        while self.driver_set.join_next().await.is_some() {}
+        while self.ongoing_connection_tasks.join_next().await.is_some() {}
 
         // We drop the muxer to unbind the address.
         self.muxer
@@ -579,14 +579,14 @@ where
                 // will return None when there are no ongoing connections
                 // and thus, it should be disabled to allow other branches
                 // to process new connections.
-                Some(peer) = self.driver_set.join_next() => {
+                Some(peer) = self.ongoing_connection_tasks.join_next() => {
                     match peer {
                         Ok((index, id)) => {
-                            tracing::trace!("driver for connection={id:?} with node={index:?} ended");
+                            tracing::trace!("task for connection={id:?} with node={index:?} ended");
                             self.garbage_collect_closed_connections(index, id);
                         }
                         Err(e) => {
-                            tracing::warn!("unable to clean up failed driver tasks: {e:?}");
+                            tracing::warn!("unable to clean up failed connection tasks: {e:?}");
                         }
                     }
                 }
@@ -609,15 +609,15 @@ pub enum ConnectionEvent {
     },
 }
 
-/// Address of a peer node.
+/// Info of a node.
 #[derive(Clone, Debug)]
-pub struct NodeAddress {
+pub struct NodeInfo {
     pub index: NodeIndex,
     pub pk: NodePublicKey,
     pub socket_address: SocketAddr,
 }
 
-pub struct DriverHandle {
-    tx: Sender<ConnectionRequest>,
+pub struct OngoingConnectionHandle {
+    service_request_tx: Sender<ServiceRequest>,
     connection_id: usize,
 }

@@ -8,7 +8,7 @@ use futures::{FutureExt, StreamExt};
 use lightning_interfaces::types::NodeIndex;
 use tokio_util::sync::CancellationToken;
 
-use crate::endpoint::NodeAddress;
+use crate::endpoint::NodeInfo;
 use crate::muxer::{ConnectionInterface, MuxerInterface};
 
 pub struct Connector<M>
@@ -37,16 +37,16 @@ where
         self.connecting.next().await
     }
 
-    pub fn enqueue_dial_task(&mut self, address: NodeAddress, muxer: M) -> Result<()> {
-        if let Entry::Vacant(entry) = self.pending_dial.entry(address.index) {
+    pub fn enqueue_dial_task(&mut self, info: NodeInfo, muxer: M) -> Result<()> {
+        if let Entry::Vacant(entry) = self.pending_dial.entry(info.index) {
             let cancel = CancellationToken::new();
             entry.insert(cancel.clone());
 
             let fut = async move {
-                let index = address.index;
+                let index = info.index;
                 let connect = || async {
                     muxer
-                        .connect(address, "localhost")
+                        .connect(info, "lightning-node")
                         .await?
                         .await
                         .map_err(Into::into)

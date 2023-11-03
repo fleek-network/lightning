@@ -20,7 +20,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use x509_parser::nom::AsBytes;
 
-use crate::endpoint::NodeAddress;
+use crate::endpoint::NodeInfo;
 use crate::muxer::{ConnectionInterface, MuxerInterface};
 use crate::pool::{Request, Response};
 
@@ -130,8 +130,8 @@ where
                 tracing::warn!("received unknown service scope: {service_scope:?}");
             },
             Some(tx) => {
-                if let Some(address) = self.node_address_from_state(&peer) {
-                    self.pin_connection(peer, address);
+                if let Some(info) = self.node_info_from_state(&peer) {
+                    self.pin_connection(peer, info);
                     tokio::spawn(async move {
                         if tx.send(request).await.is_err() {
                             tracing::error!("failed to send incoming request to user");
@@ -165,12 +165,12 @@ where
             .into_iter()
             // We ignore connections for which we don't have information on state.
             .filter_map(|index| {
-                let address = self.node_address_from_state(&index)?;
-                let should_connect = address.index < self.get_index();
+                let info = self.node_info_from_state(&index)?;
+                let should_connect = info.index < self.get_index();
                 Some(ConnectionInfo {
                     from_topology: true,
                     pinned: false,
-                    address,
+                    node_info: info,
                     connect: should_connect,
                 })
             })
@@ -178,7 +178,9 @@ where
 
         // We perform a union.
         for info in peers.iter() {
-            self.peers.entry(info.address.index).or_insert(info.clone());
+            self.peers
+                .entry(info.node_info.index)
+                .or_insert(info.clone());
         }
 
         // We tell the pool who to connect to.
@@ -198,19 +200,19 @@ where
         }
     }
 
-    pub fn node_address_from_state(&self, index: &NodeIndex) -> Option<NodeAddress> {
+    pub fn node_info_from_state(&self, index: &NodeIndex) -> Option<NodeInfo> {
         let pk = self.sync_query.index_to_pubkey(*index)?;
 
         let info = self.sync_query.get_node_info(&pk)?;
 
-        Some(NodeAddress {
+        Some(NodeInfo {
             index: *index,
             pk,
             socket_address: SocketAddr::from((info.domain, info.ports.pool)),
         })
     }
 
-    pub fn pin_connection(&mut self, peer: NodeIndex, address: NodeAddress) {
+    pub fn pin_connection(&mut self, peer: NodeIndex, info: NodeInfo) {
         let our_index = self.get_index();
         self.peers
             .entry(peer)
@@ -220,7 +222,7 @@ where
                 ConnectionInfo {
                     pinned: true,
                     from_topology: false,
-                    address,
+                    node_info: info,
                     connect: should_connect,
                 }
             });
@@ -269,11 +271,11 @@ where
             tokio::select! {
                 send_request = self.send_request_rx.recv() => {
                     let send_request = send_request?;
-                    match self.node_address_from_state(&send_request.peer) {
-                        Some(address) => {
-                            self.pin_connection(send_request.peer, address.clone());
+                    match self.node_info_from_state(&send_request.peer) {
+                        Some(info) => {
+                            self.pin_connection(send_request.peer, info.clone());
                             return Some(PoolTask::SendRequest(SendRequestTask {
-                                    peer: address,
+                                    peer: info,
                                     service_scope: send_request.service_scope,
                                     request: send_request.request,
                                     respond: send_request.respond,
@@ -361,7 +363,7 @@ pub enum BroadcastTask {
 
 // Todo: find a way to consolidate with `SendRequest`.
 pub struct SendRequestTask {
-    pub peer: NodeAddress,
+    pub peer: NodeInfo,
     pub service_scope: ServiceScope,
     pub request: Bytes,
     pub respond: oneshot::Sender<io::Result<Response>>,
@@ -381,8 +383,8 @@ pub struct ConnectionInfo {
     pub pinned: bool,
     /// This connection was initiated on a topology event.
     pub from_topology: bool,
-    /// The address of the peer.
-    pub address: NodeAddress,
+    /// The info of the peer.
+    pub node_info: NodeInfo,
     /// This field is used during topology updates.
     /// It tells the pool whether it should connect
     /// to the peer or wait for the peer to connect.
