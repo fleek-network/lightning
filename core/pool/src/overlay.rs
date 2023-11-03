@@ -32,7 +32,7 @@ where
     F: Fn(NodeIndex) -> bool,
 {
     /// Peers that we are currently connected to.
-    peers: HashMap<NodeIndex, ConnectionInfo>,
+    pub(crate) peers: HashMap<NodeIndex, ConnectionInfo>,
     /// Service handles.
     broadcast_service_handles: HashMap<ServiceScope, Sender<(NodeIndex, Bytes)>>,
     /// Receive requests for broadcast service.
@@ -295,7 +295,7 @@ where
                             self
                                 .peers
                                 .iter()
-                                .filter(|(index, _)| filter(**index))
+                                .filter(|(index, info)| info.from_topology && filter(**index))
                                 .map(|(_, info)| info.clone())
                                 .collect()
                         }
@@ -303,6 +303,7 @@ where
                             self
                                 .peers
                                 .get(&index)
+                                .filter(|info| info.from_topology)
                                 .map(|info| vec![info.clone()])
                                 .unwrap_or_default()
                         },
