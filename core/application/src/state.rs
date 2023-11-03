@@ -1077,7 +1077,8 @@ impl<B: Backend> State<B> {
             .into_iter()
             .for_each(|(peer_index, measurements)| {
                 // TODO(matthias): check if node has minimum stake?
-                if self.node_info.get(&peer_index).is_some() {
+
+                if measurements.verify() && self.node_info.get(&peer_index).is_some() {
                     let mut node_measurements = match self.rep_measurements.get(&peer_index) {
                         Some(node_measurements) => node_measurements,
                         None => Vec::new(),
