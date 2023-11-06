@@ -1,11 +1,16 @@
+use std::net::SocketAddr;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-pub struct Config {}
+pub struct Config {
+    pub address: SocketAddr,
+}
 
-#[allow(clippy::derivable_impls)]
 impl Default for Config {
     fn default() -> Self {
-        Self {}
+        Self {
+            address: "0.0.0.0:4350".parse().unwrap(),
+        }
     }
 }

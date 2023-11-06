@@ -1,6 +1,5 @@
-use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use lightning_interfaces::infu_collection::{c, Collection};
@@ -11,22 +10,23 @@ use lightning_interfaces::{
     ReputationAggregatorInterface,
     WithStartAndShutdown,
 };
+use tokio::net::UdpSocket;
 use tokio::sync::Notify;
 use tracing::error;
 
 use crate::config::Config;
 
 pub struct Pinger<C: Collection> {
+    config: Config,
     sender: Arc<PingSender<C>>,
     responder: Arc<PingResponder<C>>,
     is_running: Arc<AtomicBool>,
     shutdown_notify: Arc<Notify>,
-    _marker: PhantomData<C>,
 }
 
 impl<C: Collection> PingerInterface<C> for Pinger<C> {
     fn init(
-        _config: Self::Config,
+        config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     ) -> anyhow::Result<Self> {
@@ -39,11 +39,11 @@ impl<C: Collection> PingerInterface<C> for Pinger<C> {
         let responder =
             PingResponder::<C>::new(query_runner, rep_reporter, shutdown_notify.clone());
         Ok(Self {
+            config,
             sender: Arc::new(sender),
             responder: Arc::new(responder),
             is_running: Arc::new(AtomicBool::new(false)),
             shutdown_notify,
-            _marker: PhantomData,
         })
     }
 }
@@ -55,14 +55,29 @@ impl<C: Collection> WithStartAndShutdown for Pinger<C> {
     }
 
     async fn start(&self) {
+        // Note(matthias): providing the UPD socket to the sender and responder using interior
+        // mutability is not elegant. It is necessary because the Pinger's init function is
+        // not async, so we cannot create the socket in the init function and pass
+        // it to the sender and responder there.
+        // I didn't make the init function async because none of the other init functions are.
         if !self.is_running() {
             let sender = self.sender.clone();
+            let responder = self.responder.clone();
+            if sender.socket.lock().unwrap().is_none() {
+                let socket = Arc::new(
+                    UdpSocket::bind(self.config.address)
+                        .await
+                        .expect("Failed to bind to UDP socket"),
+                );
+                sender.provide_socket(socket.clone());
+                responder.provide_socket(socket);
+            }
+
             let is_running = self.is_running.clone();
             tokio::spawn(async move {
                 sender.start().await;
                 is_running.store(false, Ordering::Relaxed);
             });
-            let responder = self.responder.clone();
             let is_running = self.is_running.clone();
             tokio::spawn(async move {
                 responder.start().await;
@@ -81,6 +96,7 @@ impl<C: Collection> WithStartAndShutdown for Pinger<C> {
 
 #[allow(unused)]
 struct PingSender<C: Collection> {
+    socket: Mutex<Option<Arc<UdpSocket>>>,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     shutdown_notify: Arc<Notify>,
@@ -93,6 +109,7 @@ impl<C: Collection> PingSender<C> {
         shutdown_notify: Arc<Notify>,
     ) -> Self {
         Self {
+            socket: Mutex::new(None),
             query_runner,
             rep_reporter,
             shutdown_notify,
@@ -109,10 +126,15 @@ impl<C: Collection> PingSender<C> {
             }
         }
     }
+
+    fn provide_socket(&self, socket: Arc<UdpSocket>) {
+        *self.socket.lock().unwrap() = Some(socket);
+    }
 }
 
 #[allow(unused)]
 struct PingResponder<C: Collection> {
+    socket: Mutex<Option<Arc<UdpSocket>>>,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     shutdown_notify: Arc<Notify>,
@@ -125,6 +147,7 @@ impl<C: Collection> PingResponder<C> {
         shutdown_notify: Arc<Notify>,
     ) -> Self {
         Self {
+            socket: Mutex::new(None),
             query_runner,
             rep_reporter,
             shutdown_notify,
@@ -140,6 +163,10 @@ impl<C: Collection> PingResponder<C> {
 
             }
         }
+    }
+
+    fn provide_socket(&self, socket: Arc<UdpSocket>) {
+        *self.socket.lock().unwrap() = Some(socket);
     }
 }
 
