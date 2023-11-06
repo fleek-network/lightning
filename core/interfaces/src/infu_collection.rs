@@ -29,6 +29,7 @@ collection!([
     SignerInterface,
     FetcherInterface,
     PoolInterface,
+    PingerInterface,
 ]);
 
 /// The Fleek Network node.
@@ -92,6 +93,7 @@ impl<C: Collection> Node<C> {
         provider.get::<C::ServiceExecutorInterface>();
         provider.get::<C::FetcherInterface>();
         provider.get::<C::PoolInterface>();
+        provider.get::<C::PingerInterface>();
     }
 }
 
@@ -102,6 +104,7 @@ forward!(async fn start_or_shutdown_node(this, start: bool) on [
     ApplicationInterface,
     SyncronizerInterface,
     ReputationAggregatorInterface,
+    PingerInterface,
     BroadcastInterface,
     HandshakeInterface,
     ArchiveInterface,

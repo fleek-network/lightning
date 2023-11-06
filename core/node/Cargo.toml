@@ -26,6 +26,7 @@ lightning-service-executor = { path = "../service-executor" }
 lightning-signer = { path = "../signer" }
 lightning-syncronizer = { path = "../syncronizer" }
 lightning-topology = { path = "../topology" }
+lightning-pinger = { path = "../pinger" }
 mock = { path = "../mock" }
 toml = "0.7"
 infusion.workspace = true

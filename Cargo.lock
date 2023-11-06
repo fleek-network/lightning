@@ -4806,6 +4806,7 @@ dependencies = [
  "lightning-interfaces",
  "lightning-notifier",
  "lightning-origin-ipfs",
+ "lightning-pinger",
  "lightning-pool",
  "lightning-rep-collector",
  "lightning-resolver",
@@ -4871,6 +4872,18 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.9",
+ "tracing",
+]
+
+[[package]]
+name = "lightning-pinger"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "lightning-interfaces",
+ "serde",
+ "tokio",
  "tracing",
 ]
 

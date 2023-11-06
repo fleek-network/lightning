@@ -1,0 +1,15 @@
+[package]
+name = "lightning-pinger"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lightning-interfaces = {path="../interfaces"}
+tokio.workspace = true
+async-trait.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+tracing.workspace = true
+

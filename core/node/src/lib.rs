@@ -17,6 +17,7 @@ use lightning_interfaces::infu_collection::{
 };
 use lightning_notifier::Notifier;
 use lightning_origin_ipfs::IPFSOrigin;
+use lightning_pinger::Pinger;
 use lightning_pool::Pool;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_resolver::resolver::Resolver;
@@ -55,6 +56,7 @@ impl CollectionBase for FinalTypes {
     type SignerInterface<C: Collection> = Signer<C>;
     type FetcherInterface<C: Collection> = Fetcher<C>;
     type PoolInterface<C: Collection> = Pool<C>;
+    type PingerInterface<C: Collection> = Pinger<C>;
 }
 
 // Create the collection modifier that can inject the mock consensus
