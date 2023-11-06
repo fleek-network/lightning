@@ -17,7 +17,8 @@ use tracing::error;
 use crate::config::Config;
 
 pub struct Pinger<C: Collection> {
-    inner: Arc<PingerInner<C>>,
+    sender: Arc<PingSender<C>>,
+    responder: Arc<PingResponder<C>>,
     is_running: Arc<AtomicBool>,
     shutdown_notify: Arc<Notify>,
     _marker: PhantomData<C>,
@@ -25,15 +26,21 @@ pub struct Pinger<C: Collection> {
 
 impl<C: Collection> PingerInterface<C> for Pinger<C> {
     fn init(
-        config: Self::Config,
+        _config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     ) -> anyhow::Result<Self> {
         let shutdown_notify = Arc::new(Notify::new());
-        let inner =
-            PingerInner::<C>::new(config, query_runner, rep_reporter, shutdown_notify.clone());
+        let sender = PingSender::<C>::new(
+            query_runner.clone(),
+            rep_reporter.clone(),
+            shutdown_notify.clone(),
+        );
+        let responder =
+            PingResponder::<C>::new(query_runner, rep_reporter, shutdown_notify.clone());
         Ok(Self {
-            inner: Arc::new(inner),
+            sender: Arc::new(sender),
+            responder: Arc::new(responder),
             is_running: Arc::new(AtomicBool::new(false)),
             shutdown_notify,
             _marker: PhantomData,
@@ -49,10 +56,16 @@ impl<C: Collection> WithStartAndShutdown for Pinger<C> {
 
     async fn start(&self) {
         if !self.is_running() {
-            let inner = self.inner.clone();
+            let sender = self.sender.clone();
             let is_running = self.is_running.clone();
             tokio::spawn(async move {
-                inner.start().await;
+                sender.start().await;
+                is_running.store(false, Ordering::Relaxed);
+            });
+            let responder = self.responder.clone();
+            let is_running = self.is_running.clone();
+            tokio::spawn(async move {
+                responder.start().await;
                 is_running.store(false, Ordering::Relaxed);
             });
             self.is_running.store(true, Ordering::Relaxed);
@@ -67,22 +80,51 @@ impl<C: Collection> WithStartAndShutdown for Pinger<C> {
 }
 
 #[allow(unused)]
-struct PingerInner<C: Collection> {
-    config: Config,
+struct PingSender<C: Collection> {
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     shutdown_notify: Arc<Notify>,
 }
 
-impl<C: Collection> PingerInner<C> {
+impl<C: Collection> PingSender<C> {
     fn new(
-        config: Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
         shutdown_notify: Arc<Notify>,
     ) -> Self {
         Self {
-            config,
+            query_runner,
+            rep_reporter,
+            shutdown_notify,
+        }
+    }
+
+    async fn start(&self) {
+        loop {
+            tokio::select! {
+                _ = self.shutdown_notify.notified() => {
+                    break;
+                }
+
+            }
+        }
+    }
+}
+
+#[allow(unused)]
+struct PingResponder<C: Collection> {
+    query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+    shutdown_notify: Arc<Notify>,
+}
+
+impl<C: Collection> PingResponder<C> {
+    fn new(
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+        shutdown_notify: Arc<Notify>,
+    ) -> Self {
+        Self {
             query_runner,
             rep_reporter,
             shutdown_notify,

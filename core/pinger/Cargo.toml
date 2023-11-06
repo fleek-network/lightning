@@ -13,3 +13,11 @@ anyhow.workspace = true
 serde.workspace = true
 tracing.workspace = true
 
+[dev-dependencies]
+lightning-test-utils = {path="../test-utils"}
+lightning-signer = {path="../signer"}
+lightning-application = {path="../application", features = ["test"]}
+lightning-notifier = {path="../notifier"}
+lightning-rep-collector = {path="../rep-collector"}
+infusion.workspace = true
+fleek-crypto.workspace = true
