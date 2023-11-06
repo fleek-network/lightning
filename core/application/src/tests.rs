@@ -115,6 +115,7 @@ fn add_to_committee(
             rpc: 6000 + index,
             pool: 5000 + index,
             dht: 4000 + index,
+            pinger: 2000 + index,
             handshake: HandshakePorts {
                 http: 5000 + index,
                 webrtc: 6000 + index,

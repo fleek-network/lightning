@@ -119,6 +119,7 @@ async fn get_pools(
                 rpc: 48300_u16,
                 pool: port_offset + i as u16,
                 dht: 48500_u16,
+                pinger: 48600_u16,
                 // Handshake is unused so the defaults are fine.
                 handshake: Default::default(),
             },

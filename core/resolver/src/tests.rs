@@ -60,6 +60,7 @@ async fn test_start_shutdown() {
             rpc: 48300_u16,
             pool: 48400_u16,
             dht: 48500_u16,
+            pinger: 48600_u16,
             handshake: Default::default(),
         },
         None,

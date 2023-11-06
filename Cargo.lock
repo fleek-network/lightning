@@ -4640,6 +4640,7 @@ dependencies = [
  "lightning-interfaces",
  "lightning-node",
  "lightning-notifier",
+ "lightning-pinger",
  "lightning-pool",
  "lightning-rep-collector",
  "lightning-resolver",

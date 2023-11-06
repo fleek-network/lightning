@@ -34,6 +34,7 @@ use lightning_interfaces::types::{Blake3Hash, NodePorts, Staking};
 use lightning_interfaces::{ConfigProviderInterface, DhtSocket};
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
+use lightning_pinger::{Config as PingerConfig, Pinger};
 use lightning_pool::{Config as PoolConfig, Pool};
 use lightning_rep_collector::config::Config as RepAggConfig;
 use lightning_rep_collector::ReputationAggregator;
@@ -276,6 +277,9 @@ impl SwarmBuilder {
                 dht: port_assigner
                     .get_port(min_port, max_port, Transport::Udp)
                     .expect("Could not get port"),
+                pinger: port_assigner
+                    .get_port(min_port, max_port, Transport::Udp)
+                    .expect("Could not get port"),
                 handshake: lightning_interfaces::types::HandshakePorts {
                     http: port_assigner
                         .get_port(min_port, max_port, Transport::Tcp)
@@ -432,6 +436,10 @@ fn build_config(
             .join("data/archive")
             .try_into()
             .expect("Failed to resolve path"),
+    });
+
+    config.inject::<Pinger<FinalTypes>>(PingerConfig {
+        address: format!("127.0.0.1:{}", ports.pinger).parse().unwrap(),
     });
     config
 }

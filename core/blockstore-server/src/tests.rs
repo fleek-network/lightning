@@ -117,6 +117,7 @@ async fn get_peers(
                 rpc: 48300_u16,
                 pool: port_offset + i as u16,
                 dht: 48500_u16,
+                pinger: 48600_u16,
                 handshake: Default::default(),
             },
             None,
