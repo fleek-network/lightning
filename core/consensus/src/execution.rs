@@ -141,9 +141,6 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
 #[async_trait]
 impl<Q: SyncQueryRunnerInterface> ExecutionState for Execution<Q> {
     async fn handle_consensus_output(&self, consensus_output: ConsensusOutput) {
-        let mut batch_payload: Vec<Transaction> =
-            Vec::with_capacity(consensus_output.sub_dag.num_batches());
-
         for (cert, batches) in consensus_output.batches {
             if cert.epoch() != self.query_runner.get_epoch() {
                 // If the certificate epoch does not match the current epoch in the application
@@ -152,32 +149,37 @@ impl<Q: SyncQueryRunnerInterface> ExecutionState for Execution<Q> {
                 // nodes execute the same transactions
                 continue;
             }
-            // Put all the batches in this Consensus output into one vec of batches.
-            for mut batch in batches {
-                batch_payload.extend(batch.transactions_mut().to_owned());
-            }
-        }
-        if !batch_payload.is_empty() {
-            // We have batches in the payload send them over broadcast along with an attestion of
-            // them
 
-            let last_executed = self.query_runner.get_last_block();
-            let parcel = AuthenticStampedParcel {
-                transactions: batch_payload.clone(),
-                last_executed,
-            };
+            if !batches.is_empty() {
+                let mut batch_payload =
+                    Vec::with_capacity(batches.iter().fold(0, |acc, batch| acc + batch.size()));
 
-            let epoch_changed = self.submit_batch(batch_payload, parcel.to_digest()).await;
+                for mut batch in batches {
+                    batch_payload.extend(batch.transactions_mut().to_owned());
+                }
 
-            if let Err(e) = self.tx_narwhal_batches.send((parcel, epoch_changed)).await {
-                // This shouldnt ever happen. But if it does there is no critical tasks happening on
-                // the other end of this that would require a panic
-                error!("Narwhal failed to send batch payload to edge consensus: {e:?}");
-            }
+                // We have batches in the payload send them over broadcast along with an attestion
+                // of them
+                let last_executed = self.query_runner.get_last_block();
+                let parcel = AuthenticStampedParcel {
+                    transactions: batch_payload.clone(),
+                    last_executed,
+                };
 
-            // Submit the batches to application layer and if the epoch changed reset last executed
-            if epoch_changed {
-                self.reconfigure_notify.notify_waiters();
+                let epoch_changed = self.submit_batch(batch_payload, parcel.to_digest()).await;
+
+                if let Err(e) = self.tx_narwhal_batches.send((parcel, epoch_changed)).await {
+                    // This shouldnt ever happen. But if it does there is no critical tasks
+                    // happening on the other end of this that would require a
+                    // panic
+                    error!("Narwhal failed to send batch payload to edge consensus: {e:?}");
+                }
+
+                // Submit the batches to application layer and if the epoch changed reset last
+                // executed
+                if epoch_changed {
+                    self.reconfigure_notify.notify_waiters();
+                }
             }
         }
     }
