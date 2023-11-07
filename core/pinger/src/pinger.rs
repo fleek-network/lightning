@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -22,15 +22,17 @@ use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use tokio::net::UdpSocket;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{mpsc, Notify};
 use tracing::error;
 
 use crate::config::Config;
 
+const TIMEOUT: Duration = Duration::from_secs(15);
+
 pub struct Pinger<C: Collection> {
     inner: Arc<PingerInner<C>>,
     is_running: Arc<AtomicBool>,
-    shutdown_tx: broadcast::Sender<()>,
+    shutdown_notify: Arc<Notify>,
 }
 
 impl<C: Collection> PingerInterface<C> for Pinger<C> {
@@ -43,18 +45,18 @@ impl<C: Collection> PingerInterface<C> for Pinger<C> {
         let (notifier_tx, notifier_rx) = mpsc::channel(10);
         notifier.notify_on_new_epoch(notifier_tx);
 
-        let (shutdown_tx, shutdown_rx) = broadcast::channel(10);
+        let shutdown_notify = Arc::new(Notify::new());
         let inner = PingerInner::<C>::new(
             config,
             query_runner,
             rep_reporter,
             notifier_rx,
-            Mutex::new(Some(shutdown_rx)),
+            shutdown_notify.clone(),
         );
         Ok(Self {
             inner: Arc::new(inner),
             is_running: Arc::new(AtomicBool::new(false)),
-            shutdown_tx,
+            shutdown_notify,
         })
     }
 }
@@ -80,9 +82,7 @@ impl<C: Collection> WithStartAndShutdown for Pinger<C> {
     }
 
     async fn shutdown(&self) {
-        self.shutdown_tx
-            .send(())
-            .expect("Failed to send shutdown signal");
+        self.shutdown_notify.notify_one();
     }
 }
 
@@ -92,7 +92,7 @@ struct PingerInner<C: Collection> {
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     notifier_rx: Mutex<Option<mpsc::Receiver<Notification>>>,
-    shutdown_rx: Mutex<Option<broadcast::Receiver<()>>>,
+    shutdown_notify: Arc<Notify>,
 }
 
 impl<C: Collection> PingerInner<C> {
@@ -101,21 +101,21 @@ impl<C: Collection> PingerInner<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
         notifier_rx: mpsc::Receiver<Notification>,
-        shutdown_rx: Mutex<Option<broadcast::Receiver<()>>>,
+        shutdown_notify: Arc<Notify>,
     ) -> Self {
         Self {
             config,
             query_runner,
             rep_reporter,
             notifier_rx: Mutex::new(Some(notifier_rx)),
-            shutdown_rx,
+            shutdown_notify,
         }
     }
 
     async fn start(&self) {
         let mut buf = [0; 1024];
-        let mut shutdown_rx = self.shutdown_rx.lock().unwrap().take().unwrap();
         let mut notifier_rx = self.notifier_rx.lock().unwrap().take().unwrap();
+        let (timeout_tx, mut timeout_rx) = mpsc::channel(1024);
 
         let socket = Arc::new(
             UdpSocket::bind(self.config.address)
@@ -138,7 +138,7 @@ impl<C: Collection> PingerInner<C> {
         let mut pending_req: HashMap<(NodeIndex, u32), Instant> = HashMap::with_capacity(128);
         loop {
             tokio::select! {
-                _ = shutdown_rx.recv() => {
+                _ = self.shutdown_notify.notified() => {
                     break;
                 }
                 res = socket.recv_from(&mut buf) => {
@@ -191,6 +191,20 @@ impl<C: Collection> PingerInner<C> {
                             error!("Failed to respond to ping message: {e:?}");
                         } else {
                             pending_req.insert((peer_index, id), Instant::now());
+                            let tx = timeout_tx.clone();
+                            tokio::spawn(async move {
+                                tokio::time::sleep(TIMEOUT).await;
+                                tx.send((u32::MAX, id)).await.expect("Failed to send timeout");
+                            });
+                        }
+                    }
+                }
+                timeout = timeout_rx.recv() => {
+                    if let Some((node, id)) = timeout {
+                        if pending_req.remove(&(node, id)).is_some() {
+                            // Report unanswered ping
+                            self.rep_reporter
+                                .report_ping(node, None);
                         }
                     }
                 }
@@ -203,7 +217,6 @@ impl<C: Collection> PingerInner<C> {
             }
         }
 
-        *self.shutdown_rx.lock().unwrap() = Some(shutdown_rx);
         *self.notifier_rx.lock().unwrap() = Some(notifier_rx);
     }
 
