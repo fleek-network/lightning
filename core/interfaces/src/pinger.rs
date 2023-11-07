@@ -8,6 +8,7 @@ use crate::{
     ConfigProviderInterface,
     NotifierInterface,
     ReputationAggregatorInterface,
+    SignerInterface,
     WithStartAndShutdown,
 };
 
@@ -21,12 +22,14 @@ pub trait PingerInterface<C: Collection>:
         app: ::ApplicationInterface,
         rep_aggregator: ::ReputationAggregatorInterface,
         notifier: ::NotifierInterface,
+        signer: ::SignerInterface,
     ) {
         Self::init(
             config.get::<Self>(),
             app.sync_query(),
             rep_aggregator.get_reporter(),
             notifier.clone(),
+            signer,
         )
     }
 
@@ -35,5 +38,6 @@ pub trait PingerInterface<C: Collection>:
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
         notifier: C::NotifierInterface,
+        signer: &C::SignerInterface,
     ) -> anyhow::Result<Self>;
 }

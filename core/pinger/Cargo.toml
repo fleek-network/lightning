@@ -13,6 +13,7 @@ anyhow.workspace = true
 serde.workspace = true
 rand.workspace = true
 tracing.workspace = true
+fleek-crypto.workspace = true
 
 [dev-dependencies]
 lightning-test-utils = {path="../test-utils"}
@@ -21,4 +22,3 @@ lightning-application = {path="../application", features = ["test"]}
 lightning-notifier = {path="../notifier"}
 lightning-rep-collector = {path="../rep-collector"}
 infusion.workspace = true
-fleek-crypto.workspace = true

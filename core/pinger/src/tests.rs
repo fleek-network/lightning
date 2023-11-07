@@ -158,6 +158,7 @@ async fn init_pinger() -> Pinger<TestBinding> {
         app.sync_query(),
         rep_aggregator.get_reporter(),
         notifier,
+        &signer,
     )
     .unwrap()
 }
