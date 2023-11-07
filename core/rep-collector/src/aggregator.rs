@@ -25,7 +25,8 @@ use crate::config::Config;
 use crate::measurement_manager::MeasurementManager;
 
 #[cfg(not(test))]
-const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(300);
+//const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(300);
+const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(2);
 #[cfg(test)]
 const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(2);
 

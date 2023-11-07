@@ -24,7 +24,7 @@ use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use tokio::net::UdpSocket;
-use tokio::sync::{mpsc, Notify, OnceCell};
+use tokio::sync::{mpsc, OnceCell};
 use tracing::{error, info};
 
 use crate::config::Config;
@@ -35,7 +35,7 @@ const TIMEOUT: Duration = Duration::from_secs(15);
 pub struct Pinger<C: Collection> {
     inner: Arc<PingerInner<C>>,
     is_running: Arc<AtomicBool>,
-    shutdown_notify: Arc<Notify>,
+    shutdown_tx: mpsc::Sender<()>,
 }
 
 impl<C: Collection> PingerInterface<C> for Pinger<C> {
@@ -49,7 +49,7 @@ impl<C: Collection> PingerInterface<C> for Pinger<C> {
         let (notifier_tx, notifier_rx) = mpsc::channel(10);
         notifier.notify_on_new_epoch(notifier_tx);
 
-        let shutdown_notify = Arc::new(Notify::new());
+        let (shutdown_tx, shutdown_rx) = mpsc::channel(10);
         let (_, node_sk) = signer.get_sk();
         let inner = PingerInner::<C>::new(
             config,
@@ -57,12 +57,12 @@ impl<C: Collection> PingerInterface<C> for Pinger<C> {
             query_runner,
             rep_reporter,
             notifier_rx,
-            shutdown_notify.clone(),
+            shutdown_rx,
         );
         Ok(Self {
             inner: Arc::new(inner),
             is_running: Arc::new(AtomicBool::new(false)),
-            shutdown_notify,
+            shutdown_tx,
         })
     }
 }
@@ -88,7 +88,10 @@ impl<C: Collection> WithStartAndShutdown for Pinger<C> {
     }
 
     async fn shutdown(&self) {
-        self.shutdown_notify.notify_one();
+        self.shutdown_tx
+            .send(())
+            .await
+            .expect("Failed to send shutdown signal");
     }
 }
 
@@ -100,7 +103,7 @@ struct PingerInner<C: Collection> {
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     notifier_rx: Mutex<Option<mpsc::Receiver<Notification>>>,
-    shutdown_notify: Arc<Notify>,
+    shutdown_rx: Mutex<Option<mpsc::Receiver<()>>>,
 }
 
 impl<C: Collection> PingerInner<C> {
@@ -110,7 +113,7 @@ impl<C: Collection> PingerInner<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
         notifier_rx: mpsc::Receiver<Notification>,
-        shutdown_notify: Arc<Notify>,
+        shutdown_rx: mpsc::Receiver<()>,
     ) -> Self {
         Self {
             config,
@@ -119,13 +122,37 @@ impl<C: Collection> PingerInner<C> {
             query_runner,
             rep_reporter,
             notifier_rx: Mutex::new(Some(notifier_rx)),
-            shutdown_notify,
+            shutdown_rx: Mutex::new(Some(shutdown_rx)),
         }
     }
 
     async fn start(&self) {
+        let mut shutdown_rx = self.shutdown_rx.lock().unwrap().take().unwrap();
+
+        // Note(matthias): should a node be able to respond to pings before it knows its node index?
+        // In my opinion it should not because it is not fully functioning.
+        if !self.node_index.initialized() {
+            let mut interval = tokio::time::interval(Duration::from_secs(60));
+            let pk = self.node_sk.to_pk();
+            loop {
+                tokio::select! {
+                    _ = shutdown_rx.recv() => {
+                        *self.shutdown_rx.lock().unwrap() = Some(shutdown_rx);
+                        return;
+                    }
+                    _ = interval.tick() => {
+                        if let Some(index) = self.query_runner.pubkey_to_index(pk) {
+                            self.node_index.set(index).expect("Failed to set once cell");
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        // At this point we can assume that the node knows its index.
+        let node_index = *self.node_index.get().unwrap();
+
         let mut buf = [0; 1024];
-        let mut notifier_rx = self.notifier_rx.lock().unwrap().take().unwrap();
         let (timeout_tx, mut timeout_rx) = mpsc::channel(1024);
 
         let socket = Arc::new(
@@ -147,25 +174,11 @@ impl<C: Collection> PingerInner<C> {
         let mut cursor = 0;
 
         let mut pending_req: HashMap<(NodeIndex, u32), Instant> = HashMap::with_capacity(128);
-
-        // Node(matthias): Should a node be able to respond to pings before it knows its node index?
-        // In my opinion it should not because it is not fully functioning.
-
-        if !self.node_index.initialized() {
-            loop {
-                if let Some(index) = self.query_runner.pubkey_to_index(self.node_sk.to_pk()) {
-                    self.node_index.set(index).expect("Failed to set once cell");
-                    break;
-                }
-                tokio::time::sleep(Duration::from_secs(60)).await;
-            }
-        }
-        // At this point we can assume that the node knows its index.
-        let node_index = *self.node_index.get().unwrap();
+        let mut notifier_rx = self.notifier_rx.lock().unwrap().take().unwrap();
 
         loop {
             tokio::select! {
-                _ = self.shutdown_notify.notified() => {
+                _ = shutdown_rx.recv() => {
                     break;
                 }
                 res = socket.recv_from(&mut buf) => {
@@ -208,6 +221,7 @@ impl<C: Collection> PingerInner<C> {
                 }
                 _ = interval.tick() => {
                     let peer_index = node_registry[cursor % node_registry.len()];
+                    cursor += 1;
                     if let Some(node) = self.query_runner.get_node_info_with_index(&peer_index) {
                         let id = rng.gen_range(0..u32::MAX);
                         let msg = Message::Request { sender: node_index, id };
@@ -220,7 +234,9 @@ impl<C: Collection> PingerInner<C> {
                             let tx = timeout_tx.clone();
                             tokio::spawn(async move {
                                 tokio::time::sleep(TIMEOUT).await;
-                                tx.send((peer_index, id)).await.expect("Failed to send timeout");
+                                // We ignore the sending error because it can happen that the
+                                // pinger is shutdown while there are still pending timeout tasks.
+                                let _ = tx.send((peer_index, id)).await;
                             });
                         }
                     }
@@ -244,6 +260,7 @@ impl<C: Collection> PingerInner<C> {
             }
         }
 
+        *self.shutdown_rx.lock().unwrap() = Some(shutdown_rx);
         *self.notifier_rx.lock().unwrap() = Some(notifier_rx);
     }
 
@@ -293,7 +310,7 @@ impl TryFrom<&[u8]> for Message {
     type Error = anyhow::Error;
 
     fn try_from(value: &[u8]) -> anyhow::Result<Self> {
-        if value.len() != 8 {
+        if value.len() != 9 {
             return Err(anyhow!("Number of bytes must be 9"));
         }
         match &value[0] {
