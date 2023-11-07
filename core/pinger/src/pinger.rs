@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -8,20 +10,25 @@ use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
+    Notification,
+    NotifierInterface,
     PingerInterface,
     ReputationAggregatorInterface,
+    ReputationReporterInterface,
+    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
+use rand::rngs::SmallRng;
+use rand::seq::SliceRandom;
+use rand::{Rng, SeedableRng};
 use tokio::net::UdpSocket;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 use tracing::error;
 
 use crate::config::Config;
 
 pub struct Pinger<C: Collection> {
-    config: Config,
-    sender: Arc<PingSender<C>>,
-    responder: Arc<PingResponder<C>>,
+    inner: Arc<PingerInner<C>>,
     is_running: Arc<AtomicBool>,
     shutdown_tx: broadcast::Sender<()>,
 }
@@ -31,21 +38,23 @@ impl<C: Collection> PingerInterface<C> for Pinger<C> {
         config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+        notifier: C::NotifierInterface,
     ) -> anyhow::Result<Self> {
-        let (tx, rx) = broadcast::channel(10);
-        let sender = PingSender::<C>::new(
-            query_runner.clone(),
-            rep_reporter.clone(),
-            Mutex::new(Some(rx)),
-        );
-        let responder =
-            PingResponder::<C>::new(query_runner, rep_reporter, Mutex::new(Some(tx.subscribe())));
-        Ok(Self {
+        let (notifier_tx, notifier_rx) = mpsc::channel(10);
+        notifier.notify_on_new_epoch(notifier_tx);
+
+        let (shutdown_tx, shutdown_rx) = broadcast::channel(10);
+        let inner = PingerInner::<C>::new(
             config,
-            sender: Arc::new(sender),
-            responder: Arc::new(responder),
+            query_runner,
+            rep_reporter,
+            notifier_rx,
+            Mutex::new(Some(shutdown_rx)),
+        );
+        Ok(Self {
+            inner: Arc::new(inner),
             is_running: Arc::new(AtomicBool::new(false)),
-            shutdown_tx: tx,
+            shutdown_tx,
         })
     }
 }
@@ -57,30 +66,11 @@ impl<C: Collection> WithStartAndShutdown for Pinger<C> {
     }
 
     async fn start(&self) {
-        // Note(matthias): providing the UPD socket to the sender and responder using interior
-        // mutability is not elegant. It is necessary because the Pinger's init function is
-        // not async, so we cannot create the socket in the init function and pass
-        // it to the sender and responder there.
-        // I didn't make the init function async because none of the other init functions are.
         if !self.is_running() {
-            let sender = self.sender.clone();
-            let responder = self.responder.clone();
-            let socket = Arc::new(
-                UdpSocket::bind(self.config.address)
-                    .await
-                    .expect("Failed to bind to UDP socket"),
-            );
-            sender.provide_socket(socket.clone());
-            responder.provide_socket(socket);
-
+            let inner = self.inner.clone();
             let is_running = self.is_running.clone();
             tokio::spawn(async move {
-                sender.start().await;
-                is_running.store(false, Ordering::Relaxed);
-            });
-            let is_running = self.is_running.clone();
-            tokio::spawn(async move {
-                responder.start().await;
+                inner.start().await;
                 is_running.store(false, Ordering::Relaxed);
             });
             self.is_running.store(true, Ordering::Relaxed);
@@ -97,73 +87,55 @@ impl<C: Collection> WithStartAndShutdown for Pinger<C> {
 }
 
 #[allow(unused)]
-struct PingSender<C: Collection> {
-    socket: Mutex<Option<Arc<UdpSocket>>>,
+struct PingerInner<C: Collection> {
+    config: Config,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+    notifier_rx: Mutex<Option<mpsc::Receiver<Notification>>>,
     shutdown_rx: Mutex<Option<broadcast::Receiver<()>>>,
 }
 
-impl<C: Collection> PingSender<C> {
+impl<C: Collection> PingerInner<C> {
     fn new(
+        config: Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+        notifier_rx: mpsc::Receiver<Notification>,
         shutdown_rx: Mutex<Option<broadcast::Receiver<()>>>,
     ) -> Self {
         Self {
-            socket: Mutex::new(None),
+            config,
             query_runner,
             rep_reporter,
-            shutdown_rx,
-        }
-    }
-
-    async fn start(&self) {
-        let _socket = self.socket.lock().unwrap().take().unwrap();
-        let mut shutdown_rx = self.shutdown_rx.lock().unwrap().take().unwrap();
-        loop {
-            tokio::select! {
-                _ = shutdown_rx.recv() => {
-                    break;
-                }
-
-            }
-        }
-
-        *self.shutdown_rx.lock().unwrap() = Some(shutdown_rx);
-    }
-
-    fn provide_socket(&self, socket: Arc<UdpSocket>) {
-        *self.socket.lock().unwrap() = Some(socket);
-    }
-}
-
-#[allow(unused)]
-struct PingResponder<C: Collection> {
-    socket: Mutex<Option<Arc<UdpSocket>>>,
-    query_runner: c!(C::ApplicationInterface::SyncExecutor),
-    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
-    shutdown_rx: Mutex<Option<broadcast::Receiver<()>>>,
-}
-
-impl<C: Collection> PingResponder<C> {
-    fn new(
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
-        shutdown_rx: Mutex<Option<broadcast::Receiver<()>>>,
-    ) -> Self {
-        Self {
-            socket: Mutex::new(None),
-            query_runner,
-            rep_reporter,
+            notifier_rx: Mutex::new(Some(notifier_rx)),
             shutdown_rx,
         }
     }
 
     async fn start(&self) {
         let mut buf = [0; 1024];
-        let socket = self.socket.lock().unwrap().take().unwrap();
         let mut shutdown_rx = self.shutdown_rx.lock().unwrap().take().unwrap();
+        let mut notifier_rx = self.notifier_rx.lock().unwrap().take().unwrap();
+
+        let socket = Arc::new(
+            UdpSocket::bind(self.config.address)
+                .await
+                .expect("Failed to bind to UDP socket"),
+        );
+
+        // Note(matthias): instead of having a fixed interval, we can also determine how many nodes
+        // there are, how many pings we want to send to each node per epoch, and the epoch length,
+        // and then set the interval accordingly.
+        // The advantage of setting a fixed interval is that we can control the network traffic.
+        // The advantage of setting the interval dynamically is that ensures that every node is
+        // pinged x amount of times per epoch.
+        let mut interval = tokio::time::interval(self.config.ping_interval);
+
+        let mut rng = SmallRng::from_entropy();
+        let mut node_registry = self.get_node_registry(&mut rng);
+        let mut cursor = 0;
+
+        let mut pending_req: HashMap<(NodeIndex, u32), Instant> = HashMap::with_capacity(128);
         loop {
             tokio::select! {
                 _ = shutdown_rx.recv() => {
@@ -172,14 +144,30 @@ impl<C: Collection> PingResponder<C> {
                 res = socket.recv_from(&mut buf) => {
                     match res {
                         Ok((len, addr)) => {
-                            match PingMessage::try_from(&buf[0..len]) {
-                                Ok(ping) => {
+                            match Message::try_from(&buf[0..len]) {
+                                Ok(msg) => {
                                     // TODO(matthias): process ping message
                                     // TODO(matthias): use actual node index
-                                    let pong = PingMessage { sender: u32::MAX, id: ping.id };
-                                    let pong_bytes: Vec<u8> = pong.into();
-                                    if let Err(e) = socket.send_to(&pong_bytes, addr).await {
-                                        error!("Failed to respond to ping message: {e:?}");
+                                    match msg {
+                                        Message::Request { sender: _, id } => {
+                                            let pong = Message::Response { sender: u32::MAX, id };
+                                            let bytes: Vec<u8> = pong.into();
+                                            if let Err(e) = socket.send_to(&bytes, addr).await {
+                                                error!("Failed to respond to ping message: {e:?}");
+                                            }
+                                        }
+                                        Message::Response { sender, id } => {
+                                            // TODO(matthias): should we use signatures to prove
+                                            // a message was sent from the sender?
+                                            // Should we make sure the sender IP matches the IP on
+                                            // the app state?
+                                            let key = &(sender, id); // thank you clippy
+                                            if let Some(instant) = pending_req.remove(key) {
+                                                let rtt = instant.elapsed();
+                                                self.rep_reporter
+                                                    .report_ping(sender, Some(rtt / 2));
+                                            }
+                                        }
                                     }
                                 }
                                 Err(e) => {
@@ -192,14 +180,42 @@ impl<C: Collection> PingResponder<C> {
                         }
                     }
                 }
+                _ = interval.tick() => {
+                    let peer_index = node_registry[cursor % node_registry.len()];
+                    if let Some(node) = self.query_runner.get_node_info_with_index(&peer_index) {
+                        let id = rng.gen_range(0..u32::MAX);
+                        let msg = Message::Request { sender: u32::MAX, id };
+                        let bytes: Vec<u8> = msg.into();
+                        let addr = (node.domain, node.ports.pinger);
+                        if let Err(e) = socket.send_to(&bytes, addr).await {
+                            error!("Failed to respond to ping message: {e:?}");
+                        } else {
+                            pending_req.insert((peer_index, id), Instant::now());
+                        }
+                    }
+                }
+                epoch_notify = notifier_rx.recv() => {
+                    if let Some(Notification::NewEpoch) = epoch_notify {
+                        node_registry = self.get_node_registry(&mut rng);
+                        cursor = 0;
+                    }
+                }
             }
         }
 
         *self.shutdown_rx.lock().unwrap() = Some(shutdown_rx);
+        *self.notifier_rx.lock().unwrap() = Some(notifier_rx);
     }
 
-    fn provide_socket(&self, socket: Arc<UdpSocket>) {
-        *self.socket.lock().unwrap() = Some(socket);
+    fn get_node_registry(&self, rng: &mut SmallRng) -> Vec<NodeIndex> {
+        let mut nodes: Vec<NodeIndex> = self
+            .query_runner
+            .get_node_registry(None)
+            .into_iter()
+            .filter_map(|node| self.query_runner.pubkey_to_index(node.public_key))
+            .collect();
+        nodes.shuffle(rng);
+        nodes
     }
 }
 
@@ -209,30 +225,47 @@ impl<C: Collection> ConfigConsumer for Pinger<C> {
     type Config = Config;
 }
 
-struct PingMessage {
-    sender: NodeIndex,
-    id: u32,
+enum Message {
+    Request { sender: NodeIndex, id: u32 },
+    Response { sender: NodeIndex, id: u32 },
 }
 
-impl From<PingMessage> for Vec<u8> {
-    fn from(value: PingMessage) -> Self {
-        let mut buf = Vec::with_capacity(4);
-        buf.extend_from_slice(&value.sender.to_le_bytes());
-        buf.extend_from_slice(&value.id.to_le_bytes());
+impl From<Message> for Vec<u8> {
+    fn from(value: Message) -> Self {
+        let mut buf = Vec::with_capacity(9);
+        match value {
+            Message::Request { sender, id } => {
+                buf.push(0x00);
+                buf.extend_from_slice(&sender.to_le_bytes());
+                buf.extend_from_slice(&id.to_le_bytes());
+            },
+            Message::Response { sender, id } => {
+                buf.push(0x01);
+                buf.extend_from_slice(&sender.to_le_bytes());
+                buf.extend_from_slice(&id.to_le_bytes());
+            },
+        }
         buf
     }
 }
 
-impl TryFrom<&[u8]> for PingMessage {
+impl TryFrom<&[u8]> for Message {
     type Error = anyhow::Error;
 
     fn try_from(value: &[u8]) -> anyhow::Result<Self> {
         if value.len() != 8 {
-            return Err(anyhow!("Number of bytes must be 8"));
+            return Err(anyhow!("Number of bytes must be 9"));
         }
-        Ok(Self {
-            sender: NodeIndex::from_le_bytes(value[0..4].try_into()?),
-            id: NodeIndex::from_le_bytes(value[4..8].try_into()?),
-        })
+        match &value[0] {
+            0x00 => Ok(Self::Request {
+                sender: NodeIndex::from_le_bytes(value[1..5].try_into()?),
+                id: NodeIndex::from_le_bytes(value[5..9].try_into()?),
+            }),
+            0x01 => Ok(Self::Response {
+                sender: NodeIndex::from_le_bytes(value[1..5].try_into()?),
+                id: NodeIndex::from_le_bytes(value[5..9].try_into()?),
+            }),
+            _ => Err(anyhow!("Invalid magic byte")),
+        }
     }
 }

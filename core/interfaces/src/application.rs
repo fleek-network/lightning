@@ -121,6 +121,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Returns information about a single node.
     fn get_node_info(&self, id: &NodePublicKey) -> Option<NodeInfo>;
 
+    /// Returns information about a single node using its index.
+    fn get_node_info_with_index(&self, node_index: &NodeIndex) -> Option<NodeInfo>;
+
     /// Returns information about an account.
     fn get_account_info(&self, id: &EthAddress) -> Option<AccountInfo>;
 

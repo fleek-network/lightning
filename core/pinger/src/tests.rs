@@ -146,7 +146,7 @@ async fn init_pinger() -> Pinger<TestBinding> {
     let rep_aggregator = ReputationAggregator::<TestBinding>::init(
         config,
         signer.get_socket(),
-        notifier,
+        notifier.clone(),
         query_runner.clone(),
     )
     .unwrap();
@@ -157,6 +157,7 @@ async fn init_pinger() -> Pinger<TestBinding> {
         Config::default(),
         app.sync_query(),
         rep_aggregator.get_reporter(),
+        notifier,
     )
     .unwrap()
 }

@@ -4890,6 +4890,7 @@ dependencies = [
  "lightning-rep-collector",
  "lightning-signer",
  "lightning-test-utils",
+ "rand 0.8.5",
  "serde",
  "tokio",
  "tracing",

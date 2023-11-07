@@ -440,6 +440,7 @@ fn build_config(
 
     config.inject::<Pinger<FinalTypes>>(PingerConfig {
         address: format!("127.0.0.1:{}", ports.pinger).parse().unwrap(),
+        ..Default::default()
     });
     config
 }

@@ -174,6 +174,11 @@ impl SyncQueryRunnerInterface for QueryRunner {
         self.get_node_info_with_pub_key(id, |node_info| node_info)
     }
 
+    fn get_node_info_with_index(&self, node_index: &NodeIndex) -> Option<NodeInfo> {
+        self.inner
+            .run(|ctx| self.node_table.get(ctx).get(node_index))
+    }
+
     fn get_account_info(&self, id: &EthAddress) -> Option<AccountInfo> {
         self.inner.run(|ctx| self.account_table.get(ctx).get(id))
     }
