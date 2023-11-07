@@ -14,10 +14,6 @@ impl PrometheusDiscoveryChunk {
     pub(crate) fn new(targets: Vec<String>, labels: HashMap<String, String>) -> Self {
         Self { targets, labels }
     }
-
-    pub fn get_targets(&self) -> &Vec<String> {
-        &self.targets
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
