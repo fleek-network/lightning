@@ -526,7 +526,7 @@ impl NormalizedMeasurements {
             count += 1;
         }
 
-        if count == 0 {
+        if count < 3 {
             return None;
         }
         // This value will be in the range [0, 1]
