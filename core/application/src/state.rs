@@ -1092,9 +1092,7 @@ impl<B: Backend> State<B> {
         measurements
             .into_iter()
             .for_each(|(peer_index, measurements)| {
-                // TODO(matthias): check if node has minimum stake?
-
-                if measurements.verify() && self.node_info.get(&peer_index).is_some() {
+                if self.is_valid_node(&peer_index).unwrap_or(false) && measurements.verify() {
                     let mut node_measurements = match self.rep_measurements.get(&peer_index) {
                         Some(node_measurements) => node_measurements,
                         None => Vec::new(),
@@ -1599,7 +1597,7 @@ impl<B: Backend> State<B> {
 
             _ => return Err(TransactionResponse::Revert(ExecutionError::OnlyNode)),
         };
-        if !self.is_valid_node(&node_index) {
+        if !self.is_valid_node(&node_index).unwrap_or(false) {
             return Err(TransactionResponse::Revert(
                 ExecutionError::InsufficientStake,
             ));
@@ -1608,18 +1606,19 @@ impl<B: Backend> State<B> {
     }
 
     // Checks if a node has staked the minimum required amount.
+    // Returns `None` if the
     //
     // Panics:
-    // - This function can panic if ProtocolParams::MinimumNodeStake is missing from the parameters.
-    //   This should not happen because this parameter is seeded in the genesis.
-    // - This function can panic if the passed node index does not exist.
-    fn is_valid_node(&self, node_index: &NodeIndex) -> bool {
+    // This function can panic if ProtocolParams::MinimumNodeStake is missing from the parameters.
+    // This should not happen because this parameter is seeded in the genesis.
+    fn is_valid_node(&self, node_index: &NodeIndex) -> Option<bool> {
         let min_amount = self
             .parameters
             .get(&ProtocolParams::MinimumNodeStake)
             .unwrap();
-        let node_info = self.node_info.get(node_index).unwrap();
-        node_info.stake.staked >= min_amount.into()
+        self.node_info
+            .get(node_index)
+            .map(|node_info| node_info.stake.staked >= min_amount.into())
     }
 
     fn get_node_info(&self, sender: TransactionSender) -> Option<(NodeIndex, NodeInfo)> {
