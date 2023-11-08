@@ -637,7 +637,7 @@ impl<B: Backend> State<B> {
         }
         // check if node has stakes to be locked
         if node.stake.staked == HpUfixed::zero() {
-            return TransactionResponse::Revert(ExecutionError::InsufficientStakesToLock);
+            return TransactionResponse::Revert(ExecutionError::InsufficientStake);
         }
 
         let epoch = match self.metadata.get(&Metadata::Epoch) {
@@ -1576,21 +1576,50 @@ impl<B: Backend> State<B> {
     // Useful for transaction that nodes can call but an account owner cant
     // Does not panic
     fn only_node(&self, sender: TransactionSender) -> Result<NodeIndex, TransactionResponse> {
-        match sender {
-            TransactionSender::NodeMain(public_key) => self
-                .pub_key_to_index
-                .get(&public_key)
-                .ok_or(TransactionResponse::Revert(
-                    ExecutionError::NodeDoesNotExist,
-                )),
-            TransactionSender::NodeConsensus(public_key) => self
-                .consensus_key_to_index
-                .get(&public_key)
-                .ok_or(TransactionResponse::Revert(
-                    ExecutionError::NodeDoesNotExist,
-                )),
-            _ => Err(TransactionResponse::Revert(ExecutionError::OnlyNode)),
+        let node_index = match sender {
+            TransactionSender::NodeMain(public_key) => match self.pub_key_to_index.get(&public_key)
+            {
+                Some(node_index) => node_index,
+                None => {
+                    return Err(TransactionResponse::Revert(
+                        ExecutionError::NodeDoesNotExist,
+                    ));
+                },
+            },
+            TransactionSender::NodeConsensus(public_key) => {
+                match self.consensus_key_to_index.get(&public_key) {
+                    Some(node_index) => node_index,
+                    None => {
+                        return Err(TransactionResponse::Revert(
+                            ExecutionError::NodeDoesNotExist,
+                        ));
+                    },
+                }
+            },
+
+            _ => return Err(TransactionResponse::Revert(ExecutionError::OnlyNode)),
+        };
+        if !self.is_valid_node(&node_index) {
+            return Err(TransactionResponse::Revert(
+                ExecutionError::InsufficientStake,
+            ));
         }
+        Ok(node_index)
+    }
+
+    // Checks if a node has staked the minimum required amount.
+    //
+    // Panics:
+    // - This function can panic if ProtocolParams::MinimumNodeStake is missing from the parameters.
+    //   This should not happen because this parameter is seeded in the genesis.
+    // - This function can panic if the passed node index does not exist.
+    fn is_valid_node(&self, node_index: &NodeIndex) -> bool {
+        let min_amount = self
+            .parameters
+            .get(&ProtocolParams::MinimumNodeStake)
+            .unwrap();
+        let node_info = self.node_info.get(node_index).unwrap();
+        node_info.stake.staked >= min_amount.into()
     }
 
     fn get_node_info(&self, sender: TransactionSender) -> Option<(NodeIndex, NodeInfo)> {
