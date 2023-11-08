@@ -20,6 +20,7 @@ use lightning_interfaces::types::{
     BlockExecutionResponse,
     DeliveryAcknowledgment,
     Epoch,
+    ExecutionData,
     ExecutionError,
     HandshakePorts,
     NodePorts,
@@ -985,6 +986,65 @@ async fn test_submit_rep_measurements() {
     assert_eq!(rep_measurements2.len(), 1);
     assert_eq!(rep_measurements2[0].reporting_node, reporting_node_index);
     assert_eq!(rep_measurements2[0].measurements, measurements2);
+}
+
+#[test]
+async fn test_submit_rep_measurements_twice() {
+    let (committee, keystore) = get_genesis_committee(4);
+    let mut genesis = Genesis::load().unwrap();
+    genesis.node_info = committee;
+    let (update_socket, query_runner) = init_app(Some(Config {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+        testnet: false,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
+    }));
+
+    let mut map = BTreeMap::new();
+    let mut rng = random::get_seedable_rng();
+
+    let measurements = reputation::generate_reputation_measurements(&mut rng, 0.1);
+    let peer = keystore[1].node_secret_key.to_pk();
+    let peer_index = query_runner.pubkey_to_index(peer).unwrap();
+    map.insert(peer_index, measurements.clone());
+
+    // Submit the reputation measurements
+    let req = get_update_request_node(
+        UpdateMethod::SubmitReputationMeasurements {
+            measurements: map.clone(),
+        },
+        &keystore[0].node_secret_key,
+        1,
+    );
+    match run_transaction(vec![req.into()], &update_socket).await {
+        Ok(response) => {
+            assert_eq!(
+                response.txn_receipts[0].response,
+                TransactionResponse::Success(ExecutionData::None)
+            );
+        },
+        Err(e) => panic!("{e}"),
+    }
+
+    // Attempt to submit reputation measurements twice per epoch.
+    // This transaction should revert because each node only can submit its reputation measurements
+    // once per epoch.
+    let req = get_update_request_node(
+        UpdateMethod::SubmitReputationMeasurements { measurements: map },
+        &keystore[0].node_secret_key,
+        2,
+    );
+    match run_transaction(vec![req.into()], &update_socket).await {
+        Ok(response) => {
+            assert_eq!(
+                response.txn_receipts[0].response,
+                TransactionResponse::Revert(ExecutionError::AlreadySubmittedMeasurements)
+            );
+        },
+        Err(e) => panic!("{e}"),
+    }
 }
 
 #[test]

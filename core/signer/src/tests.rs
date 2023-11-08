@@ -198,21 +198,15 @@ async fn test_retry_send() {
     signer.start().await;
     consensus.start().await;
 
-    // Send two transactions to the signer.
-    let update_method = UpdateMethod::SubmitReputationMeasurements {
-        measurements: BTreeMap::new(),
-    };
+    // Send two transactions to the signer. The OptIn transaction was chosen arbitrarily.
+    let update_method = UpdateMethod::OptIn {};
     signer_socket.run(update_method).await.unwrap();
     // This transaction won't be ordered and the nonce won't be incremented on the application.
-    let update_method = UpdateMethod::SubmitReputationMeasurements {
-        measurements: BTreeMap::new(),
-    };
+    let update_method = UpdateMethod::OptIn {};
     signer_socket.run(update_method).await.unwrap();
     // This transaction will have the wrong nonce, since the signer increments nonces
     // optimistically.
-    let update_method = UpdateMethod::SubmitReputationMeasurements {
-        measurements: BTreeMap::new(),
-    };
+    let update_method = UpdateMethod::OptIn {};
     signer_socket.run(update_method).await.unwrap();
 
     // The signer will notice that the nonce doesn't increment on the application after the second

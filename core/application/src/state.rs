@@ -111,6 +111,7 @@ pub struct State<B: Backend> {
     pub parameters: B::Ref<ProtocolParams, u128>,
     pub rep_measurements: B::Ref<NodeIndex, Vec<ReportedReputationMeasurements>>,
     pub rep_scores: B::Ref<NodeIndex, u8>,
+    pub submitted_rep_measurements: B::Ref<NodeIndex, bool>,
     pub current_epoch_served: B::Ref<NodeIndex, NodeServed>,
     pub last_epoch_served: B::Ref<NodeIndex, NodeServed>,
     pub total_served: B::Ref<Epoch, TotalServed>,
@@ -134,6 +135,7 @@ impl<B: Backend> State<B> {
             rep_measurements: backend.get_table_reference("rep_measurements"),
             latencies: backend.get_table_reference("latencies"),
             rep_scores: backend.get_table_reference("rep_scores"),
+            submitted_rep_measurements: backend.get_table_reference("submitted_rep_measurements"),
             last_epoch_served: backend.get_table_reference("last_epoch_served"),
             current_epoch_served: backend.get_table_reference("current_epoch_served"),
             total_served: backend.get_table_reference("total_served"),
@@ -908,9 +910,14 @@ impl<B: Backend> State<B> {
 
         self.update_latencies();
 
-        // Remove measurements from this epoch once we ccalculated the rep scores.
+        // Remove measurements from this epoch once we calculated the rep scores.
         let nodes = self.rep_measurements.keys();
         nodes.for_each(|node| self.rep_measurements.remove(&node));
+
+        // Reset the already submitted flags so that nodes can submit measurements again in the new
+        // epoch.
+        let nodes = self.submitted_rep_measurements.keys();
+        nodes.for_each(|node| self.submitted_rep_measurements.remove(&node));
     }
 
     fn update_latencies(&self) {
@@ -1073,6 +1080,15 @@ impl<B: Backend> State<B> {
             Ok(index) => index,
             Err(e) => return e,
         };
+        if self
+            .submitted_rep_measurements
+            .get(&reporting_node)
+            .unwrap_or(false)
+        {
+            return TransactionResponse::Revert(ExecutionError::AlreadySubmittedMeasurements);
+        }
+        self.submitted_rep_measurements.set(reporting_node, true);
+
         measurements
             .into_iter()
             .for_each(|(peer_index, measurements)| {

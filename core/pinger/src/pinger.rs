@@ -95,7 +95,6 @@ impl<C: Collection> WithStartAndShutdown for Pinger<C> {
     }
 }
 
-#[allow(unused)]
 struct PingerInner<C: Collection> {
     config: Config,
     node_index: OnceCell<NodeIndex>,
@@ -220,8 +219,8 @@ impl<C: Collection> PingerInner<C> {
                     }
                 }
                 _ = interval.tick() => {
-                    let peer_index = node_registry[cursor % node_registry.len()];
-                    cursor += 1;
+                    let peer_index = node_registry[cursor];
+                    cursor = (cursor + 1) % node_registry.len();
                     if let Some(node) = self.query_runner.get_node_info_with_index(&peer_index) {
                         let id = rng.gen_range(0..u32::MAX);
                         let msg = Message::Request { sender: node_index, id };

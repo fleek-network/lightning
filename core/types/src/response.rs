@@ -123,6 +123,7 @@ pub enum ExecutionError {
     NodeDoesNotExist,
     CantSendToYourself,
     AlreadySignaled,
+    AlreadySubmittedMeasurements,
     NonExistingService,
     OnlyAccountOwner,
     OnlyNode,
