@@ -375,7 +375,7 @@ async fn test_submit_measurements() {
 
 #[tokio::test]
 async fn test_reputation_calculation_and_query() {
-    // The application will only calculate reputation scores for nodes that if multiple nodes
+    // The application will only calculate reputation scores for nodes if multiple nodes
     // have reported measurements. Therefore, we need to create two reputation aggregators, two
     // signers, and two consensus services that will receive a socket for the same application
     // service.
@@ -545,8 +545,12 @@ async fn test_reputation_calculation_and_query() {
     // Both nodes report measurements for two peers (alice and bob).
     // note(dalton): Refactored to not include measurements for non white listed nodes so have to
     // switch Alice and bob to the keys we added to the committee
-    let alice = query_runner.pubkey_to_index(node_public_key1).unwrap();
-    let bob = query_runner.pubkey_to_index(node_public_key2).unwrap();
+    let alice = query_runner
+        .pubkey_to_index(keystore[0].node_secret_key.to_pk())
+        .unwrap();
+    let bob = query_runner
+        .pubkey_to_index(keystore[1].node_secret_key.to_pk())
+        .unwrap();
     rep_reporter1.report_sat(alice, Weight::Strong);
     rep_reporter1.report_ping(alice, Some(Duration::from_millis(100)));
     rep_reporter1.report_bytes_sent(alice, 10_000, Some(Duration::from_millis(100)));

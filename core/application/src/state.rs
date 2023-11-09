@@ -1082,10 +1082,17 @@ impl<B: Backend> State<B> {
         }
         self.submitted_rep_measurements.set(reporting_node, true);
 
+        if measurements.len() > self.node_info.keys().count() {
+            return TransactionResponse::Revert(ExecutionError::TooManyMeasurements);
+        }
+
         measurements
             .into_iter()
             .for_each(|(peer_index, measurements)| {
-                if self.is_valid_node(&peer_index).unwrap_or(false) && measurements.verify() {
+                if peer_index != reporting_node
+                    && self.is_valid_node(&peer_index).unwrap_or(false)
+                    && measurements.verify()
+                {
                     let mut node_measurements = match self.rep_measurements.get(&peer_index) {
                         Some(node_measurements) => node_measurements,
                         None => Vec::new(),

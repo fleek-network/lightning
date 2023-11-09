@@ -136,4 +136,5 @@ pub enum ExecutionError {
     EpochHasNotStarted,
     ConsensusKeyAlreadyIndexed,
     Unimplemented,
+    TooManyMeasurements,
 }
