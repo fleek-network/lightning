@@ -1337,7 +1337,13 @@ impl<B: Backend> State<B> {
             _ => 0,
         };
 
-        let mut node_registry: Vec<NodeIndex> = self.get_node_registry().keys().copied().collect();
+        let mut node_registry: Vec<NodeIndex> = self
+            .get_node_registry()
+            .keys()
+            .copied()
+            // The unwrap is safe because `node_registry` contains only valid node indices.
+            .filter(|index| self.node_info.get(index).unwrap().participating)
+            .collect();
         let committee_size = self.parameters.get(&ProtocolParams::CommitteeSize).unwrap();
         let num_of_nodes = node_registry.len() as u128;
         // if total number of nodes are less than committee size, all nodes are part of committee
