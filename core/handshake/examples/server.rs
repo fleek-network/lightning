@@ -14,6 +14,7 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use lightning_node::config::TomlConfigProvider;
+use lightning_rpc::server::Rpc;
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 use mock::syncronizer::MockSyncronizer;
@@ -26,6 +27,7 @@ partial!(ExampleBinding {
     SyncronizerInterface = MockSyncronizer<Self>;
     HandshakeInterface = Handshake<Self>;
     ServiceExecutorInterface = ServiceExecutor<Self>;
+    RpcInterface = Rpc<Self>;
 });
 
 forward!(async fn start_or_shutdown_node(this, start: bool) on [

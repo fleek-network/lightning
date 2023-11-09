@@ -32,6 +32,9 @@ pub enum Command {
     /// Key management utilities.
     #[command(subcommand)]
     Keys(KeySubCmd),
+    /// Opt into or opt out of network participation.
+    #[command(subcommand)]
+    Opt(OptSubCmd),
     /// Print the loaded configuration.
     PrintConfig {
         /// Print the default configuration instead of loading the current one.
@@ -70,4 +73,14 @@ pub enum KeySubCmd {
     /// Generate new private keys.
     /// This command will fail if the keys already exist.
     Generate,
+}
+
+#[derive(Subcommand)]
+pub enum OptSubCmd {
+    /// Opt into network participation.
+    In,
+    /// Opt out of network participation. Run this command before shutting down your node.
+    Out,
+    /// Query the participation status of your node.
+    Status,
 }

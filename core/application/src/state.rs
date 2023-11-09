@@ -63,9 +63,9 @@ use crate::table::{Backend, TableRef};
 
 /// Minimum number of reported measurements that have to be available for a node.
 /// If less measurements have been reported, no reputation score will be computed in that epoch.
-#[cfg(all(not(test), not(feature = "test")))]
+#[cfg(all(not(test), not(debug_assertions)))]
 const MIN_NUM_MEASUREMENTS: usize = 10;
-#[cfg(any(test, feature = "test"))]
+#[cfg(any(test, debug_assertions))]
 const MIN_NUM_MEASUREMENTS: usize = 2;
 
 /// Reported measurements are weighted by the reputation score of the reporting node.
@@ -810,7 +810,6 @@ impl<B: Backend> State<B> {
             let epoch_duration = self.parameters.get(&ProtocolParams::EpochTime).unwrap_or(1);
 
             let new_epoch_end = current_committee.epoch_end_timestamp + epoch_duration as u64;
-
             // Save the old committee so we can see who signaled
             self.committee_info.set(current_epoch, current_committee);
             // Get new committee
@@ -892,11 +891,12 @@ impl<B: Backend> State<B> {
             // The value of score will be in range [0, 100]
             self.rep_scores.set(node, score as u8);
 
-            let uptime = uptime.unwrap_or(0);
-            if uptime < MINIMUM_UPTIME {
-                if let Some(mut node_info) = self.node_info.get(&node) {
-                    node_info.participating = false;
-                    self.node_info.set(node, node_info);
+            if let Some(uptime) = uptime {
+                if uptime < MINIMUM_UPTIME {
+                    if let Some(mut node_info) = self.node_info.get(&node) {
+                        node_info.participating = false;
+                        self.node_info.set(node, node_info);
+                    }
                 }
             }
         });

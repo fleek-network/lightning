@@ -4,6 +4,7 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::ServiceExecutorInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::{FinalTypes, WithMockConsensus};
+use lightning_rpc::server::Rpc;
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -13,7 +14,7 @@ use tracing_subscriber::EnvFilter;
 
 use crate::args::{Args, Command};
 use crate::commands::run::CustomStartShutdown;
-use crate::commands::{dev, keys, print_config, run};
+use crate::commands::{dev, keys, opt, print_config, run};
 use crate::utils::fs::ensure_parent_exist;
 
 pub struct Cli {
@@ -56,7 +57,11 @@ impl Cli {
 
     pub async fn exec_with_custom_start_shutdown<C>(self, cb: CustomStartShutdown<C>) -> Result<()>
     where
-        C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterface = Signer<C>>,
+        C: Collection<
+                ConfigProviderInterface = TomlConfigProvider<C>,
+                SignerInterface = Signer<C>,
+                RpcInterface = Rpc<C>,
+            >,
     {
         self.setup();
         let config_path = self.resolve_config_path()?;
@@ -69,11 +74,16 @@ impl Cli {
         custom_start_shutdown: Option<CustomStartShutdown<C>>,
     ) -> Result<()>
     where
-        C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterface = Signer<C>>,
+        C: Collection<
+                ConfigProviderInterface = TomlConfigProvider<C>,
+                SignerInterface = Signer<C>,
+                RpcInterface = Rpc<C>,
+            >,
     {
         match self.args.cmd {
             Command::Run => run::exec::<C>(config_path, custom_start_shutdown).await,
             Command::Keys(cmd) => keys::exec::<C>(cmd, config_path).await,
+            Command::Opt(cmd) => opt::exec::<C>(cmd, config_path).await,
             Command::PrintConfig { default } => print_config::exec::<C>(default, config_path).await,
             Command::Dev(cmd) => dev::exec::<C>(cmd, config_path).await,
         }

@@ -27,7 +27,7 @@ use crate::measurement_manager::MeasurementManager;
 #[cfg(all(not(test), not(debug_assertions)))]
 const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(300);
 #[cfg(any(test, debug_assertions))]
-const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(2);
+const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(3);
 
 pub struct ReputationAggregator<C: Collection> {
     inner: Arc<ReputationAggregatorInner<C>>,

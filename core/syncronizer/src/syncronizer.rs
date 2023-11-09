@@ -244,8 +244,8 @@ impl<C: Collection> SyncronizerInner<C> {
                 .await
                 .expect("Failed to send blockstore server request");
 
-            if res.recv().await.is_ok() {
-                return Ok(());
+            if let Ok(Ok(response)) = res.recv().await {
+                return Ok(response);
             }
         }
         Err(anyhow!(

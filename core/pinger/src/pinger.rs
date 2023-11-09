@@ -268,6 +268,7 @@ impl<C: Collection> PingerInner<C> {
             .query_runner
             .get_node_registry(None)
             .into_iter()
+            .filter(|node| node.participating)
             .filter_map(|node| self.query_runner.pubkey_to_index(node.public_key))
             .collect();
         nodes.shuffle(rng);
