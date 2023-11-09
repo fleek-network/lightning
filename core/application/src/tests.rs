@@ -1323,6 +1323,53 @@ async fn test_supply_across_epoch() {
         {
             panic!("{error:?}");
         }
+
+        // We have to submit uptime measurements to make sure nodes aren't set to
+        // participating=false in the next epoch.
+        // This is obviously tedious. The alternative is to deactivate the removal of offline nodes
+        // for testing.
+        for node in &keystore {
+            let mut map = BTreeMap::new();
+            let measurements = ReputationMeasurements {
+                latency: None,
+                interactions: None,
+                inbound_bandwidth: None,
+                outbound_bandwidth: None,
+                bytes_received: None,
+                bytes_sent: None,
+                uptime: Some(100),
+                hops: None,
+            };
+            for peer in &keystore {
+                if node.node_secret_key == peer.node_secret_key {
+                    continue;
+                }
+                let public_key = peer.node_secret_key.to_pk();
+                let peer_index = query_runner.pubkey_to_index(public_key).unwrap();
+                map.insert(peer_index, measurements.clone());
+            }
+            let nonce = query_runner
+                .get_node_info(&node.node_secret_key.to_pk())
+                .unwrap()
+                .nonce
+                + 1;
+            let req = get_update_request_node(
+                UpdateMethod::SubmitReputationMeasurements { measurements: map },
+                &node.node_secret_key,
+                nonce,
+            );
+            if let TransactionResponse::Revert(error) =
+                run_transaction(vec![req.into()], &update_socket)
+                    .await
+                    .unwrap()
+                    .txn_receipts[0]
+                    .response
+                    .clone()
+            {
+                panic!("{error:?}");
+            }
+        }
+
         let (_, new_keystore) = get_new_committee(&query_runner, &committee, &keystore);
         if let Err(err) = simple_epoch_change(i, &new_keystore, &update_socket, &query_runner).await
         {

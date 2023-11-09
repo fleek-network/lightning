@@ -872,41 +872,34 @@ impl<B: Backend> State<B> {
                 }
             }
         }
-        let new_rep_scores = lightning_reputation::calculate_reputation_scores(map);
+
         // Store new scores in application state.
-        new_rep_scores
-            .iter()
-            .for_each(|(node, (new_score, uptime))| {
-                let old_score = rep_scores.get(node).unwrap_or(&default_score);
-                let new_score = new_score.unwrap_or(default_score);
-                let emwa_weight = HpUfixed::<18>::from(REP_EWMA_WEIGHT);
-                let score = HpUfixed::<18>::from(*old_score as u32) * emwa_weight.clone()
-                    + (HpUfixed::<18>::from(1.0) - emwa_weight)
-                        * HpUfixed::<18>::from(new_score as u32);
-                let score: u128 = score.try_into().unwrap_or(default_score as u128);
-                // The value of score will be in range [0, 100]
-                self.rep_scores.set(*node, score as u8);
+        let new_rep_scores = lightning_reputation::calculate_reputation_scores(map);
+        let nodes = self.node_info.keys();
+        nodes.for_each(|node| {
+            let (new_score, uptime) = match new_rep_scores.get(&node) {
+                Some((new_score, uptime)) => (*new_score, *uptime),
+                None => (None, None),
+            };
 
-                uptime.map(|uptime| {
-                    if uptime < MINIMUM_UPTIME {
-                        if let Some(mut node_info) = self.node_info.get(node) {
-                            node_info.participating = false;
-                            self.node_info.set(*node, node_info);
-                        }
-                    }
-                });
-            });
+            let old_score = rep_scores.get(&node).unwrap_or(&default_score);
+            let new_score = new_score.unwrap_or(0);
+            let emwa_weight = HpUfixed::<18>::from(REP_EWMA_WEIGHT);
+            let score = HpUfixed::<18>::from(*old_score as u32) * emwa_weight.clone()
+                + (HpUfixed::<18>::from(1.0) - emwa_weight)
+                    * HpUfixed::<18>::from(new_score as u32);
+            let score: u128 = score.try_into().unwrap_or(default_score as u128);
+            // The value of score will be in range [0, 100]
+            self.rep_scores.set(node, score as u8);
 
-        // If not in test mode, remove outdated rep scores.
-        // TODO(matthias): Maybe we should keep the old rep scores in case a node rejoins?
-        if cfg!(all(not(test), not(feature = "test"))) {
-            let nodes = self.rep_scores.keys();
-            nodes.for_each(|node| {
-                if !new_rep_scores.contains_key(&node) {
-                    self.rep_scores.remove(&node);
+            let uptime = uptime.unwrap_or(0);
+            if uptime < MINIMUM_UPTIME {
+                if let Some(mut node_info) = self.node_info.get(&node) {
+                    node_info.participating = false;
+                    self.node_info.set(node, node_info);
                 }
-            });
-        }
+            }
+        });
 
         self.update_latencies();
 
