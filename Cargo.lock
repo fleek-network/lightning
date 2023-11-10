@@ -4542,6 +4542,7 @@ dependencies = [
  "lightning-topology",
  "lightning-types",
  "mock",
+ "rand 0.8.5",
  "reqwest",
  "resolved-pathbuf",
  "serde",

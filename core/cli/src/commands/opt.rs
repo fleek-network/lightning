@@ -17,9 +17,19 @@ use lightning_node::config::TomlConfigProvider;
 use lightning_rpc::server::Rpc;
 use lightning_rpc::utils;
 use lightning_signer::Signer;
-use lightning_types::{NodeInfo, TransactionRequest, UpdateMethod, UpdatePayload, UpdateRequest};
+use lightning_types::{
+    NodeIndex,
+    NodeInfo,
+    Participation,
+    TransactionRequest,
+    UpdateMethod,
+    UpdatePayload,
+    UpdateRequest,
+};
+use rand::seq::SliceRandom;
 use reqwest::Client;
 use resolved_pathbuf::ResolvedPathBuf;
+use serde::de::DeserializeOwned;
 use serde_json::json;
 
 use crate::args::OptSubCmd;
@@ -43,19 +53,31 @@ async fn opt_in<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>
     let public_key = secret_key.to_pk();
     let port = get_rpc_port(config);
 
-    let nonce = get_node_nonce(public_key, port)
+    let genesis_committee = get_genesis_committee(port)
         .await
-        .context("Failed to query nonce via rpc. Is your node running?")?;
+        .context("Failed to get genesis committee via rpc. Is your node running?")?;
 
-    let tx = create_update_request(UpdateMethod::OptIn {}, secret_key, nonce + 1);
-    send_transaction(tx, port)
+    let node_info =
+        genesis_committee_rpc::<Option<NodeInfo>>(&genesis_committee, get_node_info(public_key))
+            .await
+            .context("Failed to get node info from genesis committee")?;
+    let node_info = node_info.context("Node not found on state.")?;
+    if node_info.participation == Participation::True {
+        println!("Your node is already participating in the network.");
+        return Ok(());
+    }
+    let tx = create_update_request(UpdateMethod::OptIn {}, secret_key, node_info.nonce + 1);
+
+    genesis_committee_rpc::<()>(&genesis_committee, send_transaction(tx))
         .await
-        .context("Failed to send opt in transaction. Is your node running?")?;
+        .context("Failed to send transaction to genesis committee")?;
 
-    wait_for_participation_status(public_key, port, true, 10)
+    wait_for_participation_status(&genesis_committee, public_key, Participation::OptedIn, 10)
         .await
         .context("Timed out while trying to confirm opt in transaction.")?;
-    println!("Opt in transaction was successful.");
+    println!(
+        "Opt in transaction was successful. Your node will be participating once the next epoch starts."
+    );
     Ok(())
 }
 
@@ -67,19 +89,33 @@ async fn opt_out<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C
     let public_key = secret_key.to_pk();
     let port = get_rpc_port(config);
 
-    let nonce = get_node_nonce(public_key, port)
+    let genesis_committee = get_genesis_committee(port)
         .await
-        .context("Failed to query nonce via rpc. Is your node running?")?;
+        .context("Failed to get genesis committee via rpc. Is your node running?")?;
 
-    let tx = create_update_request(UpdateMethod::OptOut {}, secret_key, nonce + 1);
-    send_transaction(tx, port)
+    let node_info =
+        genesis_committee_rpc::<Option<NodeInfo>>(&genesis_committee, get_node_info(public_key))
+            .await
+            .context("Failed to get node info from genesis committee")?;
+    let node_info = node_info.context("Node not found on state.")?;
+    if node_info.participation == Participation::False {
+        println!(
+            "Your node is not participating in the network. Opting out of the network is not necessary."
+        );
+        return Ok(());
+    }
+    let tx = create_update_request(UpdateMethod::OptOut {}, secret_key, node_info.nonce + 1);
+
+    genesis_committee_rpc::<()>(&genesis_committee, send_transaction(tx))
         .await
-        .context("Failed to send opt out transaction. Is your node running?")?;
+        .context("Failed to send transaction to genesis committee")?;
 
-    wait_for_participation_status(public_key, port, true, 10)
+    wait_for_participation_status(&genesis_committee, public_key, Participation::OptedOut, 10)
         .await
         .context("Timed out while trying to confirm opt out transaction.")?;
-    println!("Opt out transaction was successful. You can shutdown your node.");
+    println!(
+        "Opt out transaction was successful. Your can shutdown your node after the current epoch ends."
+    );
     Ok(())
 }
 
@@ -91,15 +127,27 @@ async fn status<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>
     let public_key = secret_key.to_pk();
     let port = get_rpc_port(config);
 
-    let status = get_participation_status(public_key, port)
+    let genesis_committee = get_genesis_committee(port)
         .await
-        .context("Failed to query participation status. Is your node running?")?;
+        .context("Failed to get genesis committee via rpc. Is your node running?")?;
 
-    if status {
-        println!("Your node is participating in the network.");
-    } else {
-        println!("Your node is not participating in the network.");
+    let node_info =
+        genesis_committee_rpc::<Option<NodeInfo>>(&genesis_committee, get_node_info(public_key))
+            .await
+            .context("Failed to get node info from genesis committee")?;
+    let node_info = node_info.context("Node not found on state.")?;
+
+    match node_info.participation {
+        Participation::True => println!("Your node is participating in the network."),
+        Participation::False => println!("Your node is not participating in the network."),
+        Participation::OptedIn => {
+            println!("Your node is opted in. Your node will be participating next epoch.")
+        },
+        Participation::OptedOut => {
+            println!("Your node is opted out. You can shutdown your node next epoch.")
+        },
     }
+
     Ok(())
 }
 
@@ -114,7 +162,7 @@ fn load_secret_key<C: Collection<SignerInterface = Signer<C>>>(
             .context("Failed to decode node pem file")?;
         Ok(node_secret_key)
     } else {
-        Err(anyhow::anyhow!("Node Public Key: does not exist"))
+        Err(anyhow::anyhow!("Node public key does not exist"))
     }
 }
 
@@ -140,67 +188,83 @@ fn create_update_request(
     }
 }
 
-async fn get_node_nonce(node_public_key: NodePublicKey, port: u16) -> Result<u64> {
-    let node_info = get_node_info(node_public_key, port).await?;
-    Ok(node_info.nonce)
-}
-
-async fn send_transaction(update_request: UpdateRequest, port: u16) -> Result<()> {
-    let request = json!({
+fn send_transaction(update_request: UpdateRequest) -> String {
+    json!({
         "jsonrpc": "2.0",
         "method":"flk_send_txn",
         "params": TransactionRequest::UpdateRequest(update_request),
         "id":1,
     })
-    .to_string();
-
-    let client = Client::new();
-    utils::rpc_request::<()>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        request.to_string(),
-    )
-    .await?;
-
-    Ok(())
+    .to_string()
 }
 
-async fn get_participation_status(node_public_key: NodePublicKey, port: u16) -> Result<bool> {
-    let node_info = get_node_info(node_public_key, port).await?;
-    Ok(node_info.participating)
-}
-
-async fn get_node_info(node_public_key: NodePublicKey, port: u16) -> Result<NodeInfo> {
-    let request = json!({
+fn get_node_info(public_key: NodePublicKey) -> String {
+    json!({
         "jsonrpc": "2.0",
         "method":"flk_get_node_info",
         "params":{
-            "public_key": node_public_key,
+            "public_key": public_key,
             "version": 3
         },
+        "id":1,
+    })
+    .to_string()
+}
+
+async fn get_genesis_committee(port: u16) -> Result<Vec<(NodeIndex, NodeInfo)>> {
+    let request = json!({
+        "jsonrpc": "2.0",
+        "method":"flk_get_genesis_committee",
+        "params": [],
         "id":1,
     })
     .to_string();
 
     let client = Client::new();
-    let node_info = utils::rpc_request::<NodeInfo>(
+    let res = utils::rpc_request::<Vec<(NodeIndex, NodeInfo)>>(
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         request.to_string(),
     )
     .await?;
-    Ok(node_info.result)
+    let mut genesis_committee = res.result;
+    genesis_committee.shuffle(&mut rand::thread_rng());
+    Ok(genesis_committee)
+}
+
+async fn genesis_committee_rpc<T: DeserializeOwned>(
+    genesis_committee: &Vec<(NodeIndex, NodeInfo)>,
+    request: String,
+) -> Result<T> {
+    let client = Client::new();
+    for (_, node) in genesis_committee {
+        if let Ok(res) = utils::rpc_request::<T>(
+            &client,
+            format!("http://{}:{}/rpc/v0", node.domain, node.ports.rpc),
+            request.clone(),
+        )
+        .await
+        {
+            return Ok(res.result);
+        }
+    }
+    Err(anyhow::anyhow!(
+        "Unable to get a response from genesis committee"
+    ))
 }
 
 async fn wait_for_participation_status(
-    node_public_key: NodePublicKey,
-    port: u16,
-    target_status: bool,
+    genesis_committee: &Vec<(NodeIndex, NodeInfo)>,
+    public_key: NodePublicKey,
+    target_status: Participation,
     max_tries: u32,
 ) -> Result<()> {
     for _ in 0..max_tries {
-        let status = get_participation_status(node_public_key, port).await?;
-        if status == target_status {
+        let node_info =
+            genesis_committee_rpc::<Option<NodeInfo>>(genesis_committee, get_node_info(public_key))
+                .await?;
+        let node_info = node_info.context("Node not found on state.")?;
+        if node_info.participation == target_status {
             return Ok(());
         }
         tokio::time::sleep(Duration::from_secs(5)).await;

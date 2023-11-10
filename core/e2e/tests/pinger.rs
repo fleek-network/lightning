@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::Result;
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::{logging, rpc};
-use lightning_interfaces::types::NodeInfo;
+use lightning_interfaces::types::{NodeInfo, Participation};
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
 use serial_test::serial;
@@ -80,7 +80,7 @@ async fn e2e_detect_offline_node() -> Result<()> {
             .await
             .expect("Failed to parse response.")
             .unwrap();
-        assert!(!node_info.participating);
+        assert_eq!(node_info.participation, Participation::False);
     }
 
     swarm.shutdown();

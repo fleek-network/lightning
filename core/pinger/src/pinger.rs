@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::types::NodeIndex;
+use lightning_interfaces::types::{NodeIndex, Participation};
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
@@ -268,7 +268,7 @@ impl<C: Collection> PingerInner<C> {
             .query_runner
             .get_node_registry(None)
             .into_iter()
-            .filter(|node| node.participating)
+            .filter(|node| node.participation == Participation::True)
             .filter_map(|node| self.query_runner.pubkey_to_index(node.public_key))
             .collect();
         nodes.shuffle(rng);

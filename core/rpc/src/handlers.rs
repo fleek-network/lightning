@@ -16,6 +16,7 @@ use lightning_interfaces::types::{
     FetcherRequest,
     FetcherResponse,
     ImmutablePointer,
+    NodeIndex,
     NodeInfo,
     NodeInfoWithIndex,
     NodeServed,
@@ -112,6 +113,10 @@ impl RpcServer {
             .with_method(
                 "flk_get_committee_members",
                 get_committee_members_handler::<C>,
+            )
+            .with_method(
+                "flk_get_genesis_committee",
+                get_genesis_committee_handler::<C>,
             )
             .with_method("flk_get_epoch", get_epoch_handler::<C>)
             .with_method("flk_get_epoch_info", get_epoch_info_handler::<C>)
@@ -321,6 +326,12 @@ pub async fn get_committee_members_handler<C: Collection>(
     data: Data<Arc<RpcData<C>>>,
 ) -> Result<Vec<NodePublicKey>> {
     Ok(data.0.query_runner.get_committee_members())
+}
+
+pub async fn get_genesis_committee_handler<C: Collection>(
+    data: Data<Arc<RpcData<C>>>,
+) -> Result<Vec<(NodeIndex, NodeInfo)>> {
+    Ok(data.0.query_runner.genesis_committee())
 }
 
 pub async fn get_epoch_handler<C: Collection>(data: Data<Arc<RpcData<C>>>) -> Result<u64> {

@@ -90,6 +90,15 @@ pub enum Value {
     GenesisCommittee(Vec<NodeIndex>),
 }
 
+/// Indicates the participation status of a node.
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
+pub enum Participation {
+    True,
+    False,
+    OptedIn,
+    OptedOut,
+}
+
 /// Adjustable parameters that are stored in the blockchain
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]
 #[repr(u8)]
@@ -139,8 +148,8 @@ pub struct NodeInfo {
     pub ports: NodePorts,
     /// The public key of the nodes narwhal worker
     pub worker_public_key: NodePublicKey,
-    /// Whether the node is currently participating in the network
-    pub participating: bool,
+    /// The participation status of the node
+    pub participation: Participation,
     /// The nonce of the node. Added to each transaction before signed to prevent replays and
     /// enforce ordering
     pub nonce: u64,

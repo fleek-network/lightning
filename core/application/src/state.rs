@@ -31,6 +31,7 @@ use lightning_interfaces::types::{
     NodeInfo,
     NodePorts,
     NodeServed,
+    Participation,
     ProofOfConsensus,
     ProofOfMisbehavior,
     ProtocolParams,
@@ -595,7 +596,7 @@ impl<B: Backend> State<B> {
                         domain,
                         worker_domain,
                         ports,
-                        participating: true,
+                        participation: Participation::True,
                         nonce: 0,
                     };
                     self.create_node(node);
@@ -891,10 +892,19 @@ impl<B: Backend> State<B> {
             // The value of score will be in range [0, 100]
             self.rep_scores.set(node, score as u8);
 
+            let mut node_info = self.node_info.get(&node).unwrap();
+            if node_info.participation == Participation::OptedIn {
+                node_info.participation = Participation::True;
+            }
+            if node_info.participation == Participation::OptedOut {
+                node_info.participation = Participation::False;
+            }
+            self.node_info.set(node, node_info);
+
             if let Some(uptime) = uptime {
                 if uptime < MINIMUM_UPTIME {
                     if let Some(mut node_info) = self.node_info.get(&node) {
-                        node_info.participating = false;
+                        node_info.participation = Participation::False;
                         self.node_info.set(node, node_info);
                     }
                 }
@@ -990,7 +1000,7 @@ impl<B: Backend> State<B> {
         };
         match self.node_info.get(&index) {
             Some(mut node_info) => {
-                node_info.participating = true;
+                node_info.participation = Participation::OptedIn;
                 self.node_info.set(index, node_info);
                 TransactionResponse::Success(ExecutionData::None)
             },
@@ -1005,7 +1015,7 @@ impl<B: Backend> State<B> {
         };
         match self.node_info.get(&index) {
             Some(mut node_info) => {
-                node_info.participating = false;
+                node_info.participation = Participation::OptedOut;
                 self.node_info.set(index, node_info);
                 TransactionResponse::Success(ExecutionData::None)
             },
@@ -1342,7 +1352,7 @@ impl<B: Backend> State<B> {
             .keys()
             .copied()
             // The unwrap is safe because `node_registry` contains only valid node indices.
-            .filter(|index| self.node_info.get(index).unwrap().participating)
+            .filter(|index| self.node_info.get(index).unwrap().participation == Participation::True)
             .collect();
         let committee_size = self.parameters.get(&ProtocolParams::CommitteeSize).unwrap();
         let num_of_nodes = node_registry.len() as u128;

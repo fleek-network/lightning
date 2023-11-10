@@ -10,6 +10,7 @@ use lightning_interfaces::types::{
     NodeInfo,
     NodePorts,
     NodeServed,
+    Participation,
     Staking,
     TotalServed,
 };
@@ -109,7 +110,7 @@ impl From<&GenesisNode> for NodeInfo {
             worker_public_key: value.worker_public_key,
             staked_since: 0,
             stake: value.stake.clone(),
-            participating: true,
+            participation: Participation::True,
             nonce: 0,
             ports: value.ports.clone(),
         }

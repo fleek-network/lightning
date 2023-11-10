@@ -24,6 +24,7 @@ use lightning_interfaces::types::{
     ExecutionError,
     HandshakePorts,
     NodePorts,
+    Participation,
     ProofOfConsensus,
     ProtocolParams,
     ReputationMeasurements,
@@ -1229,8 +1230,8 @@ async fn test_uptime_participation() {
     let node_info1 = query_runner.get_node_info(&peer1).unwrap();
     let node_info2 = query_runner.get_node_info(&peer2).unwrap();
 
-    assert!(!node_info1.participating);
-    assert!(node_info2.participating);
+    assert_eq!(node_info1.participation, Participation::False);
+    assert_eq!(node_info2.participation, Participation::True);
 }
 
 #[test]
