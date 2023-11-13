@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use lightning_interfaces::types::{NodeIndex, Topic};
@@ -31,6 +32,8 @@ pub struct RecvCmd {
 #[derive(Debug)]
 pub struct SendCmd {
     pub topic: Topic,
+    /// If `filter` is Some(set), then the message will only be send to the nodes in `set`
+    pub filter: Option<HashSet<NodeIndex>>,
     pub payload: Vec<u8>,
 }
 

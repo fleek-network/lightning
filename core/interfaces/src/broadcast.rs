@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use infusion::c;
@@ -62,8 +64,9 @@ pub trait BroadcastInterface<C: Collection>:
 pub trait PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
     type Event: BroadcastEventInterface<T> = infusion::Blank<T>;
 
-    /// Publish a message.
-    async fn send(&self, msg: &T);
+    /// Publish a message. If `filter` is `Some(set)`, then the message
+    /// will only be sent to nodes in `set`.
+    async fn send(&self, msg: &T, filter: Option<HashSet<NodeIndex>>);
 
     /// Await the next message in the topic, should only return `None` if there are
     /// no longer any new messages coming. (indicating that the gossip instance is

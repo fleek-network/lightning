@@ -7,6 +7,7 @@
 //! the entire thing in a central event loop.
 
 use std::cell::OnceCell;
+use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use bytes::Bytes;
@@ -309,7 +310,7 @@ impl<C: Collection> Context<C> {
                 self.db.insert_with_message(id, digest, message);
 
                 // Start advertising the message.
-                self.advertise(id, digest);
+                self.advertise(id, digest, cmd.filter);
             },
             Command::Propagate(digest) => {
                 let Some(id) = self.db.get_id(&digest) else  {
@@ -328,7 +329,7 @@ impl<C: Collection> Context<C> {
                 self.pending_store.remove_message(id);
 
                 // Continue with advertising this message to the connected peers.
-                self.advertise(id, digest);
+                self.advertise(id, digest, None);
 
                 increment_counter!(
                     "broadcast_messages_propagated",
@@ -343,7 +344,12 @@ impl<C: Collection> Context<C> {
     }
 
     #[inline]
-    fn advertise(&self, interned_id: MessageInternedId, digest: Digest) {
+    fn advertise(
+        &self,
+        interned_id: MessageInternedId,
+        digest: Digest,
+        filter: Option<HashSet<NodeIndex>>,
+    ) {
         let mut message = Vec::new();
         if Frame::Advr(Advr {
             interned_id,
@@ -358,13 +364,21 @@ impl<C: Collection> Context<C> {
 
         // TODO(qti3e): If there are too many connections consider spawning node here.
 
-        let peers = self.peers.clone();
-        self.event_handler.send_to_all(message.into(), move |id| {
-            peers
-                .get(&id)
-                .map(|mapping| !mapping.contains_key(&interned_id))
-                .unwrap_or(true)
-        });
+        match filter {
+            Some(nodes) => self
+                .event_handler
+                .send_to_all(message.into(), move |id| nodes.contains(&id)),
+            None => {
+                let peers = self.peers.clone();
+
+                self.event_handler.send_to_all(message.into(), move |id| {
+                    peers
+                        .get(&id)
+                        .map(|mapping| !mapping.contains_key(&interned_id))
+                        .unwrap_or(true)
+                });
+            },
+        }
     }
 
     #[inline]

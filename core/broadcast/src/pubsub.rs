@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
@@ -53,7 +54,7 @@ impl<T: LightningMessage + Clone> Clone for PubSubI<T> {
 impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
     type Event = Event<T>;
 
-    async fn send(&self, msg: &T) {
+    async fn send(&self, msg: &T, filter: Option<HashSet<NodeIndex>>) {
         debug!("sending a message on topic {:?}", self.topic);
 
         let mut payload = Vec::with_capacity(512);
@@ -61,6 +62,7 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
             .expect("Unexpected failure writing to buffer.");
         let _ = self.command_sender.send(Command::Send(SendCmd {
             topic: self.topic,
+            filter,
             payload,
         }));
     }

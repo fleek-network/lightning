@@ -445,5 +445,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
 pub enum PubSubMsg {
     Transactions(AuthenticStampedParcel),
     Attestation(CommitteeAttestation),
+    // TODO(matthias): add request payload
+    Request,
 }
 impl AutoImplSerde for PubSubMsg {}
