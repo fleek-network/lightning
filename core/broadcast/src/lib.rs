@@ -12,6 +12,8 @@ mod pubsub;
 mod recv_buffer;
 mod ring;
 mod stats;
+#[cfg(test)]
+mod tests;
 
 pub use broadcast::Broadcast;
 pub use config::Config;

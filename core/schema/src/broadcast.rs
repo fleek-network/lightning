@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::AutoImplSerde;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BroadcastMessage {
     pub topic: Topic,
     pub originator: NodePublicKey,

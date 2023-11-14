@@ -370,7 +370,6 @@ impl<C: Collection> Context<C> {
                 .send_to_all(message.into(), move |id| nodes.contains(&id)),
             None => {
                 let peers = self.peers.clone();
-
                 self.event_handler.send_to_all(message.into(), move |id| {
                     peers
                         .get(&id)
@@ -424,7 +423,6 @@ async fn main_loop<C: Collection>(
 
     loop {
         debug!("waiting for next event.");
-
         tokio::select! {
             // We kind of care about the priority of these events. Or do we?
             // TODO(qti3e): Evaluate this.
