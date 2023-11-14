@@ -65,15 +65,13 @@ sui-types = { git = "https://github.com/daltoncoder/narwhal-hack.git" }
 sui-keys = { git = "https://github.com/daltoncoder/narwhal-hack.git" }
 
 [profile.release]
-# 2 full, 0 nothing, 1 good enough.
+# include some debug info, useful for backtraces
 debug = 1
-# currently enabled, may increase build time, but runtime faster, can set to `"thin"`.
+# perform "fat" link time optimization on the workspace and all dependencies
 lto = true
 # enables full optimization, disregarding binary size, with loop vectorization
 opt-level = 3
 # speeds up build time to offset some of the link time optimization.
 codegen-units = 1
-# strip debug info from binary.
-strip = 'debuginfo'
 # On panic terminate the process.
 panic = 'abort'
