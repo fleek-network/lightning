@@ -69,8 +69,8 @@ sui-keys = { git = "https://github.com/daltoncoder/narwhal-hack.git" }
 debug = 1
 # currently enabled, may increase build time, but runtime faster, can set to `"thin"`.
 lto = true
-# optimize for binary size, but also turn off loop vectorization.
-opt-level = 'z'
+# enables full optimization, disregarding binary size, with loop vectorization
+opt-level = 3
 # speeds up build time to offset some of the link time optimization.
 codegen-units = 1
 # strip debug info from binary.
