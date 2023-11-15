@@ -8,6 +8,7 @@ use fleek_crypto::{
     AccountOwnerSecretKey,
     ConsensusPublicKey,
     ConsensusSecretKey,
+    EthAddress,
     NodePublicKey,
     NodeSecretKey,
     SecretKey,
@@ -1731,5 +1732,44 @@ async fn test_change_protocol_params() {
     assert_eq!(
         query_runner.get_protocol_params(ProtocolParams::LockTime),
         8
+    )
+}
+
+#[test]
+async fn test_revert_self_transfer() {
+    let (update_socket, query_runner) = init_app(None);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner: EthAddress = owner_secret_key.to_pk().into();
+
+    let balance: HpUfixed<18> = 1_000_u64.into();
+    deposit(
+        balance.clone(),
+        Tokens::FLK,
+        &owner_secret_key,
+        &update_socket,
+        1,
+    )
+    .await;
+
+    assert_eq!(query_runner.get_flk_balance(&owner), balance);
+
+    // Check that trying to transfer funds to yourself reverts
+    let update = get_update_request_account(
+        UpdateMethod::Transfer {
+            amount: 10u64.into(),
+            token: Tokens::FLK,
+            to: owner,
+        },
+        &owner_secret_key,
+        2,
+    );
+    let res = run_transaction(vec![update.into()], &update_socket)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        TransactionResponse::Revert(ExecutionError::CantSendToYourself),
+        res.txn_receipts[0].response
     );
 }
