@@ -8,3 +8,5 @@ pub(crate) mod storage;
 pub mod table;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_deprecated;
