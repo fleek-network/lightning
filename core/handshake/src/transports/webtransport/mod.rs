@@ -6,21 +6,29 @@ use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
 use axum::{Extension, Router};
+use bytes::{BufMut as _, Bytes};
 pub use config::WebTransportConfig;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::StreamExt;
-use tokio::sync::mpsc::{self, Receiver, Sender};
-use tracing::error;
+use tokio::sync::mpsc::{self, Receiver};
+use tracing::{error, warn};
 use wtransport::tls::Certificate;
-use wtransport::{Endpoint, ServerConfig};
+use wtransport::{Endpoint, SendStream, ServerConfig};
 
-use crate::schema::{HandshakeRequestFrame, HandshakeResponse, RequestFrame, ResponseFrame};
+use super::delimit_frame;
+use crate::schema::{
+    HandshakeRequestFrame,
+    HandshakeResponse,
+    RequestFrame,
+    ResponseFrame,
+    RES_SERVICE_PAYLOAD_TAG,
+};
 use crate::shutdown::ShutdownWaiter;
-use crate::transports::webtransport::connection::{Context, FramedStreamRx, FramedStreamTx};
+use crate::transports::webtransport::connection::{Context, FramedStreamRx};
 use crate::transports::{Transport, TransportReceiver, TransportSender};
 
 pub struct WebTransport {
-    conn_rx: Receiver<(HandshakeRequestFrame, (FramedStreamTx, FramedStreamRx))>,
+    conn_rx: Receiver<(HandshakeRequestFrame, (SendStream, FramedStreamRx))>,
 }
 
 #[async_trait]
@@ -71,39 +79,77 @@ impl Transport for WebTransport {
 
     async fn accept(&mut self) -> Option<(HandshakeRequestFrame, Self::Sender, Self::Receiver)> {
         let (frame, (frame_writer, frame_reader)) = self.conn_rx.recv().await?;
-        let (data_tx, data_rx) = mpsc::channel(2048);
+        let (data_tx, data_rx) = async_channel::unbounded();
         tokio::spawn(connection::sender_loop(data_rx, frame_writer));
         Some((
             frame,
-            WebTransportSender { tx: data_tx },
+            WebTransportSender {
+                tx: data_tx,
+                current_write: 0,
+            },
             WebTransportReceiver { rx: frame_reader },
         ))
     }
 }
 
 pub struct WebTransportSender {
-    tx: Sender<Vec<u8>>,
+    tx: async_channel::Sender<Bytes>,
+    current_write: u32,
 }
 
-macro_rules! webtransport_send {
-    ($t1:expr, $t2:expr) => {
-        let tx = $t1.tx.clone();
-        let bytes = $t2.encode();
-        tokio::spawn(async move {
-            if let Err(e) = tx.send(bytes.to_vec()).await {
-                error!("failed to send payload to connection loop: {e}");
-            };
-        });
-    };
+impl WebTransportSender {
+    #[inline(always)]
+    fn send_inner(&mut self, bytes: Bytes) {
+        if let Err(e) = self.tx.try_send(bytes) {
+            warn!("payload dropped, failed to send to write loop: {e}");
+        }
+    }
 }
 
 impl TransportSender for WebTransportSender {
     fn send_handshake_response(&mut self, response: HandshakeResponse) {
-        webtransport_send!(self, response);
+        self.send_inner(delimit_frame(response.encode()));
     }
 
     fn send(&mut self, frame: ResponseFrame) {
-        webtransport_send!(self, frame);
+        debug_assert!(
+            !matches!(
+                frame,
+                ResponseFrame::ServicePayload { .. } | ResponseFrame::ServicePayloadChunk { .. }
+            ),
+            "payloads should only be sent via start_write and write"
+        );
+
+        self.send_inner(delimit_frame(frame.encode()));
+    }
+
+    fn start_write(&mut self, len: usize) {
+        debug_assert!(
+            self.current_write == 0,
+            "data should be written completely before calling start_write again"
+        );
+
+        self.current_write = len as u32;
+
+        // add 1 to the length to include the frame tag
+        let len = len as u32 + 1;
+        let mut buffer = Vec::with_capacity(5);
+        buffer.put_u32(len);
+        buffer.put_u8(RES_SERVICE_PAYLOAD_TAG);
+        // write the delimiter and payload tag to the stream
+        self.send_inner(buffer.into());
+
+        self.current_write = len;
+    }
+
+    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
+        let len = buf.len() as u32;
+        debug_assert!(self.current_write != 0);
+        debug_assert!(self.current_write >= len);
+
+        self.current_write -= len;
+        self.send_inner(buf.to_vec().into());
+        Ok(buf.len())
     }
 }
 
