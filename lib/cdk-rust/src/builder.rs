@@ -8,7 +8,6 @@ use crate::transport::Transport;
 
 pub struct AttachedTransport<T>(T);
 
-/// Builds a client.
 pub struct Builder<M, T> {
     mode: M,
     transport: Option<T>,
