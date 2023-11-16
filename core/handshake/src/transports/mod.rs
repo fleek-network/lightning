@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use axum::Router;
+use bytes::{BufMut, Bytes, BytesMut};
 use lightning_interfaces::ExecutorProviderInterface;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -34,6 +35,8 @@ pub trait Transport: Sized + Send + Sync + 'static {
     ) -> Option<(schema::HandshakeRequestFrame, Self::Sender, Self::Receiver)>;
 }
 
+// TODO: Explore being able to make this async while also avoiding dynamic dispatch after support
+//       for secondary connections are added
 pub trait TransportSender: Sized + Send + Sync + 'static {
     /// Send the initial handshake response to the client.
     fn send_handshake_response(&mut self, response: schema::HandshakeResponse);
@@ -45,6 +48,13 @@ pub trait TransportSender: Sized + Send + Sync + 'static {
     fn terminate(mut self, reason: schema::TerminationReason) {
         self.send(schema::ResponseFrame::Termination { reason })
     }
+
+    /// Declare a number of bytes to write as service payloads.
+    fn start_write(&mut self, len: usize);
+
+    /// Write some bytes as service payloads. Must ALWAYS be called after
+    /// [`TransportSender::start_write`].
+    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize>;
 }
 
 #[async_trait]
@@ -112,4 +122,12 @@ fn spawn_listener_task<T: Transport, P: ExecutorProviderInterface>(
             }
         }
     });
+}
+
+/// Delimit a complete frame with a u32 length.
+pub fn delimit_frame(bytes: Bytes) -> Bytes {
+    let mut buf = BytesMut::with_capacity(4 + bytes.len());
+    buf.put_u32(bytes.len() as u32);
+    buf.put(bytes);
+    buf.into()
 }
