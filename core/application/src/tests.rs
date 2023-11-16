@@ -47,6 +47,58 @@ struct GenesisCommitteeKeystore {
     _worker_secret_key: NodeSecretKey,
 }
 
+macro_rules! run_transaction {
+    ($tx:expr,$socket:expr) => {{
+        let result = run_transaction(vec![$tx.into()], $socket).await;
+        assert!(result.is_ok());
+        result.unwrap()
+    }};
+}
+
+macro_rules! expect_tx_success {
+    ($tx:expr,$socket:expr,$response:expr) => {{
+        let result = run_transaction!($tx, $socket);
+        assert_eq!(
+            result.txn_receipts[0].response,
+            TransactionResponse::Success($response)
+        );
+    }};
+}
+
+macro_rules! expect_tx_revert {
+    ($tx:expr,$socket:expr,$revert:expr) => {{
+        let result = run_transaction!($tx, $socket);
+        assert_eq!(
+            result.txn_receipts[0].response,
+            TransactionResponse::Revert($revert)
+        );
+    }};
+}
+
+macro_rules! change_epoch {
+    ($socket:expr,$secret_key:expr,$account_nonce:expr,$epoch:expr) => {{
+        let req = get_update_request_node(
+            UpdateMethod::ChangeEpoch { epoch: $epoch },
+            $secret_key,
+            $account_nonce,
+        );
+        run_transaction!(req, $socket)
+    }};
+}
+
+macro_rules! submit_reputation_measurements {
+    ($socket:expr,$secret_key:expr,$account_nonce:expr,$measurements:expr) => {{
+        let req = get_update_request_node(
+            UpdateMethod::SubmitReputationMeasurements {
+                measurements: $measurements,
+            },
+            $secret_key,
+            $account_nonce,
+        );
+        run_transaction!(req, $socket)
+    }};
+}
+
 // Init the app and return the execution engine socket that would go to narwhal and the query socket
 // that could go to anyone
 fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
@@ -61,6 +113,34 @@ fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
     let app = Application::<TestBinding>::init(config.unwrap(), Default::default()).unwrap();
 
     (app.transaction_executor(), app.sync_query())
+}
+
+fn test_init_app(genesis: Genesis) -> (ExecutionEngineSocket, QueryRunner) {
+    init_app(Some(Config {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+        testnet: false,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
+    }))
+}
+
+fn test_reputation_measurements(uptime: u8) -> ReputationMeasurements {
+    ReputationMeasurements {
+        latency: None,
+        interactions: None,
+        inbound_bandwidth: None,
+        outbound_bandwidth: None,
+        bytes_received: None,
+        bytes_sent: None,
+        uptime: Some(uptime),
+        hops: None,
+    }
+}
+
+fn calculate_required_signals(committee_size: usize) -> usize {
+    2 * committee_size / 3 + 1
 }
 
 // Helper function to create a genesis committee.
@@ -171,44 +251,29 @@ async fn test_epoch_change() {
     let mut genesis = Genesis::load().unwrap();
     let committee_size = committee.len();
     genesis.node_info = committee;
-    let (update_socket, query_runner) = init_app(Some(Config {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-        testnet: false,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    }));
+    let (update_socket, query_runner) = test_init_app(genesis);
 
-    let required_signals = 2 * committee_size / 3 + 1;
+    let required_signals = calculate_required_signals(committee_size);
+    let epoch = 0;
+    let nonce = 1;
 
     // Have (required_signals - 1) say they are ready to change epoch
     // make sure the epoch doesnt change each time someone signals
     for node in keystore.iter().take(required_signals - 1) {
-        let req = get_update_request_node(
-            UpdateMethod::ChangeEpoch { epoch: 0 },
-            &node.node_secret_key,
-            1,
-        );
-
-        let res = run_transaction(vec![req.into()], &update_socket)
-            .await
-            .unwrap();
         // Make sure epoch didnt change
+        let res = change_epoch!(&update_socket, &node.node_secret_key, nonce, epoch);
         assert!(!res.change_epoch);
     }
     // check that the current epoch is still 0
     assert_eq!(query_runner.get_epoch_info().epoch, 0);
 
     // Have the last needed committee member signal the epoch change and make sure it changes
-    let req = get_update_request_node(
-        UpdateMethod::ChangeEpoch { epoch: 0 },
+    let res = change_epoch!(
+        &update_socket,
         &keystore[required_signals].node_secret_key,
-        1,
+        nonce,
+        epoch
     );
-    let res = run_transaction(vec![req.into()], &update_socket)
-        .await
-        .unwrap();
     assert!(res.change_epoch);
 
     // Query epoch info and make sure it incremented to new epoch
@@ -220,14 +285,7 @@ async fn test_submit_rep_measurements() {
     let (committee, keystore) = create_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
     genesis.node_info = committee;
-    let (update_socket, query_runner) = init_app(Some(Config {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-        testnet: false,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    }));
+    let (update_socket, query_runner) = test_init_app(genesis);
 
     let mut map = BTreeMap::new();
     let mut rng = random::get_seedable_rng();
@@ -249,9 +307,8 @@ async fn test_submit_rep_measurements() {
         &keystore[0].node_secret_key,
         1,
     );
-    if let Err(e) = run_transaction(vec![req.into()], &update_socket).await {
-        panic!("{e}");
-    }
+
+    run_transaction!(req, &update_socket);
 
     let rep_measurements1 = query_runner.get_rep_measurements(&peer_index1);
     assert_eq!(rep_measurements1.len(), 1);
@@ -269,14 +326,7 @@ async fn test_submit_rep_measurements_twice() {
     let (committee, keystore) = create_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
     genesis.node_info = committee;
-    let (update_socket, query_runner) = init_app(Some(Config {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-        testnet: false,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    }));
+    let (update_socket, query_runner) = test_init_app(genesis);
 
     let mut map = BTreeMap::new();
     let mut rng = random::get_seedable_rng();
@@ -294,15 +344,8 @@ async fn test_submit_rep_measurements_twice() {
         &keystore[0].node_secret_key,
         1,
     );
-    match run_transaction(vec![req.into()], &update_socket).await {
-        Ok(response) => {
-            assert_eq!(
-                response.txn_receipts[0].response,
-                TransactionResponse::Success(ExecutionData::None)
-            );
-        },
-        Err(e) => panic!("{e}"),
-    }
+
+    expect_tx_success!(req, &update_socket, ExecutionData::None);
 
     // Attempt to submit reputation measurements twice per epoch.
     // This transaction should revert because each node only can submit its reputation measurements
@@ -312,15 +355,12 @@ async fn test_submit_rep_measurements_twice() {
         &keystore[0].node_secret_key,
         2,
     );
-    match run_transaction(vec![req.into()], &update_socket).await {
-        Ok(response) => {
-            assert_eq!(
-                response.txn_receipts[0].response,
-                TransactionResponse::Revert(ExecutionError::AlreadySubmittedMeasurements)
-            );
-        },
-        Err(e) => panic!("{e}"),
-    }
+
+    expect_tx_revert!(
+        req,
+        &update_socket,
+        ExecutionError::AlreadySubmittedMeasurements
+    );
 }
 
 #[tokio::test]
@@ -329,15 +369,8 @@ async fn test_rep_scores() {
     let committee_len = committee.len();
     let mut genesis = Genesis::load().unwrap();
     genesis.node_info = committee;
-    let (update_socket, query_runner) = init_app(Some(Config {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-        testnet: false,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    }));
-    let required_signals = 2 * committee_len / 3 + 1;
+    let (update_socket, query_runner) = test_init_app(genesis);
+    let required_signals = calculate_required_signals(committee_len);
 
     let mut rng = random::get_seedable_rng();
 
@@ -352,45 +385,22 @@ async fn test_rep_scores() {
     let peer_index2 = query_runner.pubkey_to_index(peer2).unwrap();
     map.insert(peer_index2, measurements.clone());
 
-    let req = get_update_request_node(
-        UpdateMethod::SubmitReputationMeasurements { measurements: map },
-        &keystore[0].node_secret_key,
-        1,
-    );
-
-    if let Err(e) = run_transaction(vec![req.into()], &update_socket).await {
-        panic!("{e}");
-    }
+    let nonce = 1;
+    submit_reputation_measurements!(&update_socket, &keystore[0].node_secret_key, nonce, map);
 
     let mut map = BTreeMap::new();
     let measurements = reputation::generate_reputation_measurements(&mut rng, 0.1);
     map.insert(peer_index1, measurements.clone());
-
     let measurements = reputation::generate_reputation_measurements(&mut rng, 0.1);
     map.insert(peer_index2, measurements.clone());
+    submit_reputation_measurements!(&update_socket, &keystore[1].node_secret_key, nonce, map);
 
-    let req = get_update_request_node(
-        UpdateMethod::SubmitReputationMeasurements { measurements: map },
-        &keystore[1].node_secret_key,
-        1,
-    );
-
-    if let Err(e) = run_transaction(vec![req.into()], &update_socket).await {
-        panic!("{e}");
-    }
-
+    let epoch = 0;
     // Change epoch so that rep scores will be calculated from the measurements.
     for (i, node) in keystore.iter().enumerate().take(required_signals) {
         // Not the prettiest solution but we have to keep track of the nonces somehow.
-        let nonce = if i == 0 || i == 1 { 2 } else { 1 };
-        let req = get_update_request_node(
-            UpdateMethod::ChangeEpoch { epoch: 0 },
-            &node.node_secret_key,
-            nonce,
-        );
-        run_transaction(vec![req.into()], &update_socket)
-            .await
-            .unwrap();
+        let nonce = if i < 2 { 2 } else { 1 };
+        change_epoch!(&update_socket, &node.node_secret_key, nonce, epoch);
     }
 
     assert!(query_runner.get_reputation(&peer_index1).is_some());
@@ -405,101 +415,34 @@ async fn test_uptime_participation() {
     committee[0].reputation = Some(40);
     committee[1].reputation = Some(80);
     genesis.node_info = committee;
-    let (update_socket, query_runner) = init_app(Some(Config {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-        testnet: false,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    }));
-    let required_signals = 2 * committee_len / 3 + 1;
+    let (update_socket, query_runner) = test_init_app(genesis);
+    let required_signals = calculate_required_signals(committee_len);
 
     let mut map = BTreeMap::new();
-    let measurements = ReputationMeasurements {
-        latency: None,
-        interactions: None,
-        inbound_bandwidth: None,
-        outbound_bandwidth: None,
-        bytes_received: None,
-        bytes_sent: None,
-        uptime: Some(5),
-        hops: None,
-    };
+    let measurements = test_reputation_measurements(5);
     let peer1 = keystore[2].node_secret_key.to_pk();
     let peer_index1 = query_runner.pubkey_to_index(peer1).unwrap();
     map.insert(peer_index1, measurements.clone());
-    let measurements = ReputationMeasurements {
-        latency: None,
-        interactions: None,
-        inbound_bandwidth: None,
-        outbound_bandwidth: None,
-        bytes_received: None,
-        bytes_sent: None,
-        uptime: Some(20),
-        hops: None,
-    };
+
+    let measurements = test_reputation_measurements(20);
     let peer2 = keystore[3].node_secret_key.to_pk();
     let peer_index2 = query_runner.pubkey_to_index(peer2).unwrap();
     map.insert(peer_index2, measurements.clone());
 
-    let req = get_update_request_node(
-        UpdateMethod::SubmitReputationMeasurements { measurements: map },
-        &keystore[0].node_secret_key,
-        1,
-    );
-
-    if let Err(e) = run_transaction(vec![req.into()], &update_socket).await {
-        panic!("{e}");
-    }
+    let nonce = 1;
+    submit_reputation_measurements!(&update_socket, &keystore[0].node_secret_key, nonce, map);
 
     let mut map = BTreeMap::new();
-    let measurements = ReputationMeasurements {
-        latency: None,
-        interactions: None,
-        inbound_bandwidth: None,
-        outbound_bandwidth: None,
-        bytes_received: None,
-        bytes_sent: None,
-        uptime: Some(9),
-        hops: None,
-    };
-    map.insert(peer_index1, measurements.clone());
+    map.insert(peer_index1, test_reputation_measurements(9));
+    map.insert(peer_index2, test_reputation_measurements(25));
+    submit_reputation_measurements!(&update_socket, &keystore[1].node_secret_key, nonce, map);
 
-    let measurements = ReputationMeasurements {
-        latency: None,
-        interactions: None,
-        inbound_bandwidth: None,
-        outbound_bandwidth: None,
-        bytes_received: None,
-        bytes_sent: None,
-        uptime: Some(25),
-        hops: None,
-    };
-    map.insert(peer_index2, measurements.clone());
-
-    let req = get_update_request_node(
-        UpdateMethod::SubmitReputationMeasurements { measurements: map },
-        &keystore[1].node_secret_key,
-        1,
-    );
-
-    if let Err(e) = run_transaction(vec![req.into()], &update_socket).await {
-        panic!("{e}");
-    }
-
+    let epoch = 0;
     // Change epoch so that rep scores will be calculated from the measurements.
     for (i, node) in keystore.iter().enumerate().take(required_signals) {
         // Not the prettiest solution but we have to keep track of the nonces somehow.
         let nonce = if i == 0 || i == 1 { 2 } else { 1 };
-        let req = get_update_request_node(
-            UpdateMethod::ChangeEpoch { epoch: 0 },
-            &node.node_secret_key,
-            nonce,
-        );
-        run_transaction(vec![req.into()], &update_socket)
-            .await
-            .unwrap();
+        change_epoch!(&update_socket, &node.node_secret_key, nonce, epoch);
     }
 
     let node_info1 = query_runner.get_node_info(&peer1).unwrap();
