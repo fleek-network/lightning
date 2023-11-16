@@ -1,12 +1,11 @@
+use async_channel::bounded;
 use async_trait::async_trait;
 use axum::routing::get;
 use axum::Router;
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::OnceCell;
-use tracing::error;
 
 use super::{Transport, TransportReceiver, TransportSender};
 use crate::schema;
@@ -18,15 +17,21 @@ static LISTENERS: OnceCell<
 
 /// Dial a mocked connection, returning a tokio sender and receiver for the "client".
 /// Users are in charge of sending the initial [`HandshakeRequestFrame`].
-pub async fn dial_mock(port: u16) -> Option<(Sender<Bytes>, Receiver<Bytes>)> {
+pub async fn dial_mock(
+    port: u16,
+) -> Option<(async_channel::Sender<Bytes>, async_channel::Receiver<Bytes>)> {
     let map = LISTENERS.get_or_init(|| async { DashMap::new() }).await;
     let conn_tx = map.get(&port)?;
 
-    let (tx1, rx2) = channel(16);
-    let (tx2, rx1) = channel(16);
+    let (tx1, rx2) = bounded(256);
+    let (tx2, rx1) = bounded(256);
     conn_tx
         .send((
-            MockTransportSender { tx: tx1 },
+            MockTransportSender {
+                tx: tx1,
+                current_write: 0,
+                buffer: BytesMut::new(),
+            },
             MockTransportReceiver { rx: rx1 },
         ))
         .await
@@ -78,11 +83,15 @@ impl Transport for MockTransport {
         ))
     }
 
+    /// accept a new connection. This will immediately await the handshake frame after the
+    /// connection is established.
     async fn accept(
         &mut self,
     ) -> Option<(schema::HandshakeRequestFrame, Self::Sender, Self::Receiver)> {
-        let (sender, mut receiver) = self.conn_rx.recv().await?;
-        let bytes = receiver.rx.recv().await?;
+        let (sender, receiver) = self.conn_rx.recv().await?;
+
+        // decode handshake frame
+        let bytes = receiver.rx.recv().await.ok()?;
         let frame = schema::HandshakeRequestFrame::decode(&bytes).ok()?;
 
         Some((frame, sender, receiver))
@@ -91,41 +100,55 @@ impl Transport for MockTransport {
 
 /// Mock sender
 pub struct MockTransportSender {
-    tx: tokio::sync::mpsc::Sender<Bytes>,
+    tx: async_channel::Sender<Bytes>,
+    current_write: usize,
+    buffer: BytesMut,
 }
 
-macro_rules! mock_send {
-    ($t1:expr, $t2:expr) => {
-        let sender = $t1.tx.clone();
-        let bytes = $t2.encode();
-        tokio::spawn(async move {
-            if let Err(e) = sender.send(bytes).await {
-                error!("failed to send message to client: {e}");
-            };
-        });
-    };
+impl MockTransportSender {
+    fn send_inner(&mut self, bytes: Bytes) {
+        self.tx
+            .try_send(bytes)
+            .expect("failed to send bytes over the mock connection")
+    }
 }
 
 impl TransportSender for MockTransportSender {
     fn send_handshake_response(&mut self, response: schema::HandshakeResponse) {
-        mock_send!(self, response);
+        self.send_inner(response.encode());
     }
 
     fn send(&mut self, frame: schema::ResponseFrame) {
-        mock_send!(self, frame);
+        self.send_inner(frame.encode());
+    }
+
+    fn start_write(&mut self, len: usize) {
+        debug_assert!(self.buffer.is_empty());
+        self.buffer.reserve(len);
+    }
+
+    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
+        debug_assert!(buf.len() <= self.current_write);
+        self.current_write -= buf.len();
+        self.buffer.put(buf);
+        if self.current_write == 0 {
+            let bytes = self.buffer.split().freeze();
+            self.send_inner(bytes);
+        }
+        Ok(buf.len())
     }
 }
 
 /// Mock receiver
 pub struct MockTransportReceiver {
-    rx: tokio::sync::mpsc::Receiver<Bytes>,
+    rx: async_channel::Receiver<Bytes>,
 }
 
 #[async_trait]
 impl TransportReceiver for MockTransportReceiver {
     async fn recv(&mut self) -> Option<schema::RequestFrame> {
-        let bytes = self.rx.recv().await?;
-        schema::RequestFrame::decode(&bytes).ok()
+        let bytes = self.rx.recv().await.ok()?;
+        Some(schema::RequestFrame::decode(&bytes).expect("failed to decode request frame"))
     }
 }
 

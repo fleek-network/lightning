@@ -1,6 +1,7 @@
 #![feature(result_option_inspect)]
 use std::time::Duration;
 
+use async_channel::{Receiver, Sender};
 use bytes::{BufMut, Bytes, BytesMut};
 use criterion::{criterion_group, BenchmarkId, Criterion};
 use fleek_crypto::{ClientPublicKey, ClientSignature};
@@ -16,7 +17,6 @@ use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::KeyOnlySigner;
 use serde_json::json;
 use tokio::runtime::Runtime;
-use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
 
 static MB: usize = 1024 * 1024;
@@ -111,7 +111,7 @@ fn run_clients(n: usize) -> Vec<JoinHandle<()>> {
     for _ in 0..n {
         let handle = tokio::spawn(async {
             loop {
-                let Some((tx, mut rx)) = dial_mock(69).await else {
+                let Some((tx, rx)) = dial_mock(69).await else {
                     break;
                 };
 
@@ -154,7 +154,7 @@ fn run_clients(n: usize) -> Vec<JoinHandle<()>> {
 
                 let mut remaining = 1024 * 8;
                 while remaining > 0 {
-                    if let Some(bytes) = rx.recv().await {
+                    if let Ok(bytes) = rx.recv().await {
                         remaining -= bytes.len() - 1;
                     } else {
                         return;
