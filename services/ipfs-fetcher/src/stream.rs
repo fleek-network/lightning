@@ -1,25 +1,24 @@
-use anyhow::{Context, Result};
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use anyhow::Result;
+use bytes::{Buf, Bytes, BytesMut};
+use fn_sdk::connection::Connection;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::UnixStream;
-use tracing::trace;
 
 pub struct ServiceStream {
-    socket: UnixStream,
+    pub conn: Connection,
     buffer: BytesMut,
 }
 
 impl ServiceStream {
-    pub fn new(socket: UnixStream) -> Self {
+    pub fn new(conn: Connection) -> Self {
         Self {
-            socket,
+            conn,
             buffer: BytesMut::with_capacity(1),
         }
     }
 
-    pub async fn recv(&mut self) -> Option<Bytes> {
+    pub async fn read_request(&mut self) -> Option<Bytes> {
         // Read the request length delimiter
-        if self.socket.read_buf(&mut self.buffer).await.ok()? == 0 {
+        if self.conn.stream.read_buf(&mut self.buffer).await.ok()? == 0 {
             // Socket was closed
             return None;
         }
@@ -35,7 +34,7 @@ impl ServiceStream {
 
         // Read the request URI
         while self.buffer.len() < len {
-            if self.socket.read_buf(&mut self.buffer).await.ok()? == 0 {
+            if self.conn.stream.read_buf(&mut self.buffer).await.ok()? == 0 {
                 // Socket was closed
                 return None;
             }
@@ -46,15 +45,9 @@ impl ServiceStream {
         Some(self.buffer.split_to(len - 1).into())
     }
 
-    pub async fn send(&mut self, bytes: &[u8]) -> Result<()> {
-        let len = bytes.len();
-        trace!("sending {len} bytes");
-        let mut buf = BytesMut::with_capacity(4 + len);
-        buf.put_u32(len as u32);
-        buf.put(bytes);
-        self.socket
-            .write_all(&buf)
-            .await
-            .context("failed to write outgoing bytes")
+    pub async fn send_payload(&mut self, bytes: &[u8]) -> Result<()> {
+        self.conn.start_write(bytes.len()).await?;
+        self.conn.write_all(bytes).await?;
+        Ok(())
     }
 }

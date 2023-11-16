@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
 use arrayref::array_ref;
 use bytes::{Bytes, BytesMut};
+use fn_sdk::connection::Connection;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::UnixStream;
+use tracing::info;
 
 #[derive(Serialize, Deserialize)]
 pub enum Message {
@@ -11,10 +12,12 @@ pub enum Message {
 }
 
 impl Message {
+    #[inline(always)]
     pub fn decode(bytes: &[u8]) -> Result<Self> {
         bincode::deserialize(bytes).context("failed to decode message")
     }
 
+    #[inline(always)]
     pub fn encode(&self) -> Bytes {
         bincode::serialize(self)
             .expect("failed to serialize message")
@@ -23,23 +26,25 @@ impl Message {
 }
 
 struct ServiceStream {
-    socket: UnixStream,
+    conn: Connection,
     buffer: BytesMut,
 }
 
 impl ServiceStream {
-    fn new(socket: UnixStream) -> Self {
+    #[inline(always)]
+    fn new(conn: Connection) -> Self {
         Self {
-            socket,
+            conn,
             buffer: BytesMut::with_capacity(4),
         }
     }
 
-    async fn recv(&mut self) -> Option<Message> {
+    #[inline(always)]
+    async fn read_message(&mut self) -> Option<Message> {
         loop {
             if self.buffer.len() < 4 {
                 // Read more bytes for the length delimiter
-                if self.socket.read_buf(&mut self.buffer).await.ok()? == 0 {
+                if self.conn.read_buf(&mut self.buffer).await.ok()? == 0 {
                     return None;
                 };
             } else {
@@ -50,7 +55,7 @@ impl ServiceStream {
 
                 // If we need more bytes, read until we have enough
                 while self.buffer.len() < len {
-                    if self.socket.read_buf(&mut self.buffer).await.ok()? == 0 {
+                    if self.conn.read_buf(&mut self.buffer).await.ok()? == 0 {
                         return None;
                     };
                 }
@@ -69,24 +74,28 @@ impl ServiceStream {
         }
     }
 
-    async fn send(&mut self, size: usize) -> Result<()> {
+    #[inline(always)]
+    async fn send_payload(&mut self, size: usize) -> Result<()> {
         // Write the buffer to the socket
-        self.socket
-            .write_all(&vec![17; size])
-            .await
-            .context("failed to write frame to socket")
+        self.conn.start_write(size).await?;
+        self.conn.write_all(&vec![17; size]).await?;
+        Ok(())
     }
 }
 
-async fn connection_loop(socket: UnixStream) {
-    let mut stream = ServiceStream::new(socket);
-    stream.send(32).await.expect("failed to send hello message");
+#[inline(always)]
+async fn connection_loop(conn: Connection) {
+    let mut stream = ServiceStream::new(conn);
+    stream
+        .send_payload(32)
+        .await
+        .expect("failed to send hello message");
 
-    while let Some(Message::Request { chunk_len, chunks }) = stream.recv().await {
+    while let Some(Message::Request { chunk_len, chunks }) = stream.read_message().await {
         // send n chunks with a certain length
         for _ in 0..chunks {
             stream
-                .send(chunk_len)
+                .send_payload(chunk_len)
                 .await
                 .expect("failed to send chunk message");
         }
@@ -95,10 +104,10 @@ async fn connection_loop(socket: UnixStream) {
 
 pub async fn main() {
     fn_sdk::ipc::init_from_env();
-    println!("Running io_stress service!");
+    info!("Running io_stress service!");
 
     let listener = fn_sdk::ipc::conn_bind().await;
-    while let Ok((socket, _)) = listener.accept().await {
-        tokio::spawn(connection_loop(socket));
+    while let Ok(conn) = listener.accept().await {
+        tokio::spawn(connection_loop(conn));
     }
 }
