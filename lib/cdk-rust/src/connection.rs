@@ -59,6 +59,7 @@ pub struct Connection<T: Transport> {
     inner: T::Stream,
 }
 
+// Todo: It might be more useful to separate sending and receiving handles.
 impl<T: Transport> Connection<T> {
     pub async fn send(&self, data: &[u8], _: usize) -> Result<()> {
         // Todo: More to do here.

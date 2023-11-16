@@ -8,19 +8,19 @@ use crate::transport::Transport;
 
 pub struct AttachedTransport<T>(T);
 
-pub struct Builder<M, T> {
+pub struct Connector<M, T> {
     mode: M,
     transport: Option<T>,
     pk: Option<ClientPublicKey>,
 }
 
-impl<M, T> Builder<M, T>
+impl<M, T> Connector<M, T>
 where
     M: Mode,
     T: Transport,
 {
-    pub fn pk(self, pk: ClientPublicKey) -> Builder<M, T> {
-        Builder {
+    pub fn pk(self, pk: ClientPublicKey) -> Connector<M, T> {
+        Connector {
             mode: self.mode,
             transport: self.transport,
             pk: Some(pk),
@@ -28,8 +28,8 @@ where
     }
 
     /// Set the transport of the client or driver.
-    pub fn transport(self, transport: T) -> Builder<M, AttachedTransport<T>> {
-        Builder {
+    pub fn transport(self, transport: T) -> Connector<M, AttachedTransport<T>> {
+        Connector {
             mode: self.mode,
             transport: Some(AttachedTransport(transport)),
             pk: self.pk,
@@ -37,9 +37,9 @@ where
     }
 }
 
-impl<T: Transport> Builder<PrimaryMode, T> {
+impl<T: Transport> Connector<PrimaryMode, T> {
     /// Creates a builder for constructing a client or driver in primary mode.
-    pub fn primary(client_secret_key: [u8; 32], service_id: u32) -> Builder<PrimaryMode, T> {
+    pub fn primary(client_secret_key: [u8; 32], service_id: u32) -> Connector<PrimaryMode, T> {
         Self {
             mode: PrimaryMode {
                 _client_secret_key: client_secret_key,
@@ -51,8 +51,8 @@ impl<T: Transport> Builder<PrimaryMode, T> {
     }
 }
 
-impl<T: Transport> Builder<PrimaryMode, AttachedTransport<T>> {
-    pub async fn build(self) -> anyhow::Result<Connection<T>> {
+impl<T: Transport> Connector<PrimaryMode, AttachedTransport<T>> {
+    pub async fn connect(self) -> anyhow::Result<Connection<T>> {
         // This unwrap is safe because `transport()` is required (using the type system).
         let transport = self.transport.unwrap().0;
         let context = Context::new(
@@ -64,9 +64,9 @@ impl<T: Transport> Builder<PrimaryMode, AttachedTransport<T>> {
     }
 }
 
-impl<T: Transport> Builder<SecondaryMode, T> {
+impl<T: Transport> Connector<SecondaryMode, T> {
     /// Creates a builder for constructing a client or driver in secondary mode.
-    pub fn secondary(access_token: [u8; 48], node_pk: [u8; 32]) -> Builder<SecondaryMode, T> {
+    pub fn secondary(access_token: [u8; 48], node_pk: [u8; 32]) -> Connector<SecondaryMode, T> {
         Self {
             mode: SecondaryMode {
                 access_token,
@@ -78,8 +78,8 @@ impl<T: Transport> Builder<SecondaryMode, T> {
     }
 }
 
-impl<T: Transport> Builder<SecondaryMode, AttachedTransport<T>> {
-    pub async fn build(self) -> anyhow::Result<Connection<T>> {
+impl<T: Transport> Connector<SecondaryMode, AttachedTransport<T>> {
+    pub async fn connect(self) -> anyhow::Result<Connection<T>> {
         // This unwrap is safe because `transport()` because this method is only available
         // after attaching a transport.
         let transport = self.transport.unwrap().0;
