@@ -4,15 +4,17 @@ use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
 use tokio::io::AsyncReadExt;
+use tokio::sync::Mutex;
 use wtransport::endpoint::endpoint_side::Client;
-use wtransport::{ClientConfig, Connection, Endpoint};
+use wtransport::{ClientConfig, Connection, Endpoint, RecvStream, SendStream};
 
 use crate::tls;
-use crate::transport::{Transport, TransportStream};
+use crate::transport::{Transport, TransportReceiver, TransportSender};
 
 pub struct WebTransport {
     target: String,
     endpoint: Endpoint<Client>,
+    connection: Mutex<Option<Connection>>,
 }
 
 impl WebTransport {
@@ -28,6 +30,7 @@ impl WebTransport {
         Ok(Self {
             endpoint,
             target: config.target,
+            connection: Mutex::new(None),
         })
     }
 }
@@ -40,30 +43,46 @@ pub struct Config {
 
 #[async_trait]
 impl Transport for WebTransport {
-    type Stream = WebTransportStream;
+    type Sender = WebTransportSender;
+    type Receiver = WebTransportReceiver;
 
-    async fn connect(&self) -> anyhow::Result<Self::Stream> {
-        let conn = self.endpoint.connect(&self.target).await?;
-        Ok(WebTransportStream { inner: conn })
+    async fn connect(&self) -> Result<(Self::Sender, Self::Receiver)> {
+        let mut guard = self.connection.lock().await;
+
+        if guard.is_none() {
+            let conn = self.endpoint.connect(&self.target).await?;
+            debug_assert!(guard.replace(conn).is_none());
+        }
+
+        let (tx_stream, rx_stream) = guard.as_ref().unwrap().open_bi().await?.await?;
+        Ok((
+            WebTransportSender { inner: tx_stream },
+            WebTransportReceiver { inner: rx_stream },
+        ))
     }
 }
 
-pub struct WebTransportStream {
-    inner: Connection,
+pub struct WebTransportSender {
+    inner: SendStream,
 }
 
 #[async_trait]
-impl TransportStream for WebTransportStream {
-    async fn send(&self, data: &[u8]) -> Result<()> {
-        let mut writer = self.inner.open_uni().await?.await?;
-        writer.write_all(data).await.map_err(Into::into)
+impl TransportSender for WebTransportSender {
+    async fn send(&mut self, data: &[u8]) -> Result<()> {
+        self.inner.write_all(data).await.map_err(Into::into)
     }
+}
 
+pub struct WebTransportReceiver {
+    inner: RecvStream,
+}
+
+#[async_trait]
+impl TransportReceiver for WebTransportReceiver {
     async fn recv(&mut self) -> Result<Bytes> {
-        let mut receiver = self.inner.accept_uni().await?;
         // Todo: verify that read_to_end is cancel safe.
         let mut buffer = Vec::new();
-        receiver.read_to_end(buffer.as_mut()).await?;
+        self.inner.read_to_end(buffer.as_mut()).await?;
         Ok(Bytes::from(buffer))
     }
 }

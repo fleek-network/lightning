@@ -5,9 +5,8 @@ use bytes::Bytes;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use tokio::sync::Mutex;
 
-use crate::transport::{Transport, TransportStream};
+use crate::transport::{Transport, TransportReceiver, TransportSender};
 
 pub struct TcpTransport {
     target: SocketAddr,
@@ -21,35 +20,37 @@ impl TcpTransport {
 
 #[async_trait]
 impl Transport for TcpTransport {
-    type Stream = TcpStream;
+    type Sender = TcpSender;
+    type Receiver = TcpReceiver;
 
-    async fn connect(&self) -> anyhow::Result<Self::Stream> {
+    async fn connect(&self) -> anyhow::Result<(Self::Sender, Self::Receiver)> {
         let stream = net::TcpStream::connect(self.target).await?;
         let (reader, writer) = stream.into_split();
-        Ok(TcpStream {
-            reader,
-            writer: Mutex::new(Some(writer)),
-        })
+        Ok((TcpSender { inner: writer }, TcpReceiver { inner: reader }))
     }
 }
 
-pub struct TcpStream {
-    reader: OwnedReadHalf,
-    // Todo: This is temporary.
-    writer: Mutex<Option<OwnedWriteHalf>>,
+pub struct TcpSender {
+    inner: OwnedWriteHalf,
 }
 
 #[async_trait]
-impl TransportStream for TcpStream {
-    async fn send(&self, data: &[u8]) -> anyhow::Result<()> {
-        let mut guard = self.writer.lock().await;
-        let writer = guard.as_mut().take().unwrap();
-        writer.write_all(data).await.map_err(Into::into)
+impl TransportSender for TcpSender {
+    async fn send(&mut self, data: &[u8]) -> anyhow::Result<()> {
+        self.inner.write_all(data).await.map_err(Into::into)
     }
+}
 
+pub struct TcpReceiver {
+    inner: OwnedReadHalf,
+}
+
+#[async_trait]
+impl TransportReceiver for TcpReceiver {
     async fn recv(&mut self) -> anyhow::Result<Bytes> {
+        // Todo: read length prefix.
         let mut buffer = Vec::new();
-        self.reader.read_to_end(buffer.as_mut()).await?;
+        self.inner.read_to_end(buffer.as_mut()).await?;
         Ok(Bytes::from(buffer))
     }
 }

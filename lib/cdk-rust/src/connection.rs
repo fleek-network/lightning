@@ -4,24 +4,27 @@ use fleek_crypto::{ClientPublicKey, ClientSignature};
 
 use crate::context::Context;
 use crate::mode::{ModeSetting, PrimaryMode, SecondaryMode};
-use crate::schema::HandshakeRequestFrame;
-use crate::transport::{Transport, TransportStream};
+use crate::schema::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
+use crate::transport::{Transport, TransportReceiver, TransportSender};
 
-pub async fn connect<T: Transport>(transport: T, ctx: Context) -> Result<Connection<T>> {
-    let mut stream = transport.connect().await?;
+pub async fn connect<T: Transport>(
+    transport: &T,
+    ctx: &Context,
+) -> Result<(T::Sender, T::Receiver)> {
+    let (mut sender, receiver) = transport.connect().await?;
 
     match ctx.mode() {
         ModeSetting::Primary(setting) => {
-            start_handshake::<T>(&mut stream, setting, *ctx.pk()).await?
+            start_handshake::<T>(&mut sender, setting, *ctx.pk()).await?
         },
-        ModeSetting::Secondary(setting) => join_connection::<T>(&mut stream, setting).await?,
+        ModeSetting::Secondary(setting) => join_connection::<T>(&mut sender, setting).await?,
     }
 
-    Ok(Connection { inner: stream })
+    Ok((sender, receiver))
 }
 
 async fn start_handshake<T: Transport>(
-    stream: &mut T::Stream,
+    stream: &mut T::Sender,
     setting: &PrimaryMode,
     pk: ClientPublicKey,
 ) -> Result<()> {
@@ -41,7 +44,7 @@ async fn start_handshake<T: Transport>(
 }
 
 async fn join_connection<T: Transport>(
-    stream: &mut T::Stream,
+    stream: &mut T::Sender,
     setting: &SecondaryMode,
 ) -> Result<()> {
     let frame = HandshakeRequestFrame::JoinRequest {
@@ -55,19 +58,46 @@ async fn join_connection<T: Transport>(
     Ok(())
 }
 
-pub struct Connection<T: Transport> {
-    inner: T::Stream,
+pub struct Connector<T: Transport> {
+    transport: T,
+    ctx: Context,
 }
 
-// Todo: It might be more useful to separate sending and receiving handles.
-impl<T: Transport> Connection<T> {
-    pub async fn send(&self, data: &[u8], _: usize) -> Result<()> {
-        // Todo: More to do here.
-        self.inner.send(data).await
+impl<T: Transport> Connector<T> {
+    pub(crate) fn new(transport: T, ctx: Context) -> Self {
+        Self { transport, ctx }
+    }
+    pub async fn connect(&self) -> Result<(Sender<T>, Receiver<T>)> {
+        let (sender, receiver) = connect(&self.transport, &self.ctx).await?;
+        Ok((Sender { inner: sender }, Receiver { inner: receiver }))
+    }
+}
+
+pub struct Sender<T: Transport> {
+    inner: T::Sender,
+}
+
+impl<T: Transport> Sender<T> {
+    pub async fn send(&mut self, data: Bytes) -> Result<()> {
+        let serialized_frame = RequestFrame::ServicePayload { bytes: data }.encode();
+        self.inner.send(serialized_frame.as_ref()).await
     }
 
-    pub async fn receive(&mut self) -> Result<Bytes> {
-        // Todo: More to do here.
-        self.inner.recv().await
+    async fn _request_access_token(&mut self, _ttl: u64) {
+        todo!()
+    }
+
+    async fn _extend_access_token(&mut self, _ttl: u64) {
+        todo!()
+    }
+}
+
+pub struct Receiver<T: Transport> {
+    inner: T::Receiver,
+}
+
+impl<T: Transport> Receiver<T> {
+    pub async fn recv(&mut self) -> Result<ResponseFrame> {
+        ResponseFrame::decode(self.inner.recv().await?.as_ref())
     }
 }
