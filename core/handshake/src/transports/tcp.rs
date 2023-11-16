@@ -7,12 +7,11 @@ use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::mpsc;
 use tracing::{info, warn};
-use triomphe::Arc;
 
-use super::{Transport, TransportReceiver, TransportSender};
-use crate::schema;
+use super::{delimit_frame, Transport, TransportReceiver, TransportSender};
+use crate::schema::{self, RES_SERVICE_PAYLOAD_TAG};
 use crate::shutdown::ShutdownWaiter;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -109,8 +108,8 @@ fn spawn_handshake_task(
 
         // Parse the handshake frame
         let Ok(frame) = schema::HandshakeRequestFrame::decode(&buf) else {
-                        return
-                    };
+            return
+        };
 
         let (reader, writer) = stream.into_split();
 
@@ -121,9 +120,10 @@ fn spawn_handshake_task(
     });
 }
 
+/// Driver loop to write outgoing bytes directly to the stream.
 async fn spawn_write_driver(mut writer: OwnedWriteHalf, rx: async_channel::Receiver<Bytes>) {
     while let Ok(bytes) = rx.recv().await {
-        if let Err(e) = writer.write_all(&delimit_frame(bytes)).await {
+        if let Err(e) = writer.write_all(&bytes).await {
             warn!("Dropping payload, failed to write to stream: {e}");
         };
     }
@@ -131,10 +131,12 @@ async fn spawn_write_driver(mut writer: OwnedWriteHalf, rx: async_channel::Recei
 
 pub struct TcpSender {
     sender: async_channel::Sender<Bytes>,
-    notify: Arc<Notify>,
+    current_write: u32,
 }
 
 impl TcpSender {
+    /// Create the [`TcpSender`], additionally spawning a task to handle writing bytes to the
+    /// stream.
     #[inline(always)]
     pub fn spawn(writer: OwnedWriteHalf) -> Self {
         let (sender, receiver) = async_channel::unbounded();
@@ -142,11 +144,10 @@ impl TcpSender {
 
         Self {
             sender,
-            notify: Arc::new(Notify::new()),
+            current_write: 0,
         }
     }
 
-    /// Spawn a task to write the bytes to the stream
     #[inline(always)]
     fn send_inner(&mut self, bytes: Bytes) {
         if let Err(e) = self.sender.try_send(bytes) {
@@ -155,23 +156,50 @@ impl TcpSender {
     }
 }
 
-impl Drop for TcpSender {
-    fn drop(&mut self) {
-        // Release all pending write tasks immediately
-        self.notify.notify_waiters()
-    }
-}
-
 impl TransportSender for TcpSender {
     fn send_handshake_response(&mut self, response: schema::HandshakeResponse) {
-        self.send_inner(response.encode());
+        self.send_inner(delimit_frame(response.encode()));
     }
 
-    /// Should not send a payload greater than u32::MAX - 1
     fn send(&mut self, frame: schema::ResponseFrame) {
-        let bytes = frame.encode();
-        assert!(bytes.len() < u32::MAX as usize);
+        debug_assert!(
+            !matches!(
+                frame,
+                schema::ResponseFrame::ServicePayload { .. }
+                    | schema::ResponseFrame::ServicePayloadChunk { .. }
+            ),
+            "payloads should only be sent via start_write and write"
+        );
+
+        let bytes = delimit_frame(frame.encode());
         self.send_inner(bytes);
+    }
+
+    fn start_write(&mut self, len: usize) {
+        debug_assert!(
+            self.current_write == 0,
+            "data should be written completely before calling start_write again"
+        );
+
+        self.current_write = len as u32;
+
+        // add 1 to the length to include the frame tag
+        let len = len as u32 + 1;
+        let mut buffer = Vec::with_capacity(5);
+        buffer.put_u32(len);
+        buffer.put_u8(RES_SERVICE_PAYLOAD_TAG);
+        // write the delimiter and payload tag to the stream
+        self.send_inner(buffer.into());
+    }
+
+    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
+        let len = buf.len() as u32;
+        debug_assert!(self.current_write != 0);
+        debug_assert!(self.current_write >= len);
+
+        self.current_write -= len;
+        self.send_inner(buf.to_vec().into());
+        Ok(buf.len())
     }
 }
 
@@ -191,6 +219,9 @@ impl TcpReceiver {
 
 #[async_trait]
 impl TransportReceiver for TcpReceiver {
+    /// Cancel Safety:
+    /// This method is cancel safe, but could potentially allocate multiple times for the delimiter
+    /// if canceled.
     async fn recv(&mut self) -> Option<schema::RequestFrame> {
         loop {
             if self.buffer.len() < 4 {
@@ -224,13 +255,6 @@ impl TransportReceiver for TcpReceiver {
             }
         }
     }
-}
-
-pub fn delimit_frame(bytes: Bytes) -> Bytes {
-    let mut buf = BytesMut::with_capacity(4 + bytes.len());
-    buf.put_u32(bytes.len() as u32);
-    buf.put(bytes);
-    buf.into()
 }
 
 #[cfg(test)]
