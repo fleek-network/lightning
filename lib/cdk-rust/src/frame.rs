@@ -1,8 +1,6 @@
 use bytes::Bytes;
 
-use crate::schema::{RequestFrame, ResponseFrame};
-
-pub type Response = ResponseFrame;
+use crate::schema::RequestFrame;
 
 pub enum Request {
     /// Raw message to be sent to the service implementation.

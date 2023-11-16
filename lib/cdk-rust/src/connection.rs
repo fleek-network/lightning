@@ -1,50 +1,39 @@
+use anyhow::Result;
+use bytes::Bytes;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
-use futures::{SinkExt, StreamExt};
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::task::JoinSet;
 
 use crate::context::Context;
-use crate::frame::{Request, Response};
 use crate::mode::{ModeSetting, PrimaryMode, SecondaryMode};
-use crate::schema::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
-use crate::transport::Transport;
+use crate::schema::HandshakeRequestFrame;
+use crate::transport::{Transport, TransportStream};
 
-pub async fn connect_and_drive<T: Transport>(
-    transport: T,
-    request_rx: Receiver<Request>,
-    response_tx: Sender<Response>,
-    ctx: Context,
-) -> anyhow::Result<()> {
-    let (mut tx, mut rx) = transport.connect().await?;
+pub async fn connect<T: Transport>(transport: T, ctx: Context) -> Result<Connection<T>> {
+    let mut stream = transport.connect().await?;
 
     match ctx.mode() {
         ModeSetting::Primary(setting) => {
-            start_handshake::<T>((&mut tx, &mut rx), setting, *ctx.pk()).await?
+            start_handshake::<T>(&mut stream, setting, *ctx.pk()).await?
         },
-        ModeSetting::Secondary(setting) => {
-            join_connection::<T>((&mut tx, &mut rx), setting).await?
-        },
+        ModeSetting::Secondary(setting) => join_connection::<T>(&mut stream, setting).await?,
     }
 
-    connection_loop::<T>((tx, rx), request_rx, response_tx).await
+    Ok(Connection { inner: stream })
 }
 
 async fn start_handshake<T: Transport>(
-    (tx, _): (&mut T::Sender, &mut T::Receiver),
+    stream: &mut T::Stream,
     setting: &PrimaryMode,
     pk: ClientPublicKey,
-) -> anyhow::Result<()> {
-    tx.send(
-        HandshakeRequestFrame::Handshake {
-            retry: None,
-            service: setting.service_id,
-            pk,
-            // Todo: Create signature.
-            pop: ClientSignature([0; 48]),
-        }
-        .encode(),
-    )
-    .await?;
+) -> Result<()> {
+    let frame = HandshakeRequestFrame::Handshake {
+        retry: None,
+        service: setting.service_id,
+        pk,
+        // Todo: Create signature.
+        pop: ClientSignature([0; 48]),
+    }
+    .encode();
+    stream.send(frame.as_ref()).await?;
 
     // Todo: Complete HANDSHAKE.
 
@@ -52,64 +41,32 @@ async fn start_handshake<T: Transport>(
 }
 
 async fn join_connection<T: Transport>(
-    (tx, _): (&mut T::Sender, &mut T::Receiver),
+    stream: &mut T::Stream,
     setting: &SecondaryMode,
-) -> anyhow::Result<()> {
-    tx.send(
-        HandshakeRequestFrame::JoinRequest {
-            access_token: setting.access_token,
-        }
-        .encode(),
-    )
-    .await?;
+) -> Result<()> {
+    let frame = HandshakeRequestFrame::JoinRequest {
+        access_token: setting.access_token,
+    }
+    .encode();
+    stream.send(frame.as_ref()).await?;
 
     // Todo: Complete JOIN.
 
     Ok(())
 }
 
-async fn connection_loop<T: Transport>(
-    (mut tx, mut rx): (T::Sender, T::Receiver),
-    mut request_rx: Receiver<Request>,
-    response_tx: Sender<Response>,
-) -> anyhow::Result<()> {
-    // We spawn a separate task because the transport sender is not cloneable.
-    let mut sender_task = JoinSet::new();
-    sender_task.spawn(async move {
-        while let Some(request) = request_rx.recv().await {
-            if let Err(e) = tx.send(RequestFrame::from(request).encode()).await {
-                log::error!("failed to send request frame: {e:?}");
-                break;
-            }
-        }
-    });
+pub struct Connection<T: Transport> {
+    inner: T::Stream,
+}
 
-    loop {
-        tokio::select! {
-            bytes = rx.next() => {
-                let Some(bytes) = bytes else {
-                    break;
-                };
-
-                let response_event_tx = response_tx.clone();
-                tokio::spawn(async move {
-                    match ResponseFrame::decode(bytes.as_ref()) {
-                        Ok(frame) => {
-                            let _ = response_event_tx.send(frame).await;
-                        }
-                        Err(e) => {
-                            log::error!("invalid response frame: {e:?}");
-                        }
-                    }
-                });
-            }
-            _ = sender_task.join_next() => {
-                // The sending task is the only one in the join set.
-                // If that finishes, there is nothing we can do so we return.
-                break;
-            }
-        }
+impl<T: Transport> Connection<T> {
+    pub async fn send(&self, data: &[u8], _: usize) -> Result<()> {
+        // Todo: More to do here.
+        self.inner.send(data).await
     }
 
-    Ok(())
+    pub async fn receive(&mut self) -> Result<Bytes> {
+        // Todo: More to do here.
+        self.inner.recv().await
+    }
 }

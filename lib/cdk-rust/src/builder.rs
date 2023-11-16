@@ -1,12 +1,12 @@
 use fleek_crypto::ClientPublicKey;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::connection;
+use crate::connection::Connection;
 use crate::context::Context;
-use crate::frame::{Request, Response};
 use crate::mode::{Mode, ModeSetting, PrimaryMode, SecondaryMode};
 use crate::transport::Transport;
+
+pub struct AttachedTransport<T>(T);
 
 /// Builds a client.
 pub struct Builder<M, T> {
@@ -53,7 +53,7 @@ impl<T: Transport> Builder<PrimaryMode, T> {
 }
 
 impl<T: Transport> Builder<PrimaryMode, AttachedTransport<T>> {
-    pub fn build(self) -> (Sender<Request>, Receiver<Response>) {
+    pub async fn build(self) -> anyhow::Result<Connection<T>> {
         // This unwrap is safe because `transport()` is required (using the type system).
         let transport = self.transport.unwrap().0;
         let context = Context::new(
@@ -61,15 +61,7 @@ impl<T: Transport> Builder<PrimaryMode, AttachedTransport<T>> {
             // Todo: better default?
             self.pk.unwrap_or(ClientPublicKey([1; 96])),
         );
-        let (request_tx, request_rx) = mpsc::channel(1024);
-        let (response_tx, response_rx) = mpsc::channel(1024);
-        tokio::spawn(connection::connect_and_drive::<T>(
-            transport,
-            request_rx,
-            response_tx,
-            context,
-        ));
-        (request_tx, response_rx)
+        connection::connect(transport, context).await
     }
 }
 
@@ -88,7 +80,7 @@ impl<T: Transport> Builder<SecondaryMode, T> {
 }
 
 impl<T: Transport> Builder<SecondaryMode, AttachedTransport<T>> {
-    pub fn build(self) -> (Sender<Request>, Receiver<Response>) {
+    pub async fn build(self) -> anyhow::Result<Connection<T>> {
         // This unwrap is safe because `transport()` because this method is only available
         // after attaching a transport.
         let transport = self.transport.unwrap().0;
@@ -97,16 +89,6 @@ impl<T: Transport> Builder<SecondaryMode, AttachedTransport<T>> {
             // Todo: better default?
             self.pk.unwrap_or(ClientPublicKey([1; 96])),
         );
-        let (request_tx, request_rx) = mpsc::channel(1024);
-        let (response_tx, response_rx) = mpsc::channel(1024);
-        tokio::spawn(connection::connect_and_drive::<T>(
-            transport,
-            request_rx,
-            response_tx,
-            context,
-        ));
-        (request_tx, response_rx)
+        connection::connect(transport, context).await
     }
 }
-
-pub struct AttachedTransport<T>(T);

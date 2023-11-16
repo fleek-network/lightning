@@ -1,17 +1,14 @@
 use std::net::SocketAddr;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{Sink, Stream};
-use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use tokio::io::AsyncReadExt;
 use wtransport::endpoint::endpoint_side::Client;
-use wtransport::{ClientConfig, Endpoint, RecvStream, SendStream};
+use wtransport::{ClientConfig, Connection, Endpoint};
 
 use crate::tls;
-use crate::transport::Transport;
+use crate::transport::{Transport, TransportStream};
 
 pub struct WebTransport {
     target: String,
@@ -41,80 +38,32 @@ pub struct Config {
     pub bind_address: SocketAddr,
 }
 
-pub type FramedStreamTx = FramedWrite<SendStream, LengthDelimitedCodec>;
-pub type FramedStreamRx = FramedRead<RecvStream, LengthDelimitedCodec>;
-
 #[async_trait]
 impl Transport for WebTransport {
-    type Sender = WebTransportSender;
-    type Receiver = WebTransportReceiver;
+    type Stream = WebTransportStream;
 
-    async fn connect(&self) -> anyhow::Result<(Self::Sender, Self::Receiver)> {
+    async fn connect(&self) -> anyhow::Result<Self::Stream> {
         let conn = self.endpoint.connect(&self.target).await?;
-        // Todo: For now, we just open one bidirectional stream.
-        // Ideally, we would like to generate new streams from the connection
-        // and perform a request-response exchange in each stream.
-        let (tx, rx) = conn.open_bi().await?.await?;
-        Ok((
-            WebTransportSender {
-                inner: FramedStreamTx::new(tx, LengthDelimitedCodec::new()),
-            },
-            WebTransportReceiver {
-                inner: FramedStreamRx::new(rx, LengthDelimitedCodec::new()),
-            },
-        ))
+        Ok(WebTransportStream { inner: conn })
     }
 }
 
-pub struct WebTransportSender {
-    inner: FramedStreamTx,
+pub struct WebTransportStream {
+    inner: Connection,
 }
 
-impl Sink<Bytes> for WebTransportSender {
-    type Error = std::io::Error;
-
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::new(&mut self.inner)
-            .poll_ready(cx)
-            .map_err(std::io::Error::from)
+#[async_trait]
+impl TransportStream for WebTransportStream {
+    async fn send(&self, data: &[u8]) -> Result<()> {
+        let mut writer = self.inner.open_uni().await?.await?;
+        writer.write_all(data).await.map_err(Into::into)
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: Bytes) -> Result<(), Self::Error> {
-        Pin::new(&mut self.inner)
-            .start_send(item)
-            .map_err(std::io::Error::from)
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::new(&mut self.inner)
-            .poll_flush(cx)
-            .map_err(std::io::Error::from)
-    }
-
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::new(&mut self.inner)
-            .poll_close(cx)
-            .map_err(std::io::Error::from)
-    }
-}
-
-pub struct WebTransportReceiver {
-    inner: FramedStreamRx,
-}
-
-impl Stream for WebTransportReceiver {
-    type Item = Bytes;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.inner)
-            .poll_next(cx)
-            .map(|opt| match opt {
-                None => None,
-                Some(Ok(bytes)) => Some(Bytes::from(bytes)),
-                Some(Err(e)) => {
-                    log::error!("unexpected error in receiving stream: {e:?}");
-                    None
-                },
-            })
+    async fn recv(&mut self) -> Result<Bytes> {
+        let mut receiver = self.inner.accept_uni().await?;
+        // Todo: verify that read_to_end is cancel safe.
+        let mut buffer = Vec::new();
+        receiver.read_to_end(buffer.as_mut()).await?;
+        Ok(Bytes::from(buffer))
     }
 }
