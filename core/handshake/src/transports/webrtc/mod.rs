@@ -6,6 +6,7 @@ use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use anyhow::Result;
 use async_trait::async_trait;
 use axum::Router;
+use bytes::Bytes;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use stunclient::StunClient;
@@ -104,6 +105,7 @@ impl Transport for WebRtcTransport {
             addr,
             conns: self.conns.clone(),
             notify: self.notify.clone(),
+            current_write: 0,
         };
         let receiver = WebRtcReceiver(receiver);
 
@@ -116,11 +118,12 @@ pub struct WebRtcSender {
     addr: IpAddr,
     conns: ConnectionMap,
     notify: Arc<Notify>,
+    current_write: usize,
 }
 
 impl WebRtcSender {
     #[inline(always)]
-    fn send(&mut self, payload: &[u8]) {
+    fn send_inner(&mut self, payload: &[u8]) {
         if let Some(mut conn) = self.conns.get_mut(&self.addr) {
             if let Err(e) = conn.write(payload) {
                 warn!("failed to write outgoing payload to rtc instance: {e}");
@@ -132,38 +135,52 @@ impl WebRtcSender {
 
 impl TransportSender for WebRtcSender {
     fn send_handshake_response(&mut self, frame: schema::HandshakeResponse) {
-        self.send(&frame.encode());
+        self.send_inner(&frame.encode());
     }
 
     fn send(&mut self, frame: schema::ResponseFrame) {
-        match frame {
-            // Chunk outgoing payloads larger than the webrtc max
-            schema::ResponseFrame::ServicePayload { bytes } if bytes.len() > MAX_PAYLOAD_SIZE => {
-                let mut iter = bytes.chunks(MAX_PAYLOAD_SIZE).peekable();
-                while let Some(chunk) = iter.next() {
-                    let frame = schema::ResponseFrame::ServicePayload {
-                        bytes: chunk.to_vec().into(),
-                    };
-                    let mut bytes = frame.encode().to_vec();
+        debug_assert!(
+            !matches!(
+                frame,
+                schema::ResponseFrame::ServicePayload { .. }
+                    | schema::ResponseFrame::ServicePayloadChunk { .. }
+            ),
+            "write api should be used for service payloads"
+        );
 
-                    if iter.peek().is_some() {
-                        // Set the frame tag to 0x40, signaling that it is a partial chunk of the
-                        // service payload, and should be buffered and concatenated with
-                        // the next chunk. The last chunk will keep the original frame tag (0x00),
-                        // signaling that the payload is complete, which also allows single
-                        // chunk payloads to use the normal frame tag.
-                        bytes[0] = 0x40;
-                    }
+        // Other frames will never be larger than the max len, so we just send them.
+        self.send_inner(&frame.encode());
+    }
 
-                    // Send the chunk
-                    self.send(&bytes);
-                }
-            },
-            frame => {
-                // Other frames will never be larger than the max len, so we just send them.
-                self.send(&frame.encode());
-            },
+    fn start_write(&mut self, len: usize) {
+        debug_assert!(
+            self.current_write == 0,
+            "all bytes should be written before another call to start_write"
+        );
+        self.current_write = len;
+    }
+
+    // TODO: consider buffering up to the max payload size to send less chunks/extra bytes
+    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
+        let mut buf: Bytes = buf.to_vec().into();
+        debug_assert!(self.current_write >= buf.len());
+
+        while !buf.is_empty() {
+            let amt = MAX_PAYLOAD_SIZE.min(buf.len());
+            let bytes = buf.split_to(amt);
+
+            if self.current_write > amt {
+                // If we have more data to write for this service payload, send it as a chunk.
+                self.send_inner(&schema::ResponseFrame::ServicePayloadChunk { bytes }.encode())
+            } else {
+                // If this is the last data, send it as a normal payload.
+                self.send_inner(&schema::ResponseFrame::ServicePayload { bytes }.encode())
+            }
+
+            self.current_write -= amt;
         }
+
+        Ok(0)
     }
 }
 
