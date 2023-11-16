@@ -15,6 +15,7 @@ use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc;
 
+use crate::connection::ConnectionListener;
 use crate::futures::future_callback;
 use crate::ipc_types::{IpcMessage, IpcRequest, Request, Response};
 
@@ -23,11 +24,14 @@ pub(crate) static mut IPC_PATH: Option<PathBuf> = None;
 pub(crate) static mut BLOCKSTORE: Option<PathBuf> = None;
 
 /// Bind to the connection stream.
-pub async fn conn_bind() -> UnixListener {
+pub async fn conn_bind() -> ConnectionListener {
     let path = unsafe { IPC_PATH.as_ref() }
         .expect("Service setupt not complete.")
         .join("conn");
-    UnixListener::bind(path).expect("IPC bind failed.")
+
+    ConnectionListener {
+        listener: UnixListener::bind(path).expect("IPC bind failed."),
+    }
 }
 
 /// Init the service event loop using environment variables. This method *MUST* only be called
