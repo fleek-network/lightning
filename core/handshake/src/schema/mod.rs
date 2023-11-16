@@ -7,6 +7,22 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 
 pub const NETWORK_PREFIX: &[u8; 5] = b"FLEEK";
 
+pub const HANDSHAKE_REQ_TAG: u8 = 0x00;
+pub const HANDSHAKE_RETRY_REQ_TAG: u8 = 0x01;
+pub const HANDSHAKE_JOIN_REQ_TAG: u8 = 0x02;
+
+pub const REQ_SERVICE_PAYLOAD_TAG: u8 = 0x00;
+pub const REQ_ACCESS_TOKEN_TAG: u8 = 0x01;
+pub const REQ_EXTEND_ACCESS_TOKEN_TAG: u8 = 0x02;
+pub const REQ_DELIVERY_ACK_TAG: u8 = 0x03;
+
+pub const RES_SERVICE_PAYLOAD_TAG: u8 = 0x00;
+pub const RES_SERVICE_PAYLOAD_CHUNK_TAG: u8 = 0x40;
+pub const RES_ACCESS_TOKEN_TAG: u8 = 0x01;
+
+/// Challenge sent by the server for the client to sign in their handshake request.
+/// TODO: Determine if the extra round trip is ideal here, and identify other
+/// solutions for safely determining some bytes for the client proof of possession.
 #[derive(Debug, PartialEq, Eq)]
 pub struct ChallengeFrame {
     pub challenge: [u8; 32],
@@ -33,20 +49,23 @@ impl ChallengeFrame {
     }
 }
 
+/// Handshake frame sent by the client to either initialize a new connection or join an existing
+/// one.
 #[derive(Debug, PartialEq, Eq)]
 pub enum HandshakeRequestFrame {
+    /// Primary connection handshake.
     Handshake {
         retry: Option<u64>,
         service: ServiceId,
         pk: ClientPublicKey,
         pop: ClientSignature,
     },
-    JoinRequest {
-        access_token: [u8; 48],
-    },
+    /// Secondary connection join request.
+    JoinRequest { access_token: [u8; 48] },
 }
 
 impl HandshakeRequestFrame {
+    /// Encode the frame into bytes.
     pub fn encode(&self) -> Bytes {
         match self {
             HandshakeRequestFrame::Handshake {
@@ -58,12 +77,12 @@ impl HandshakeRequestFrame {
                 let mut buf = match retry {
                     None => {
                         let mut buf = Vec::with_capacity(149);
-                        buf.put_u8(0x00);
+                        buf.put_u8(HANDSHAKE_REQ_TAG);
                         buf
                     },
                     Some(id) => {
                         let mut buf = Vec::with_capacity(157);
-                        buf.put_u8(0x01);
+                        buf.put_u8(HANDSHAKE_RETRY_REQ_TAG);
                         buf.put_u64(*id);
                         buf
                     },
@@ -75,16 +94,17 @@ impl HandshakeRequestFrame {
             },
             HandshakeRequestFrame::JoinRequest { access_token } => {
                 let mut buf = Vec::with_capacity(49);
-                buf.put_u8(0x02);
+                buf.put_u8(HANDSHAKE_JOIN_REQ_TAG);
                 buf.put_slice(access_token);
                 buf.into()
             },
         }
     }
 
+    /// Decode a complete buffer into a frame.
     pub fn decode(bytes: &[u8]) -> Result<Self> {
         match bytes[0] {
-            0x00 => {
+            HANDSHAKE_REQ_TAG => {
                 if bytes.len() != 149 {
                     return Err(anyhow!("wrong number of bytes"));
                 }
@@ -98,7 +118,7 @@ impl HandshakeRequestFrame {
                     retry: None,
                 })
             },
-            0x01 => {
+            HANDSHAKE_RETRY_REQ_TAG => {
                 if bytes.len() != 157 {
                     return Err(anyhow!("wrong number of bytes"));
                 }
@@ -113,7 +133,7 @@ impl HandshakeRequestFrame {
                     pop,
                 })
             },
-            0x02 => {
+            HANDSHAKE_JOIN_REQ_TAG => {
                 if bytes.len() != 49 {
                     return Err(anyhow!("wrong number of bytes"));
                 }
@@ -124,10 +144,14 @@ impl HandshakeRequestFrame {
         }
     }
 
+    /// Cancel Safety:
+    /// This method currently consumes bytes from the reader in multiple steps, which is not cancel
+    /// safe.
     pub async fn decode_from_reader<R: AsyncRead + Unpin>(reader: &mut R) -> Result<Self> {
+        // TODO: Cancel safety.
         let ty = reader.read_u8().await?;
         match ty {
-            0x00 => {
+            HANDSHAKE_REQ_TAG => {
                 let mut buf = vec![0u8; 149];
                 reader
                     .read_exact(buf.get_mut(1..).expect("Buffer is large enough"))
@@ -135,7 +159,7 @@ impl HandshakeRequestFrame {
                 buf[0] = 0x00;
                 Self::decode(&buf)
             },
-            0x01 => {
+            HANDSHAKE_RETRY_REQ_TAG => {
                 let mut buf = vec![0u8; 157];
                 reader
                     .read_exact(buf.get_mut(1..).expect("Buffer is large enough"))
@@ -143,7 +167,7 @@ impl HandshakeRequestFrame {
                 buf[0] = 0x01;
                 Self::decode(&buf)
             },
-            0x02 => {
+            HANDSHAKE_JOIN_REQ_TAG => {
                 let mut buf = vec![0u8; 49];
                 reader
                     .read_exact(buf.get_mut(1..).expect("Buffer is large enough"))
@@ -156,6 +180,7 @@ impl HandshakeRequestFrame {
     }
 }
 
+/// Server response proving the node's identity.
 #[derive(Debug, PartialEq, Eq)]
 pub struct HandshakeResponse {
     pub pk: NodePublicKey,
@@ -181,52 +206,58 @@ impl HandshakeResponse {
     }
 }
 
+/// Request frames sent by the client and received by the server.
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum RequestFrame {
-    /// Raw message to be sent to the service implementation.
+    /// Raw message to be sent to the service implementation. Available for any connection level.
     ServicePayload { bytes: bytes::Bytes },
-    /// Request access token from.
+    /// Client request for an access token. Should only be used by the primary connection.
     AccessToken { ttl: u64 },
-    /// Extend the access token associated with this connection.
+    /// Extend the access token associated with this primary connection.
     ExtendAccessToken { ttl: u64 },
+    /// Delivery acknowledgment, a client signature for some work the node and
+    /// service committed to.
     DeliveryAcknowledgment {
-        // TODO
+        // TODO:
     },
 }
 
 impl RequestFrame {
+    /// Encode a complete frame into bytes
     pub fn encode(&self) -> Bytes {
         match self {
             Self::ServicePayload { bytes } => {
                 let mut buf = Vec::new();
-                buf.put_u8(0x00);
+                buf.put_u8(REQ_SERVICE_PAYLOAD_TAG);
                 buf.put_slice(bytes);
                 buf.into()
             },
             Self::AccessToken { ttl } => {
                 let mut buf = Vec::with_capacity(9);
-                buf.put_u8(0x01);
+                buf.put_u8(REQ_ACCESS_TOKEN_TAG);
                 buf.put_u64(*ttl);
                 buf.into()
             },
             Self::ExtendAccessToken { ttl } => {
                 let mut buf = Vec::with_capacity(9);
-                buf.put_u8(0x02);
+                buf.put_u8(REQ_EXTEND_ACCESS_TOKEN_TAG);
                 buf.put_u64(*ttl);
                 buf.into()
             },
-            Self::DeliveryAcknowledgment {} => vec![0x03].into(),
+            // TODO: encode signature bytes
+            Self::DeliveryAcknowledgment { .. } => vec![REQ_DELIVERY_ACK_TAG].into(),
         }
     }
 
+    /// Decode a complete buffer of bytes into a frame.
     pub fn decode(bytes: &[u8]) -> Result<Self> {
         match bytes[0] {
-            0x00 => {
+            REQ_SERVICE_PAYLOAD_TAG => {
                 let bytes = bytes[1..].to_vec().into();
                 Ok(Self::ServicePayload { bytes })
             },
-            0x01 => {
+            REQ_ACCESS_TOKEN_TAG => {
                 if bytes.len() != 9 {
                     return Err(anyhow!("wrong number of bytes"));
                 }
@@ -234,7 +265,7 @@ impl RequestFrame {
                 let ttl = u64::from_be_bytes(*array_ref!(bytes, 1, 8));
                 Ok(Self::AccessToken { ttl })
             },
-            0x02 => {
+            REQ_EXTEND_ACCESS_TOKEN_TAG => {
                 if bytes.len() != 9 {
                     return Err(anyhow!("wrong number of bytes"));
                 }
@@ -242,67 +273,81 @@ impl RequestFrame {
                 let ttl = u64::from_be_bytes(*array_ref!(bytes, 1, 8));
                 Ok(Self::ExtendAccessToken { ttl })
             },
-            0x03 => Ok(Self::DeliveryAcknowledgment {}),
+            // TODO: decode signature bytes
+            REQ_DELIVERY_ACK_TAG => Ok(Self::DeliveryAcknowledgment {}),
             _ => Err(anyhow!("invalid frame tag")),
         }
     }
 
+    /// Cancel Safety:
+    /// This method currently consumes bytes from the reader in multiple steps, which is not cancel
+    /// safe.
     pub async fn decode_from_reader<R: AsyncRead + Unpin>(reader: &mut R) -> Result<Self> {
         let ty = reader.read_u8().await?;
         match ty {
-            0x00 => {
+            REQ_SERVICE_PAYLOAD_TAG => {
                 let mut bytes = Vec::new();
                 reader.read_to_end(&mut bytes).await?;
                 Ok(Self::ServicePayload {
                     bytes: bytes.into(),
                 })
             },
-            0x01 => {
+            REQ_ACCESS_TOKEN_TAG => {
                 let mut bytes = vec![0u8; 8];
                 reader.read_exact(&mut bytes).await?;
                 let ttl = u64::from_be_bytes(*array_ref!(bytes, 0, 8));
                 Ok(Self::AccessToken { ttl })
             },
-            0x02 => {
+            REQ_EXTEND_ACCESS_TOKEN_TAG => {
                 let mut bytes = vec![0u8; 8];
                 reader.read_exact(&mut bytes).await?;
                 let ttl = u64::from_be_bytes(*array_ref!(bytes, 0, 8));
                 Ok(Self::ExtendAccessToken { ttl })
             },
-            0x03 => Ok(Self::DeliveryAcknowledgment {}),
+            REQ_DELIVERY_ACK_TAG => Ok(Self::DeliveryAcknowledgment {}),
             _ => Err(anyhow!("invalid frame tag")),
         }
     }
 }
 
+/// Response frames sent by the server and received by the client.
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ResponseFrame {
     /// Message to be passed.
-    ServicePayload {
-        bytes: bytes::Bytes,
-    },
+    ServicePayload { bytes: bytes::Bytes },
+    /// A chunk of a message that should be buffered and combined with the next payload frame.
+    ///
+    /// This frame is *never* used by stream based transports.
+    ServicePayloadChunk { bytes: bytes::Bytes },
+    /// Access token granted for secondary connections.
     AccessToken {
         ttl: u64,
         access_token: Box<[u8; 48]>,
     },
-    Termination {
-        reason: TerminationReason,
-    },
+    /// Termination signal to gracefully end a connection with a reason.
+    Termination { reason: TerminationReason },
 }
 
 impl ResponseFrame {
+    /// Encode the response frame into bytes.
     pub fn encode(&self) -> Bytes {
         match self {
             Self::ServicePayload { bytes } => {
                 let mut buf = Vec::with_capacity(1 + bytes.len());
-                buf.put_u8(0x00);
+                buf.put_u8(RES_SERVICE_PAYLOAD_TAG);
+                buf.put_slice(bytes);
+                buf.into()
+            },
+            Self::ServicePayloadChunk { bytes } => {
+                let mut buf = Vec::with_capacity(1 + bytes.len());
+                buf.put_u8(RES_SERVICE_PAYLOAD_CHUNK_TAG);
                 buf.put_slice(bytes);
                 buf.into()
             },
             Self::AccessToken { ttl, access_token } => {
                 let mut buf = Vec::with_capacity(57);
-                buf.put_u8(0x01);
+                buf.put_u8(RES_ACCESS_TOKEN_TAG);
                 buf.put_u64(*ttl);
                 buf.put_slice(access_token.as_slice());
                 buf.into()
@@ -311,13 +356,18 @@ impl ResponseFrame {
         }
     }
 
+    /// Decode a complete buffer into a frame.
     pub fn decode(bytes: &[u8]) -> Result<Self> {
         match bytes[0] {
-            0x00 => {
+            RES_SERVICE_PAYLOAD_TAG => {
                 let bytes = bytes[1..].to_vec().into();
                 Ok(Self::ServicePayload { bytes })
             },
-            0x01 => {
+            RES_SERVICE_PAYLOAD_CHUNK_TAG => {
+                let bytes = bytes[1..].to_vec().into();
+                Ok(Self::ServicePayloadChunk { bytes })
+            },
+            RES_ACCESS_TOKEN_TAG => {
                 if bytes.len() != 57 {
                     return Err(anyhow!("wrong number of bytes"));
                 }
@@ -338,6 +388,7 @@ impl ResponseFrame {
     }
 }
 
+/// Termination signals
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 #[non_exhaustive]
@@ -355,6 +406,7 @@ pub enum TerminationReason {
 }
 
 impl TerminationReason {
+    /// Parse a byte into a termination reason.
     pub fn from_u8(byte: u8) -> Self {
         match byte {
             0x80 => Self::Timeout,
@@ -433,6 +485,9 @@ mod tests {
         encode_decode!(
             ResponseFrame,
             ResponseFrame::ServicePayload {
+                bytes: vec![1; 64].into(),
+            },
+            ResponseFrame::ServicePayloadChunk {
                 bytes: vec![1; 64].into(),
             },
             ResponseFrame::AccessToken {
