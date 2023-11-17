@@ -1,6 +1,9 @@
 use derive_more::IsVariant;
 use serde::{Deserialize, Serialize};
 
+// Digest of a broadcast message
+pub type Digest = [u8; 32];
+
 /// Numerical value for different gossip topics used by Fleek Network.
 // New topics can be added as the system grows.
 #[derive(

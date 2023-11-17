@@ -3,13 +3,12 @@ use std::marker::PhantomData;
 
 use async_trait::async_trait;
 use lightning_interfaces::schema::LightningMessage;
-use lightning_interfaces::types::{NodeIndex, Topic};
+use lightning_interfaces::types::{Digest, NodeIndex, Topic};
 use lightning_interfaces::{BroadcastEventInterface, PubSub};
 use tokio::sync::oneshot;
 use tracing::{debug, info};
 
 use crate::command::{Command, CommandSender, RecvCmd, SendCmd};
-use crate::Digest;
 
 pub struct PubSubI<T: LightningMessage + Clone> {
     topic: Topic,
@@ -65,6 +64,12 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
             filter,
             payload,
         }));
+    }
+
+    /// Propagate a message that we already propagated before.
+    async fn repropagate(&self, digest: Digest) {
+        debug!("repropagate a message on topic {:?}", self.topic);
+        let _ = self.command_sender.send(Command::Propagate(digest));
     }
 
     /// Receive the oldest message we still haven't seen by this receiver. Due to the ring-buf like

@@ -1,10 +1,8 @@
 use fleek_crypto::NodeSignature;
 use ink_quill::{ToDigest, TranscriptBuilder};
 use lightning_interfaces::schema::AutoImplSerde;
-use lightning_interfaces::types::{NodeIndex, Topic};
+use lightning_interfaces::types::{Digest, NodeIndex, Topic};
 use serde::{Deserialize, Serialize};
-
-pub type Digest = [u8; 32];
 
 pub type MessageInternedId = u16;
 

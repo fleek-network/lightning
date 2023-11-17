@@ -1,6 +1,7 @@
 use fxhash::FxHashMap;
+use lightning_interfaces::types::Digest;
 
-use crate::frame::{Digest, MessageInternedId};
+use crate::frame::MessageInternedId;
 use crate::Message;
 
 // TODO: Make this persist.

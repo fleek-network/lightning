@@ -1,4 +1,6 @@
-use crate::frame::{Digest, MessageInternedId};
+use lightning_interfaces::types::Digest;
+
+use crate::frame::MessageInternedId;
 
 /// The interner is responsible for assigning a numeric value to each digest
 /// that we see. This interning is per execution and there is no guarantee that

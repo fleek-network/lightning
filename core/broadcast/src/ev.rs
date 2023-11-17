@@ -16,7 +16,7 @@ use infusion::c;
 use ink_quill::ToDigest;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::schema::LightningMessage;
-use lightning_interfaces::types::{NodeIndex, Topic};
+use lightning_interfaces::types::{Digest, NodeIndex, Topic};
 use lightning_interfaces::{
     ApplicationInterface,
     EventHandlerInterface,
@@ -39,7 +39,7 @@ use crate::pending::PendingStore;
 use crate::recv_buffer::RecvBuffer;
 use crate::ring::MessageRing;
 use crate::stats::{ConnectionStats, Stats};
-use crate::{Advr, Digest, Message, MessageInternedId, Want};
+use crate::{Advr, Message, MessageInternedId, Want};
 
 /// An interned id. But not from our interned table.
 pub type RemoteInternedId = MessageInternedId;

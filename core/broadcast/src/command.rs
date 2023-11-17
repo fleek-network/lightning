@@ -1,10 +1,8 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use lightning_interfaces::types::{NodeIndex, Topic};
+use lightning_interfaces::types::{Digest, NodeIndex, Topic};
 use tokio::sync::{mpsc, oneshot};
-
-use crate::Digest;
 
 /// A message that might be shared across threads. This is already validated
 /// and is what we send to the pubsub.
