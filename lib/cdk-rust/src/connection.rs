@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use anyhow::Result;
 use bytes::Bytes;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
@@ -58,18 +60,79 @@ async fn join_connection<T: Transport>(
     Ok(())
 }
 
-pub struct Connector<T: Transport> {
+pub struct Connector<C, T: Transport> {
     transport: T,
     ctx: Context,
+    _marker: PhantomData<C>,
 }
 
-impl<T: Transport> Connector<T> {
+impl<M, T: Transport> Connector<M, T> {
     pub(crate) fn new(transport: T, ctx: Context) -> Self {
-        Self { transport, ctx }
+        Self {
+            transport,
+            ctx,
+            _marker: PhantomData,
+        }
     }
-    pub async fn connect(&self) -> Result<(Sender<T>, Receiver<T>)> {
+}
+
+impl<T: Transport> Connector<PrimaryConnection<T>, T> {
+    pub async fn connect(&self) -> Result<PrimaryConnection<T>> {
         let (sender, receiver) = connect(&self.transport, &self.ctx).await?;
-        Ok((Sender { inner: sender }, Receiver { inner: receiver }))
+        let inner = InnerConnection {
+            sender: Sender { inner: sender },
+            receiver: Receiver { inner: receiver },
+        };
+        Ok(PrimaryConnection { inner })
+    }
+}
+
+impl<T: Transport> Connector<SecondaryConnection<T>, T> {
+    pub async fn connect(&self) -> Result<SecondaryConnection<T>> {
+        let (sender, receiver) = connect(&self.transport, &self.ctx).await?;
+        let inner = InnerConnection {
+            sender: Sender { inner: sender },
+            receiver: Receiver { inner: receiver },
+        };
+        Ok(SecondaryConnection { inner })
+    }
+}
+
+struct InnerConnection<T: Transport> {
+    sender: Sender<T>,
+    receiver: Receiver<T>,
+}
+
+// These primary and secondary connection objects
+// allow us to restrict some operations that
+// are only allowed for specific type of connection.
+pub struct PrimaryConnection<T: Transport> {
+    inner: InnerConnection<T>,
+}
+
+// Todo: add send and recv methods here for convenience.
+impl<T: Transport> PrimaryConnection<T> {
+    pub async fn request_access_token(&mut self, _: usize) -> Result<Bytes> {
+        todo!()
+    }
+
+    pub async fn extend_access_token(&mut self, _: usize) -> Result<()> {
+        todo!()
+    }
+
+    pub fn split(self) -> (Sender<T>, Receiver<T>) {
+        (self.inner.sender, self.inner.receiver)
+    }
+}
+
+pub struct SecondaryConnection<T: Transport> {
+    inner: InnerConnection<T>,
+}
+
+// Todo: add send and recv methods here for convenience.
+impl<T: Transport> SecondaryConnection<T> {
+    pub fn split(self) -> (Sender<T>, Receiver<T>) {
+        (self.inner.sender, self.inner.receiver)
     }
 }
 
@@ -78,17 +141,10 @@ pub struct Sender<T: Transport> {
 }
 
 impl<T: Transport> Sender<T> {
+    /// Cancel safety: This method is not cancel-safe.
     pub async fn send(&mut self, data: Bytes) -> Result<()> {
         let serialized_frame = RequestFrame::ServicePayload { bytes: data }.encode();
         self.inner.send(serialized_frame.as_ref()).await
-    }
-
-    async fn _request_access_token(&mut self, _ttl: u64) {
-        todo!()
-    }
-
-    async fn _extend_access_token(&mut self, _ttl: u64) {
-        todo!()
     }
 }
 
@@ -97,6 +153,7 @@ pub struct Receiver<T: Transport> {
 }
 
 impl<T: Transport> Receiver<T> {
+    /// Cancel safety: This method is cancel-safe.
     pub async fn recv(&mut self) -> Result<ResponseFrame> {
         ResponseFrame::decode(self.inner.recv().await?.as_ref())
     }

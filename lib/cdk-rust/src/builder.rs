@@ -1,7 +1,7 @@
 use anyhow::Result;
 use fleek_crypto::ClientPublicKey;
 
-use crate::connection::Connector;
+use crate::connection::{Connector, PrimaryConnection, SecondaryConnection};
 use crate::context::Context;
 use crate::mode::{Mode, ModeSetting, PrimaryMode, SecondaryMode};
 use crate::transport::Transport;
@@ -53,7 +53,7 @@ impl<T: Transport> Builder<PrimaryMode, T> {
 }
 
 impl<T: Transport> Builder<PrimaryMode, AttachedTransport<T>> {
-    pub async fn build(self) -> Result<Connector<T>> {
+    pub async fn build(self) -> Result<Connector<PrimaryConnection<T>, T>> {
         // This unwrap is safe because `transport()` because this method is only available
         // after attaching a transport.
         let transport = self.transport.unwrap().0;
@@ -81,7 +81,7 @@ impl<T: Transport> Builder<SecondaryMode, T> {
 }
 
 impl<T: Transport> Builder<SecondaryMode, AttachedTransport<T>> {
-    pub async fn build(self) -> Result<Connector<T>> {
+    pub async fn build(self) -> Result<Connector<SecondaryConnection<T>, T>> {
         // This unwrap is safe because `transport()` because this method is only available
         // after attaching a transport.
         let transport = self.transport.unwrap().0;
