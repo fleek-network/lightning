@@ -2,7 +2,7 @@
 pub use std::convert::Infallible;
 use std::fmt::{Debug, Display};
 
-use crate::vtable::Tag;
+use crate::object::Tag;
 
 /// A cycle is reported as a path starting from a node `v` and ending with `v`.
 pub type Cycle = Vec<Tag>;

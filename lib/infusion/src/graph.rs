@@ -1,12 +1,10 @@
-use std::any::TypeId;
 use std::collections::VecDeque;
 use std::fmt::{Debug, Display};
 
 use indexmap::{IndexMap, IndexSet};
 
 use crate::error::CycleFound;
-use crate::vtable::{Object, Tag, VTable};
-use crate::InitializationError;
+use crate::object::Tag;
 
 /// The raw dependency graph of a collection. It contains the project model.
 ///
@@ -90,7 +88,7 @@ impl DependencyGraph {
         writeln!(&mut b, "  direction LR");
         for (v, tmp) in &self.dependency_graph {
             for u in tmp {
-                writeln!(&mut b, "  {} --> {}", u.trait_name(), v.trait_name());
+                writeln!(&mut b, "  {} --> {}", u.type_name(), v.type_name());
             }
         }
 
