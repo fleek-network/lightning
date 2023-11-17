@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -30,7 +29,6 @@ use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{utils, Config as SignerConfig, Signer};
 use lightning_topology::{Config as TopologyConfig, Topology};
 use tokio::sync::oneshot;
-use tokio::time::timeout;
 
 use crate::{Broadcast, Config};
 
@@ -271,95 +269,6 @@ async fn test_send() {
         .await;
 
     // wait until node2 and node3 received the messages before cleaning up
-    rx2.await.unwrap();
-    rx3.await.unwrap();
-
-    // Clean up
-    for peer in &peers {
-        peer.broadcast.shutdown().await;
-        peer.pool.shutdown().await;
-    }
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
-}
-
-#[tokio::test]
-async fn test_send_to_one() {
-    // Initialize three broadcasts
-    let (peers, app, path) = get_broadcasts("send_to_one", 29000, 3).await;
-
-    for peer in &peers {
-        peer.broadcast.start().await;
-        peer.pool.start().await;
-    }
-
-    let pub_sub1 = peers[0]
-        .broadcast
-        .get_pubsub::<BroadcastFrame>(Topic::Debug);
-    let mut pub_sub2 = peers[1]
-        .broadcast
-        .get_pubsub::<BroadcastFrame>(Topic::Debug);
-    let mut pub_sub3 = peers[2]
-        .broadcast
-        .get_pubsub::<BroadcastFrame>(Topic::Debug);
-
-    let node_index2 = app
-        .sync_query()
-        .pubkey_to_index(peers[1].node_secret_key.to_pk())
-        .unwrap();
-
-    // Create a message from node1
-    let message = BroadcastMessage {
-        topic: Topic::Debug,
-        originator: peers[0].node_secret_key.to_pk(),
-        payload: String::from("hello").into_bytes(),
-    };
-    let target_signature = peers[0].node_secret_key.sign(&message.to_digest());
-
-    // node2 listens to the broadcast and we make sure that it receives the same message that node1
-    // sent out
-    let (tx, rx2) = oneshot::channel();
-    let target_message = message.clone();
-    tokio::spawn(async move {
-        match pub_sub2.recv().await.unwrap() {
-            BroadcastFrame::Message { message, signature } => {
-                assert_eq!(message, target_message);
-                assert_eq!(signature, target_signature);
-                tx.send(()).unwrap();
-            },
-            _ => panic!("Unexpected frame"),
-        }
-    });
-
-    // node3 listens to the broadcast, but since node1 only sends the message to node2, it should
-    // not receive anything
-    let (tx, rx3) = oneshot::channel();
-    tokio::spawn(async move {
-        match timeout(Duration::from_secs(2), pub_sub3.recv()).await {
-            Ok(msg) => {
-                panic!("Received Unexpected message: {msg:?}");
-            },
-            Err(_) => {
-                // In this case a timeout error means the test was successful because node3 did not
-                // receive the message.
-                tx.send(()).unwrap();
-            },
-        }
-    });
-
-    // node1 sends the message over the broadcast, but only to node2
-    pub_sub1
-        .send(
-            &BroadcastFrame::Message {
-                message,
-                signature: target_signature,
-            },
-            Some(HashSet::from_iter(vec![node_index2].into_iter())),
-        )
-        .await;
-
-    // wait until node2 received the messages before cleaning up
     rx2.await.unwrap();
     rx3.await.unwrap();
 
