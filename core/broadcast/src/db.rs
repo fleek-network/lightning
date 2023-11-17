@@ -62,4 +62,13 @@ impl Database {
         };
         e.propagated = true;
     }
+
+    /// Insert the payload of a message known with the given digest.
+    pub fn insert_message(&mut self, digest: &Digest, message: Message) {
+        let Some(e) = self.data.get_mut(digest) else {
+            debug_assert!(false, "We should not be inserting payload of what we have not seen.");
+            return;
+        };
+        e.message = Some(message);
+    }
 }

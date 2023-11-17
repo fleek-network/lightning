@@ -201,10 +201,12 @@ impl<C: Collection> Context<C> {
         let id = req.interned_id;
         let Some(digest) = self.interner.get(id) else {
             trace!("invalid interned id {id}");
-            return; };
+            return;
+        };
         let Some(message) = self.db.get_message(digest) else {
-            trace!("failed to find message");
-            return; };
+            error!("failed to find message");
+            return;
+        };
         self.send(sender, Frame::Message(message));
     }
 
@@ -252,7 +254,7 @@ impl<C: Collection> Context<C> {
         let shared = SharedMessage {
             digest,
             origin: msg.origin,
-            payload: msg.payload.into(),
+            payload: msg.payload.clone().into(),
         };
 
         let now = now();
@@ -269,6 +271,8 @@ impl<C: Collection> Context<C> {
             );
         }
 
+        // Insert the message into the database for future lookups.
+        self.db.insert_message(&digest, msg);
         // Mark message as received for RTT measurements.
         self.pending_store.received_message(sender, id);
         // Report a satisfactory interaction when we receive a message.
