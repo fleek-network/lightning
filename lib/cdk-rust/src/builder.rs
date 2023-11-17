@@ -20,6 +20,8 @@ where
     M: Mode,
     T: Transport,
 {
+    // Todo: Remove this method.
+    // Get public key from the secret.
     pub fn pk(self, pk: ClientPublicKey) -> Builder<M, T> {
         Builder {
             mode: self.mode,
@@ -53,7 +55,7 @@ impl<T: Transport> Builder<PrimaryMode, T> {
 }
 
 impl<T: Transport> Builder<PrimaryMode, AttachedTransport<T>> {
-    pub async fn build(self) -> Result<Connector<PrimaryConnection<T>, T>> {
+    pub fn build(self) -> Result<Connector<PrimaryConnection<T>, T>> {
         // This unwrap is safe because `transport()` because this method is only available
         // after attaching a transport.
         let transport = self.transport.unwrap().0;
@@ -81,7 +83,7 @@ impl<T: Transport> Builder<SecondaryMode, T> {
 }
 
 impl<T: Transport> Builder<SecondaryMode, AttachedTransport<T>> {
-    pub async fn build(self) -> Result<Connector<SecondaryConnection<T>, T>> {
+    pub fn build(self) -> Result<Connector<SecondaryConnection<T>, T>> {
         // This unwrap is safe because `transport()` because this method is only available
         // after attaching a transport.
         let transport = self.transport.unwrap().0;
