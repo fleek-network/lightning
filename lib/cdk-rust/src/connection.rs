@@ -141,6 +141,7 @@ pub struct Sender<T: Transport> {
 }
 
 impl<T: Transport> Sender<T> {
+    // Todo: should this be cancel-safe?
     /// Cancel safety: This method is not cancel-safe.
     pub async fn send(&mut self, data: Bytes) -> Result<()> {
         let serialized_frame = RequestFrame::ServicePayload { bytes: data }.encode();
@@ -154,7 +155,7 @@ pub struct Receiver<T: Transport> {
 
 impl<T: Transport> Receiver<T> {
     /// Cancel safety: This method is cancel-safe.
-    pub async fn recv(&mut self) -> Result<ResponseFrame> {
-        ResponseFrame::decode(self.inner.recv().await?.as_ref())
+    pub async fn recv(&mut self) -> Option<Result<ResponseFrame>> {
+        Some(ResponseFrame::decode(self.inner.recv().await?.as_ref()))
     }
 }

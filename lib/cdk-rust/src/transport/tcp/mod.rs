@@ -1,11 +1,15 @@
 use std::net::SocketAddr;
 
+use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use futures::StreamExt;
+use tokio::io::AsyncWriteExt;
 use tokio::net;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
 
+use crate::transport;
 use crate::transport::{Transport, TransportReceiver, TransportSender};
 
 pub struct TcpTransport {
@@ -26,7 +30,12 @@ impl Transport for TcpTransport {
     async fn connect(&self) -> anyhow::Result<(Self::Sender, Self::Receiver)> {
         let stream = net::TcpStream::connect(self.target).await?;
         let (reader, writer) = stream.into_split();
-        Ok((TcpSender { inner: writer }, TcpReceiver { inner: reader }))
+        Ok((
+            TcpSender { inner: writer },
+            TcpReceiver {
+                inner: FramedRead::new(reader, LengthDelimitedCodec::new()),
+            },
+        ))
     }
 }
 
@@ -36,21 +45,24 @@ pub struct TcpSender {
 
 #[async_trait]
 impl TransportSender for TcpSender {
-    async fn send(&mut self, data: &[u8]) -> anyhow::Result<()> {
-        self.inner.write_all(data).await.map_err(Into::into)
+    async fn send(&mut self, data: &[u8]) -> Result<()> {
+        let frame = transport::create_frame(data);
+        self.inner
+            .write_all(frame.as_ref())
+            .await
+            .map_err(Into::into)
     }
 }
 
 pub struct TcpReceiver {
-    inner: OwnedReadHalf,
+    inner: FramedRead<OwnedReadHalf, LengthDelimitedCodec>,
 }
 
 #[async_trait]
 impl TransportReceiver for TcpReceiver {
-    async fn recv(&mut self) -> anyhow::Result<Bytes> {
-        // Todo: read length prefix.
-        let mut buffer = Vec::new();
-        self.inner.read_to_end(buffer.as_mut()).await?;
-        Ok(Bytes::from(buffer))
+    async fn recv(&mut self) -> Option<Bytes> {
+        // Todo: log error.
+        let bytes = self.inner.next().await?.ok()?;
+        Some(bytes.into())
     }
 }

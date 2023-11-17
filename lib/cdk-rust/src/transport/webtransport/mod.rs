@@ -3,13 +3,14 @@ use std::net::SocketAddr;
 use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
-use tokio::io::AsyncReadExt;
+use futures::StreamExt;
 use tokio::sync::Mutex;
+use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
 use wtransport::endpoint::endpoint_side::Client;
 use wtransport::{ClientConfig, Connection, Endpoint, RecvStream, SendStream};
 
 use crate::tls;
-use crate::transport::{Transport, TransportReceiver, TransportSender};
+use crate::transport::{self, Transport, TransportReceiver, TransportSender};
 
 pub struct WebTransport {
     target: String,
@@ -57,7 +58,9 @@ impl Transport for WebTransport {
         let (tx_stream, rx_stream) = guard.as_ref().unwrap().open_bi().await?.await?;
         Ok((
             WebTransportSender { inner: tx_stream },
-            WebTransportReceiver { inner: rx_stream },
+            WebTransportReceiver {
+                inner: FramedRead::new(rx_stream, LengthDelimitedCodec::new()),
+            },
         ))
     }
 }
@@ -69,20 +72,23 @@ pub struct WebTransportSender {
 #[async_trait]
 impl TransportSender for WebTransportSender {
     async fn send(&mut self, data: &[u8]) -> Result<()> {
-        self.inner.write_all(data).await.map_err(Into::into)
+        let frame = transport::create_frame(data);
+        self.inner
+            .write_all(frame.as_ref())
+            .await
+            .map_err(Into::into)
     }
 }
 
 pub struct WebTransportReceiver {
-    inner: RecvStream,
+    inner: FramedRead<RecvStream, LengthDelimitedCodec>,
 }
 
 #[async_trait]
 impl TransportReceiver for WebTransportReceiver {
-    async fn recv(&mut self) -> Result<Bytes> {
-        // Todo: verify that read_to_end is cancel safe.
-        let mut buffer = Vec::new();
-        self.inner.read_to_end(buffer.as_mut()).await?;
-        Ok(Bytes::from(buffer))
+    async fn recv(&mut self) -> Option<Bytes> {
+        // Todo: log error.
+        let bytes = self.inner.next().await?.ok()?;
+        Some(bytes.into())
     }
 }
