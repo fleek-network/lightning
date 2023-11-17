@@ -110,13 +110,29 @@ pub struct PrimaryConnection<T: Transport> {
     inner: InnerConnection<T>,
 }
 
-// Todo: add send and recv methods here for convenience.
 impl<T: Transport> PrimaryConnection<T> {
-    pub async fn request_access_token(&mut self, _: usize) -> Result<Bytes> {
-        todo!()
+    pub async fn request_access_token(&mut self, ttl: u64) -> Result<(u64, Box<[u8; 48]>)> {
+        self.inner
+            .sender
+            .send(RequestFrame::AccessToken { ttl }.encode())
+            .await?;
+        match self.inner.receiver.recv().await.ok_or(anyhow::anyhow!(
+            "failed to request an access token: transport connection closed"
+        ))?? {
+            ResponseFrame::AccessToken { ttl, access_token } => Ok((ttl, access_token)),
+            ResponseFrame::Termination { reason } => {
+                Err(anyhow::anyhow!("failed to get token: {reason:?}"))
+            },
+            ResponseFrame::ServicePayload { .. } => {
+                // This assumes that the server will not send any frame until we do.
+                // This assumption may not be true in the future.
+                panic!("received an invalid frame: received a service payload frame");
+            },
+        }
     }
 
     pub async fn extend_access_token(&mut self, _: usize) -> Result<()> {
+        // Todo: discuss what is the response given this request.
         todo!()
     }
 
@@ -129,7 +145,6 @@ pub struct SecondaryConnection<T: Transport> {
     inner: InnerConnection<T>,
 }
 
-// Todo: add send and recv methods here for convenience.
 impl<T: Transport> SecondaryConnection<T> {
     pub fn split(self) -> (Sender<T>, Receiver<T>) {
         (self.inner.sender, self.inner.receiver)
