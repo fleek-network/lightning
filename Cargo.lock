@@ -3832,9 +3832,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bincode",
- "ethers",
  "num-bigint",
  "num-traits",
+ "primitive-types",
  "ruint",
  "serde",
  "serde_json",

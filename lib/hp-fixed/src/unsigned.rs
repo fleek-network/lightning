@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 use num_bigint::BigUint;
 use num_traits::{CheckedDiv, FromPrimitive, ToPrimitive, Zero};
+use primitive_types::U256 as EthersU256;
 use ruint::aliases::U256;
 use ruint::ToUintError;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -427,7 +428,7 @@ impl<const P: usize> TryFrom<HpUfixed<P>> for U256 {
     }
 }
 
-impl<const P: usize> TryFrom<HpUfixed<P>> for ethers::types::U256 {
+impl<const P: usize> TryFrom<HpUfixed<P>> for EthersU256 {
     type Error = HpFixedConversionError;
 
     fn try_from(value: HpUfixed<P>) -> Result<Self, Self::Error> {
@@ -435,12 +436,12 @@ impl<const P: usize> TryFrom<HpUfixed<P>> for ethers::types::U256 {
         if bytes.len() > 32 {
             return Err(HpFixedConversionError::Overflow);
         }
-        Ok(ethers::types::U256::from_little_endian(&bytes))
+        Ok(EthersU256::from_little_endian(&bytes))
     }
 }
 
-impl<const P: usize> From<ethers::types::U256> for HpUfixed<P> {
-    fn from(value: ethers::types::U256) -> Self {
+impl<const P: usize> From<EthersU256> for HpUfixed<P> {
+    fn from(value: EthersU256) -> Self {
         let mut bytes = vec![0; 32];
         value.to_little_endian(&mut bytes);
         let value_to_big: BigUint = BigUint::from_bytes_le(&bytes);
@@ -451,7 +452,7 @@ impl<const P: usize> From<ethers::types::U256> for HpUfixed<P> {
 #[cfg(test)]
 mod tests {
 
-    use ethers::types::U256;
+    use primitive_types::U256;
 
     use super::*;
 
