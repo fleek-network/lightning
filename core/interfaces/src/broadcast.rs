@@ -69,7 +69,7 @@ pub trait PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
     async fn send(&self, msg: &T, filter: Option<HashSet<NodeIndex>>);
 
     /// Propagate a message that we already propagated before.
-    async fn repropagate(&self, digest: Digest);
+    async fn repropagate(&self, digest: Digest, filter: Option<HashSet<NodeIndex>>);
 
     /// Await the next message in the topic, should only return `None` if there are
     /// no longer any new messages coming. (indicating that the gossip instance is

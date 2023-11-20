@@ -35,6 +35,14 @@ pub struct SendCmd {
     pub payload: Vec<u8>,
 }
 
+/// A propagate call from a pubsub.
+#[derive(Debug)]
+pub struct PropagateCmd {
+    pub digest: Digest,
+    /// If `filter` is Some(set), then the message will only be send to the nodes in `set`
+    pub filter: Option<HashSet<NodeIndex>>,
+}
+
 /// A command is what is sent from the other threads to the event loop.
 #[derive(Debug)]
 pub enum Command {
@@ -48,7 +56,7 @@ pub enum Command {
     ///
     /// The broadcast does not advertise a message unless the subscribers
     /// decides to do so.
-    Propagate(Digest),
+    Propagate(PropagateCmd),
     //// Mark that a message had an invalid sender. We are still interested
     /// in this message digest, but not from the given origin.
     MarkInvalidSender(Digest),

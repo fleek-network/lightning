@@ -316,8 +316,8 @@ impl<C: Collection> Context<C> {
                 // Start advertising the message.
                 self.advertise(id, digest, cmd.filter);
             },
-            Command::Propagate(digest) => {
-                let Some(id) = self.db.get_id(&digest) else  {
+            Command::Propagate(cmd) => {
+                let Some(id) = self.db.get_id(&cmd.digest) else  {
                     debug_assert!(
                         false,
                         "We should not be trying to propagate a message we don't know the id of."
@@ -327,13 +327,13 @@ impl<C: Collection> Context<C> {
 
                 // Mark the message as propagated. This will make us lose any interest for future
                 // advertisements of this message.
-                self.db.mark_propagated(&digest);
+                self.db.mark_propagated(&cmd.digest);
 
                 // Remove the received message from the pending store.
                 self.pending_store.remove_message(id);
 
                 // Continue with advertising this message to the connected peers.
-                self.advertise(id, digest, None);
+                self.advertise(id, cmd.digest, cmd.filter);
 
                 increment_counter!(
                     "broadcast_messages_propagated",

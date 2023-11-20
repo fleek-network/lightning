@@ -8,7 +8,7 @@ use lightning_interfaces::{BroadcastEventInterface, PubSub};
 use tokio::sync::oneshot;
 use tracing::{debug, info};
 
-use crate::command::{Command, CommandSender, RecvCmd, SendCmd};
+use crate::command::{Command, CommandSender, PropagateCmd, RecvCmd, SendCmd};
 
 pub struct PubSubI<T: LightningMessage + Clone> {
     topic: Topic,
@@ -67,9 +67,11 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
     }
 
     /// Propagate a message that we already propagated before.
-    async fn repropagate(&self, digest: Digest) {
+    async fn repropagate(&self, digest: Digest, filter: Option<HashSet<NodeIndex>>) {
         debug!("repropagate a message on topic {:?}", self.topic);
-        let _ = self.command_sender.send(Command::Propagate(digest));
+        let _ = self
+            .command_sender
+            .send(Command::Propagate(PropagateCmd { digest, filter }));
     }
 
     /// Receive the oldest message we still haven't seen by this receiver. Due to the ring-buf like
@@ -103,7 +105,10 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
             self.last_seen = Some(id);
 
             if let Ok(decoded) = T::decode(&msg.payload) {
-                let _ = self.command_sender.send(Command::Propagate(msg.digest));
+                let _ = self.command_sender.send(Command::Propagate(PropagateCmd {
+                    digest: msg.digest,
+                    filter: None,
+                }));
                 return Some(decoded);
             } else {
                 info!(
@@ -169,7 +174,10 @@ impl<T: LightningMessage> BroadcastEventInterface<T> for Event<T> {
     }
 
     fn propagate(self) {
-        let _ = self.command_sender.send(Command::Propagate(self.digest));
+        let _ = self.command_sender.send(Command::Propagate(PropagateCmd {
+            digest: self.digest,
+            filter: None,
+        }));
     }
 
     fn mark_invalid_sender(self) {
