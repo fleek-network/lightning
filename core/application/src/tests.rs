@@ -1,8 +1,17 @@
 use std::collections::BTreeMap;
+use std::net::IpAddr;
 
 use affair::Socket;
 use anyhow::{anyhow, Result};
-use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
+use fleek_crypto::{
+    AccountOwnerSecretKey,
+    ConsensusPublicKey,
+    ConsensusSecretKey,
+    EthAddress,
+    NodePublicKey,
+    NodeSecretKey,
+    SecretKey,
+};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     Block,
@@ -12,7 +21,9 @@ use lightning_interfaces::types::{
     HandshakePorts,
     NodePorts,
     Participation,
+    ProofOfConsensus,
     ReputationMeasurements,
+    Tokens,
     TransactionRequest,
     TransactionResponse,
     UpdateMethod,
@@ -49,7 +60,21 @@ struct GenesisCommitteeKeystore {
 
 macro_rules! run_transaction {
     ($tx:expr,$socket:expr) => {{
-        let result = run_transaction(vec![$tx.into()], $socket).await;
+        let updates = vec![$tx.into()];
+        run_updates!(updates, $socket)
+    }};
+}
+
+macro_rules! run_transactions {
+    ($txs:expr,$socket:expr) => {{
+        let updates = $txs.into_iter().map(|update| update.into()).collect();
+        run_updates!(updates, $socket)
+    }};
+}
+
+macro_rules! run_updates {
+    ($updates:expr,$socket:expr) => {{
+        let result = run_transaction($updates, $socket).await;
         assert!(result.is_ok());
         result.unwrap()
     }};
@@ -99,6 +124,15 @@ macro_rules! submit_reputation_measurements {
     }};
 }
 
+macro_rules! assert_rep_measurements_update {
+    ($query_runner:expr,$update:expr,$reporting_node_index:expr) => {{
+        let rep_measurements = $query_runner.get_rep_measurements(&$update.0);
+        assert_eq!(rep_measurements.len(), 1);
+        assert_eq!(rep_measurements[0].reporting_node, $reporting_node_index);
+        assert_eq!(rep_measurements[0].measurements, $update.1);
+    }};
+}
+
 // Init the app and return the execution engine socket that would go to narwhal and the query socket
 // that could go to anyone
 fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
@@ -115,7 +149,14 @@ fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
     (app.transaction_executor(), app.sync_query())
 }
 
-fn test_init_app(genesis: Genesis) -> (ExecutionEngineSocket, QueryRunner) {
+fn test_genesis() -> Genesis {
+    Genesis::load().unwrap()
+}
+
+fn test_init_app(committee: Vec<GenesisNode>) -> (ExecutionEngineSocket, QueryRunner) {
+    let mut genesis = test_genesis();
+    genesis.node_info = committee;
+
     init_app(Some(Config {
         genesis: Some(genesis),
         mode: Mode::Test,
@@ -225,6 +266,121 @@ fn get_update_request_node(
     }
 }
 
+// Passing the private key around like this should only be done for
+// testing.
+fn get_update_request_account(
+    method: UpdateMethod,
+    secret_key: &AccountOwnerSecretKey,
+    nonce: u64,
+) -> UpdateRequest {
+    let payload = UpdatePayload {
+        sender: secret_key.to_pk().into(),
+        nonce,
+        method,
+    };
+    let digest = payload.to_digest();
+    let signature = secret_key.sign(&digest);
+    UpdateRequest {
+        signature: signature.into(),
+        payload,
+    }
+}
+
+fn prepare_deposit_update(
+    amount: u64,
+    secret_key: &AccountOwnerSecretKey,
+    nonce: u64,
+) -> UpdateRequest {
+    get_update_request_account(
+        UpdateMethod::Deposit {
+            proof: ProofOfConsensus {},
+            token: Tokens::FLK,
+            amount: amount.into(),
+        },
+        secret_key,
+        nonce,
+    )
+}
+
+fn prepare_regular_stake_update(
+    amount: u64,
+    node_public_key: &NodePublicKey,
+    secret_key: &AccountOwnerSecretKey,
+    nonce: u64,
+) -> UpdateRequest {
+    get_update_request_account(
+        UpdateMethod::Stake {
+            amount: amount.into(),
+            node_public_key: *node_public_key,
+            consensus_key: None,
+            node_domain: None,
+            worker_public_key: None,
+            worker_domain: None,
+            ports: None,
+        },
+        secret_key,
+        nonce,
+    )
+}
+
+fn prepare_initial_stake_update(
+    amount: u64,
+    node_public_key: &NodePublicKey,
+    consensus_key: ConsensusPublicKey,
+    node_domain: IpAddr,
+    worker_pub_key: NodePublicKey,
+    worker_domain: IpAddr,
+    ports: NodePorts,
+    secret_key: &AccountOwnerSecretKey,
+    nonce: u64,
+) -> UpdateRequest {
+    get_update_request_account(
+        UpdateMethod::Stake {
+            amount: amount.into(),
+            node_public_key: *node_public_key,
+            consensus_key: Some(consensus_key),
+            node_domain: Some(node_domain),
+            worker_public_key: Some(worker_pub_key),
+            worker_domain: Some(worker_domain),
+            ports: Some(ports),
+        },
+        secret_key,
+        nonce,
+    )
+}
+
+fn prepare_unstake_update(
+    amount: u64,
+    node_public_key: &NodePublicKey,
+    secret_key: &AccountOwnerSecretKey,
+    nonce: u64,
+) -> UpdateRequest {
+    get_update_request_account(
+        UpdateMethod::Unstake {
+            amount: amount.into(),
+            node: *node_public_key,
+        },
+        secret_key,
+        nonce,
+    )
+}
+
+fn prepare_withdraw_unstaked_update(
+    node_public_key: &NodePublicKey,
+    recipient: Option<EthAddress>,
+    secret_key: &AccountOwnerSecretKey,
+    nonce: u64,
+) -> UpdateRequest {
+    get_update_request_account(
+        UpdateMethod::WithdrawUnstaked {
+            node: *node_public_key,
+            recipient,
+        },
+        secret_key,
+        nonce,
+    )
+}
+
 // Helper function that submits a transaction to the application.
 async fn run_transaction(
     requests: Vec<TransactionRequest>,
@@ -240,6 +396,16 @@ async fn run_transaction(
     Ok(res)
 }
 
+fn update_reputation_measurements(
+    query_runner: &QueryRunner,
+    map: &mut BTreeMap<u32, ReputationMeasurements>,
+    peer: NodePublicKey,
+    measurements: ReputationMeasurements,
+) -> (u32, ReputationMeasurements) {
+    let peer_index = query_runner.pubkey_to_index(peer).unwrap();
+    map.insert(peer_index, measurements.clone());
+    (peer_index, measurements)
+}
 //////////////////////////////////////////////////////////////////////////////////
 ////////////////// This is where the actual tests are defined ////////////////////
 //////////////////////////////////////////////////////////////////////////////////
@@ -247,13 +413,11 @@ async fn run_transaction(
 #[tokio::test]
 async fn test_epoch_change() {
     // Create a genesis committee and seed the application state with it.
-    let (committee, keystore) = create_genesis_committee(4);
-    let mut genesis = Genesis::load().unwrap();
-    let committee_size = committee.len();
-    genesis.node_info = committee;
-    let (update_socket, query_runner) = test_init_app(genesis);
-
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
     let required_signals = calculate_required_signals(committee_size);
+
     let epoch = 0;
     let nonce = 1;
 
@@ -282,59 +446,49 @@ async fn test_epoch_change() {
 
 #[tokio::test]
 async fn test_submit_rep_measurements() {
-    let (committee, keystore) = create_genesis_committee(4);
-    let mut genesis = Genesis::load().unwrap();
-    genesis.node_info = committee;
-    let (update_socket, query_runner) = test_init_app(genesis);
-
-    let mut map = BTreeMap::new();
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
     let mut rng = random::get_seedable_rng();
 
-    let measurements1 = reputation::generate_reputation_measurements(&mut rng, 0.1);
-    let peer1 = keystore[1].node_secret_key.to_pk();
-    let peer_index1 = query_runner.pubkey_to_index(peer1).unwrap();
-    map.insert(peer_index1, measurements1.clone());
-
-    let measurements2 = reputation::generate_reputation_measurements(&mut rng, 0.1);
-    let peer2 = keystore[2].node_secret_key.to_pk();
-    let peer_index2 = query_runner.pubkey_to_index(peer2).unwrap();
-    map.insert(peer_index2, measurements2.clone());
+    let mut map = BTreeMap::new();
+    let update1 = update_reputation_measurements(
+        &query_runner,
+        &mut map,
+        keystore[1].node_secret_key.to_pk(),
+        reputation::generate_reputation_measurements(&mut rng, 0.1),
+    );
+    let update2 = update_reputation_measurements(
+        &query_runner,
+        &mut map,
+        keystore[2].node_secret_key.to_pk(),
+        reputation::generate_reputation_measurements(&mut rng, 0.1),
+    );
 
     let reporting_node_key = keystore[0].node_secret_key.to_pk();
     let reporting_node_index = query_runner.pubkey_to_index(reporting_node_key).unwrap();
-    let req = get_update_request_node(
-        UpdateMethod::SubmitReputationMeasurements { measurements: map },
-        &keystore[0].node_secret_key,
-        1,
-    );
 
-    run_transaction!(req, &update_socket);
+    submit_reputation_measurements!(&update_socket, &keystore[0].node_secret_key, 1, map);
 
-    let rep_measurements1 = query_runner.get_rep_measurements(&peer_index1);
-    assert_eq!(rep_measurements1.len(), 1);
-    assert_eq!(rep_measurements1[0].reporting_node, reporting_node_index);
-    assert_eq!(rep_measurements1[0].measurements, measurements1);
-
-    let rep_measurements2 = query_runner.get_rep_measurements(&peer_index2);
-    assert_eq!(rep_measurements2.len(), 1);
-    assert_eq!(rep_measurements2[0].reporting_node, reporting_node_index);
-    assert_eq!(rep_measurements2[0].measurements, measurements2);
+    assert_rep_measurements_update!(&query_runner, update1, reporting_node_index);
+    assert_rep_measurements_update!(&query_runner, update2, reporting_node_index);
 }
 
 #[tokio::test]
 async fn test_submit_rep_measurements_twice() {
-    let (committee, keystore) = create_genesis_committee(4);
-    let mut genesis = Genesis::load().unwrap();
-    genesis.node_info = committee;
-    let (update_socket, query_runner) = test_init_app(genesis);
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
 
-    let mut map = BTreeMap::new();
     let mut rng = random::get_seedable_rng();
 
-    let measurements = reputation::generate_reputation_measurements(&mut rng, 0.1);
-    let peer = keystore[1].node_secret_key.to_pk();
-    let peer_index = query_runner.pubkey_to_index(peer).unwrap();
-    map.insert(peer_index, measurements.clone());
+    let mut map = BTreeMap::new();
+    let _ = update_reputation_measurements(
+        &query_runner,
+        &mut map,
+        keystore[1].node_secret_key.to_pk(),
+        reputation::generate_reputation_measurements(&mut rng, 0.1),
+    );
 
     // Submit the reputation measurements
     let req = get_update_request_node(
@@ -365,34 +519,45 @@ async fn test_submit_rep_measurements_twice() {
 
 #[tokio::test]
 async fn test_rep_scores() {
-    let (committee, keystore) = create_genesis_committee(4);
-    let committee_len = committee.len();
-    let mut genesis = Genesis::load().unwrap();
-    genesis.node_info = committee;
-    let (update_socket, query_runner) = test_init_app(genesis);
-    let required_signals = calculate_required_signals(committee_len);
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+    let required_signals = calculate_required_signals(committee_size);
 
     let mut rng = random::get_seedable_rng();
 
-    let mut map = BTreeMap::new();
-    let measurements = reputation::generate_reputation_measurements(&mut rng, 0.1);
     let peer1 = keystore[2].node_secret_key.to_pk();
-    let peer_index1 = query_runner.pubkey_to_index(peer1).unwrap();
-    map.insert(peer_index1, measurements.clone());
-
-    let measurements = reputation::generate_reputation_measurements(&mut rng, 0.1);
     let peer2 = keystore[3].node_secret_key.to_pk();
-    let peer_index2 = query_runner.pubkey_to_index(peer2).unwrap();
-    map.insert(peer_index2, measurements.clone());
-
     let nonce = 1;
+
+    let mut map = BTreeMap::new();
+    let _ = update_reputation_measurements(
+        &query_runner,
+        &mut map,
+        peer1,
+        reputation::generate_reputation_measurements(&mut rng, 0.1),
+    );
+    let _ = update_reputation_measurements(
+        &query_runner,
+        &mut map,
+        peer2,
+        reputation::generate_reputation_measurements(&mut rng, 0.1),
+    );
     submit_reputation_measurements!(&update_socket, &keystore[0].node_secret_key, nonce, map);
 
     let mut map = BTreeMap::new();
-    let measurements = reputation::generate_reputation_measurements(&mut rng, 0.1);
-    map.insert(peer_index1, measurements.clone());
-    let measurements = reputation::generate_reputation_measurements(&mut rng, 0.1);
-    map.insert(peer_index2, measurements.clone());
+    let (peer_idx_1, _) = update_reputation_measurements(
+        &query_runner,
+        &mut map,
+        peer1,
+        reputation::generate_reputation_measurements(&mut rng, 0.1),
+    );
+    let (peer_idx_2, _) = update_reputation_measurements(
+        &query_runner,
+        &mut map,
+        peer2,
+        reputation::generate_reputation_measurements(&mut rng, 0.1),
+    );
     submit_reputation_measurements!(&update_socket, &keystore[1].node_secret_key, nonce, map);
 
     let epoch = 0;
@@ -403,51 +568,150 @@ async fn test_rep_scores() {
         change_epoch!(&update_socket, &node.node_secret_key, nonce, epoch);
     }
 
-    assert!(query_runner.get_reputation(&peer_index1).is_some());
-    assert!(query_runner.get_reputation(&peer_index2).is_some());
+    assert!(query_runner.get_reputation(&peer_idx_1).is_some());
+    assert!(query_runner.get_reputation(&peer_idx_2).is_some());
 }
 
 #[tokio::test]
 async fn test_uptime_participation() {
-    let (mut committee, keystore) = create_genesis_committee(4);
-    let committee_len = committee.len();
-    let mut genesis = Genesis::load().unwrap();
+    let committee_size = 4;
+    let (mut committee, keystore) = create_genesis_committee(committee_size);
     committee[0].reputation = Some(40);
     committee[1].reputation = Some(80);
-    genesis.node_info = committee;
-    let (update_socket, query_runner) = test_init_app(genesis);
-    let required_signals = calculate_required_signals(committee_len);
+    let (update_socket, query_runner) = test_init_app(committee);
+
+    let required_signals = calculate_required_signals(committee_size);
+
+    let peer_1 = keystore[2].node_secret_key.to_pk();
+    let peer_2 = keystore[3].node_secret_key.to_pk();
+    let nonce = 1;
 
     let mut map = BTreeMap::new();
-    let measurements = test_reputation_measurements(5);
-    let peer1 = keystore[2].node_secret_key.to_pk();
-    let peer_index1 = query_runner.pubkey_to_index(peer1).unwrap();
-    map.insert(peer_index1, measurements.clone());
+    let _ = update_reputation_measurements(
+        &query_runner,
+        &mut map,
+        peer_1,
+        test_reputation_measurements(5),
+    );
+    let _ = update_reputation_measurements(
+        &query_runner,
+        &mut map,
+        peer_2,
+        test_reputation_measurements(20),
+    );
 
-    let measurements = test_reputation_measurements(20);
-    let peer2 = keystore[3].node_secret_key.to_pk();
-    let peer_index2 = query_runner.pubkey_to_index(peer2).unwrap();
-    map.insert(peer_index2, measurements.clone());
-
-    let nonce = 1;
     submit_reputation_measurements!(&update_socket, &keystore[0].node_secret_key, nonce, map);
 
     let mut map = BTreeMap::new();
-    map.insert(peer_index1, test_reputation_measurements(9));
-    map.insert(peer_index2, test_reputation_measurements(25));
+    let _ = update_reputation_measurements(
+        &query_runner,
+        &mut map,
+        peer_1,
+        test_reputation_measurements(9),
+    );
+
+    let _ = update_reputation_measurements(
+        &query_runner,
+        &mut map,
+        peer_2,
+        test_reputation_measurements(25),
+    );
     submit_reputation_measurements!(&update_socket, &keystore[1].node_secret_key, nonce, map);
 
     let epoch = 0;
     // Change epoch so that rep scores will be calculated from the measurements.
     for (i, node) in keystore.iter().enumerate().take(required_signals) {
         // Not the prettiest solution but we have to keep track of the nonces somehow.
-        let nonce = if i == 0 || i == 1 { 2 } else { 1 };
+        let nonce = if i < 2 { 2 } else { 1 };
         change_epoch!(&update_socket, &node.node_secret_key, nonce, epoch);
     }
 
-    let node_info1 = query_runner.get_node_info(&peer1).unwrap();
-    let node_info2 = query_runner.get_node_info(&peer2).unwrap();
+    let node_info1 = query_runner.get_node_info(&peer_1).unwrap();
+    let node_info2 = query_runner.get_node_info(&peer_2).unwrap();
 
     assert_eq!(node_info1.participation, Participation::False);
     assert_eq!(node_info2.participation, Participation::True);
+}
+
+#[tokio::test]
+async fn test_stake() {
+    let committee_size = 4;
+    let (committee, _keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let peer_pub_key = NodeSecretKey::generate().to_pk();
+
+    // Deposit some FLK into account 1
+    let deposit = 1000;
+    let update1 = prepare_deposit_update(deposit, &owner_secret_key, 1);
+    let update2 = prepare_deposit_update(deposit, &owner_secret_key, 2);
+
+    // Put 2 of the transaction in the block just to also test block exucution a bit
+    let _ = run_transactions!(vec![update1, update2], &update_socket);
+
+    // check that he has 2_000 flk balance
+    assert_eq!(
+        query_runner.get_flk_balance(&owner_secret_key.to_pk().into()),
+        (2 * deposit).into()
+    );
+
+    // Test staking on a new node
+    let stake_amount = 1000;
+    // First check that trying to stake without providing all the node info reverts
+    let update = prepare_regular_stake_update(stake_amount, &peer_pub_key, &owner_secret_key, 3);
+    expect_tx_revert!(
+        update,
+        &update_socket,
+        ExecutionError::InsufficientNodeDetails
+    );
+
+    // Now try with the correct details for a new node
+    let update = prepare_initial_stake_update(
+        stake_amount,
+        &peer_pub_key,
+        [0; 96].into(),
+        "127.0.0.1".parse().unwrap(),
+        [0; 32].into(),
+        "127.0.0.1".parse().unwrap(),
+        NodePorts::default(),
+        &owner_secret_key,
+        4,
+    );
+
+    expect_tx_success!(update, &update_socket, ExecutionData::None);
+
+    // Query the new node and make sure he has the proper stake
+    assert_eq!(query_runner.get_staked(&peer_pub_key), stake_amount.into());
+
+    // Stake 1000 more but since it is not a new node we should be able to leave the optional
+    // paramaters out without a revert
+    let update = prepare_regular_stake_update(stake_amount, &peer_pub_key, &owner_secret_key, 5);
+
+    expect_tx_success!(update, &update_socket, ExecutionData::None);
+
+    // Node should now have 2_000 stake
+    assert_eq!(
+        query_runner.get_staked(&peer_pub_key),
+        (2 * stake_amount).into()
+    );
+
+    // Now test unstake and make sure it moves the tokens to locked status
+    let update = prepare_unstake_update(stake_amount, &peer_pub_key, &owner_secret_key, 6);
+    run_transaction!(update, &update_socket);
+
+    // Check that his locked is 1000 and his remaining stake is 1000
+    assert_eq!(query_runner.get_staked(&peer_pub_key), stake_amount.into());
+    assert_eq!(query_runner.get_locked(&peer_pub_key), stake_amount.into());
+
+    // Since this test starts at epoch 0 locked_until will be == lock_time
+    assert_eq!(
+        query_runner.get_locked_time(&peer_pub_key),
+        test_genesis().lock_time
+    );
+
+    // Try to withdraw the locked tokens and it should revert
+    let update = prepare_withdraw_unstaked_update(&peer_pub_key, None, &owner_secret_key, 7);
+
+    expect_tx_revert!(update, &update_socket, ExecutionError::TokensLocked);
 }
