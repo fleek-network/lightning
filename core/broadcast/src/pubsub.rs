@@ -177,4 +177,8 @@ impl<T: LightningMessage> BroadcastEventInterface<T> for Event<T> {
             .command_sender
             .send(Command::MarkInvalidSender(self.digest));
     }
+
+    fn get_digest(&self) -> Digest {
+        self.digest
+    }
 }

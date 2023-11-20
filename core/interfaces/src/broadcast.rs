@@ -95,4 +95,7 @@ pub trait BroadcastEventInterface<T: LightningMessage>: Send + Sync {
     /// This method should be called when the body of the message would suggest
     /// that the originator MUST have been another node.
     fn mark_invalid_sender(self);
+
+    /// Returns the digest of the broadcast message associated with this event.
+    fn get_digest(&self) -> Digest;
 }

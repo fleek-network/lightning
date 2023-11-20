@@ -155,11 +155,18 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                 msg.mark_invalid_sender();
                                 continue;
                             }
+
+                            let digest = msg.get_digest();
+
                             // propagate msg as soon as we know its good
                             msg.propagate();
 
                             if !on_committee{
-                                transaction_store.add_attestation(att.digest, att.node_index);
+                                transaction_store.add_attestation(
+                                    att.digest,
+                                    att.node_index,
+                                    digest
+                                );
 
                                 // get the current chain head
                                 let head = query_runner.get_last_block();

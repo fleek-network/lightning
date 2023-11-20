@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
-use lightning_interfaces::types::NodeIndex;
+use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
 use lightning_interfaces::{SyncQueryRunnerInterface, ToDigest};
 
 use crate::execution::{AuthenticStampedParcel, Digest, Execution};
@@ -9,8 +9,17 @@ use crate::execution::{AuthenticStampedParcel, Digest, Execution};
 #[derive(Clone)]
 pub struct TransactionStore {
     parcels: HashMap<Digest, AuthenticStampedParcel>,
-    attestations: HashMap<Digest, Vec<NodeIndex>>,
+    attestations: HashMap<Digest, Vec<Attestation>>,
     executed: HashSet<Digest>,
+}
+
+#[derive(PartialEq, Eq, Clone)]
+struct Attestation {
+    node_index: NodeIndex,
+    // This is the digest from the broadcast message that contained the attestation.
+    // At the moment, both broadcast and consensus use [u8; 32] for the digests, but we should
+    // treat them as different types nonetheless.
+    message_digest: BroadcastDigest,
 }
 
 impl TransactionStore {
@@ -27,10 +36,19 @@ impl TransactionStore {
         self.parcels.insert(digest, parcel);
     }
 
-    pub fn add_attestation(&mut self, digest: Digest, node: NodeIndex) {
+    pub fn add_attestation(
+        &mut self,
+        digest: Digest,
+        node_index: NodeIndex,
+        message_digest: BroadcastDigest,
+    ) {
         let attestation_list = self.attestations.entry(digest).or_default();
-        if !attestation_list.contains(&node) {
-            attestation_list.push(node);
+        let attn = Attestation {
+            node_index,
+            message_digest,
+        };
+        if !attestation_list.contains(&attn) {
+            attestation_list.push(attn);
         }
     }
 
