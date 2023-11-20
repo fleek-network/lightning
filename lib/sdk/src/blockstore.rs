@@ -68,4 +68,15 @@ impl ContentHandle {
         let path = get_block_path(block, &self.tree[block]);
         std::fs::read(path)
     }
+
+    /// Read the entire content from the file system.
+    pub async fn read_to_end(&self) -> std::io::Result<Vec<u8>> {
+        // Reserve capacity for all but the last block, since we know all blocks but the last one
+        // will be 256KiB
+        let mut buf = Vec::with_capacity((256 << 10) * (self.len() - 1));
+        for i in 0..self.len() {
+            buf.append(&mut self.read(i).await?);
+        }
+        Ok(buf)
+    }
 }
