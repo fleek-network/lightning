@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use fleek_crypto::NodePublicKey;
@@ -72,7 +73,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
         .unwrap_or(u32::MAX);
     let mut on_committee = committee.contains(&our_index);
 
-    let mut transaction_store = TransactionStore::new();
+    let mut txn_store = TransactionStore::new();
     loop {
         // todo(dalton): revisit pinning these and using Notify over oneshot
         let shutdown_future = shutdown_notify.notified();
@@ -90,7 +91,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 
                 let parcel_digest = parcel.to_digest();
 
-                transaction_store.store_parcel(parcel.clone());
+                txn_store.store_parcel(parcel.clone());
                 // No need to store the attestation we have already executed it
 
                 let attestation = CommitteeAttestation {
@@ -129,12 +130,12 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 
                             let parcel_digest = parcel.to_digest();
 
-                            transaction_store.store_parcel(parcel);
+                            txn_store.store_parcel(parcel);
 
                             // get the current chain head
                             let head = query_runner.get_last_block();
 
-                            if transaction_store
+                            if txn_store
                             .try_execute(parcel_digest,quorom_threshold,&execution,head).await {
                                 committee = query_runner.get_committee_members_by_index();
                                 quorom_threshold = (committee.len() * 2) / 3 + 1;
@@ -162,7 +163,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                             msg.propagate();
 
                             if !on_committee{
-                                transaction_store.add_attestation(
+                                txn_store.add_attestation(
                                     att.digest,
                                     att.node_index,
                                     digest
@@ -171,7 +172,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                 // get the current chain head
                                 let head = query_runner.get_last_block();
 
-                                if transaction_store
+                                if txn_store
                                 .try_execute(att.digest, quorom_threshold, &execution, head).await {
                                     committee = query_runner.get_committee_members_by_index();
                                     quorom_threshold = (committee.len() * 2) / 3 + 1;
@@ -185,9 +186,30 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                 }
                             }
                         }
-                        PubSubMsg::Request => {
-                            // TODO(matthias): handle request
-                            todo!()
+                        PubSubMsg::RequestTransactions(digest) => {
+                            if let Some(parcel) = txn_store.get_parcel(&digest) {
+                                let parcel = PubSubMsg::Transactions(parcel.clone());
+                                let filter = HashSet::from_iter(vec![msg.originator()].into_iter());
+                                pub_sub.send(&parcel, Some(filter)).await;
+                            }
+                            // TODO(matthias): should we propagate requests?
+                            //msg.propagate();
+                        }
+                        PubSubMsg::RequestAttestations { digest, have } => {
+                            if let Some(attestations) = txn_store.get_attestations(&digest) {
+                                for attn in attestations {
+                                    if !have.check(&attn.node_index) {
+                                        // if we have an attestation that the requesting
+                                        // peer does not have, we send it
+                                        let filter = HashSet::from_iter(
+                                            vec![msg.originator()].into_iter()
+                                        );
+                                        pub_sub.repropagate(digest, Some(filter)).await;
+                                    }
+                                }
+                            }
+                            // TODO(matthias): should we propagate requests?
+                            //msg.propagate();
                         }
                     }
                 }

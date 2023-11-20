@@ -14,12 +14,12 @@ pub struct TransactionStore {
 }
 
 #[derive(PartialEq, Eq, Clone)]
-struct Attestation {
-    node_index: NodeIndex,
+pub(crate) struct Attestation {
+    pub(crate) node_index: NodeIndex,
     // This is the digest from the broadcast message that contained the attestation.
     // At the moment, both broadcast and consensus use [u8; 32] for the digests, but we should
     // treat them as different types nonetheless.
-    message_digest: BroadcastDigest,
+    pub(crate) message_digest: BroadcastDigest,
 }
 
 impl TransactionStore {
@@ -29,6 +29,14 @@ impl TransactionStore {
             attestations: HashMap::with_capacity(512),
             executed: HashSet::with_capacity(512),
         }
+    }
+
+    pub(crate) fn get_parcel(&self, digest: &Digest) -> Option<&AuthenticStampedParcel> {
+        self.parcels.get(digest)
+    }
+
+    pub(crate) fn get_attestations(&self, digest: &Digest) -> Option<&Vec<Attestation>> {
+        self.attestations.get(digest)
     }
 
     pub fn store_parcel(&mut self, parcel: AuthenticStampedParcel) {

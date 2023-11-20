@@ -5,6 +5,7 @@ use std::time::{Duration, SystemTime};
 
 use affair::{Executor, TokioSpawn};
 use async_trait::async_trait;
+use bloomfilter::Bloom;
 use derive_more::{From, IsVariant, TryInto};
 use lightning_interfaces::application::ExecutionEngineSocket;
 use lightning_interfaces::common::WithStartAndShutdown;
@@ -12,7 +13,7 @@ use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
-use lightning_interfaces::types::{Epoch, EpochInfo, UpdateMethod};
+use lightning_interfaces::types::{Epoch, EpochInfo, NodeIndex, UpdateMethod};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
@@ -37,7 +38,7 @@ use typed_store::DBMetrics;
 
 use crate::config::Config;
 use crate::edge_node::consensus::EdgeConsensus;
-use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Execution};
+use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Digest, Execution};
 use crate::forwarder::Forwarder;
 use crate::narwhal::{NarwhalArgs, NarwhalService};
 
@@ -445,7 +446,11 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
 pub enum PubSubMsg {
     Transactions(AuthenticStampedParcel),
     Attestation(CommitteeAttestation),
-    // TODO(matthias): add request payload
-    Request,
+    RequestTransactions(Digest),
+    RequestAttestations {
+        digest: Digest,
+        have: Bloom<NodeIndex>,
+    },
 }
+
 impl AutoImplSerde for PubSubMsg {}
