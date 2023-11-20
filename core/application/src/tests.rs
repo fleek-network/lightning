@@ -323,6 +323,7 @@ fn prepare_regular_stake_update(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn prepare_initial_stake_update(
     amount: u64,
     node_public_key: &NodePublicKey,
