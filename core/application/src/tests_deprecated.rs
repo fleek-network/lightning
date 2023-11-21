@@ -750,61 +750,6 @@ async fn test_supply_across_epoch() {
 }
 
 #[test]
-async fn test_validate_txn() {
-    let (committee, keystore) = get_genesis_committee(4);
-    let mut genesis = Genesis::load().unwrap();
-    genesis.node_info = committee;
-    let (update_socket, query_runner) = init_app(Some(Config {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-        testnet: false,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    }));
-
-    // Submit a ChangeEpoch transaction that will revert (EpochHasNotStarted) and ensure that the
-    // `validate_txn` method of the query runner returns the same response as the update runner.
-    let req = get_update_request_node(
-        UpdateMethod::ChangeEpoch { epoch: 1 },
-        &keystore[0].node_secret_key,
-        1,
-    );
-    let res = run_transaction(vec![req.clone().into()], &update_socket)
-        .await
-        .unwrap();
-    let req = get_update_request_node(
-        UpdateMethod::ChangeEpoch { epoch: 1 },
-        &keystore[0].node_secret_key,
-        2,
-    );
-    assert_eq!(
-        res.txn_receipts[0].response,
-        query_runner.validate_txn(req.into())
-    );
-
-    // Submit a ChangeEpoch transaction that will succeed and ensure that the
-    // `validate_txn` method of the query runner returns the same response as the update runner.
-    let req = get_update_request_node(
-        UpdateMethod::ChangeEpoch { epoch: 0 },
-        &keystore[0].node_secret_key,
-        2,
-    );
-    let res = run_transaction(vec![req.into()], &update_socket)
-        .await
-        .unwrap();
-    let req = get_update_request_node(
-        UpdateMethod::ChangeEpoch { epoch: 0 },
-        &keystore[1].node_secret_key,
-        1,
-    );
-    assert_eq!(
-        res.txn_receipts[0].response,
-        query_runner.validate_txn(req.into())
-    );
-}
-
-#[test]
 async fn test_get_node_registry() {
     let (committee, keystore) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();

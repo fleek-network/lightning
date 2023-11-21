@@ -452,6 +452,14 @@ fn prepare_pod_request(
     )
 }
 
+fn prepare_change_epoch_request(
+    epoch: u64,
+    secret_key: &NodeSecretKey,
+    nonce: u64,
+) -> UpdateRequest {
+    get_update_request_node(UpdateMethod::ChangeEpoch { epoch }, secret_key, nonce)
+}
+
 fn prepare_transfer_request(
     amount: &HpUfixed<18>,
     to: &EthAddress,
@@ -991,4 +999,36 @@ async fn test_change_protocol_params() {
     expect_tx_revert!(update, &update_socket, ExecutionError::OnlyGovernance);
     // Lock time should still be 8.
     assert_eq!(query_runner.get_protocol_params(param), new_value)
+}
+
+#[tokio::test]
+async fn test_validate_txn() {
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+
+    // Submit a ChangeEpoch transaction that will revert (EpochHasNotStarted) and ensure that the
+    // `validate_txn` method of the query runner returns the same response as the update runner.
+    let invalid_epoch = 1;
+    let req = prepare_change_epoch_request(invalid_epoch, &keystore[0].node_secret_key, 1);
+    let res = run_transaction!(req, &update_socket);
+
+    let req = prepare_change_epoch_request(invalid_epoch, &keystore[0].node_secret_key, 2);
+    assert_eq!(
+        res.txn_receipts[0].response,
+        query_runner.validate_txn(req.into())
+    );
+
+    // Submit a ChangeEpoch transaction that will succeed and ensure that the
+    // `validate_txn` method of the query runner returns the same response as the update runner.
+    let epoch = 0;
+    let req = prepare_change_epoch_request(epoch, &keystore[0].node_secret_key, 2);
+
+    let res = run_transaction!(req, &update_socket);
+    let req = prepare_change_epoch_request(epoch, &keystore[1].node_secret_key, 1);
+
+    assert_eq!(
+        res.txn_receipts[0].response,
+        query_runner.validate_txn(req.into())
+    );
 }
