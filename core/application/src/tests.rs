@@ -24,6 +24,7 @@ use lightning_interfaces::types::{
     NodePorts,
     Participation,
     ProofOfConsensus,
+    ProtocolParams,
     ReputationMeasurements,
     Tokens,
     TotalServed,
@@ -182,17 +183,23 @@ fn test_genesis() -> Genesis {
 fn test_init_app(committee: Vec<GenesisNode>) -> (ExecutionEngineSocket, QueryRunner) {
     let mut genesis = test_genesis();
     genesis.node_info = committee;
+    init_app(Some(test_config(genesis)))
+}
 
-    init_app(Some(Config {
+fn init_app_with_genesis(genesis: &Genesis) -> (ExecutionEngineSocket, QueryRunner) {
+    init_app(Some(test_config(genesis.clone())))
+}
+
+fn test_config(genesis: Genesis) -> Config {
+    Config {
         genesis: Some(genesis),
         mode: Mode::Test,
         testnet: false,
         storage: StorageConfig::InMemory,
         db_path: None,
         db_options: None,
-    }))
+    }
 }
-
 fn test_reputation_measurements(uptime: u8) -> ReputationMeasurements {
     ReputationMeasurements {
         latency: None,
@@ -456,6 +463,22 @@ fn prepare_transfer_request(
             amount: amount.clone(),
             token: Tokens::FLK,
             to: *to,
+        },
+        secret_key,
+        nonce,
+    )
+}
+
+fn prepare_change_protocol_param_request(
+    param: &ProtocolParams,
+    value: &u128,
+    secret_key: &AccountOwnerSecretKey,
+    nonce: u64,
+) -> UpdateRequest {
+    get_update_request_account(
+        UpdateMethod::ChangeProtocolParam {
+            param: param.clone(),
+            value: *value,
         },
         secret_key,
         nonce,
@@ -932,4 +955,40 @@ async fn test_is_valid_node() {
     );
     // Make sure that this node is not a valid node.
     assert!(!query_runner.is_valid_node(&node_pub_key));
+}
+
+#[tokio::test]
+async fn test_change_protocol_params() {
+    let governance_secret_key = AccountOwnerSecretKey::generate();
+    let governance_public_key = governance_secret_key.to_pk();
+
+    let mut genesis = test_genesis();
+    genesis.governance_address = governance_public_key.into();
+
+    let (update_socket, query_runner) = init_app_with_genesis(&genesis);
+
+    let param = ProtocolParams::LockTime;
+    let new_value = 5;
+    let update =
+        prepare_change_protocol_param_request(&param, &new_value, &governance_secret_key, 1);
+    run_transaction!(update, &update_socket);
+    assert_eq!(query_runner.get_protocol_params(param.clone()), new_value);
+
+    let new_value = 8;
+    let update =
+        prepare_change_protocol_param_request(&param, &new_value, &governance_secret_key, 2);
+    run_transaction!(update, &update_socket);
+    assert_eq!(query_runner.get_protocol_params(param.clone()), new_value);
+
+    // Make sure that another private key cannot change protocol parameters.
+    let some_secret_key = AccountOwnerSecretKey::generate();
+    let minimum_stake_amount = query_runner.get_staking_amount().into();
+    deposit!(&update_socket, &some_secret_key, 1, &minimum_stake_amount);
+
+    let malicious_value = 1;
+    let update =
+        prepare_change_protocol_param_request(&param, &malicious_value, &some_secret_key, 2);
+    expect_tx_revert!(update, &update_socket, ExecutionError::OnlyGovernance);
+    // Lock time should still be 8.
+    assert_eq!(query_runner.get_protocol_params(param), new_value)
 }
