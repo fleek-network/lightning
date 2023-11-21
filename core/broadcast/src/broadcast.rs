@@ -113,7 +113,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         let (_, sk) = signer.get_sk();
         let event_handler = pool.open_event(ServiceScope::Broadcast);
 
-        let ctx = Context::<C>::new(Database::default(), sqr, rep_reporter, event_handler, sk);
+        let ctx = Context::<C>::new(Database::new(), sqr, rep_reporter, event_handler, sk);
 
         Ok(Self {
             command_sender: ctx.get_command_sender(),

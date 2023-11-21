@@ -23,6 +23,7 @@ affair.workspace = true
 infusion.workspace = true
 derive_more = "0.99"
 im = "15.1"
+quick_cache = "0.4.0"
 smallvec = "1.11.0"
 ta = "0.5.0"
 tracing.workspace = true
@@ -30,9 +31,9 @@ rand.workspace = true
 
 
 [dev-dependencies]
-lightning-signer = { path="../signer" }
-lightning-application = { path="../application", features = ["test"] }
-lightning-pool = { path="../pool" }
-lightning-notifier = { path="../notifier" }
+lightning-signer = { path = "../signer" }
+lightning-application = { path = "../application", features = ["test"] }
+lightning-pool = { path = "../pool" }
+lightning-notifier = { path = "../notifier" }
 lightning-rep-collector = { path = "../rep-collector" }
-lightning-topology = { path="../topology" }
+lightning-topology = { path = "../topology" }

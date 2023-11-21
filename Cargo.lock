@@ -4510,6 +4510,7 @@ dependencies = [
  "lightning-signer",
  "lightning-topology",
  "mini-moka",
+ "quick_cache",
  "rand 0.8.5",
  "serde",
  "smallvec",
@@ -7347,6 +7348,18 @@ name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
+
+[[package]]
+name = "quick_cache"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f69f8d22fa3f34f3083d9a4375c038732c7a7e964de1beb81c544da92dfc40b8"
+dependencies = [
+ "ahash 0.8.3",
+ "equivalent",
+ "hashbrown 0.14.1",
+ "parking_lot",
+]
 
 [[package]]
 name = "quinn"
