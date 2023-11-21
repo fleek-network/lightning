@@ -17,6 +17,7 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     Block,
     BlockExecutionResponse,
+    DeliveryAcknowledgment,
     ExecutionData,
     ExecutionError,
     HandshakePorts,
@@ -25,6 +26,7 @@ use lightning_interfaces::types::{
     ProofOfConsensus,
     ReputationMeasurements,
     Tokens,
+    TotalServed,
     TransactionRequest,
     TransactionResponse,
     UpdateMethod,
@@ -422,6 +424,27 @@ fn prepare_stake_lock_update(
     )
 }
 
+// Helper methods for tests
+// Passing the private key around like this should only be done for
+// testing.
+fn prepare_pod_request(
+    secret_key: &NodeSecretKey,
+    commodity: u128,
+    service_id: u32,
+    nonce: u64,
+) -> UpdateRequest {
+    get_update_request_node(
+        UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+            commodity,  // units of data served
+            service_id, // service 0 serving bandwidth
+            proofs: vec![DeliveryAcknowledgment],
+            metadata: None,
+        },
+        secret_key,
+        nonce,
+    )
+}
+
 // Helper function that submits a transaction to the application.
 async fn run_transaction(
     requests: Vec<TransactionRequest>,
@@ -798,5 +821,36 @@ async fn test_stake_lock() {
         unstake_req,
         &update_socket,
         ExecutionError::LockedTokensUnstakeForbidden
+    );
+}
+
+#[tokio::test]
+async fn test_pod_without_proof() {
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+
+    let bandwidth_commodity = 1000;
+    let compute_commodity = 2000;
+    let bandwidth_pod =
+        prepare_pod_request(&keystore[0].node_secret_key, bandwidth_commodity, 0, 1);
+    let compute_pod = prepare_pod_request(&keystore[0].node_secret_key, compute_commodity, 1, 2);
+
+    // run the delivery ack transaction
+    run_transactions!(vec![bandwidth_pod, compute_pod], &update_socket);
+
+    assert_eq!(
+        query_runner
+            .get_node_served(&keystore[0].node_secret_key.to_pk())
+            .served,
+        vec![bandwidth_commodity, compute_commodity]
+    );
+
+    assert_eq!(
+        query_runner.get_total_served(0),
+        TotalServed {
+            served: vec![bandwidth_commodity, compute_commodity],
+            reward_pool: (0.1 * bandwidth_commodity as f64 + 0.2 * compute_commodity as f64).into()
+        }
     );
 }

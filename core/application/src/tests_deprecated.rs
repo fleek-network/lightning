@@ -28,7 +28,6 @@ use lightning_interfaces::types::{
     ProtocolParams,
     ReputationMeasurements,
     Tokens,
-    TotalServed,
     TransactionRequest,
     TransactionResponse,
     UpdateMethod,
@@ -423,49 +422,6 @@ async fn test_genesis() {
         let balance = query_runner.get_staked(&node.primary_public_key);
         assert_eq!(HpUfixed::<18>::from(genesis.min_stake), balance);
     }
-}
-
-#[test]
-async fn test_pod_without_proof() {
-    let (committee, keystore) = get_genesis_committee(4);
-    let mut genesis = Genesis::load().unwrap();
-    genesis.node_info = committee;
-    let (update_socket, query_runner) = init_app(Some(Config {
-        genesis: Some(genesis),
-        mode: Mode::Test,
-        testnet: false,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
-    }));
-
-    let bandwidth_pod = pod_request(&keystore[0].node_secret_key, 1000, 0, 1);
-    let compute_pod = pod_request(&keystore[0].node_secret_key, 2000, 1, 2);
-
-    // run the delivery ack transaction
-    if let Err(e) = run_transaction(
-        vec![bandwidth_pod.into(), compute_pod.into()],
-        &update_socket,
-    )
-    .await
-    {
-        panic!("{e}");
-    }
-
-    assert_eq!(
-        query_runner
-            .get_node_served(&keystore[0].node_secret_key.to_pk())
-            .served,
-        vec![1000, 2000]
-    );
-
-    assert_eq!(
-        query_runner.get_total_served(0),
-        TotalServed {
-            served: vec![1000, 2000],
-            reward_pool: (0.1 * 1000_f64 + 0.2 * 2000_f64).into()
-        }
-    );
 }
 
 #[test]
