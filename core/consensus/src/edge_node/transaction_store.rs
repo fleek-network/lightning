@@ -147,6 +147,17 @@ impl TransactionStore {
         Err(NotExecuted::MissingParcel(last_digest))
     }
 
+    pub fn should_send_request(&self) -> bool {
+        if let Some(last_executed_timestamp) = self.last_executed_timestamp {
+            if let Ok(time_passed) = last_executed_timestamp.elapsed() {
+                // TODO(matthias): do napkin math for this threshold
+                let threshold = 8 * self.deviation_tbe + self.estimated_tbe;
+                return time_passed > threshold;
+            }
+        }
+        false
+    }
+
     // This method should be called whenever we execute a parcel.
     fn update_estimated_tbe(&mut self) {
         if let Some(timestamp) = self.last_executed_timestamp {

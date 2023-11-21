@@ -8,7 +8,7 @@ use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinHandle;
 use tracing::info;
 
-use super::transaction_store::TransactionStore;
+use super::transaction_store::{NotExecuted, TransactionStore};
 use crate::consensus::PubSubMsg;
 use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Execution};
 
@@ -150,8 +150,8 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                         reconfigure_notify.notify_waiters();
                                     }
                                 }
-                                Err(_not_executed) => {
-
+                                Err(not_executed) => {
+                                    handle_not_executed(not_executed, &txn_store, &pub_sub).await;
                                 }
                             }
                         }
@@ -193,7 +193,9 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                         reconfigure_notify.notify_waiters();
                                     }
                                 }
-                                Err(_not_executed) => {}
+                                Err(not_executed) => {
+                                    handle_not_executed(not_executed, &txn_store, &pub_sub).await;
+                                }
                             }
                         }
                     }
@@ -210,6 +212,29 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                 }
 
             },
+        }
+    }
+}
+
+async fn handle_not_executed<P: PubSub<PubSubMsg>>(
+    not_executed: NotExecuted,
+    txn_store: &TransactionStore,
+    pub_sub: &P,
+) {
+    // While trying to connect the chain back to the head, we discovered a missing parcel.
+    // This is can happen normally, because parcels or attestations might arrive out of
+    // order.
+    // However, this could also mean that we missed a broadcast message containing a parcel,
+    // and our peers are no longer broadcasting this message.
+    // In this case we want to send a request out for this parcel.
+    // In order to prevent sending out these requests prematurely, we keep a running average of
+    // the intervals between executing parcels.
+    // If we are missing a parcel, and the time that has passed since executing the last parcel
+    // is larger than the expected time, we send out a request.
+    if let NotExecuted::MissingParcel(digest) = not_executed {
+        if txn_store.should_send_request() {
+            let request = PubSubMsg::RequestTransactions(digest);
+            pub_sub.send(&request, None).await;
         }
     }
 }
