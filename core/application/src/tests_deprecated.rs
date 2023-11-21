@@ -807,62 +807,6 @@ async fn test_validate_txn() {
 }
 
 #[test]
-async fn test_is_valid_node() {
-    let (update_socket, query_runner) = init_app(None);
-
-    let owner_secret_key = AccountOwnerSecretKey::generate();
-    let node_secret_key = NodeSecretKey::generate();
-
-    // Stake minimum required amount.
-    let minimum_stake_amount = query_runner.get_staking_amount();
-    deposit(
-        minimum_stake_amount.into(),
-        Tokens::FLK,
-        &owner_secret_key,
-        &update_socket,
-        1,
-    )
-    .await;
-    stake(
-        minimum_stake_amount.into(),
-        node_secret_key.to_pk(),
-        [0; 96].into(),
-        &owner_secret_key,
-        &update_socket,
-        2,
-    )
-    .await;
-    // Make sure that this node is a valid node.
-    assert!(query_runner.is_valid_node(&node_secret_key.to_pk()));
-
-    // Generate new keys for a different node.
-    let owner_secret_key = AccountOwnerSecretKey::generate();
-    let node_secret_key = NodeSecretKey::generate();
-
-    // Stake less than the minimum required amount.
-    let less_than_minimum_skate_amount = minimum_stake_amount / 2;
-    deposit(
-        less_than_minimum_skate_amount.into(),
-        Tokens::FLK,
-        &owner_secret_key,
-        &update_socket,
-        1,
-    )
-    .await;
-    stake(
-        less_than_minimum_skate_amount.into(),
-        node_secret_key.to_pk(),
-        [1; 96].into(),
-        &owner_secret_key,
-        &update_socket,
-        2,
-    )
-    .await;
-    // Make sure that this node is not a valid node.
-    assert!(!query_runner.is_valid_node(&node_secret_key.to_pk()));
-}
-
-#[test]
 async fn test_get_node_registry() {
     let (committee, keystore) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();

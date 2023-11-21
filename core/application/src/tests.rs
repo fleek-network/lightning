@@ -802,7 +802,7 @@ async fn test_stake_lock() {
     let (update_socket, query_runner) = init_app(None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
-    let node_secret_key = NodeSecretKey::generate();
+    let node_pub_key = NodeSecretKey::generate().to_pk();
     let amount: HpUfixed<18> = 1_000u64.into();
 
     deposit!(&update_socket, &owner_secret_key, 1, &amount);
@@ -816,24 +816,23 @@ async fn test_stake_lock() {
         &owner_secret_key,
         2,
         &amount,
-        &node_secret_key.to_pk(),
+        &node_pub_key,
         [0; 96].into()
     );
-    assert_eq!(query_runner.get_staked(&node_secret_key.to_pk()), amount);
+    assert_eq!(query_runner.get_staked(&node_pub_key), amount);
 
     let locked_for = 365;
-    let stake_lock_req =
-        prepare_stake_lock_update(&node_secret_key.to_pk(), locked_for, &owner_secret_key, 3);
+    let stake_lock_req = prepare_stake_lock_update(&node_pub_key, locked_for, &owner_secret_key, 3);
 
     expect_tx_success!(stake_lock_req, &update_socket, ExecutionData::None);
 
     assert_eq!(
-        query_runner.get_stake_locked_until(&node_secret_key.to_pk()),
+        query_runner.get_stake_locked_until(&node_pub_key),
         locked_for
     );
 
     let unstake_req: UpdateRequest =
-        prepare_unstake_update(&amount, &node_secret_key.to_pk(), &owner_secret_key, 4);
+        prepare_unstake_update(&amount, &node_pub_key, &owner_secret_key, 4);
     expect_tx_revert!(
         unstake_req,
         &update_socket,
@@ -887,4 +886,50 @@ async fn test_revert_self_transfer() {
     // Check that trying to transfer funds to yourself reverts
     let update = prepare_transfer_request(&10_u64.into(), &owner, &owner_secret_key, 2);
     expect_tx_revert!(update, &update_socket, ExecutionError::CantSendToYourself);
+}
+
+#[tokio::test]
+async fn test_is_valid_node() {
+    let (update_socket, query_runner) = init_app(None);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_pub_key = NodeSecretKey::generate().to_pk();
+
+    // Stake minimum required amount.
+    let minimum_stake_amount = query_runner.get_staking_amount().into();
+    deposit!(&update_socket, &owner_secret_key, 1, &minimum_stake_amount);
+    stake!(
+        &update_socket,
+        &owner_secret_key,
+        2,
+        &minimum_stake_amount,
+        &node_pub_key,
+        [0; 96].into()
+    );
+
+    // Make sure that this node is a valid node.
+    assert!(query_runner.is_valid_node(&node_pub_key));
+
+    // Generate new keys for a different node.
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_pub_key = NodeSecretKey::generate().to_pk();
+
+    // Stake less than the minimum required amount.
+    let less_than_minimum_skate_amount = minimum_stake_amount / HpUfixed::<18>::from(2u16);
+    deposit!(
+        &update_socket,
+        &owner_secret_key,
+        1,
+        &less_than_minimum_skate_amount
+    );
+    stake!(
+        &update_socket,
+        &owner_secret_key,
+        2,
+        &less_than_minimum_skate_amount,
+        &node_pub_key,
+        [1; 96].into()
+    );
+    // Make sure that this node is not a valid node.
+    assert!(!query_runner.is_valid_node(&node_pub_key));
 }
