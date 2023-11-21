@@ -12,6 +12,7 @@ use fleek_crypto::{
     NodeSecretKey,
     SecretKey,
 };
+use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     Block,
@@ -133,8 +134,31 @@ macro_rules! assert_rep_measurements_update {
     }};
 }
 
-// Init the app and return the execution engine socket that would go to narwhal and the query socket
-// that could go to anyone
+macro_rules! deposit {
+    ($socket:expr,$secret_key:expr,$account_nonce:expr,$amount:expr) => {{
+        let req = prepare_deposit_update($amount, $secret_key, $account_nonce);
+        expect_tx_success!(req, $socket, ExecutionData::None)
+    }};
+}
+
+macro_rules! stake {
+    ($socket:expr,$secret_key:expr,$nonce:expr,$amount:expr,$node_pk:expr,$consensus_key:expr) => {{
+        let req = prepare_initial_stake_update(
+            $amount,
+            $node_pk,
+            $consensus_key,
+            "127.0.0.1".parse().unwrap(),
+            [0; 32].into(),
+            "127.0.0.1".parse().unwrap(),
+            NodePorts::default(),
+            $secret_key,
+            $nonce,
+        );
+
+        expect_tx_success!(req, $socket, ExecutionData::None)
+    }};
+}
+
 fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
     let config = config.or(Some(Config {
         genesis: None,
@@ -287,7 +311,7 @@ fn get_update_request_account(
 }
 
 fn prepare_deposit_update(
-    amount: u64,
+    amount: &HpUfixed<18>,
     secret_key: &AccountOwnerSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
@@ -295,7 +319,7 @@ fn prepare_deposit_update(
         UpdateMethod::Deposit {
             proof: ProofOfConsensus {},
             token: Tokens::FLK,
-            amount: amount.into(),
+            amount: amount.clone(),
         },
         secret_key,
         nonce,
@@ -303,14 +327,14 @@ fn prepare_deposit_update(
 }
 
 fn prepare_regular_stake_update(
-    amount: u64,
+    amount: &HpUfixed<18>,
     node_public_key: &NodePublicKey,
     secret_key: &AccountOwnerSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
     get_update_request_account(
         UpdateMethod::Stake {
-            amount: amount.into(),
+            amount: amount.clone(),
             node_public_key: *node_public_key,
             consensus_key: None,
             node_domain: None,
@@ -325,7 +349,7 @@ fn prepare_regular_stake_update(
 
 #[allow(clippy::too_many_arguments)]
 fn prepare_initial_stake_update(
-    amount: u64,
+    amount: &HpUfixed<18>,
     node_public_key: &NodePublicKey,
     consensus_key: ConsensusPublicKey,
     node_domain: IpAddr,
@@ -337,7 +361,7 @@ fn prepare_initial_stake_update(
 ) -> UpdateRequest {
     get_update_request_account(
         UpdateMethod::Stake {
-            amount: amount.into(),
+            amount: amount.clone(),
             node_public_key: *node_public_key,
             consensus_key: Some(consensus_key),
             node_domain: Some(node_domain),
@@ -351,14 +375,14 @@ fn prepare_initial_stake_update(
 }
 
 fn prepare_unstake_update(
-    amount: u64,
+    amount: &HpUfixed<18>,
     node_public_key: &NodePublicKey,
     secret_key: &AccountOwnerSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
     get_update_request_account(
         UpdateMethod::Unstake {
-            amount: amount.into(),
+            amount: amount.clone(),
             node: *node_public_key,
         },
         secret_key,
@@ -376,6 +400,22 @@ fn prepare_withdraw_unstaked_update(
         UpdateMethod::WithdrawUnstaked {
             node: *node_public_key,
             recipient,
+        },
+        secret_key,
+        nonce,
+    )
+}
+
+fn prepare_stake_lock_update(
+    node_public_key: &NodePublicKey,
+    locked_for: u64,
+    secret_key: &AccountOwnerSecretKey,
+    nonce: u64,
+) -> UpdateRequest {
+    get_update_request_account(
+        UpdateMethod::StakeLock {
+            node: *node_public_key,
+            locked_for,
         },
         secret_key,
         nonce,
@@ -644,9 +684,9 @@ async fn test_stake() {
     let peer_pub_key = NodeSecretKey::generate().to_pk();
 
     // Deposit some FLK into account 1
-    let deposit = 1000;
-    let update1 = prepare_deposit_update(deposit, &owner_secret_key, 1);
-    let update2 = prepare_deposit_update(deposit, &owner_secret_key, 2);
+    let deposit = 1000_u64.into();
+    let update1 = prepare_deposit_update(&deposit, &owner_secret_key, 1);
+    let update2 = prepare_deposit_update(&deposit, &owner_secret_key, 2);
 
     // Put 2 of the transaction in the block just to also test block exucution a bit
     let _ = run_transactions!(vec![update1, update2], &update_socket);
@@ -654,13 +694,13 @@ async fn test_stake() {
     // check that he has 2_000 flk balance
     assert_eq!(
         query_runner.get_flk_balance(&owner_secret_key.to_pk().into()),
-        (2 * deposit).into()
+        (HpUfixed::<18>::from(2u16) * deposit)
     );
 
     // Test staking on a new node
-    let stake_amount = 1000;
+    let stake_amount = 1000u64.into();
     // First check that trying to stake without providing all the node info reverts
-    let update = prepare_regular_stake_update(stake_amount, &peer_pub_key, &owner_secret_key, 3);
+    let update = prepare_regular_stake_update(&stake_amount, &peer_pub_key, &owner_secret_key, 3);
     expect_tx_revert!(
         update,
         &update_socket,
@@ -669,7 +709,7 @@ async fn test_stake() {
 
     // Now try with the correct details for a new node
     let update = prepare_initial_stake_update(
-        stake_amount,
+        &stake_amount,
         &peer_pub_key,
         [0; 96].into(),
         "127.0.0.1".parse().unwrap(),
@@ -683,27 +723,27 @@ async fn test_stake() {
     expect_tx_success!(update, &update_socket, ExecutionData::None);
 
     // Query the new node and make sure he has the proper stake
-    assert_eq!(query_runner.get_staked(&peer_pub_key), stake_amount.into());
+    assert_eq!(query_runner.get_staked(&peer_pub_key), stake_amount);
 
     // Stake 1000 more but since it is not a new node we should be able to leave the optional
     // paramaters out without a revert
-    let update = prepare_regular_stake_update(stake_amount, &peer_pub_key, &owner_secret_key, 5);
+    let update = prepare_regular_stake_update(&stake_amount, &peer_pub_key, &owner_secret_key, 5);
 
     expect_tx_success!(update, &update_socket, ExecutionData::None);
 
     // Node should now have 2_000 stake
     assert_eq!(
         query_runner.get_staked(&peer_pub_key),
-        (2 * stake_amount).into()
+        (HpUfixed::<18>::from(2u16) * stake_amount.clone())
     );
 
     // Now test unstake and make sure it moves the tokens to locked status
-    let update = prepare_unstake_update(stake_amount, &peer_pub_key, &owner_secret_key, 6);
+    let update = prepare_unstake_update(&stake_amount, &peer_pub_key, &owner_secret_key, 6);
     run_transaction!(update, &update_socket);
 
     // Check that his locked is 1000 and his remaining stake is 1000
-    assert_eq!(query_runner.get_staked(&peer_pub_key), stake_amount.into());
-    assert_eq!(query_runner.get_locked(&peer_pub_key), stake_amount.into());
+    assert_eq!(query_runner.get_staked(&peer_pub_key), stake_amount);
+    assert_eq!(query_runner.get_locked(&peer_pub_key), stake_amount);
 
     // Since this test starts at epoch 0 locked_until will be == lock_time
     assert_eq!(
@@ -715,4 +755,48 @@ async fn test_stake() {
     let update = prepare_withdraw_unstaked_update(&peer_pub_key, None, &owner_secret_key, 7);
 
     expect_tx_revert!(update, &update_socket, ExecutionError::TokensLocked);
+}
+
+#[tokio::test]
+async fn test_stake_lock() {
+    let (update_socket, query_runner) = init_app(None);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_secret_key = NodeSecretKey::generate();
+    let amount: HpUfixed<18> = 1_000u64.into();
+
+    deposit!(&update_socket, &owner_secret_key, 1, &amount);
+    assert_eq!(
+        query_runner.get_flk_balance(&owner_secret_key.to_pk().into()),
+        amount
+    );
+
+    stake!(
+        &update_socket,
+        &owner_secret_key,
+        2,
+        &amount,
+        &node_secret_key.to_pk(),
+        [0; 96].into()
+    );
+    assert_eq!(query_runner.get_staked(&node_secret_key.to_pk()), amount);
+
+    let locked_for = 365;
+    let stake_lock_req =
+        prepare_stake_lock_update(&node_secret_key.to_pk(), locked_for, &owner_secret_key, 3);
+
+    expect_tx_success!(stake_lock_req, &update_socket, ExecutionData::None);
+
+    assert_eq!(
+        query_runner.get_stake_locked_until(&node_secret_key.to_pk()),
+        locked_for
+    );
+
+    let unstake_req: UpdateRequest =
+        prepare_unstake_update(&amount, &node_secret_key.to_pk(), &owner_secret_key, 4);
+    expect_tx_revert!(
+        unstake_req,
+        &update_socket,
+        ExecutionError::LockedTokensUnstakeForbidden
+    );
 }
