@@ -428,9 +428,9 @@ fn prepare_stake_lock_update(
 // Passing the private key around like this should only be done for
 // testing.
 fn prepare_pod_request(
-    secret_key: &NodeSecretKey,
     commodity: u128,
     service_id: u32,
+    secret_key: &NodeSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
     get_update_request_node(
@@ -439,6 +439,23 @@ fn prepare_pod_request(
             service_id, // service 0 serving bandwidth
             proofs: vec![DeliveryAcknowledgment],
             metadata: None,
+        },
+        secret_key,
+        nonce,
+    )
+}
+
+fn prepare_transfer_request(
+    amount: &HpUfixed<18>,
+    to: &EthAddress,
+    secret_key: &AccountOwnerSecretKey,
+    nonce: u64,
+) -> UpdateRequest {
+    get_update_request_account(
+        UpdateMethod::Transfer {
+            amount: amount.clone(),
+            token: Tokens::FLK,
+            to: *to,
         },
         secret_key,
         nonce,
@@ -833,8 +850,8 @@ async fn test_pod_without_proof() {
     let bandwidth_commodity = 1000;
     let compute_commodity = 2000;
     let bandwidth_pod =
-        prepare_pod_request(&keystore[0].node_secret_key, bandwidth_commodity, 0, 1);
-    let compute_pod = prepare_pod_request(&keystore[0].node_secret_key, compute_commodity, 1, 2);
+        prepare_pod_request(bandwidth_commodity, 0, &keystore[0].node_secret_key, 1);
+    let compute_pod = prepare_pod_request(compute_commodity, 1, &keystore[0].node_secret_key, 2);
 
     // run the delivery ack transaction
     run_transactions!(vec![bandwidth_pod, compute_pod], &update_socket);
@@ -853,4 +870,21 @@ async fn test_pod_without_proof() {
             reward_pool: (0.1 * bandwidth_commodity as f64 + 0.2 * compute_commodity as f64).into()
         }
     );
+}
+
+#[tokio::test]
+async fn test_revert_self_transfer() {
+    let (update_socket, query_runner) = init_app(None);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner: EthAddress = owner_secret_key.to_pk().into();
+
+    let balance = 1_000u64.into();
+
+    deposit!(&update_socket, &owner_secret_key, 1, &balance);
+    assert_eq!(query_runner.get_flk_balance(&owner), balance);
+
+    // Check that trying to transfer funds to yourself reverts
+    let update = prepare_transfer_request(&10_u64.into(), &owner, &owner_secret_key, 2);
+    expect_tx_revert!(update, &update_socket, ExecutionError::CantSendToYourself);
 }
