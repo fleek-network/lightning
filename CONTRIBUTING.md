@@ -119,7 +119,7 @@ The project is under heavy development to release the first version of the node 
 
 
 ## Join The Project Team
-Please visit our [Discord](https://discord.gg/fleekxyz) to get in touch with us.
+Please visit our [Discord](https://discord.gg/fleek) to get in touch with us.
 
 <!-- omit in toc -->
 ## Attribution
