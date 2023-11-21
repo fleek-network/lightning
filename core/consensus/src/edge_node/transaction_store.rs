@@ -1,16 +1,24 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
 use lightning_interfaces::{SyncQueryRunnerInterface, ToDigest};
 
 use crate::execution::{AuthenticStampedParcel, Digest, Execution};
 
+// Exponentially moving average parameter for estimating the time between executions of parcels.
+// This parameter must be in range [0, 1].
+const TBE_EMA: f64 = 0.125;
+
 #[derive(Clone)]
 pub struct TransactionStore {
     parcels: HashMap<Digest, Parcel>,
     attestations: HashMap<Digest, Vec<NodeIndex>>,
     executed: HashSet<Digest>,
+    last_executed_timestamp: Option<SystemTime>,
+    estimated_tbe: Duration,
+    deviation_tbe: Duration,
 }
 
 #[derive(Clone)]
@@ -28,6 +36,10 @@ impl TransactionStore {
             parcels: HashMap::with_capacity(512),
             attestations: HashMap::with_capacity(512),
             executed: HashSet::with_capacity(512),
+            last_executed_timestamp: None,
+            // TODO(matthias): do some napkin math for these initial estimates
+            estimated_tbe: Duration::from_secs(30),
+            deviation_tbe: Duration::from_secs(10),
         }
     }
 
@@ -75,17 +87,15 @@ impl TransactionStore {
         head: Digest,
     ) -> Result<bool, NotExecuted> {
         if self.executed.contains(&digest) {
-            // if we executed before return false
+            // we already executed this parcel
             Ok(false)
         } else if let Some(x) = self.attestations.get(&digest) {
-            // If it is in our attestation table return true if our attestations is >= our threshold
-            // else false
+            // we need a quorum of attestations in order to execute the parcel
             if x.len() >= threshold {
                 // if we should execute we need to make sure we can connect this to our transaction
                 // chain
                 self.try_execute_chain(digest, execution, head).await
             } else {
-                //Ok(false)
                 Err(NotExecuted::MissingAttestations(digest))
             }
         } else if self.parcels.contains_key(&digest) {
@@ -110,9 +120,6 @@ impl TransactionStore {
 
             txn_chain.push_front((parcel.inner.transactions.clone(), last_digest));
 
-            // for batch in &parcel.transactions {
-            //     txn_chain.push_front(batch.clone());
-            // }
             if parcel.inner.last_executed == head {
                 let mut epoch_changed = false;
 
@@ -128,12 +135,35 @@ impl TransactionStore {
                     self.executed.insert(digest);
                 }
 
+                // TODO(matthias): technically this call should be inside the for loop where we
+                // call `submit_batch`, but I think this might bias the estimate to be too low.
+                self.update_estimated_tbe();
+
                 return Ok(epoch_changed);
             } else {
                 last_digest = parcel.inner.last_executed;
             }
         }
         Err(NotExecuted::MissingParcel(last_digest))
+    }
+
+    // This method should be called whenever we execute a parcel.
+    fn update_estimated_tbe(&mut self) {
+        if let Some(timestamp) = self.last_executed_timestamp {
+            if let Ok(sample_tbe) = timestamp.elapsed() {
+                let sample_tbe = sample_tbe.as_millis() as f64;
+                let estimated_tbe = self.estimated_tbe.as_millis() as f64;
+                let new_estimated_tbe = (1.0 - TBE_EMA) * estimated_tbe + TBE_EMA * sample_tbe;
+                self.estimated_tbe = Duration::from_millis(new_estimated_tbe as u64);
+                // TODO(matthias): add sensible bounds for `estimated_tbe`
+
+                let deviation_tbe = self.deviation_tbe.as_millis() as f64;
+                let new_deviation_tbe = (1.0 - TBE_EMA) * deviation_tbe
+                    + TBE_EMA * (new_estimated_tbe - sample_tbe).abs();
+                self.deviation_tbe = Duration::from_millis(new_deviation_tbe as u64);
+            }
+        }
+        self.last_executed_timestamp = Some(SystemTime::now());
     }
 }
 
