@@ -5,7 +5,6 @@ use std::time::{Duration, SystemTime};
 
 use affair::{Executor, TokioSpawn};
 use async_trait::async_trait;
-use bloomfilter::Bloom;
 use derive_more::{From, IsVariant, TryInto};
 use lightning_interfaces::application::ExecutionEngineSocket;
 use lightning_interfaces::common::WithStartAndShutdown;
@@ -13,7 +12,7 @@ use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
-use lightning_interfaces::types::{Epoch, EpochInfo, NodeIndex, UpdateMethod};
+use lightning_interfaces::types::{Epoch, EpochInfo, UpdateMethod};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
@@ -447,10 +446,6 @@ pub enum PubSubMsg {
     Transactions(AuthenticStampedParcel),
     Attestation(CommitteeAttestation),
     RequestTransactions(Digest),
-    RequestAttestations {
-        digest: Digest,
-        have: Bloom<NodeIndex>,
-    },
 }
 
 impl AutoImplSerde for PubSubMsg {}

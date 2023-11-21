@@ -91,7 +91,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 
                 let parcel_digest = parcel.to_digest();
 
-                txn_store.store_parcel(parcel.clone());
+                txn_store.store_parcel(parcel.clone(), None);
                 // No need to store the attestation we have already executed it
 
                 let attestation = CommitteeAttestation {
@@ -115,104 +115,100 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                 }
             },
             Some(mut msg) = pub_sub.recv_event() => {
-                if on_committee {
-                    msg.propagate();
-                } else {
-                    match msg.take().unwrap() {
-                        PubSubMsg::Transactions(parcel) => {
+                match msg.take().unwrap() {
+                    PubSubMsg::Transactions(parcel) => {
+                        if !committee.contains(&msg.originator()){
+                            msg.mark_invalid_sender();
+                            continue;
+                        }
+
+                        let msg_digest = msg.get_digest();
+                        // propagate here now that we know its good and before we do async work
+                        msg.propagate();
+
+                        let parcel_digest = parcel.to_digest();
+
+                        txn_store.store_parcel(parcel, Some(msg_digest));
+
+                        if !on_committee {
                             info!("Received transaction parcel from gossip as an edge node");
-                            if !committee.contains(&msg.originator()){
-                                msg.mark_invalid_sender();
-                                continue;
+                            // get the current chain head
+                            let head = query_runner.get_last_block();
+
+                            match txn_store
+                            .try_execute(parcel_digest,quorom_threshold,&execution,head).await {
+                                Ok(epoch_changed) => {
+                                    if epoch_changed {
+                                        committee = query_runner.get_committee_members_by_index();
+                                        quorom_threshold = (committee.len() * 2) / 3 + 1;
+                                        // We recheck our index incase it was non existant before and
+                                        // we staked during this epoch and finally got the certificate
+                                        our_index = query_runner
+                                            .pubkey_to_index(node_public_key)
+                                            .unwrap_or(u32::MAX);
+                                        on_committee = committee.contains(&our_index);
+                                        reconfigure_notify.notify_waiters();
+                                    }
+                                }
+                                Err(_not_executed) => {
+
+                                }
                             }
-                            // propagate here now that we know its good and before we do async work
-                            msg.propagate();
+                        }
+                    },
+                    PubSubMsg::Attestation(att) => {
+                        let originator = msg.originator();
 
-                            let parcel_digest = parcel.to_digest();
+                        if originator != att.node_index || !committee.contains(&originator){
+                            msg.mark_invalid_sender();
+                            continue;
+                        }
 
-                            txn_store.store_parcel(parcel);
+                        // propagate msg as soon as we know its good
+                        msg.propagate();
+
+                        if !on_committee{
+                            info!("Received parcel attestation from gossip as an edge node");
+                            txn_store.add_attestation(
+                                att.digest,
+                                att.node_index,
+                            );
 
                             // get the current chain head
                             let head = query_runner.get_last_block();
 
-                            if txn_store
-                            .try_execute(parcel_digest,quorom_threshold,&execution,head).await {
-                                committee = query_runner.get_committee_members_by_index();
-                                quorom_threshold = (committee.len() * 2) / 3 + 1;
-                                // We recheck our index incase it was non existant before and
-                                // we staked during this epoch and finally got the certificate
-                                our_index = query_runner
-                                    .pubkey_to_index(node_public_key)
-                                    .unwrap_or(u32::MAX);
-                                on_committee = committee.contains(&our_index);
-                                reconfigure_notify.notify_waiters();
-                            }
-                        },
-                        PubSubMsg::Attestation(att) => {
-                            info!("Received parcel attestation from gossip as an edge node");
-                            let originator = msg.originator();
-
-                            if originator != att.node_index || !committee.contains(&originator){
-                                msg.mark_invalid_sender();
-                                continue;
-                            }
-
-                            let digest = msg.get_digest();
-
-                            // propagate msg as soon as we know its good
-                            msg.propagate();
-
-                            if !on_committee{
-                                txn_store.add_attestation(
-                                    att.digest,
-                                    att.node_index,
-                                    digest
-                                );
-
-                                // get the current chain head
-                                let head = query_runner.get_last_block();
-
-                                if txn_store
-                                .try_execute(att.digest, quorom_threshold, &execution, head).await {
-                                    committee = query_runner.get_committee_members_by_index();
-                                    quorom_threshold = (committee.len() * 2) / 3 + 1;
-                                    // We recheck our index incase it was non existant before and
-                                    // we staked during this epoch and finally got the certificate
-                                    our_index = query_runner
-                                        .pubkey_to_index(node_public_key)
-                                        .unwrap_or(u32::MAX);
-                                    on_committee = committee.contains(&our_index);
-                                    reconfigure_notify.notify_waiters();
-                                }
-                            }
-                        }
-                        PubSubMsg::RequestTransactions(digest) => {
-                            if let Some(parcel) = txn_store.get_parcel(&digest) {
-                                let parcel = PubSubMsg::Transactions(parcel.clone());
-                                let filter = HashSet::from_iter(vec![msg.originator()].into_iter());
-                                pub_sub.send(&parcel, Some(filter)).await;
-                            }
-                            // TODO(matthias): should we propagate requests?
-                            //msg.propagate();
-                        }
-                        PubSubMsg::RequestAttestations { digest, have } => {
-                            if let Some(attestations) = txn_store.get_attestations(&digest) {
-                                for attn in attestations {
-                                    if !have.check(&attn.node_index) {
-                                        // if we have an attestation that the requesting
-                                        // peer does not have, we send it
-                                        let filter = HashSet::from_iter(
-                                            vec![msg.originator()].into_iter()
-                                        );
-                                        pub_sub.repropagate(digest, Some(filter)).await;
+                            match txn_store
+                            .try_execute(att.digest, quorom_threshold, &execution, head).await {
+                                Ok(epoch_changed) => {
+                                    if epoch_changed {
+                                        committee = query_runner
+                                            .get_committee_members_by_index();
+                                        quorom_threshold = (committee.len() * 2) / 3 + 1;
+                                        // We recheck our index incase it was non existant before and
+                                        // we staked during this epoch and finally got the certificate
+                                        our_index = query_runner
+                                            .pubkey_to_index(node_public_key)
+                                            .unwrap_or(u32::MAX);
+                                        on_committee = committee.contains(&our_index);
+                                        reconfigure_notify.notify_waiters();
                                     }
                                 }
+                                Err(_not_executed) => {}
                             }
-                            // TODO(matthias): should we propagate requests?
-                            //msg.propagate();
+                        }
+                    }
+                    PubSubMsg::RequestTransactions(digest) => {
+                        // TODO(matthias): should we propagate requests?
+                        //msg.propagate();
+                        if let Some(parcel) = txn_store.get_parcel(&digest) {
+                            if let Some(msg_digest) = parcel.message_digest {
+                                let filter = HashSet::from_iter(vec![msg.originator()].into_iter());
+                                pub_sub.repropagate(msg_digest, Some(filter)).await;
+                            }
                         }
                     }
                 }
+
             },
         }
     }
