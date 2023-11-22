@@ -105,7 +105,7 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
             blockstore_server,
             rx_epoch_change,
             config.epoch_change_delta,
-        );
+        )?;
 
         Ok(Self {
             inner: Mutex::new(Some(inner)),
@@ -128,22 +128,25 @@ impl<C: Collection> SyncronizerInner<C> {
         blockstore_server: &C::BlockStoreServerInterface,
         rx_epoch_change: Receiver<Notification>,
         epoch_change_delta: Duration,
-    ) -> Self {
+    ) -> Result<Self> {
         let mut genesis_committee = query_runner.genesis_committee();
         // Shuffle this since we often hit this list in order until one responds. This will give our
         // network a bit of diversity on which bootstrap node they try first
         genesis_committee.shuffle(&mut rand::thread_rng());
 
-        let rpc_client = reqwest::Client::new();
+        let rpc_client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .connect_timeout(Duration::from_secs(5))
+            .build()?;
 
-        Self {
+        Ok(Self {
             query_runner,
             blockstore_server_socket: blockstore_server.get_socket(),
             rx_epoch_change,
             genesis_committee,
             rpc_client,
             epoch_change_delta,
-        }
+        })
     }
 
     async fn run(
