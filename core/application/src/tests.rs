@@ -39,6 +39,7 @@ use lightning_interfaces::{
     partial,
     ApplicationInterface,
     ExecutionEngineSocket,
+    PagingParams,
     SyncQueryRunnerInterface,
     ToDigest,
 };
@@ -123,6 +124,29 @@ macro_rules! change_epoch {
             $account_nonce,
         );
         run_transaction!(req, $socket)
+    }};
+}
+
+macro_rules! assert_valid_node {
+    ($valid_nodes:expr,$query_runner:expr,$node_pk:expr) => {{
+        let node_info = $query_runner.get_node_info($node_pk).unwrap();
+        // Node registry contains the first valid node
+        assert!($valid_nodes.contains(&node_info));
+    }};
+}
+
+macro_rules! assert_not_valid_node {
+    ($valid_nodes:expr,$query_runner:expr,$node_pk:expr) => {{
+        let node_info = $query_runner.get_node_info($node_pk).unwrap();
+        // Node registry contains the first valid node
+        assert!(!$valid_nodes.contains(&node_info));
+    }};
+}
+
+macro_rules! assert_paging_node_registry {
+    ($query_runner:expr,$paging_params:expr, $expected_len:expr) => {{
+        let valid_nodes = $query_runner.get_node_registry(Some($paging_params));
+        assert_eq!(valid_nodes.len(), $expected_len);
     }};
 }
 
@@ -636,6 +660,14 @@ fn update_reputation_measurements(
     let peer_index = query_runner.pubkey_to_index(peer).unwrap();
     map.insert(peer_index, measurements.clone());
     (peer_index, measurements)
+}
+
+fn paging_params(ignore_stake: bool, start: u32, limit: usize) -> PagingParams {
+    PagingParams {
+        ignore_stake,
+        start,
+        limit,
+    }
 }
 //////////////////////////////////////////////////////////////////////////////////
 ////////////////// This is where the actual tests are defined ////////////////////
@@ -1305,4 +1337,107 @@ async fn test_distribute_rewards() {
                 * &service_proportions[s as usize].convert_precision()
         );
     }
+}
+
+#[tokio::test]
+async fn test_get_node_registry() {
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+
+    let owner_secret_key1 = AccountOwnerSecretKey::generate();
+    let node_secret_key1 = NodeSecretKey::generate();
+
+    // Stake minimum required amount.
+    let minimum_stake_amount = query_runner.get_staking_amount().into();
+    deposit!(&update_socket, &owner_secret_key1, 1, &minimum_stake_amount);
+    stake!(
+        &update_socket,
+        &owner_secret_key1,
+        2,
+        &minimum_stake_amount,
+        &node_secret_key1.to_pk(),
+        [0; 96].into()
+    );
+
+    // Generate new keys for a different node.
+    let owner_secret_key2 = AccountOwnerSecretKey::generate();
+    let node_secret_key2 = NodeSecretKey::generate();
+
+    // Stake less than the minimum required amount.
+    let less_than_minimum_skate_amount = minimum_stake_amount.clone() / HpUfixed::<18>::from(2u16);
+    deposit!(
+        &update_socket,
+        &owner_secret_key2,
+        1,
+        &less_than_minimum_skate_amount
+    );
+    stake!(
+        &update_socket,
+        &owner_secret_key2,
+        2,
+        &less_than_minimum_skate_amount,
+        &node_secret_key2.to_pk(),
+        [1; 96].into()
+    );
+
+    // Generate new keys for a different node.
+    let owner_secret_key3 = AccountOwnerSecretKey::generate();
+    let node_secret_key3 = NodeSecretKey::generate();
+
+    // Stake minimum required amount.
+    deposit!(&update_socket, &owner_secret_key3, 1, &minimum_stake_amount);
+    stake!(
+        &update_socket,
+        &owner_secret_key3,
+        2,
+        &minimum_stake_amount,
+        &node_secret_key3.to_pk(),
+        [3; 96].into()
+    );
+
+    let valid_nodes = query_runner.get_node_registry(None);
+    // We added two valid nodes, so the node registry should contain 2 nodes plus the committee.
+    assert_eq!(valid_nodes.len(), 2 + keystore.len());
+    assert_valid_node!(&valid_nodes, &query_runner, &node_secret_key1.to_pk());
+    // Node registry doesn't contain the invalid node
+    assert_not_valid_node!(&valid_nodes, &query_runner, &node_secret_key2.to_pk());
+    assert_valid_node!(&valid_nodes, &query_runner, &node_secret_key3.to_pk());
+
+    // We added 3 nodes, so the node registry should contain 3 nodes plus the committee.
+    assert_paging_node_registry!(
+        &query_runner,
+        paging_params(true, 0, keystore.len() + 3),
+        3 + keystore.len()
+    );
+    // We added 2 valid nodes, so the node registry should contain 2 nodes plus the committee.
+    assert_paging_node_registry!(
+        &query_runner,
+        paging_params(false, 0, keystore.len() + 3),
+        2 + keystore.len()
+    );
+
+    // We get the first 4 nodes.
+    assert_paging_node_registry!(
+        &query_runner,
+        paging_params(true, 0, keystore.len()),
+        keystore.len()
+    );
+
+    // The first 4 nodes are the committee and we added 3 nodes.
+    assert_paging_node_registry!(&query_runner, paging_params(true, 4, keystore.len()), 3);
+
+    // The first 4 nodes are the committee and we added 2 valid nodes.
+    assert_paging_node_registry!(
+        &query_runner,
+        paging_params(false, keystore.len() as u32, keystore.len()),
+        2
+    );
+
+    // The first 4 nodes are the committee and we added 3 nodes.
+    assert_paging_node_registry!(
+        &query_runner,
+        paging_params(false, keystore.len() as u32, 1),
+        1
+    );
 }
