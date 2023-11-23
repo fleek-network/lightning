@@ -14,7 +14,9 @@ const TBE_EMA: f64 = 0.125;
 #[derive(Clone)]
 pub struct TransactionStore {
     parcels: HashMap<Digest, Parcel>,
+    pending_parcels: HashMap<Digest, Parcel>,
     attestations: HashMap<Digest, Vec<NodeIndex>>,
+    pending_attestations: HashMap<Digest, Vec<NodeIndex>>,
     executed: HashSet<Digest>,
     last_executed_timestamp: Option<SystemTime>,
     estimated_tbe: Duration,
@@ -34,7 +36,9 @@ impl TransactionStore {
     pub fn new() -> Self {
         Self {
             parcels: HashMap::with_capacity(512),
+            pending_parcels: HashMap::with_capacity(512),
             attestations: HashMap::with_capacity(512),
+            pending_attestations: HashMap::with_capacity(512),
             executed: HashSet::with_capacity(512),
             last_executed_timestamp: None,
             // TODO(matthias): do some napkin math for these initial estimates
@@ -70,8 +74,34 @@ impl TransactionStore {
             });
     }
 
+    // Store a parcel from the next epoch. After the epoch change we have to verify if this
+    // parcel originated from a committee member.
+    pub fn store_pending_parcel(
+        &mut self,
+        parcel: AuthenticStampedParcel,
+        message_digest: BroadcastDigest,
+    ) {
+        let digest = parcel.to_digest();
+        self.pending_parcels.insert(
+            digest,
+            Parcel {
+                inner: parcel,
+                message_digest: Some(message_digest),
+            },
+        );
+    }
+
     pub fn add_attestation(&mut self, digest: Digest, node_index: NodeIndex) {
         let attestation_list = self.attestations.entry(digest).or_default();
+        if !attestation_list.contains(&node_index) {
+            attestation_list.push(node_index);
+        }
+    }
+
+    // Stores an attestation from the next epoch. After the epoch change we have to verify if this
+    // attestation originated from a committee member.
+    pub fn add_pending_attestation(&mut self, digest: Digest, node_index: NodeIndex) {
+        let attestation_list = self.pending_attestations.entry(digest).or_default();
         if !attestation_list.contains(&node_index) {
             attestation_list.push(node_index);
         }

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use fastcrypto::hash::HashFunction;
 use fleek_blake3 as blake3;
-use lightning_interfaces::types::{Block, IndexRequest, NodeIndex, TransactionRequest};
+use lightning_interfaces::types::{Block, Epoch, IndexRequest, NodeIndex, TransactionRequest};
 use lightning_interfaces::{
     ExecutionEngineSocket,
     IndexSocket,
@@ -24,6 +24,7 @@ pub type Digest = [u8; 32];
 pub struct AuthenticStampedParcel {
     pub transactions: Vec<Transaction>,
     pub last_executed: Digest,
+    pub epoch: Epoch,
 }
 
 impl ToDigest for AuthenticStampedParcel {
@@ -53,6 +54,7 @@ pub struct CommitteeAttestation {
     /// We send random bytes with this messsage so it gives it a unique hash and differentiates it
     /// from the other committee members attestation broadcasts
     pub node_index: NodeIndex,
+    pub epoch: Epoch,
 }
 
 pub struct Execution<Q: SyncQueryRunnerInterface> {
@@ -142,7 +144,8 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
 impl<Q: SyncQueryRunnerInterface> ExecutionState for Execution<Q> {
     async fn handle_consensus_output(&self, consensus_output: ConsensusOutput) {
         for (cert, batches) in consensus_output.batches {
-            if cert.epoch() != self.query_runner.get_epoch() {
+            let current_epoch = self.query_runner.get_epoch();
+            if cert.epoch() != current_epoch {
                 // If the certificate epoch does not match the current epoch in the application
                 // state do not execute this transaction, This could only happen in
                 // certain race conditions at the end of an epoch and we need this to ensure all
@@ -164,6 +167,7 @@ impl<Q: SyncQueryRunnerInterface> ExecutionState for Execution<Q> {
                 let parcel = AuthenticStampedParcel {
                     transactions: batch_payload.clone(),
                     last_executed,
+                    epoch: current_epoch,
                 };
 
                 let epoch_changed = self.submit_batch(batch_payload, parcel.to_digest()).await;
@@ -229,6 +233,7 @@ mod tests {
         AuthenticStampedParcel {
             transactions,
             last_executed: last_executed.unwrap_or([0; 32]),
+            epoch: 1,
         }
     }
 

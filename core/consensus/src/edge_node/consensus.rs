@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::types::Epoch;
 use lightning_interfaces::{BroadcastEventInterface, PubSub, SyncQueryRunnerInterface, ToDigest};
 use tokio::pin;
 use tokio::sync::{mpsc, Notify};
@@ -96,7 +97,8 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 
                 let attestation = CommitteeAttestation {
                     digest: parcel_digest,
-                    node_index: our_index
+                    node_index: our_index,
+                    epoch: parcel.epoch,
                 };
 
                 info!("Send transaction parcel to broadcast as a validator");
@@ -117,18 +119,29 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
             Some(mut msg) = pub_sub.recv_event() => {
                 match msg.take().unwrap() {
                     PubSubMsg::Transactions(parcel) => {
-                        if !committee.contains(&msg.originator()){
+                        let epoch = query_runner.get_epoch();
+                        let is_committee = committee.contains(&msg.originator());
+                        if !is_valid_message(is_committee, parcel.epoch, epoch) {
                             msg.mark_invalid_sender();
                             continue;
                         }
 
                         let msg_digest = msg.get_digest();
                         // propagate here now that we know its good and before we do async work
+                        // TODO(matthias): should we propagate parcels from the next epoch as
+                        // well?
                         msg.propagate();
 
                         let parcel_digest = parcel.to_digest();
 
-                        txn_store.store_parcel(parcel, Some(msg_digest));
+                        if parcel.epoch == epoch + 1 {
+                            // if the parcel is from the next epoch, we optimistically
+                            // store it and check if it's from a validator once we change
+                            // epochs
+                            txn_store.store_pending_parcel(parcel, msg_digest);
+                        } else {
+                            txn_store.store_parcel(parcel, Some(msg_digest));
+                        }
 
                         if !on_committee {
                             info!("Received transaction parcel from gossip as an edge node");
@@ -159,20 +172,33 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                     PubSubMsg::Attestation(att) => {
                         let originator = msg.originator();
 
-                        if originator != att.node_index || !committee.contains(&originator){
+                        let epoch = query_runner.get_epoch();
+                        let is_committee = committee.contains(&originator);
+                        if originator != att.node_index
+                            || !is_valid_message(is_committee, att.epoch, epoch) {
                             msg.mark_invalid_sender();
                             continue;
                         }
 
                         // propagate msg as soon as we know its good
+                        // TODO(matthias): should we propagate attestations from the next epoch as
+                        // well?
                         msg.propagate();
 
-                        if !on_committee{
+                        if !on_committee {
                             info!("Received parcel attestation from gossip as an edge node");
-                            txn_store.add_attestation(
-                                att.digest,
-                                att.node_index,
-                            );
+
+                            if att.epoch == epoch + 1 {
+                                // if the attestation is from the next epoch, we optimistically
+                                // store it and check if it's from a validator once we change
+                                // epochs
+                                txn_store.add_pending_attestation(att.digest, att.node_index);
+                            } else {
+                                txn_store.add_attestation(
+                                    att.digest,
+                                    att.node_index,
+                                );
+                            }
 
                             // get the current chain head
                             let head = query_runner.get_last_block();
@@ -216,25 +242,56 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
     }
 }
 
+// While trying to connect the chain back to the head, we discovered a missing parcel.
+// This is can happen normally, because parcels or attestations might arrive out of
+// order.
+// However, this could also mean that we missed a broadcast message containing a parcel,
+// and our peers are no longer broadcasting this message.
+// In this case we want to send a request out for this parcel.
+// In order to prevent sending out these requests prematurely, we keep a running average of
+// the intervals between executing parcels.
+// If we are missing a parcel, and the time that has passed since executing the last parcel
+// is larger than the expected time, we send out a request.
 async fn handle_not_executed<P: PubSub<PubSubMsg>>(
     not_executed: NotExecuted,
     txn_store: &TransactionStore,
     pub_sub: &P,
 ) {
-    // While trying to connect the chain back to the head, we discovered a missing parcel.
-    // This is can happen normally, because parcels or attestations might arrive out of
-    // order.
-    // However, this could also mean that we missed a broadcast message containing a parcel,
-    // and our peers are no longer broadcasting this message.
-    // In this case we want to send a request out for this parcel.
-    // In order to prevent sending out these requests prematurely, we keep a running average of
-    // the intervals between executing parcels.
-    // If we are missing a parcel, and the time that has passed since executing the last parcel
-    // is larger than the expected time, we send out a request.
     if let NotExecuted::MissingParcel(digest) = not_executed {
         if txn_store.should_send_request() {
             let request = PubSubMsg::RequestTransactions(digest);
             pub_sub.send(&request, None).await;
         }
+    }
+}
+
+// The parcel must be either from the current committee or from the
+// next epoch. We optimistically accept parcels from the following
+// epoch in case we missed the epoch change parcel. We will verify
+// later on that the parcel was sent from a committee member.
+fn is_valid_message(in_committee: bool, msg_epoch: Epoch, current_epoch: Epoch) -> bool {
+    (in_committee && msg_epoch == current_epoch) || msg_epoch == current_epoch + 1
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::edge_node::consensus::is_valid_message;
+
+    #[test]
+    fn test_is_valid_message() {
+        // msg is from a committee member, msg epoch is the current epoch => valid
+        assert!(is_valid_message(true, 2, 2));
+        // msg is from a committee member, msg epoch is from the next epoch => valid
+        assert!(is_valid_message(true, 4, 3));
+        // msg is from a committee member, msg epoch is from the current epoch + 2 => invalid
+        assert!(!is_valid_message(true, 7, 5));
+        // msg is from a committee member, msg epoch is from the last epoch => invalid
+        assert!(!is_valid_message(true, 4, 5));
+        // msg is not from a committee member, msg epoch is the next epoch => valid
+        assert!(is_valid_message(false, 2, 1));
+        // msg is not from a committee member, msg epoch is the current epoch + 2 => invalid
+        assert!(!is_valid_message(false, 3, 1));
+        // msg is not from a committee member, msg epoch is the last epoch => invalid
+        assert!(!is_valid_message(false, 1, 2));
     }
 }
