@@ -64,8 +64,7 @@ pub struct Params {
     supply_at_genesis: Option<u64>,
 }
 
-// This is a helper struct for keeping track of a node's private keys.
-// Many tests require us to submit transactions.
+/// Helper struct for keeping track of a node's private keys.
 #[derive(Clone)]
 struct GenesisCommitteeKeystore {
     _owner_secret_key: AccountOwnerSecretKey,
@@ -74,41 +73,81 @@ struct GenesisCommitteeKeystore {
     _worker_secret_key: NodeSecretKey,
 }
 
-macro_rules! run_transaction {
-    ($tx:expr,$socket:expr) => {{
-        let updates = vec![$tx.into()];
-        run_updates!(updates, $socket)
+/// Helper macro for executing single Update within a single Block.
+/// Asserts that submission occurred.
+/// Transaction Result may be Success or Revert.
+///
+///  # Arguments
+///
+/// * `update: UpdateRequest` - The update request to be executed.
+/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
+///
+/// # Returns
+///
+/// * `BlockExecutionResponse`
+macro_rules! run_update {
+    ($update:expr,$socket:expr) => {{
+        let updates = vec![$update.into()];
+        run_transactions!(updates, $socket)
     }};
 }
 
-macro_rules! run_transactions {
-    ($txs:expr,$socket:expr) => {{
-        let updates = $txs.into_iter().map(|update| update.into()).collect();
-        run_updates!(updates, $socket)
-    }};
-}
-
+/// Helper macro for executing many Updates within a single Block.
+/// Asserts that submission occurred.
+/// Transaction Result may be Success or Revert.
+///
+///  # Arguments
+///
+/// * `updates: Vec<UpdateRequest>` - Vector of update requests to be executed.
+/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
+///
+/// # Returns
+///
+/// * `BlockExecutionResponse`
 macro_rules! run_updates {
     ($updates:expr,$socket:expr) => {{
-        let result = run_transaction($updates, $socket).await;
+        let txs = $updates.into_iter().map(|update| update.into()).collect();
+        run_transactions!(txs, $socket)
+    }};
+}
+
+/// Helper macro for executing many Transactions within a single Block.
+/// Asserts that submission occurred.
+/// Transaction Result may be Success or Revert.
+///
+///  # Arguments
+///
+/// * `txs: Vec<TransactionRequest>` - Vector of transaction to be executed.
+/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
+///
+/// # Returns
+///
+/// * `BlockExecutionResponse`
+macro_rules! run_transactions {
+    ($txs:expr,$socket:expr) => {{
+        let result = run_transaction($txs, $socket).await;
         assert!(result.is_ok());
         result.unwrap()
     }};
 }
 
 macro_rules! expect_tx_success {
-    ($tx:expr,$socket:expr,$response:expr) => {{
-        let result = run_transaction!($tx, $socket);
+    ($update:expr,$socket:expr) => {{
+        expect_tx_success!($update, $socket, ExecutionData::None);
+    }};
+    ($update:expr,$socket:expr,$response:expr) => {{
+        let result = run_update!($update, $socket);
         assert_eq!(
             result.txn_receipts[0].response,
             TransactionResponse::Success($response)
         );
+        result
     }};
 }
 
 macro_rules! expect_tx_revert {
-    ($tx:expr,$socket:expr,$revert:expr) => {{
-        let result = run_transaction!($tx, $socket);
+    ($update:expr,$socket:expr,$revert:expr) => {{
+        let result = run_update!($update, $socket);
         assert_eq!(
             result.txn_receipts[0].response,
             TransactionResponse::Revert($revert)
@@ -123,7 +162,7 @@ macro_rules! change_epoch {
             $secret_key,
             $account_nonce,
         );
-        run_transaction!(req, $socket)
+        run_update!(req, $socket)
     }};
 }
 
@@ -156,7 +195,7 @@ macro_rules! assert_paging_node_registry {
 macro_rules! simple_epoch_change {
     ($socket:expr,$committee_keystore:expr,$query_runner:expr,$epoch:expr) => {{
         let required_signals = calculate_required_signals($committee_keystore.len());
-        // make call epoch change for 2/3rd committe members
+        // make call epoch change for 2/3rd committee members
         for (index, node) in $committee_keystore
             .iter()
             .enumerate()
@@ -169,7 +208,7 @@ macro_rules! simple_epoch_change {
                 + 1;
             let req = prepare_change_epoch_request($epoch, &node.node_secret_key, nonce);
 
-            let res = run_transaction!(req, $socket);
+            let res = run_update!(req, $socket);
             // check epoch change
             if index == required_signals - 1 {
                 assert!(res.change_epoch);
@@ -187,7 +226,7 @@ macro_rules! submit_reputation_measurements {
             $secret_key,
             $account_nonce,
         );
-        run_transaction!(req, $socket)
+        expect_tx_success!(req, $socket)
     }};
 }
 
@@ -203,7 +242,7 @@ macro_rules! assert_rep_measurements_update {
 macro_rules! deposit {
     ($socket:expr,$secret_key:expr,$account_nonce:expr,$amount:expr) => {{
         let req = prepare_deposit_update($amount, $secret_key, $account_nonce);
-        expect_tx_success!(req, $socket, ExecutionData::None)
+        expect_tx_success!(req, $socket)
     }};
 }
 
@@ -221,14 +260,28 @@ macro_rules! stake {
             $nonce,
         );
 
-        expect_tx_success!(req, $socket, ExecutionData::None)
+        expect_tx_success!(req, $socket)
+    }};
+}
+
+macro_rules! deposit_and_stake {
+    ($socket:expr,$secret_key:expr,$nonce:expr,$amount:expr,$node_pk:expr,$consensus_key:expr) => {{
+        deposit!($socket, $secret_key, $nonce, $amount);
+        stake!(
+            $socket,
+            $secret_key,
+            $nonce + 1,
+            $amount,
+            $node_pk,
+            $consensus_key
+        );
     }};
 }
 
 macro_rules! stake_lock {
     ($socket:expr,$secret_key:expr,$nonce:expr,$node_pk:expr,$locked_for:expr) => {{
         let req = prepare_stake_lock_request($locked_for, $node_pk, $secret_key, $nonce);
-        expect_tx_success!(req, $socket, ExecutionData::None)
+        expect_tx_success!(req, $socket)
     }};
 }
 
@@ -654,10 +707,10 @@ async fn run_transaction(
 fn update_reputation_measurements(
     query_runner: &QueryRunner,
     map: &mut BTreeMap<u32, ReputationMeasurements>,
-    peer: NodePublicKey,
+    peer: &NodePublicKey,
     measurements: ReputationMeasurements,
 ) -> (u32, ReputationMeasurements) {
-    let peer_index = query_runner.pubkey_to_index(peer).unwrap();
+    let peer_index = query_runner.pubkey_to_index(*peer).unwrap();
     map.insert(peer_index, measurements.clone());
     (peer_index, measurements)
 }
@@ -669,9 +722,94 @@ fn paging_params(ignore_stake: bool, start: u32, limit: usize) -> PagingParams {
         limit,
     }
 }
+
+fn add_to_committee(
+    committee: &mut Vec<GenesisNode>,
+    keystore: &mut Vec<GenesisCommitteeKeystore>,
+    node_secret_key: NodeSecretKey,
+    consensus_secret_key: ConsensusSecretKey,
+    owner_secret_key: AccountOwnerSecretKey,
+    index: u16,
+) {
+    let node_public_key = node_secret_key.to_pk();
+    let consensus_public_key = consensus_secret_key.to_pk();
+    let owner_public_key = owner_secret_key.to_pk();
+    committee.push(GenesisNode::new(
+        owner_public_key.into(),
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 8000 + index,
+            worker: 9000 + index,
+            mempool: 7000 + index,
+            rpc: 6000 + index,
+            pool: 5000 + index,
+            dht: 4000 + index,
+            pinger: 2000 + index,
+            handshake: HandshakePorts {
+                http: 5000 + index,
+                webrtc: 6000 + index,
+                webtransport: 7000 + index,
+            },
+        },
+        None,
+        true,
+    ));
+    keystore.push(GenesisCommitteeKeystore {
+        _owner_secret_key: owner_secret_key,
+        _worker_secret_key: node_secret_key.clone(),
+        node_secret_key,
+        _consensus_secret_key: consensus_secret_key,
+    });
+}
+
+fn get_new_committee(
+    query_runner: &QueryRunner,
+    committee: &[GenesisNode],
+    keystore: &[GenesisCommitteeKeystore],
+) -> (Vec<GenesisNode>, Vec<GenesisCommitteeKeystore>) {
+    let mut new_committee = Vec::new();
+    let mut new_keystore = Vec::new();
+    let committee_members = query_runner.get_committee_members();
+    for node in committee_members {
+        let index = committee
+            .iter()
+            .enumerate()
+            .find_map(|(index, c)| {
+                if c.primary_public_key == node {
+                    Some(index)
+                } else {
+                    None
+                }
+            })
+            .expect("Committee member was not found in genesis Committee");
+        new_committee.push(committee[index].clone());
+        new_keystore.push(keystore[index].clone());
+    }
+    (new_committee, new_keystore)
+}
+
 //////////////////////////////////////////////////////////////////////////////////
 ////////////////// This is where the actual tests are defined ////////////////////
 //////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_genesis_configuration() {
+    // Init application + get the query and update socket
+    let (_, query_runner) = init_app(None);
+    // Get the genesis parameters plus the initial committee
+    let genesis = test_genesis();
+    let genesis_committee = genesis.node_info;
+    // For every member of the genesis committee they should have an initial stake of the min stake
+    // Query to make sure that holds true
+    for node in genesis_committee {
+        let balance = query_runner.get_staked(&node.primary_public_key);
+        assert_eq!(HpUfixed::<18>::from(genesis.min_stake), balance);
+    }
+}
 
 #[tokio::test]
 async fn test_epoch_change() {
@@ -685,9 +823,9 @@ async fn test_epoch_change() {
     let nonce = 1;
 
     // Have (required_signals - 1) say they are ready to change epoch
-    // make sure the epoch doesnt change each time someone signals
+    // make sure the epoch doesn't change each time someone signals
     for node in keystore.iter().take(required_signals - 1) {
-        // Make sure epoch didnt change
+        // Make sure epoch didn't change
         let res = change_epoch!(&update_socket, &node.node_secret_key, nonce, epoch);
         assert!(!res.change_epoch);
     }
@@ -718,13 +856,13 @@ async fn test_submit_rep_measurements() {
     let update1 = update_reputation_measurements(
         &query_runner,
         &mut map,
-        keystore[1].node_secret_key.to_pk(),
+        &keystore[1].node_secret_key.to_pk(),
         reputation::generate_reputation_measurements(&mut rng, 0.1),
     );
     let update2 = update_reputation_measurements(
         &query_runner,
         &mut map,
-        keystore[2].node_secret_key.to_pk(),
+        &keystore[2].node_secret_key.to_pk(),
         reputation::generate_reputation_measurements(&mut rng, 0.1),
     );
 
@@ -749,20 +887,12 @@ async fn test_submit_rep_measurements_twice() {
     let _ = update_reputation_measurements(
         &query_runner,
         &mut map,
-        keystore[1].node_secret_key.to_pk(),
+        &keystore[1].node_secret_key.to_pk(),
         reputation::generate_reputation_measurements(&mut rng, 0.1),
     );
 
     // Submit the reputation measurements
-    let req = get_update_request_node(
-        UpdateMethod::SubmitReputationMeasurements {
-            measurements: map.clone(),
-        },
-        &keystore[0].node_secret_key,
-        1,
-    );
-
-    expect_tx_success!(req, &update_socket, ExecutionData::None);
+    submit_reputation_measurements!(&update_socket, &keystore[0].node_secret_key, 1, map.clone());
 
     // Attempt to submit reputation measurements twice per epoch.
     // This transaction should revert because each node only can submit its reputation measurements
@@ -797,13 +927,13 @@ async fn test_rep_scores() {
     let _ = update_reputation_measurements(
         &query_runner,
         &mut map,
-        peer1,
+        &peer1,
         reputation::generate_reputation_measurements(&mut rng, 0.1),
     );
     let _ = update_reputation_measurements(
         &query_runner,
         &mut map,
-        peer2,
+        &peer2,
         reputation::generate_reputation_measurements(&mut rng, 0.1),
     );
     submit_reputation_measurements!(&update_socket, &keystore[0].node_secret_key, nonce, map);
@@ -812,13 +942,13 @@ async fn test_rep_scores() {
     let (peer_idx_1, _) = update_reputation_measurements(
         &query_runner,
         &mut map,
-        peer1,
+        &peer1,
         reputation::generate_reputation_measurements(&mut rng, 0.1),
     );
     let (peer_idx_2, _) = update_reputation_measurements(
         &query_runner,
         &mut map,
-        peer2,
+        &peer2,
         reputation::generate_reputation_measurements(&mut rng, 0.1),
     );
     submit_reputation_measurements!(&update_socket, &keystore[1].node_secret_key, nonce, map);
@@ -853,13 +983,13 @@ async fn test_uptime_participation() {
     let _ = update_reputation_measurements(
         &query_runner,
         &mut map,
-        peer_1,
+        &peer_1,
         test_reputation_measurements(5),
     );
     let _ = update_reputation_measurements(
         &query_runner,
         &mut map,
-        peer_2,
+        &peer_2,
         test_reputation_measurements(20),
     );
 
@@ -869,14 +999,14 @@ async fn test_uptime_participation() {
     let _ = update_reputation_measurements(
         &query_runner,
         &mut map,
-        peer_1,
+        &peer_1,
         test_reputation_measurements(9),
     );
 
     let _ = update_reputation_measurements(
         &query_runner,
         &mut map,
-        peer_2,
+        &peer_2,
         test_reputation_measurements(25),
     );
     submit_reputation_measurements!(&update_socket, &keystore[1].node_secret_key, nonce, map);
@@ -911,7 +1041,7 @@ async fn test_stake() {
     let update2 = prepare_deposit_update(&deposit, &owner_secret_key, 2);
 
     // Put 2 of the transaction in the block just to also test block exucution a bit
-    let _ = run_transactions!(vec![update1, update2], &update_socket);
+    let _ = run_updates!(vec![update1, update2], &update_socket);
 
     // check that he has 2_000 flk balance
     assert_eq!(
@@ -942,16 +1072,16 @@ async fn test_stake() {
         4,
     );
 
-    expect_tx_success!(update, &update_socket, ExecutionData::None);
+    expect_tx_success!(update, &update_socket);
 
     // Query the new node and make sure he has the proper stake
     assert_eq!(query_runner.get_staked(&peer_pub_key), stake_amount);
 
     // Stake 1000 more but since it is not a new node we should be able to leave the optional
-    // paramaters out without a revert
+    // parameters out without a revert
     let update = prepare_regular_stake_update(&stake_amount, &peer_pub_key, &owner_secret_key, 5);
 
-    expect_tx_success!(update, &update_socket, ExecutionData::None);
+    expect_tx_success!(update, &update_socket);
 
     // Node should now have 2_000 stake
     assert_eq!(
@@ -961,7 +1091,7 @@ async fn test_stake() {
 
     // Now test unstake and make sure it moves the tokens to locked status
     let update = prepare_unstake_update(&stake_amount, &peer_pub_key, &owner_secret_key, 6);
-    run_transaction!(update, &update_socket);
+    run_update!(update, &update_socket);
 
     // Check that his locked is 1000 and his remaining stake is 1000
     assert_eq!(query_runner.get_staked(&peer_pub_key), stake_amount);
@@ -987,34 +1117,28 @@ async fn test_stake_lock() {
     let node_pub_key = NodeSecretKey::generate().to_pk();
     let amount: HpUfixed<18> = 1_000u64.into();
 
-    deposit!(&update_socket, &owner_secret_key, 1, &amount);
-    assert_eq!(
-        query_runner.get_flk_balance(&owner_secret_key.to_pk().into()),
-        amount
-    );
-
-    stake!(
+    deposit_and_stake!(
         &update_socket,
         &owner_secret_key,
-        2,
+        1,
         &amount,
         &node_pub_key,
         [0; 96].into()
     );
+
     assert_eq!(query_runner.get_staked(&node_pub_key), amount);
 
     let locked_for = 365;
     let stake_lock_req = prepare_stake_lock_update(&node_pub_key, locked_for, &owner_secret_key, 3);
 
-    expect_tx_success!(stake_lock_req, &update_socket, ExecutionData::None);
+    expect_tx_success!(stake_lock_req, &update_socket);
 
     assert_eq!(
         query_runner.get_stake_locked_until(&node_pub_key),
         locked_for
     );
 
-    let unstake_req: UpdateRequest =
-        prepare_unstake_update(&amount, &node_pub_key, &owner_secret_key, 4);
+    let unstake_req = prepare_unstake_update(&amount, &node_pub_key, &owner_secret_key, 4);
     expect_tx_revert!(
         unstake_req,
         &update_socket,
@@ -1035,7 +1159,7 @@ async fn test_pod_without_proof() {
     let compute_pod = prepare_pod_request(compute_commodity, 1, &keystore[0].node_secret_key, 2);
 
     // run the delivery ack transaction
-    run_transactions!(vec![bandwidth_pod, compute_pod], &update_socket);
+    run_updates!(vec![bandwidth_pod, compute_pod], &update_socket);
 
     assert_eq!(
         query_runner
@@ -1079,11 +1203,10 @@ async fn test_is_valid_node() {
 
     // Stake minimum required amount.
     let minimum_stake_amount = query_runner.get_staking_amount().into();
-    deposit!(&update_socket, &owner_secret_key, 1, &minimum_stake_amount);
-    stake!(
+    deposit_and_stake!(
         &update_socket,
         &owner_secret_key,
-        2,
+        1,
         &minimum_stake_amount,
         &node_pub_key,
         [0; 96].into()
@@ -1098,16 +1221,10 @@ async fn test_is_valid_node() {
 
     // Stake less than the minimum required amount.
     let less_than_minimum_skate_amount = minimum_stake_amount / HpUfixed::<18>::from(2u16);
-    deposit!(
+    deposit_and_stake!(
         &update_socket,
         &owner_secret_key,
         1,
-        &less_than_minimum_skate_amount
-    );
-    stake!(
-        &update_socket,
-        &owner_secret_key,
-        2,
         &less_than_minimum_skate_amount,
         &node_pub_key,
         [1; 96].into()
@@ -1130,13 +1247,13 @@ async fn test_change_protocol_params() {
     let new_value = 5;
     let update =
         prepare_change_protocol_param_request(&param, &new_value, &governance_secret_key, 1);
-    run_transaction!(update, &update_socket);
+    run_update!(update, &update_socket);
     assert_eq!(query_runner.get_protocol_params(param.clone()), new_value);
 
     let new_value = 8;
     let update =
         prepare_change_protocol_param_request(&param, &new_value, &governance_secret_key, 2);
-    run_transaction!(update, &update_socket);
+    run_update!(update, &update_socket);
     assert_eq!(query_runner.get_protocol_params(param.clone()), new_value);
 
     // Make sure that another private key cannot change protocol parameters.
@@ -1162,7 +1279,7 @@ async fn test_validate_txn() {
     // `validate_txn` method of the query runner returns the same response as the update runner.
     let invalid_epoch = 1;
     let req = prepare_change_epoch_request(invalid_epoch, &keystore[0].node_secret_key, 1);
-    let res = run_transaction!(req, &update_socket);
+    let res = run_update!(req, &update_socket);
 
     let req = prepare_change_epoch_request(invalid_epoch, &keystore[0].node_secret_key, 2);
     assert_eq!(
@@ -1175,7 +1292,7 @@ async fn test_validate_txn() {
     let epoch = 0;
     let req = prepare_change_epoch_request(epoch, &keystore[0].node_secret_key, 2);
 
-    let res = run_transaction!(req, &update_socket);
+    let res = run_update!(req, &update_socket);
     let req = prepare_change_epoch_request(epoch, &keystore[1].node_secret_key, 1);
 
     assert_eq!(
@@ -1224,20 +1341,18 @@ async fn test_distribute_rewards() {
     let deposit_amount = 10_000_u64.into();
     let locked_for = 1460;
     // deposit FLK tokens and stake it
-    deposit!(&update_socket, &owner_secret_key1, 1, &deposit_amount);
-    stake!(
+    deposit_and_stake!(
         &update_socket,
         &owner_secret_key1,
-        2,
+        1,
         &deposit_amount,
         &node_secret_key1.to_pk(),
         [0; 96].into()
     );
-    deposit!(&update_socket, &owner_secret_key2, 1, &deposit_amount);
-    stake!(
+    deposit_and_stake!(
         &update_socket,
         &owner_secret_key2,
-        2,
+        1,
         &deposit_amount,
         &node_secret_key2.to_pk(),
         [1; 96].into()
@@ -1271,7 +1386,7 @@ async fn test_distribute_rewards() {
     ];
 
     // run the delivery ack transaction
-    run_transactions!(vec![pod_10, pod_11, pod_21], &update_socket);
+    run_updates!(vec![pod_10, pod_11, pod_21], &update_socket);
 
     // call epoch change that will trigger distribute rewards
     simple_epoch_change!(&update_socket, &keystore, &query_runner, 0);
@@ -1350,11 +1465,10 @@ async fn test_get_node_registry() {
 
     // Stake minimum required amount.
     let minimum_stake_amount = query_runner.get_staking_amount().into();
-    deposit!(&update_socket, &owner_secret_key1, 1, &minimum_stake_amount);
-    stake!(
+    deposit_and_stake!(
         &update_socket,
         &owner_secret_key1,
-        2,
+        1,
         &minimum_stake_amount,
         &node_secret_key1.to_pk(),
         [0; 96].into()
@@ -1366,16 +1480,10 @@ async fn test_get_node_registry() {
 
     // Stake less than the minimum required amount.
     let less_than_minimum_skate_amount = minimum_stake_amount.clone() / HpUfixed::<18>::from(2u16);
-    deposit!(
+    deposit_and_stake!(
         &update_socket,
         &owner_secret_key2,
         1,
-        &less_than_minimum_skate_amount
-    );
-    stake!(
-        &update_socket,
-        &owner_secret_key2,
-        2,
         &less_than_minimum_skate_amount,
         &node_secret_key2.to_pk(),
         [1; 96].into()
@@ -1440,4 +1548,125 @@ async fn test_get_node_registry() {
         paging_params(false, keystore.len() as u32, 1),
         1
     );
+}
+
+#[tokio::test]
+async fn test_supply_across_epoch() {
+    let committee_size = 4;
+    let (mut committee, mut keystore) = create_genesis_committee(committee_size);
+
+    let epoch_time = 100;
+    let max_inflation = 10;
+    let protocol_part = 10;
+    let node_part = 80;
+    let service_part = 10;
+    let boost = 4;
+    let supply_at_genesis = 1000000;
+    let (update_socket, query_runner) = init_app_with_params(
+        Params {
+            epoch_time: Some(epoch_time),
+            max_inflation: Some(max_inflation),
+            protocol_share: Some(protocol_part),
+            node_share: Some(node_part),
+            service_builder_share: Some(service_part),
+            max_boost: Some(boost),
+            supply_at_genesis: Some(supply_at_genesis),
+        },
+        Some(committee.clone()),
+    );
+
+    // get params for emission calculations
+    let percentage_divisor: HpUfixed<18> = 100_u16.into();
+    let supply_at_year_start: HpUfixed<18> = supply_at_genesis.into();
+    let inflation: HpUfixed<18> = HpUfixed::from(max_inflation) / &percentage_divisor;
+    let node_share = HpUfixed::from(node_part) / &percentage_divisor;
+    let protocol_share = HpUfixed::from(protocol_part) / &percentage_divisor;
+    let service_share = HpUfixed::from(service_part) / &percentage_divisor;
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_secret_key = NodeSecretKey::generate();
+    let consensus_secret_key = ConsensusSecretKey::generate();
+
+    let deposit_amount = 10_000_u64.into();
+    // deposit FLK tokens and stake it
+    deposit_and_stake!(
+        &update_socket,
+        &owner_secret_key,
+        1,
+        &deposit_amount,
+        &node_secret_key.to_pk(),
+        consensus_secret_key.to_pk()
+    );
+
+    // the index should be increment of whatever the size of genesis committee is, 5 in this case
+    add_to_committee(
+        &mut committee,
+        &mut keystore,
+        node_secret_key.clone(),
+        consensus_secret_key.clone(),
+        owner_secret_key.clone(),
+        5,
+    );
+
+    // every epoch supply increase similar for simplicity of the test
+    let _node_1_usd = 0.1 * 10000_f64;
+
+    // calculate emissions per unit
+    let emissions_per_epoch: HpUfixed<18> = (&inflation * &supply_at_year_start) / &365.0.into();
+
+    let mut supply = supply_at_year_start;
+
+    // 365 epoch changes to see if the current supply and year start suppply are ok
+    for epoch in 0..365 {
+        // add at least one transaction per epoch, so reward pool is not zero
+        let nonce = query_runner
+            .get_node_info(&node_secret_key.to_pk())
+            .unwrap()
+            .nonce;
+        let pod_10 = prepare_pod_request(10000, 0, &node_secret_key, nonce + 1);
+        expect_tx_success!(pod_10, &update_socket);
+
+        // We have to submit uptime measurements to make sure nodes aren't set to
+        // participating=false in the next epoch.
+        // This is obviously tedious. The alternative is to deactivate the removal of offline nodes
+        // for testing.
+        for node in &keystore {
+            let mut map = BTreeMap::new();
+            let measurements = test_reputation_measurements(100);
+
+            for peer in &keystore {
+                if node.node_secret_key == peer.node_secret_key {
+                    continue;
+                }
+                let _ = update_reputation_measurements(
+                    &query_runner,
+                    &mut map,
+                    &peer.node_secret_key.to_pk(),
+                    measurements.clone(),
+                );
+            }
+            let nonce = query_runner
+                .get_node_info(&node.node_secret_key.to_pk())
+                .unwrap()
+                .nonce
+                + 1;
+
+            submit_reputation_measurements!(&update_socket, &node.node_secret_key, nonce, map);
+        }
+
+        let (_, new_keystore) = get_new_committee(&query_runner, &committee, &keystore);
+        simple_epoch_change!(&update_socket, &new_keystore, &query_runner, epoch);
+
+        let supply_increase = &emissions_per_epoch * &node_share
+            + &emissions_per_epoch * &protocol_share
+            + &emissions_per_epoch * &service_share;
+        let total_supply = query_runner.get_total_supply();
+        supply += supply_increase;
+        assert_eq!(total_supply, supply);
+        if epoch == 364 {
+            // the supply_year_start should update
+            let supply_year_start = query_runner.get_year_start_supply();
+            assert_eq!(total_supply, supply_year_start);
+        }
+    }
 }
