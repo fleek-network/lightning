@@ -120,7 +120,8 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                 match msg.take().unwrap() {
                     PubSubMsg::Transactions(parcel) => {
                         let epoch = query_runner.get_epoch();
-                        let is_committee = committee.contains(&msg.originator());
+                        let originator = msg.originator();
+                        let is_committee = committee.contains(&originator);
                         if !is_valid_message(is_committee, parcel.epoch, epoch) {
                             msg.mark_invalid_sender();
                             continue;
@@ -138,7 +139,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                             // if the parcel is from the next epoch, we optimistically
                             // store it and check if it's from a validator once we change
                             // epochs
-                            txn_store.store_pending_parcel(parcel, msg_digest);
+                            txn_store.store_pending_parcel(parcel, originator, msg_digest);
                         } else {
                             txn_store.store_parcel(parcel, Some(msg_digest));
                         }
@@ -161,6 +162,11 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                             .unwrap_or(u32::MAX);
                                         on_committee = committee.contains(&our_index);
                                         reconfigure_notify.notify_waiters();
+
+                                        // Check the validity of the parcels/attestations that we
+                                        // stored optimistically.
+                                        txn_store.process_pending_parcels(&committee);
+                                        txn_store.process_pending_attestations(&committee);
                                     }
                                 }
                                 Err(not_executed) => {
@@ -217,6 +223,11 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                             .unwrap_or(u32::MAX);
                                         on_committee = committee.contains(&our_index);
                                         reconfigure_notify.notify_waiters();
+
+                                        // Check the validity of the parcels/attestations that we
+                                        // stored optimistically.
+                                        txn_store.process_pending_parcels(&committee);
+                                        txn_store.process_pending_attestations(&committee);
                                     }
                                 }
                                 Err(not_executed) => {

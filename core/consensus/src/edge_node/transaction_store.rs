@@ -14,7 +14,7 @@ const TBE_EMA: f64 = 0.125;
 #[derive(Clone)]
 pub struct TransactionStore {
     parcels: HashMap<Digest, Parcel>,
-    pending_parcels: HashMap<Digest, Parcel>,
+    pending_parcels: HashMap<Digest, (NodeIndex, Parcel)>,
     attestations: HashMap<Digest, Vec<NodeIndex>>,
     pending_attestations: HashMap<Digest, Vec<NodeIndex>>,
     executed: HashSet<Digest>,
@@ -79,15 +79,19 @@ impl TransactionStore {
     pub fn store_pending_parcel(
         &mut self,
         parcel: AuthenticStampedParcel,
+        node_index: NodeIndex,
         message_digest: BroadcastDigest,
     ) {
         let digest = parcel.to_digest();
         self.pending_parcels.insert(
             digest,
-            Parcel {
-                inner: parcel,
-                message_digest: Some(message_digest),
-            },
+            (
+                node_index,
+                Parcel {
+                    inner: parcel,
+                    message_digest: Some(message_digest),
+                },
+            ),
         );
     }
 
@@ -105,6 +109,42 @@ impl TransactionStore {
         if !attestation_list.contains(&node_index) {
             attestation_list.push(node_index);
         }
+    }
+
+    pub fn process_pending_parcels(&mut self, committee: &[NodeIndex]) {
+        let pending_parcels =
+            std::mem::replace(&mut self.pending_parcels, HashMap::with_capacity(512));
+        pending_parcels
+            .into_iter()
+            .filter(|(_, (node_index, _))| committee.contains(node_index))
+            .for_each(|(digest, (_, parcel))| {
+                self.parcels.insert(digest, parcel);
+            })
+    }
+
+    pub fn process_pending_attestations(&mut self, committee: &[NodeIndex]) {
+        let pending_attestations =
+            std::mem::replace(&mut self.pending_attestations, HashMap::with_capacity(512));
+        pending_attestations
+            .into_iter()
+            .for_each(|(digest, attns)| {
+                for att in attns {
+                    if committee.contains(&att) {
+                        self.attestations.entry(digest).or_default().push(att);
+                    }
+                }
+            })
+    }
+
+    pub fn should_send_request(&self) -> bool {
+        if let Some(last_executed_timestamp) = self.last_executed_timestamp {
+            if let Ok(time_passed) = last_executed_timestamp.elapsed() {
+                // TODO(matthias): do napkin math for this threshold
+                let threshold = 8 * self.deviation_tbe + self.estimated_tbe;
+                return time_passed > threshold;
+            }
+        }
+        false
     }
 
     // Threshold should be 2f + 1 of the committee
@@ -175,17 +215,6 @@ impl TransactionStore {
             }
         }
         Err(NotExecuted::MissingParcel(last_digest))
-    }
-
-    pub fn should_send_request(&self) -> bool {
-        if let Some(last_executed_timestamp) = self.last_executed_timestamp {
-            if let Ok(time_passed) = last_executed_timestamp.elapsed() {
-                // TODO(matthias): do napkin math for this threshold
-                let threshold = 8 * self.deviation_tbe + self.estimated_tbe;
-                return time_passed > threshold;
-            }
-        }
-        false
     }
 
     // This method should be called whenever we execute a parcel.
