@@ -1,6 +1,6 @@
 [package]
 name = "fleek-service-ipfs-fetcher"
-version.workspace = true
+version = "0.0.1"
 edition.workspace = true
 
 [dependencies]
@@ -9,8 +9,8 @@ tokio.workspace = true
 bytes.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
+arrayref = "0.3.7"
 
 [dev-dependencies]
 lightning-handshake = { path = "../../core/handshake" }
-arrayref = "0.3.7"
 cid = "0.10"

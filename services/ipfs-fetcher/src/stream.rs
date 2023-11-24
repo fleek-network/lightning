@@ -1,5 +1,6 @@
 use anyhow::Result;
-use bytes::{Buf, Bytes, BytesMut};
+use arrayref::array_ref;
+use bytes::{Bytes, BytesMut};
 use fn_sdk::connection::Connection;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -17,20 +18,23 @@ impl ServiceStream {
     }
 
     pub async fn read_request(&mut self) -> Option<Bytes> {
-        // Read the request length delimiter
-        if self.conn.stream.read_buf(&mut self.buffer).await.ok()? == 0 {
-            // Socket was closed
-            return None;
+        // Read the payload length delimiter
+        while self.buffer.len() < 4 {
+            if self.conn.stream.read_buf(&mut self.buffer).await.ok()? == 0 {
+                // Socket was closed
+                return None;
+            }
         }
 
         // Parse and allocate for the length
-        let len = self.buffer[0] as usize + 1;
-        if len == 1 {
+        let bytes = self.buffer.split_to(4);
+        let len = u32::from_be_bytes(*array_ref!(bytes, 0, 4)) as usize;
+        if len == 0 || len > 1024 {
             // If the client specified it's going to send 0 bytes, this is an error
             return None;
         }
         // We reserve an additional byte for the next request
-        self.buffer.reserve(len);
+        self.buffer.reserve(len + 4);
 
         // Read the request URI
         while self.buffer.len() < len {
@@ -41,8 +45,7 @@ impl ServiceStream {
         }
 
         // Split and return the URI
-        self.buffer.advance(1);
-        Some(self.buffer.split_to(len - 1).into())
+        Some(self.buffer.split_to(len).into())
     }
 
     pub async fn send_payload(&mut self, bytes: &[u8]) -> Result<()> {
