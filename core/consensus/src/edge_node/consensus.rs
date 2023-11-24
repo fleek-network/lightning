@@ -92,7 +92,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 
                 let parcel_digest = parcel.to_digest();
 
-                txn_store.store_parcel(parcel.clone(), None);
+                txn_store.store_parcel(parcel.clone(), our_index, None);
                 // No need to store the attestation we have already executed it
 
                 let attestation = CommitteeAttestation {
@@ -141,7 +141,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                             // epochs
                             txn_store.store_pending_parcel(parcel, originator, msg_digest);
                         } else {
-                            txn_store.store_parcel(parcel, Some(msg_digest));
+                            txn_store.store_parcel(parcel, originator, Some(msg_digest));
                         }
 
                         if !on_committee {
@@ -166,7 +166,6 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                         // Check the validity of the parcels/attestations that we
                                         // stored optimistically.
                                         txn_store.process_pending_parcels(&committee);
-                                        txn_store.process_pending_attestations(&committee);
                                     }
                                 }
                                 Err(not_executed) => {
@@ -227,7 +226,6 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                         // Check the validity of the parcels/attestations that we
                                         // stored optimistically.
                                         txn_store.process_pending_parcels(&committee);
-                                        txn_store.process_pending_attestations(&committee);
                                     }
                                 }
                                 Err(not_executed) => {

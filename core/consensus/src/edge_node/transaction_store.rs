@@ -13,10 +13,12 @@ const TBE_EMA: f64 = 0.125;
 
 #[derive(Clone)]
 pub struct TransactionStore {
-    parcels: HashMap<Digest, Parcel>,
-    pending_parcels: HashMap<Digest, (NodeIndex, Parcel)>,
-    attestations: HashMap<Digest, Vec<NodeIndex>>,
-    pending_attestations: HashMap<Digest, Vec<NodeIndex>>,
+    parcels: HashMap<Digest, ParcelWrapper>,
+    pending_parcels: HashMap<Digest, ParcelWrapper>,
+    //parcels: HashMap<Digest, Parcel>,
+    //pending_parcels: HashMap<Digest, (NodeIndex, Parcel)>,
+    //attestations: HashMap<Digest, Vec<NodeIndex>>,
+    //pending_attestations: HashMap<Digest, Vec<NodeIndex>>,
     executed: HashSet<Digest>,
     last_executed_timestamp: Option<SystemTime>,
     estimated_tbe: Duration,
@@ -24,8 +26,16 @@ pub struct TransactionStore {
 }
 
 #[derive(Clone)]
+pub(crate) struct ParcelWrapper {
+    pub(crate) parcel: Option<Parcel>,
+    pub(crate) attestations: Option<Vec<NodeIndex>>,
+}
+
+#[derive(Clone)]
 pub(crate) struct Parcel {
     pub(crate) inner: AuthenticStampedParcel,
+    // The originator of this parcel.
+    pub(crate) originator: NodeIndex,
     // This is the digest from the broadcast message that contained the parcel.
     // At the moment, both broadcast and consensus use [u8; 32] for the digests, but we should
     // treat them as different types nonetheless.
@@ -37,8 +47,8 @@ impl TransactionStore {
         Self {
             parcels: HashMap::with_capacity(512),
             pending_parcels: HashMap::with_capacity(512),
-            attestations: HashMap::with_capacity(512),
-            pending_attestations: HashMap::with_capacity(512),
+            //attestations: HashMap::with_capacity(512),
+            //pending_attestations: HashMap::with_capacity(512),
             executed: HashSet::with_capacity(512),
             last_executed_timestamp: None,
             // TODO(matthias): do some napkin math for these initial estimates
@@ -48,29 +58,52 @@ impl TransactionStore {
     }
 
     pub(crate) fn get_parcel(&self, digest: &Digest) -> Option<&Parcel> {
-        self.parcels.get(digest)
+        self.parcels
+            .get(digest)
+            .and_then(|wrapper| wrapper.parcel.as_ref())
+    }
+
+    pub(crate) fn get_attestations(&self, digest: &Digest) -> Option<&Vec<NodeIndex>> {
+        self.parcels
+            .get(digest)
+            .and_then(|wrapper| wrapper.attestations.as_ref())
     }
 
     // Store a parcel and optionally provide the digest of the broadcast message that delivered
     // this parcel.
-    // If we already store the parcel, we won't overwrite it again. If we store the parcel, but
-    // don't store a broadcast message yet, we will update it.
+    // If we already store the parcel, we won't overwrite it again. If we already store the parcel,
+    // but don't store the broadcast message yet, we will insert the message.
     pub fn store_parcel(
         &mut self,
         parcel: AuthenticStampedParcel,
+        originator: NodeIndex,
         message_digest: Option<BroadcastDigest>,
     ) {
         let digest = parcel.to_digest();
         self.parcels
             .entry(digest)
-            .and_modify(|parcel| {
-                if parcel.message_digest.is_none() {
-                    parcel.message_digest = message_digest;
-                }
+            .and_modify(|wrapper| match &mut wrapper.parcel {
+                Some(parcel) => {
+                    if parcel.message_digest.is_none() {
+                        parcel.message_digest = message_digest;
+                    }
+                },
+                None => {
+                    wrapper.parcel = Some(Parcel {
+                        // TODO(matthias): get rid of this clone
+                        inner: parcel.clone(),
+                        originator,
+                        message_digest,
+                    });
+                },
             })
-            .or_insert(Parcel {
-                inner: parcel,
-                message_digest: None,
+            .or_insert(ParcelWrapper {
+                parcel: Some(Parcel {
+                    inner: parcel,
+                    originator,
+                    message_digest: None,
+                }),
+                attestations: None,
             });
     }
 
@@ -79,36 +112,64 @@ impl TransactionStore {
     pub fn store_pending_parcel(
         &mut self,
         parcel: AuthenticStampedParcel,
-        node_index: NodeIndex,
+        originator: NodeIndex,
         message_digest: BroadcastDigest,
     ) {
         let digest = parcel.to_digest();
-        self.pending_parcels.insert(
-            digest,
-            (
-                node_index,
-                Parcel {
-                    inner: parcel,
+        self.pending_parcels
+            .entry(digest)
+            .and_modify(|wrapper| {
+                wrapper.parcel = Some(Parcel {
+                    // TODO(matthias): get rid of this clone
+                    inner: parcel.clone(),
+                    originator,
                     message_digest: Some(message_digest),
-                },
-            ),
-        );
+                })
+            })
+            .or_insert(ParcelWrapper {
+                parcel: Some(Parcel {
+                    inner: parcel,
+                    originator,
+                    message_digest: Some(message_digest),
+                }),
+                attestations: None,
+            });
     }
 
     pub fn add_attestation(&mut self, digest: Digest, node_index: NodeIndex) {
-        let attestation_list = self.attestations.entry(digest).or_default();
-        if !attestation_list.contains(&node_index) {
-            attestation_list.push(node_index);
-        }
+        self.parcels
+            .entry(digest)
+            .and_modify(|wrapper| match &mut wrapper.attestations {
+                Some(attestations) => {
+                    attestations.push(node_index);
+                },
+                None => {
+                    wrapper.attestations = Some(vec![node_index]);
+                },
+            })
+            .or_insert(ParcelWrapper {
+                parcel: None,
+                attestations: Some(vec![node_index]),
+            });
     }
 
     // Stores an attestation from the next epoch. After the epoch change we have to verify if this
     // attestation originated from a committee member.
     pub fn add_pending_attestation(&mut self, digest: Digest, node_index: NodeIndex) {
-        let attestation_list = self.pending_attestations.entry(digest).or_default();
-        if !attestation_list.contains(&node_index) {
-            attestation_list.push(node_index);
-        }
+        self.pending_parcels
+            .entry(digest)
+            .and_modify(|wrapper| match &mut wrapper.attestations {
+                Some(attestations) => {
+                    attestations.push(node_index);
+                },
+                None => {
+                    wrapper.attestations = Some(vec![node_index]);
+                },
+            })
+            .or_insert(ParcelWrapper {
+                parcel: None,
+                attestations: Some(vec![node_index]),
+            });
     }
 
     pub fn process_pending_parcels(&mut self, committee: &[NodeIndex]) {
@@ -116,24 +177,30 @@ impl TransactionStore {
             std::mem::replace(&mut self.pending_parcels, HashMap::with_capacity(512));
         pending_parcels
             .into_iter()
-            .filter(|(_, (node_index, _))| committee.contains(node_index))
-            .for_each(|(digest, (_, parcel))| {
-                self.parcels.insert(digest, parcel);
-            })
-    }
-
-    pub fn process_pending_attestations(&mut self, committee: &[NodeIndex]) {
-        let pending_attestations =
-            std::mem::replace(&mut self.pending_attestations, HashMap::with_capacity(512));
-        pending_attestations
-            .into_iter()
-            .for_each(|(digest, attns)| {
-                for att in attns {
-                    if committee.contains(&att) {
-                        self.attestations.entry(digest).or_default().push(att);
+            .map(|(digest, mut wrapper)| {
+                if let Some(parcel) = &mut wrapper.parcel {
+                    if !committee.contains(&parcel.originator) {
+                        wrapper.parcel = None;
                     }
                 }
+
+                if let Some(attns) = wrapper.attestations {
+                    let valid_attn: Vec<NodeIndex> = attns
+                        .iter()
+                        .copied()
+                        .filter(|node_index| committee.contains(node_index))
+                        .collect();
+                    if valid_attn.is_empty() {
+                        wrapper.attestations = None;
+                    } else {
+                        wrapper.attestations = Some(valid_attn);
+                    }
+                }
+                (digest, wrapper)
             })
+            .for_each(|(digest, wrapper)| {
+                self.parcels.insert(digest, wrapper);
+            });
     }
 
     pub fn should_send_request(&self) -> bool {
@@ -159,7 +226,7 @@ impl TransactionStore {
         if self.executed.contains(&digest) {
             // we already executed this parcel
             Ok(false)
-        } else if let Some(x) = self.attestations.get(&digest) {
+        } else if let Some(x) = self.get_attestations(&digest) {
             // we need a quorum of attestations in order to execute the parcel
             if x.len() >= threshold {
                 // if we should execute we need to make sure we can connect this to our transaction
@@ -185,7 +252,7 @@ impl TransactionStore {
         let mut last_digest = digest;
         let mut parcel_chain = Vec::new();
 
-        while let Some(parcel) = self.parcels.get(&last_digest) {
+        while let Some(parcel) = self.get_parcel(&last_digest) {
             parcel_chain.push(last_digest);
 
             txn_chain.push_front((parcel.inner.transactions.clone(), last_digest));
