@@ -387,7 +387,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     fn validate_txn(&self, txn: TransactionRequest) -> TransactionResponse {
         self.inner.run(|ctx| {
-            // Create the app/execution enviroment
+            // Create the app/execution environment
             let backend = StateTables {
                 table_selector: ctx,
             };

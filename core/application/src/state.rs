@@ -468,8 +468,8 @@ impl<B: Backend> State<B> {
         _token: Tokens,
         to: EthAddress,
     ) -> TransactionResponse {
-        // Todo(Dalton): Figure out if we should support transfering other tokens like usdc within
-        // our network for now im going to treat this function as just transfering FLK
+        // Todo(Dalton): Figure out if we should support transferring other tokens like usdc within
+        // our network for now im going to treat this function as just transferring FLK
 
         // This transaction is only callable by AccountOwners and not nodes
         // So revert if the sender is a node public key
@@ -526,7 +526,7 @@ impl<B: Backend> State<B> {
 
         let mut owner = self.account_info.get(&sender).unwrap_or_default();
 
-        // Make sure the sender has atleast the amount of FLK he is trying to stake
+        // Make sure the sender has at least the amount of FLK he is trying to stake
         if owner.flk_balance < amount {
             return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
         }
@@ -568,7 +568,7 @@ impl<B: Backend> State<B> {
                 self.node_info.set(index, node);
             },
             None => {
-                // If the node doesnt Exist, create it. But check if they provided all the required
+                // If the node doesn't Exist, create it. But check if they provided all the required
                 // options for a new node
                 if let (
                     Some(consensus_key),
@@ -697,14 +697,14 @@ impl<B: Backend> State<B> {
             return TransactionResponse::Revert(ExecutionError::LockedTokensUnstakeForbidden);
         }
 
-        // Make sure the node has atleast that much staked
+        // Make sure the node has at least that much staked
         if node.stake.staked < amount {
             return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
         }
 
         let lock_time = self.parameters.get(&ProtocolParams::LockTime).unwrap_or(0);
 
-        // decrease the stake, add to the locked amount, and set the locked time for the withdrawl
+        // decrease the stake, add to the locked amount, and set the locked time for the withdrawal
         // current epoch + lock time todo(dalton): we should be storing unstaked tokens in a
         // list so we can have multiple locked stakes with dif lock times
         node.stake.staked -= amount.clone();
@@ -751,21 +751,21 @@ impl<B: Backend> State<B> {
             return TransactionResponse::Revert(ExecutionError::TokensLocked);
         }
 
-        // if there is no recipient the owner will recieve the withdrawl
+        // if there is no recipient the owner will receive the withdrawal
         let recipient = recipient.unwrap_or(sender_public_key);
-        let mut reciever = self.account_info.get(&recipient).unwrap_or_default();
+        let mut receiver = self.account_info.get(&recipient).unwrap_or_default();
 
         // add the withdrawn tokens to the recipient and reset the nodes locked stake state
         // no need to reset locked_until on the node because that will get adjusted the next time
         // the node unstakes
-        reciever.flk_balance += node.stake.locked;
+        receiver.flk_balance += node.stake.locked;
         node.stake.locked = HpUfixed::zero();
 
         // Todo(dalton): if the nodes stake+locked are equal to 0 here should we remove him from the
-        // state tables completly?
+        // state tables completely?
 
         // Save state changes and return response
-        self.account_info.set(recipient, reciever);
+        self.account_info.set(recipient, receiver);
         self.node_info.set(index, node);
         TransactionResponse::Success(ExecutionData::None)
     }
@@ -1230,7 +1230,7 @@ impl<B: Backend> State<B> {
             self.service_revenue.remove(&service_id);
         }
 
-        // protcols share for rewards
+        // protocols share for rewards
         let protocol_share: HpUfixed<18> = &(self
             .parameters
             .get(&ProtocolParams::ProtocolShare)
@@ -1587,7 +1587,7 @@ impl<B: Backend> State<B> {
             )),
         }
     }
-    // Useful for transaction that nodes can call but an account owner cant
+    // Useful for transaction that nodes can call but an account owner can't
     // Does not panic
     fn only_node(&self, sender: TransactionSender) -> Result<NodeIndex, TransactionResponse> {
         let node_index = match sender {

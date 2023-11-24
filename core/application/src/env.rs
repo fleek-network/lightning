@@ -128,7 +128,7 @@ impl Env<UpdatePerm> {
         P: IncrementalPutInterface,
     {
         let response = self.inner.run(move |ctx| {
-            // Create the app/execution enviroment
+            // Create the app/execution environment
             let backend = StateTables {
                 table_selector: ctx,
             };
@@ -154,7 +154,8 @@ impl Env<UpdatePerm> {
                     Err(err) => TransactionResponse::Revert(err),
                 };
 
-                // If the transaction moved the epoch forward, aknowledge that in the block response
+                // If the transaction moved the epoch forward, acknowledge that in the block
+                // response
                 if let TransactionResponse::Success(ExecutionData::EpochChange) = results {
                     response.change_epoch = true;
                 }
@@ -169,7 +170,7 @@ impl Env<UpdatePerm> {
                     response: results,
                 };
                 /* Todo(dalton): Check if the transaction resulted in the committee change(Like a current validator getting slashed)
-                    if so aknowledge that in the block response
+                    if so acknowledge that in the block response
                 */
                 response.txn_receipts.push(receipt);
             }
@@ -204,7 +205,7 @@ impl Env<UpdatePerm> {
         response
     }
 
-    /// Returns an identical enviroment but with query permissions
+    /// Returns an identical environment but with query permissions
     pub fn query_socket(&self) -> Env<QueryPerm> {
         Env {
             inner: self.inner.query(),
@@ -218,7 +219,7 @@ impl Env<UpdatePerm> {
     /// Tries to seeds the application state with the genesis block
     /// This function will panic if the genesis file cannot be decoded into the correct types
     /// Will return true if database was empty and genesis needed to be loaded or false if there was
-    /// already state loaded and it didnt load genesis
+    /// already state loaded and it didn't load genesis
     pub fn genesis(&mut self, config: &Config) -> bool {
         self.inner.run(|ctx| {
             let mut metadata_table = ctx.get_table::<Metadata, Value>("metadata");
@@ -433,7 +434,7 @@ impl Default for Env<UpdatePerm> {
     }
 }
 
-/// The socket that recieves all update transactions
+/// The socket that receives all update transactions
 pub struct UpdateWorker<C: Collection> {
     env: Env<UpdatePerm>,
     blockstore: C::BlockStoreInterface,

@@ -73,9 +73,9 @@ struct GenesisCommitteeKeystore {
     _worker_secret_key: NodeSecretKey,
 }
 
-/// Helper macro for executing single Update within a single Block.
+/// Helper macro executing single Update within a single Block.
 /// Asserts that submission occurred.
-/// Transaction Result may be Success or Revert.
+/// Transaction Result may be Success or Revert - `TransactionResponse`.
 ///
 ///  # Arguments
 ///
@@ -92,9 +92,9 @@ macro_rules! run_update {
     }};
 }
 
-/// Helper macro for executing many Updates within a single Block.
+/// Helper macro executing many Updates within a single Block.
 /// Asserts that submission occurred.
-/// Transaction Result may be Success or Revert.
+/// Transaction Result may be Success or Revert - `TransactionResponse`.
 ///
 ///  # Arguments
 ///
@@ -111,7 +111,7 @@ macro_rules! run_updates {
     }};
 }
 
-/// Helper macro for executing many Transactions within a single Block.
+/// Helper macro executing many Transactions within a single Block.
 /// Asserts that submission occurred.
 /// Transaction Result may be Success or Revert.
 ///
@@ -131,6 +131,19 @@ macro_rules! run_transactions {
     }};
 }
 
+/// Helper macro executing a single Update within a single Block.
+/// Asserts that submission occurred.
+/// Asserts that the Update was successful - `TransactionResponse::Success`.
+///
+///  # Arguments
+///
+/// * `update: UpdateRequest` - Vector of update requests to be executed.
+/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
+/// * `response: ExecutionData` - Expected execution data, optional param
+///
+/// # Returns
+///
+/// * `BlockExecutionResponse`
 macro_rules! expect_tx_success {
     ($update:expr,$socket:expr) => {{
         expect_tx_success!($update, $socket, ExecutionData::None);
@@ -145,6 +158,15 @@ macro_rules! expect_tx_success {
     }};
 }
 
+/// Helper macro executing a single Update within a single Block.
+/// Asserts that submission occurred.
+/// Asserts that the Update was reverted - `TransactionResponse::Revert`.
+///
+///  # Arguments
+///
+/// * `update: UpdateRequest` - Vector of update requests to be executed.
+/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
+/// * `revert: ExecutionError` - Expected execution error
 macro_rules! expect_tx_revert {
     ($update:expr,$socket:expr,$revert:expr) => {{
         let result = run_update!($update, $socket);
@@ -155,43 +177,40 @@ macro_rules! expect_tx_revert {
     }};
 }
 
+/// Helper macro executing `ChangeEpoch` Update within a single Block.
+/// Asserts that submission occurred.
+///
+///  # Arguments
+///
+/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
+/// * `secret_key: &NodeSecretKey` - Node's secret key for signing transaction.
+/// * `nonce: u64` - Nonce for Node's account.
+/// * `epoch: u64` - Epoch to be changed.
+///
+/// # Returns
+///
+/// * `BlockExecutionResponse`
 macro_rules! change_epoch {
-    ($socket:expr,$secret_key:expr,$account_nonce:expr,$epoch:expr) => {{
-        let req = get_update_request_node(
+    ($socket:expr,$secret_key:expr,$nonce:expr,$epoch:expr) => {{
+        let req = prepare_update_request_node(
             UpdateMethod::ChangeEpoch { epoch: $epoch },
             $secret_key,
-            $account_nonce,
+            $nonce,
         );
         run_update!(req, $socket)
     }};
 }
 
-macro_rules! assert_valid_node {
-    ($valid_nodes:expr,$query_runner:expr,$node_pk:expr) => {{
-        let node_info = $query_runner.get_node_info($node_pk).unwrap();
-        // Node registry contains the first valid node
-        assert!($valid_nodes.contains(&node_info));
-    }};
-}
-
-macro_rules! assert_not_valid_node {
-    ($valid_nodes:expr,$query_runner:expr,$node_pk:expr) => {{
-        let node_info = $query_runner.get_node_info($node_pk).unwrap();
-        // Node registry contains the first valid node
-        assert!(!$valid_nodes.contains(&node_info));
-    }};
-}
-
-macro_rules! assert_paging_node_registry {
-    ($query_runner:expr,$paging_params:expr, $expected_len:expr) => {{
-        let valid_nodes = $query_runner.get_node_registry(Some($paging_params));
-        assert_eq!(valid_nodes.len(), $expected_len);
-    }};
-}
-
-// Helper macro that performs an epoch change.
-// In order to submit the `ChangeEpoch` transactions, this function needs access to the committee's
-// private keys. These are supplied in the `committee_keystore`.
+/// Helper macro that performs an epoch change.
+/// Asserts that submission occurred.
+///
+///  # Arguments
+///
+/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
+/// * `committee_keystore: &Vec<GenesisCommitteeKeystore> ` - Keystore with committee's private
+///   keys.
+/// * `query_runner: &QueryRunner` - Query Runner.
+/// * `epoch: u64` - Epoch to be changed.
 macro_rules! simple_epoch_change {
     ($socket:expr,$committee_keystore:expr,$query_runner:expr,$epoch:expr) => {{
         let required_signals = calculate_required_signals($committee_keystore.len());
@@ -217,35 +236,59 @@ macro_rules! simple_epoch_change {
     }};
 }
 
+/// Helper macro executing `SubmitReputationMeasurements` Update within a single Block.
+/// Asserts that submission occurred.
+/// Asserts that the Update was successful - `TransactionResponse::Success`.
+///
+///  # Arguments
+///
+/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
+/// * `secret_key: &NodeSecretKey` - Node's secret key for signing transaction.
+/// * `nonce: u64` - Nonce for Node's account.
+/// * `measurements: BTreeMap<u32, ReputationMeasurements>` - Reputation measurements to be
+///   submitted.
 macro_rules! submit_reputation_measurements {
-    ($socket:expr,$secret_key:expr,$account_nonce:expr,$measurements:expr) => {{
-        let req = get_update_request_node(
+    ($socket:expr,$secret_key:expr,$nonce:expr,$measurements:expr) => {{
+        let req = prepare_update_request_node(
             UpdateMethod::SubmitReputationMeasurements {
                 measurements: $measurements,
             },
             $secret_key,
-            $account_nonce,
+            $nonce,
         );
         expect_tx_success!(req, $socket)
     }};
 }
 
-macro_rules! assert_rep_measurements_update {
-    ($query_runner:expr,$update:expr,$reporting_node_index:expr) => {{
-        let rep_measurements = $query_runner.get_rep_measurements(&$update.0);
-        assert_eq!(rep_measurements.len(), 1);
-        assert_eq!(rep_measurements[0].reporting_node, $reporting_node_index);
-        assert_eq!(rep_measurements[0].measurements, $update.1);
-    }};
-}
-
+/// Helper macro executing `SubmitReputationMeasurements` Update within a single Block.
+/// Asserts that submission occurred.
+/// Asserts that the Update was successful - `TransactionResponse::Success`.
+///
+///  # Arguments
+///
+/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
+/// * `secret_key: &AccountOwnerSecretKey` - Account's secret key for signing transaction.
+/// * `nonce: u64` - Nonce for the account.
+/// * `amount: &HpUfixed<18>` - Amount to be deposited.
 macro_rules! deposit {
-    ($socket:expr,$secret_key:expr,$account_nonce:expr,$amount:expr) => {{
-        let req = prepare_deposit_update($amount, $secret_key, $account_nonce);
+    ($socket:expr,$secret_key:expr,$nonce:expr,$amount:expr) => {{
+        let req = prepare_deposit_update($amount, $secret_key, $nonce);
         expect_tx_success!(req, $socket)
     }};
 }
 
+/// Helper macro executing `Stake` Update within a single Block.
+/// Asserts that submission occurred.
+/// Asserts that the Update was successful - `TransactionResponse::Success`.
+///
+///  # Arguments
+///
+/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
+/// * `secret_key: &AccountOwnerSecretKey` - Account's secret key for signing transaction.
+/// * `nonce: u64` - Nonce for the account.
+/// * `amount: &HpUfixed<18>` - Amount to be staked.
+/// * `node_pk: &NodePublicKey` - Public key of a Node to be staked on.
+/// * `consensus_key: ConsensusPublicKey` - Consensus public key.
 macro_rules! stake {
     ($socket:expr,$secret_key:expr,$nonce:expr,$amount:expr,$node_pk:expr,$consensus_key:expr) => {{
         let req = prepare_initial_stake_update(
@@ -264,6 +307,18 @@ macro_rules! stake {
     }};
 }
 
+/// Helper macro executing `Deposit` and `Stake` Updates within a single Block.
+/// Asserts that submission occurred.
+/// Asserts that Updates were successful - `TransactionResponse::Success`.
+///
+///  # Arguments
+///
+/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
+/// * `secret_key: &AccountOwnerSecretKey` - Account's secret key for signing transaction.
+/// * `nonce: u64` - Nonce for the account.
+/// * `amount: &HpUfixed<18>` - Amount to be deposited and staked.
+/// * `node_pk: &NodePublicKey` - Public key of a Node to be staked on.
+/// * `consensus_key: ConsensusPublicKey` - Consensus public key.
 macro_rules! deposit_and_stake {
     ($socket:expr,$secret_key:expr,$nonce:expr,$amount:expr,$node_pk:expr,$consensus_key:expr) => {{
         deposit!($socket, $secret_key, $nonce, $amount);
@@ -278,6 +333,17 @@ macro_rules! deposit_and_stake {
     }};
 }
 
+/// Helper macro executing `StakeLock` Update within a single Block.
+/// Asserts that submission occurred.
+/// Asserts that the Updates was successful - `TransactionResponse::Success`.
+///
+///  # Arguments
+///
+/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
+/// * `secret_key: &AccountOwnerSecretKey` - Account's secret key for signing transaction.
+/// * `nonce: u64` - Nonce for the account.
+/// * `node_pk: &NodePublicKey` - Public key of a Node.
+/// * `locked_for: u64` - Lock time.
 macro_rules! stake_lock {
     ($socket:expr,$secret_key:expr,$nonce:expr,$node_pk:expr,$locked_for:expr) => {{
         let req = prepare_stake_lock_request($locked_for, $node_pk, $secret_key, $nonce);
@@ -285,6 +351,73 @@ macro_rules! stake_lock {
     }};
 }
 
+/// Assert that Reputation Measurements are submitted (updated).
+///
+///  # Arguments
+///
+/// * `query_runner: &QueryRunner` - Query Runner.
+/// * `update: (u32, ReputationMeasurements)` - Tuple containing node index and reputation
+///   measurements.
+/// * `reporting_node_index: u64` - Reporting Node index.
+macro_rules! assert_rep_measurements_update {
+    ($query_runner:expr,$update:expr,$reporting_node_index:expr) => {{
+        let rep_measurements = $query_runner.get_rep_measurements(&$update.0);
+        assert_eq!(rep_measurements.len(), 1);
+        assert_eq!(rep_measurements[0].reporting_node, $reporting_node_index);
+        assert_eq!(rep_measurements[0].measurements, $update.1);
+    }};
+}
+
+/// Assert that a Node is valid.
+///
+///  # Arguments
+///
+/// * `valid_nodes: &Vec<NodeInfo>` - List of valid nodes.
+/// * `query_runner: &QueryRunner` - Query Runner.
+/// * `node_pk: &NodePublicKey` - Node's public key
+macro_rules! assert_valid_node {
+    ($valid_nodes:expr,$query_runner:expr,$node_pk:expr) => {{
+        let node_info = $query_runner.get_node_info($node_pk).unwrap();
+        // Node registry contains the first valid node
+        assert!($valid_nodes.contains(&node_info));
+    }};
+}
+
+/// Assert that a Node is NOT valid.
+///
+///  # Arguments
+///
+/// * `valid_nodes: &Vec<NodeInfo>` - List of valid nodes.
+/// * `query_runner: &QueryRunner` - Query Runner.
+/// * `node_pk: &NodePublicKey` - Node's public key
+macro_rules! assert_not_valid_node {
+    ($valid_nodes:expr,$query_runner:expr,$node_pk:expr) => {{
+        let node_info = $query_runner.get_node_info($node_pk).unwrap();
+        // Node registry contains the first valid node
+        assert!(!$valid_nodes.contains(&node_info));
+    }};
+}
+
+/// Assert that paging works properly with `get_node_registry`.
+///
+///  # Arguments
+///
+/// * `query_runner: &QueryRunner` - Query Runner.
+/// * `paging_params: PagingParams` - Paging params.
+/// * `expected_len: usize` - Expected length of the query result.
+macro_rules! assert_paging_node_registry {
+    ($query_runner:expr,$paging_params:expr, $expected_len:expr) => {{
+        let valid_nodes = $query_runner.get_node_registry(Some($paging_params));
+        assert_eq!(valid_nodes.len(), $expected_len);
+    }};
+}
+
+/// Load Tests Genesis configuration
+fn test_genesis() -> Genesis {
+    Genesis::load().expect("Failed to load genesis from file.")
+}
+
+/// Initialize application state with provided or default configuration.
 fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
     let config = config.or(Some(Config {
         genesis: None,
@@ -297,25 +430,26 @@ fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
     do_init_app(config.unwrap())
 }
 
+/// Initialize application with provided configuration.
 fn do_init_app(config: Config) -> (ExecutionEngineSocket, QueryRunner) {
     let app = Application::<TestBinding>::init(config, Default::default()).unwrap();
 
     (app.transaction_executor(), app.sync_query())
 }
-fn test_genesis() -> Genesis {
-    Genesis::load().expect("Failed to load genesis from file.")
-}
 
+/// Initialize application with provided committee.
 fn test_init_app(committee: Vec<GenesisNode>) -> (ExecutionEngineSocket, QueryRunner) {
     let mut genesis = test_genesis();
     genesis.node_info = committee;
     init_app(Some(test_config(genesis)))
 }
 
+/// Initialize application with provided genesis.
 fn init_app_with_genesis(genesis: &Genesis) -> (ExecutionEngineSocket, QueryRunner) {
     init_app(Some(test_config(genesis.clone())))
 }
 
+/// Initialize application with provided parameters.
 fn init_app_with_params(
     params: Params,
     committee: Option<Vec<GenesisNode>>,
@@ -369,6 +503,7 @@ fn init_app_with_params(
     init_app(Some(config))
 }
 
+/// Prepare test Config based on provided genesis.
 fn test_config(genesis: Genesis) -> Config {
     Config {
         genesis: Some(genesis),
@@ -379,6 +514,8 @@ fn test_config(genesis: Genesis) -> Config {
         db_options: None,
     }
 }
+
+/// Prepare test Reputation Measurements based on provided `uptime`.
 fn test_reputation_measurements(uptime: u8) -> ReputationMeasurements {
     ReputationMeasurements {
         latency: None,
@@ -392,12 +529,12 @@ fn test_reputation_measurements(uptime: u8) -> ReputationMeasurements {
     }
 }
 
+/// Calculate requited signals for epoch change
 fn calculate_required_signals(committee_size: usize) -> usize {
     2 * committee_size / 3 + 1
 }
 
-// Helper function to create a genesis committee.
-// This is useful for tests where we need to seed the application state with nodes.
+/// Create a test genesis committee.
 fn create_genesis_committee(
     num_members: usize,
 ) -> (Vec<GenesisNode>, Vec<GenesisCommitteeKeystore>) {
@@ -424,6 +561,7 @@ fn create_genesis_committee(
     (committee, keystore)
 }
 
+/// Create a new member for test committee.
 fn create_committee_member(
     owner_secret_key: &AccountOwnerSecretKey,
     node_secret_key: &NodeSecretKey,
@@ -459,8 +597,9 @@ fn create_committee_member(
     )
 }
 
-// Helper function to create an update request from a update method.
-fn get_update_request_node(
+/// Prepare an `UpdateRequest` from an `UpdateMethod` signed with `NodeSecretKey`.
+/// Passing the private key around like this should only be done for testing.
+fn prepare_update_request_node(
     method: UpdateMethod,
     secret_key: &NodeSecretKey,
     nonce: u64,
@@ -478,9 +617,9 @@ fn get_update_request_node(
     }
 }
 
-// Passing the private key around like this should only be done for
-// testing.
-fn get_update_request_account(
+/// Prepare an `UpdateRequest` from an `UpdateMethod` signed with `AccountOwnerSecretKey`.
+/// Passing the private key around like this should only be done for testing.
+fn prepare_update_request_account(
     method: UpdateMethod,
     secret_key: &AccountOwnerSecretKey,
     nonce: u64,
@@ -498,12 +637,14 @@ fn get_update_request_account(
     }
 }
 
+/// Prepare an `UpdateRequest` for `UpdateMethod::Deposit` signed with `AccountOwnerSecretKey`.
+/// Passing the private key around like this should only be done for testing.
 fn prepare_deposit_update(
     amount: &HpUfixed<18>,
     secret_key: &AccountOwnerSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
-    get_update_request_account(
+    prepare_update_request_account(
         UpdateMethod::Deposit {
             proof: ProofOfConsensus {},
             token: Tokens::FLK,
@@ -514,13 +655,16 @@ fn prepare_deposit_update(
     )
 }
 
+/// Prepare an `UpdateRequest` for `UpdateMethod::Stake` signed with `AccountOwnerSecretKey`.
+/// For the first `Stake`, use `prepare_initial_stake_update`.
+/// Passing the private key around like this should only be done for testing.
 fn prepare_regular_stake_update(
     amount: &HpUfixed<18>,
     node_public_key: &NodePublicKey,
     secret_key: &AccountOwnerSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
-    get_update_request_account(
+    prepare_update_request_account(
         UpdateMethod::Stake {
             amount: amount.clone(),
             node_public_key: *node_public_key,
@@ -535,6 +679,8 @@ fn prepare_regular_stake_update(
     )
 }
 
+/// Prepare an `UpdateRequest` for `UpdateMethod::Stake` signed with `AccountOwnerSecretKey`.
+/// Passing the private key around like this should only be done for testing.
 #[allow(clippy::too_many_arguments)]
 fn prepare_initial_stake_update(
     amount: &HpUfixed<18>,
@@ -547,7 +693,7 @@ fn prepare_initial_stake_update(
     secret_key: &AccountOwnerSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
-    get_update_request_account(
+    prepare_update_request_account(
         UpdateMethod::Stake {
             amount: amount.clone(),
             node_public_key: *node_public_key,
@@ -562,13 +708,15 @@ fn prepare_initial_stake_update(
     )
 }
 
+/// Prepare an `UpdateRequest` for `UpdateMethod::Unstake` signed with `AccountOwnerSecretKey`.
+/// Passing the private key around like this should only be done for testing.
 fn prepare_unstake_update(
     amount: &HpUfixed<18>,
     node_public_key: &NodePublicKey,
     secret_key: &AccountOwnerSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
-    get_update_request_account(
+    prepare_update_request_account(
         UpdateMethod::Unstake {
             amount: amount.clone(),
             node: *node_public_key,
@@ -578,13 +726,16 @@ fn prepare_unstake_update(
     )
 }
 
+/// Prepare an `UpdateRequest` for `UpdateMethod::WithdrawUnstaked` signed with
+/// `AccountOwnerSecretKey`. Passing the private key around like this should only be done for
+/// testing.
 fn prepare_withdraw_unstaked_update(
     node_public_key: &NodePublicKey,
     recipient: Option<EthAddress>,
     secret_key: &AccountOwnerSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
-    get_update_request_account(
+    prepare_update_request_account(
         UpdateMethod::WithdrawUnstaked {
             node: *node_public_key,
             recipient,
@@ -594,13 +745,15 @@ fn prepare_withdraw_unstaked_update(
     )
 }
 
+/// Prepare an `UpdateRequest` for `UpdateMethod::StakeLock` signed with `AccountOwnerSecretKey`.
+/// Passing the private key around like this should only be done for testing.
 fn prepare_stake_lock_update(
     node_public_key: &NodePublicKey,
     locked_for: u64,
     secret_key: &AccountOwnerSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
-    get_update_request_account(
+    prepare_update_request_account(
         UpdateMethod::StakeLock {
             node: *node_public_key,
             locked_for,
@@ -610,16 +763,15 @@ fn prepare_stake_lock_update(
     )
 }
 
-// Helper methods for tests
-// Passing the private key around like this should only be done for
-// testing.
+/// Prepare an `UpdateRequest` for `UpdateMethod::SubmitDeliveryAcknowledgmentAggregation` signed
+/// with `NodeSecretKey`. Passing the private key around like this should only be done for testing.
 fn prepare_pod_request(
     commodity: u128,
     service_id: u32,
     secret_key: &NodeSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
-    get_update_request_node(
+    prepare_update_request_node(
         UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
             commodity,  // units of data served
             service_id, // service 0 serving bandwidth
@@ -631,6 +783,9 @@ fn prepare_pod_request(
     )
 }
 
+/// Prepare an `UpdateRequest` for `UpdateMethod::SubmitDeliveryAcknowledgmentAggregation` signed
+/// with `AccountOwnerSecretKey`. Passing the private key around like this should only be done for
+/// testing.
 fn prepare_stake_lock_request(
     locked_for: u64,
     node: &NodePublicKey,
@@ -638,7 +793,7 @@ fn prepare_stake_lock_request(
     nonce: u64,
 ) -> UpdateRequest {
     // Deposit some FLK into account 1
-    get_update_request_account(
+    prepare_update_request_account(
         UpdateMethod::StakeLock {
             node: *node,
             locked_for,
@@ -648,21 +803,25 @@ fn prepare_stake_lock_request(
     )
 }
 
+/// Prepare an `UpdateRequest` for `UpdateMethod::ChangeEpoch` signed with `NodeSecretKey`.
+/// Passing the private key around like this should only be done for testing.
 fn prepare_change_epoch_request(
     epoch: u64,
     secret_key: &NodeSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
-    get_update_request_node(UpdateMethod::ChangeEpoch { epoch }, secret_key, nonce)
+    prepare_update_request_node(UpdateMethod::ChangeEpoch { epoch }, secret_key, nonce)
 }
 
+/// Prepare an `UpdateRequest` for `UpdateMethod::Transfer` signed with `AccountOwnerSecretKey`.
+/// Passing the private key around like this should only be done for testing.
 fn prepare_transfer_request(
     amount: &HpUfixed<18>,
     to: &EthAddress,
     secret_key: &AccountOwnerSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
-    get_update_request_account(
+    prepare_update_request_account(
         UpdateMethod::Transfer {
             amount: amount.clone(),
             token: Tokens::FLK,
@@ -673,13 +832,16 @@ fn prepare_transfer_request(
     )
 }
 
+/// Prepare an `UpdateRequest` for `UpdateMethod::ChangeProtocolParam` signed with
+/// `AccountOwnerSecretKey`. Passing the private key around like this should only be done for
+/// testing.
 fn prepare_change_protocol_param_request(
     param: &ProtocolParams,
     value: &u128,
     secret_key: &AccountOwnerSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
-    get_update_request_account(
+    prepare_update_request_account(
         UpdateMethod::ChangeProtocolParam {
             param: param.clone(),
             value: *value,
@@ -689,7 +851,8 @@ fn prepare_change_protocol_param_request(
     )
 }
 
-// Helper function that submits a transaction to the application.
+/// Helper (async) function that submit a transaction to the application via `UpdateSocket`.
+/// Returns `Result<BlockExecutionResponse>`.
 async fn run_transaction(
     requests: Vec<TransactionRequest>,
     update_socket: &Socket<Block, BlockExecutionResponse>,
@@ -704,6 +867,8 @@ async fn run_transaction(
     Ok(res)
 }
 
+/// Helper function that update `BTreeMap<u32, ReputationMeasurements>` with new
+/// `ReputationMeasurements` for given `NodePublicKey` Returns tuple `(peer_index, measurements)`.
 fn update_reputation_measurements(
     query_runner: &QueryRunner,
     map: &mut BTreeMap<u32, ReputationMeasurements>,
@@ -715,6 +880,7 @@ fn update_reputation_measurements(
     (peer_index, measurements)
 }
 
+/// Helper function that prepare `PagingParams`
 fn paging_params(ignore_stake: bool, start: u32, limit: usize) -> PagingParams {
     PagingParams {
         ignore_stake,
@@ -723,6 +889,7 @@ fn paging_params(ignore_stake: bool, start: u32, limit: usize) -> PagingParams {
     }
 }
 
+/// Helper function that add a node to the `committee`.
 fn add_to_committee(
     committee: &mut Vec<GenesisNode>,
     keystore: &mut Vec<GenesisCommitteeKeystore>,
@@ -766,7 +933,8 @@ fn add_to_committee(
     });
 }
 
-fn get_new_committee(
+/// Helper function that prepare new `committee`.
+fn prepare_new_committee(
     query_runner: &QueryRunner,
     committee: &[GenesisNode],
     keystore: &[GenesisCommitteeKeystore],
@@ -897,7 +1065,7 @@ async fn test_submit_rep_measurements_twice() {
     // Attempt to submit reputation measurements twice per epoch.
     // This transaction should revert because each node only can submit its reputation measurements
     // once per epoch.
-    let req = get_update_request_node(
+    let req = prepare_update_request_node(
         UpdateMethod::SubmitReputationMeasurements { measurements: map },
         &keystore[0].node_secret_key,
         2,
@@ -1654,7 +1822,7 @@ async fn test_supply_across_epoch() {
             submit_reputation_measurements!(&update_socket, &node.node_secret_key, nonce, map);
         }
 
-        let (_, new_keystore) = get_new_committee(&query_runner, &committee, &keystore);
+        let (_, new_keystore) = prepare_new_committee(&query_runner, &committee, &keystore);
         simple_epoch_change!(&update_socket, &new_keystore, &query_runner, epoch);
 
         let supply_increase = &emissions_per_epoch * &node_share
