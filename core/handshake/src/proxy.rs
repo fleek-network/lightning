@@ -1,6 +1,6 @@
 use anyhow::Result;
 use arrayref::array_ref;
-use bytes::{Buf, Bytes};
+use bytes::BytesMut;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
 use tokio::task::JoinHandle;
@@ -16,6 +16,7 @@ pub struct Proxy<S: TransportSender, R: TransportReceiver> {
     socket: UnixStream,
     current_write: usize,
     shutdown: ShutdownWaiter,
+    socket_buffer: BytesMut,
 }
 
 impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
@@ -26,6 +27,7 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
             socket,
             current_write: 0,
             shutdown,
+            socket_buffer: BytesMut::new(),
         }
     }
 
@@ -41,7 +43,6 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
     /// Main loop, handling incoming frames and outgoing bytes until the shutdown
     /// signal is received or an error occurs.
     async fn run(mut self) -> Result<()> {
-        let mut buffer = [0; 4 << 10];
         loop {
             tokio::select! {
                 // if we have an incoming payload, handle it
@@ -50,11 +51,11 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
                     None => break Ok(()),
                 },
                 // If we read any bytes from the socket, send it over the transport
-                Ok(n) = self.socket.read(&mut buffer) => {
+                Ok(n) = self.socket.read_buf(&mut self.socket_buffer) => {
                     if n == 0 {
                         break Ok(())
                     }
-                    self.handle_socket_bytes(buffer[0..n].to_vec().into()).await?;
+                    self.handle_socket_bytes().await?;
                 },
                 _ = self.shutdown.wait_for_shutdown() => break Ok(()),
             }
@@ -62,20 +63,23 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
     }
 
     /// Handle outgoing bytes from the service socket
-    async fn handle_socket_bytes(&mut self, mut bytes: Bytes) -> Result<()> {
-        while !bytes.is_empty() {
+    async fn handle_socket_bytes(&mut self) -> Result<()> {
+        while !self.socket_buffer.is_empty() {
             if self.current_write > 0 {
-                // Send bytes to the transport
-                let mut bytes = bytes.split_to(self.current_write.min(bytes.len()));
-                while !bytes.is_empty() {
-                    let sent = self.tx.write(&bytes)?;
-                    bytes.advance(sent);
-                }
+                // write bytes to the transport
+                let len = self.current_write.min(self.socket_buffer.len());
+                let bytes = self.socket_buffer.split_to(len);
+                self.current_write -= len;
+                self.tx.write(&bytes)?;
+            } else if self.socket_buffer.len() >= 4 {
+                // read the payload delimiter
+                let bytes = self.socket_buffer.split_to(4);
+                let len = u32::from_be_bytes(*array_ref![bytes, 0, 4]) as usize;
+                self.tx.start_write(len);
+                self.current_write = len;
+                self.socket_buffer.reserve(len);
             } else {
-                // Send delimiter to the transport
-                let bytes = bytes.split_to(4);
-                let len = u32::from_be_bytes(*array_ref![bytes, 0, 4]);
-                self.tx.start_write(len as usize);
+                break;
             }
         }
 
