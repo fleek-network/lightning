@@ -129,8 +129,6 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 
                         let msg_digest = msg.get_digest();
                         // propagate here now that we know its good and before we do async work
-                        // TODO(matthias): should we propagate parcels from the next epoch as
-                        // well?
                         msg.propagate();
 
                         let parcel_digest = parcel.to_digest();
@@ -165,7 +163,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 
                                         // Check the validity of the parcels/attestations that we
                                         // stored optimistically.
-                                        txn_store.process_pending_parcels(&committee);
+                                        txn_store.change_epoch(&committee);
                                     }
                                 }
                                 Err(not_executed) => {
@@ -186,8 +184,6 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         }
 
                         // propagate msg as soon as we know its good
-                        // TODO(matthias): should we propagate attestations from the next epoch as
-                        // well?
                         msg.propagate();
 
                         if !on_committee {
@@ -225,7 +221,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 
                                         // Check the validity of the parcels/attestations that we
                                         // stored optimistically.
-                                        txn_store.process_pending_parcels(&committee);
+                                        txn_store.change_epoch(&committee);
                                     }
                                 }
                                 Err(not_executed) => {
