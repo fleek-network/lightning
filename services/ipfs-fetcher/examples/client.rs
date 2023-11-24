@@ -1,5 +1,4 @@
 use arrayref::array_ref;
-use bytes::{Buf, BufMut, BytesMut};
 use cid::Cid;
 use lightning_handshake::schema::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
 use tcp_client::TcpClient;
@@ -25,15 +24,11 @@ async fn main() -> anyhow::Result<()> {
 
     // Send a request for the CID.
     let cid = Cid::try_from(CID).expect("valid cid").to_bytes();
-    let mut buf = BytesMut::with_capacity(1 + cid.len());
-    buf.put_u8(cid.len() as u8);
-    buf.put(cid.as_slice());
     client
-        .send(RequestFrame::ServicePayload { bytes: buf.into() })
+        .send(RequestFrame::ServicePayload { bytes: cid.into() })
         .await?;
     println!("sent request for cid");
 
-    let mut buffer = BytesMut::new();
     let mut total = 0;
 
     // Read the number of blocks we should receive back.
@@ -42,37 +37,19 @@ async fn main() -> anyhow::Result<()> {
     };
 
     println!("first frame was {} bytes long", bytes.len());
-    if bytes.len() > 8 {
-        buffer.put(&bytes[8..]);
-    }
-    let num_blocks = u32::from_be_bytes(*array_ref![bytes, 4, 4]);
+    let num_blocks = u32::from_be_bytes(*array_ref![bytes, 0, 4]);
     println!("Expecting {num_blocks} block(s) of content");
 
     // Stream the remaining content
     for _ in 0..num_blocks {
         println!("receiving block");
-        // Read payloads until we have the length of this block
-        while buffer.len() < 4 {
-            println!("reading delimiter");
-            let Some(ResponseFrame::ServicePayload { bytes }) = client.recv().await else {
-                panic!("invalid or no response received");
-            };
-            buffer.put(bytes);
-        }
 
-        // Read payloads until we have the entire block
-        let len = u32::from_be_bytes(*array_ref![buffer, 0, 4]) as usize + 4;
-        while buffer.len() < len {
-            println!("reading content ({}/{})", buffer.len(), len);
-            let Some(ResponseFrame::ServicePayload { bytes }) = client.recv().await else {
-                panic!("invalid or no response received");
-            };
-            buffer.put(bytes)
-        }
+        // Read the block
+        let Some(ResponseFrame::ServicePayload { bytes }) = client.recv().await else {
+            panic!("invalid or no response received");
+        };
 
-        // Drop the block from memory (we don't need them for this example)
-        buffer.advance(len);
-        total += len;
+        total += bytes.len();
     }
 
     println!("Successfully streamed {total} bytes for {CID}");
@@ -83,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
 mod tcp_client {
     use anyhow::Result;
     use arrayref::array_ref;
-    use bytes::{BufMut, Bytes, BytesMut};
+    use bytes::{Bytes, BytesMut};
     use lightning_handshake::schema::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpStream, ToSocketAddrs};
@@ -141,10 +118,8 @@ mod tcp_client {
         }
 
         async fn send_inner(&mut self, bytes: Bytes) -> Result<()> {
-            let mut buf = BytesMut::with_capacity(4 + bytes.len());
-            buf.put_u32(bytes.len() as u32);
-            buf.put(bytes);
-            self.stream.write_all(&buf).await?;
+            self.stream.write_u32(bytes.len() as u32).await?;
+            self.stream.write_all(&bytes).await?;
             Ok(())
         }
     }
