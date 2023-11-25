@@ -8,6 +8,8 @@ edition = "2021"
 anyhow.workspace = true
 async-trait.workspace = true
 bincode.workspace = true
+bytes.workspace = true
+deadqueue = "0.2"
 lightning-interfaces = { path="../interfaces" }
 lightning-rep-collector = { path="../rep-collector" }
 fleek-crypto.workspace = true
