@@ -4571,6 +4571,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "clap 4.4.10",
+ "bytes",
  "env_logger 0.10.0",
  "fleek-crypto",
  "futures",
