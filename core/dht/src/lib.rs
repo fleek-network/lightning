@@ -10,3 +10,4 @@ mod task;
 
 pub mod config;
 pub mod dht;
+mod v2;
