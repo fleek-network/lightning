@@ -1,12 +1,12 @@
 use std::marker::PhantomData;
-use std::net::IpAddr;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bytes::Bytes;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_interfaces::ApplicationInterface;
 use tokio::net::UdpSocket;
 use tokio::sync::oneshot;
 
@@ -31,16 +31,26 @@ pub enum Error {
     Canceled,
 }
 
-pub trait LookupInterface: Clone + Send + Sync + Unpin {
+#[async_trait]
+pub trait LookupInterface: Clone + Send + Sync + Unpin + 'static {
     async fn find_node(&self, hash: u32) -> Result<Vec<NodeIndex>>;
     async fn find_value(&self, hash: u32) -> Result<Option<Bytes>>;
 }
 
-#[derive(Clone)]
 pub struct Looker<C: Collection> {
     sync_query: c![C::ApplicationInterface::SyncExecutor],
     socket: Arc<UdpSocket>,
     _marker: PhantomData<C>,
+}
+
+impl<C: Collection> Clone for Looker<C> {
+    fn clone(&self) -> Self {
+        Self {
+            sync_query: self.sync_query.clone(),
+            socket: self.socket.clone(),
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<C: Collection> Looker<C> {
