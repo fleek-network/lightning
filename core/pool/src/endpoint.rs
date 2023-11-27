@@ -112,10 +112,8 @@ where
     // Before connections are dropped, they will be put in this buffer.
     // After a grace period, the connections will be dropped.
     connection_buffer: Vec<OngoingConnectionHandle>,
-    /// Receiver of events from a connection.
-    event_notifier_rx: Receiver<InternalEvent>,
-    /// Sender of events from a connection.
-    event_notifier_tx: Sender<InternalEvent>,
+    /// Notify when to run clean up task.
+    cleanup_notify: Arc<Notify>,
     /// Multiplexed transport.
     muxer: Option<M>,
     /// Config for the multiplexed transport.
@@ -137,7 +135,6 @@ where
         index: OnceCell<NodeIndex>,
     ) -> Self {
         let (connection_event_tx, connection_event_rx) = mpsc::channel(1024);
-        let (event_notifier_tx, event_notifier_rx) = mpsc::channel(128);
 
         Self {
             pool: HashMap::new(),
@@ -154,8 +151,7 @@ where
             config,
             redundant_pool: HashMap::new(),
             connection_buffer: Vec::new(),
-            event_notifier_rx,
-            event_notifier_tx,
+            cleanup_notify: Arc::new(Notify::new()),
         }
     }
 
@@ -297,20 +293,18 @@ where
                     if let Some(conn_handle) = self.pool.remove(&index) {
                         self.connection_buffer.push(conn_handle);
                     }
+                    // Todo: add unit test for this.
+                    if let Some(conn_handle) = self.redundant_pool.remove(&index) {
+                        self.connection_buffer.push(conn_handle);
+                    }
                 });
 
                 // Schedule the internal notification to drop the buffered connections.
-                let event_notifier_tx = self.event_notifier_tx.clone();
+                let event_notifier_tx = self.cleanup_notify.clone();
                 tokio::spawn(async move {
                     tokio::time::sleep(CONN_GRACE_PERIOD).await;
-                    let _ = event_notifier_tx
-                        .send(InternalEvent::DropBufferedConnections)
-                        .await;
+                    event_notifier_tx.notify_one();
                 });
-
-                // Todo: add unit test for this.
-                self.redundant_pool
-                    .retain(|index, _| keep.contains_key(index));
 
                 for info in keep.into_values() {
                     tracing::debug!(
@@ -604,14 +598,8 @@ where
                         }
                     }
                 }
-                internal_event = self.event_notifier_rx.recv() => {
-                    if let Some(event) = internal_event {
-                        match event {
-                            InternalEvent::DropBufferedConnections => {
-                                self.connection_buffer.clear();
-                            }
-                        }
-                    }
+                _ = self.cleanup_notify.notified() => {
+                    self.connection_buffer.clear();
                 }
                 // It's safe to match on Some(_) here because `poll_next`
                 // will return None when there are no ongoing connections
@@ -645,10 +633,6 @@ pub enum ConnectionEvent {
         service_scope: ServiceScope,
         request: (RequestHeader, Request),
     },
-}
-
-enum InternalEvent {
-    DropBufferedConnections,
 }
 
 /// Info of a node.
