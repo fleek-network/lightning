@@ -489,7 +489,17 @@ async fn test_overlay_update_connections() {
         .iter()
         .map(|peer| peer.node_index)
         .collect::<HashSet<_>>();
-    overlay.update_connections(peers_to_connect.clone());
+    let task = overlay.update_connections(peers_to_connect.clone());
+
+    // Then: Task includes peers to keep and drop.
+    let BroadcastTask::Update { keep, drop } = task else {
+        panic!("invalid task");
+    };
+    assert!(keep.contains_key(&peers[1].node_index));
+    assert_eq!(keep.len(), 1);
+    assert!(drop.contains(&peers[2].node_index));
+    assert!(drop.contains(&peers[3].node_index));
+    assert_eq!(drop.len(), 2);
 
     // Then: state in the overlay includes the expected peers.
     let local_overlay = overlay.peers.keys().copied().collect::<HashSet<_>>();

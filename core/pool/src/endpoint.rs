@@ -112,7 +112,7 @@ where
     // Before connections are dropped, they will be put in this buffer.
     // After a grace period, the connections will be dropped.
     connection_buffer: Vec<OngoingConnectionHandle>,
-    //
+    /// Receiver of events from a connection.
     event_notifier_rx: Receiver<InternalEvent>,
     /// Sender of events from a connection.
     event_notifier_tx: Sender<InternalEvent>,
@@ -291,16 +291,9 @@ where
                     });
                 }
             },
-            BroadcastTask::Update { peers } => {
-                // Keep ongoing connections and move the connections to drop into the buffer.
-                let peers_to_drop: Vec<NodeIndex> = self
-                    .pool
-                    .keys()
-                    .copied()
-                    .filter(|index| !peers.contains_key(index))
-                    .collect();
-
-                peers_to_drop.into_iter().for_each(|index| {
+            BroadcastTask::Update { keep, drop } => {
+                // Move the connections to be dropped into a buffer.
+                drop.into_iter().for_each(|index| {
                     if let Some(conn_handle) = self.pool.remove(&index) {
                         self.connection_buffer.push(conn_handle);
                     }
@@ -315,10 +308,11 @@ where
                         .await;
                 });
 
+                // Todo: add unit test for this.
                 self.redundant_pool
-                    .retain(|index, _| peers.contains_key(index));
+                    .retain(|index, _| keep.contains_key(index));
 
-                for info in peers.into_values() {
+                for info in keep.into_values() {
                     tracing::debug!(
                         "broadcast update: peer with index: {:?}",
                         info.node_info.index

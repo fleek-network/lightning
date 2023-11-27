@@ -150,6 +150,7 @@ where
     #[inline]
     pub fn update_connections(&mut self, peers: HashSet<NodeIndex>) -> BroadcastTask {
         // We keep pinned connections.
+        let mut peers_to_drop = Vec::new();
         self.peers.retain(|index, info| {
             let is_in_overlay = peers.contains(index);
             if is_in_overlay {
@@ -157,7 +158,13 @@ where
                 // topology update.
                 info.from_topology = true
             }
-            is_in_overlay || info.pinned
+
+            if is_in_overlay || info.pinned {
+                true
+            } else {
+                peers_to_drop.push(*index);
+                false
+            }
         });
 
         // We get information about the peers.
@@ -185,7 +192,8 @@ where
 
         // We tell the pool who to connect to.
         BroadcastTask::Update {
-            peers: self.peers.clone(),
+            keep: self.peers.clone(),
+            drop: peers_to_drop,
         }
     }
 
@@ -357,7 +365,8 @@ pub enum BroadcastTask {
     },
     Update {
         // Nodes that are in our overlay.
-        peers: HashMap<NodeIndex, ConnectionInfo>,
+        keep: HashMap<NodeIndex, ConnectionInfo>,
+        drop: Vec<NodeIndex>,
     },
 }
 
