@@ -3,23 +3,21 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
+
+use anyhow::Result;
 use bytes::Bytes;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::Notify;
-use tokio::task::{JoinHandle, JoinSet};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use crate::v2::lookup::LookupInterface;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{oneshot, Notify};
+use tokio::task::{JoinHandle, JoinSet};
+
+use crate::v2::lookup::{Looker, LookupInterface, ProviderRespond, ValueRespond};
 
 pub enum Task {
-    LookUp {
-        hash: u32,
-        value: bool,
-    },
-    Ping {
-        peer: NodeIndex,
-        timeout: Duration,
-    }
+    LookUpValue { hash: u32, respond: ValueRespond },
+    LookUpNode { hash: u32, respond: ProviderRespond },
+    Ping { peer: NodeIndex, timeout: Duration },
 }
 
 pub struct NetworkMessage {
@@ -28,29 +26,26 @@ pub struct NetworkMessage {
 }
 
 pub enum Event {
-    Pong {
-        peer: NodeIndex,
-    },
-    Timeout {
-        peer: NodeIndex,
-    }
+    Pong { peer: NodeIndex },
+    Timeout { peer: NodeIndex },
 }
 
 // 1. Manage tasks from user.
 // 2. Read messages from incoming-queue which are messages received from the network.
 //      - These include tasks like FIND_NODE or STORE_VALUE.
 //      - Some include RPC responses that must be passed on to ongoing tasks.
-// 3. (Needs thinking because this might be able to be done by Table itself) Schedule routine tasks related to pruning table.
-pub struct WorkerPool<C: Collection, L: LookupInterface<C>> {
-    /// Look-up task.
-    lookup_task: L,
-    /// Requests from user.
+// 3. (Needs thinking because this might be able to be done by Table itself) Schedule routine tasks
+//    related to pruning table.
+pub struct WorkerPool<C: Collection, L: LookupInterface> {
+    /// Performs look-ups.
+    looker: L,
+    /// Queue for receiving tasks.
     task_queue: Receiver<Task>,
-    /// Queue to send ping events.
+    /// Queue for sending ping events.
     ping_queue_tx: Sender<Event>,
-    /// Ongoing tasks.
+    /// Set of currently running worker tasks.
     ongoing_tasks: JoinSet<u64>,
-    /// Ongoing lookup tasks.
+    /// Logical set of ongoing lookup tasks.
     ongoing: HashMap<u64, ()>,
     /// Maximum pool size.
     max_pool_size: usize,
@@ -59,15 +54,70 @@ pub struct WorkerPool<C: Collection, L: LookupInterface<C>> {
     _marker: PhantomData<C>,
 }
 
-impl<C: Collection, L: LookupInterface<C>> WorkerPool<C, L> {
-    pub async fn run(self) {
+impl<C: Collection, L: LookupInterface> WorkerPool<C, L> {
+    pub async fn run(&mut self) {
         loop {
             tokio::select! {
                 biased;
-                _ = self.shutdown.notified() => {}
-                message = self.incoming_message.pop() => {}
-                request = self.requests.pop() => {}
+                _ = self.shutdown.notified() => {
+                    tracing::info!("shutting down worker pool");
+                    break;
+                }
+                incoming_task = self.task_queue.recv() => {
+                    let Some(task) = incoming_task {
+                        break
+                    };
+                    self.handle_incoming_task(task);
+                }
+                Some(task_result) = self.ongoing_tasks.join_next() => {
+                    match task_result {
+                        Ok(id) => self.cleanup(id),
+                        Err(e) => {
+                            tracing::warn!("failed to clean up task: worker task panicked");
+                        }
+                    };
+                }
             }
         }
+    }
+
+    /// Try to run the task on a worker.
+    fn handle_incoming_task(&mut self, task: Task) -> Result<()> {
+        // Validate.
+        if self.ongoing_tasks.len() > self.max_pool_size {
+            // Should we add a buffer?
+        }
+
+        match task {
+            Task::LookUpValue { hash, respond } => {
+                let looker = self.looker.clone();
+                let id: u64 = rand::random();
+                self.ongoing_tasks.spawn(async move {
+                    let value = looker.find_value(hash).await;
+                    // if the client drops the receiver, there's nothing we can do.
+                    let _ = respond.send(value);
+                    id
+                });
+            },
+            Task::LookUpNode { hash, respond } => {
+                let looker = self.looker.clone();
+                let id: u64 = rand::random();
+                self.ongoing_tasks.spawn(async move {
+                    let nodes = looker.find_node(hash).await;
+                    // if the client drops the receiver, there's nothing we can do.
+                    let _ = respond.send(nodes);
+                    id
+                });
+            },
+            Task::Ping { .. } => {
+                todo!()
+            },
+        }
+
+        Ok(())
+    }
+
+    fn cleanup(&mut self, id: u64) {
+        debug_assert!(self.ongoing.remove(&id).is_some());
     }
 }
