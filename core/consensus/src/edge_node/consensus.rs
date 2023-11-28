@@ -11,7 +11,7 @@ use tracing::info;
 
 use super::transaction_store::{NotExecuted, TransactionStore};
 use crate::consensus::PubSubMsg;
-use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Execution};
+use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Digest, Execution};
 
 pub struct EdgeConsensus {
     handle: JoinHandle<()>,
@@ -73,6 +73,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
         .pubkey_to_index(node_public_key)
         .unwrap_or(u32::MAX);
     let mut on_committee = committee.contains(&our_index);
+    let (timeout_tx, mut timeout_rx) = mpsc::channel(128);
 
     let mut txn_store = TransactionStore::new();
     loop {
@@ -167,7 +168,11 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                     }
                                 }
                                 Err(not_executed) => {
-                                    handle_not_executed(not_executed, &txn_store, &pub_sub).await;
+                                    handle_not_executed(
+                                        not_executed,
+                                        &txn_store,
+                                        timeout_tx.clone()
+                                    ).await;
                                 }
                             }
                         }
@@ -225,7 +230,11 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                     }
                                 }
                                 Err(not_executed) => {
-                                    handle_not_executed(not_executed, &txn_store, &pub_sub).await;
+                                    handle_not_executed(
+                                        not_executed,
+                                        &txn_store,
+                                        timeout_tx.clone()
+                                    ).await;
                                 }
                             }
                         }
@@ -243,6 +252,16 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                 }
 
             },
+            digest = timeout_rx.recv() => {
+                // Timeout for a missing parcel. If we still haven't received the parcel, we send a
+                // request.
+                if let Some(digest) = digest {
+                    if txn_store.get_parcel(&digest).is_none() {
+                        let request = PubSubMsg::RequestTransactions(digest);
+                        pub_sub.send(&request, None).await;
+                    }
+                }
+            }
         }
     }
 }
@@ -255,18 +274,19 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 // In this case we want to send a request out for this parcel.
 // In order to prevent sending out these requests prematurely, we keep a running average of
 // the intervals between executing parcels.
-// If we are missing a parcel, and the time that has passed since executing the last parcel
+// If we are missing a parcel, and the time that has passed since trying toexecute the last parcel
 // is larger than the expected time, we send out a request.
-async fn handle_not_executed<P: PubSub<PubSubMsg>>(
+async fn handle_not_executed(
     not_executed: NotExecuted,
     txn_store: &TransactionStore,
-    pub_sub: &P,
+    timeout_tx: mpsc::Sender<Digest>,
 ) {
     if let NotExecuted::MissingParcel(digest) = not_executed {
-        if txn_store.should_send_request() {
-            let request = PubSubMsg::RequestTransactions(digest);
-            pub_sub.send(&request, None).await;
-        }
+        let timeout = txn_store.get_timeout();
+        tokio::spawn(async move {
+            tokio::time::sleep(timeout).await;
+            let _ = timeout_tx.send(digest).await;
+        });
     }
 }
 

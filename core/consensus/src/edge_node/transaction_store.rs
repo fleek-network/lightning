@@ -97,15 +97,8 @@ impl TransactionStore {
         self.parcels.change_epoch(committee);
     }
 
-    pub fn should_send_request(&self) -> bool {
-        if let Some(last_executed_timestamp) = self.last_executed_timestamp {
-            if let Ok(time_passed) = last_executed_timestamp.elapsed() {
-                // TODO(matthias): do napkin math for this threshold
-                let threshold = 8 * self.deviation_tbe + self.estimated_tbe;
-                return time_passed > threshold;
-            }
-        }
-        false
+    pub fn get_timeout(&self) -> Duration {
+        4 * self.deviation_tbe + self.estimated_tbe
     }
 
     // Threshold should be 2f + 1 of the committee
