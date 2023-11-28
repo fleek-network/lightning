@@ -116,21 +116,16 @@ impl TransactionStore {
     ) -> Result<bool, NotExecuted> {
         if self.executed.contains(&digest) {
             // we already executed this parcel
-            Ok(false)
+            return Ok(false);
         } else if let Some(x) = self.get_attestations(&digest) {
             // we need a quorum of attestations in order to execute the parcel
             if x.len() >= threshold {
                 // if we should execute we need to make sure we can connect this to our transaction
                 // chain
-                self.try_execute_chain(digest, execution, head).await
-            } else {
-                Err(NotExecuted::MissingAttestations(digest))
+                return self.try_execute_chain(digest, execution, head).await;
             }
-        } else if self.parcels.contains_parcel(&digest) {
-            Err(NotExecuted::MissingAttestations(digest))
-        } else {
-            Err(NotExecuted::MissingParcel(digest))
         }
+        Err(NotExecuted::MissingAttestations(digest))
     }
 
     async fn try_execute_chain<Q: SyncQueryRunnerInterface>(
