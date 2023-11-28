@@ -1,4 +1,4 @@
-use crate::table::TableKey;
+use crate::table::server::TableKey;
 
 pub type Distance = TableKey;
 

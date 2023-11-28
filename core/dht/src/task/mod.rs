@@ -1,3 +1,4 @@
+// Todo: Delete this directory.
 mod lookup;
 
 pub mod bootstrap;
@@ -18,13 +19,14 @@ use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinSet;
 use tokio_util::time::DelayQueue;
 
-use crate::bucket::BUCKET_REFRESH_INTERVAL;
-use crate::network::{Message, MessageType, Request, Response};
+use crate::network::network::{Message, MessageType, Request, Response};
+use crate::network::socket;
 use crate::node::NodeInfo;
-use crate::table::{TableKey, TableRequest};
+use crate::table::bucket;
+use crate::table::bucket::BUCKET_REFRESH_INTERVAL;
+use crate::table::server::{TableKey, TableRequest};
 use crate::task::bootstrap::{Bootstrapper, BOOTSTRAP_TASK_ID};
 use crate::task::lookup::LookupTask;
-use crate::{bucket, socket};
 
 type TaskResult = Result<u64, TaskFailed>;
 

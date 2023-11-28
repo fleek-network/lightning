@@ -19,9 +19,10 @@ use tokio::net::UdpSocket;
 use tokio::sync::{mpsc, Notify};
 
 use crate::config::Config;
+use crate::network::network;
 use crate::node::NodeInfo;
 use crate::task::bootstrap::Bootstrapper;
-use crate::{api, network, store, table, task};
+use crate::{api, store, table, task};
 
 /// Builds the DHT.
 pub struct Builder<C: Collection> {
@@ -173,7 +174,7 @@ impl<C: Collection> WithStartAndShutdown for Dht<C> {
         let (table_tx, table_rx) = mpsc::channel(self.buffer_size);
         let (task_tx, task_rx) = mpsc::channel(self.buffer_size);
 
-        tokio::spawn(table::start_worker::<C>(
+        tokio::spawn(table::server::start_worker::<C>(
             table_rx,
             public_key,
             task_tx.clone(),

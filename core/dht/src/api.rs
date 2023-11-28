@@ -8,9 +8,9 @@ use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{oneshot, Notify};
 
-use crate::network::{Message, MessageType, Request};
-use crate::socket;
-use crate::table::TableKey;
+use crate::network::network::{Message, MessageType, Request};
+use crate::network::socket;
+use crate::table::server::TableKey;
 use crate::task::Task;
 
 pub async fn start_worker(

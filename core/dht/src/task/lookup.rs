@@ -11,12 +11,12 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
 use tokio::{select, time};
 
-use crate::bucket::MAX_BUCKET_SIZE;
-use crate::distance::{self, Distance};
-use crate::network::{Message, MessageType, Request};
+use crate::network::network::{Message, MessageType, Request};
+use crate::network::socket;
 use crate::node::NodeInfo;
-use crate::socket;
-use crate::table::{TableKey, TableRequest};
+use crate::table::bucket::MAX_BUCKET_SIZE;
+use crate::table::distance::{self, Distance};
+use crate::table::server::{TableKey, TableRequest};
 use crate::task::{ResponseEvent, TaskResponse};
 
 /// Kademlia's lookup procedure.
