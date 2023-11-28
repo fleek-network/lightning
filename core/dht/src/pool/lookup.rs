@@ -8,10 +8,6 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ApplicationInterface;
 use tokio::net::UdpSocket;
-use tokio::sync::oneshot;
-
-pub type ValueRespond = oneshot::Sender<Result<Option<Bytes>>>;
-pub type ProviderRespond = oneshot::Sender<Result<Vec<NodeIndex>>>;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -33,8 +29,9 @@ pub enum Error {
 
 #[async_trait]
 pub trait LookupInterface: Clone + Send + Sync + Unpin + 'static {
-    async fn find_node(&self, hash: u32) -> Result<Vec<NodeIndex>>;
-    async fn find_value(&self, hash: u32) -> Result<Option<Bytes>>;
+    async fn lookup_contact(&self, hash: u32) -> Result<Vec<NodeIndex>>;
+
+    async fn lookup_value(&self, hash: u32) -> Result<Option<Bytes>>;
 }
 
 pub struct Looker<C: Collection> {
