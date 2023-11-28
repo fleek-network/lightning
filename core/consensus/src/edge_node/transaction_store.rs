@@ -12,6 +12,10 @@ use crate::execution::{AuthenticStampedParcel, Digest, Execution};
 // This parameter must be in range [0, 1].
 const TBE_EMA: f64 = 0.125;
 
+// Bounds for the estimated time between executions.
+const MIN_TBE: Duration = Duration::from_secs(60);
+const MAX_TBE: Duration = Duration::from_secs(300);
+
 pub struct TransactionStore {
     parcels: RingBuffer,
     executed: HashSet<Digest>,
@@ -179,7 +183,8 @@ impl TransactionStore {
                 let estimated_tbe = self.estimated_tbe.as_millis() as f64;
                 let new_estimated_tbe = (1.0 - TBE_EMA) * estimated_tbe + TBE_EMA * sample_tbe;
                 self.estimated_tbe = Duration::from_millis(new_estimated_tbe as u64);
-                // TODO(matthias): add sensible bounds for `estimated_tbe`
+                self.estimated_tbe = self.estimated_tbe.max(MIN_TBE);
+                self.estimated_tbe = self.estimated_tbe.min(MAX_TBE);
 
                 let deviation_tbe = self.deviation_tbe.as_millis() as f64;
                 let new_deviation_tbe = (1.0 - TBE_EMA) * deviation_tbe
