@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::node::NodeInfo;
-use crate::table::TableKey;
+use crate::table::server::TableKey;
 
 #[cfg(not(test))]
 pub const MAX_BUCKET_SIZE: usize = 6;

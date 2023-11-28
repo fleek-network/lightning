@@ -5,9 +5,9 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tokio::task::{JoinHandle, JoinSet};
 
-use crate::bucket::{self, MAX_BUCKETS};
 use crate::node::NodeInfo;
-use crate::table::{TableKey, TableRequest};
+use crate::table::bucket::{self, MAX_BUCKETS};
+use crate::table::server::{TableKey, TableRequest};
 use crate::task::{Task, TaskFailed, TaskResult};
 
 pub const BOOTSTRAP_TASK_ID: u64 = 0;
@@ -183,8 +183,8 @@ mod tests {
     use rand::Rng;
 
     use super::*;
-    use crate::bucket::MAX_BUCKETS;
     use crate::distance;
+    use crate::table::bucket::MAX_BUCKETS;
 
     #[test]
     fn test_random_key_in_bucket() {

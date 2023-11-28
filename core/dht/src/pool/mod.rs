@@ -1,3 +1,4 @@
+mod lookup;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -12,7 +13,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
-use crate::v2::lookup::{LookupInterface, ProviderRespond, ValueRespond};
+use crate::pool::lookup::{LookupInterface, ProviderRespond, ValueRespond};
 
 pub enum Task {
     LookUpValue { hash: u32, respond: ValueRespond },
@@ -110,7 +111,7 @@ impl<C: Collection, L: LookupInterface> WorkerPool<C, L> {
                 }));
             },
             Task::Ping { .. } => {
-                todo!()
+                self.ongoing_tasks.push(tokio::spawn(async move { 0 }));
             },
         }
     }

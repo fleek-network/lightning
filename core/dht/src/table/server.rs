@@ -4,14 +4,15 @@ use std::sync::Arc;
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ReputationAggregatorInterface;
 use thiserror::Error;
-use tokio::sync::mpsc::{self, Receiver};
+use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::sync::{oneshot, Notify};
 
-use crate::bucket::{Bucket, BUCKET_REFRESH_INTERVAL, MAX_BUCKETS, MAX_BUCKET_SIZE};
-use crate::distance;
 use crate::node::NodeInfo;
+use crate::table::bucket::{Bucket, BUCKET_REFRESH_INTERVAL, MAX_BUCKETS, MAX_BUCKET_SIZE};
+use crate::table::distance;
 use crate::task::Task;
 
 //const DELTA: u64 = Duration::from_secs(600).as_millis() as u64; // 10 minutes
@@ -349,7 +350,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::*;
-    use crate::bucket;
+    use crate::table::bucket;
 
     partial!(PartialBinding {
         ApplicationInterface = Application<Self>;
@@ -635,4 +636,30 @@ mod tests {
             _ = request_fut => {}
         }
     }
+}
+
+pub enum Request {
+    ClosestNodes { hash: u32 },
+    AddNode { index: NodeIndex },
+    UpdateNodeTimestamp { timestamp: u64 },
+}
+
+pub struct Server {
+    /// Queue on incoming requests.
+    request_queue: Receiver<Request>,
+}
+
+#[derive(Clone)]
+pub struct Client {
+    request_queue: Sender<Request>,
+}
+
+impl Client {
+    pub fn closest_nodes(&self) {}
+
+    pub fn add_node(&self) {}
+
+    pub fn update_timestamp(&self) {}
+
+    pub fn pong(&self, index: NodeIndex) {}
 }

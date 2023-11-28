@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{oneshot, Notify};
 
-use crate::table::TableKey;
+use crate::table::server::TableKey;
 
 pub enum StoreRequest {
     Get {
