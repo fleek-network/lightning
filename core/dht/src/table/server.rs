@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::Result;
+use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::NodeIndex;
@@ -11,13 +12,108 @@ use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::sync::{oneshot, Notify};
 
 use crate::node::NodeInfo;
+use crate::pool;
+use crate::pool::{ValueRespond};
 use crate::table::bucket::{Bucket, BUCKET_REFRESH_INTERVAL, MAX_BUCKETS, MAX_BUCKET_SIZE};
-use crate::table::distance;
+use crate::table::{distance, Event};
+use crate::table::manager::Manager;
 use crate::task::Task;
 
 //const DELTA: u64 = Duration::from_secs(600).as_millis() as u64; // 10 minutes
 
 pub type TableKey = [u8; 32];
+
+pub struct Server<M> {
+    /// Queue on incoming requests.
+    request_queue: Receiver<Request>,
+    /// Queue on incoming events.
+    event_queue: Receiver<Event>,
+    /// Local store.
+    store: HashMap<TableKey, Bytes>,
+    /// Table manager.
+    manager: M,
+    /// Pool client.
+    pool: pool::Client,
+    /// Shutdown notify.
+    shutdown: Arc<Notify>,
+}
+
+impl<M: Manager> Server<M> {
+    pub fn handle_request(&mut self, request: Request) {
+        match request {
+            Request::Get {
+                key,
+                local,
+                respond,
+            } => {
+                if local {
+                    self.local_get(&key, respond);
+                } else {
+                    self.get(key, respond);
+                }
+            },
+            Request::Put { key, value, local } => {
+                if local {
+                    self.local_put(key, value);
+                } else {
+                    self.put(key, value);
+                }
+            },
+            Request::ClosestContacts { key, respond } => {
+                let _ = respond.send(self.manager.closest_contacts(key));
+            },
+        }
+    }
+
+    fn put(&mut self, key: TableKey, value: Bytes) {
+        if let Err(e) = self.pool.store(key, value) {
+            tracing::error!("`put` failed: {e:?}");
+        }
+    }
+
+    fn local_put(&mut self, key: TableKey, value: Bytes) {
+        self.store.insert(key, value);
+    }
+
+    fn get(&self, key: TableKey, respond: ValueRespond) {
+        if self.store.contains_key(&key) {
+            self.local_get(&key, respond)
+        } else {
+            if let Err(e) = self.pool.lookup_value(key, respond) {
+                tracing::error!("`get` failed: {e:?}");
+            }
+        }
+    }
+
+    fn local_get(&self, key: &TableKey, respond: ValueRespond) {
+        let entry = self.store.get(key).cloned();
+        let _ = respond.send(Ok(entry));
+    }
+
+    pub async fn run(&mut self) -> Result<()> {
+        loop {
+            tokio::select! {
+                _ = self.shutdown.notified() => {
+                    break;
+                }
+                next = self.request_queue.recv() => {
+                    let Some(request) = next else {
+                        break;
+                    };
+                    self.handle_request(request);
+                }
+                next = self.event_queue.recv() => {
+                    let Some(event) = next else {
+                        break
+                    };
+                    self.manager.handle_event(event);
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
 
 pub async fn start_worker<C: Collection>(
     mut rx: Receiver<TableRequest>,
@@ -639,27 +735,18 @@ mod tests {
 }
 
 pub enum Request {
-    ClosestNodes { hash: u32 },
-    AddNode { index: NodeIndex },
-    UpdateNodeTimestamp { timestamp: u64 },
-}
-
-pub struct Server {
-    /// Queue on incoming requests.
-    request_queue: Receiver<Request>,
-}
-
-#[derive(Clone)]
-pub struct Client {
-    request_queue: Sender<Request>,
-}
-
-impl Client {
-    pub fn closest_nodes(&self) {}
-
-    pub fn add_node(&self) {}
-
-    pub fn update_timestamp(&self) {}
-
-    pub fn pong(&self, index: NodeIndex) {}
+    Get {
+        key: TableKey,
+        local: bool,
+        respond: ValueRespond,
+    },
+    Put {
+        key: TableKey,
+        value: Bytes,
+        local: bool,
+    },
+    ClosestContacts {
+        key: TableKey,
+        respond: oneshot::Sender<Vec<NodeIndex>>,
+    },
 }
