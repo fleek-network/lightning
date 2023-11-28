@@ -84,7 +84,7 @@ impl<C: Collection> Context<C> {
         let pk = sk.to_pk();
         Self {
             db,
-            interner: Interner::new(u16::MAX),
+            interner: Interner::new(Interner::MAX_CAPACITY),
             incoming_messages: [
                 MessageRing::new(2048).into(),
                 MessageRing::new(32).into(),

@@ -17,5 +17,7 @@ mod tests;
 
 pub use broadcast::Broadcast;
 pub use config::Config;
+#[doc(hidden)]
+pub use ev::Context;
 pub use frame::*;
 pub use pubsub::PubSubI;

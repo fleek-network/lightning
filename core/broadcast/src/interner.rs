@@ -21,12 +21,16 @@ pub struct Interner {
 }
 
 impl Interner {
+    pub const MAX_CAPACITY: usize = 65_536;
+
     /// Create a new interner with the provided capacity. In practice consider
-    /// passing `u16::MAX` as the capacity. That will only consume 2MB of memory.
-    pub fn new(capacity: u16) -> Self {
+    /// passing [`Interner::MAX_CAPACITY`] as the capacity. That will only
+    /// consume 2MB of memory.
+    pub fn new(capacity: usize) -> Self {
+        assert!(capacity <= Self::MAX_CAPACITY);
         Self {
             next: 0,
-            data: Vec::with_capacity(capacity.into()),
+            data: Vec::with_capacity(capacity),
         }
     }
 
@@ -34,9 +38,14 @@ impl Interner {
     #[inline(always)]
     pub fn insert(&mut self, digest: Digest) -> MessageInternedId {
         let index = self.next;
-        // TODO: FIXME
-        self.next = self.next.wrapping_add(1);
-        self.data.insert(index as usize, digest);
+        self.next = index.wrapping_add(1);
+
+        if self.data.len() < Self::MAX_CAPACITY {
+            self.data.push(digest);
+        } else {
+            self.data[index as usize] = digest;
+        }
+
         index
     }
 
@@ -45,5 +54,43 @@ impl Interner {
     #[inline(always)]
     pub fn get(&self, id: MessageInternedId) -> Option<&Digest> {
         self.data.get(id as usize)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn to_digest(index: u16, fill: u8) -> Digest {
+        let mut value = [fill; 32];
+        value[0..2].copy_from_slice(&index.to_le_bytes());
+        value
+    }
+
+    #[test]
+    fn interner() {
+        let mut interner = Interner::new(Interner::MAX_CAPACITY);
+
+        for i in 0..=u16::MAX {
+            let id = interner.insert(to_digest(i, 0));
+            assert_eq!(id, i);
+            assert_eq!(interner.get(id), Some(&to_digest(i, 0)));
+        }
+
+        assert_eq!(interner.data.len(), Interner::MAX_CAPACITY);
+
+        for i in 0..u16::MAX {
+            if i == 100 {
+                for id in 100..200 {
+                    assert_eq!(interner.get(id), Some(&to_digest(id, 0)));
+                }
+            }
+
+            let id = interner.insert(to_digest(i, 1));
+            assert_eq!(id, i);
+            assert_eq!(interner.get(id), Some(&to_digest(i, 1)));
+        }
+
+        assert_eq!(interner.data.len(), Interner::MAX_CAPACITY);
     }
 }
