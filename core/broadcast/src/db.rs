@@ -16,14 +16,17 @@ struct Entry {
     propagated: bool,
 }
 
-impl Database {
-    pub fn new() -> Self {
+impl Default for Database {
+    fn default() -> Self {
         // todo(dalton): Figure out a sane cache for broadcast messaging. Ideally a 24 hour epoch
         // worth.
         Self {
             data: Cache::new(100_000),
         }
     }
+}
+
+impl Database {
     /// Insert a message with all the information we have about it. And set propagated to true.
     pub fn insert_with_message(&mut self, id: MessageInternedId, digest: Digest, message: Message) {
         self.data.insert(
@@ -102,7 +105,7 @@ mod test {
 
     #[test]
     fn test_cache() {
-        let mut db = Database::new();
+        let mut db = Database::default();
         // We will set this to the sixty thousand entry we make into the cache
         let mut sixty_thousand = None;
         // we will set this to the first entry we put in the cache
