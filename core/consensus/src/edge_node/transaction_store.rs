@@ -19,6 +19,7 @@ const MAX_TBE: Duration = Duration::from_secs(300);
 pub struct TransactionStore {
     parcels: RingBuffer,
     executed: HashSet<Digest>,
+    pending: HashSet<Digest>,
     last_executed_timestamp: Option<SystemTime>,
     estimated_tbe: Duration,
     deviation_tbe: Duration,
@@ -46,6 +47,7 @@ impl TransactionStore {
         Self {
             parcels: RingBuffer::new(),
             executed: HashSet::with_capacity(512),
+            pending: HashSet::with_capacity(512),
             last_executed_timestamp: None,
             // TODO(matthias): do some napkin math for these initial estimates
             estimated_tbe: Duration::from_secs(30),
@@ -111,6 +113,40 @@ impl TransactionStore {
         &mut self,
         digest: Digest,
         threshold: usize,
+        query_runner: &Q,
+        execution: &Arc<Execution<Q>>,
+    ) -> Result<bool, NotExecuted> {
+        // get the current chain head
+        let head = query_runner.get_last_block();
+        let mut epoch_changed = match self
+            .try_execute_internal(digest, threshold, execution, head)
+            .await
+        {
+            Ok(epoch_changed) => epoch_changed,
+            Err(NotExecuted::MissingAttestations(_)) => false,
+            Err(e) => return Err(e),
+        };
+
+        let digests: Vec<Digest> = self.pending.iter().copied().collect();
+        for digest in digests {
+            if self.pending.contains(&digest) {
+                // get the current chain head
+                let head = query_runner.get_last_block();
+                if let Ok(epoch_changed_) = self
+                    .try_execute_internal(digest, threshold, execution, head)
+                    .await
+                {
+                    epoch_changed = epoch_changed || epoch_changed_;
+                }
+            }
+        }
+        Ok(epoch_changed)
+    }
+
+    async fn try_execute_internal<Q: SyncQueryRunnerInterface>(
+        &mut self,
+        digest: Digest,
+        threshold: usize,
         execution: &Arc<Execution<Q>>,
         head: Digest,
     ) -> Result<bool, NotExecuted> {
@@ -155,6 +191,7 @@ impl TransactionStore {
 
                 // mark all parcels in chain as executed
                 for digest in parcel_chain {
+                    self.pending.remove(&digest);
                     self.executed.insert(digest);
                 }
 
@@ -166,6 +203,9 @@ impl TransactionStore {
             } else {
                 last_digest = parcel.inner.last_executed;
             }
+        }
+        for digest in parcel_chain {
+            self.pending.insert(digest);
         }
         Err(NotExecuted::MissingParcel(last_digest))
     }

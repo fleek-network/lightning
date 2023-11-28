@@ -148,11 +148,14 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 
                         if !on_committee {
                             info!("Received transaction parcel from gossip as an edge node");
-                            // get the current chain head
-                            let head = query_runner.get_last_block();
 
                             match txn_store
-                            .try_execute(parcel_digest,quorom_threshold,&execution,head).await {
+                            .try_execute(
+                                parcel_digest,
+                                quorom_threshold,
+                                &query_runner,
+                                &execution,
+                            ).await {
                                 Ok(epoch_changed) => {
                                     if epoch_changed {
                                         committee = query_runner.get_committee_members_by_index();
@@ -210,11 +213,13 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                 );
                             }
 
-                            // get the current chain head
-                            let head = query_runner.get_last_block();
-
                             match txn_store
-                            .try_execute(att.digest, quorom_threshold, &execution, head).await {
+                            .try_execute(
+                                att.digest,
+                                quorom_threshold,
+                                &query_runner,
+                                &execution,
+                            ).await {
                                 Ok(epoch_changed) => {
                                     if epoch_changed {
                                         committee = query_runner

@@ -44,11 +44,6 @@ impl RingBuffer {
                 .and_then(|wrapper| wrapper.attestations.as_ref()))
     }
 
-    pub fn contains_parcel(&self, digest: &Digest) -> bool {
-        self.ring[self.pointer].contains_key(digest)
-            || self.ring[self.prev_pointer()].contains_key(digest)
-    }
-
     // Store a parcel from the current epoch.
     pub fn store_parcel(
         &mut self,
