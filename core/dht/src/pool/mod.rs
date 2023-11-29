@@ -3,6 +3,7 @@ mod lookup;
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -16,6 +17,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{oneshot, Notify};
 use tokio::task::JoinHandle;
 
+use crate::network::sock::UdpTransport;
 use crate::pool::lookup::LookupInterface;
 use crate::table::Event;
 
@@ -33,6 +35,8 @@ pub struct NetworkMessage {
 pub struct WorkerPool<C: Collection, L: LookupInterface> {
     /// Performs look-ups.
     looker: L,
+    /// Socket to send/recv messages over the network.
+    socket: UdpTransport,
     /// Queue for receiving tasks.
     task_queue: Receiver<Task>,
     /// Queue for sending events.
@@ -57,11 +61,22 @@ impl<C: Collection, L: LookupInterface> WorkerPool<C, L> {
                     tracing::info!("shutting down worker pool");
                     break;
                 }
-                incoming_task = self.task_queue.recv() => {
-                    let Some(task) = incoming_task else {
+                next = self.task_queue.recv() => {
+                    let Some(task) = next else {
                         break;
                     };
                     self.handle_incoming_task(task);
+                }
+                next = self.socket.recv() => {
+                    match next {
+                        Ok(message) => {
+                            self.handle_message(message);
+                        }
+                        Err(e) => {
+                            tracing::error!("unexpected error from socket: {e:?}");
+                            break;
+                        }
+                    }
                 }
                 Some(task_result) = self.ongoing_tasks.next() => {
                     match task_result {
@@ -107,6 +122,10 @@ impl<C: Collection, L: LookupInterface> WorkerPool<C, L> {
                 self.ongoing_tasks.push(tokio::spawn(async move { 0 }));
             },
         }
+    }
+
+    fn handle_message(&self, message: (Bytes, SocketAddr)) {
+        let (bytes, addr) = message;
     }
 
     fn cleanup(&mut self, id: u64) {

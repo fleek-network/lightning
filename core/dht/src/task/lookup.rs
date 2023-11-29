@@ -12,7 +12,7 @@ use tokio::sync::oneshot;
 use tokio::{select, time};
 
 use crate::network::network::{Message, MessageType, Request};
-use crate::network::socket;
+use crate::network::sock;
 use crate::node::NodeInfo;
 use crate::table::bucket::MAX_BUCKET_SIZE;
 use crate::table::distance::{self, Distance};
@@ -76,7 +76,7 @@ pub async fn lookup<C: Collection>(mut lookup: LookupTask<C>) -> Result<TaskResp
                     payload,
                 };
                 let bytes = bincode::serialize(&message).expect("query to be valid");
-                socket::send_to(&lookup.socket, bytes.as_slice(), node.inner.address).await?;
+                sock::send_to(&lookup.socket, bytes.as_slice(), node.inner.address).await?;
                 pending.insert(
                     node.inner.key,
                     PendingResponse {
