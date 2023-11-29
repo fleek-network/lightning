@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Duration;
 
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::Epoch;
@@ -76,7 +77,9 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
         .unwrap_or(u32::MAX);
     let mut on_committee = committee.contains(&our_index);
     let (timeout_tx, mut timeout_rx) = mpsc::channel(128);
+    // TODO(matthias): should any of these two be a LRU cache?
     let mut pending_timeouts = HashSet::new();
+    let mut pending_requests = HashSet::new();
 
     let mut txn_store = TransactionStore::new();
     loop {
@@ -133,9 +136,25 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 
                         let msg_digest = msg.get_digest();
                         // propagate here now that we know its good and before we do async work
-                        msg.propagate();
+
 
                         let parcel_digest = parcel.to_digest();
+
+                        // Check if we requested this parcel
+                        if pending_requests.remove(&parcel_digest) {
+                            // This is a parcel that we specifically requested, so
+                            // we have to set a timeout for the previous parcel, because
+                            // swallow the Err return in the loop of `try_execute`.
+                            set_parcel_timer(
+                                parcel.last_executed,
+                                txn_store.get_timeout(),
+                                timeout_tx.clone(),
+                                &mut pending_timeouts,
+                            ).await;
+                        } else {
+                            // only propagate normal parcels, not the ones we requested
+                            msg.propagate();
+                        }
 
                         if parcel.epoch == epoch + 1 {
                             // if the parcel is from the next epoch, we optimistically
@@ -176,7 +195,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                 Err(not_executed) => {
                                     handle_not_executed(
                                         not_executed,
-                                        &txn_store,
+                                        txn_store.get_timeout(),
                                         timeout_tx.clone(),
                                         &mut pending_timeouts,
                                     ).await;
@@ -241,7 +260,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                 Err(not_executed) => {
                                     handle_not_executed(
                                         not_executed,
-                                        &txn_store,
+                                        txn_store.get_timeout(),
                                         timeout_tx.clone(),
                                         &mut pending_timeouts,
                                     ).await;
@@ -270,6 +289,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                     if txn_store.get_parcel(&digest).is_none() {
                         let request = PubSubMsg::RequestTransactions(digest);
                         pub_sub.send(&request, None).await;
+                        pending_requests.insert(digest);
                     }
                 }
             }
@@ -289,18 +309,26 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 // is larger than the expected time, we send out a request.
 async fn handle_not_executed(
     not_executed: NotExecuted,
-    txn_store: &TransactionStore,
+    timeout: Duration,
     timeout_tx: mpsc::Sender<Digest>,
     pending_timeouts: &mut HashSet<Digest>,
 ) {
     if let NotExecuted::MissingParcel(digest) = not_executed {
-        if !pending_timeouts.contains(&digest) && pending_timeouts.len() < MAX_PENDING_TIMEOUTS {
-            let timeout = txn_store.get_timeout();
-            tokio::spawn(async move {
-                tokio::time::sleep(timeout).await;
-                let _ = timeout_tx.send(digest).await;
-            });
-        }
+        set_parcel_timer(digest, timeout, timeout_tx, pending_timeouts).await;
+    }
+}
+
+async fn set_parcel_timer(
+    digest: Digest,
+    timeout: Duration,
+    timeout_tx: mpsc::Sender<Digest>,
+    pending_timeouts: &mut HashSet<Digest>,
+) {
+    if !pending_timeouts.contains(&digest) && pending_timeouts.len() < MAX_PENDING_TIMEOUTS {
+        tokio::spawn(async move {
+            tokio::time::sleep(timeout).await;
+            let _ = timeout_tx.send(digest).await;
+        });
         pending_timeouts.insert(digest);
     }
 }
