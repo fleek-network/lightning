@@ -48,6 +48,7 @@ impl<S: SyncQueryRunnerInterface> UnreliableTransport for UdpTransport<S> {
         self.send(bytes.as_ref(), address).await
     }
 
+    // This is cancel-safe.
     async fn recv(&self) -> std::io::Result<(NodeIndex, Message)> {
         let (bytes, _) = self.inner_recv().await?;
         let message = Message::decode(bytes).map_err(|_| io::ErrorKind::InvalidData)?;
