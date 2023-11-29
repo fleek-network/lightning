@@ -26,12 +26,6 @@ pub struct TransactionStore {
 }
 
 #[derive(Clone)]
-pub struct ParcelWrapper {
-    pub(crate) parcel: Option<Parcel>,
-    pub(crate) attestations: Option<Vec<NodeIndex>>,
-}
-
-#[derive(Clone)]
 pub struct Parcel {
     pub inner: AuthenticStampedParcel,
     // The originator of this parcel.
@@ -59,7 +53,7 @@ impl TransactionStore {
         self.parcels.get_parcel(digest)
     }
 
-    pub fn get_attestations(&self, digest: &Digest) -> Option<&Vec<NodeIndex>> {
+    pub fn get_attestations(&self, digest: &Digest) -> Option<&HashSet<NodeIndex>> {
         self.parcels.get_attestations(digest)
     }
 

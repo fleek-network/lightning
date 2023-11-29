@@ -1,11 +1,17 @@
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
 use lightning_interfaces::ToDigest;
 
-use super::transaction_store::{Parcel, ParcelWrapper};
+use super::transaction_store::Parcel;
 use crate::execution::{AuthenticStampedParcel, Digest};
+
+#[derive(Clone)]
+pub struct ParcelWrapper {
+    pub(crate) parcel: Option<Parcel>,
+    pub(crate) attestations: Option<HashSet<NodeIndex>>,
+}
 
 pub struct RingBuffer {
     ring: Vec<HashMap<Digest, ParcelWrapper>>,
@@ -35,7 +41,7 @@ impl RingBuffer {
     // Returns the attestations for the given digest, if they exist.
     // If the attestations do not exist for the current epoch, we will check for attestations from
     // the previous epoch.
-    pub fn get_attestations(&self, digest: &Digest) -> Option<&Vec<NodeIndex>> {
+    pub fn get_attestations(&self, digest: &Digest) -> Option<&HashSet<NodeIndex>> {
         self.ring[self.pointer]
             .get(digest)
             .and_then(|wrapper| wrapper.attestations.as_ref())
@@ -91,7 +97,7 @@ impl RingBuffer {
             }
 
             if let Some(attns) = &mut wrapper.attestations {
-                let valid_attn: Vec<NodeIndex> = attns
+                let valid_attn: HashSet<NodeIndex> = attns
                     .iter()
                     .copied()
                     .filter(|node_index| committee.contains(node_index))
@@ -159,15 +165,15 @@ impl RingBuffer {
             .entry(digest)
             .and_modify(|wrapper| match &mut wrapper.attestations {
                 Some(attestations) => {
-                    attestations.push(node_index);
+                    attestations.insert(node_index);
                 },
                 None => {
-                    wrapper.attestations = Some(vec![node_index]);
+                    wrapper.attestations = Some(HashSet::from([node_index]));
                 },
             })
             .or_insert(ParcelWrapper {
                 parcel: None,
-                attestations: Some(vec![node_index]),
+                attestations: Some(HashSet::from([node_index])),
             });
     }
 

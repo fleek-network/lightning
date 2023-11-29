@@ -254,7 +254,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         //msg.propagate();
                         if let Some(parcel) = txn_store.get_parcel(&digest) {
                             if let Some(msg_digest) = parcel.message_digest {
-                                let filter = HashSet::from_iter(vec![msg.originator()].into_iter());
+                                let filter = HashSet::from([msg.originator()]);
                                 pub_sub.repropagate(msg_digest, Some(filter)).await;
                             }
                         }
