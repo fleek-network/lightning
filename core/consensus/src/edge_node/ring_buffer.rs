@@ -32,7 +32,7 @@ impl RingBuffer {
                 .and_then(|wrapper| wrapper.parcel.as_ref()))
     }
 
-    // Returns the attestations for the given digest, if they exists.
+    // Returns the attestations for the given digest, if they exist.
     // If the attestations do not exist for the current epoch, we will check for attestations from
     // the previous epoch.
     pub fn get_attestations(&self, digest: &Digest) -> Option<&Vec<NodeIndex>> {
