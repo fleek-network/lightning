@@ -4,7 +4,7 @@ use lightning_interfaces::types::NodeIndex;
 use crate::table::server::TableKey;
 
 pub enum Event {
-    Pong { index: NodeIndex, timestamp: u64 },
+    Pong { from: NodeIndex, timestamp: u64 },
     Unresponsive { index: NodeIndex },
 }
 
