@@ -5,13 +5,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::table::server::TableKey;
 
-const PING_TYPE: u8 = 0;
-const PONG_TYPE: u8 = 1;
-const STORE_TYPE: u8 = 2;
-const FIND_VALUE_TYPE: u8 = 3;
-const FIND_VALUE_RESPONSE_TYPE: u8 = 4;
-const FIND_NODE_TYPE: u8 = 5;
-const FIND_NODE_RESPONSE_TYPE: u8 = 6;
+pub const PING_TYPE: u8 = 0;
+pub const PONG_TYPE: u8 = 1;
+pub const STORE_TYPE: u8 = 2;
+pub const FIND_VALUE_TYPE: u8 = 3;
+pub const FIND_VALUE_RESPONSE_TYPE: u8 = 4;
+pub const FIND_NODE_TYPE: u8 = 5;
+pub const FIND_NODE_RESPONSE_TYPE: u8 = 6;
 
 pub fn ping(id: u32, token: u32, from: NodeIndex) -> Message {
     Message::new(id, token, from, PING_TYPE, Bytes::new())
@@ -153,12 +153,14 @@ pub struct Message {
     // Todo: Maybe merge id and token to safe space.
     id: u32,
     token: u32,
-    from: NodeIndex,
+    // Todo: find trust-less way of deriving the src node index.
+    pub(crate) from: NodeIndex,
     ty: u8,
     bytes: Bytes,
 }
 
 impl Message {
+    #[inline]
     fn new(id: u32, token: u32, from: NodeIndex, ty: u8, bytes: Bytes) -> Self {
         Self {
             id,
@@ -169,10 +171,32 @@ impl Message {
         }
     }
 
+    #[inline]
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    #[inline]
+    pub fn token(&self) -> u32 {
+        self.token
+    }
+
+    #[inline]
+    pub fn ty(&self) -> u8 {
+        self.ty
+    }
+
+    #[inline]
+    pub fn bytes(self) -> Bytes {
+        self.bytes
+    }
+
+    #[inline]
     pub fn decode(bytes: Bytes) -> Result<Self> {
         Self::try_from(bytes)
     }
 
+    #[inline]
     pub fn encode(self) -> Bytes {
         Bytes::from(self)
     }
