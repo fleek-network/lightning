@@ -11,7 +11,6 @@ use thiserror::Error;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::sync::{oneshot, Notify};
 
-use crate::network::sock::UdpTransport;
 use crate::node::NodeInfo;
 use crate::pool;
 use crate::pool::ValueRespond;

@@ -17,7 +17,8 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{oneshot, Notify};
 use tokio::task::JoinHandle;
 
-use crate::network::sock::UdpTransport;
+use crate::network;
+use crate::network::{Message, UdpTransport, UnreliableTransport};
 use crate::pool::lookup::LookupInterface;
 use crate::table::Event;
 
@@ -27,24 +28,26 @@ pub enum Task {
     Ping { peer: NodeIndex, timeout: Duration },
 }
 
-pub struct NetworkMessage {
-    id: u64,
-    payload: Bytes,
-}
-
-pub struct WorkerPool<C: Collection, L: LookupInterface> {
+pub struct WorkerPool<C, L, T>
+where
+    C: Collection,
+    L: LookupInterface,
+    T: UnreliableTransport,
+{
+    /// Our node index.
+    us: NodeIndex,
     /// Performs look-ups.
     looker: L,
     /// Socket to send/recv messages over the network.
-    socket: UdpTransport,
+    socket: T,
     /// Queue for receiving tasks.
     task_queue: Receiver<Task>,
     /// Queue for sending events.
     event_queue: Sender<Event>,
     /// Set of currently running worker tasks.
-    ongoing_tasks: FuturesUnordered<JoinHandle<u64>>,
+    ongoing_tasks: FuturesUnordered<JoinHandle<u32>>,
     /// Logical set of ongoing lookup tasks.
-    ongoing: HashMap<u64, ()>,
+    ongoing: HashMap<u32, ()>,
     /// Maximum pool size.
     max_pool_size: usize,
     /// Shutdown notify.
@@ -52,7 +55,12 @@ pub struct WorkerPool<C: Collection, L: LookupInterface> {
     _marker: PhantomData<C>,
 }
 
-impl<C: Collection, L: LookupInterface> WorkerPool<C, L> {
+impl<C, L, T> WorkerPool<C, L, T>
+where
+    C: Collection,
+    L: LookupInterface,
+    T: UnreliableTransport,
+{
     pub async fn run(&mut self) {
         loop {
             tokio::select! {
@@ -100,7 +108,7 @@ impl<C: Collection, L: LookupInterface> WorkerPool<C, L> {
         match task {
             Task::LookUpValue { hash, respond } => {
                 let looker = self.looker.clone();
-                let id: u64 = rand::random();
+                let id: u32 = rand::random();
                 self.ongoing_tasks.push(tokio::spawn(async move {
                     let value = looker.lookup_value(hash).await;
                     // if the client drops the receiver, there's nothing we can do.
@@ -110,7 +118,7 @@ impl<C: Collection, L: LookupInterface> WorkerPool<C, L> {
             },
             Task::LookUpNode { hash, respond } => {
                 let looker = self.looker.clone();
-                let id: u64 = rand::random();
+                let id: u32 = rand::random();
                 self.ongoing_tasks.push(tokio::spawn(async move {
                     let nodes = looker.lookup_contact(hash).await;
                     // if the client drops the receiver, there's nothing we can do.
@@ -124,12 +132,47 @@ impl<C: Collection, L: LookupInterface> WorkerPool<C, L> {
         }
     }
 
-    fn handle_message(&self, message: (Bytes, SocketAddr)) {
-        let (bytes, addr) = message;
+    fn handle_message(&self, message: (NodeIndex, Message)) {
+        let (from, message) = message;
+        let id = message.id();
+        let token = message.token();
+        let ty = message.ty();
+        match ty {
+            network::PING_TYPE => {
+                self.pong(id, token, from);
+            },
+            network::PONG_TYPE => {},
+            network::STORE_TYPE => {},
+            network::FIND_NODE_TYPE => {},
+            network::FIND_NODE_RESPONSE_TYPE => {},
+            network::FIND_VALUE_TYPE => {},
+            network::FIND_VALUE_RESPONSE_TYPE => {},
+            ty => {
+                tracing::warn!("invalid message type id received: {ty}")
+            },
+        }
     }
 
-    fn cleanup(&mut self, id: u64) {
-        debug_assert!(self.ongoing.remove(&id).is_some());
+    pub fn pong(&self, id: u32, token: u32, dst: NodeIndex) {
+        if self.ongoing_tasks.len() > self.max_pool_size {
+            // Should we buffer it or ignore pings in the case where we're overwhelmed?
+        }
+
+        let message = network::pong(id, token, self.us);
+        let socket = self.socket.clone();
+        self.ongoing_tasks.push(tokio::spawn(async move {
+            if let Err(e) = socket.send(message, dst).await {
+                tracing::error!("failed to send pong: {e:?}");
+            }
+            // Since we don't save any state that needs cleanup for
+            // this task, it doesn't matter which id we give it.
+            rand::random()
+        }));
+        // We do not update `ongoing` because we don't expect a response for a pong.
+    }
+
+    fn cleanup(&mut self, id: u32) {
+        self.ongoing.remove(&id);
     }
 }
 
