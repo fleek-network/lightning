@@ -266,7 +266,8 @@ async fn test_send() {
             },
             None,
         )
-        .await;
+        .await
+        .unwrap();
 
     // wait until node2 and node3 received the messages before cleaning up
     rx2.await.unwrap();

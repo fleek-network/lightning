@@ -66,7 +66,7 @@ pub trait PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
 
     /// Publish a message. If `filter` is `Some(set)`, then the message
     /// will only be sent to nodes in `set`.
-    async fn send(&self, msg: &T, filter: Option<HashSet<NodeIndex>>);
+    async fn send(&self, msg: &T, filter: Option<HashSet<NodeIndex>>) -> Result<Digest>;
 
     /// Propagate a message that we already propagated before.
     async fn repropagate(&self, digest: Digest, filter: Option<HashSet<NodeIndex>>);

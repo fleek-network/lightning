@@ -310,6 +310,8 @@ impl<C: Collection> Context<C> {
                     (digest, tmp)
                 };
 
+                let _ = cmd.response.send(digest);
+
                 let id = self.interner.insert(digest);
                 self.db.insert_with_message(id, digest, message);
 

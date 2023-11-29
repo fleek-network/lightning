@@ -201,7 +201,7 @@ impl<C: Collection> ResolverInner<C> {
                 if index > 0 {
                     resolved_pointer.pointer = pointer.clone();
                 }
-                self.pubsub.send(&resolved_pointer, None).await;
+                let _ = self.pubsub.send(&resolved_pointer, None).await;
             }
         }
     }

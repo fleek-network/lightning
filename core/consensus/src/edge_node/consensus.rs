@@ -98,10 +98,6 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                 }
 
                 let parcel_digest = parcel.to_digest();
-
-                txn_store.store_parcel(parcel.clone(), our_index, None);
-                // No need to store the attestation we have already executed it
-
                 let attestation = CommitteeAttestation {
                     digest: parcel_digest,
                     node_index: our_index,
@@ -109,8 +105,14 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                 };
 
                 info!("Send transaction parcel to broadcast as a validator");
-                pub_sub.send(&attestation.into(), None).await;
-                pub_sub.send(&parcel.into(), None).await;
+                let _ = pub_sub.send(&attestation.into(), None).await;
+
+                if let Ok(msg_digest) = pub_sub.send(&parcel.clone().into(), None).await {
+                    txn_store.store_parcel(parcel, our_index, Some(msg_digest));
+                } else {
+                    txn_store.store_parcel(parcel, our_index, None);
+                }
+                // No need to store the attestation we have already executed it
 
                 if epoch_changed {
                     committee = query_runner.get_committee_members_by_index();
@@ -288,7 +290,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                     pending_timeouts.remove(&digest);
                     if txn_store.get_parcel(&digest).is_none() {
                         let request = PubSubMsg::RequestTransactions(digest);
-                        pub_sub.send(&request, None).await;
+                        let _ = pub_sub.send(&request, None).await;
                         pending_requests.insert(digest);
                     }
                 }

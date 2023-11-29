@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::marker::PhantomData;
 
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{Digest, NodeIndex, Topic};
@@ -53,17 +54,22 @@ impl<T: LightningMessage + Clone> Clone for PubSubI<T> {
 impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
     type Event = Event<T>;
 
-    async fn send(&self, msg: &T, filter: Option<HashSet<NodeIndex>>) {
+    async fn send(&self, msg: &T, filter: Option<HashSet<NodeIndex>>) -> Result<Digest> {
         debug!("sending a message on topic {:?}", self.topic);
 
         let mut payload = Vec::with_capacity(512);
         msg.encode(&mut payload)
             .expect("Unexpected failure writing to buffer.");
+
+        let (tx, rx) = oneshot::channel();
         let _ = self.command_sender.send(Command::Send(SendCmd {
             topic: self.topic,
             filter,
             payload,
+            response: tx,
         }));
+        rx.await
+            .map_err(|e| anyhow!("Failed to receive message digest: {e:?}"))
     }
 
     /// Propagate a message that we already propagated before.

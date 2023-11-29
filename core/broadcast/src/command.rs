@@ -33,6 +33,8 @@ pub struct SendCmd {
     /// If `filter` is Some(set), then the message will only be send to the nodes in `set`
     pub filter: Option<HashSet<NodeIndex>>,
     pub payload: Vec<u8>,
+    /// The response channel for returning the message digest.
+    pub response: oneshot::Sender<Digest>,
 }
 
 /// A propagate call from a pubsub.
