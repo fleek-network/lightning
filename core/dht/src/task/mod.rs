@@ -20,7 +20,7 @@ use tokio::task::JoinSet;
 use tokio_util::time::DelayQueue;
 
 use crate::network::network::{Message, MessageType, Request, Response};
-use crate::network::socket;
+use crate::network::sock;
 use crate::node::NodeInfo;
 use crate::table::bucket;
 use crate::table::bucket::BUCKET_REFRESH_INTERVAL;
@@ -273,7 +273,7 @@ impl<C: Collection> TaskManager<C> {
                         },
                     };
 
-                    if let Err(e) = socket::send_to(&socket, &bytes, address).await {
+                    if let Err(e) = sock::send_to(&socket, &bytes, address).await {
                         return Err(TaskFailed {
                             id,
                             error: e.into(),

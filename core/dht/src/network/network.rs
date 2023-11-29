@@ -9,7 +9,7 @@ use tokio::select;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{oneshot, Notify};
 
-use crate::network::socket;
+use crate::network::sock;
 use crate::node::NodeInfo;
 use crate::store::StoreRequest;
 use crate::table::server::{TableKey, TableRequest};
@@ -32,7 +32,7 @@ pub async fn start_worker(
     };
     loop {
         select! {
-            incoming = socket::recv_from(&socket) => {
+            incoming = sock::recv_from(&socket) => {
                 match incoming {
                     Ok((datagram, address)) => {
                         if let Err(e) = handler.handle_incoming(datagram, address) {
@@ -95,7 +95,7 @@ async fn handle_query(
                 payload,
             };
             let bytes = bincode::serialize(&response)?;
-            socket::send_to(&socket, bytes.as_slice(), address).await?;
+            sock::send_to(&socket, bytes.as_slice(), address).await?;
 
             tracing::trace!(
                 "discovered new contact {:?} {:?}",
@@ -133,7 +133,7 @@ async fn handle_query(
                 payload,
             };
             let bytes = bincode::serialize(&response)?;
-            socket::send_to(&socket, bytes.as_slice(), address).await?;
+            sock::send_to(&socket, bytes.as_slice(), address).await?;
         },
     }
     Ok(())

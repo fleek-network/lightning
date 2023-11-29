@@ -9,7 +9,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{oneshot, Notify};
 
 use crate::network::network::{Message, MessageType, Request};
-use crate::network::socket;
+use crate::network::sock;
 use crate::table::server::TableKey;
 use crate::task::Task;
 
@@ -127,7 +127,7 @@ impl Handler {
         let bytes = bincode::serialize(&message).expect("Serialization to succeed");
         for node in response.nodes {
             tracing::trace!("send STORE to {node:?}");
-            if let Err(e) = socket::send_to(&self.socket, &bytes, node.address).await {
+            if let Err(e) = sock::send_to(&self.socket, &bytes, node.address).await {
                 tracing::error!("failed to send datagram {e:?}");
             }
         }
