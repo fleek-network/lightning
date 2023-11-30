@@ -5,6 +5,7 @@ use std::time::Duration;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::Epoch;
 use lightning_interfaces::{BroadcastEventInterface, PubSub, SyncQueryRunnerInterface, ToDigest};
+use quick_cache::unsync::Cache;
 use tokio::pin;
 use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinHandle;
@@ -14,7 +15,7 @@ use super::transaction_store::{NotExecuted, TransactionStore};
 use crate::consensus::PubSubMsg;
 use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Digest, Execution};
 
-const MAX_PENDING_TIMEOUTS: usize = 10;
+const MAX_PENDING_TIMEOUTS: usize = 100;
 
 pub struct EdgeConsensus {
     handle: JoinHandle<()>,
@@ -77,9 +78,10 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
         .unwrap_or(u32::MAX);
     let mut on_committee = committee.contains(&our_index);
     let (timeout_tx, mut timeout_rx) = mpsc::channel(128);
-    // TODO(matthias): should any of these two be a LRU cache?
+    // `pending_timeouts` is not a cache because we already limit the number of timeouts we spawn
+    // with `MAX_PENDING_TIMEOUTS`, so `pending_timeouts` is bounded from above by that constant
     let mut pending_timeouts = HashSet::new();
-    let mut pending_requests = HashSet::new();
+    let mut pending_requests = Cache::new(100);
 
     let mut txn_store = TransactionStore::new();
     loop {
@@ -139,11 +141,10 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         let msg_digest = msg.get_digest();
                         // propagate here now that we know its good and before we do async work
 
-
                         let parcel_digest = parcel.to_digest();
 
                         // Check if we requested this parcel
-                        if pending_requests.remove(&parcel_digest) {
+                        if pending_requests.remove(&parcel_digest).is_some() {
                             // This is a parcel that we specifically requested, so
                             // we have to set a timeout for the previous parcel, because
                             // swallow the Err return in the loop of `try_execute`.
@@ -291,7 +292,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                     if txn_store.get_parcel(&digest).is_none() {
                         let request = PubSubMsg::RequestTransactions(digest);
                         let _ = pub_sub.send(&request, None).await;
-                        pending_requests.insert(digest);
+                        pending_requests.insert(digest, ());
                     }
                 }
             }

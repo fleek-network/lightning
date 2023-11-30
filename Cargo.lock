@@ -4578,6 +4578,7 @@ dependencies = [
  "narwhal-types",
  "narwhal-worker",
  "prometheus",
+ "quick_cache",
  "rand 0.8.5",
  "resolved-pathbuf",
  "serde",
