@@ -1,6 +1,7 @@
 use anyhow::Result;
 use bytes::Bytes;
 use lightning_interfaces::types::NodeIndex;
+use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
@@ -12,17 +13,60 @@ pub struct Client {
 }
 
 impl Client {
-    pub async fn get(&self, hash: u32) -> Option<Bytes> {
-        None
+    pub async fn get(&self, key: TableKey) -> Option<Bytes> {
+        let (respond_tx, respond_rx) = oneshot::channel();
+        if let Err(e) = self
+            .request_queue
+            .send(Request::Get {
+                key: rand::random(),
+                local: false,
+                respond: respond_tx,
+            })
+            .await
+        {
+            return None;
+        }
+        match respond_rx.await.ok()? {
+            Ok(value) => value,
+            Err(e) => {
+                tracing::debug!("failed to find entry for key {key:?}: {e:?}");
+                None
+            },
+        }
     }
 
-    pub async fn put(&self, hash: u32, value: Bytes) {}
+    pub async fn put(&self, hash: u32, value: Bytes) {
+        let _ = self
+            .request_queue
+            .send(Request::Put {
+                key: rand::random(),
+                value,
+                local: false,
+            })
+            .await;
+    }
 
     pub async fn local_get(&self, key: TableKey) -> Option<Bytes> {
-        None
+        let (respond_tx, respond_rx) = oneshot::channel();
+        if let Err(e) = self
+            .request_queue
+            .send(Request::Get {
+                key: rand::random(),
+                local: true,
+                respond: respond_tx,
+            })
+            .await
+        {
+            return None;
+        }
+        match respond_rx.await.ok()? {
+            Ok(value) => value,
+            Err(e) => {
+                tracing::debug!("failed to find entry for key {key:?}");
+                None
+            },
+        }
     }
-
-    pub async fn local_put(&self, value: Bytes) {}
 
     pub fn try_local_put(&self, value: Bytes) -> Result<()> {
         self.request_queue
@@ -45,5 +89,7 @@ impl Client {
         respond_rx.await.map_err(Into::into)
     }
 
-    pub fn bootstrap(&self, _bootstrappers: Vec<NodeIndex>) {}
+    pub fn bootstrap(&self, _bootstrappers: Vec<NodeIndex>) {
+        todo!()
+    }
 }

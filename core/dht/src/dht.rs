@@ -48,6 +48,8 @@ impl<C: Collection> Builder<C> {
             .iter()
             .map(|b| NodeInfo {
                 key: b.network_public_key,
+                // Todo: Fix this.
+                index: 0,
                 address: b.address,
                 last_responded: None,
             })
@@ -67,6 +69,8 @@ impl<C: Collection> Builder<C> {
     pub fn add_node(&mut self, key: NodePublicKey, address: SocketAddr) {
         self.nodes.push(NodeInfo {
             key,
+            // Todo: Fix this.
+            index: 0,
             address,
             last_responded: None,
         });
