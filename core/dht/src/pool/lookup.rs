@@ -33,15 +33,18 @@ struct Payload {
     peers: Vec<NodeIndex>,
 }
 
-pub enum Error {
-    Canceled,
+pub struct Context {
+    /// Task id.
+    pub id: u32,
+    /// Queue for receiving messages from the network.
+    pub queue: Receiver<FindQueryResponse>,
 }
 
 #[async_trait]
 pub trait LookupInterface: Clone + Send + Sync + 'static {
-    async fn lookup_contact(&self, task_id: u32, key: TableKey) -> Result<Vec<NodeIndex>>;
+    async fn lookup_contact(&self, key: TableKey, ctx: Context) -> Result<Vec<NodeIndex>>;
 
-    async fn lookup_value(&self, task_id: u32, key: TableKey) -> Result<Option<Bytes>>;
+    async fn lookup_value(&self, key: TableKey, ctx: Context) -> Result<Option<Bytes>>;
 }
 
 pub struct Looker<C: Collection, T> {
@@ -88,13 +91,13 @@ where
         }
     }
 
+    // Todo: this task needs to be broken down and cleaned up.
     pub async fn lookup(
         &self,
-        task_id: u32,
         key: TableKey,
-        mut message_queue: Receiver<FindQueryResponse>,
+        is_content: bool,
+        mut ctx: Context,
     ) -> Result<(Vec<NodeIndex>, Bytes)> {
-        let is_content = true;
         let mut closest_nodes = LookupMap::<LookupNode>::new(key);
 
         // Get initial K closest nodes from our local table.
@@ -133,9 +136,9 @@ where
                 {
                     let token = rand::random();
                     let message = if is_content {
-                        network::find_value(task_id, token, self.us, key)
+                        network::find_value(ctx.id, token, self.us, key)
                     } else {
-                        network::find_node(task_id, token, self.us, key)
+                        network::find_node(ctx.id, token, self.us, key)
                     };
                     self.socket.send(message, node.index).await?;
 
@@ -165,7 +168,7 @@ where
                     continue;
                 }
                 // Incoming K nodes from peers.
-                message = message_queue.recv() => {
+                message = ctx.queue.recv() => {
                     let response_event = message.expect("handler worker not to drop the channel");
                     // Todo: Ignore if not in state.
                     let sender_key = self.sync_query.index_to_pubkey(response_event.from).unwrap();
@@ -187,35 +190,12 @@ where
                             continue;
                         }
 
-                        // Set the last_responded timestamp of the sender node
+                        // Set the last_responded timestamp of the sender node.
                         let _timestamp = SystemTime::now()
                                 .duration_since(SystemTime::UNIX_EPOCH)
                                 .unwrap()
                                 .as_millis() as u64;
 
-                        // Todo: Finish this.
-                        // let table_query = TableRequest::UpdateNodeTimestamp {
-                        //     node_key: sender_key,
-                        //     timestamp
-                        // };
-                        //
-                        // lookup
-                        //     .table_tx
-                        //     .send(table_query)
-                        //     .await
-                        //     .expect("failed to update node timestamp");
-                        //
-                        // Report a satisfactory interaction for the node that responded to our
-                        // request.
-                        //lookup.rep_reporter.report_sat(&sender_key, Weight::Weak);
-
-                        // Todo: we should return the closest nodes seen so far for this.
-                        // If this is look up is a find a value, we check if the value is in the response.
-                        if is_content && content.len() > 0 {
-                            return Ok((Vec::new(), content));
-                        }
-
-                        // Todo: clean up.
                         let nodes: Vec<(TableKey, LookupNode)> =contacts
                             .into_iter()
                             .filter(|index| {
@@ -254,6 +234,17 @@ where
                             None => late.remove(&sender_key).unwrap().node,
                         };
 
+                        // If this is look up is a find a value, we check if the value is in the response.
+                        if is_content && content.len() > 0 {
+                            let mut closest_nodes_seen = vec![node.index];
+                            closest_nodes_seen.extend(closest_nodes
+                                .into_nodes()
+                                .map(|lookup_node| lookup_node.index)
+                                .take(MAX_BUCKET_SIZE));
+
+                            return Ok((closest_nodes_seen, content));
+                        }
+
                         // Put this node back to closest nodes list.
                         assert!(closest_nodes.update(
                             node.key.0,
@@ -271,18 +262,13 @@ where
             }
         }
 
-        if is_content {
-            Ok((Vec::new(), Bytes::new()))
-        } else {
-            Ok((
-                closest_nodes
-                    .into_nodes()
-                    .map(|lookup_node| lookup_node.index)
-                    .take(MAX_BUCKET_SIZE)
-                    .collect(),
-                Bytes::new(),
-            ))
-        }
+        let closest_nodes_seen = closest_nodes
+            .into_nodes()
+            .map(|lookup_node| lookup_node.index)
+            .take(MAX_BUCKET_SIZE)
+            .collect();
+
+        Ok((closest_nodes_seen, Bytes::new()))
     }
 }
 
@@ -292,12 +278,16 @@ where
     C: Collection,
     T: UnreliableTransport,
 {
-    async fn lookup_contact(&self, task_id: u32, key: TableKey) -> Result<Vec<NodeIndex>> {
-        todo!()
+    async fn lookup_contact(&self, key: TableKey, ctx: Context) -> Result<Vec<NodeIndex>> {
+        self.lookup(key, false, ctx)
+            .await
+            .map(|(contacts, _)| contacts)
     }
 
-    async fn lookup_value(&self, task_id: u32, key: TableKey) -> Result<Option<Bytes>> {
-        todo!()
+    async fn lookup_value(&self, key: TableKey, ctx: Context) -> Result<Option<Bytes>> {
+        self.lookup(key, true, ctx)
+            .await
+            .map(|(_, content)| Some(content))
     }
 }
 

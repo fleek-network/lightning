@@ -16,11 +16,11 @@ use futures::StreamExt;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{oneshot, Notify};
+use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
 
 use crate::network::{Find, FindResponse, Message, UdpTransport, UnreliableTransport};
-use crate::pool::lookup::LookupInterface;
+use crate::pool::lookup::{Context, LookupInterface};
 use crate::table::server::TableKey;
 use crate::table::Event;
 use crate::{network, table};
@@ -123,22 +123,34 @@ where
             Task::LookUpValue { key, respond, .. } => {
                 let looker = self.looker.clone();
                 let id: u32 = rand::random();
+                let (message_queue_tx, message_queue_rx) = mpsc::channel(1024);
                 self.ongoing_tasks.push(tokio::spawn(async move {
-                    let value = looker.lookup_value(id, key).await;
+                    let ctx = Context {
+                        id,
+                        queue: message_queue_rx,
+                    };
+                    let value = looker.lookup_value(key, ctx).await;
                     // if the client drops the receiver, there's nothing we can do.
                     let _ = respond.send(value);
                     id
                 }));
+                self.ongoing.insert(id, TaskInfo::lookup(message_queue_tx));
             },
             Task::LookUpNode { key, respond } => {
                 let looker = self.looker.clone();
                 let id: u32 = rand::random();
+                let (message_queue_tx, message_queue_rx) = mpsc::channel(1024);
                 self.ongoing_tasks.push(tokio::spawn(async move {
-                    let nodes = looker.lookup_contact(id, key).await;
+                    let ctx = Context {
+                        id,
+                        queue: message_queue_rx,
+                    };
+                    let nodes = looker.lookup_contact(key, ctx).await;
                     // if the client drops the receiver, there's nothing we can do.
                     let _ = respond.send(nodes);
                     id
                 }));
+                self.ongoing.insert(id, TaskInfo::lookup(message_queue_tx));
             },
             Task::Ping { dst, timeout } => {
                 self.ping(dst, timeout);
@@ -422,7 +434,7 @@ impl TaskInfo {
         }
     }
 
-    pub fn find(respond: Sender<FindQueryResponse>) -> Self {
+    pub fn lookup(respond: Sender<FindQueryResponse>) -> Self {
         Self {
             find_respond: Some(respond),
             ping_info: None,
