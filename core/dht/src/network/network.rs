@@ -106,6 +106,8 @@ async fn handle_query(
                 .send(TableRequest::AddNode {
                     node: NodeInfo {
                         address,
+                        // Todo: Fix this.
+                        index: 0,
                         key: message.sender_key,
                         last_responded: None,
                     },
