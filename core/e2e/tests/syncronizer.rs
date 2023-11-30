@@ -33,6 +33,7 @@ async fn e2e_syncronize_state() -> Result<()> {
         .with_committee_size(4)
         .with_epoch_time(15000)
         .with_epoch_start(epoch_start)
+        .with_syncronizer_delta(Duration::from_secs(5))
         .use_persistence()
         .build();
     swarm.launch_genesis_committee().await.unwrap();

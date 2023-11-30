@@ -168,6 +168,7 @@ pub struct SwarmBuilder {
     epoch_time: Option<u64>,
     port_assigner: Option<PortAssigner>,
     bootstrappers: Option<Vec<Bootstrapper>>,
+    syncronizer_delta: Option<Duration>,
     archiver: bool,
     use_persistence: bool,
     committee_size: Option<u64>,
@@ -226,6 +227,11 @@ impl SwarmBuilder {
 
     pub fn with_archiver(mut self) -> Self {
         self.archiver = true;
+        self
+    }
+
+    pub fn with_syncronizer_delta(mut self, delta: Duration) -> Self {
+        self.syncronizer_delta = Some(delta);
         self
     }
 
@@ -292,7 +298,13 @@ impl SwarmBuilder {
                         .expect("Could not get port"),
                 },
             };
-            let config = build_config(&root, ports.clone(), bootstrappers.clone(), self.archiver);
+            let config = build_config(
+                &root,
+                ports.clone(),
+                bootstrappers.clone(),
+                self.archiver,
+                self.syncronizer_delta.unwrap_or(Duration::from_secs(300)),
+            );
 
             // Generate and store the node public key.
             let (node_pk, consensus_pk) = generate_and_store_node_secret(&config);
@@ -356,6 +368,7 @@ fn build_config(
     ports: NodePorts,
     bootstrappers: Vec<Bootstrapper>,
     archiver: bool,
+    syncronizer_delta: Duration,
 ) -> TomlConfigProvider<FinalTypes> {
     let config = TomlConfigProvider::<FinalTypes>::default();
 
@@ -427,7 +440,7 @@ fn build_config(
     });
 
     config.inject::<Syncronizer<FinalTypes>>(SyncronizerConfig {
-        epoch_change_delta: Duration::from_secs(5),
+        epoch_change_delta: syncronizer_delta,
     });
 
     config.inject::<Archive<FinalTypes>>(ArchiveConfig {
