@@ -26,9 +26,18 @@ use crate::table::Event;
 use crate::{network, table};
 
 pub enum Task {
-    LookUpValue { hash: u32, respond: ValueRespond },
-    LookUpNode { hash: u32, respond: ContactRespond },
-    Ping { dst: NodeIndex, timeout: Duration },
+    LookUpValue {
+        key: TableKey,
+        respond: ValueRespond,
+    },
+    LookUpNode {
+        key: TableKey,
+        respond: ContactRespond,
+    },
+    Ping {
+        dst: NodeIndex,
+        timeout: Duration,
+    },
 }
 
 pub struct WorkerPool<C, L, T>
@@ -111,21 +120,21 @@ where
         }
 
         match task {
-            Task::LookUpValue { hash, respond, .. } => {
+            Task::LookUpValue { key, respond, .. } => {
                 let looker = self.looker.clone();
                 let id: u32 = rand::random();
                 self.ongoing_tasks.push(tokio::spawn(async move {
-                    let value = looker.lookup_value(hash).await;
+                    let value = looker.lookup_value(id, key).await;
                     // if the client drops the receiver, there's nothing we can do.
                     let _ = respond.send(value);
                     id
                 }));
             },
-            Task::LookUpNode { hash, respond } => {
+            Task::LookUpNode { key, respond } => {
                 let looker = self.looker.clone();
                 let id: u32 = rand::random();
                 self.ongoing_tasks.push(tokio::spawn(async move {
-                    let nodes = looker.lookup_contact(hash).await;
+                    let nodes = looker.lookup_contact(id, key).await;
                     // if the client drops the receiver, there's nothing we can do.
                     let _ = respond.send(nodes);
                     id
@@ -253,6 +262,7 @@ where
         content: Bytes,
         from: NodeIndex,
     ) {
+        // Todo: Send a pong event.
         // It is assumed here that only lookup tasks send FIND queries.
         if let Some(task_info) = self.ongoing.get(&id) {
             // Lookup tasks validate the token themselves.
@@ -426,12 +436,12 @@ struct PingInfo {
     dst: NodeIndex,
 }
 
-struct FindQueryResponse {
+pub struct FindQueryResponse {
     from: NodeIndex,
     token: u32,
     contacts: Vec<NodeIndex>,
     content: Bytes,
 }
 
-pub type ValueRespond = oneshot::Sender<lookup::Result<Option<Bytes>>>;
-pub type ContactRespond = oneshot::Sender<lookup::Result<Vec<NodeIndex>>>;
+pub type ValueRespond = oneshot::Sender<anyhow::Result<Option<Bytes>>>;
+pub type ContactRespond = oneshot::Sender<anyhow::Result<Vec<NodeIndex>>>;
