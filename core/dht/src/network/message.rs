@@ -27,18 +27,12 @@ pub fn store(id: u32, token: u32, from: NodeIndex, value: Bytes) -> Message {
 }
 
 pub fn find_value(id: u32, token: u32, from: NodeIndex, key: TableKey) -> Message {
-    let bytes = Bytes::from(Find {
-        key,
-        is_content: true,
-    });
+    let bytes = Bytes::from(Find { key });
     Message::new(id, token, from, FIND_VALUE_TYPE, bytes)
 }
 
 pub fn find_node(id: u32, token: u32, from: NodeIndex, key: TableKey) -> Message {
-    let bytes = Bytes::from(Find {
-        key,
-        is_content: false,
-    });
+    let bytes = Bytes::from(Find { key });
     Message::new(id, token, from, FIND_NODE_TYPE, bytes)
 }
 
@@ -59,10 +53,12 @@ pub fn find_node_response(
     token: u32,
     from: NodeIndex,
     contacts: Vec<NodeIndex>,
-    value: Bytes,
 ) -> Message {
-    let bytes = Bytes::from(FindResponse { contacts, value });
-    Message::new(id, token, from, FIND_NODE_RESPONSE_TYPE, bytes)
+    let bytes = Bytes::from(FindResponse {
+        contacts,
+        value: Bytes::new(),
+    });
+    Message::new(id, token, from, FIND_NODE_RESPONSE_TYPE, Bytes::new())
 }
 
 pub fn find_response_in_parts(
@@ -76,13 +72,7 @@ pub fn find_response_in_parts(
 ) -> Vec<Message> {
     let mut buf = Vec::new();
     for chunk in contacts.chunks(max_size) {
-        buf.push(find_node_response(
-            id,
-            token,
-            from,
-            chunk.to_vec(),
-            value.clone(),
-        ))
+        buf.push(find_node_response(id, token, from, chunk.to_vec()))
     }
     buf
 }
@@ -106,7 +96,13 @@ impl From<Bytes> for Store {
 #[derive(Deserialize, Serialize)]
 pub struct Find {
     key: TableKey,
-    is_content: bool,
+}
+
+impl Find {
+    #[inline]
+    pub fn key(&self) -> &TableKey {
+        &self.key
+    }
 }
 
 impl From<Find> for Bytes {
@@ -131,6 +127,18 @@ pub struct FindResponse {
     // This might not be used because an immediate requirement is that indexer
     // handles mapping and not actual application data.
     value: Bytes,
+}
+
+impl FindResponse {
+    #[inline]
+    pub fn contacts(&self) -> &[NodeIndex] {
+        &self.contacts
+    }
+
+    #[inline]
+    pub fn content(&self) -> Bytes {
+        self.value.clone()
+    }
 }
 
 impl From<FindResponse> for Bytes {
