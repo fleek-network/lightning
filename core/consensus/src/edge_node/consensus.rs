@@ -154,6 +154,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                 timeout_tx.clone(),
                                 &mut pending_timeouts,
                             ).await;
+                            info!("Received requested parcel with digest: {parcel_digest:?}");
                         } else {
                             // only propagate normal parcels, not the ones we requested
                             msg.propagate();
@@ -272,12 +273,11 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         }
                     }
                     PubSubMsg::RequestTransactions(digest) => {
-                        // TODO(matthias): should we propagate requests?
-                        //msg.propagate();
                         if let Some(parcel) = txn_store.get_parcel(&digest) {
                             if let Some(msg_digest) = parcel.message_digest {
                                 let filter = HashSet::from([msg.originator()]);
                                 pub_sub.repropagate(msg_digest, Some(filter)).await;
+                                info!("Respond to request for missing parcel with digest: {digest:?}");
                             }
                         }
                     }
@@ -293,6 +293,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         let request = PubSubMsg::RequestTransactions(digest);
                         let _ = pub_sub.send(&request, None).await;
                         pending_requests.insert(digest, ());
+                        info!("Send request for missing parcel with digest: {digest:?}");
                     }
                 }
             }
