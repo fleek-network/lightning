@@ -7,6 +7,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use anyhow::Error;
 use bytes::Bytes;
 pub use client::Client;
 use futures::future::Either;
@@ -18,10 +19,11 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{oneshot, Notify};
 use tokio::task::JoinHandle;
 
-use crate::network;
-use crate::network::{FindResponse, Message, UdpTransport, UnreliableTransport};
+use crate::network::{Find, FindResponse, Message, UdpTransport, UnreliableTransport};
 use crate::pool::lookup::LookupInterface;
+use crate::table::server::TableKey;
 use crate::table::Event;
+use crate::{network, table};
 
 pub enum Task {
     LookUpValue { hash: u32, respond: ValueRespond },
@@ -45,6 +47,8 @@ where
     task_queue: Receiver<Task>,
     /// Queue for sending events.
     event_queue: Sender<Event>,
+    /// Table client.
+    table: table::Client,
     /// Set of currently running worker tasks.
     ongoing_tasks: FuturesUnordered<JoinHandle<u32>>,
     /// Logical set of ongoing lookup tasks.
@@ -145,14 +149,135 @@ where
             network::PONG_TYPE => {
                 self.handle_pong(id, token, from);
             },
-            network::STORE_TYPE => {},
-            network::FIND_NODE_TYPE => {},
-            network::FIND_NODE_RESPONSE_TYPE => {},
-            network::FIND_VALUE_TYPE => {},
-            network::FIND_VALUE_RESPONSE_TYPE => {},
+            network::STORE_TYPE => {
+                self.handle_store(message.bytes());
+            },
+            network::FIND_NODE_TYPE => match Find::try_from(message.bytes()) {
+                Ok(find) => {
+                    self.handle_find(*find.key(), id, token, false, from);
+                },
+                Err(e) => {
+                    tracing::error!("invalid FIND_NODE message: {e:?}");
+                },
+            },
+            network::FIND_NODE_RESPONSE_TYPE => match FindResponse::try_from(message.bytes()) {
+                Ok(find_response) => {
+                    self.handle_find_response(
+                        id,
+                        token,
+                        find_response.contacts(),
+                        find_response.content(),
+                        from,
+                    );
+                },
+                Err(e) => {
+                    tracing::error!("invalid FIND_NODE response: {e:?}");
+                },
+            },
+            network::FIND_VALUE_TYPE => match Find::try_from(message.bytes()) {
+                Ok(find) => {
+                    self.handle_find(*find.key(), id, token, true, from);
+                },
+                Err(e) => {
+                    tracing::error!("invalid FIND_VALUE message: {e:?}");
+                },
+            },
+            network::FIND_VALUE_RESPONSE_TYPE => match FindResponse::try_from(message.bytes()) {
+                Ok(find_response) => {
+                    self.handle_find_response(
+                        id,
+                        token,
+                        find_response.contacts(),
+                        find_response.content(),
+                        from,
+                    );
+                },
+                Err(e) => {
+                    tracing::error!("invalid FIND_VALUE response: {e:?}");
+                },
+            },
             ty => {
                 tracing::warn!("invalid message type id received: {ty}")
             },
+        }
+    }
+
+    fn handle_find(
+        &mut self,
+        key: TableKey,
+        peer_id: u32,
+        peer_token: u32,
+        for_content: bool,
+        from: NodeIndex,
+    ) {
+        if self.ongoing_tasks.len() > self.max_pool_size {
+            // Should we buffer it for later?
+        }
+
+        let socket = self.socket.clone();
+        let table = self.table.clone();
+        let us = self.us;
+
+        let id = rand::random();
+        self.ongoing_tasks.push(tokio::spawn(async move {
+            match table.closest_contacts(key).await {
+                Ok(contacts) => {
+                    if for_content {
+                        let value = table.local_get(key).await.unwrap_or(Bytes::new());
+                        let message = network::find_value_response(
+                            peer_id, peer_token, us, key, contacts, value,
+                        );
+                        let _ = socket.send(message, from).await;
+                    } else {
+                        let message =
+                            network::find_node_response(peer_id, peer_token, us, contacts);
+                        let _ = socket.send(message, from).await;
+                    }
+                },
+                Err(e) => {
+                    // The table client failed which means the underlying channel was dropped
+                    // so there is nothing else to do.
+                    tracing::error!("table client failed");
+                },
+            }
+            id
+        }));
+        // We do not update `ongoing` because we don't expect a response for a pong.
+    }
+
+    fn handle_find_response(
+        &mut self,
+        id: u32,
+        token: u32,
+        contacts: &[NodeIndex],
+        content: Bytes,
+        from: NodeIndex,
+    ) {
+        // It is assumed here that only lookup tasks send FIND queries.
+        if let Some(task_info) = self.ongoing.get(&id) {
+            // Lookup tasks validate the token themselves.
+            let queue = task_info
+                .find_respond
+                .clone()
+                .expect("every lookup task to have a queue");
+            if let Err(e) = queue.try_send(FindQueryResponse {
+                from,
+                token,
+                contacts: contacts.to_vec(),
+                content,
+            }) {
+                // Todo: let's define what we want to do in this case.
+                // If the error is due to the queue being full,
+                // it means the task is getting overwhelmed by messages
+                // from the network.
+                tracing::error!("failed to send FIND response to requester");
+            }
+        }
+    }
+
+    fn handle_store(&self, bytes: Bytes) {
+        if let Err(e) = self.table.try_local_put(bytes) {
+            tracing::error!("unable to store data: {e:?}");
         }
     }
 
@@ -266,7 +391,7 @@ where
 }
 
 struct TaskInfo {
-    find_response_queue: Option<Sender<FindResponse>>,
+    find_respond: Option<Sender<FindQueryResponse>>,
     ping_info: Option<PingInfo>,
 }
 
@@ -282,8 +407,15 @@ impl TaskInfo {
             dst: ping_dst,
         };
         Self {
-            find_response_queue: None,
+            find_respond: None,
             ping_info: Some(ping_info),
+        }
+    }
+
+    pub fn find(respond: Sender<FindQueryResponse>) -> Self {
+        Self {
+            find_respond: Some(respond),
+            ping_info: None,
         }
     }
 }
@@ -292,6 +424,13 @@ struct PingInfo {
     pong_event_respond: Option<oneshot::Sender<NodeIndex>>,
     token: u32,
     dst: NodeIndex,
+}
+
+struct FindQueryResponse {
+    from: NodeIndex,
+    token: u32,
+    contacts: Vec<NodeIndex>,
+    content: Bytes,
 }
 
 pub type ValueRespond = oneshot::Sender<lookup::Result<Option<Bytes>>>;
