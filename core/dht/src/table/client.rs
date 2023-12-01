@@ -89,7 +89,11 @@ impl Client {
         respond_rx.await.map_err(Into::into)
     }
 
-    pub fn bootstrap(&self, _bootstrappers: Vec<NodeIndex>) {
-        todo!()
+    pub fn bootstrap(&self, bootstrappers: Vec<NodeIndex>) -> Result<()> {
+        self.request_queue
+            .try_send(Request::Bootstrap {
+                bootstrap_nodes: bootstrappers,
+            })
+            .map_err(Into::into)
     }
 }

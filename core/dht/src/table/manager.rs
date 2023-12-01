@@ -17,6 +17,10 @@ pub enum Event {
 pub trait Manager {
     fn closest_contacts(&self, key: TableKey) -> Vec<NodeIndex>;
 
+    fn closest_contact_info(&self, key: TableKey) -> Vec<NodeInfo>;
+
+    fn add_node(&mut self, node: NodeInfo) -> Result<()>;
+
     fn handle_event(&mut self, event: Event);
 }
 
@@ -26,6 +30,14 @@ impl Manager for StdManager {
             .into_iter()
             .map(|info| info.index)
             .collect()
+    }
+
+    fn closest_contact_info(&self, key: TableKey) -> Vec<NodeInfo> {
+        self.closest_nodes(&key)
+    }
+
+    fn add_node(&mut self, node: NodeInfo) -> Result<()> {
+        self.inner_add_node(node)
     }
 
     fn handle_event(&mut self, event: Event) {
@@ -108,7 +120,7 @@ impl StdManager {
         }
     }
 
-    pub fn add_node(&mut self, node: NodeInfo) -> Result<()> {
+    pub fn inner_add_node(&mut self, node: NodeInfo) -> Result<()> {
         if node.key == self.local_node_key {
             // We don't add ourselves to the routing table.
             return Ok(());
