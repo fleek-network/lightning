@@ -36,7 +36,7 @@ impl Cli {
         // In case of spawning the binary with the `SERVICE_ID` env abort the default flow and
         // instead run the code for that service.
         if let Ok(service_id) = std::env::var("SERVICE_ID") {
-            tracing_subscriber::fmt::init();
+            self.setup_logging(true);
             ServiceExecutor::<FinalTypes>::run_service(
                 service_id.parse().expect("SERVICE_ID to be a number"),
             )
@@ -44,7 +44,7 @@ impl Cli {
             std::process::exit(0);
         }
 
-        self.setup();
+        self.setup_logging(false);
         let config_path = self.resolve_config_path()?;
         match self.args.with_mock_consensus {
             true => {
@@ -63,7 +63,7 @@ impl Cli {
                 RpcInterface = Rpc<C>,
             >,
     {
-        self.setup();
+        self.setup_logging(false);
         let config_path = self.resolve_config_path()?;
         self.run::<C>(config_path, Some(cb)).await
     }
@@ -89,7 +89,7 @@ impl Cli {
         }
     }
 
-    fn setup(&self) {
+    fn setup_logging(&self, is_subprocess: bool) {
         // Build the filter from cli args, or override if environment variable is set.
         let mut did_override = false;
         let env_filter = EnvFilter::builder()
@@ -135,7 +135,7 @@ impl Cli {
                 .with_filter(env_filter),
         );
 
-        if self.args.with_console {
+        if self.args.with_console && !is_subprocess {
             // Spawn tokio_console server
             let console_layer = console_subscriber::Builder::default()
                 .with_default_env()
@@ -146,11 +146,13 @@ impl Cli {
             registry.init();
         }
 
-        if did_override && self.args.verbose != 0 {
-            warn!("-v is useless when RUST_LOG override is present");
-        }
-        if self.args.verbose > 3 {
-            warn!("The maximum verbosity level is 3, Parsa.")
+        if !is_subprocess {
+            if did_override && self.args.verbose != 0 {
+                warn!("-v is useless when RUST_LOG override is present");
+            }
+            if self.args.verbose > 3 {
+                warn!("The maximum verbosity level is 3, Parsa.")
+            }
         }
     }
 
