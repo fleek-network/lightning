@@ -28,4 +28,4 @@ bincode = "1.3.3"
 # Built-in services
 # fleek-service-ping-example = { path = "../../services/ping" }
 # fleek-service-big-buck-bunny = { path = "../../services/big-buck-bunny" }
-fleek-service-ipfs-fetcher = { path = "../../services/ipfs-fetcher" }
+fleek-service-cdn = { path = "../../services/cdn" }

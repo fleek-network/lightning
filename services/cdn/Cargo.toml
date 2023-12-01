@@ -1,5 +1,5 @@
 [package]
-name = "fleek-service-ipfs-fetcher"
+name = "fleek-service-cdn"
 version = "0.0.1"
 edition.workspace = true
 
