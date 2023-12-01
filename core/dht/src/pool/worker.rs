@@ -13,12 +13,12 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
 
+use crate::network;
 use crate::network::{Find, FindResponse, Message, UnreliableTransport};
 use crate::pool::lookup::{Context, LookupInterface};
 use crate::pool::{ContactRespond, ValueRespond};
-use crate::table::server::TableKey;
-use crate::table::Event;
-use crate::{network, table};
+use crate::table::worker::TableKey;
+use crate::table::{Event, Table};
 
 pub enum Task {
     LookUpValue {
@@ -39,24 +39,22 @@ pub enum Task {
     },
 }
 
-pub struct WorkerPool<C, L, T>
+pub struct PoolWorker<C, L, T, U>
 where
     C: Collection,
-    L: LookupInterface,
-    T: UnreliableTransport,
 {
     /// Our node index.
     us: NodeIndex,
     /// Performs look-ups.
     looker: L,
     /// Socket to send/recv messages over the network.
-    socket: T,
+    socket: U,
     /// Queue for receiving tasks.
     task_queue: Receiver<Task>,
     /// Queue for sending events.
     event_queue: Sender<Event>,
     /// Table client.
-    table: table::Client,
+    table: T,
     /// Set of currently running worker tasks.
     ongoing_tasks: FuturesUnordered<JoinHandle<u32>>,
     /// Logical set of ongoing lookup tasks.
@@ -68,11 +66,12 @@ where
     _marker: PhantomData<C>,
 }
 
-impl<C, L, T> WorkerPool<C, L, T>
+impl<C, L, T, U> PoolWorker<C, L, T, U>
 where
     C: Collection,
     L: LookupInterface,
-    T: UnreliableTransport,
+    T: Table,
+    U: UnreliableTransport,
 {
     /// Try to run the task on a worker.
     fn handle_incoming_task(&mut self, task: Task) {

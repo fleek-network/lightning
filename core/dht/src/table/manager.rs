@@ -5,7 +5,7 @@ use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::NodeIndex;
 
 use crate::table::bucket::{Bucket, MAX_BUCKETS, MAX_BUCKET_SIZE};
-use crate::table::server::TableKey;
+use crate::table::worker::TableKey;
 use crate::table::{distance, NodeInfo};
 
 pub enum Event {

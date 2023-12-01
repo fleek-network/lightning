@@ -19,7 +19,7 @@ use crate::table::{bucket, distance, Event, NodeInfo};
 
 pub type TableKey = [u8; 32];
 
-pub struct Server<C: Collection, M, P> {
+pub struct TableWorker<C: Collection, M, P> {
     /// Our node index.
     us: TableKey,
     /// Queue on incoming requests.
@@ -42,7 +42,7 @@ pub struct Server<C: Collection, M, P> {
     shutdown: Arc<Notify>,
 }
 
-impl<C, M, P> Server<C, M, P>
+impl<C, M, P> TableWorker<C, M, P>
 where
     C: Collection,
     M: Manager,
