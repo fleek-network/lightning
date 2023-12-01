@@ -40,8 +40,12 @@ impl Pool for Client {
         Ok(())
     }
 
-    fn store(&self, _key: TableKey, _value: Bytes) -> Result<()> {
-        todo!()
+    fn store(&self, key: TableKey, value: Bytes) -> Result<()> {
+        let queue = self.inner.clone();
+        tokio::spawn(async move {
+            let _ = queue.send(Task::Store { key, value }).await;
+        });
+        Ok(())
     }
 
     fn ping(&self, dst: NodeIndex, timeout: Duration) -> Result<()> {
