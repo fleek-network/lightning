@@ -39,10 +39,7 @@ pub enum Task {
     },
 }
 
-pub struct PoolWorker<C, L, T, U>
-where
-    C: Collection,
-{
+pub struct PoolWorker<L, T, U> {
     /// Our node index.
     us: NodeIndex,
     /// Performs look-ups.
@@ -63,16 +60,37 @@ where
     max_pool_size: usize,
     /// Shutdown notify.
     shutdown: Arc<Notify>,
-    _marker: PhantomData<C>,
 }
 
-impl<C, L, T, U> PoolWorker<C, L, T, U>
+impl<L, T, U> PoolWorker<L, T, U>
 where
-    C: Collection,
     L: LookupInterface,
     T: Table,
     U: UnreliableTransport,
 {
+    pub fn new(
+        us: NodeIndex,
+        looker: L,
+        socket: U,
+        table: T,
+        task_queue: Receiver<Task>,
+        event_queue: Sender<Event>,
+        max_pool_size: usize,
+        shutdown: Arc<Notify>,
+    ) -> Self {
+        Self {
+            us,
+            looker,
+            socket,
+            table,
+            ongoing_tasks: FuturesUnordered::new(),
+            event_queue,
+            task_queue,
+            max_pool_size,
+            shutdown,
+            ongoing: HashMap::new(),
+        }
+    }
     /// Try to run the task on a worker.
     fn handle_incoming_task(&mut self, task: Task) {
         // Validate.

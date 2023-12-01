@@ -8,8 +8,8 @@ use futures::StreamExt;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{ApplicationInterface, SyncQueryRunnerInterface};
-use tokio::sync::mpsc::Receiver;
-use tokio::sync::{oneshot, Notify};
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
 
 use crate::pool::{Pool, ValueRespond};
@@ -48,6 +48,29 @@ where
     M: Manager,
     P: Pool,
 {
+    pub fn new(
+        us: TableKey,
+        sync_query: c!(C::ApplicationInterface::SyncExecutor),
+        manager: M,
+        pool: P,
+        request_queue: Receiver<Request>,
+        event_queue: Receiver<Event>,
+        shutdown: Arc<Notify>,
+    ) -> Self {
+        Self {
+            us,
+            request_queue,
+            event_queue,
+            store: HashMap::new(),
+            manager,
+            pool,
+            sync_query,
+            bootstrap_tasks: FuturesUnordered::new(),
+            bootstrap_state: BootstrapState::Idle,
+            shutdown,
+        }
+    }
+
     pub fn handle_request(&mut self, request: Request) {
         match request {
             Request::Get {

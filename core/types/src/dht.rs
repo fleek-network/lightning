@@ -11,25 +11,6 @@ pub enum KeyPrefix {
     ContentRegistry,
 }
 
-#[derive(Clone, Debug)]
-pub enum DhtRequest {
-    Put {
-        prefix: KeyPrefix,
-        key: Vec<u8>,
-        value: Vec<u8>,
-    },
-    Get {
-        prefix: KeyPrefix,
-        key: Vec<u8>,
-    },
-}
-
-#[derive(Clone, Debug)]
-pub enum DhtResponse {
-    Put(()),
-    Get(Option<TableEntry>),
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TableEntry {
     /// The name space of this key-value pair.
