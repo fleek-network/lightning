@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::table::server::TableKey;
+use crate::table::worker::TableKey;
 use crate::table::NodeInfo;
 
 #[cfg(not(test))]

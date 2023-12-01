@@ -3,7 +3,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use lightning_interfaces::types::NodeIndex;
 use serde::{Deserialize, Serialize};
 
-use crate::table::server::TableKey;
+use crate::table::worker::TableKey;
 
 pub const PING_TYPE: u8 = 0;
 pub const PONG_TYPE: u8 = 1;

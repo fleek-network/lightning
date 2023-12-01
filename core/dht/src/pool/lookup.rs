@@ -13,13 +13,13 @@ use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{ApplicationInterface, SyncQueryRunnerInterface};
 use tokio::sync::mpsc::Receiver;
 
+use crate::network;
 use crate::network::UnreliableTransport;
 use crate::pool::worker::FindQueryResponse;
 use crate::table::bucket::MAX_BUCKET_SIZE;
-use crate::table::distance;
 use crate::table::distance::Distance;
-use crate::table::server::TableKey;
-use crate::{network, table};
+use crate::table::worker::TableKey;
+use crate::table::{distance, Table};
 
 pub struct Context {
     /// Task id.
@@ -35,18 +35,19 @@ pub trait LookupInterface: Clone + Send + Sync + 'static {
     async fn lookup_value(&self, key: TableKey, ctx: Context) -> Result<Option<Bytes>>;
 }
 
-pub struct Looker<C: Collection, T> {
+pub struct Looker<C: Collection, T, U> {
     us: NodeIndex,
-    table: table::Client,
+    table: T,
     sync_query: c![C::ApplicationInterface::SyncExecutor],
-    socket: T,
+    socket: U,
     _marker: PhantomData<C>,
 }
 
-impl<C, T> Clone for Looker<C, T>
+impl<C, T, U> Clone for Looker<C, T, U>
 where
     C: Collection,
-    T: UnreliableTransport,
+    T: Table,
+    U: UnreliableTransport,
 {
     fn clone(&self) -> Self {
         Self {
@@ -59,15 +60,16 @@ where
     }
 }
 
-impl<C, T> Looker<C, T>
+impl<C, T, U> Looker<C, T, U>
 where
     C: Collection,
-    T: UnreliableTransport,
+    T: Table,
+    U: UnreliableTransport,
 {
     fn _new(
         us: NodeIndex,
-        table: table::Client,
-        socket: T,
+        table: T,
+        socket: U,
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
     ) -> Self {
         Self {
@@ -262,10 +264,11 @@ where
 }
 
 #[async_trait]
-impl<C, T> LookupInterface for Looker<C, T>
+impl<C, T, U> LookupInterface for Looker<C, T, U>
 where
     C: Collection,
-    T: UnreliableTransport,
+    T: Table,
+    U: UnreliableTransport,
 {
     async fn lookup_contact(&self, key: TableKey, ctx: Context) -> Result<Vec<NodeIndex>> {
         self.lookup(key, false, ctx)
