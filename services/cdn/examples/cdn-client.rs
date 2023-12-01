@@ -1,14 +1,19 @@
 use arrayref::array_ref;
+use bytes::{BufMut, BytesMut};
 use cid::Cid;
+use fleek_service_cdn::Origin;
 use lightning_handshake::schema::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
 use tcp_client::TcpClient;
 
 const ADDRESS: &str = "127.0.0.1:4221";
-const CID: &str = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
 const SERVICE_ID: u32 = 0;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let (origin, uid) = cli::args();
+
+    println!("Sending handshake");
+
     // Connect and handshake with the node
     let mut client = TcpClient::connect(ADDRESS).await?;
     client
@@ -20,14 +25,24 @@ async fn main() -> anyhow::Result<()> {
         })
         .await?;
 
-    println!("send handshake");
+    println!("Sending content request for {uid}");
 
-    // Send a request for the CID.
-    let cid = Cid::try_from(CID).expect("valid cid").to_bytes();
+    // Parse the hash from the cli into a uri
+    let hash = match origin {
+        Origin::IPFS => Cid::try_from(uid).expect("valid ipfs cid").to_bytes(),
+        Origin::Blake3 => hex::decode(uid.as_bytes()).expect("valid hex string"),
+        _ => unreachable!(),
+    };
+
+    // Send the request for the origin and uid
+    let mut buffer = BytesMut::with_capacity(1 + hash.len());
+    buffer.put_u8(origin as u8);
+    buffer.put_slice(&hash);
     client
-        .send(RequestFrame::ServicePayload { bytes: cid.into() })
+        .send(RequestFrame::ServicePayload {
+            bytes: buffer.into(),
+        })
         .await?;
-    println!("sent request for cid");
 
     let mut total = 0;
 
@@ -36,25 +51,65 @@ async fn main() -> anyhow::Result<()> {
         panic!("invalid or no response received");
     };
 
-    println!("first frame was {} bytes long", bytes.len());
     let num_blocks = u32::from_be_bytes(*array_ref![bytes, 0, 4]);
+
     println!("Expecting {num_blocks} block(s) of content");
 
     // Stream the remaining content
     for _ in 0..num_blocks {
-        println!("receiving block");
-
         // Read the block
         let Some(ResponseFrame::ServicePayload { bytes }) = client.recv().await else {
             panic!("invalid or no response received");
         };
 
+        println!("block received");
+
         total += bytes.len();
     }
 
-    println!("Successfully streamed {total} bytes for {CID}");
+    println!("Successfully streamed {total} bytes");
 
     Ok(())
+}
+
+mod cli {
+    use fleek_service_cdn::Origin;
+
+    pub fn args() -> (Origin, String) {
+        let mut args = std::env::args();
+        args.next();
+
+        let Some(uid) = args.next() else { help(); std::process::exit(1); };
+
+        let origin = {
+            let arg = args.next().unwrap_or("ipfs".into());
+            match arg.to_lowercase().as_str() {
+                "ipfs" => Origin::IPFS,
+                "blake3" => Origin::Blake3,
+                _ => {
+                    help();
+                    std::process::exit(1);
+                },
+            }
+        };
+
+        (origin, uid)
+    }
+
+    fn help() {
+        println!(
+            "Usage: ./cdn-client <UID> [ipfs|blake3, default: ipfs]
+
+Examples: 
+    Big Buck Bunny:
+        ./cdn-client b4bb88454076fa65e9c6f7f4343b02ccea7fbd9a6b9235d177fe71cfdc5d7043 blake3
+        ./cdn-client bafybeibi5vlbuz3jstustlxbxk7tmxsyjjrxak6us4yqq6z2df3jwidiwi ipfs 
+
+    Puppet Image:
+        ./cdn-client 62c6f749c80a27813a84066b92a6fdc37fd83779bf9d64f1f1a3692cf3a7dfbd blake3
+        ./cdn-client bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi ipfs"
+        )
+    }
 }
 
 mod tcp_client {

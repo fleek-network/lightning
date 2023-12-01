@@ -1570,7 +1570,19 @@ dependencies = [
  "multibase",
  "multihash 0.18.1",
  "serde",
- "unsigned-varint",
+ "unsigned-varint 0.7.2",
+]
+
+[[package]]
+name = "cid"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "472ac98592f38dfd48f188d5713a328422ed22fa39eb52b8bca495370134762a"
+dependencies = [
+ "core2",
+ "multibase",
+ "multihash 0.19.1",
+ "unsigned-varint 0.8.0",
 ]
 
 [[package]]
@@ -3267,14 +3279,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "fleek-service-ipfs-fetcher"
+name = "fleek-service-cdn"
 version = "0.0.1"
 dependencies = [
  "anyhow",
  "arrayref",
  "bytes",
- "cid",
+ "cid 0.11.0",
  "fn-sdk",
+ "hex",
  "lightning-handshake",
  "tokio",
  "tracing",
@@ -4671,7 +4684,7 @@ dependencies = [
  "async-trait",
  "blake3-tree",
  "bytes",
- "cid",
+ "cid 0.10.1",
  "fleek-crypto",
  "infusion",
  "lightning-application",
@@ -4859,7 +4872,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bytes",
- "cid",
+ "cid 0.10.1",
  "futures",
  "hyper",
  "hyper-rustls",
@@ -5055,7 +5068,7 @@ dependencies = [
  "bincode",
  "bytes",
  "dashmap",
- "fleek-service-ipfs-fetcher",
+ "fleek-service-cdn",
  "fn-sdk",
  "futures",
  "fxhash",
@@ -5589,7 +5602,7 @@ dependencies = [
  "percent-encoding",
  "serde",
  "static_assertions",
- "unsigned-varint",
+ "unsigned-varint 0.7.2",
  "url",
 ]
 
@@ -5612,7 +5625,7 @@ checksum = "835d6ff01d610179fbce3de1694d007e500bf33a7f29689838941d6bf783ae40"
 dependencies = [
  "core2",
  "multihash-derive",
- "unsigned-varint",
+ "unsigned-varint 0.7.2",
 ]
 
 [[package]]
@@ -5629,7 +5642,7 @@ dependencies = [
  "multihash-derive",
  "sha2 0.10.8",
  "sha3 0.10.8",
- "unsigned-varint",
+ "unsigned-varint 0.7.2",
 ]
 
 [[package]]
@@ -5639,7 +5652,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "076d548d76a0e2a0d4ab471d0b1c36c577786dfc4471242035d97a12a735c492"
 dependencies = [
  "core2",
- "unsigned-varint",
+ "unsigned-varint 0.7.2",
 ]
 
 [[package]]
@@ -9943,6 +9956,12 @@ name = "unsigned-varint"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6889a77d49f1f013504cec6bf97a2c730394adedaeb1deb5ea08949a50541105"
+
+[[package]]
+name = "unsigned-varint"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb066959b24b5196ae73cb057f45598450d2c5f71460e98c49b738086eff9c06"
 
 [[package]]
 name = "untrusted"

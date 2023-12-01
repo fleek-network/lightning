@@ -13,4 +13,5 @@ arrayref = "0.3.7"
 
 [dev-dependencies]
 lightning-handshake = { path = "../../core/handshake" }
-cid = "0.10"
+cid = "0.11"
+hex = "0.4"
