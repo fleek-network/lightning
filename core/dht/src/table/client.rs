@@ -1,7 +1,6 @@
 use anyhow::Result;
 use bytes::Bytes;
 use lightning_interfaces::types::NodeIndex;
-use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
@@ -15,7 +14,7 @@ pub struct Client {
 impl Client {
     pub async fn get(&self, key: TableKey) -> Option<Bytes> {
         let (respond_tx, respond_rx) = oneshot::channel();
-        if let Err(e) = self
+        if self
             .request_queue
             .send(Request::Get {
                 key: rand::random(),
@@ -23,6 +22,7 @@ impl Client {
                 respond: respond_tx,
             })
             .await
+            .is_err()
         {
             return None;
         }
@@ -35,11 +35,11 @@ impl Client {
         }
     }
 
-    pub async fn put(&self, hash: u32, value: Bytes) {
+    pub async fn put(&self, key: TableKey, value: Bytes) {
         let _ = self
             .request_queue
             .send(Request::Put {
-                key: rand::random(),
+                key,
                 value,
                 local: false,
             })
@@ -48,7 +48,7 @@ impl Client {
 
     pub async fn local_get(&self, key: TableKey) -> Option<Bytes> {
         let (respond_tx, respond_rx) = oneshot::channel();
-        if let Err(e) = self
+        if self
             .request_queue
             .send(Request::Get {
                 key: rand::random(),
@@ -56,13 +56,14 @@ impl Client {
                 respond: respond_tx,
             })
             .await
+            .is_err()
         {
             return None;
         }
         match respond_rx.await.ok()? {
             Ok(value) => value,
             Err(e) => {
-                tracing::debug!("failed to find entry for key {key:?}");
+                tracing::debug!("failed to find entry for key {key:?}: {e:?}");
                 None
             },
         }

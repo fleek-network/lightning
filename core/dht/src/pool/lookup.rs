@@ -21,18 +21,6 @@ use crate::table::distance::Distance;
 use crate::table::server::TableKey;
 use crate::{network, table};
 
-/// Look-up response.
-pub struct Response {
-    id: u64,
-    payload: Bytes,
-}
-
-/// Look-up response payload.
-struct Payload {
-    value: Bytes,
-    peers: Vec<NodeIndex>,
-}
-
 pub struct Context {
     /// Task id.
     pub id: u32,
@@ -76,7 +64,7 @@ where
     C: Collection,
     T: UnreliableTransport,
 {
-    fn new(
+    fn _new(
         us: NodeIndex,
         table: table::Client,
         socket: T,
@@ -236,7 +224,7 @@ where
                         };
 
                         // If this is look up is a find a value, we check if the value is in the response.
-                        if is_content && content.len() > 0 {
+                        if is_content && !content.is_empty() {
                             let mut closest_nodes_seen = vec![node.index];
                             closest_nodes_seen.extend(closest_nodes
                                 .into_nodes()

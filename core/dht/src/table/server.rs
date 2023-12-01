@@ -3,27 +3,20 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use bytes::Bytes;
-use fleek_crypto::NodePublicKey;
 use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{
-    ApplicationInterface,
-    ReputationAggregatorInterface,
-    SyncQueryRunnerInterface,
-};
-use thiserror::Error;
-use tokio::sync::mpsc::{self, Receiver};
+use lightning_interfaces::{ApplicationInterface, SyncQueryRunnerInterface};
+use tokio::sync::mpsc::Receiver;
 use tokio::sync::{oneshot, Notify};
 use tokio::task::JoinHandle;
 
-use crate::node::NodeInfo;
 use crate::pool;
 use crate::pool::ValueRespond;
-use crate::table::bucket::{BUCKET_REFRESH_INTERVAL, MAX_BUCKETS, MAX_BUCKET_SIZE};
-use crate::table::manager::{Manager, StdManager};
-use crate::table::{bucket, distance, Event};
-use crate::task::Task;
+use crate::table::bucket::MAX_BUCKETS;
+use crate::table::manager::Manager;
+use crate::table::{bucket, distance, Event, NodeInfo};
 
 pub type TableKey = [u8; 32];
 
@@ -78,7 +71,9 @@ where
             Request::ClosestContacts { key, respond } => {
                 let _ = respond.send(self.manager.closest_contacts(key));
             },
-            Request::Bootstrap { bootstrap_nodes } => {},
+            Request::Bootstrap { bootstrap_nodes } => {
+                self.bootstrap(bootstrap_nodes);
+            },
         }
     }
 
@@ -98,7 +93,28 @@ where
         }
     }
 
-    fn handle_bootstrap_event(&mut self, contacts: Vec<NodeIndex>) {
+    fn handle_bootstrap_task_error(&mut self) {
+        debug_assert!(!matches!(self.bootstrap_state, BootstrapState::Idle));
+
+        match self.bootstrap_state {
+            BootstrapState::Initial => {
+                self.bootstrap_state = BootstrapState::Idle;
+            },
+            BootstrapState::Looking => {
+                if self.bootstrap_tasks.is_empty() {
+                    self.bootstrap_state = BootstrapState::Idle;
+                }
+            },
+            BootstrapState::Idle => {
+                debug_assert!(
+                    false,
+                    "we should not have any running bootstrap tasks during this state"
+                );
+            },
+        }
+    }
+
+    fn handle_bootstrap_response(&mut self, contacts: Vec<NodeIndex>) {
         match self.bootstrap_state {
             BootstrapState::Initial => {
                 // Add new contacts to the table.
@@ -136,6 +152,11 @@ where
             },
             BootstrapState::Looking => {
                 self.add_contacts(contacts);
+
+                if self.bootstrap_tasks.is_empty() {
+                    // We're done bootstrapping.
+                    self.bootstrap_state = BootstrapState::Idle;
+                }
             },
             BootstrapState::Idle => {
                 unreachable!("invalid bootstrapping state");
@@ -170,10 +191,8 @@ where
     fn get(&self, key: TableKey, respond: ValueRespond) {
         if self.store.contains_key(&key) {
             self.local_get(&key, respond)
-        } else {
-            if let Err(e) = self.pool.lookup_value(key, respond) {
-                tracing::error!("`get` failed: {e:?}");
-            }
+        } else if let Err(e) = self.pool.lookup_value(key, respond) {
+            tracing::error!("`get` failed: {e:?}");
         }
     }
 
@@ -200,191 +219,22 @@ where
                     };
                     self.manager.handle_event(event);
                 }
+                Some(result) = self.bootstrap_tasks.next() => {
+                    match result {
+                        Ok(Ok(contacts)) => {
+                            self.handle_bootstrap_response(contacts);
+                        }
+                        _ => {
+                            self.handle_bootstrap_task_error()
+                        }
+                    }
+
+                }
             }
         }
 
         Ok(())
     }
-}
-
-pub async fn start_worker<C: Collection>(
-    mut rx: Receiver<TableRequest>,
-    local_key: NodePublicKey,
-    task_tx: mpsc::Sender<Task>,
-    _local_rep_query: c![C::ReputationAggregatorInterface::ReputationQuery],
-    shutdown_notify: Arc<Notify>,
-) {
-    let mut table = StdManager::new(local_key);
-
-    // We always start with one bucket, so kick off the refresh task for this bucket.
-    let task = Task::RefreshBucket {
-        bucket_index: table.buckets.len() - 1,
-        delay: BUCKET_REFRESH_INTERVAL,
-    };
-    if let Err(e) = task_tx.send(task).await {
-        tracing::trace!("failed to send bucket refresh task: {e:?}");
-    }
-    loop {
-        tokio::select! {
-            request = rx.recv() => {
-                if let Some(request) = request {
-                    match request {
-                        TableRequest::ClosestNodes { target: key, respond } => {
-                            let nodes = table.closest_nodes(&key);
-                            respond.send(Ok(nodes))
-                                .expect("internal table client not to drop the channel");
-                        },
-                        TableRequest::AddNode { node, respond } => {
-                            let num_buckets = table.buckets.len();
-                            let result = table
-                                .add_node(node)
-                                .map_err(|e| QueryError(e.to_string()));
-
-                            if num_buckets < table.buckets.len() {
-                                // A new bucket was created.
-                                let task = Task::RefreshBucket {
-                                    bucket_index: table.buckets.len() - 1,
-                                    delay: BUCKET_REFRESH_INTERVAL,
-                                };
-                                if let Err(e) = task_tx.send(task).await {
-                                    tracing::trace!("failed to send bucket refresh task: {e:?}");
-                                }
-                            }
-                            if let Some(respond) = respond {
-                                respond.send(result)
-                                    .expect("internal table client not to drop the channel");
-                            }
-                        },
-                        TableRequest::NearestNeighborsBucket { respond } => {
-                            let local_key = table.local_node_key;
-                            let closest = table.closest_nodes(&local_key.0);
-                            match &closest.first() {
-                                Some(node) => {
-                                    let index = distance::leading_zero_bits(
-                                        &node.key.0,
-                                        &local_key.0
-                                    );
-                                    respond.send(Some(index))
-                                        .expect("internal table client not to drop the channel");
-                                },
-                                None => {
-                                    respond.send(None)
-                                        .expect("internal table client not to drop the channel");
-                                },
-                            }
-                        },
-                        TableRequest::UpdateNodeTimestamp { node_key, timestamp } => {
-                            table.update_node_timestamp(node_key, timestamp);
-                        }
-                        TableRequest::ProposeBucketNodes { bucket_index, nodes } => {
-                            let mut actual_buckets = HashMap::new();
-                            for node in nodes {
-                                let index = distance::leading_zero_bits(&local_key.0, &node.key.0);
-                                actual_buckets.entry(index).or_insert(Vec::new()).push(node);
-                            }
-                            if let Some(nodes) = table.get_bucket_nodes(bucket_index) {
-                                for node in nodes {
-                                    let index = distance::leading_zero_bits(
-                                        &local_key.0,
-                                        &node.key.0
-                                    );
-                                    actual_buckets.entry(index).or_insert(Vec::new()).push(node);
-                                }
-                            }
-                            for bucket in actual_buckets.values_mut() {
-                                bucket.sort_by(|a, b| {
-                                    // Sort the bucket such that the most desirable nodes are at the end of
-                                    // the vec.
-                                    //match (a.last_responded, b.last_responded) {
-                                    //    (Some(a_last_res), Some(b_last_res)) => {
-                                    //        let score_a = local_rep_query.get_reputation_of(&a.key);
-                                    //        let score_b = local_rep_query.get_reputation_of(&b.key);
-                                    //        if a_last_res.abs_diff(b_last_res) < DELTA
-                                    //            && (score_a.is_some() || score_b.is_some()) {
-                                    //            // If the dfference between the timestamps of the
-                                    //            // last responses is less than some specified delta,
-                                    //            // we use the local reputation as a tie breaker.
-                                    //            score_a.cmp(&score_b)
-                                    //        } else {
-                                    //            a_last_res.cmp(&b_last_res)
-                                    //        }
-                                    //    },
-                                    //    (Some(_), None) => Ordering::Greater,
-                                    //    (None, Some(_)) => Ordering::Less,
-                                    //    (None, None) => Ordering::Equal,
-                                    //}
-                                    a.last_responded.cmp(&b.last_responded)
-                                });
-                            }
-                            // Pick the most desirable nodes from each bucket.
-                            // Make sure that we pick approximately the same amount of nodes from
-                            // each bucket.
-                            let mut fresh_nodes = Vec::new();
-                            'outer: loop {
-                                let mut all_empty = true;
-                                for nodes in actual_buckets.values_mut() {
-                                    if let Some(node) = nodes.pop() {
-                                        fresh_nodes.push(node);
-                                    }
-                                    if !nodes.is_empty() {
-                                        all_empty = false;
-                                    }
-                                    if fresh_nodes.len() == MAX_BUCKET_SIZE {
-                                        break 'outer;
-                                    }
-                                }
-                                if all_empty {
-                                    break;
-                                }
-                            }
-                            table.set_bucket_nodes(bucket_index, fresh_nodes);
-                        }
-                        #[cfg(test)]
-                        TableRequest::GetBucketNodes { bucket_index, respond } => {
-                            respond.send(table.get_bucket_nodes(bucket_index)).unwrap();
-                        }
-                    }
-                }
-            }
-            _ = shutdown_notify.notified() => {
-                tracing::info!("shutting down table worker");
-                break;
-            }
-        }
-    }
-}
-
-#[derive(Debug, Error)]
-#[error("querying the table failed: {0}")]
-pub struct QueryError(String);
-
-pub enum TableRequest {
-    ClosestNodes {
-        target: TableKey,
-        respond: oneshot::Sender<Result<Vec<NodeInfo>, QueryError>>,
-    },
-    AddNode {
-        node: NodeInfo,
-        respond: Option<oneshot::Sender<Result<(), QueryError>>>,
-    },
-    // Returns index for non-empty bucket containing closest neighbors. Used for bootstrapping.
-    NearestNeighborsBucket {
-        respond: oneshot::Sender<Option<usize>>,
-    },
-    UpdateNodeTimestamp {
-        node_key: NodePublicKey,
-        timestamp: u64,
-    },
-    #[allow(unused)]
-    ProposeBucketNodes {
-        bucket_index: usize,
-        nodes: Vec<NodeInfo>,
-    },
-    #[cfg(test)]
-    GetBucketNodes {
-        bucket_index: usize,
-        respond: oneshot::Sender<Option<Vec<NodeInfo>>>,
-    },
 }
 
 pub enum Request {

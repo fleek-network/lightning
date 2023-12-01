@@ -40,7 +40,6 @@ pub fn find_value_response(
     id: u32,
     token: u32,
     from: NodeIndex,
-    key: TableKey,
     contacts: Vec<NodeIndex>,
     value: Bytes,
 ) -> Message {
@@ -58,16 +57,14 @@ pub fn find_node_response(
         contacts,
         value: Bytes::new(),
     });
-    Message::new(id, token, from, FIND_NODE_RESPONSE_TYPE, Bytes::new())
+    Message::new(id, token, from, FIND_NODE_RESPONSE_TYPE, bytes)
 }
 
-pub fn find_response_in_parts(
+pub fn _find_response_in_parts(
     id: u32,
     token: u32,
     from: NodeIndex,
-    key: TableKey,
     contacts: Vec<NodeIndex>,
-    value: Bytes,
     max_size: usize,
 ) -> Vec<Message> {
     let mut buf = Vec::new();
