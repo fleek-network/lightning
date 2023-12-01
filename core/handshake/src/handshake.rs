@@ -13,6 +13,7 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use tokio::sync::Mutex;
+use tracing::warn;
 use triomphe::Arc;
 
 use crate::config::HandshakeConfig;
@@ -120,6 +121,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
         // Attempt to connect to the service, getting the unix socket.
         let Some(socket) = self.provider.connect(service_id).await else {
             tx.terminate(crate::schema::TerminationReason::InvalidService);
+            warn!("failed to connect to service {service_id}");
             return;
         };
 

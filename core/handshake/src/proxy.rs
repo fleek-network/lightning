@@ -51,11 +51,10 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
                     None => break Ok(()),
                 },
                 // If we read any bytes from the socket, send it over the transport
-                Ok(n) = self.socket.read_buf(&mut self.socket_buffer) => {
-                    if n == 0 {
-                        break Ok(())
-                    }
-                    self.handle_socket_bytes().await?;
+                res = self.socket.read_buf(&mut self.socket_buffer) => match res {
+                    Ok(n) if n == 0 => break Ok(()),
+                    Ok(_) => self.handle_socket_bytes().await?,
+                    Err(_) => break Ok(()),
                 },
                 _ = self.shutdown.wait_for_shutdown() => break Ok(()),
             }
