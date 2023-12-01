@@ -12,15 +12,14 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::{oneshot, Notify};
 use tokio::task::JoinHandle;
 
-use crate::pool;
-use crate::pool::ValueRespond;
+use crate::pool::{Pool, ValueRespond};
 use crate::table::bucket::MAX_BUCKETS;
 use crate::table::manager::Manager;
 use crate::table::{bucket, distance, Event, NodeInfo};
 
 pub type TableKey = [u8; 32];
 
-pub struct Server<C: Collection, M> {
+pub struct Server<C: Collection, M, P> {
     /// Our node index.
     us: TableKey,
     /// Queue on incoming requests.
@@ -32,7 +31,7 @@ pub struct Server<C: Collection, M> {
     /// Table manager.
     manager: M,
     /// Pool client.
-    pool: pool::Client,
+    pool: P,
     /// Sync query.
     sync_query: c![C::ApplicationInterface::SyncExecutor],
     /// Bootstrap-related tasks.
@@ -43,10 +42,11 @@ pub struct Server<C: Collection, M> {
     shutdown: Arc<Notify>,
 }
 
-impl<C, M> Server<C, M>
+impl<C, M, P> Server<C, M, P>
 where
     C: Collection,
     M: Manager,
+    P: Pool,
 {
     pub fn handle_request(&mut self, request: Request) {
         match request {
