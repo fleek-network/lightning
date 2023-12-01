@@ -1,29 +1,35 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::Result;
 use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
+use futures::stream::FuturesUnordered;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::ReputationAggregatorInterface;
+use lightning_interfaces::{
+    ApplicationInterface,
+    ReputationAggregatorInterface,
+    SyncQueryRunnerInterface,
+};
 use thiserror::Error;
 use tokio::sync::mpsc::{self, Receiver};
 use tokio::sync::{oneshot, Notify};
+use tokio::task::JoinHandle;
 
 use crate::node::NodeInfo;
 use crate::pool;
 use crate::pool::ValueRespond;
-use crate::table::bucket::{BUCKET_REFRESH_INTERVAL, MAX_BUCKET_SIZE};
+use crate::table::bucket::{BUCKET_REFRESH_INTERVAL, MAX_BUCKETS, MAX_BUCKET_SIZE};
 use crate::table::manager::{Manager, StdManager};
-use crate::table::{distance, Event};
+use crate::table::{bucket, distance, Event};
 use crate::task::Task;
-
-//const DELTA: u64 = Duration::from_secs(600).as_millis() as u64; // 10 minutes
 
 pub type TableKey = [u8; 32];
 
-pub struct Server<M> {
+pub struct Server<C: Collection, M> {
+    /// Our node index.
+    us: TableKey,
     /// Queue on incoming requests.
     request_queue: Receiver<Request>,
     /// Queue on incoming events.
@@ -34,11 +40,21 @@ pub struct Server<M> {
     manager: M,
     /// Pool client.
     pool: pool::Client,
+    /// Sync query.
+    sync_query: c![C::ApplicationInterface::SyncExecutor],
+    /// Bootstrap-related tasks.
+    bootstrap_tasks: FuturesUnordered<JoinHandle<Result<Vec<NodeIndex>>>>,
+    /// State of bootstrap process.
+    bootstrap_state: BootstrapState,
     /// Shutdown notify.
     shutdown: Arc<Notify>,
 }
 
-impl<M: Manager> Server<M> {
+impl<C, M> Server<C, M>
+where
+    C: Collection,
+    M: Manager,
+{
     pub fn handle_request(&mut self, request: Request) {
         match request {
             Request::Get {
@@ -62,6 +78,82 @@ impl<M: Manager> Server<M> {
             Request::ClosestContacts { key, respond } => {
                 let _ = respond.send(self.manager.closest_contacts(key));
             },
+            Request::Bootstrap { bootstrap_nodes } => {},
+        }
+    }
+
+    fn bootstrap(&mut self, bootstrap_nodes: Vec<NodeIndex>) {
+        if matches!(self.bootstrap_state, BootstrapState::Idle) {
+            self.add_contacts(bootstrap_nodes);
+
+            // Todo: Handle error.
+            // Do self lookup.
+            let (lookup_result_tx, lookup_result_rx) = oneshot::channel();
+            let _ = self.pool.lookup_contact(self.us, lookup_result_tx);
+
+            self.bootstrap_tasks
+                .push(tokio::spawn(async move { lookup_result_rx.await? }));
+
+            self.bootstrap_state = BootstrapState::Initial;
+        }
+    }
+
+    fn handle_bootstrap_event(&mut self, contacts: Vec<NodeIndex>) {
+        match self.bootstrap_state {
+            BootstrapState::Initial => {
+                // Add new contacts to the table.
+                self.add_contacts(contacts);
+
+                // Here we want to find the first non-empty bucket (logically to us)
+                // and generate random keys for every bucket starting from
+                // the aforementioned bucket.
+                // We start a lookup task for each of those keys.
+                let closest = self.manager.closest_contact_info(self.us);
+                match closest.first() {
+                    Some(node) => {
+                        let index = distance::leading_zero_bits(&node.key.0, &self.us);
+
+                        let random_keys = (index..MAX_BUCKETS)
+                            .map(|index| bucket::random_key_in_bucket(index, &self.us))
+                            .collect::<HashSet<_>>();
+
+                        for next_key in random_keys {
+                            let (lookup_result_tx, lookup_result_rx) = oneshot::channel();
+                            let _ = self.pool.lookup_contact(next_key, lookup_result_tx);
+
+                            self.bootstrap_tasks
+                                .push(tokio::spawn(async move { lookup_result_rx.await? }));
+                        }
+
+                        self.bootstrap_state = BootstrapState::Looking;
+                    },
+                    None => {
+                        tracing::error!("failed to find closest nodes");
+                        // Nothing left to do.
+                        self.bootstrap_state = BootstrapState::Idle;
+                    },
+                }
+            },
+            BootstrapState::Looking => {
+                self.add_contacts(contacts);
+            },
+            BootstrapState::Idle => {
+                unreachable!("invalid bootstrapping state");
+            },
+        }
+    }
+
+    fn add_contacts(&mut self, contacts: Vec<NodeIndex>) {
+        for index in contacts {
+            if let Some(key) = self.sync_query.index_to_pubkey(index) {
+                let _ = self.manager.add_node(NodeInfo {
+                    // Todo: Remove this field.
+                    address: "0.0.0.0:0".parse().unwrap(),
+                    index,
+                    key,
+                    last_responded: None,
+                });
+            }
         }
     }
 
@@ -312,4 +404,13 @@ pub enum Request {
         key: TableKey,
         respond: oneshot::Sender<Vec<NodeIndex>>,
     },
+    Bootstrap {
+        bootstrap_nodes: Vec<NodeIndex>,
+    },
+}
+
+enum BootstrapState {
+    Idle,
+    Initial,
+    Looking,
 }

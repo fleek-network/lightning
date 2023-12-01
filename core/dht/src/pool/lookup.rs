@@ -92,6 +92,7 @@ where
     }
 
     // Todo: this task needs to be broken down and cleaned up.
+    // Todo: send events to table.
     pub async fn lookup(
         &self,
         key: TableKey,
