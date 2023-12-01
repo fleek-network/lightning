@@ -14,7 +14,7 @@ use lightning_interfaces::{ApplicationInterface, SyncQueryRunnerInterface};
 use tokio::sync::mpsc::Receiver;
 
 use crate::network::UnreliableTransport;
-use crate::pool::FindQueryResponse;
+use crate::pool::worker::FindQueryResponse;
 use crate::table::bucket::MAX_BUCKET_SIZE;
 use crate::table::distance;
 use crate::table::distance::Distance;
