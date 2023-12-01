@@ -33,6 +33,10 @@ pub enum Task {
         dst: NodeIndex,
         timeout: Duration,
     },
+    Store {
+        key: TableKey,
+        value: Bytes,
+    },
 }
 
 pub struct WorkerPool<C, L, T>
@@ -79,39 +83,16 @@ where
 
         match task {
             Task::LookUpValue { key, respond, .. } => {
-                let looker = self.looker.clone();
-                let id: u32 = rand::random();
-                let (message_queue_tx, message_queue_rx) = mpsc::channel(1024);
-                self.ongoing_tasks.push(tokio::spawn(async move {
-                    let ctx = Context {
-                        id,
-                        queue: message_queue_rx,
-                    };
-                    let value = looker.lookup_value(key, ctx).await;
-                    // if the client drops the receiver, there's nothing we can do.
-                    let _ = respond.send(value);
-                    id
-                }));
-                self.ongoing.insert(id, TaskInfo::lookup(message_queue_tx));
+                self.lookup_value(key, respond);
             },
             Task::LookUpNode { key, respond } => {
-                let looker = self.looker.clone();
-                let id: u32 = rand::random();
-                let (message_queue_tx, message_queue_rx) = mpsc::channel(1024);
-                self.ongoing_tasks.push(tokio::spawn(async move {
-                    let ctx = Context {
-                        id,
-                        queue: message_queue_rx,
-                    };
-                    let nodes = looker.lookup_contact(key, ctx).await;
-                    // if the client drops the receiver, there's nothing we can do.
-                    let _ = respond.send(nodes);
-                    id
-                }));
-                self.ongoing.insert(id, TaskInfo::lookup(message_queue_tx));
+                self.lookup_node(key, respond);
             },
             Task::Ping { dst, timeout } => {
                 self.ping(dst, timeout);
+            },
+            Task::Store { key, value } => {
+                self.store(key, value);
             },
         }
     }
@@ -179,6 +160,73 @@ where
                 tracing::warn!("invalid message type id received: {ty}")
             },
         }
+    }
+
+    fn lookup_value(&mut self, key: TableKey, respond: ValueRespond) {
+        let looker = self.looker.clone();
+        let id: u32 = rand::random();
+        let (message_queue_tx, message_queue_rx) = mpsc::channel(1024);
+        self.ongoing_tasks.push(tokio::spawn(async move {
+            let ctx = Context {
+                id,
+                queue: message_queue_rx,
+            };
+            let value = looker.lookup_value(key, ctx).await;
+            // if the client drops the receiver, there's nothing we can do.
+            let _ = respond.send(value);
+            id
+        }));
+        self.ongoing.insert(id, TaskInfo::lookup(message_queue_tx));
+    }
+
+    fn lookup_node(&mut self, key: TableKey, respond: ContactRespond) {
+        let looker = self.looker.clone();
+        let id: u32 = rand::random();
+        let (message_queue_tx, message_queue_rx) = mpsc::channel(1024);
+        self.ongoing_tasks.push(tokio::spawn(async move {
+            let ctx = Context {
+                id,
+                queue: message_queue_rx,
+            };
+            let nodes = looker.lookup_contact(key, ctx).await;
+            // if the client drops the receiver, there's nothing we can do.
+            let _ = respond.send(nodes);
+            id
+        }));
+        self.ongoing.insert(id, TaskInfo::lookup(message_queue_tx));
+    }
+
+    fn store(&mut self, key: TableKey, value: Bytes) {
+        let us = self.us;
+        let looker = self.looker.clone();
+        let socket = self.socket.clone();
+
+        let id: u32 = rand::random();
+        let (message_queue_tx, message_queue_rx) = mpsc::channel(1024);
+        self.ongoing_tasks.push(tokio::spawn(async move {
+            // Look for the closest contacts to the key.
+            let ctx = Context {
+                id,
+                queue: message_queue_rx,
+            };
+            match looker.lookup_contact(key, ctx).await {
+                Ok(nodes) => {
+                    // Send them a STORE message.
+                    let token = rand::random();
+                    for index in nodes {
+                        // Todo: let's avoid creating a new message each time.
+                        let _ = socket
+                            .send(network::store(id, token, us, value.clone()), index)
+                            .await;
+                    }
+                },
+                Err(e) => {
+                    tracing::error!("STORE task failed: {e:?}")
+                },
+            }
+            id
+        }));
+        self.ongoing.insert(id, TaskInfo::lookup(message_queue_tx));
     }
 
     fn handle_find(
