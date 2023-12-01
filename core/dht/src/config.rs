@@ -6,13 +6,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub address: SocketAddr,
-    pub bootstrappers: Vec<Bootstrapper>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct Bootstrapper {
-    pub address: SocketAddr,
-    pub network_public_key: NodePublicKey,
+    pub bootstrappers: Vec<NodePublicKey>,
 }
 
 impl Default for Config {

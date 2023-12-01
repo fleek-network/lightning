@@ -50,7 +50,7 @@ pub struct StdManager {
 }
 
 impl StdManager {
-    pub fn _new(local_node_key: NodePublicKey) -> Self {
+    pub fn new(local_node_key: NodePublicKey) -> Self {
         Self {
             local_node_key,
             buckets: vec![Bucket::new()],

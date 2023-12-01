@@ -66,7 +66,7 @@ where
     T: Table,
     U: UnreliableTransport,
 {
-    fn _new(
+    pub fn new(
         us: NodeIndex,
         table: T,
         socket: U,

@@ -4,18 +4,56 @@ mod manager;
 pub mod worker;
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
+use infusion::c;
+use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-pub use manager::Event;
+use lightning_interfaces::ApplicationInterface;
+pub use manager::{Event, StdManager};
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::Sender;
-use tokio::sync::oneshot;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{mpsc, oneshot, Notify};
 
-use crate::table::worker::{Request, TableKey};
+use crate::pool::{DhtPool, Pool};
+use crate::table::manager::Manager;
+use crate::table::worker::{Request, TableKey, TableWorker};
+
+pub fn create_table_and_worker<C, M, P>(
+    us: TableKey,
+    sync_query: c!(C::ApplicationInterface::SyncExecutor),
+    pool: P,
+    manager: M,
+    event_queue: Receiver<Event>,
+    shutdown: Arc<Notify>,
+) -> (DhtTable, TableWorker<C, M, P>)
+where
+    C: Collection,
+    M: Manager,
+    P: Pool,
+{
+    let (request_queue_tx, request_queue_rx) = mpsc::channel(1024);
+
+    let worker = TableWorker::new(
+        us,
+        sync_query,
+        manager,
+        pool,
+        request_queue_rx,
+        event_queue,
+        shutdown,
+    );
+    (
+        DhtTable {
+            request_queue: request_queue_tx,
+        },
+        worker,
+    )
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NodeInfo {
@@ -44,6 +82,12 @@ pub trait Table: Clone + Send + Sync + 'static {
 #[derive(Clone)]
 pub struct DhtTable {
     request_queue: Sender<Request>,
+}
+
+impl DhtTable {
+    pub fn new(request_queue: Sender<Request>) -> Self {
+        Self { request_queue }
+    }
 }
 
 #[async_trait]
