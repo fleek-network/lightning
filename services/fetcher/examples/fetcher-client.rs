@@ -1,7 +1,7 @@
 use arrayref::array_ref;
 use bytes::{BufMut, BytesMut};
 use cid::Cid;
-use fleek_service_cdn::Origin;
+use fleek_service_fetcher::Origin;
 use lightning_handshake::schema::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
 use tcp_client::TcpClient;
 
@@ -73,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 mod cli {
-    use fleek_service_cdn::Origin;
+    use fleek_service_fetcher::Origin;
 
     pub fn args() -> (Origin, String) {
         let mut args = std::env::args();
