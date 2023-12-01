@@ -6,7 +6,7 @@ use fleek_crypto::{NodePublicKey, NodeSecretKey, PublicKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::{Mode, StorageConfig};
 use lightning_dht::config::Config;
-use lightning_dht::dht::{Builder, Dht};
+use lightning_dht::dht::Dht;
 use lightning_interfaces::dht::{DhtInterface, DhtSocket};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, DhtRequest, DhtResponse, KeyPrefix};

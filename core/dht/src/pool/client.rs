@@ -19,19 +19,19 @@ impl Clone for Client {
 }
 
 impl Client {
-    pub fn lookup_value(&self, key: TableKey, respond: ValueRespond) -> Result<()> {
+    pub fn lookup_value(&self, _key: TableKey, _respond: ValueRespond) -> Result<()> {
         Ok(())
     }
 
-    pub fn lookup_contact(&self, key: TableKey, respond: ContactRespond) -> Result<()> {
+    pub fn lookup_contact(&self, _key: TableKey, _respond: ContactRespond) -> Result<()> {
         Ok(())
     }
 
-    pub fn store(&self, key: TableKey, value: Bytes) -> Result<()> {
+    pub fn store(&self, _key: TableKey, _value: Bytes) -> Result<()> {
         Ok(())
     }
 
-    pub fn ping(&self, hash: u32) -> Result<()> {
+    pub fn ping(&self, _dst: NodeIndex) -> Result<()> {
         Ok(())
     }
 }

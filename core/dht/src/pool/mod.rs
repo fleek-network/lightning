@@ -3,11 +3,9 @@ mod lookup;
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use anyhow::Error;
 use bytes::Bytes;
 pub use client::Client;
 use futures::future::Either;
@@ -19,7 +17,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
 
-use crate::network::{Find, FindResponse, Message, UdpTransport, UnreliableTransport};
+use crate::network::{Find, FindResponse, Message, UnreliableTransport};
 use crate::pool::lookup::{Context, LookupInterface};
 use crate::table::server::TableKey;
 use crate::table::Event;
@@ -245,9 +243,8 @@ where
                 Ok(contacts) => {
                     if for_content {
                         let value = table.local_get(key).await.unwrap_or(Bytes::new());
-                        let message = network::find_value_response(
-                            peer_id, peer_token, us, key, contacts, value,
-                        );
+                        let message =
+                            network::find_value_response(peer_id, peer_token, us, contacts, value);
                         let _ = socket.send(message, from).await;
                     } else {
                         let message =
@@ -258,7 +255,7 @@ where
                 Err(e) => {
                     // The table client failed which means the underlying channel was dropped
                     // so there is nothing else to do.
-                    tracing::error!("table client failed");
+                    tracing::error!("table client failed: {e:?}");
                 },
             }
             id
@@ -282,12 +279,15 @@ where
                 .find_respond
                 .clone()
                 .expect("every lookup task to have a queue");
-            if let Err(e) = queue.try_send(FindQueryResponse {
-                from,
-                token,
-                contacts: contacts.to_vec(),
-                content,
-            }) {
+            if queue
+                .try_send(FindQueryResponse {
+                    from,
+                    token,
+                    contacts: contacts.to_vec(),
+                    content,
+                })
+                .is_err()
+            {
                 // Todo: let's define what we want to do in this case.
                 // If the error is due to the queue being full,
                 // it means the task is getting overwhelmed by messages
@@ -348,16 +348,15 @@ where
                     let _ = event_queue.send(Event::Unresponsive { index: dst }).await;
                 },
                 Some(pong_result) => {
-                    if pong_result.is_err() {
-                        tracing::warn!("ping task info was dropped unexpectedly");
-                        let _ = event_queue.send(Event::Unresponsive { index: dst }).await;
-                    } else {
-                        let from = pong_result.unwrap();
+                    if let Ok(from) = pong_result {
                         let timestamp = SystemTime::now()
                             .duration_since(SystemTime::UNIX_EPOCH)
                             .unwrap()
                             .as_millis() as u64;
                         let _ = event_queue.send(Event::Pong { from, timestamp }).await;
+                    } else {
+                        tracing::warn!("ping task info was dropped unexpectedly");
+                        let _ = event_queue.send(Event::Unresponsive { index: dst }).await;
                     }
                 },
             }
