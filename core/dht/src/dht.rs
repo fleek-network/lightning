@@ -1,7 +1,4 @@
-use std::future::Future;
-use std::marker::PhantomData;
 use std::net::SocketAddr;
-use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -22,37 +19,45 @@ use lightning_interfaces::{
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{mpsc, Mutex, Notify};
+use tokio::task::JoinHandle;
 
 use crate::config::Config;
 use crate::network::UdpTransport;
-use crate::pool::{DhtPool, Looker, PoolWorker};
+use crate::pool::{DhtLookUp, DhtPool, PoolWorker, Task};
 use crate::table::worker::{Request, TableKey, TableWorker};
-use crate::table::{DhtTable, NodeInfo, StdManager, Table};
-use crate::{pool, table};
+use crate::table::{DhtTable, Table, TableManager};
+
+pub type TableWorkerType<C> = TableWorker<C, TableManager, DhtPool>;
+pub type PoolWorkerType<C> = PoolWorker<
+    DhtLookUp<C, DhtTable, UdpTransport<c![C::ApplicationInterface::SyncExecutor]>>,
+    DhtTable,
+    UdpTransport<c![C::ApplicationInterface::SyncExecutor]>,
+>;
+
+pub type LookUpType<C> =
+    DhtLookUp<C, DhtTable, UdpTransport<c![C::ApplicationInterface::SyncExecutor]>>;
 
 /// Maintains the DHT.
 #[allow(clippy::type_complexity, unused)]
 pub struct Dht<C: Collection> {
     table: DhtTable,
-    table_request_receiver: Arc<Mutex<Option<Receiver<Request>>>>,
-    table_worker: Arc<Mutex<Option<TableWorker<C, StdManager, DhtPool>>>>,
-    pool_worker: Arc<
-        Mutex<
-            Option<
-                PoolWorker<
-                    Looker<C, DhtTable, UdpTransport<c![C::ApplicationInterface::SyncExecutor]>>,
-                    DhtTable,
-                    UdpTransport<c![C::ApplicationInterface::SyncExecutor]>,
-                >,
-            >,
-        >,
-    >,
-    network_secret_key: NodeSecretKey,
-    nodes: Vec<NodePublicKey>,
+    pool: DhtPool,
+    status: Arc<Mutex<Option<Status>>>,
+    bootstrap_nodes: Vec<NodePublicKey>,
+    sk: NodeSecretKey,
     sync_query: c![C::ApplicationInterface::SyncExecutor],
-    is_running: Arc<Mutex<bool>>,
-    shutdown_notify: Arc<Notify>,
-    collection: PhantomData<C>,
+}
+
+enum Status {
+    NotRunning {
+        table_request_receiver: Receiver<Request>,
+        pool_task_receiver: Receiver<Task>,
+    },
+    Running {
+        table_worker_handle: JoinHandle<Receiver<Request>>,
+        pool_worker_handle: JoinHandle<Receiver<Task>>,
+        shutdown: Arc<Notify>,
+    },
 }
 
 #[async_trait]
@@ -61,58 +66,102 @@ where
     C: Collection,
 {
     fn is_running(&self) -> bool {
-        todo!()
+        let guard = self.status.blocking_lock();
+        matches!(guard.as_ref().unwrap(), &Status::Running { .. })
     }
 
     async fn start(&self) {
         // Todo: Fix this because index may not be available.
-        let local_pk = self.network_secret_key.to_pk();
+        let local_pk = self.sk.to_pk();
         let local_index = self.sync_query.pubkey_to_index(local_pk).unwrap();
-        {
-            let mut pool_worker_guard = self.pool_worker.lock().await;
-            if pool_worker_guard.is_none() {
+        let mut guard = self.status.lock().await;
+        let mut status = guard.take().unwrap();
+
+        match status {
+            Status::NotRunning {
+                table_request_receiver,
+                pool_task_receiver,
+            } => {
+                let shutdown = Arc::new(Notify::new());
                 // Todo: clean up socket in shutdown.
                 let address: SocketAddr = "0.0.0.0:0".parse().unwrap();
                 let udp_socket = Arc::new(UdpSocket::bind(address).await.unwrap());
                 let socket = UdpTransport::new(udp_socket, self.sync_query.clone());
 
-                let looker = Looker::new(
+                let looker: LookUpType<C> = DhtLookUp::new(
                     local_index,
                     self.table.clone(),
                     socket.clone(),
                     self.sync_query.clone(),
                 );
 
+                // Todo: make configurable.
+                let max_pool_size = 2048;
                 let (event_queue_tx, event_queue_rx) = mpsc::channel(1024);
-                let (pool, pool_worker) = pool::create_pool_and_worker(
+
+                let pool_worker: PoolWorkerType<C> = PoolWorker::new(
                     local_index,
                     looker,
+                    socket,
                     self.table.clone(),
-                    socket.clone(),
+                    pool_task_receiver,
                     event_queue_tx,
-                    self.shutdown_notify.clone(),
+                    max_pool_size,
+                    shutdown.clone(),
                 );
 
-                pool_worker_guard.replace(pool_worker);
-
-                let request_queue = self.table_request_receiver.lock().await.take().unwrap();
-                let table_worker = TableWorker::new(
+                let table_worker: TableWorkerType<C> = TableWorker::new(
                     local_pk.0,
                     self.sync_query.clone(),
-                    StdManager::new(local_pk),
-                    pool,
-                    request_queue,
+                    TableManager::new(local_pk),
+                    self.pool.clone(),
+                    table_request_receiver,
                     event_queue_rx,
-                    self.shutdown_notify.clone(),
+                    shutdown.clone(),
                 );
 
-                self.table_worker.lock().await.replace(table_worker);
-            }
+                status = Status::Running {
+                    table_worker_handle: table_worker.spawn(),
+                    pool_worker_handle: pool_worker.spawn(),
+                    shutdown,
+                };
+            },
+            Status::Running { .. } => {
+                unreachable!("invalid DHT status")
+            },
         }
+
+        guard.replace(status);
     }
 
     async fn shutdown(&self) {
-        todo!()
+        let mut guard = self.status.lock().await;
+        let mut status = guard.take().unwrap();
+        match status {
+            Status::Running {
+                pool_worker_handle,
+                table_worker_handle,
+                shutdown,
+            } => {
+                // There may be a race condition if shutdown() is called immediately after
+                // start(). Calling notify_waiters() notifies tasks that have called notified().
+                // Workers may not have had the chance to do that so we may consider using a
+                // notifier for each worker.
+                shutdown.notify_waiters();
+                let table_request_receiver = table_worker_handle.await.unwrap();
+                let pool_task_receiver = pool_worker_handle.await.unwrap();
+
+                status = Status::NotRunning {
+                    table_request_receiver,
+                    pool_task_receiver,
+                };
+            },
+            Status::NotRunning { .. } => {
+                unreachable!("invalid DHT status when shutting down")
+            },
+        }
+
+        guard.replace(status);
     }
 }
 
@@ -132,17 +181,20 @@ where
         let (_, sk) = signer.get_sk();
         let (request_queue_tx, request_queue_rx) = mpsc::channel(1024);
         let table = DhtTable::new(request_queue_tx);
+
+        let (task_queue_tx, task_queue_rx) = mpsc::channel(1024);
+        let pool = DhtPool::new(task_queue_tx);
+
         Ok(Dht {
+            sk,
             table,
-            table_request_receiver: Arc::new(Mutex::new(Some(request_queue_rx))),
-            table_worker: Arc::new(Mutex::new(None)),
-            pool_worker: Arc::new(Mutex::new(None)),
-            network_secret_key: sk,
+            pool,
+            status: Arc::new(Mutex::new(Some(Status::NotRunning {
+                table_request_receiver: request_queue_rx,
+                pool_task_receiver: task_queue_rx,
+            }))),
             sync_query,
-            nodes: config.bootstrappers,
-            is_running: Arc::new(Mutex::new(false)),
-            shutdown_notify: Arc::new(Notify::new()),
-            collection: PhantomData,
+            bootstrap_nodes: config.bootstrappers,
         })
     }
 

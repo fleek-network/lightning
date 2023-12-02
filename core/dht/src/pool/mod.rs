@@ -6,16 +6,14 @@ use std::time::Duration;
 
 use anyhow::Result;
 use bytes::Bytes;
-use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-pub use lookup::Looker;
-use tokio::sync::mpsc::{Receiver, Sender};
+pub use lookup::DhtLookUp;
+use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, oneshot, Notify};
-pub use worker::PoolWorker;
+pub use worker::{PoolWorker, Task};
 
 use crate::network::UnreliableTransport;
-use crate::pool::lookup::LookupInterface;
-use crate::pool::worker::Task;
+use crate::pool::lookup::LookUp;
 use crate::table::worker::TableKey;
 use crate::table::{Event, Table};
 
@@ -31,7 +29,7 @@ pub fn create_pool_and_worker<L, T, U>(
     shutdown: Arc<Notify>,
 ) -> (DhtPool, PoolWorker<L, T, U>)
 where
-    L: LookupInterface,
+    L: LookUp,
     T: Table,
     U: UnreliableTransport,
 {
@@ -55,7 +53,7 @@ where
     )
 }
 
-pub trait Pool {
+pub trait Pool: Send + 'static {
     fn lookup_value(&self, key: TableKey, respond: ValueRespond) -> Result<()>;
 
     fn lookup_contact(&self, key: TableKey, respond: ContactRespond) -> Result<()>;

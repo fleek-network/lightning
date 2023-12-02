@@ -14,17 +14,17 @@ use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ApplicationInterface;
-pub use manager::{Event, StdManager};
+pub use manager::{Event, TableManager};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, Notify};
 
-use crate::pool::{DhtPool, Pool};
+use crate::pool::Pool;
 use crate::table::manager::Manager;
 use crate::table::worker::{Request, TableKey, TableWorker};
 
 pub fn create_table_and_worker<C, M, P>(
-    us: TableKey,
+    local_key: TableKey,
     sync_query: c!(C::ApplicationInterface::SyncExecutor),
     pool: P,
     manager: M,
@@ -39,7 +39,7 @@ where
     let (request_queue_tx, request_queue_rx) = mpsc::channel(1024);
 
     let worker = TableWorker::new(
-        us,
+        local_key,
         sync_query,
         manager,
         pool,

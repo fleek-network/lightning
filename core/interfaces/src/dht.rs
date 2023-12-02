@@ -1,4 +1,3 @@
-use affair::Socket;
 use async_trait::async_trait;
 use infusion::c;
 use lightning_types::{KeyPrefix, TableEntry};
