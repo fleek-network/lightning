@@ -21,7 +21,7 @@ use lightning_pinger::Pinger;
 use lightning_pool::Pool;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_resolver::resolver::Resolver;
-use lightning_rpc::server::Rpc;
+use lightning_rpc::Rpc;
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 use lightning_syncronizer::syncronizer::Syncronizer;

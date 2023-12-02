@@ -14,8 +14,7 @@ use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::ToDigest;
 use lightning_node::config::TomlConfigProvider;
-use lightning_rpc::server::Rpc;
-use lightning_rpc::utils;
+use lightning_rpc::{Rpc, utils};
 use lightning_signer::Signer;
 use lightning_types::{
     NodeIndex,
@@ -167,7 +166,7 @@ fn load_secret_key<C: Collection<SignerInterface = Signer<C>>>(
 }
 
 fn get_rpc_port<C: Collection<RpcInterface = Rpc<C>>>(config: Arc<TomlConfigProvider<C>>) -> u16 {
-    config.get::<C::RpcInterface>().port
+    config.get::<C::RpcInterface>().port()
 }
 
 fn create_update_request(

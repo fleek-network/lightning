@@ -41,7 +41,7 @@ use lightning_rep_collector::ReputationAggregator;
 use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
 use lightning_rpc::config::Config as RpcConfig;
-use lightning_rpc::server::Rpc;
+use lightning_rpc::Rpc;
 use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
 use lightning_signer::{utils, Config as SignerConfig, Signer};
 use lightning_syncronizer::config::Config as SyncronizerConfig;
@@ -378,10 +378,7 @@ fn build_config(
             .try_into()
             .expect("Failed to resolve path"),
     });
-    config.inject::<Rpc<FinalTypes>>(RpcConfig {
-        port: ports.rpc,
-        ..Default::default()
-    });
+    config.inject::<Rpc<FinalTypes>>(RpcConfig::default_with_port(ports.rpc));
 
     config.inject::<Consensus<FinalTypes>>(ConsensusConfig {
         store_path: root

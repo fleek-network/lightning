@@ -7,6 +7,7 @@ use num_traits::{CheckedDiv, FromPrimitive, ToPrimitive, Zero};
 use primitive_types::U256 as EthersU256;
 use ruint::aliases::U256;
 use ruint::ToUintError;
+use schemars::{JsonSchema, schema_for_value};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
@@ -46,6 +47,42 @@ use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
 
 #[derive(Clone, Hash, PartialEq, PartialOrd, Ord, Eq, Default)]
 pub struct HpUfixed<const P: usize>(BigUint);
+
+impl JsonSchema for HpUfixed<6> {
+    fn schema_name() -> String {
+        "HpUfixed".to_string()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed(concat!(module_path!(), "::HpUfixed"))
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        let ui = BigUint::new(vec![1, 1]);
+
+        schema_for_value!(
+            Self(ui)
+        ).schema.into()
+    }
+}
+
+impl JsonSchema for HpUfixed<18> {
+    fn schema_name() -> String {
+        "HpUfixed".to_string()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed(concat!(module_path!(), "::HpUfixed"))
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        let ui = BigUint::new(vec![1, 1]);
+
+        schema_for_value!(
+            Self(ui)
+        ).schema.into()
+    }
+}
 
 impl<const P: usize> HpUfixed<P> {
     pub fn new(value: BigUint) -> Self {

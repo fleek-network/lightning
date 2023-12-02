@@ -1,0 +1,18 @@
+[package]
+name = "lightning-openrpc-macros"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dependencies]
+derive-syn-parse = "0.1.5"
+itertools = "0.12.0"
+proc-macro2 = "1.0.70"
+quote = "1.0.33"
+syn = { version = "1.0.104", features = ["full", "derive", "extra-traits"] }
+unescape = "0.1.0"
+lightning-openrpc = { path = "../rpc-openrpc" }

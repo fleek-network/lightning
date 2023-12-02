@@ -6,7 +6,7 @@ use lightning_interfaces::types::Blake3Hash;
 use lightning_interfaces::{ConfigProviderInterface, DhtSocket};
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
-use lightning_rpc::server::Rpc;
+use lightning_rpc::Rpc;
 use tokio::sync::oneshot;
 
 use crate::container::Container;
@@ -56,7 +56,7 @@ impl ContainerizedNode {
 
     pub fn get_rpc_address(&self) -> String {
         let config = self.config.get::<Rpc<FinalTypes>>();
-        format!("http://{}:{}/rpc/v0", config.addr, config.port)
+        format!("http://{}", config.addr())
     }
 
     pub fn get_owner_secret_key(&self) -> AccountOwnerSecretKey {

@@ -32,6 +32,53 @@ use crate::{NodeIndex, NodePorts, TransactionDestination};
 // TODO: Change this to capital and non-abrv version.
 const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";
 
+/// Create this wrapper so we can implement JsonSchema for EthersTransaction
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct EthersTransactionWrapper {
+    pub tx: EthersTransaction,
+}
+
+impl schemars::JsonSchema for EthersTransactionWrapper {
+    fn schema_name() -> String {
+        "EthersTransaction".into()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed(concat!(module_path!(), "::NodePublicKey"))
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        let tx = EthersTransaction::default();
+        schemars::schema_for_value!(tx).schema.into()
+    }
+}
+
+impl std::ops::Deref for EthersTransactionWrapper {
+    type Target = EthersTransaction;
+
+    fn deref(&self) -> &Self::Target {
+        &self.tx
+    }
+}
+
+impl std::ops::DerefMut for EthersTransactionWrapper {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.tx
+    }
+}
+
+impl From<EthersTransaction> for EthersTransactionWrapper {
+    fn from(tx: EthersTransaction) -> Self {
+        Self { tx }
+    }
+}
+
+impl From<EthersTransactionWrapper> for EthersTransaction {
+    fn from(wrapper: EthersTransactionWrapper) -> Self {
+        wrapper.tx
+    }
+}
+
 /// A block of transactions, which is a list of update requests each signed by a user,
 /// the block is the atomic view into the network, meaning that queries do not view
 /// the intermediary state within a block, but only have the view to the latest executed
@@ -45,7 +92,7 @@ pub struct Block {
 
 /// An update transaction, sent from users to the consensus to migrate the application
 /// from one state to the next state.
-#[derive(Debug, Hash, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Serialize, Deserialize, Eq, PartialEq, schemars::JsonSchema)]
 pub struct UpdateRequest {
     /// The signature by the user signing this payload.
     pub signature: TransactionSignature,
@@ -62,14 +109,14 @@ impl From<UpdateRequest> for TransactionRequest {
 
 impl From<EthersTransaction> for TransactionRequest {
     fn from(value: EthersTransaction) -> Self {
-        Self::EthereumRequest(value)
+        Self::EthereumRequest(value.into())
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, schemars::JsonSchema)]
 pub enum TransactionRequest {
     UpdateRequest(UpdateRequest),
-    EthereumRequest(EthersTransaction),
+    EthereumRequest(EthersTransactionWrapper),
 }
 
 impl TransactionRequest {
@@ -135,7 +182,7 @@ impl TryFrom<Vec<u8>> for TransactionRequest {
             },
             0x01 => {
                 let eth_tx = rlp::decode::<EthersTransaction>(&value[0..value.len() - 1])?;
-                Ok(TransactionRequest::EthereumRequest(eth_tx))
+                Ok(TransactionRequest::EthereumRequest(eth_tx.into()))
             },
             _ => Err(anyhow::anyhow!("Invalid magic byte: {magic_byte}")),
         }
@@ -193,7 +240,7 @@ impl TryFrom<Vec<u8>> for Block {
 }
 
 /// The payload data of FN transaction
-#[derive(Debug, Hash, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Serialize, Deserialize, Eq, PartialEq, schemars::JsonSchema)]
 pub struct UpdatePayload {
     /// The sender of the transaction.
     pub sender: TransactionSender,
@@ -204,7 +251,7 @@ pub struct UpdatePayload {
 }
 
 /// All of the update functions in our logic, along their parameters.
-#[derive(Debug, Hash, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Serialize, Deserialize, Eq, PartialEq, schemars::JsonSchema)]
 pub enum UpdateMethod {
     /// The main function of the application layer. After aggregating ProofOfAcknowledgements a
     /// node will submit this transaction to get paid.
@@ -583,7 +630,7 @@ mod tests {
                     };
                     let bytes = tx.rlp().to_vec();
                     let tx = rlp::decode::<EthersTransaction>(&bytes).unwrap();
-                    TransactionRequest::EthereumRequest(tx)
+                    TransactionRequest::EthereumRequest(tx.into())
                 }
             })
             .collect();
@@ -597,7 +644,7 @@ mod tests {
     #[test]
     fn test_transaction_request_eth() {
         let tx = EthersTransaction::default();
-        let tx_req = TransactionRequest::EthereumRequest(tx);
+        let tx_req = TransactionRequest::EthereumRequest(tx.into());
         let bytes: Vec<u8> = (&tx_req).try_into().unwrap();
         let tx_req_r = TransactionRequest::try_from(bytes).unwrap();
 

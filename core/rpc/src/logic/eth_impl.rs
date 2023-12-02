@@ -1,0 +1,261 @@
+use std::sync::Arc;
+
+use ethers::types::{
+    Address,
+    Block,
+    BlockNumber,
+    Bytes,
+    Transaction,
+    TransactionReceipt,
+    TransactionRequest,
+    H256,
+    U256,
+};
+use ethers::utils::rlp;
+use fleek_crypto::EthAddress;
+use jsonrpsee::core::RpcResult;
+use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::types::{ArchiveRequest, ArchiveResponse};
+use lightning_interfaces::SyncQueryRunnerInterface;
+use tracing::trace;
+
+use crate::api::EthApiServer;
+use crate::api_types::{CallRequest, StateOverride};
+use crate::error::RPCError;
+use crate::Data;
+
+pub struct EthApi<C: Collection> {
+    data: Arc<Data<C>>,
+}
+
+impl<C: Collection> EthApi<C> {
+    pub(crate) fn new(data: Arc<Data<C>>) -> Self {
+        Self { data }
+    }
+}
+
+#[async_trait::async_trait]
+impl<C: Collection> EthApiServer for EthApi<C> {
+    async fn block_number(&self) -> RpcResult<U256> {
+        trace!(target: "rpc::eth", "Serving eth_blockNumber");
+
+        Ok(U256::from(self.data.query_runner.get_block_number()))
+    }
+
+    async fn transaction_count(
+        &self,
+        address: EthAddress,
+        block: Option<BlockNumber>,
+    ) -> RpcResult<U256> {
+        trace!(target: "rpc::eth", ?address, "Serving eth_getTransactionCount");
+
+        if let Some(_) = block {
+            return Err(RPCError::custom("block number not supported".to_string()).into());
+        }
+
+        Ok(U256::from(
+            self.data.query_runner.get_account_nonce(&address) + 1,
+        ))
+    }
+
+    async fn balance(&self, address: EthAddress, block_number: Option<BlockNumber>) -> RpcResult<U256> {
+        trace!(target: "rpc::eth", ?address, ?block_number, "Serving eth_getBalance");
+        // Todo(dalton) direct safe conversion from hpfixed => u128
+        Ok(self
+            .data
+            .query_runner
+            .get_flk_balance(&address)
+            .try_into()
+            .unwrap_or(U256::zero()))
+    }
+
+    async fn protocol_version(&self) -> RpcResult<u64> {
+        trace!(target: "rpc::eth", "Serving eth_protocolVersion");
+        Ok(0x41)
+    }
+
+    async fn chain_id(&self) -> RpcResult<u32> {
+        trace!(target: "rpc::eth", "Serving eth_chainId");
+        Ok(self.data.query_runner.get_chain_id())
+    }
+
+    /// todo(n)
+    async fn syncing(&self) -> RpcResult<bool> {
+        trace!(target: "rpc::eth", "Serving eth_syncing");
+        Ok(false)
+    }
+
+    async fn block_by_number(&self, number: BlockNumber, full: bool) -> RpcResult<Option<H256>> {
+        trace!(target: "rpc::eth", ?number, ?full, "Serving eth_getBlockByNumber");
+        if let Some(socket) = &self.data.archive_socket {
+            match socket.run(ArchiveRequest::GetBlockByNumber(number)).await {
+                Ok(Ok(ArchiveResponse::Block(block))) => Ok(Some(block.block_hash.into())),
+                Ok(Ok(ArchiveResponse::None)) => Ok(None),
+                _ => Err(RPCError::custom("Failed to query block".to_string()).into()),
+            }
+        } else {
+            Err(RPCError::custom("Archive socket not initialized".to_string()).into())
+        }
+    }
+
+    async fn block_by_hash(&self, hash: H256, full: bool) -> RpcResult<Option<Block<H256>>> {
+        trace!(target: "rpc::eth", ?hash, ?full, "Serving eth_getBlockByHash");
+        if let Some(socket) = &self.data.archive_socket {
+            match socket
+                .run(ArchiveRequest::GetBlockByHash(hash.into()))
+                .await
+            {
+                Ok(Ok(ArchiveResponse::Block(block))) => Ok(Some(block.into())),
+                Ok(Ok(ArchiveResponse::None)) => Ok(None),
+                Ok(Err(e)) => Err(RPCError::custom(format!("Failed to query block: {}", e)).into()),
+                Ok(_) => Err(RPCError::custom(
+                    "Received an invalid response type. this is a bug".to_string(),
+                )
+                .into()),
+                Err(e) => Err(RPCError::from(e).into()),
+            }
+        } else {
+            Err(RPCError::custom("Archive socket not initialized".to_string()).into())
+        }
+    }
+
+    async fn transaction_receipt(&self, hash: H256) -> RpcResult<Option<TransactionReceipt>> {
+        trace!(target: "rpc::eth", ?hash, "Serving eth_getTransactionReceipt");
+
+        if let Some(socket) = &self.data.archive_socket {
+            match socket
+                .run(ArchiveRequest::GetTransactionReceipt(hash.0))
+                .await
+            {
+                Ok(Ok(ArchiveResponse::TransactionReceipt(txn))) => Ok(Some(txn.into())),
+                Ok(Ok(ArchiveResponse::None)) => Ok(None),
+                Ok(Err(e)) => Err(RPCError::custom(format!(
+                    "Failed to query transaction receipt: {}",
+                    e
+                ))
+                .into()),
+                Ok(_) => Err(RPCError::custom(
+                    "Recieved an invalid response type. this is a bug.".to_string(),
+                )
+                .into()),
+                Err(e) => Err(RPCError::from(e).into()),
+            }
+        } else {
+            Err(RPCError::custom("Archive socket not initialized".to_string()).into())
+        }
+    }
+
+    async fn send_raw_transaction(&self, tx: Bytes) -> RpcResult<H256> {
+        trace!(target: "rpc::eth", "Serving eth_sendRawTransaction");
+        let tx_data = tx.as_ref();
+
+        let mut transaction = rlp::decode::<Transaction>(tx_data).map_err(RPCError::from)?;
+
+        transaction.recover_from_mut().map_err(RPCError::from)?;
+
+        let hash = transaction.hash();
+
+        self.data
+            .mempool_socket
+            .run(transaction.into())
+            .await
+            .map_err(RPCError::from)?;
+
+        Ok(hash)
+    }
+
+    /// Todo(n)
+    async fn gas_price(&self) -> RpcResult<U256> {
+        trace!(target: "rpc::eth", "Serving eth_gasPrice");
+        Ok(U256::zero())
+    }
+
+    /// todo(n)
+    async fn estimate_gas(&self, tx: CallRequest) -> RpcResult<U256> {
+        trace!(target: "rpc::eth", ?tx, "Serving eth_estimateGas");
+        Ok(U256::from(1000000))
+    }
+
+    /// todo(n)
+    async fn code(
+        &self,
+        address: EthAddress,
+        block_number: Option<BlockNumber>,
+    ) -> RpcResult<Bytes> {
+        trace!(target: "rpc::eth", ?address, ?block_number, "Serving eth_getCode");
+        Ok(Bytes::default())
+    }
+
+    async fn max_priority_fee_per_gas(&self) -> RpcResult<U256> {
+        trace!(target: "rpc::eth", "Serving eth_maxPriorityFeePerGas");
+        Ok(U256::zero())
+    }
+
+    async fn fee_history(&self) -> RpcResult<String> {
+        Err(RPCError::unimplemented().into())
+    }
+
+    /// todo(n)
+    async fn storage_at(
+        &self,
+        _address: EthAddress,
+        _index: U256,
+        _block_number: Option<BlockNumber>,
+    ) -> RpcResult<Bytes> {
+        Err(RPCError::unimplemented().into())
+    }
+
+    async fn transaction_by_hash(&self, _hash: H256) -> RpcResult<String> {
+        Err(RPCError::unimplemented().into())
+    }
+
+    async fn mining(&self) -> RpcResult<bool> {
+        Err(RPCError::unimplemented().into())
+    }
+
+    async fn hashrate(&self) -> RpcResult<U256> {
+        Err(RPCError::unimplemented().into())
+    }
+
+    async fn get_work(&self) -> RpcResult<Vec<String>> {
+        Err(RPCError::unimplemented().into())
+    }
+
+    async fn submit_hashrate(&self, _hash_rate: U256, _client_id: String) -> RpcResult<bool> {
+        Err(RPCError::unimplemented().into())
+    }
+
+    async fn submit_work(&self, _nonce: U256, _pow_hash: H256, _mix_hash: H256) -> RpcResult<bool> {
+        Err(RPCError::unimplemented().into())
+    }
+
+    async fn send_transaction(&self, _tx: TransactionRequest) -> RpcResult<H256> {
+        Err(RPCError::unimplemented().into())
+    }
+
+    async fn coinbase(&self) -> RpcResult<Address> {
+        Err(RPCError::unimplemented().into())
+    }
+
+    async fn accounts(&self) -> RpcResult<Vec<Address>> {
+        Err(RPCError::unimplemented().into())
+    }
+
+    /// todo(n)
+    async fn call(
+        &self,
+        _tx: TransactionRequest,
+        _block_number: Option<BlockNumber>,
+        _state_overrides: Option<StateOverride>,
+    ) -> RpcResult<Bytes> {
+        Err(RPCError::unimplemented().into())
+    }
+
+    async fn sign(&self, _address: EthAddress, _data: Bytes) -> RpcResult<Bytes> {
+        Err(RPCError::unimplemented().into())
+    }
+
+    async fn sign_transaction(&self, _tx: TransactionRequest) -> RpcResult<Bytes> {
+        Err(RPCError::unimplemented().into())
+    }
+}

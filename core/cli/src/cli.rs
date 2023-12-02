@@ -4,7 +4,7 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::ServiceExecutorInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::{FinalTypes, WithMockConsensus};
-use lightning_rpc::server::Rpc;
+use lightning_rpc::Rpc;
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 use resolved_pathbuf::ResolvedPathBuf;

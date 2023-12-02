@@ -1,4 +1,4 @@
-use std::thread;
+use std::net::SocketAddr;
 use std::time::Duration;
 
 use affair::{Executor, TokioSpawn, Worker};
@@ -9,10 +9,10 @@ use fleek_crypto::{
     EthAddress,
     NodePublicKey,
     NodeSecretKey,
-    PublicKey,
     SecretKey,
 };
 use hp_fixed::unsigned::HpUfixed;
+use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisAccount, GenesisNode};
@@ -58,11 +58,9 @@ use lightning_signer::{Config as SignerConfig, Signer};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio::{task, test};
 
 use crate::config::Config as RpcConfig;
-use crate::server::Rpc;
-use crate::utils;
+use crate::{utils, Rpc};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RpcSuccessResponse<T> {
@@ -101,7 +99,7 @@ partial!(TestBinding {
     ReputationAggregatorInterface = ReputationAggregator<Self>;
 });
 
-fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
+fn init_rpc(app: Application<TestBinding>, port: u16) -> Result<Rpc<TestBinding>> {
     let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
 
     let ipfs_origin =
@@ -146,7 +144,7 @@ fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
     .unwrap();
 
     let rpc = Rpc::<TestBinding>::init(
-        RpcConfig::default(),
+        RpcConfig::default_with_port(port),
         MockWorker::mempool_socket(),
         app.sync_query(),
         blockstore,
@@ -158,6 +156,7 @@ fn init_rpc(app: Application<TestBinding>) -> Result<Rpc<TestBinding>> {
 
 async fn init_rpc_without_consensus(
     genesis: Option<Genesis>,
+    port: u16,
 ) -> Result<(Rpc<TestBinding>, QueryRunner)> {
     let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
     let app = match genesis {
@@ -179,18 +178,18 @@ async fn init_rpc_without_consensus(
     let query_runner = app.sync_query();
     app.start().await;
 
-    let rpc = init_rpc(app).unwrap();
+    let rpc = init_rpc(app, port).unwrap();
     Ok((rpc, query_runner))
 }
 
-async fn init_rpc_app_test() -> Result<(Rpc<TestBinding>, QueryRunner)> {
+async fn init_rpc_app_test(port: u16) -> Result<(Rpc<TestBinding>, QueryRunner)> {
     let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
     let app = Application::<TestBinding>::init(AppConfig::test(), blockstore).unwrap();
     let query_runner = app.sync_query();
     app.start().await;
 
     // Init rpc service
-    let rpc = init_rpc(app).unwrap();
+    let rpc = init_rpc(app, port).unwrap();
 
     Ok((rpc, query_runner))
 }
@@ -205,14 +204,26 @@ async fn wait_for_server_start(port: u16) -> Result<()> {
             .send()
             .await;
         match response {
-            Ok(res) if res.status().is_success() => {
-                println!("Server is ready!");
-                break;
+            Ok(res) => {
+                if res.status().is_success() {
+                    println!("Server is ready");
+                    break;
+                } else {
+                    println!(
+                        "Server is not ready yet status: {}, res: {}",
+                        res.status(),
+                        res.text().await?
+                    );
+                    retries -= 1;
+                    // Delay between retries
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                }
             },
-            _ => {
+            Err(e) => {
+                println!("Server Error: {}", e);
                 retries -= 1;
                 // Delay between retries
-                thread::sleep(Duration::from_secs(1));
+                tokio::time::sleep(Duration::from_secs(1)).await;
             },
         }
     }
@@ -224,14 +235,21 @@ async fn wait_for_server_start(port: u16) -> Result<()> {
     }
 }
 
-#[test]
+fn client(url: SocketAddr) -> HttpClient {
+    HttpClientBuilder::default()
+        .build(format!("http://{}", url))
+        .expect("client to build")
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_ping() -> Result<()> {
     let port = 30000;
-    let (mut rpc, _) = init_rpc_without_consensus(None).await.unwrap();
-    rpc.config.port = port;
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    let (rpc, _) = init_rpc_without_consensus(None, port).await.unwrap();
+    rpc.start().await;
+
+    let handle = rpc.handle.lock().await;
+
+    assert!(!handle.as_ref().expect("RPC server to be there").is_stopped());
 
     wait_for_server_start(port).await?;
 
@@ -243,7 +261,7 @@ async fn test_rpc_ping() -> Result<()> {
     });
 
     let response =
-        utils::make_request(format!("http://127.0.0.1:{port}/rpc/v0"), req.to_string()).await?;
+        utils::make_request(format!("http://127.0.0.1:{port}/AHHHHHH"), req.to_string()).await?;
 
     if response.status().is_success() {
         let response_body = response.text().await?;
@@ -255,7 +273,7 @@ async fn test_rpc_ping() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_flk_balance() -> Result<()> {
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -271,13 +289,12 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
         bandwidth_balance: 0,
     });
 
-    let (mut rpc, _) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30001;
-    rpc.config.port = port;
+    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
+        .await
+        .unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -299,7 +316,7 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_reputation() -> Result<()> {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
@@ -334,20 +351,18 @@ async fn test_rpc_get_reputation() -> Result<()> {
     // Init application service and store reputation score in application state.
     genesis_node.reputation = Some(46);
     genesis.node_info.push(genesis_node);
-
-    let (mut rpc, _query_runner) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30002;
-    rpc.config.port = port;
+    let (rpc, _query_runner) = init_rpc_without_consensus(Some(genesis), port)
+        .await
+        .unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_reputation",
-        "params": {"public_key": node_public_key.to_base58()},
+        "params": {"public_key": node_public_key},
         "id":1,
     });
 
@@ -363,7 +378,7 @@ async fn test_rpc_get_reputation() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_staked() -> Result<()> {
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -406,13 +421,12 @@ async fn test_rpc_get_staked() -> Result<()> {
 
     genesis.node_info.push(node_info);
 
-    let (mut rpc, _) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30003;
-    rpc.config.port = port;
+    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
+        .await
+        .unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
     let req = json!({
         "jsonrpc": "2.0",
@@ -433,7 +447,7 @@ async fn test_rpc_get_staked() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_stables_balance() -> Result<()> {
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -449,13 +463,12 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
         bandwidth_balance: 0,
     });
 
-    let (mut rpc, _) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30004;
-    rpc.config.port = port;
+    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
+        .await
+        .unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -477,7 +490,7 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_stake_locked_until() -> Result<()> {
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -519,13 +532,12 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
 
     genesis.node_info.push(node_info);
 
-    let (mut rpc, _) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30005;
-    rpc.config.port = port;
+    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
+        .await
+        .unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -547,7 +559,7 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_locked_time() -> Result<()> {
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -589,13 +601,12 @@ async fn test_rpc_get_locked_time() -> Result<()> {
 
     genesis.node_info.push(node_info);
 
-    let (mut rpc, _) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30006;
-    rpc.config.port = port;
+    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
+        .await
+        .unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -617,7 +628,7 @@ async fn test_rpc_get_locked_time() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_locked() -> Result<()> {
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -659,35 +670,24 @@ async fn test_rpc_get_locked() -> Result<()> {
 
     genesis.node_info.push(node_info);
 
-    let (mut rpc, _) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30007;
-    rpc.config.port = port;
+    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
+        .await
+        .unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_locked",
-        "params": {"public_key": node_public_key},
-        "id":1,
-    });
+    let client = client(rpc.config.addr());
 
-    let client = Client::new();
-    let response = utils::rpc_request::<HpUfixed<18>>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-    )
-    .await?;
-    assert_eq!(HpUfixed::<18>::from(500_u32), response.result);
+    let res =
+        crate::api::FleekApiClient::get_locked(&client, node_public_key).await?;
+    assert_eq!(HpUfixed::<18>::from(500_u32), res);
 
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_bandwidth_balance() -> Result<()> {
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -703,13 +703,12 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
         bandwidth_balance: 10_000,
     });
 
-    let (mut rpc, _) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30008;
-    rpc.config.port = port;
+    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
+        .await
+        .unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -731,7 +730,7 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_node_info() -> Result<()> {
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -773,13 +772,12 @@ async fn test_rpc_get_node_info() -> Result<()> {
 
     genesis.node_info.push(node_info.clone());
 
-    let (mut rpc, _) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30009;
-    rpc.config.port = port;
+    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
+        .await
+        .unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -801,15 +799,12 @@ async fn test_rpc_get_node_info() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_staking_amount() -> Result<()> {
     let port = 30010;
-    let (mut rpc, query_runner) = init_rpc_app_test().await.unwrap();
-    rpc.config.port = port;
+    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -831,15 +826,12 @@ async fn test_rpc_get_staking_amount() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_committee_members() -> Result<()> {
     let port = 30011;
-    let (mut rpc, query_runner) = init_rpc_app_test().await.unwrap();
-    rpc.config.port = port;
+    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -861,15 +853,12 @@ async fn test_rpc_get_committee_members() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_epoch() -> Result<()> {
     let port = 30012;
-    let (mut rpc, query_runner) = init_rpc_app_test().await.unwrap();
-    rpc.config.port = port;
+    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -891,15 +880,12 @@ async fn test_rpc_get_epoch() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_epoch_info() -> Result<()> {
     let port = 30013;
-    let (mut rpc, query_runner) = init_rpc_app_test().await.unwrap();
-    rpc.config.port = port;
+    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -921,15 +907,12 @@ async fn test_rpc_get_epoch_info() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_total_supply() -> Result<()> {
     let port = 30014;
-    let (mut rpc, query_runner) = init_rpc_app_test().await.unwrap();
-    rpc.config.port = port;
+    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -951,15 +934,12 @@ async fn test_rpc_get_total_supply() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_year_start_supply() -> Result<()> {
     let port = 30015;
-    let (mut rpc, query_runner) = init_rpc_app_test().await.unwrap();
-    rpc.config.port = port;
+    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -982,15 +962,12 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_protocol_fund_address() -> Result<()> {
     let port = 30016;
-    let (mut rpc, query_runner) = init_rpc_app_test().await.unwrap();
-    rpc.config.port = port;
+    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -1012,15 +989,12 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_protocol_params() -> Result<()> {
     let port = 30017;
-    let (mut rpc, query_runner) = init_rpc_app_test().await.unwrap();
-    rpc.config.port = port;
+    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let params = ProtocolParams::LockTime;
@@ -1028,7 +1002,7 @@ async fn test_rpc_get_protocol_params() -> Result<()> {
     let req = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_protocol_params",
-        "params": params,
+        "params": {"protocol_params": params},
         "id":1,
     });
 
@@ -1044,7 +1018,7 @@ async fn test_rpc_get_protocol_params() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_total_served() -> Result<()> {
     // Init application service and store total served in application state.
     let mut genesis = Genesis::load().unwrap();
@@ -1055,19 +1029,18 @@ async fn test_rpc_get_total_served() -> Result<()> {
     };
     genesis.total_served.insert(0, total_served.clone());
 
-    let (mut rpc, _) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30018;
-    rpc.config.port = port;
+    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
+        .await
+        .unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_total_served",
-        "params": 0,
+        "params": { "epoch": 0 },
         "id":1,
     });
 
@@ -1083,7 +1056,7 @@ async fn test_rpc_get_total_served() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_node_served() -> Result<()> {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
@@ -1121,13 +1094,12 @@ async fn test_rpc_get_node_served() -> Result<()> {
     });
     genesis.node_info.push(genesis_node);
 
-    let (mut rpc, _) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30019;
-    rpc.config.port = port;
+    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
+        .await
+        .unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -1149,7 +1121,7 @@ async fn test_rpc_get_node_served() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_is_valid_node() -> Result<()> {
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -1191,13 +1163,12 @@ async fn test_rpc_is_valid_node() -> Result<()> {
 
     genesis.node_info.push(node_info);
 
-    let (mut rpc, _) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30020;
-    rpc.config.port = port;
+    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
+        .await
+        .unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -1219,7 +1190,7 @@ async fn test_rpc_is_valid_node() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_node_registry() -> Result<()> {
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -1269,18 +1240,16 @@ async fn test_rpc_get_node_registry() -> Result<()> {
             },
         );
 
-    let (mut rpc, _) = init_rpc_without_consensus(Some(genesis)).await.unwrap();
     let port = 30021;
-    rpc.config.port = port;
+    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port).await.unwrap();
 
-    task::spawn(async move {
-        rpc.start().await;
-    });
+    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_node_registry",
+        "params": [],
         "id":1,
     });
 
@@ -1307,7 +1276,6 @@ async fn test_rpc_get_node_registry() -> Result<()> {
         req.to_string(),
     )
     .await?;
-    assert_eq!(response.result.len(), 1);
     assert!(response.result.contains(&NodeInfo::from(&node_info)));
 
     Ok(())

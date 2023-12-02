@@ -21,19 +21,19 @@ pub type Epoch = u64;
 /// A nodes index
 pub type NodeIndex = u32;
 
-#[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq, schemars::JsonSchema)]
 pub enum Tokens {
     USDC,
     FLK,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, schemars::JsonSchema)]
 pub struct NodeServed {
     pub served: CommodityServed,
     pub stables_revenue: HpUfixed<6>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, schemars::JsonSchema)]
 pub struct TotalServed {
     pub served: CommodityServed,
     pub reward_pool: HpUfixed<6>,
@@ -46,7 +46,7 @@ type CommodityServed = Vec<u128>;
 
 /// This is commodities served by different services in Fleek Network.
 /// C-like enums used here to future proof for state, if we add more commodity types
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, FromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, FromPrimitive, schemars::JsonSchema)]
 #[repr(u8)]
 pub enum CommodityTypes {
     Bandwidth = 0,
@@ -54,7 +54,7 @@ pub enum CommodityTypes {
     Gpu = 2,
 }
 
-#[derive(Clone, Debug, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ReportedReputationMeasurements {
     pub reporting_node: NodeIndex,
     pub measurements: ReputationMeasurements,
@@ -91,7 +91,7 @@ pub enum Value {
 }
 
 /// Indicates the participation status of a node.
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
 pub enum Participation {
     True,
     False,
@@ -100,7 +100,7 @@ pub enum Participation {
 }
 
 /// Adjustable parameters that are stored in the blockchain
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug, schemars::JsonSchema)]
 #[repr(u8)]
 pub enum ProtocolParams {
     /// The time in milliseconds that an epoch lasts for. Genesis 24 hours(86400)
@@ -127,7 +127,7 @@ pub enum ProtocolParams {
     MaxStakeLockTime = 10,
 }
 
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
 pub struct NodeInfo {
     /// The owner of this node
     pub owner: EthAddress,
@@ -155,14 +155,14 @@ pub struct NodeInfo {
     pub nonce: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, schemars::JsonSchema)]
 pub struct NodeInfoWithIndex {
     pub index: NodeIndex,
     pub info: NodeInfo,
 }
 
 /// The ports a node has open for its processes
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
 pub struct NodePorts {
     pub primary: u16,
     pub worker: u16,
@@ -190,7 +190,7 @@ impl Default for NodePorts {
 }
 
 /// The ports a node has open for the handshake server
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
 pub struct HandshakePorts {
     pub http: u16,
     pub webrtc: u16,
@@ -208,7 +208,7 @@ impl Default for HandshakePorts {
 }
 
 /// Struct that stores the information about the stake of amount of a node.
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default, schemars::JsonSchema)]
 pub struct Staking {
     /// How much FLK that is currently staked
     pub staked: HpUfixed<18>,
@@ -232,7 +232,7 @@ pub struct Worker {
 
 /// Placeholder
 /// Information about the services
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash, Eq, PartialEq, schemars::JsonSchema)]
 pub struct Service {
     /// the owner address that deploys the service and also recieves reward share
     pub owner: EthAddress,

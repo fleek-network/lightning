@@ -5,13 +5,13 @@ on:
     branches:
       - main
     paths:
-      - docs/rpc
+      - core/rpc/src/api/**
 
   workflow_dispatch:
 
-jobs:        
+jobs:
   deploy:
-    name: Build
+    name: Create RPC Docs
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -22,6 +22,13 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 16
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Build RPC Docs
+        run: cargo run --bin generate-openrpc-spec -- --write-to .
+
       - name: Install open-rpc
         run: npm install -g @open-rpc/generator
 
@@ -104,3 +111,14 @@ jobs:
           # https://github.com/actions/checkout/issues/13#issuecomment-724415212
           user_name: github-actions[bot]
           user_email: 41898282+github-actions[bot]@users.noreply.github.com
+
+      - name: Commit files
+        run: |
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git commit -a -m "Generate OpenRPC docs"
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}

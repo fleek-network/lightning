@@ -102,7 +102,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
         transactions.push(TransactionRequest::UpdateRequest(tx));
     }
     for tx in eth_txns {
-        transactions.push(TransactionRequest::EthereumRequest(tx));
+        transactions.push(TransactionRequest::EthereumRequest(tx.into()));
     }
     let block = Block {
         transactions,

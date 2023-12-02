@@ -1,540 +1,249 @@
 {
   "openrpc": "1.2.6",
   "info": {
-    "version": "1.0.0",
-    "title": "Fleek Network JSON-RPC",
-    "description": "This API enables JSON-RPC interaction with Fleek Network Node",
+    "title": "Fleek Lightning",
+    "description": "Fleek Lightning RPC API",
+    "contact": {
+      "name": "",
+      "url": "",
+      "email": ""
+    },
     "license": {
-      "name": "Apache 2.0",
-      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
-    }
+      "name": "",
+      "url": ""
+    },
+    "version": "1.0.0"
   },
   "methods": [
     {
-      "name": "flk_ping",
-      "summary": "Returns a 'pong' message",
-      "params": [],
-      "result": {
-        "name": "pingResult",
-        "description": "The result of the ping, which is a 'pong' string",
-        "schema": {
-          "type": "string"
+      "name": "flk_get_account_info",
+      "tags": [
+        {
+          "name": "1.0.0"
         }
-      }
-    },
-    {
-      "name": "flk_get_flk_balance",
-      "summary": "Get balance for the provided ETH address",
+      ],
       "params": [
         {
           "name": "public_key",
-          "description": "The ETH address",
           "required": true,
           "schema": {
-            "$ref": "#/components/schemas/Address"
+            "$ref": "#/components/schemas/EthAddress"
           }
         }
       ],
       "result": {
-        "name": "balance",
-        "description": "The balance of the ETH address",
-        "schema": {
-          "$ref": "#/components/schemas/HpFixed18"
-        }
-      },
-      "examples": [
-        {
-          "name": "flk_get_flk_balanceExample",
-          "params": [
-            {
-              "name": "public_key",
-              "value": "0x123456789abcdef0123456789abcdef01234567"
-            }
-          ],
-          "result": {
-            "name": "balance",
-            "value": "1000000000000000000"
-          }
-        }
-      ]
-    },
-    {
-      "name": "flk_get_stables_balance",
-      "summary": "Get stablecoin balance for the provided ETH address",
-      "params": [
-        {
-          "name": "public_key",
-          "description": "The ETH address",
-          "required": true,
-          "schema": {
-            "$ref": "#/components/schemas/Address"
-          }
-        }
-      ],
-      "result": {
-        "name": "stablesBalance",
-        "description": "The stablecoin balance of the ETH address in HpFixed6 format",
-        "schema": {
-          "$ref": "#/components/schemas/HpFixed6"
-        }
-      },
-      "examples": [
-        {
-          "name": "flk_get_stables_balanceExample",
-          "params": [
-            {
-              "name": "public_key",
-              "value": "0x123456789abcdef0123456789abcdef01234567"
-            }
-          ],
-          "result": {
-            "name": "stablesBalance",
-            "value": "1000000"
-          }
-        }
-      ]
-    },
-    {
-      "name": "flk_get_staked",
-      "summary": "Get staked amount for the provided node public key",
-      "params": [
-        {
-          "name": "public_key",
-          "description": "The node public key",
-          "required": true,
-          "schema": {
-            "$ref": "#/components/schemas/NodePublicKey"
-          }
-        }
-      ],
-      "result": {
-        "name": "stakedAmount",
-        "description": "The staked amount of the node in HpFixed18 format",
-        "schema": {
-          "$ref": "#/components/schemas/HpFixed18"
-        }
-      },
-      "examples": [
-        {
-          "name": "flk_get_stakedExample",
-          "params": [
-            {
-              "name": "public_key",
-              "value": "node_public_key"
-            }
-          ],
-          "result": {
-            "name": "stakedAmount",
-            "value": "100000000000000000000"
-          }
-        }
-      ]
-    },
-    {
-      "name": "flk_get_locked",
-      "summary": "Get the number of locked FLK tokens due to unstake operation for the provided public key",
-      "params": [
-        {
-          "name": "public_key",
-          "description": "The node public key",
-          "required": true,
-          "schema": {
-            "$ref": "#/components/schemas/NodePublicKey"
-          }
-        }
-      ],
-      "result": {
-        "name": "lockedFlkTokens",
-        "description": "The number of locked FLK tokens due to unstake operations. It's in HpFixed18 format.",
-        "schema": {
-          "$ref": "#/components/schemas/HpFixed18"
-        }
-      },
-      "examples": [
-        {
-          "name": "flk_get_lockedExample",
-          "params": [
-            {
-              "name": "public_key",
-              "value": "node_public_key"
-            }
-          ],
-          "result": {
-            "name": "lockedFlkTokens",
-            "value": "1000000000000000000"
-          }
-        }
-      ]
-    },
-    {
-      "name": "flk_get_stake_locked_until",
-      "summary": "Get the epoch until which stakes are locked for boosts for the provided public key",
-      "params": [
-        {
-          "name": "public_key",
-          "description": "The node public key",
-          "required": true,
-          "schema": {
-            "$ref": "#/components/schemas/NodePublicKey"
-          }
-        }
-      ],
-      "result": {
-        "name": "lockedUntilEpoch",
-        "description": "The epoch until which stakes are locked for boosts. It's represented as a stringified u64 number.",
-        "schema": {
-          "$ref": "#/components/schemas/Epoch"
-        }
-      },
-      "examples": [
-        {
-          "name": "flk_get_stake_locked_untilExample",
-          "params": [
-            {
-              "name": "public_key",
-              "value": "node_public_key"
-            }
-          ],
-          "result": {
-            "name": "lockedUntilEpoch",
-            "value": "730"
-          }
-        }
-      ]
-    },
-    {
-      "name": "flk_get_locked_time",
-      "summary": "Get the epoch until which a node's stake is locked due to an unstake operation",
-      "params": [
-        {
-          "name": "public_key",
-          "description": "The node public key",
-          "required": true,
-          "schema": {
-            "$ref": "#/components/schemas/NodePublicKey"
-          }
-        }
-      ],
-      "result": {
-        "name": "lockedUntilEpoch",
-        "description": "The epoch until which a node's stake is locked due to an unstake operation. It's represented as a stringified u64 number.",
-        "schema": {
-          "$ref": "#/components/schemas/Epoch"
-        }
-      },
-      "examples": [
-        {
-          "name": "flk_get_locked_timeExample",
-          "params": [
-            {
-              "name": "public_key",
-              "value": "node_public_key"
-            }
-          ],
-          "result": {
-            "name": "lockedUntilEpoch",
-            "value": "199"
-          }
-        }
-      ]
-    },
-    {
-      "name": "flk_account_info",
-      "summary": "Retrieves information about a acccount for a public key.",
-      "params": [
-        {
-          "name": "public_key",
-          "description": "The public key of the account",
-          "required": true,
-          "schema": {
-            "$ref": "#/components/schemas/Address"
-          }
-        }
-      ],
-      "result": {
-        "name": "account_info",
-        "description": "Detailed information about the account",
+        "name": "AccountInfo",
         "schema": {
           "$ref": "#/components/schemas/AccountInfo"
         }
       }
     },
     {
-      "name": "flk_get_node_info",
-      "summary": "Retrieves information about a node given its public key.",
+      "name": "flk_get_bandwidth_balance",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
       "params": [
         {
           "name": "public_key",
-          "description": "The public key of the node",
           "required": true,
           "schema": {
-            "$ref": "#/components/schemas/NodePublicKey"
+            "$ref": "#/components/schemas/EthAddress"
           }
         }
       ],
       "result": {
-        "name": "nodeInfo",
-        "description": "Detailed information about the node",
+        "name": "u128",
+        "required": true,
         "schema": {
-          "$ref": "#/components/schemas/NodeInfo"
+          "type": "integer",
+          "format": "uint128",
+          "minimum": 0.0
         }
       }
     },
     {
-      "name": "flk_get_reputation",
-      "summary": "Get reputation for the provided public key",
-      "params": [
+      "name": "flk_get_committee_members",
+      "tags": [
         {
-          "name": "public_key",
-          "description": "The node public key",
-          "required": true,
-          "schema": {
-            "$ref": "#/components/schemas/NodePublicKey"
-          }
+          "name": "1.0.0"
         }
       ],
-      "result": {
-        "name": "reputation",
-        "description": "The reputation of the node",
-        "schema": {
-          "$ref": "#/components/schemas/IntegerOrNull"
-        }
-      },
-      "examples": [
-        {
-          "name": "flk_get_reputationExample",
-          "params": [
-            {
-              "name": "public_key",
-              "value": "node_public_key"
-            }
-          ],
-          "result": {
-            "name": "reputation",
-            "value": 10
-          }
-        }
-      ]
-    },
-    {
-      "name": "flk_get_staking_amount",
-      "summary": "Get the minimum staking amount required to run a node",
       "params": [],
       "result": {
-        "name": "stakingAmount",
-        "description": "The minimum staking amount required to run a node. This value is a number and transactions happens in HpFixed18",
-        "schema": {
-          "type": "integer"
-        }
-      },
-      "examples": [
-        {
-          "name": "flk_get_staking_amountExample",
-          "params": [],
-          "result": {
-            "name": "stakingAmount",
-            "value": 1000
-          }
-        }
-      ]
-    },
-    {
-      "name": "flk_get_committee_members",
-      "summary": "Get the committee members",
-      "params": [],
-      "result": {
-        "name": "committeeMembers",
-        "description": "The public keys of the nodes that are committee members",
+        "name": "Vec<NodePublicKey>",
+        "required": true,
         "schema": {
           "type": "array",
           "items": {
-            "schema": {
-              "$ref": "#/components/schemas/NodePublicKey"
-            }
+            "$ref": "#/components/schemas/NodePublicKey"
           }
         }
       }
     },
     {
       "name": "flk_get_epoch",
-      "summary": "Get the current epoch",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
       "params": [],
       "result": {
-        "name": "currentEpoch",
-        "description": "The current epoch represented as a u64 number.",
+        "name": "u64",
+        "required": true,
         "schema": {
-          "$ref": "#/components/schemas/Epoch"
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
         }
-      },
-      "examples": [
-        {
-          "name": "flk_get_epochExample",
-          "params": [],
-          "result": {
-            "name": "currentEpoch",
-            "value": 299
-          }
-        }
-      ]
+      }
     },
     {
       "name": "flk_get_epoch_info",
-      "summary": "Get the current epoch information",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
       "params": [],
       "result": {
-        "name": "epochInfo",
-        "description": "The information of the current epoch",
+        "name": "EpochInfo",
+        "required": true,
         "schema": {
           "$ref": "#/components/schemas/EpochInfo"
         }
       }
     },
     {
-      "name": "flk_get_year_start_supply",
-      "summary": "Get the year start supply used for inflation",
-      "params": [],
-      "result": {
-        "name": "yearStartSupply",
-        "description": "The year start supply represented as a high-precision fixed-point (18 decimals) number",
-        "schema": {
-          "$ref": "#/components/schemas/HpFixed18"
-        }
-      },
-      "examples": [
+      "name": "flk_get_flk_balance",
+      "tags": [
         {
-          "name": "flk_get_year_start_supplyExample",
-          "params": [],
-          "result": {
-            "name": "yearStartSupply",
-            "value": "1000000000000000000000"
-          }
+          "name": "1.0.0"
         }
-      ]
-    },
-    {
-      "name": "flk_get_total_supply",
-      "summary": "Get the total supply at any point",
-      "params": [],
-      "result": {
-        "name": "totalSupply",
-        "description": "The total supply at any point represented as a high-precision fixed-point (18 decimals) number",
-        "schema": {
-          "$ref": "#/components/schemas/HpFixed18"
-        }
-      },
-      "examples": [
-        {
-          "name": "flk_get_total_supplyExample",
-          "params": [],
-          "result": {
-            "name": "totalSupply",
-            "value": "1000000000000000000000"
-          }
-        }
-      ]
-    },
-    {
-      "name": "flk_get_protocol_fund_address",
-      "summary": "Get the foundation address where foundation rewards will be transferred to",
-      "params": [],
-      "result": {
-        "name": "fundAddress",
-        "description": "The foundation address",
-        "schema": {
-          "$ref": "#/components/schemas/Address"
-        }
-      },
-      "examples": [
-        {
-          "name": "flk_get_protocol_fund_addressExample",
-          "params": [],
-          "result": {
-            "name": "fundAddress",
-            "value": "0x123456789abcdef0123456789abcdef01234567"
-          }
-        }
-      ]
-    },
-    {
-      "name": "flk_get_protocol_params",
-      "summary": "Get the specified protocol parameter",
+      ],
       "params": [
         {
-          "name": "parameter",
-          "description": "The name of the protocol parameter",
+          "name": "public_key",
           "required": true,
           "schema": {
-            "$ref": "#/components/schemas/ProtocolParams"
+            "$ref": "#/components/schemas/EthAddress"
           }
         }
       ],
       "result": {
-        "name": "protocolParameterValue",
-        "description": "The value of the specified protocol parameter, represented as an integer.",
+        "name": "HpUfixed<18>",
+        "required": true,
         "schema": {
-          "type": "integer"
+          "$ref": "#/components/schemas/HpUfixed"
         }
-      },
-      "examples": [
-        {
-          "name": "flk_get_protocol_paramsExample",
-          "params": [
-            {
-              "name": "parameter",
-              "value": "lock_time"
-            }
-          ],
-          "result": {
-            "name": "protocolParameterValue",
-            "value": 300
-          }
-        }
-      ]
+      }
     },
     {
-      "name": "flk_get_total_served",
-      "summary": "Get total served information",
+      "name": "flk_get_genesis_committee",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
       "params": [],
       "result": {
-        "name": "totalServed",
-        "description": "Total served and reward pool information",
+        "name": "Vec<(NodeIndex,NodeInfo)>",
+        "required": true,
         "schema": {
-          "type": "object",
-          "properties": {
-            "served": {
-              "$ref": "#/components/schemas/CommodityServed"
-            },
-            "reward_pool": {
-              "$ref": "#/components/schemas/HpFixed6"
-            }
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              },
+              {
+                "$ref": "#/components/schemas/NodeInfo"
+              }
+            ],
+            "maxItems": 2,
+            "minItems": 2
           }
         }
-      },
-      "examples": [
-        {
-          "name": "flk_get_total_servedExample",
-          "params": [],
-          "result": {
-            "name": "totalServed",
-            "value": {
-              "served": [
-                100000,
-                200000,
-                300000
-              ],
-              "reward_pool": "100000000000"
-            }
-          }
-        }
-      ]
+      }
     },
     {
-      "name": "flk_get_node_served",
-      "summary": "Get the commodity served and stables revenue for the specified node",
+      "name": "flk_get_last_epoch_hash",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [],
+      "result": {
+        "name": "[u8;32]",
+        "required": true,
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          },
+          "maxItems": 32,
+          "minItems": 32
+        }
+      }
+    },
+    {
+      "name": "flk_get_latencies",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [],
+      "result": {
+        "name": "Vec<((NodePublicKey,NodePublicKey),Duration)>",
+        "required": true,
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "array",
+                "items": [
+                  {
+                    "$ref": "#/components/schemas/NodePublicKey"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NodePublicKey"
+                  }
+                ],
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "$ref": "#/components/schemas/Duration"
+              }
+            ],
+            "maxItems": 2,
+            "minItems": 2
+          }
+        }
+      }
+    },
+    {
+      "name": "flk_get_locked",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
       "params": [
         {
           "name": "public_key",
-          "description": "The public key of the node",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/NodePublicKey"
@@ -542,50 +251,23 @@
         }
       ],
       "result": {
-        "name": "nodeServed",
-        "description": "The commodity served and stables revenue of the node",
+        "name": "HpUfixed<18>",
+        "required": true,
         "schema": {
-          "type": "object",
-          "properties": {
-            "served": {
-              "$ref": "#/components/schemas/CommodityServed"
-            },
-            "stables_revenue": {
-              "$ref": "#/components/schemas/HpFixed6"
-            }
-          }
+          "$ref": "#/components/schemas/HpUfixed"
         }
-      },
-      "examples": [
-        {
-          "name": "flk_get_node_servedExample",
-          "params": [
-            {
-              "name": "public_key",
-              "value": "0x123456789abcdef0123456789abcdef01234567"
-            }
-          ],
-          "result": {
-            "name": "nodeServed",
-            "value": {
-              "served": [
-                1000,
-                2000,
-                3000
-              ],
-              "stables_revenue": "1500000123456"
-            }
-          }
-        }
-      ]
+      }
     },
     {
-      "name": "flk_is_valid_node",
-      "summary": "Check if a node is staking the minimum required amount",
+      "name": "flk_get_locked_time",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
       "params": [
         {
           "name": "public_key",
-          "description": "The public key of the node",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/NodePublicKey"
@@ -593,35 +275,56 @@
         }
       ],
       "result": {
-        "name": "isValidNode",
-        "description": "true if the node is staking the minimum required amount, false otherwise.",
+        "name": "u64",
+        "required": true,
         "schema": {
-          "type": "boolean"
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
         }
-      },
-      "examples": [
+      }
+    },
+    {
+      "name": "flk_get_node_info",
+      "tags": [
         {
-          "name": "flk_is_valid_nodeExample",
-          "params": [
-            {
-              "name": "public_key",
-              "value": "node_public_key"
-            }
-          ],
-          "result": {
-            "name": "isValidNode",
-            "value": true
+          "name": "1.0.0"
+        }
+      ],
+      "params": [
+        {
+          "name": "public_key",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
           }
         }
-      ]
+      ],
+      "result": {
+        "name": "NodeInfo",
+        "schema": {
+          "$ref": "#/components/schemas/NodeInfo"
+        }
+      }
     },
     {
       "name": "flk_get_node_registry",
-      "summary": "Get the registry of valid nodes",
-      "params": [],
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [
+        {
+          "name": "paging",
+          "schema": {
+            "$ref": "#/components/schemas/PagingParams"
+          }
+        }
+      ],
       "result": {
-        "name": "nodeRegistry",
-        "description": "The registry of valid nodes",
+        "name": "Vec<NodeInfo>",
+        "required": true,
         "schema": {
           "type": "array",
           "items": {
@@ -631,53 +334,41 @@
       }
     },
     {
-      "name": "flk_get_latencies",
-      "summary": "Get latency data between nodes for the current epoch.",
-      "params": [],
+      "name": "flk_get_node_registry_index",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [
+        {
+          "name": "paging",
+          "schema": {
+            "$ref": "#/components/schemas/PagingParams"
+          }
+        }
+      ],
       "result": {
-        "name": "latencies",
-        "description": "A list containing latency measurements between node pairs. Each entry has a 'from' and 'to' identifier and the corresponding latency.",
+        "name": "Vec<NodeInfoWithIndex>",
+        "required": true,
         "schema": {
           "type": "array",
           "items": {
-            "types": "object",
-            "properties": {
-              "key": {
-                "$ref": "#/components/schemas/LatencyKey"
-              },
-              "value": {
-                "$ref": "#/components/schemas/Duration"
-              }
-            }
+            "$ref": "#/components/schemas/NodeInfoWithIndex"
           }
         }
-      },
-      "examples": [
-        {
-          "name": "flk_get_latencies",
-          "params": [],
-          "result": {
-            "name": "latencies",
-            "value": [
-              {
-                "LatencyKey": {
-                  "from": "0x123456789abcdef0123456789abcdef01234567",
-                  "to": "0x765432109abcdef0123456789abcdef01234599"
-                },
-                "duration": 100
-              }
-            ]
-          }
-        }
-      ] 
+      }
     },
     {
-      "name": "flk_get_reputation_measurements",
-      "summary": "Provides a list of reputation measurements reported by peers for a node with the given public key.",
+      "name": "flk_get_node_served",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
       "params": [
         {
           "name": "public_key",
-          "description": "The node public key",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/NodePublicKey"
@@ -685,357 +376,1882 @@
         }
       ],
       "result": {
-        "name": "reportedMeasurementsList",
-        "description": "list of reported measurement by multiple nodes identified by reporting_node for each entry",
+        "name": "NodeServed",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/NodeServed"
+        }
+      }
+    },
+    {
+      "name": "flk_get_protocol_fund_address",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [],
+      "result": {
+        "name": "EthAddress",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/EthAddress"
+        }
+      }
+    },
+    {
+      "name": "flk_get_protocol_params",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [
+        {
+          "name": "protocol_params",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/ProtocolParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "u128",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "format": "uint128",
+          "minimum": 0.0
+        }
+      }
+    },
+    {
+      "name": "flk_get_reputation",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [
+        {
+          "name": "public_key",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "u8",
+        "schema": {
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
+        }
+      }
+    },
+    {
+      "name": "flk_get_reputation_measurements",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [
+        {
+          "name": "public_key",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "Vec<ReportedReputationMeasurements>",
+        "required": true,
         "schema": {
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {
-              "reporting_node": {
-                "$ref": "#/components/schemas/NodeIndex"
-              },
-              "measurements": {
-                "$ref": "#/components/schemas/ReputationMeasurement"
-              }
-            }
+            "$ref": "#/components/schemas/ReportedReputationMeasurements"
           }
         }
-      },
-      "examples": [
-        {
-          "name": "flk_get_reputation_measurements",
-          "params": [
-            {
-              "name": "public_key",
-              "value": "0x123456789abcdef0123456789abcdef01234567"
-            }
-          ],
-          "result": {
-            "name": "reportedMeasurementsList",
-            "value": [
-              {
-                "reporting_node": 1,
-                "measurements": {
-                "latency": 100,
-                "interactions": 32,
-                "inbound_bandwidth": 100,
-                "outbound_bandwidth": 100,
-                "bytes_received": 1000,
-                "bytes_sent": 900,
-                "hops": 5
-                }
-              }
-            ]
-          }
-        }
-      ]
+      }
     },
     {
-      "name": "flk_get_last_epoch_hash",
-      "summary": "Get the hash of the most recently ended epoch.",
+      "name": "flk_get_stables_balance",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [
+        {
+          "name": "public_key",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/EthAddress"
+          }
+        }
+      ],
+      "result": {
+        "name": "HpUfixed<6>",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/HpUfixed"
+        }
+      }
+    },
+    {
+      "name": "flk_get_stake_locked_until",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [
+        {
+          "name": "public_key",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "u64",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    },
+    {
+      "name": "flk_get_staked",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [
+        {
+          "name": "public_key",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "HpUfixed<18>",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/HpUfixed"
+        }
+      }
+    },
+    {
+      "name": "flk_get_staking_amount",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
       "params": [],
       "result": {
-        "name": "LastEpochHash",
-        "description": "A 32-byte array representing the unique hash of the last epoch.",
+        "name": "u128",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "format": "uint128",
+          "minimum": 0.0
+        }
+      }
+    },
+    {
+      "name": "flk_get_total_served",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [
+        {
+          "name": "epoch",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          }
+        }
+      ],
+      "result": {
+        "name": "TotalServed",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/TotalServed"
+        }
+      }
+    },
+    {
+      "name": "flk_get_total_supply",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [],
+      "result": {
+        "name": "HpUfixed<18>",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/HpUfixed"
+        }
+      }
+    },
+    {
+      "name": "flk_get_year_start_supply",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [],
+      "result": {
+        "name": "HpUfixed<18>",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/HpUfixed"
+        }
+      }
+    },
+    {
+      "name": "flk_health",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [],
+      "result": {
+        "name": "String",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "name": "flk_is_valid_node",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [
+        {
+          "name": "public_key",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NodePublicKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "bool",
+        "required": true,
+        "schema": {
+          "type": "boolean"
+        }
+      }
+    },
+    {
+      "name": "flk_metrics",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [],
+      "result": {
+        "name": "String",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "name": "flk_ping",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [],
+      "result": {
+        "name": "String",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "name": "flk_put",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [
+        {
+          "name": "data",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8",
+              "minimum": 0.0
+            }
+          }
+        }
+      ],
+      "result": {
+        "name": "Blake3Hash",
+        "required": true,
         "schema": {
           "type": "array",
           "items": {
             "type": "integer",
-            "format": "uint8"
+            "format": "uint8",
+            "minimum": 0.0
           },
-          "minItems": 32,
-          "maxItems": 32
+          "maxItems": 32,
+          "minItems": 32
+        }
+      }
+    },
+    {
+      "name": "flk_send_txn",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [
+        {
+          "name": "tx",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/TransactionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "()",
+        "required": true,
+        "schema": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "name": "net_listening",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [],
+      "result": {
+        "name": "bool",
+        "required": true,
+        "schema": {
+          "type": "boolean"
+        }
+      }
+    },
+    {
+      "name": "net_peerCount",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [],
+      "result": {
+        "name": "String",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "name": "net_version",
+      "tags": [
+        {
+          "name": "1.0.0"
+        }
+      ],
+      "params": [],
+      "result": {
+        "name": "String",
+        "schema": {
+          "type": "string"
         }
       }
     }
   ],
   "components": {
     "schemas": {
-      "Address": {
-        "type": "string",
-        "pattern": "^0x[a-fA-F0-9]{40}$"
-      },
-      "NodePublicKey": {
-        "type": "string",
-        "pattern": "^[a-fA-F0-9]{192}$"
-      },
-      "NodeNetworkingPublicKey": {
-        "type": "string",
-        "pattern": "^[a-fA-F0-9]{64}$"
-      },
-      "HpFixed18": {
-        "type": "string",
-        "pattern": "^[0-9]$",
-        "description": "A high-precision unsigned fixed-point number with 18 digits of precision, serialized to a string without a decimal point."
-      },
-      "HpFixed6": {
-        "type": "string",
-        "pattern": "^[0-9]$",
-        "description": "A high-precision unsigned fixed-point number with 6 digits of precision, serialized to a string without a decimal point."
-      },
-      "Epoch": {
-        "type": "integer",
-        "description": "An integer representing the epoch."
-      },
-      "NodeIndex": {
-        "type": "integer",
-        "description": "An integer representing the node index in the registry."
-      },
-      "ProtocolParams": {
-        "type": "string",
-        "enum": [
-          "epoch_time",
-          "committee_size",
-          "minimum_node_stake",
-          "eligibility_time",
-          "lock_time",
-          "protocol_share",
-          "node_share",
-          "service_builder_share",
-          "max_inflation",
-          "max_boost",
-          "max_stake_lock_time"
-        ]
-      },
-      "Null": {
-        "title": "null",
-        "type": "null",
-        "description": "Null"
-      },
-      "IntegerOrNull": {
-        "title": "integerOrNull",
-        "oneOf": [
-          {
-            "type": "integer"
-          },
-          {
-            "$ref": "#/components/schemas/Null"
-          }
-        ]
-      },
-      "SignedIntegerOrNull": {
-        "title": "signedIntegerOrNull",
-        "oneOf": [
-          {
-            "type": "integer",
-            "format": "int64"
-          },
-          {
-            "$ref": "#/components/schemas/Null"
-          }
-        ]
-      },
-      "NodeInfo": {
+      "AccountInfo": {
+        "description": "The account info stored per account on the blockchain",
         "type": "object",
+        "required": [
+          "bandwidth_balance",
+          "flk_balance",
+          "nonce",
+          "stables_balance"
+        ],
         "properties": {
-          "owner": {
-            "$ref": "#/components/schemas/Address"
+          "bandwidth_balance": {
+            "description": "The accounts stables/bandwidth balance",
+            "type": "integer",
+            "format": "uint128",
+            "minimum": 0.0
           },
-          "public_key": {
-            "$ref": "#/components/schemas/NodePublicKey"
-          },
-          "network_key": {
-            "$ref": "#/components/schemas/NodeNetworkingPublicKey"
-          },
-          "staked_since": {
-            "$ref": "#/components/schemas/Epoch"
-          },
-          "stake": {
-            "$ref": "#/components/schemas/Staking"
-          },
-          "domain": {
-            "$ref": "#/components/schemas/Multiaddr"
-          },
-          "workers": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Worker"
-            }
+          "flk_balance": {
+            "description": "The accounts FLK balance",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HpUfixed"
+              }
+            ]
           },
           "nonce": {
+            "description": "The nonce of the account. Added to each transaction before signed to prevent replays and enforce ordering",
             "type": "integer",
-            "format": "uint64"
-          }
-        },
-        "required": [
-          "owner",
-          "public_key",
-          "network_key",
-          "staked_since",
-          "stake",
-          "domain",
-          "workers",
-          "nonce"
-        ]
-      },
-      "AccountInfo": {
-        "type": "object",
-        "properties": {
-          "flk_balance": {
-            "$ref": "#/components/schemas/HpFixed18",
-            "description": "The accounts FLK balance"
+            "format": "uint64",
+            "minimum": 0.0
           },
           "stables_balance": {
-            "$ref": "#/components/schemas/HpFixed6",
-            "description": "The accounts stables balance"
-          },
-          "bandwidth_balance": {
-            "type": "integer"
-          },
-          "nonce": {
-            "type": "integer",
-            "format":"uint64",
-            "description": "The nonce of the account"
+            "description": "the accounts stable coin balance",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HpUfixed"
+              }
+            ]
           }
-        },
-        "required": [
-          "flk_balance",
-          "stables_balance",
-          "bandwidth_balance",
-          "nonce"
-        ]
+        }
       },
-      "Worker": {
-        "type": "object",
-        "properties": {
-          "public_key": {
-            "$ref": "#/components/schemas/NodeNetworkingPublicKey"
-          },
-          "address": {
-            "$ref": "#/components/schemas/Multiaddr"
-          },
-          "mempool": {
-            "$ref": "#/components/schemas/Multiaddr"
-          }
-        },
-        "required": [
-          "public_key",
-          "address",
-          "mempool"
-        ]
+      "AccountOwnerSignature": {
+        "title": "AccountOwnerSignature",
+        "examples": [
+          "11111111111111111111111111111111111111111111111111111111111111111"
+        ],
+        "type": "string"
       },
-      "Multiaddr": {
+      "CommodityTypes": {
+        "description": "This is commodities served by different services in Fleek Network. C-like enums used here to future proof for state, if we add more commodity types",
         "type": "string",
-        "description": "A network address, which includes the IP address, the protocol (TCP/UDP), the port, and optionally a protocol path. For example: '/ip4/127.0.0.1/tcp/38102/http'."
-      },
-      "Staking": {
-        "type": "object",
-        "properties": {
-          "staked": {
-            "$ref": "#/components/schemas/HpFixed18",
-            "description": "The amount of tokens staked."
-          },
-          "stake_locked_until": {
-            "type": "integer",
-            "format": "uint64",
-            "description": "The epoch until which the stake is locked to get boost."
-          },
-          "locked": {
-            "$ref": "#/components/schemas/HpFixed18",
-            "description": "The amount of tokens locked due to unstake txn."
-          },
-          "locked_until": {
-            "type": "integer",
-            "format": "uint64",
-            "description": "The epoch until which the tokens are locked due to unstake txn."
-          }
-        },
-        "required": [
-          "staked",
-          "stake_locked_until",
-          "locked",
-          "locked_until"
+        "enum": [
+          "Bandwidth",
+          "Compute",
+          "Gpu"
         ]
       },
-      "CommodityServed": {
-        "type": "array",
-        "items": {
-          "type": "integer"
-        },
-        "description": "Array of amount commodities served, the indexes of served commodites array corresponds to the array [Bandwidth ,Compute, Gpu]"
+      "ConsensusPublicKey": {
+        "title": "ConsensusPublicKey",
+        "examples": [
+          "u76G7q22Qc5nRC5Fi6dzbNE7FQxqRKEtTS9qjDftWFwhBKmoozGLv8wFiFmGnYDFMEKyYxozWRdM3wgjs1Na3fvxDARxi9CSNJUZJfPXC2WUu3uLnUw96jPBRp7rtHEzS5H"
+        ],
+        "type": "string"
+      },
+      "ConsensusSignature": {
+        "title": "ConsensusSignature",
+        "examples": [
+          "111111111111111111111111111111111111111111111111"
+        ],
+        "type": "string"
+      },
+      "DeliveryAcknowledgment": {
+        "type": "null"
+      },
+      "Duration": {
+        "type": "object",
+        "required": [
+          "nanos",
+          "secs"
+        ],
+        "properties": {
+          "nanos": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0.0
+          },
+          "secs": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          }
+        }
       },
       "EpochInfo": {
+        "description": "Info on a Narwhal epoch",
         "type": "object",
-        "properties": {
-          "committee": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NodeInfo"
-            },
-            "description": "List of committee members"
-          },
-          "epoch": {
-            "$ref": "#/components/schemas/Epoch",
-            "description": "The current epoch number"
-          },
-          "epoch_end": {
-            "type": "integer",
-            "description": "Timestamp when the epoch ends"
-          }
-        },
         "required": [
           "committee",
           "epoch",
           "epoch_end"
+        ],
+        "properties": {
+          "committee": {
+            "description": "List of committee members",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeInfo"
+            }
+          },
+          "epoch": {
+            "description": "The current epoch number",
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
+          "epoch_end": {
+            "description": "Timestamp when the epoch ends",
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          }
+        }
+      },
+      "EthAddress": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
+        },
+        "maxItems": 20,
+        "minItems": 20
+      },
+      "EthersTransaction": {
+        "examples": [
+          {
+            "blockHash": null,
+            "blockNumber": null,
+            "from": "0x0000000000000000000000000000000000000000",
+            "gas": "0x0",
+            "gasPrice": null,
+            "hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "input": "0x",
+            "nonce": "0x0",
+            "r": "0x0",
+            "s": "0x0",
+            "to": null,
+            "transactionIndex": null,
+            "v": "0x0",
+            "value": "0x0"
+          }
+        ],
+        "type": "object",
+        "properties": {
+          "blockHash": true,
+          "blockNumber": true,
+          "from": {
+            "type": "string"
+          },
+          "gas": {
+            "type": "string"
+          },
+          "gasPrice": true,
+          "hash": {
+            "type": "string"
+          },
+          "input": {
+            "type": "string"
+          },
+          "nonce": {
+            "type": "string"
+          },
+          "r": {
+            "type": "string"
+          },
+          "s": {
+            "type": "string"
+          },
+          "to": true,
+          "transactionIndex": true,
+          "v": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "HandshakePorts": {
+        "description": "The ports a node has open for the handshake server",
+        "type": "object",
+        "required": [
+          "http",
+          "webrtc",
+          "webtransport"
+        ],
+        "properties": {
+          "http": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0.0
+          },
+          "webrtc": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0.0
+          },
+          "webtransport": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0.0
+          }
+        }
+      },
+      "HpUfixed": {
+        "examples": [
+          "4294967297"
+        ],
+        "type": "string"
+      },
+      "NodeInfo": {
+        "type": "object",
+        "required": [
+          "consensus_key",
+          "domain",
+          "nonce",
+          "owner",
+          "participation",
+          "ports",
+          "public_key",
+          "stake",
+          "staked_since",
+          "worker_domain",
+          "worker_public_key"
+        ],
+        "properties": {
+          "consensus_key": {
+            "description": "The BLS public key of the node which is used for our BFT DAG consensus multi signatures.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ConsensusPublicKey"
+              }
+            ]
+          },
+          "domain": {
+            "description": "The nodes primary domain",
+            "type": "string",
+            "format": "ip"
+          },
+          "nonce": {
+            "description": "The nonce of the node. Added to each transaction before signed to prevent replays and enforce ordering",
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
+          "owner": {
+            "description": "The owner of this node",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EthAddress"
+              }
+            ]
+          },
+          "participation": {
+            "description": "The participation status of the node",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Participation"
+              }
+            ]
+          },
+          "ports": {
+            "description": "Open ports for this node",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NodePorts"
+              }
+            ]
+          },
+          "public_key": {
+            "description": "Public key that is used for fast communication signatures for this node.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NodePublicKey"
+              }
+            ]
+          },
+          "stake": {
+            "description": "The amount of stake by the node.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Staking"
+              }
+            ]
+          },
+          "staked_since": {
+            "description": "The epoch that this node has been staked since,",
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
+          "worker_domain": {
+            "description": "The node workers domain",
+            "type": "string",
+            "format": "ip"
+          },
+          "worker_public_key": {
+            "description": "The public key of the nodes narwhal worker",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NodePublicKey"
+              }
+            ]
+          }
+        }
+      },
+      "NodeInfoWithIndex": {
+        "type": "object",
+        "required": [
+          "index",
+          "info"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0.0
+          },
+          "info": {
+            "$ref": "#/components/schemas/NodeInfo"
+          }
+        }
+      },
+      "NodePorts": {
+        "description": "The ports a node has open for its processes",
+        "type": "object",
+        "required": [
+          "dht",
+          "handshake",
+          "mempool",
+          "pinger",
+          "pool",
+          "primary",
+          "rpc",
+          "worker"
+        ],
+        "properties": {
+          "dht": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0.0
+          },
+          "handshake": {
+            "$ref": "#/components/schemas/HandshakePorts"
+          },
+          "mempool": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0.0
+          },
+          "pinger": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0.0
+          },
+          "pool": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0.0
+          },
+          "primary": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0.0
+          },
+          "rpc": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0.0
+          },
+          "worker": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0.0
+          }
+        }
+      },
+      "NodePublicKey": {
+        "title": "NodePublicKey",
+        "examples": [
+          "F5tV4PLSzx1Lt4mYBe13aYQ8hsLMTCfjgY2pLr82AumH"
+        ],
+        "type": "string"
+      },
+      "NodeServed": {
+        "type": "object",
+        "required": [
+          "served",
+          "stables_revenue"
+        ],
+        "properties": {
+          "served": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint128",
+              "minimum": 0.0
+            }
+          },
+          "stables_revenue": {
+            "$ref": "#/components/schemas/HpUfixed"
+          }
+        }
+      },
+      "NodeSignature": {
+        "title": "NodeSignature",
+        "examples": [
+          "1111111111111111111111111111111111111111111111111111111111111111"
+        ],
+        "type": "string"
+      },
+      "PagingParams": {
+        "type": "object",
+        "required": [
+          "ignore_stake",
+          "limit",
+          "start"
+        ],
+        "properties": {
+          "ignore_stake": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "uint",
+            "minimum": 0.0
+          },
+          "start": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0.0
+          }
+        }
+      },
+      "Participation": {
+        "description": "Indicates the participation status of a node.",
+        "type": "string",
+        "enum": [
+          "True",
+          "False",
+          "OptedIn",
+          "OptedOut"
         ]
       },
-      "Duration": {
-        "type": "integer",
-        "format": "uint64",
-        "description": "Duration in seconds"
+      "ProofOfConsensus": {
+        "description": "Placeholder This is the proof used to operate our PoC bridges",
+        "type": "object"
       },
-      "DurationOrNull": {
-        "title": "DurationOrNull",
+      "ProofOfMisbehavior": {
+        "description": "Placeholder This is the proof presented to the slashing function that proves a node misbehaved and should be slashed",
+        "type": "string",
+        "enum": [
+          "Placeholder"
+        ]
+      },
+      "ProtocolParams": {
+        "description": "Adjustable parameters that are stored in the blockchain",
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Duration"
+            "description": "The time in milliseconds that an epoch lasts for. Genesis 24 hours(86400)",
+            "type": "string",
+            "enum": [
+              "EpochTime"
+            ]
           },
           {
-            "$ref": "#/components/schemas/Null"
+            "description": "The size of the committee",
+            "type": "string",
+            "enum": [
+              "CommitteeSize"
+            ]
+          },
+          {
+            "description": "The min FLK a node has to stake to participate in the network",
+            "type": "string",
+            "enum": [
+              "MinimumNodeStake"
+            ]
+          },
+          {
+            "description": "The time in epochs a node has to be staked to participate in the network",
+            "type": "string",
+            "enum": [
+              "EligibilityTime"
+            ]
+          },
+          {
+            "description": "The time in epochs a node has to wait to withdraw after unstaking",
+            "type": "string",
+            "enum": [
+              "LockTime"
+            ]
+          },
+          {
+            "description": "The percentage of the reward pool the protocol gets",
+            "type": "string",
+            "enum": [
+              "ProtocolShare"
+            ]
+          },
+          {
+            "description": "The percentage of the reward pool goes to edge nodes",
+            "type": "string",
+            "enum": [
+              "NodeShare"
+            ]
+          },
+          {
+            "description": "The percentage of the reward pool goes to edge nodes",
+            "type": "string",
+            "enum": [
+              "ServiceBuilderShare"
+            ]
+          },
+          {
+            "description": "The maximum target inflation rate in a year",
+            "type": "string",
+            "enum": [
+              "MaxInflation"
+            ]
+          },
+          {
+            "description": "The max multiplier on rewards for locking",
+            "type": "string",
+            "enum": [
+              "MaxBoost"
+            ]
+          },
+          {
+            "description": "The max amount of time tokens can be locked",
+            "type": "string",
+            "enum": [
+              "MaxStakeLockTime"
+            ]
           }
         ]
       },
-      "LatencyKey": {
+      "ReportedReputationMeasurements": {
         "type": "object",
+        "required": [
+          "measurements",
+          "reporting_node"
+        ],
         "properties": {
-          "from":{
-            "$ref": "#/components/schemas/NodePublicKey",
-            "description": "The public key for the node that measured the latency"
+          "measurements": {
+            "$ref": "#/components/schemas/ReputationMeasurements"
           },
-          "to": {
-            "$ref": "#/components/schemas/NodePublicKey",
-            "description": "The public key of the node of which latency was measured"
+          "reporting_node": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0.0
           }
-        },
-        "required": ["from", "to"]
+        }
       },
-      "ReputationMeasurement": {
+      "ReputationMeasurements": {
+        "description": "Contains the peer measurements that node A has about node B, that will be taken into account when computing B's reputation score.",
         "type": "object",
         "properties": {
-          "latency":{
-            "$ref": "#/components/schemas/DurationOrNull",
-            "description": "The public key for the node that measured the latency"
+          "bytes_received": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint128",
+            "minimum": 0.0
           },
-          "interactions":{
-            "$ref": "#/components/schemas/SignedIntegerOrNull",
-            "description": "the number of interactions with the reporting nodes"
+          "bytes_sent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint128",
+            "minimum": 0.0
           },
-          "inbound_bandwidth":{
-            "$ref": "#/components/schemas/IntegerOrNull"
+          "hops": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint8",
+            "minimum": 0.0
           },
-          "outbound_bandwidth":{
-            "$ref": "#/components/schemas/IntegerOrNull"
+          "inbound_bandwidth": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint128",
+            "minimum": 0.0
           },
-          "bytes_received":{
-            "$ref": "#/components/schemas/IntegerOrNull"
+          "interactions": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
           },
-          "bytes_sent":{
-            "$ref": "#/components/schemas/IntegerOrNull"
+          "latency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Duration"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
-          "hops":{
-            "$ref": "#/components/schemas/IntegerOrNull",
-            "description": "The number of hops from the reporting node"
+          "outbound_bandwidth": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint128",
+            "minimum": 0.0
+          },
+          "uptime": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint8",
+            "minimum": 0.0
+          }
+        }
+      },
+      "Service": {
+        "description": "Placeholder Information about the services",
+        "type": "object",
+        "required": [
+          "commodity_type",
+          "owner",
+          "slashing"
+        ],
+        "properties": {
+          "commodity_type": {
+            "description": "the commodity that service is going to serve",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommodityTypes"
+              }
+            ]
+          },
+          "owner": {
+            "description": "the owner address that deploys the service and also recieves reward share",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EthAddress"
+              }
+            ]
+          },
+          "slashing": {
+            "description": "TODO: List of circuits to prove a node should be slashed",
+            "type": "null"
+          }
+        }
+      },
+      "Staking": {
+        "description": "Struct that stores the information about the stake of amount of a node.",
+        "type": "object",
+        "required": [
+          "locked",
+          "locked_until",
+          "stake_locked_until",
+          "staked"
+        ],
+        "properties": {
+          "locked": {
+            "description": "How much FLK is locked pending withdraw",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HpUfixed"
+              }
+            ]
+          },
+          "locked_until": {
+            "description": "The epoch the locked FLK is eligible to be withdrawn",
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
+          "stake_locked_until": {
+            "description": "The epoch until all stakes are locked for boosting rewards",
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
+          "staked": {
+            "description": "How much FLK that is currently staked",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HpUfixed"
+              }
+            ]
+          }
+        }
+      },
+      "Tokens": {
+        "type": "string",
+        "enum": [
+          "USDC",
+          "FLK"
+        ]
+      },
+      "TotalServed": {
+        "type": "object",
+        "required": [
+          "reward_pool",
+          "served"
+        ],
+        "properties": {
+          "reward_pool": {
+            "$ref": "#/components/schemas/HpUfixed"
+          },
+          "served": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint128",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "TransactionRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "UpdateRequest"
+            ],
+            "properties": {
+              "UpdateRequest": {
+                "$ref": "#/components/schemas/UpdateRequest"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "EthereumRequest"
+            ],
+            "properties": {
+              "EthereumRequest": {
+                "$ref": "#/components/schemas/EthersTransaction"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "TransactionSender": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "NodeConsensus"
+            ],
+            "properties": {
+              "NodeConsensus": {
+                "$ref": "#/components/schemas/ConsensusPublicKey"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "NodeMain"
+            ],
+            "properties": {
+              "NodeMain": {
+                "$ref": "#/components/schemas/NodePublicKey"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "AccountOwner"
+            ],
+            "properties": {
+              "AccountOwner": {
+                "$ref": "#/components/schemas/EthAddress"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "TransactionSignature": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "NodeConsensus"
+            ],
+            "properties": {
+              "NodeConsensus": {
+                "$ref": "#/components/schemas/ConsensusSignature"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "NodeMain"
+            ],
+            "properties": {
+              "NodeMain": {
+                "$ref": "#/components/schemas/NodeSignature"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "AccountOwner"
+            ],
+            "properties": {
+              "AccountOwner": {
+                "$ref": "#/components/schemas/AccountOwnerSignature"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "UpdateMethod": {
+        "description": "All of the update functions in our logic, along their parameters.",
+        "oneOf": [
+          {
+            "description": "The main function of the application layer. After aggregating ProofOfAcknowledgements a node will submit this transaction to get paid. Revisit the naming of this transaction.",
+            "type": "object",
+            "required": [
+              "SubmitDeliveryAcknowledgmentAggregation"
+            ],
+            "properties": {
+              "SubmitDeliveryAcknowledgmentAggregation": {
+                "type": "object",
+                "required": [
+                  "commodity",
+                  "proofs",
+                  "service_id"
+                ],
+                "properties": {
+                  "commodity": {
+                    "description": "How much of the commodity was served",
+                    "type": "integer",
+                    "format": "uint128",
+                    "minimum": 0.0
+                  },
+                  "metadata": {
+                    "description": "Optional metadata to provide information additional information about this batch",
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "integer",
+                      "format": "uint8",
+                      "minimum": 0.0
+                    }
+                  },
+                  "proofs": {
+                    "description": "The PoD of delivery in bytes",
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/DeliveryAcknowledgment"
+                    }
+                  },
+                  "service_id": {
+                    "description": "The service id of the service this was provided through(CDN, compute, ect.)",
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Withdraw tokens from the network back to the L2",
+            "type": "object",
+            "required": [
+              "Withdraw"
+            ],
+            "properties": {
+              "Withdraw": {
+                "type": "object",
+                "required": [
+                  "amount",
+                  "receiving_address",
+                  "token"
+                ],
+                "properties": {
+                  "amount": {
+                    "description": "The amount to withdraw.",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/HpUfixed"
+                      }
+                    ]
+                  },
+                  "receiving_address": {
+                    "description": "The address to recieve these tokens on the L2",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/EthAddress"
+                      }
+                    ]
+                  },
+                  "token": {
+                    "description": "Which token to withdraw.",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Tokens"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Submit of PoC from the bridge on the L2 to get the tokens in network",
+            "type": "object",
+            "required": [
+              "Deposit"
+            ],
+            "properties": {
+              "Deposit": {
+                "type": "object",
+                "required": [
+                  "amount",
+                  "proof",
+                  "token"
+                ],
+                "properties": {
+                  "amount": {
+                    "description": "Amount bridged",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/HpUfixed"
+                      }
+                    ]
+                  },
+                  "proof": {
+                    "description": "The proof of the bridge recieved from the L2,",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/ProofOfConsensus"
+                      }
+                    ]
+                  },
+                  "token": {
+                    "description": "Which token was bridged",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Tokens"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Transfer tokens to another address",
+            "type": "object",
+            "required": [
+              "Transfer"
+            ],
+            "properties": {
+              "Transfer": {
+                "type": "object",
+                "required": [
+                  "amount",
+                  "to",
+                  "token"
+                ],
+                "properties": {
+                  "amount": {
+                    "description": "The amount to transfer",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/HpUfixed"
+                      }
+                    ]
+                  },
+                  "to": {
+                    "description": "The address to transfer to",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/EthAddress"
+                      }
+                    ]
+                  },
+                  "token": {
+                    "description": "Which token to transfer",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Tokens"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Stake FLK in network",
+            "type": "object",
+            "required": [
+              "Stake"
+            ],
+            "properties": {
+              "Stake": {
+                "type": "object",
+                "required": [
+                  "amount",
+                  "node_public_key"
+                ],
+                "properties": {
+                  "amount": {
+                    "description": "Amount to stake",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/HpUfixed"
+                      }
+                    ]
+                  },
+                  "consensus_key": {
+                    "description": "Consensus Public Key",
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/ConsensusPublicKey"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "node_domain": {
+                    "description": "Nodes primary internet address",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "ip"
+                  },
+                  "node_public_key": {
+                    "description": "Node Public Key",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/NodePublicKey"
+                      }
+                    ]
+                  },
+                  "ports": {
+                    "description": "internet address for workers mempool",
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/NodePorts"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "worker_domain": {
+                    "description": "internet address for the worker",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "ip"
+                  },
+                  "worker_public_key": {
+                    "description": "Worker public Key",
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/NodePublicKey"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Lock the current stakes to get boosted inflation rewards this is different than unstake and withdrawl lock",
+            "type": "object",
+            "required": [
+              "StakeLock"
+            ],
+            "properties": {
+              "StakeLock": {
+                "type": "object",
+                "required": [
+                  "locked_for",
+                  "node"
+                ],
+                "properties": {
+                  "locked_for": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0.0
+                  },
+                  "node": {
+                    "$ref": "#/components/schemas/NodePublicKey"
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Unstake FLK, the tokens will be locked for a set amount of time(ProtocolParameter::LockTime) before they can be withdrawn",
+            "type": "object",
+            "required": [
+              "Unstake"
+            ],
+            "properties": {
+              "Unstake": {
+                "type": "object",
+                "required": [
+                  "amount",
+                  "node"
+                ],
+                "properties": {
+                  "amount": {
+                    "$ref": "#/components/schemas/HpUfixed"
+                  },
+                  "node": {
+                    "$ref": "#/components/schemas/NodePublicKey"
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Withdraw tokens from a node after lock period has passed must be submitted by node owner but optionally they can provide a different public key to receive the tokens",
+            "type": "object",
+            "required": [
+              "WithdrawUnstaked"
+            ],
+            "properties": {
+              "WithdrawUnstaked": {
+                "type": "object",
+                "required": [
+                  "node"
+                ],
+                "properties": {
+                  "node": {
+                    "$ref": "#/components/schemas/NodePublicKey"
+                  },
+                  "recipient": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/EthAddress"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Sent by committee member to signal he is ready to change epoch",
+            "type": "object",
+            "required": [
+              "ChangeEpoch"
+            ],
+            "properties": {
+              "ChangeEpoch": {
+                "type": "object",
+                "required": [
+                  "epoch"
+                ],
+                "properties": {
+                  "epoch": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Adding a new service to the protocol",
+            "type": "object",
+            "required": [
+              "AddService"
+            ],
+            "properties": {
+              "AddService": {
+                "type": "object",
+                "required": [
+                  "service",
+                  "service_id"
+                ],
+                "properties": {
+                  "service": {
+                    "$ref": "#/components/schemas/Service"
+                  },
+                  "service_id": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Removing a service from the protocol",
+            "type": "object",
+            "required": [
+              "RemoveService"
+            ],
+            "properties": {
+              "RemoveService": {
+                "type": "object",
+                "required": [
+                  "service_id"
+                ],
+                "properties": {
+                  "service_id": {
+                    "description": "Service Id of the service to be removed",
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Provide proof of misbehavior to slash a node",
+            "type": "object",
+            "required": [
+              "Slash"
+            ],
+            "properties": {
+              "Slash": {
+                "type": "object",
+                "required": [
+                  "node",
+                  "proof_of_misbehavior",
+                  "service_id"
+                ],
+                "properties": {
+                  "node": {
+                    "description": "The public key of the node that misbehaved",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/NodePublicKey"
+                      }
+                    ]
+                  },
+                  "proof_of_misbehavior": {
+                    "description": "Zk proof to be provided to the slash circuit",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/ProofOfMisbehavior"
+                      }
+                    ]
+                  },
+                  "service_id": {
+                    "description": "Service id of the service a node misbehaved in",
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Report reputation measurements",
+            "type": "object",
+            "required": [
+              "SubmitReputationMeasurements"
+            ],
+            "properties": {
+              "SubmitReputationMeasurements": {
+                "type": "object",
+                "required": [
+                  "measurements"
+                ],
+                "properties": {
+                  "measurements": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "$ref": "#/components/schemas/ReputationMeasurements"
+                    }
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Change protocol parameters",
+            "type": "object",
+            "required": [
+              "ChangeProtocolParam"
+            ],
+            "properties": {
+              "ChangeProtocolParam": {
+                "type": "object",
+                "required": [
+                  "param",
+                  "value"
+                ],
+                "properties": {
+                  "param": {
+                    "$ref": "#/components/schemas/ProtocolParams"
+                  },
+                  "value": {
+                    "type": "integer",
+                    "format": "uint128",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Opt out of participating in the network.",
+            "type": "object",
+            "required": [
+              "OptOut"
+            ],
+            "properties": {
+              "OptOut": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "Opt into participating in the network.",
+            "type": "object",
+            "required": [
+              "OptIn"
+            ],
+            "properties": {
+              "OptIn": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "UpdatePayload": {
+        "description": "The payload data of FN transaction",
+        "type": "object",
+        "required": [
+          "method",
+          "nonce",
+          "sender"
+        ],
+        "properties": {
+          "method": {
+            "description": "The transition function (and parameters) for this update request.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UpdateMethod"
+              }
+            ]
+          },
+          "nonce": {
+            "description": "The counter or nonce of this request.",
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
+          "sender": {
+            "description": "The sender of the transaction.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransactionSender"
+              }
+            ]
+          }
+        }
+      },
+      "UpdateRequest": {
+        "description": "An update transaction, sent from users to the consensus to migrate the application from one state to the next state.",
+        "type": "object",
+        "required": [
+          "payload",
+          "signature"
+        ],
+        "properties": {
+          "payload": {
+            "description": "The payload of an update request, which contains a counter (nonce), and the transition function itself.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePayload"
+              }
+            ]
+          },
+          "signature": {
+            "description": "The signature by the user signing this payload.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransactionSignature"
+              }
+            ]
           }
         }
       }

@@ -3,27 +3,37 @@ name = "lightning-rpc"
 version = "0.0.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "lightning_rpc"
+path = "src/lib.rs"
+
+[[bin]]
+name = "generate-openrpc-spec"
+path = "src/spec/generate.rs"
 
 [dependencies]
-lightning-interfaces = { path = "../interfaces" }
-axum.workspace = true
-anyhow.workspace = true
-jsonrpc-v2.workspace = true
+jsonrpsee = { version = "0.20", features = ["full"] }
 serde.workspace = true
 async-trait.workspace = true
 serde_json.workspace = true
-bincode.workspace = true
-tokio.workspace = true
-infusion.workspace = true
-autometrics.workspace = true
-tracing.workspace = true
-affair.workspace = true
+tower = "0.4.13"
+ethers = "2.0.10"
+anyhow.workspace = true
+thiserror.workspace = true
 fleek-crypto.workspace = true
 hp-fixed.workspace = true
-ethers = "2.0.10"
 ruint = { version = "1.10", features = ["num-bigint", "serde"] }
-reqwest = { workspace = true, features = ["json"] }
+tokio.workspace = true
+tracing.workspace = true
+affair.workspace = true
+autometrics.workspace = true
+reqwest.workspace = true
+clap = { version = "4.4.10", features = ["derive"]}
+
+lightning-interfaces = { path = "../interfaces" }
+lightning-openrpc = { path = "../rpc-openrpc" }
+lightning-openrpc-macros = { path = "../rpc-openrpc-macros" }
+
 
 [dev-dependencies]
 reqwest = { workspace = true, features = ["json"] }
@@ -36,3 +46,4 @@ lightning-signer = { path = "../signer" }
 lightning-notifier = { path = "../notifier" }
 lightning-pool = { path = "../pool" }
 lightning-rep-collector = { path = "../rep-collector" }
+infusion.workspace = true

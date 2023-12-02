@@ -8,15 +8,25 @@ use fastcrypto::hash::{HashFunction, Keccak256};
 use fastcrypto::secp256k1::recoverable::Secp256k1RecoverableSignature;
 use fastcrypto::secp256k1::Secp256k1PublicKey;
 use fastcrypto::traits::{RecoverableSignature, VerifyRecoverable};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::hex_array;
 use crate::keys::{AccountOwnerPublicKey, AccountOwnerSignature};
 
 #[derive(
-    From, AsRef, Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize,
+    From, AsRef, Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Deserialize, JsonSchema
 )]
-pub struct EthAddress(#[serde(with = "hex_array")] pub [u8; 20]);
+pub struct EthAddress(#[serde(deserialize_with = "hex_array::deserialize")] pub [u8; 20]);
+
+impl Serialize for EthAddress {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        hex_array::serialize(&self.0, serializer)
+    }
+}
 
 impl EthAddress {
     pub fn verify(&self, signature: &AccountOwnerSignature, digest: &[u8]) -> bool {

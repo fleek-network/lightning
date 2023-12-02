@@ -11,6 +11,7 @@ num-traits ="0.2.15"
 serde = { version = "1.0", features = ["derive"] }
 ruint = { version = "1.10", features = ["num-bigint"], optional = true }
 primitive-types = "0.12.2"
+schemars = "0.8.16"
 
 [dev-dependencies]
 serde_json.workspace = true

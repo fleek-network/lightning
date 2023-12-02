@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 /// Contains the peer measurements that node A has about node B, that
 /// will be taken into account when computing B's reputation score.
-#[derive(Clone, Debug, Eq, PartialEq, Default, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Default, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ReputationMeasurements {
     pub latency: Option<Duration>,
     pub interactions: Option<i64>,

@@ -220,7 +220,7 @@ pub enum ExecutionError {
     NonExistingService,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
 pub struct PagingParams {
     // Since some nodes may be in state without
     // having staked the minimum and if at any point

@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::net::IpAddr;
+use std::ops::DerefMut;
 use std::time::Duration;
 
 use ethers::abi::AbiDecode;
@@ -154,7 +155,7 @@ impl<B: Backend> State<B> {
             ),
             TransactionRequest::EthereumRequest(payload) => (
                 TransactionSender::AccountOwner(EthAddress(payload.from.0)),
-                self.execute_ethereum_transaction(payload),
+                self.execute_ethereum_transaction(payload.into()),
             ),
         };
         // Increment nonce of the sender
@@ -1396,7 +1397,7 @@ impl<B: Backend> State<B> {
         match txn {
             TransactionRequest::UpdateRequest(payload) => self.verify_fleek_transaction(payload),
             TransactionRequest::EthereumRequest(payload) => {
-                self.verify_ethereum_transaction(payload)
+                self.verify_ethereum_transaction(payload.deref_mut())
             },
         }
     }

@@ -82,7 +82,7 @@ pub enum NodeRegistryChange {
 }
 
 /// The account info stored per account on the blockchain
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default, schemars::JsonSchema)]
 pub struct AccountInfo {
     /// The accounts FLK balance
     pub flk_balance: HpUfixed<18>,
