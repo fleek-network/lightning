@@ -29,13 +29,13 @@ pub struct Context {
 }
 
 #[async_trait]
-pub trait LookupInterface: Clone + Send + Sync + 'static {
+pub trait LookUp: Clone + Send + Sync + 'static {
     async fn lookup_contact(&self, key: TableKey, ctx: Context) -> Result<Vec<NodeIndex>>;
 
     async fn lookup_value(&self, key: TableKey, ctx: Context) -> Result<Option<Bytes>>;
 }
 
-pub struct Looker<C: Collection, T, U> {
+pub struct DhtLookUp<C: Collection, T, U> {
     us: NodeIndex,
     table: T,
     sync_query: c![C::ApplicationInterface::SyncExecutor],
@@ -43,7 +43,7 @@ pub struct Looker<C: Collection, T, U> {
     _marker: PhantomData<C>,
 }
 
-impl<C, T, U> Clone for Looker<C, T, U>
+impl<C, T, U> Clone for DhtLookUp<C, T, U>
 where
     C: Collection,
     T: Table,
@@ -60,7 +60,7 @@ where
     }
 }
 
-impl<C, T, U> Looker<C, T, U>
+impl<C, T, U> DhtLookUp<C, T, U>
 where
     C: Collection,
     T: Table,
@@ -264,7 +264,7 @@ where
 }
 
 #[async_trait]
-impl<C, T, U> LookupInterface for Looker<C, T, U>
+impl<C, T, U> LookUp for DhtLookUp<C, T, U>
 where
     C: Collection,
     T: Table,

@@ -13,7 +13,7 @@ pub enum Event {
     Unresponsive { index: NodeIndex },
 }
 
-pub trait Manager {
+pub trait Manager: Send + 'static {
     fn closest_contacts(&self, key: TableKey) -> Vec<NodeIndex>;
 
     fn closest_contact_info(&self, key: TableKey) -> Vec<NodeInfo>;
@@ -23,7 +23,7 @@ pub trait Manager {
     fn handle_event(&mut self, event: Event);
 }
 
-impl Manager for StdManager {
+impl Manager for TableManager {
     fn closest_contacts(&self, key: TableKey) -> Vec<NodeIndex> {
         self.closest_nodes(&key)
             .into_iter()
@@ -44,12 +44,12 @@ impl Manager for StdManager {
     }
 }
 
-pub struct StdManager {
+pub struct TableManager {
     pub local_node_key: NodePublicKey,
     pub buckets: Vec<Bucket>,
 }
 
-impl StdManager {
+impl TableManager {
     pub fn new(local_node_key: NodePublicKey) -> Self {
         Self {
             local_node_key,

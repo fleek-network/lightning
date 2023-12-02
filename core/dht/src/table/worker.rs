@@ -8,8 +8,8 @@ use futures::StreamExt;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{ApplicationInterface, SyncQueryRunnerInterface};
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{mpsc, oneshot, Notify};
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::{oneshot, Notify};
 use tokio::task::JoinHandle;
 
 use crate::pool::{Pool, ValueRespond};
@@ -222,6 +222,13 @@ where
     fn local_get(&self, key: &TableKey, respond: ValueRespond) {
         let entry = self.store.get(key).cloned();
         let _ = respond.send(Ok(entry));
+    }
+
+    pub fn spawn(mut self) -> JoinHandle<Receiver<Request>> {
+        tokio::spawn(async move {
+            let _ = self.run().await;
+            self.request_queue
+        })
     }
 
     pub async fn run(&mut self) -> Result<()> {

@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
@@ -7,7 +6,6 @@ use bytes::Bytes;
 use futures::future::Either;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, Notify};
@@ -15,7 +13,7 @@ use tokio::task::JoinHandle;
 
 use crate::network;
 use crate::network::{Find, FindResponse, Message, UnreliableTransport};
-use crate::pool::lookup::{Context, LookupInterface};
+use crate::pool::lookup::{Context, LookUp};
 use crate::pool::{ContactRespond, ValueRespond};
 use crate::table::worker::TableKey;
 use crate::table::{Event, Table};
@@ -64,7 +62,7 @@ pub struct PoolWorker<L, T, U> {
 
 impl<L, T, U> PoolWorker<L, T, U>
 where
-    L: LookupInterface,
+    L: LookUp,
     T: Table,
     U: UnreliableTransport,
 {
@@ -433,6 +431,13 @@ where
 
     fn cleanup(&mut self, id: u32) {
         self.ongoing.remove(&id);
+    }
+
+    pub fn spawn(mut self) -> JoinHandle<Receiver<Task>> {
+        tokio::spawn(async move {
+            let _ = self.run().await;
+            self.task_queue
+        })
     }
 
     pub async fn run(&mut self) {
