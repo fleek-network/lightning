@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -15,7 +16,7 @@ use narwhal_crypto::DefaultHashFunction;
 use narwhal_executor::ExecutionState;
 use narwhal_types::{BatchAPI, BatchDigest, ConsensusOutput, Transaction};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::{mpsc, Mutex, Notify};
 use tracing::{error, info};
 
 pub type Digest = [u8; 32];
@@ -72,6 +73,8 @@ pub struct Execution<Q: SyncQueryRunnerInterface> {
     /// If this socket is present it means the node is in archive node and should send all blocks
     /// and transactions it executes to the archiver to be indexed
     index_socket: Option<IndexSocket>,
+    /// The digest of the transactions we already executed this epoch.
+    executed_txns: Mutex<HashSet<Digest>>,
 }
 
 impl<Q: SyncQueryRunnerInterface> Execution<Q> {
@@ -90,6 +93,7 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
             tx_narwhal_batches,
             query_runner,
             index_socket,
+            executed_txns: Mutex::new(HashSet::new()),
         }
     }
 
@@ -97,9 +101,19 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
     pub(crate) async fn submit_batch(&self, payload: Vec<Transaction>, digest: Digest) -> bool {
         let mut change_epoch = false;
 
+        let mut executed_txns = self.executed_txns.lock().await;
         let transactions = payload
             .into_iter()
             .filter_map(|txn| TransactionRequest::try_from(txn).ok())
+            .filter(|txn| {
+                let hash = txn.hash();
+                if executed_txns.contains(&hash) {
+                    false
+                } else {
+                    executed_txns.insert(hash);
+                    true
+                }
+            })
             .collect::<Vec<_>>();
 
         let block = Block {
@@ -118,8 +132,10 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
         info!("Consensus submitted new block to application");
 
         if results.change_epoch {
+            executed_txns.clear();
             change_epoch = true;
         }
+
         // If we have the archive socket that means our node is in archive node and we should send
         // the block and the reciept to be indexed
         if let (Some(block), Some(socket)) = (archive_block, &self.index_socket) {
