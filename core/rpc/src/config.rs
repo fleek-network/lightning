@@ -27,7 +27,7 @@ impl Config {
 
     pub fn default_with_port(port: u16) -> Self {
         Self {
-            addr: format!("{}:{}", "127.0.0.1", port)
+            addr: format!("{}:{}", "0.0.0.0", port)
                 .parse()
                 .expect("RPC Socket Addr to parse"),
             rpc_selection: Default::default(),
@@ -46,7 +46,7 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            addr: "127.0.0.1:4230".parse().expect("RPC Socket Addr to parse"),
+            addr: "0.0.0.0:4230".parse().expect("RPC Socket Addr to parse"),
             rpc_selection: Default::default(),
         }
     }
