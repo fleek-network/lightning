@@ -3056,7 +3056,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fleek-service-cdn"
+name = "fleek-service-fetcher"
 version = "0.0.1"
 dependencies = [
  "anyhow",
@@ -5054,7 +5054,7 @@ dependencies = [
  "bincode",
  "bytes",
  "dashmap",
- "fleek-service-cdn",
+ "fleek-service-fetcher",
  "fn-sdk",
  "futures",
  "fxhash",
