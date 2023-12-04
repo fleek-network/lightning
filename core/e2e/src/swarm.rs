@@ -25,13 +25,13 @@ use lightning_blockstore_server::{BlockStoreServer, Config as BlockStoreServerCo
 use lightning_broadcast::{Broadcast, Config as BroadcastConfig};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
-use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
-use lightning_dht::dht::Dht;
+use lightning_dht::config::Config as DhtConfig;
+use lightning_dht::Dht;
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::webrtc::WebRtcConfig;
 use lightning_interfaces::types::{Blake3Hash, NodePorts, Staking};
-use lightning_interfaces::{ConfigProviderInterface, DhtSocket};
+use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
 use lightning_pinger::{Config as PingerConfig, Pinger};
@@ -132,7 +132,7 @@ impl Swarm {
             .collect()
     }
 
-    pub fn get_dht_sockets(&self) -> Vec<Option<DhtSocket>> {
+    pub fn get_dht_sockets(&self) -> Vec<Option<Dht<FinalTypes>>> {
         self.nodes
             .values()
             .map(|node| node.take_dht_socket())
@@ -167,8 +167,8 @@ pub struct SwarmBuilder {
     epoch_start: Option<u64>,
     epoch_time: Option<u64>,
     port_assigner: Option<PortAssigner>,
-    bootstrappers: Option<Vec<Bootstrapper>>,
     syncronizer_delta: Option<Duration>,
+    bootstrappers: Option<Vec<NodePublicKey>>,
     archiver: bool,
     use_persistence: bool,
     committee_size: Option<u64>,
@@ -200,7 +200,7 @@ impl SwarmBuilder {
         self
     }
 
-    pub fn with_bootstrappers(mut self, bootstrappers: Vec<Bootstrapper>) -> Self {
+    pub fn with_bootstrappers(mut self, bootstrappers: Vec<NodePublicKey>) -> Self {
         self.bootstrappers = Some(bootstrappers);
         self
     }
@@ -366,7 +366,7 @@ impl SwarmBuilder {
 fn build_config(
     root: &Path,
     ports: NodePorts,
-    bootstrappers: Vec<Bootstrapper>,
+    bootstrappers: Vec<NodePublicKey>,
     archiver: bool,
     syncronizer_delta: Duration,
 ) -> TomlConfigProvider<FinalTypes> {

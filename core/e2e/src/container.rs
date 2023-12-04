@@ -5,7 +5,7 @@ use std::thread::JoinHandle;
 use infusion::tag;
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::Blake3Hash;
-use lightning_interfaces::{BlockStoreInterface, DhtInterface, DhtSocket, SyncronizerInterface};
+use lightning_interfaces::{BlockStoreInterface, DhtInterface, SyncronizerInterface};
 use tokio::sync::{oneshot, Notify};
 
 use crate::containerized_node::RuntimeType;
@@ -14,7 +14,7 @@ pub struct Container<C: Collection> {
     join_handle: Option<JoinHandle<()>>,
     shutdown_notify: Option<Arc<Notify>>,
     ckpt_rx: Option<oneshot::Receiver<Blake3Hash>>,
-    dht_socket: Option<DhtSocket>,
+    dht: Option<C::DhtInterface>,
     blockstore: Option<C::BlockStoreInterface>,
 }
 
@@ -62,17 +62,16 @@ impl<C: Collection> Container<C> {
                             C::SyncronizerInterface
                         ))
                         .checkpoint_socket();
-                    let dht_socket = node
+                    let dht = node
                         .container
                         .get::<<C as Collection>::DhtInterface>(tag!(C::DhtInterface))
-                        .get_socket();
+                        .clone();
                     let blockstore = node
                         .container
                         .get::<<C as Collection>::BlockStoreInterface>(tag!(C::BlockStoreInterface))
                         .clone();
 
-                    tx.send((ckpt_rx, dht_socket, blockstore))
-                        .expect("Failed to send");
+                    tx.send((ckpt_rx, dht, blockstore)).expect("Failed to send");
 
                     let _ = started_tx.send(());
 
@@ -82,14 +81,14 @@ impl<C: Collection> Container<C> {
             })
             .expect("Failed to spawn E2E thread");
 
-        let (ckpt_rx, dht_socket, blockstore) = rx.recv().expect("Failed to receive");
+        let (ckpt_rx, dht, blockstore) = rx.recv().expect("Failed to receive");
         started_rx.await.expect("Failed to start the node.");
 
         Self {
             join_handle: Some(handle),
             shutdown_notify: Some(shutdown_notify),
             ckpt_rx: Some(ckpt_rx),
-            dht_socket: Some(dht_socket),
+            dht: Some(dht),
             blockstore: Some(blockstore),
         }
     }
@@ -106,8 +105,8 @@ impl<C: Collection> Container<C> {
         self.ckpt_rx.take()
     }
 
-    pub fn take_dht_socket(&mut self) -> Option<DhtSocket> {
-        self.dht_socket.take()
+    pub fn take_dht_socket(&mut self) -> Option<C::DhtInterface> {
+        self.dht.take()
     }
 
     pub fn take_blockstore(&mut self) -> Option<C::BlockStoreInterface> {

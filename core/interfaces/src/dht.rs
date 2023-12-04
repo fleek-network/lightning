@@ -7,39 +7,25 @@ use crate::{
     ApplicationInterface,
     ConfigConsumer,
     ConfigProviderInterface,
-    ReputationAggregatorInterface,
     SignerInterface,
-    TopologyInterface,
     WithStartAndShutdown,
 };
 
 #[async_trait]
 #[infusion::service]
 pub trait DhtInterface<C: Collection>:
-    ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
+    ConfigConsumer + WithStartAndShutdown + Clone + Sized + Send + Sync
 {
     fn _init(
         app: ::ApplicationInterface,
         signer: ::SignerInterface,
-        topology: ::TopologyInterface,
         config: ::ConfigProviderInterface,
-        rep_aggregator: ::ReputationAggregatorInterface,
     ) {
-        Self::init(
-            signer,
-            topology.clone(),
-            rep_aggregator.get_reporter(),
-            rep_aggregator.get_query(),
-            app.sync_query(),
-            config.get::<Self>(),
-        )
+        Self::init(signer, app.sync_query(), config.get::<Self>())
     }
 
     fn init(
         signer: &c!(C::SignerInterface),
-        topology: c!(C::TopologyInterface),
-        rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
-        local_rep_query: c![C::ReputationAggregatorInterface::ReputationQuery],
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         config: Self::Config,
     ) -> anyhow::Result<Self>;

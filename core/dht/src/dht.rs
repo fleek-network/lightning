@@ -11,7 +11,6 @@ use lightning_interfaces::types::{KeyPrefix, TableEntry};
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
-    ReputationAggregatorInterface,
     SignerInterface,
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
@@ -37,17 +36,6 @@ pub type PoolWorkerType<C> = PoolWorker<
 pub type LookUpType<C> =
     DhtLookUp<C, DhtTable, UdpTransport<c![C::ApplicationInterface::SyncExecutor]>>;
 
-/// Maintains the DHT.
-#[allow(clippy::type_complexity, unused)]
-pub struct Dht<C: Collection> {
-    table: DhtTable,
-    pool: DhtPool,
-    status: Arc<Mutex<Option<Status>>>,
-    bootstrap_nodes: Vec<NodePublicKey>,
-    sk: NodeSecretKey,
-    sync_query: c![C::ApplicationInterface::SyncExecutor],
-}
-
 enum Status {
     NotRunning {
         table_request_receiver: Receiver<Request>,
@@ -58,6 +46,29 @@ enum Status {
         pool_worker_handle: JoinHandle<Receiver<Task>>,
         shutdown: Arc<Notify>,
     },
+}
+
+/// Maintains the DHT.
+#[allow(clippy::type_complexity, unused)]
+pub struct Dht<C: Collection> {
+    table: DhtTable,
+    pool: DhtPool,
+    status: Arc<Mutex<Option<Status>>>,
+    bootstrap_nodes: Vec<NodePublicKey>,
+    sk: NodeSecretKey,
+    sync_query: c![C::ApplicationInterface::SyncExecutor],
+}
+impl<C: Collection> Clone for Dht<C> {
+    fn clone(&self) -> Self {
+        Self {
+            table: self.table.clone(),
+            pool: self.pool.clone(),
+            status: self.status.clone(),
+            bootstrap_nodes: self.bootstrap_nodes.clone(),
+            sk: self.sk.clone(),
+            sync_query: self.sync_query.clone(),
+        }
+    }
 }
 
 #[async_trait]
@@ -172,9 +183,6 @@ where
 {
     fn init(
         signer: &c![C::SignerInterface],
-        _: c![C::TopologyInterface],
-        _: c!(C::ReputationAggregatorInterface::ReputationReporter),
-        _: c![C::ReputationAggregatorInterface::ReputationQuery],
         sync_query: c![C::ApplicationInterface::SyncExecutor],
         config: Self::Config,
     ) -> Result<Self> {
