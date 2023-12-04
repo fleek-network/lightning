@@ -2,7 +2,7 @@ use arrayref::array_ref;
 use bytes::{BufMut, BytesMut};
 use cid::Cid;
 use fleek_service_fetcher::Origin;
-use lightning_handshake::schema::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
+use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
 use tcp_client::TcpClient;
 
 const ADDRESS: &str = "127.0.0.1:4221";
@@ -116,7 +116,7 @@ mod tcp_client {
     use anyhow::Result;
     use arrayref::array_ref;
     use bytes::{Bytes, BytesMut};
-    use lightning_handshake::schema::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
+    use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpStream, ToSocketAddrs};
 

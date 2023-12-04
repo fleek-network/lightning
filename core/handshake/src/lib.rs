@@ -6,5 +6,6 @@ mod shutdown;
 
 pub mod config;
 pub mod handshake;
-pub mod schema;
 pub mod transports;
+
+pub use lightning_schema::handshake as schema;

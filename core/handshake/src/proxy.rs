@@ -97,6 +97,7 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
             RequestFrame::AccessToken { .. } => todo!(),
             RequestFrame::ExtendAccessToken { .. } => todo!(),
             RequestFrame::DeliveryAcknowledgment {} => todo!(),
+            _ => unimplemented!(),
         }
 
         Ok(())

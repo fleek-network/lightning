@@ -12,6 +12,6 @@ tracing.workspace = true
 arrayref = "0.3.7"
 
 [dev-dependencies]
-lightning-handshake = { path = "../../core/handshake" }
+lightning-schema = { path = "../../core/schema" }
 cid = "0.11"
 hex = "0.4"
