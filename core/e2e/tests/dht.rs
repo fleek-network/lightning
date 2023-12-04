@@ -1,18 +1,18 @@
+use std::fs;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use std::{fs, thread};
 
 use anyhow::Result;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
-use lightning_dht::dht::{Builder as DhtBuilder, Dht};
+use lightning_dht::Dht;
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::logging;
-use lightning_e2e::utils::networking::{PortAssigner, Transport};
+use lightning_e2e::utils::networking::PortAssigner;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::{Blake3Hash, DhtRequest, DhtResponse, KeyPrefix};
-use lightning_interfaces::{partial, DhtSocket, WithStartAndShutdown};
+use lightning_interfaces::types::{Blake3Hash, KeyPrefix};
+use lightning_interfaces::{partial, DhtInterface};
+use lightning_node::FinalTypes;
 use lightning_topology::Topology;
 use resolved_pathbuf::ResolvedPathBuf;
 use serial_test::serial;
@@ -35,49 +35,12 @@ async fn e2e_dht_put_and_get() -> Result<()> {
         .unwrap()
         .as_millis() as u64;
 
-    let mut port_assigner = PortAssigner::default();
-    let bootstrapper_port = port_assigner
-        .get_port(10301, 10400, Transport::Udp)
-        .expect("Failed to assign port");
-
-    // Todo: get IP from application.
-    let bootstrapper_address = format!("127.0.0.1:{bootstrapper_port}").parse().unwrap();
-
-    let bootstrapper_config = DhtConfig {
-        address: bootstrapper_address,
-        bootstrappers: vec![],
-    };
+    let port_assigner = PortAssigner::default();
 
     // Start bootstrapper
     let bootstrap_secret_key = NodeSecretKey::generate();
     let bootstrap_shutdown_notify = Arc::new(Notify::new());
     let bootstrap_ready = Arc::new(Notify::new());
-    let bootstrap_ready_rx = bootstrap_ready.clone();
-    let bootstrap_shutdown_notify_rx = bootstrap_shutdown_notify.clone();
-
-    let key_cloned = bootstrap_secret_key.clone();
-    let _bootstrap_handle = thread::spawn(move || {
-        let mut builder = tokio::runtime::Builder::new_multi_thread();
-        let runtime = builder
-            .enable_all()
-            .build()
-            .expect("Failed to build tokio runtime for node container.");
-
-        runtime.block_on(async move {
-            let builder = DhtBuilder::<PartialBinding>::new(
-                key_cloned,
-                bootstrapper_config,
-                Default::default(),
-                Default::default(),
-            );
-            let dht = builder.build().unwrap();
-            dht.start().await;
-            bootstrap_ready_rx.notify_one();
-
-            bootstrap_shutdown_notify_rx.notified().await;
-            dht.shutdown().await;
-        });
-    });
 
     // Wait for bootstrapper to start
     bootstrap_ready.notified().await;
@@ -92,10 +55,7 @@ async fn e2e_dht_put_and_get() -> Result<()> {
         .with_max_port(10400)
         .with_num_nodes(4)
         .with_epoch_start(epoch_start)
-        .with_bootstrappers(vec![Bootstrapper {
-            address: bootstrapper_address,
-            network_public_key: bootstrap_secret_key.to_pk(),
-        }])
+        .with_bootstrappers(vec![bootstrap_secret_key.to_pk()])
         .with_port_assigner(port_assigner)
         .build();
     swarm.launch().await.unwrap();
@@ -107,21 +67,14 @@ async fn e2e_dht_put_and_get() -> Result<()> {
     let value: [u8; 4] = rand::random();
 
     #[allow(clippy::filter_map_identity)]
-    let dht_sockets: Vec<DhtSocket> = swarm
+    let dht_sockets: Vec<Dht<FinalTypes>> = swarm
         .get_dht_sockets()
         .into_iter()
         .filter_map(|s| s)
         .collect();
 
     // Send DHT put to an arbitrary node in the swarm
-    dht_sockets[0]
-        .run(DhtRequest::Put {
-            prefix: KeyPrefix::ContentRegistry,
-            key: key.to_vec(),
-            value: value.to_vec(),
-        })
-        .await
-        .unwrap();
+    dht_sockets[0].put(KeyPrefix::ContentRegistry, key.as_ref(), value.as_ref());
 
     // Wait some time for the DHT to do its magic
     tokio::time::sleep(Duration::from_secs(5)).await;
@@ -129,15 +82,10 @@ async fn e2e_dht_put_and_get() -> Result<()> {
     // Perform a DHT lookup on every node in the swarm
     for dht_socket in dht_sockets {
         let res = dht_socket
-            .run(DhtRequest::Get {
-                prefix: KeyPrefix::ContentRegistry,
-                key: key.to_vec(),
-            })
-            .await
-            .unwrap();
-
+            .get(KeyPrefix::ContentRegistry, key.as_ref())
+            .await;
         match res {
-            DhtResponse::Get(Some(entry)) => {
+            Some(entry) => {
                 // Make sure the retrieved value equals the value we stored
                 assert_eq!(value.to_vec(), entry.value);
             },

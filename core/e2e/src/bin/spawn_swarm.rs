@@ -1,18 +1,18 @@
+use std::fs;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::SystemTime;
-use std::{fs, thread};
 
 use anyhow::Result;
 use clap::Parser;
 use fleek_crypto::{NodeSecretKey, PublicKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_dht::config::{Bootstrapper, Config as DhtConfig};
-use lightning_dht::dht::{Builder as DhtBuilder, Dht};
+use lightning_dht::Dht;
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::networking::{PortAssigner, Transport};
 use lightning_e2e::utils::{logging, shutdown};
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::{partial, WithStartAndShutdown};
+use lightning_interfaces::partial;
 use lightning_topology::Topology;
 use resolved_pathbuf::ResolvedPathBuf;
 use tokio::sync::Notify;
@@ -56,40 +56,10 @@ async fn main() -> Result<()> {
         .expect("Failed to assign port");
 
     // Todo: get IP from application.
-    let bootstrapper_address = format!("127.0.0.1:{bootstrapper_port}").parse().unwrap();
-    let bootstrapper_config = DhtConfig {
-        address: bootstrapper_address,
-        bootstrappers: vec![],
-    };
+    let bootstrapper_address: SocketAddr =
+        format!("127.0.0.1:{bootstrapper_port}").parse().unwrap();
     let bootstrap_secret_key = NodeSecretKey::generate();
-    let bootstrap_shutdown_notify = Arc::new(Notify::new());
     let bootstrap_ready = Arc::new(Notify::new());
-    let bootstrap_ready_rx = bootstrap_ready.clone();
-    let bootstrap_shutdown_notify_rx = bootstrap_shutdown_notify.clone();
-
-    let key_cloned = bootstrap_secret_key.clone();
-    let _bootstrap_handle = thread::spawn(move || {
-        let mut builder = tokio::runtime::Builder::new_multi_thread();
-        let runtime = builder
-            .enable_all()
-            .build()
-            .expect("Failed to build tokio runtime for node container.");
-
-        runtime.block_on(async move {
-            let builder = DhtBuilder::<PartialBinding>::new(
-                key_cloned,
-                bootstrapper_config,
-                Default::default(),
-                Default::default(),
-            );
-            let dht = builder.build().unwrap();
-            dht.start().await;
-            bootstrap_ready_rx.notify_one();
-
-            bootstrap_shutdown_notify_rx.notified().await;
-            dht.shutdown().await;
-        });
-    });
 
     // Wait for bootstrapper to start
     bootstrap_ready.notified().await;
@@ -112,10 +82,7 @@ async fn main() -> Result<()> {
         .with_epoch_time(args.epoch_time)
         .with_epoch_start(epoch_start)
         .with_archiver()
-        .with_bootstrappers(vec![Bootstrapper {
-            address: bootstrapper_address,
-            network_public_key: bootstrap_secret_key.to_pk(),
-        }])
+        .with_bootstrappers(vec![bootstrap_secret_key.to_pk()])
         .with_port_assigner(port_assigner)
         .build();
     swarm.launch().await.unwrap();
