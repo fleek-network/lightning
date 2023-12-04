@@ -1,9 +1,9 @@
+//! TODO: unify [`LightningMessage`] with these fixed length implementations
+
 use anyhow::{anyhow, Result};
 use arrayref::array_ref;
 use bytes::{BufMut, Bytes};
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey, NodeSignature};
-use lightning_interfaces::types::ServiceId;
-use tokio::io::{AsyncRead, AsyncReadExt};
 
 pub const NETWORK_PREFIX: &[u8; 5] = b"FLEEK";
 
@@ -56,7 +56,7 @@ pub enum HandshakeRequestFrame {
     /// Primary connection handshake.
     Handshake {
         retry: Option<u64>,
-        service: ServiceId,
+        service: u32,
         pk: ClientPublicKey,
         pop: ClientSignature,
     },
@@ -139,41 +139,6 @@ impl HandshakeRequestFrame {
                 }
                 let access_token = *array_ref!(bytes, 1, 48);
                 Ok(Self::JoinRequest { access_token })
-            },
-            _ => Err(anyhow!("invalid frame tag")),
-        }
-    }
-
-    /// Cancel Safety:
-    /// This method currently consumes bytes from the reader in multiple steps, which is not cancel
-    /// safe.
-    pub async fn decode_from_reader<R: AsyncRead + Unpin>(reader: &mut R) -> Result<Self> {
-        // TODO: Cancel safety.
-        let ty = reader.read_u8().await?;
-        match ty {
-            HANDSHAKE_REQ_TAG => {
-                let mut buf = vec![0u8; 149];
-                reader
-                    .read_exact(buf.get_mut(1..).expect("Buffer is large enough"))
-                    .await?;
-                buf[0] = 0x00;
-                Self::decode(&buf)
-            },
-            HANDSHAKE_RETRY_REQ_TAG => {
-                let mut buf = vec![0u8; 157];
-                reader
-                    .read_exact(buf.get_mut(1..).expect("Buffer is large enough"))
-                    .await?;
-                buf[0] = 0x01;
-                Self::decode(&buf)
-            },
-            HANDSHAKE_JOIN_REQ_TAG => {
-                let mut buf = vec![0u8; 49];
-                reader
-                    .read_exact(buf.get_mut(1..).expect("Buffer is large enough"))
-                    .await?;
-                buf[0] = 0x02;
-                Self::decode(&buf)
             },
             _ => Err(anyhow!("invalid frame tag")),
         }
@@ -274,36 +239,6 @@ impl RequestFrame {
                 Ok(Self::ExtendAccessToken { ttl })
             },
             // TODO: decode signature bytes
-            REQ_DELIVERY_ACK_TAG => Ok(Self::DeliveryAcknowledgment {}),
-            _ => Err(anyhow!("invalid frame tag")),
-        }
-    }
-
-    /// Cancel Safety:
-    /// This method currently consumes bytes from the reader in multiple steps, which is not cancel
-    /// safe.
-    pub async fn decode_from_reader<R: AsyncRead + Unpin>(reader: &mut R) -> Result<Self> {
-        let ty = reader.read_u8().await?;
-        match ty {
-            REQ_SERVICE_PAYLOAD_TAG => {
-                let mut bytes = Vec::new();
-                reader.read_to_end(&mut bytes).await?;
-                Ok(Self::ServicePayload {
-                    bytes: bytes.into(),
-                })
-            },
-            REQ_ACCESS_TOKEN_TAG => {
-                let mut bytes = vec![0u8; 8];
-                reader.read_exact(&mut bytes).await?;
-                let ttl = u64::from_be_bytes(*array_ref!(bytes, 0, 8));
-                Ok(Self::AccessToken { ttl })
-            },
-            REQ_EXTEND_ACCESS_TOKEN_TAG => {
-                let mut bytes = vec![0u8; 8];
-                reader.read_exact(&mut bytes).await?;
-                let ttl = u64::from_be_bytes(*array_ref!(bytes, 0, 8));
-                Ok(Self::ExtendAccessToken { ttl })
-            },
             REQ_DELIVERY_ACK_TAG => Ok(Self::DeliveryAcknowledgment {}),
             _ => Err(anyhow!("invalid frame tag")),
         }

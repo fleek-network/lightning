@@ -12,5 +12,6 @@ anyhow.workspace = true
 fleek-crypto.workspace = true
 ink-quill.workspace = true
 lightning-types.workspace = true
-
+bytes = "1.5"
+arrayref = "0.3"
 flexbuffers = "2.0"

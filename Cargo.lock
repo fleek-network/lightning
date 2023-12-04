@@ -3056,7 +3056,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fleek-service-cdn"
+name = "fleek-service-fetcher"
 version = "0.0.1"
 dependencies = [
  "anyhow",
@@ -3065,7 +3065,7 @@ dependencies = [
  "cid 0.11.0",
  "fn-sdk",
  "hex",
- "lightning-handshake",
+ "lightning-schema",
  "tokio",
  "tracing",
 ]
@@ -4697,6 +4697,7 @@ dependencies = [
  "lightning-interfaces",
  "lightning-node",
  "lightning-rpc",
+ "lightning-schema",
  "lightning-service-executor",
  "lightning-signer",
  "lightning-test-utils",
@@ -5035,6 +5036,8 @@ name = "lightning-schema"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "arrayref",
+ "bytes",
  "fleek-crypto",
  "flexbuffers",
  "infusion",
@@ -5054,7 +5057,7 @@ dependencies = [
  "bincode",
  "bytes",
  "dashmap",
- "fleek-service-cdn",
+ "fleek-service-fetcher",
  "fn-sdk",
  "futures",
  "fxhash",
