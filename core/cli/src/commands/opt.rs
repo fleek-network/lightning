@@ -14,7 +14,7 @@ use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::ToDigest;
 use lightning_node::config::TomlConfigProvider;
-use lightning_rpc::{Rpc, utils};
+use lightning_rpc::{utils, Rpc};
 use lightning_signer::Signer;
 use lightning_types::{
     NodeIndex,

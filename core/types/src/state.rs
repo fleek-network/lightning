@@ -1,5 +1,4 @@
-//! The data types used in the application state.
-
+//! The data types used in the application state
 use std::net::IpAddr;
 
 use anyhow::anyhow;
@@ -46,7 +45,18 @@ type CommodityServed = Vec<u128>;
 
 /// This is commodities served by different services in Fleek Network.
 /// C-like enums used here to future proof for state, if we add more commodity types
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, FromPrimitive, schemars::JsonSchema)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    FromPrimitive,
+    schemars::JsonSchema,
+)]
 #[repr(u8)]
 pub enum CommodityTypes {
     Bandwidth = 0,
@@ -91,7 +101,19 @@ pub enum Value {
 }
 
 /// Indicates the participation status of a node.
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
+#[rustfmt::skip]
+#[derive(
+    Debug, 
+    Hash, 
+    PartialEq, 
+    PartialOrd, 
+    Ord,
+    Eq, 
+    Serialize, 
+    Deserialize, 
+    Clone, 
+    schemars::JsonSchema,
+)]
 pub enum Participation {
     True,
     False,
@@ -100,7 +122,17 @@ pub enum Participation {
 }
 
 /// Adjustable parameters that are stored in the blockchain
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug, schemars::JsonSchema)]
+#[rustfmt::skip]
+#[derive(
+    Clone, 
+    PartialEq, 
+    Eq, 
+    Hash, 
+    Serialize, 
+    Deserialize, 
+    Debug, 
+    schemars::JsonSchema
+)]
 #[repr(u8)]
 pub enum ProtocolParams {
     /// The time in milliseconds that an epoch lasts for. Genesis 24 hours(86400)
@@ -127,7 +159,19 @@ pub enum ProtocolParams {
     MaxStakeLockTime = 10,
 }
 
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
+#[rustfmt::skip]
+#[derive(
+    Debug, 
+    Hash, 
+    PartialEq, 
+    PartialOrd, 
+    Ord, 
+    Eq, 
+    Serialize, 
+    Deserialize, 
+    Clone, 
+    schemars::JsonSchema,
+)]
 pub struct NodeInfo {
     /// The owner of this node
     pub owner: EthAddress,
@@ -161,8 +205,20 @@ pub struct NodeInfoWithIndex {
     pub info: NodeInfo,
 }
 
+#[rustfmt::skip]
+#[derive(
+    Debug, 
+    Hash, 
+    PartialEq, 
+    PartialOrd, 
+    Ord, 
+    Eq, 
+    Serialize, 
+    Deserialize, 
+    Clone, 
+    schemars::JsonSchema,
+)]
 /// The ports a node has open for its processes
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
 pub struct NodePorts {
     pub primary: u16,
     pub worker: u16,
@@ -190,7 +246,19 @@ impl Default for NodePorts {
 }
 
 /// The ports a node has open for the handshake server
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
+#[rustfmt::skip]
+#[derive(
+    Debug, 
+    Hash, 
+    PartialEq, 
+    PartialOrd, 
+    Ord, 
+    Eq, 
+    Serialize, 
+    Deserialize, 
+    Clone, 
+    schemars::JsonSchema,
+)]
 pub struct HandshakePorts {
     pub http: u16,
     pub webrtc: u16,
@@ -208,7 +276,19 @@ impl Default for HandshakePorts {
 }
 
 /// Struct that stores the information about the stake of amount of a node.
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default, schemars::JsonSchema)]
+#[derive(
+    Debug,
+    Hash,
+    PartialEq,
+    PartialOrd,
+    Ord,
+    Eq,
+    Serialize,
+    Deserialize,
+    Clone,
+    Default,
+    schemars::JsonSchema,
+)]
 pub struct Staking {
     /// How much FLK that is currently staked
     pub staked: HpUfixed<18>,

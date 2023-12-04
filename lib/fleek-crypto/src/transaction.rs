@@ -26,7 +26,7 @@ use crate::{
     From,
     IsVariant,
     TryInto,
-    schemars::JsonSchema
+    schemars::JsonSchema,
 )]
 pub enum TransactionSender {
     NodeConsensus(ConsensusPublicKey),
@@ -48,7 +48,7 @@ pub enum TransactionSender {
     From,
     IsVariant,
     TryInto,
-    schemars::JsonSchema
+    schemars::JsonSchema,
 )]
 pub enum TransactionSignature {
     NodeConsensus(ConsensusSignature),

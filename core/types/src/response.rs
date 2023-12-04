@@ -6,7 +6,9 @@ use super::{Epoch, NodeInfo};
 use crate::UpdateMethod;
 
 /// Info on a Narwhal epoch
-#[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct EpochInfo {
     /// List of committee members
     pub committee: Vec<NodeInfo>,

@@ -39,13 +39,11 @@ pub async fn conn_bind() -> ConnectionListener {
 pub fn init_from_env() {
     let blockstore_path: PathBuf = std::env::var("BLOCKSTORE_PATH")
         .expect("Expected BLOCKSTORE_PATH env")
-        .try_into()
-        .expect("BLOCKSTORE_PATH to be a valid path.");
+        .into();
 
     let ipc_path: PathBuf = std::env::var("IPC_PATH")
         .expect("Expected IPC_PATH env")
-        .try_into()
-        .expect("IPC_PATH to be a valid path.");
+        .into();
 
     let (tx, rx) = mpsc::channel::<IpcRequest>(1024);
 

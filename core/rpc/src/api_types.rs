@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use ethers::types::{Address, H256, U256, Bytes};
-pub use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
+use ethers::types::{Address, Bytes, H256, U256};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
@@ -55,5 +54,5 @@ pub struct CallRequest {
     /// Transaction data
     /// This is the same as `input` but is used for backwards compatibility: <https://github.com/ethereum/go-ethereum/issues/15628>
     pub data: Option<Bytes>,
-    pub value: Option<U256>
+    pub value: Option<U256>,
 }

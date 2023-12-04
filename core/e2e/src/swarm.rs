@@ -241,7 +241,7 @@ impl SwarmBuilder {
         let min_port = self.min_port.expect("Minimum port must be provided.");
         let max_port = self.max_port.expect("Maximum port must be provided.");
 
-        let bootstrappers = self.bootstrappers.unwrap_or(Vec::new());
+        let bootstrappers = self.bootstrappers.unwrap_or_default();
         let mut port_assigner = self.port_assigner.unwrap_or_default();
 
         // Load the default genesis. Clear the committee and node info and overwrite

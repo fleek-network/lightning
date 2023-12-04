@@ -542,12 +542,12 @@ mod tests {
             std::i16::MAX as i32 + 1
         );
 
-        let small_by_2 = &small / &200_i64.try_into().unwrap();
+        let small_by_2 = &small / &200_i64.into();
         let small_float: f64 = small_by_2.try_into().unwrap();
         // small_float = 32768(small) / 200   = 163.84
         assert_eq!(163.84, small_float);
 
-        let large_by_2 = &large / &200_000_000i64.try_into().unwrap();
+        let large_by_2 = &large / &200_000_000i64.into();
         // large_by_2 is HpFixed<20>(-4_611_686_018_427_387_904_500_000_000_000)
         // warn: truncation happens
         let large_float: f64 = large_by_2.try_into().unwrap();

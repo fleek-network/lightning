@@ -10,14 +10,18 @@ use lightning_interfaces::types::{
     Blake3Hash,
     Epoch,
     EpochInfo,
+    FetcherRequest,
+    FetcherResponse,
+    ImmutablePointer,
     NodeIndex,
     NodeInfo,
     NodeInfoWithIndex,
     NodeServed,
+    OriginProvider,
     ProtocolParams,
     ReportedReputationMeasurements,
     TotalServed,
-    TransactionRequest, FetcherRequest, FetcherResponse, ImmutablePointer, OriginProvider,
+    TransactionRequest,
 };
 use lightning_interfaces::{PagingParams, SyncQueryRunnerInterface};
 
@@ -62,10 +66,7 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
     }
 
     async fn get_stake_locked_until(&self, pk: NodePublicKey) -> RpcResult<u64> {
-        Ok(self
-            .data
-            .query_runner
-            .get_stake_locked_until(&pk))
+        Ok(self.data.query_runner.get_stake_locked_until(&pk))
     }
 
     async fn get_locked_time(&self, pk: NodePublicKey) -> RpcResult<u64> {
@@ -159,13 +160,7 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
     }
 
     async fn get_latencies(&self) -> RpcResult<Vec<((NodePublicKey, NodePublicKey), Duration)>> {
-        Ok(self
-            .data
-            .query_runner
-            .get_latencies()
-            .into_iter()
-            .map(|(key, val)| (key, val))
-            .collect())
+        Ok(self.data.query_runner.get_latencies().into_iter().collect())
     }
 
     async fn get_last_epoch_hash(&self) -> RpcResult<[u8; 32]> {
@@ -193,14 +188,17 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
             .run(FetcherRequest::Put { pointer })
             .await
             .map_err(RPCError::from)?;
-        
+
         if let FetcherResponse::Put(res) = res {
             match res {
                 Ok(hash) => Ok(hash),
                 Err(err) => Err(RPCError::custom(err.to_string()).into()),
             }
         } else {
-            Err(RPCError::custom("Put returned a fetch response, this is a bug.".to_string()).into())
+            Err(
+                RPCError::custom("Put returned a fetch response, this is a bug.".to_string())
+                    .into(),
+            )
         }
     }
 

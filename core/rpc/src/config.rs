@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -18,14 +18,18 @@ impl Config {
 
     pub fn default_with_port_and_addr(addr: String, port: u16) -> Self {
         Self {
-            addr: format!("{}:{}", addr, port).parse().expect("RPC Socket Addr to parse"),
+            addr: format!("{}:{}", addr, port)
+                .parse()
+                .expect("RPC Socket Addr to parse"),
             rpc_selection: Default::default(),
         }
     }
 
     pub fn default_with_port(port: u16) -> Self {
         Self {
-            addr: format!("{}:{}", "127.0.0.1", port).parse().expect("RPC Socket Addr to parse"),
+            addr: format!("{}:{}", "127.0.0.1", port)
+                .parse()
+                .expect("RPC Socket Addr to parse"),
             rpc_selection: Default::default(),
         }
     }
@@ -33,7 +37,6 @@ impl Config {
     pub fn port(&self) -> u16 {
         self.addr.port()
     }
-
 
     pub fn addr(&self) -> SocketAddr {
         self.addr
@@ -53,12 +56,13 @@ impl Default for Config {
 pub enum RPCModules {
     Net,
     Eth,
-    Flk
+    Flk,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum RPCSelection {
     None,
+    #[default]
     All,
     Some(Vec<RPCModules>),
 }
@@ -67,15 +71,11 @@ impl RPCSelection {
     pub fn iter(self) -> impl Iterator<Item = RPCModules> {
         match self {
             RPCSelection::None => vec![].into_iter(),
-            RPCSelection::All => vec![RPCModules::Net, RPCModules::Eth, RPCModules::Flk].into_iter(),
+            RPCSelection::All => {
+                vec![RPCModules::Net, RPCModules::Eth, RPCModules::Flk].into_iter()
+            },
             RPCSelection::Some(v) => v.into_iter(),
         }
-    }
-}
-
-impl Default for RPCSelection {
-    fn default() -> Self {
-        RPCSelection::All
     }
 }
 

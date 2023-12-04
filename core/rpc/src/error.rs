@@ -23,7 +23,6 @@ impl std::fmt::Display for SocketErrorWrapper {
     }
 }
 
-
 #[derive(Debug, thiserror::Error)]
 pub enum RPCError {
     #[error("Failed to decode RLP Data {}", .0)]
@@ -37,7 +36,7 @@ pub enum RPCError {
 
     #[error("Unimplemented")]
     Unimplemented,
-    
+
     #[error("RPCError {}", .0)]
     Custom(String),
 }

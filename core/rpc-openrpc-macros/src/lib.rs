@@ -1,17 +1,24 @@
-use proc_macro::TokenStream;
-
 use derive_syn_parse::Parse;
 use itertools::Itertools;
-use proc_macro2::{Ident, TokenTree};
-use proc_macro2::{Span, TokenStream as TokenStream2};
+use proc_macro::TokenStream;
+use proc_macro2::{Ident, Span, TokenStream as TokenStream2, TokenTree};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Comma, Paren};
 use syn::{
-    parse, parse_macro_input, Attribute, GenericArgument, LitStr, PatType, Path, PathArguments,
-    Token, TraitItem, Type,
+    parse,
+    parse_macro_input,
+    Attribute,
+    GenericArgument,
+    LitStr,
+    PatType,
+    Path,
+    PathArguments,
+    Token,
+    TraitItem,
+    Type,
 };
 use unescape::unescape;
 
@@ -53,14 +60,25 @@ pub fn open_rpc(attr: TokenStream, item: TokenStream) -> TokenStream {
             };
 
             inputs.push(quote! {
-                let des = builder.create_content_descriptor::<#ty>(#name, None, #description, #required);
+                let des = builder.create_content_descriptor::<#ty>(
+                        #name,
+                        None,
+                        #description,
+                        #required
+                    );
+
                 inputs.push(des);
             })
         }
         let returns_ty = if let Some(ty) = &method.returns {
             let (ty, required) = extract_type_from_option(ty.clone());
             let name = quote! {#ty}.to_string();
-            quote! {Some(builder.create_content_descriptor::<#ty>(#name, None, None, #required));}
+            quote! {
+                Some(
+                    builder
+                        .create_content_descriptor::<#ty>(#name, None, None, #required)
+                    );
+            }
         } else {
             quote! {None;}
         };
@@ -70,14 +88,16 @@ pub fn open_rpc(attr: TokenStream, item: TokenStream) -> TokenStream {
                 let mut inputs: Vec<lightning_openrpc::ContentDescriptor> = Vec::new();
                 #(#inputs)*
                 let result = #returns_ty
-                builder.add_subscription(#namespace, #name, inputs, result, #doc, #tag, #deprecated);
+                builder
+                    .add_subscription(#namespace, #name, inputs, result, #doc, #tag, #deprecated);
             }
         } else {
             quote! {
                 let mut inputs: Vec<lightning_openrpc::ContentDescriptor> = Vec::new();
                 #(#inputs)*
                 let result = #returns_ty
-                builder.add_method(#namespace, #name, inputs, result, #doc, #tag, #deprecated);
+                builder
+                    .add_method(#namespace, #name, inputs, result, #doc, #tag, #deprecated);
             }
         }
     }).collect::<Vec<_>>();
@@ -185,7 +205,10 @@ fn parse_rpc_method(trait_data: &mut syn::ItemTrait) -> Result<RpcDefinition, sy
                             };
                             match *arg.pat.clone() {
                                 syn::Pat::Ident(name) => {
-                                    Some(get_type(arg).map(|ty| (name.ident.to_string(), ty, description)))
+                                    let result = get_type(arg)
+                                        .map(|ty| (name.ident.to_string(), ty, description));
+
+                                    Some(result)
                                 }
                                 syn::Pat::Wild(wild) => Some(Err(syn::Error::new(
                                     wild.underscore_token.span(),

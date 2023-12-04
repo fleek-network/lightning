@@ -49,7 +49,7 @@ impl<C: Collection> EthApiServer for EthApi<C> {
     ) -> RpcResult<U256> {
         trace!(target: "rpc::eth", ?address, "Serving eth_getTransactionCount");
 
-        if let Some(_) = block {
+        if block.is_some() {
             return Err(RPCError::custom("block number not supported".to_string()).into());
         }
 
@@ -58,7 +58,11 @@ impl<C: Collection> EthApiServer for EthApi<C> {
         ))
     }
 
-    async fn balance(&self, address: EthAddress, block_number: Option<BlockNumber>) -> RpcResult<U256> {
+    async fn balance(
+        &self,
+        address: EthAddress,
+        block_number: Option<BlockNumber>,
+    ) -> RpcResult<U256> {
         trace!(target: "rpc::eth", ?address, ?block_number, "Serving eth_getBalance");
         // Todo(dalton) direct safe conversion from hpfixed => u128
         Ok(self

@@ -1,6 +1,6 @@
-mod flk;
 mod eth;
+mod flk;
 mod net;
-pub use eth::{EthApiServer, EthApiClient};
-pub use flk::{FleekApiServer, FleekApiClient, FleekApiOpenRpc};
-pub use net::{NetApiServer, NetApiClient, NetApiOpenRpc};
+pub use eth::{EthApiClient, EthApiServer};
+pub use flk::{FleekApiClient, FleekApiOpenRpc, FleekApiServer};
+pub use net::{NetApiClient, NetApiOpenRpc, NetApiServer};

@@ -1,6 +1,5 @@
 use jsonrpsee::core::RpcResult;
 use jsonrpsee::proc_macros::rpc;
-
 use lightning_openrpc_macros::open_rpc;
 
 #[open_rpc(namespace = "net", tag = "1.0.0")]

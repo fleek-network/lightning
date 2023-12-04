@@ -1,7 +1,8 @@
+use std::fs::File;
+
+use clap::Parser;
 use lightning_openrpc::Project;
 use lightning_rpc::api::{FleekApiOpenRpc, NetApiOpenRpc};
-use std::fs::File;
-use clap::Parser;
 
 const VERSION: &str = "1.0.0";
 const TITLE: &str = "Fleek Lightning";
@@ -16,16 +17,14 @@ const LICENSE_URL: &str = "";
 #[command(about, version)]
 struct Args {
     /// If present the path to write the generated spec to
-    /// 
+    ///
     /// '/path/to/spec/'
     #[arg(short, long)]
-    write_to: Option<std::path::PathBuf>
+    write_to: Option<std::path::PathBuf>,
 }
 
-fn main(){
-    let Args {
-        write_to
-    } = Args::parse();
+fn main() {
+    let Args { write_to } = Args::parse();
 
     let mut project = Project::new(
         VERSION,

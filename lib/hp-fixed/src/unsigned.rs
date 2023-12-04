@@ -7,7 +7,7 @@ use num_traits::{CheckedDiv, FromPrimitive, ToPrimitive, Zero};
 use primitive_types::U256 as EthersU256;
 use ruint::aliases::U256;
 use ruint::ToUintError;
-use schemars::{JsonSchema, schema_for_value};
+use schemars::{schema_for_value, JsonSchema};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
@@ -60,9 +60,7 @@ impl JsonSchema for HpUfixed<6> {
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let ui = BigUint::new(vec![1, 1]);
 
-        schema_for_value!(
-            Self(ui)
-        ).schema.into()
+        schema_for_value!(Self(ui)).schema.into()
     }
 }
 
@@ -78,9 +76,7 @@ impl JsonSchema for HpUfixed<18> {
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let ui = BigUint::new(vec![1, 1]);
 
-        schema_for_value!(
-            Self(ui)
-        ).schema.into()
+        schema_for_value!(Self(ui)).schema.into()
     }
 }
 
@@ -560,7 +556,7 @@ mod tests {
             std::u16::MAX as u32 + 1
         );
 
-        let small_by_2 = &small / &200_u64.try_into().unwrap();
+        let small_by_2 = &small / &200_u64.into();
         let small_float: f64 = small_by_2.try_into().unwrap();
         // small_float = 65536(small) / 200   = 327.68
         assert_eq!(327.68, small_float);

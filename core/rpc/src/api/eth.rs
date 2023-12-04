@@ -1,17 +1,18 @@
 use ethers::types::{
     Address,
+    Block,
+    BlockNumber,
     Bytes,
     TransactionReceipt,
     TransactionRequest,
     H256,
     U256,
-    BlockNumber,
-    Block,
 };
 use fleek_crypto::EthAddress;
 use jsonrpsee::core::RpcResult;
 use jsonrpsee::proc_macros::rpc;
-use crate::api_types::{StateOverride, CallRequest};
+
+use crate::api_types::{CallRequest, StateOverride};
 
 #[rpc(client, server, namespace = "eth")]
 pub trait EthApi {
@@ -19,10 +20,18 @@ pub trait EthApi {
     async fn block_number(&self) -> RpcResult<U256>;
 
     #[method(name = "getTransactionCount")]
-    async fn transaction_count(&self, address: EthAddress, block_number: Option<BlockNumber>) -> RpcResult<U256>;
+    async fn transaction_count(
+        &self,
+        address: EthAddress,
+        block_number: Option<BlockNumber>,
+    ) -> RpcResult<U256>;
 
     #[method(name = "getBalance")]
-    async fn balance(&self, address: EthAddress, block_number: Option<BlockNumber>) -> RpcResult<U256>;
+    async fn balance(
+        &self,
+        address: EthAddress,
+        block_number: Option<BlockNumber>,
+    ) -> RpcResult<U256>;
 
     #[method(name = "protocolVersion")]
     async fn protocol_version(&self) -> RpcResult<u64>;
@@ -40,7 +49,11 @@ pub trait EthApi {
     async fn accounts(&self) -> RpcResult<Vec<Address>>;
 
     #[method(name = "getBlockByNumber")]
-    async fn block_by_number(&self, block_number: BlockNumber, hydrated: bool) -> RpcResult<Option<H256>>;
+    async fn block_by_number(
+        &self,
+        block_number: BlockNumber,
+        hydrated: bool,
+    ) -> RpcResult<Option<H256>>;
 
     #[method(name = "getBlockByHash")]
     async fn block_by_hash(&self, hash: H256, hydrated: bool) -> RpcResult<Option<Block<H256>>>;
@@ -101,7 +114,7 @@ pub trait EthApi {
         &self,
         tx: TransactionRequest,
         block_number: Option<BlockNumber>,
-        state_overrides: Option<StateOverride>
+        state_overrides: Option<StateOverride>,
     ) -> RpcResult<Bytes>;
 
     #[method(name = "sign")]

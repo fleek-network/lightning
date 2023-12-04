@@ -4,5 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Hash)]
 pub struct DeliveryAcknowledgmentBatch;
 
-#[derive(Serialize, Deserialize, Debug, Hash, Clone, Default, Eq, PartialEq, schemars::JsonSchema)]
+#[derive(
+    Serialize, Deserialize, Debug, Hash, Clone, Default, Eq, PartialEq, schemars::JsonSchema,
+)]
 pub struct DeliveryAcknowledgment;

@@ -26,6 +26,7 @@ pub struct Project {
 }
 
 impl Project {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         version: &str,
         title: &str,
@@ -357,6 +358,7 @@ impl RpcModuleDocBuilder {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn add_method(
         &mut self,
         namespace: &str,
@@ -371,6 +373,7 @@ impl RpcModuleDocBuilder {
         self.add_method_internal(namespace, name, params, result, doc, tags, deprecated)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn add_subscription(
         &mut self,
         namespace: &str,
@@ -387,6 +390,7 @@ impl RpcModuleDocBuilder {
         self.add_method_internal(namespace, name, params, result, doc, tags, deprecated)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn add_method_internal(
         &mut self,
         namespace: &str,

@@ -119,12 +119,8 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
     }
 
     fn is_running(&self) -> bool {
-        // should be safe because no one should be holding this lock for long
-        if let Some(_) = *self.handle.blocking_lock() {
-            true
-        } else {
-            false
-        }
+        // Handle is removed from self when we shutdown server
+        self.handle.blocking_lock().is_some()
     }
 }
 
@@ -141,11 +137,11 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
             query_runner,
             mempool_socket: mempool,
             fetcher_socket: fetcher.get_socket(),
-            _blockstore:  blockstore,
+            _blockstore: blockstore,
             archive_socket,
         });
 
-        let module = Self::create_modules_from_config(&config, data.clone())?;
+        let module = Self::create_modules_from_config(&config, data)?;
 
         Ok(Self {
             config,

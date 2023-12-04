@@ -103,7 +103,7 @@ impl Cli {
                 Err(_) => {
                     if self.args.verbose < 3 {
                         // Build the filter, explicitly ignoring noisy dependencies
-                        vec![
+                        [
                             match self.args.verbose {
                                 0 => "info",
                                 1 => "debug",

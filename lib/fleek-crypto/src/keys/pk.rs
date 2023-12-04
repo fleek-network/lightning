@@ -219,9 +219,7 @@ impl schemars::JsonSchema for AccountOwnerSignature {
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let sig = Self::try_from([0u8; 65]).expect("valid account owner signature for example");
 
-        schemars::schema_for_value!(
-            sig
-        ).schema.into()
+        schemars::schema_for_value!(sig).schema.into()
     }
 }
 
@@ -237,9 +235,7 @@ impl schemars::JsonSchema for NodeSignature {
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let sig = Self::try_from([0u8; 64]).expect("valid node signature for example");
 
-        schemars::schema_for_value!(
-            sig
-        ).schema.into()
+        schemars::schema_for_value!(sig).schema.into()
     }
 }
 
@@ -255,9 +251,7 @@ impl schemars::JsonSchema for ConsensusSignature {
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let sig = Self::try_from([0u8; 48]).expect("valid consensus signature for example");
 
-        schemars::schema_for_value!(
-            sig
-        ).schema.into()
+        schemars::schema_for_value!(sig).schema.into()
     }
 }
 
@@ -271,11 +265,10 @@ impl schemars::JsonSchema for NodePublicKey {
     }
 
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        let key = NodePublicKey::from_str("F5tV4PLSzx1Lt4mYBe13aYQ8hsLMTCfjgY2pLr82AumH").expect("valid node public key for example");
+        let key = NodePublicKey::from_str("F5tV4PLSzx1Lt4mYBe13aYQ8hsLMTCfjgY2pLr82AumH")
+            .expect("valid node public key for example");
 
-        schemars::schema_for_value!(
-            key
-        ).schema.into()
+        schemars::schema_for_value!(key).schema.into()
     }
 }
 
@@ -291,9 +284,6 @@ impl schemars::JsonSchema for ConsensusPublicKey {
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let key = ConsensusPublicKey::from_str("u76G7q22Qc5nRC5Fi6dzbNE7FQxqRKEtTS9qjDftWFwhBKmoozGLv8wFiFmGnYDFMEKyYxozWRdM3wgjs1Na3fvxDARxi9CSNJUZJfPXC2WUu3uLnUw96jPBRp7rtHEzS5H").expect("valid consensus public key for example");
 
-        schemars::schema_for_value!(
-            key
-        ).schema.into()
+        schemars::schema_for_value!(key).schema.into()
     }
 }
-

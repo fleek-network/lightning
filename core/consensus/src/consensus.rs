@@ -177,11 +177,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
             // TODO(dalton) This check should be done at application before adding it to state. So
             // it should never not be Ok so even an unwrap should be safe here
             if let (Ok(address), Ok(consensus_key), Ok(public_key)) = (
-                Multiaddr::try_from(format!(
-                    "/ip4/{}/udp/{}",
-                    node.domain.to_string(),
-                    node.ports.primary
-                )),
+                Multiaddr::try_from(format!("/ip4/{}/udp/{}", node.domain, node.ports.primary)),
                 PublicKey::from_bytes(&node.consensus_key.0),
                 NetworkPublicKey::from_bytes(&node.public_key.0),
             ) {

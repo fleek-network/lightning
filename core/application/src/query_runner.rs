@@ -159,7 +159,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     fn get_rep_measurements(&self, node: &NodeIndex) -> Vec<ReportedReputationMeasurements> {
         self.inner
-            .run(|ctx| self.rep_measurements.get(ctx).get(node).unwrap_or(vec![]))
+            .run(|ctx| self.rep_measurements.get(ctx).get(node).unwrap_or_default())
     }
 
     fn get_reputation(&self, node: &NodeIndex) -> Option<u8> {

@@ -7,5 +7,5 @@ use serde::{Deserialize, Serialize};
 /// slashed
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash, Eq, PartialEq, schemars::JsonSchema)]
 pub enum ProofOfMisbehavior {
-    Placeholder
+    Placeholder,
 }
