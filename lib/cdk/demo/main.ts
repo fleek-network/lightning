@@ -6,14 +6,54 @@ document.getElementById("start")!.onclick = async () => {
   await startSession();
 };
 
-// State variables.
+// Temporary internal hash for big buck bunny
+const bbb_blake3 = new Uint8Array([
+  16,
+  101,
+  178,
+  253,
+  130,
+  145,
+  238,
+  45,
+  55,
+  180,
+  144,
+  250,
+  71,
+  121,
+  27,
+  31,
+  201,
+  144,
+  67,
+  224,
+  179,
+  36,
+  52,
+  86,
+  242,
+  33,
+  164,
+  55,
+  27,
+  140,
+  43,
+  209,
+]);
 
+// TODO: once ipfs/unixfs content is properly supported, we can use this again
+// const bbb_cid = new Uint8Array([
+//     1, 112,  18,  32,  40, 237,  86,  26, 103, 105, 148, 233,
+//    41, 174, 225, 186, 191,  54,  94,  88,  74,  99, 112,  43,
+//   212, 151,  49,   8, 123,  58,  25, 118, 155,  32, 104, 178
+// ]);
+
+// State variables.
 const queue: Uint8Array[] = []; // Because MediaStream sucks.
-let didReceiveFirstMessage = false;
 let sourceBuffer: SourceBuffer | undefined;
-let segCounter = 0;
 let bytesRead = 0;
-let getNextSent: undefined | number;
+let receivedBlockCount = false;
 
 // --------------------------------------------
 // WebRTC
@@ -46,16 +86,31 @@ dataChan.onopen = () => {
   // Send a handshake.
   dataChan.send(schema.HandshakeRequest.encode({
     tag: schema.HandshakeRequest.Tag.Handshake,
-    service: 1 as schema.ServiceId,
+    service: 0 as schema.ServiceId,
     pk: new Uint8Array(96) as schema.ClientPublicKey,
     pop: new Uint8Array(48) as schema.ClientSignature,
   }));
+
+  console.log("sent handshake");
+
+  const buffer = new Uint8Array(33);
+  buffer[0] = 0; // Blake3 Origin
+  buffer.set(bbb_blake3, 1); // UID
+
+  // Send the request
+  dataChan.send(schema.Request.encode({
+    tag: schema.Request.Tag.ServicePayload,
+    bytes: buffer,
+  }));
+
+  console.log("sent request");
 };
 
 dataChan.onmessage = (e: MessageEvent) => {
-  if (!didReceiveFirstMessage) {
-    didReceiveFirstMessage = true;
-    getNext();
+  // handle first frame
+  if (!receivedBlockCount) {
+    console.log("got block count");
+    receivedBlockCount = true;
     return;
   }
 
@@ -67,44 +122,17 @@ dataChan.onmessage = (e: MessageEvent) => {
       decoded.tag ===
         schema.Response.Tag.ChunkedServicePayload)
   ) {
-    if (bytesRead == 0) {
-      console.log(performance.measure("first-byte", {
-        start: getNextSent,
-        end: performance.now(),
-      }));
-    }
-
     bytesRead += decoded.bytes.length;
     appendBuffer(decoded.bytes);
-
-    if (bytesRead == 256 * 1024) {
-      console.log(performance.measure("last-byte", {
-        start: getNextSent,
-        end: performance.now(),
-      }));
-      bytesRead = 0;
-      getNext();
-    }
   }
 };
 
 function appendBuffer(buffer: Uint8Array) {
-  if (sourceBuffer!.updating || queue.length != 0) {
+  if (queue.length != 0 || sourceBuffer!.updating) {
     queue.push(buffer);
-    return;
+  } else {
+    sourceBuffer!.appendBuffer(buffer);
   }
-  sourceBuffer!.appendBuffer(buffer);
-}
-
-function getNext() {
-  const buffer = new ArrayBuffer(4);
-  const view = new DataView(buffer);
-  view.setUint32(0, segCounter++);
-  getNextSent = performance.now();
-  dataChan.send(schema.Request.encode({
-    tag: schema.Request.Tag.ServicePayload,
-    bytes: new Uint8Array(buffer),
-  }));
 }
 
 pc.oniceconnectionstatechange = () => {
@@ -144,7 +172,7 @@ const startSession = async () => {
     return alert("Session Description must not be empty");
   }
 
-  console.log("got sd: ", sd);
+  console.log("got sdp response: ", sd);
 
   try {
     pc.setRemoteDescription(new RTCSessionDescription(sd));
@@ -155,7 +183,6 @@ const startSession = async () => {
 
 // --------------------------------------------
 // MediaSource
-
 // Need to be specific for Blink regarding codecs
 // ./mp4info frag_bunny.mp4 | grep Codec
 const mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
