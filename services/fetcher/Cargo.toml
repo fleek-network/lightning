@@ -1,5 +1,5 @@
 [package]
-name = "fleek-service-cdn"
+name = "fleek-service-fetcher"
 version = "0.0.1"
 edition.workspace = true
 
