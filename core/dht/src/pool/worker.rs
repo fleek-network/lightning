@@ -12,7 +12,7 @@ use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
 
 use crate::network;
-use crate::network::{Find, FindResponse, Message, UnreliableTransport};
+use crate::network::{Find, FindResponse, Message, Store, UnreliableTransport};
 use crate::pool::lookup::{Context, LookUp};
 use crate::pool::{ContactRespond, ValueRespond};
 use crate::table::worker::TableKey;
@@ -66,6 +66,7 @@ where
     T: Table,
     U: UnreliableTransport,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         us: NodeIndex,
         looker: L,
@@ -117,6 +118,10 @@ where
         let id = message.id();
         let token = message.token();
         let ty = message.ty();
+
+        // Todo: Handle or log.
+        let _ = self.event_queue.try_send(Event::Discovery { from });
+
         match ty {
             network::PING_TYPE => {
                 self.pong(id, token, from);
@@ -231,7 +236,7 @@ where
                     for index in nodes {
                         // Todo: let's avoid creating a new message each time.
                         let _ = socket
-                            .send(network::store(id, token, us, value.clone()), index)
+                            .send(network::store(id, token, us, key, value.clone()), index)
                             .await;
                     }
                 },
@@ -321,8 +326,15 @@ where
     }
 
     fn handle_store(&self, bytes: Bytes) {
-        if let Err(e) = self.table.try_local_put(bytes) {
-            tracing::error!("unable to store data: {e:?}");
+        match Store::try_from(bytes) {
+            Ok(store) => {
+                if let Err(e) = self.table.try_local_put(store.key, store.value) {
+                    tracing::error!("unable to store data: {e:?}");
+                }
+            },
+            Err(e) => {
+                tracing::trace!("received an invalid STORE message: {e:?}");
+            },
         }
     }
 

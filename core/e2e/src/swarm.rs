@@ -204,7 +204,6 @@ pub struct SwarmBuilder {
     epoch_time: Option<u64>,
     port_assigner: Option<PortAssigner>,
     syncronizer_delta: Option<Duration>,
-    bootstrappers: Option<Vec<NodePublicKey>>,
     archiver: bool,
     use_persistence: bool,
     committee_size: Option<u64>,
@@ -355,7 +354,7 @@ impl SwarmBuilder {
 
             let is_bootstrap_node = self.add_bootstrap_node && bootstrappers.is_none();
             if is_bootstrap_node {
-                bootstrappers.replace(vec![node_pk.clone()]);
+                bootstrappers.replace(vec![node_pk]);
             }
 
             let is_committee = (index as u64) < genesis.committee_size;

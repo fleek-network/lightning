@@ -21,8 +21,8 @@ pub fn pong(id: u32, token: u32, from: NodeIndex) -> Message {
     Message::new(id, token, from, PONG_TYPE, Bytes::new())
 }
 
-pub fn store(id: u32, token: u32, from: NodeIndex, value: Bytes) -> Message {
-    let bytes = Bytes::from(Store { value });
+pub fn store(id: u32, token: u32, from: NodeIndex, key: TableKey, value: Bytes) -> Message {
+    let bytes = Bytes::from(Store { key, value });
     Message::new(id, token, from, STORE_TYPE, bytes)
 }
 
@@ -75,18 +75,32 @@ pub fn _find_response_in_parts(
 }
 
 pub struct Store {
+    // Todo: if we hash this on the receiving side,
+    // then we don't have to send the key over the wire.
+    pub key: TableKey,
     pub value: Bytes,
 }
 
 impl From<Store> for Bytes {
     fn from(value: Store) -> Self {
-        value.value
+        let mut bytes = BytesMut::with_capacity(value.key.len() + value.value.len());
+        bytes.put(value.key.as_slice());
+        bytes.put(value.value);
+        bytes.freeze()
     }
 }
 
-impl From<Bytes> for Store {
-    fn from(value: Bytes) -> Self {
-        Self { value }
+impl TryFrom<Bytes> for Store {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Bytes) -> Result<Self> {
+        // Todo: add const for this magic number.
+        if value.len() <= 32 {
+            anyhow::bail!("missing data");
+        }
+        let key: TableKey = value.slice(0..32).as_ref().try_into()?;
+        let value = value.slice(32..);
+        Ok(Self { key, value })
     }
 }
 

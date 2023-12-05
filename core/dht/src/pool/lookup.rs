@@ -283,13 +283,13 @@ where
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 enum Status {
     Initial,
     Responded,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LookupNode {
     key: NodePublicKey,
     index: NodeIndex,

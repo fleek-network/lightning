@@ -74,9 +74,9 @@ pub trait Table: Clone + Send + Sync + 'static {
 
     async fn closest_contacts(&self, key: TableKey) -> Result<Vec<NodeIndex>>;
 
-    fn try_local_put(&self, value: Bytes) -> Result<()>;
+    fn try_local_put(&self, key: TableKey, value: Bytes) -> Result<()>;
 
-    fn bootstrap(&self, bootstrap_nodes: Vec<NodeIndex>) -> Result<()>;
+    fn bootstrap(&self, bootstrap_nodes: Vec<NodePublicKey>) -> Result<()>;
 }
 
 #[derive(Clone)]
@@ -97,7 +97,7 @@ impl Table for DhtTable {
         if self
             .request_queue
             .send(Request::Get {
-                key: rand::random(),
+                key,
                 local: false,
                 respond: respond_tx,
             })
@@ -131,7 +131,7 @@ impl Table for DhtTable {
         if self
             .request_queue
             .send(Request::Get {
-                key: rand::random(),
+                key,
                 local: true,
                 respond: respond_tx,
             })
@@ -160,17 +160,18 @@ impl Table for DhtTable {
         respond_rx.await.map_err(Into::into)
     }
 
-    fn try_local_put(&self, value: Bytes) -> Result<()> {
+    // Todo: consider not sending the key. See Store in network module.
+    fn try_local_put(&self, key: TableKey, value: Bytes) -> Result<()> {
         self.request_queue
             .try_send(Request::Put {
-                key: rand::random(),
+                key,
                 value,
                 local: true,
             })
             .map_err(Into::into)
     }
 
-    fn bootstrap(&self, bootstrappers: Vec<NodeIndex>) -> Result<()> {
+    fn bootstrap(&self, bootstrappers: Vec<NodePublicKey>) -> Result<()> {
         self.request_queue
             .try_send(Request::Bootstrap {
                 bootstrap_nodes: bootstrappers,

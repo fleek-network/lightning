@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use bytes::Bytes;
+use fleek_crypto::NodePublicKey;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use lightning_interfaces::infu_collection::{c, Collection};
@@ -100,9 +101,9 @@ where
         }
     }
 
-    fn bootstrap(&mut self, bootstrap_nodes: Vec<NodeIndex>) {
+    fn bootstrap(&mut self, bootstrap_nodes: Vec<NodePublicKey>) {
         if matches!(self.bootstrap_state, BootstrapState::Idle) {
-            self.add_contacts(bootstrap_nodes);
+            self.add_contacts_with_pk(bootstrap_nodes);
 
             // Todo: Handle error.
             // Do self lookup.
@@ -201,6 +202,20 @@ where
         }
     }
 
+    fn add_contacts_with_pk(&mut self, contacts: Vec<NodePublicKey>) {
+        for key in contacts {
+            if let Some(index) = self.sync_query.pubkey_to_index(key) {
+                let _ = self.manager.add_node(NodeInfo {
+                    // Todo: Remove this field.
+                    address: "0.0.0.0:0".parse().unwrap(),
+                    index,
+                    key,
+                    last_responded: None,
+                });
+            }
+        }
+    }
+
     fn put(&mut self, key: TableKey, value: Bytes) {
         if let Err(e) = self.pool.store(key, value) {
             tracing::error!("`put` failed: {e:?}");
@@ -247,7 +262,9 @@ where
                     let Some(event) = next else {
                         break
                     };
-                    self.manager.handle_event(event);
+                    if let Event::Discovery { from } = event {
+                        self.add_contacts(vec![from]);
+                    }
                 }
                 Some(result) = self.bootstrap_tasks.next() => {
                     match result {
@@ -285,7 +302,7 @@ pub enum Request {
         respond: oneshot::Sender<Vec<NodeIndex>>,
     },
     Bootstrap {
-        bootstrap_nodes: Vec<NodeIndex>,
+        bootstrap_nodes: Vec<NodePublicKey>,
     },
 }
 
