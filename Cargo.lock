@@ -4911,6 +4911,7 @@ dependencies = [
  "affair 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "anyhow",
  "async-trait",
+ "axum",
  "bincode",
  "bytes",
  "der 0.7.8",
