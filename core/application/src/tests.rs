@@ -2071,3 +2071,111 @@ async fn test_deposit_usdc_works_properly() {
         intial_balance + deposit_amount
     );
 }
+
+#[tokio::test]
+async fn test_opt_in_reverts_account_key() {
+    // Create a genesis committee and seed the application state with it.
+    let committee_size = 4;
+    let (committee, _keystore) = create_genesis_committee(committee_size);
+    let (update_socket, _query_runner) = test_init_app(committee);
+
+    // Account Secret Key
+    let secret_key = AccountOwnerSecretKey::generate();
+    let opt_in = UpdateMethod::OptIn {};
+    let update = prepare_update_request_account(opt_in, &secret_key, 1);
+    expect_tx_revert!(update, &update_socket, ExecutionError::OnlyNode);
+}
+
+#[tokio::test]
+async fn test_opt_in_reverts_node_does_not_exist() {
+    // Create a genesis committee and seed the application state with it.
+    let committee_size = 4;
+    let (committee, _keystore) = create_genesis_committee(committee_size);
+    let (update_socket, _query_runner) = test_init_app(committee);
+
+    // Unknown Node Key (without Stake)
+    let node_secret_key = NodeSecretKey::generate();
+    let opt_in = UpdateMethod::OptIn {};
+    let update = prepare_update_request_node(opt_in, &node_secret_key, 1);
+    expect_tx_revert!(update, &update_socket, ExecutionError::NodeDoesNotExist);
+}
+
+#[tokio::test]
+async fn test_opt_in_reverts_insufficient_stake() {
+    // Create a genesis committee and seed the application state with it.
+    let committee_size = 4;
+    let (committee, _keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    // New Node key
+    let node_secret_key = NodeSecretKey::generate();
+
+    // Stake less than the minimum required amount.
+    let minimum_stake_amount: HpUfixed<18> = query_runner.get_staking_amount().into();
+    let less_than_minimum_skate_amount: HpUfixed<18> =
+        minimum_stake_amount / HpUfixed::<18>::from(2u16);
+    deposit_and_stake!(
+        &update_socket,
+        &owner_secret_key,
+        1,
+        &less_than_minimum_skate_amount,
+        &node_secret_key.to_pk(),
+        [0; 96].into()
+    );
+
+    let opt_in = UpdateMethod::OptIn {};
+    let update = prepare_update_request_node(opt_in, &node_secret_key, 1);
+    expect_tx_revert!(update, &update_socket, ExecutionError::InsufficientStake);
+    assert_ne!(
+        query_runner
+            .get_node_info(&node_secret_key.to_pk())
+            .unwrap()
+            .participation,
+        Participation::OptedIn
+    );
+}
+
+#[tokio::test]
+async fn test_opt_in_works() {
+    // Create a genesis committee and seed the application state with it.
+    let committee_size = 4;
+    let (committee, _keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    // New Node
+    let node_secret_key = NodeSecretKey::generate();
+    let node_pub_key = node_secret_key.to_pk();
+
+    // Stake less than the minimum required amount.
+    let minimum_stake_amount: HpUfixed<18> = query_runner.get_staking_amount().into();
+    deposit_and_stake!(
+        &update_socket,
+        &owner_secret_key,
+        1,
+        &minimum_stake_amount,
+        &node_pub_key,
+        [0; 96].into()
+    );
+
+    assert_ne!(
+        query_runner
+            .get_node_info(&node_pub_key)
+            .unwrap()
+            .participation,
+        Participation::OptedIn
+    );
+
+    let opt_in = UpdateMethod::OptIn {};
+    let update = prepare_update_request_node(opt_in, &node_secret_key, 1);
+    expect_tx_success!(update, &update_socket);
+
+    assert_eq!(
+        query_runner
+            .get_node_info(&node_pub_key)
+            .unwrap()
+            .participation,
+        Participation::OptedIn
+    );
+}
