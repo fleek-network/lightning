@@ -1,6 +1,6 @@
 chain_id = 59330
-epoch_start = 1701809048508
-epoch_time = 1800000 #3600000
+epoch_start = 1701815624539
+epoch_time = 3600000
 committee_size = 6
 min_stake = 1000
 eligibility_time = 1
