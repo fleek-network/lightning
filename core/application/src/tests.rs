@@ -617,6 +617,26 @@ fn prepare_update_request_node(
     }
 }
 
+/// Prepare an `UpdateRequest` from an `UpdateMethod` signed with `ConsensusSecretKey`.
+/// Passing the private key around like this should only be done for testing.
+fn prepare_update_request_consensus(
+    method: UpdateMethod,
+    secret_key: &ConsensusSecretKey,
+    nonce: u64,
+) -> UpdateRequest {
+    let payload = UpdatePayload {
+        sender: secret_key.to_pk().into(),
+        nonce,
+        method,
+    };
+    let digest = payload.to_digest();
+    let signature = secret_key.sign(&digest);
+    UpdateRequest {
+        signature: signature.into(),
+        payload,
+    }
+}
+
 /// Prepare an `UpdateRequest` from an `UpdateMethod` signed with `AccountOwnerSecretKey`.
 /// Passing the private key around like this should only be done for testing.
 fn prepare_update_request_account(
@@ -1346,23 +1366,6 @@ async fn test_pod_without_proof() {
 }
 
 #[tokio::test]
-async fn test_revert_self_transfer() {
-    let (update_socket, query_runner) = init_app(None);
-
-    let owner_secret_key = AccountOwnerSecretKey::generate();
-    let owner: EthAddress = owner_secret_key.to_pk().into();
-
-    let balance = 1_000u64.into();
-
-    deposit!(&update_socket, &owner_secret_key, 1, &balance);
-    assert_eq!(query_runner.get_flk_balance(&owner), balance);
-
-    // Check that trying to transfer funds to yourself reverts
-    let update = prepare_transfer_request(&10_u64.into(), &owner, &owner_secret_key, 2);
-    expect_tx_revert!(update, &update_socket, ExecutionError::CantSendToYourself);
-}
-
-#[tokio::test]
 async fn test_is_valid_node() {
     let (update_socket, query_runner) = init_app(None);
 
@@ -1837,4 +1840,118 @@ async fn test_supply_across_epoch() {
             assert_eq!(total_supply, supply_year_start);
         }
     }
+}
+
+#[tokio::test]
+async fn test_revert_self_transfer() {
+    let (update_socket, query_runner) = init_app(None);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner: EthAddress = owner_secret_key.to_pk().into();
+
+    let balance = 1_000u64.into();
+
+    deposit!(&update_socket, &owner_secret_key, 1, &balance);
+    assert_eq!(query_runner.get_flk_balance(&owner), balance);
+
+    // Check that trying to transfer funds to yourself reverts
+    let update = prepare_transfer_request(&10_u64.into(), &owner, &owner_secret_key, 2);
+    expect_tx_revert!(update, &update_socket, ExecutionError::CantSendToYourself);
+
+    // Assure that Flk balance has not changed
+    assert_eq!(query_runner.get_flk_balance(&owner), balance);
+}
+
+#[tokio::test]
+async fn test_revert_transfer_not_account_key() {
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+    let recipient: EthAddress = AccountOwnerSecretKey::generate().to_pk().into();
+
+    let amount: HpUfixed<18> = 10_u64.into();
+    let zero_balance = 0u64.into();
+
+    assert_eq!(query_runner.get_flk_balance(&recipient), zero_balance);
+
+    let transfer = UpdateMethod::Transfer {
+        amount: amount.clone(),
+        token: Tokens::FLK,
+        to: recipient,
+    };
+
+    // Check that trying to transfer funds with Node Key reverts
+    let node_secret_key = &keystore[0].node_secret_key;
+    let update_node_key = prepare_update_request_node(transfer.clone(), node_secret_key, 1);
+    expect_tx_revert!(
+        update_node_key,
+        &update_socket,
+        ExecutionError::OnlyAccountOwner
+    );
+
+    // Check that trying to transfer funds with Consensus Key reverts
+    let consensus_secret_key = &keystore[0]._consensus_secret_key;
+    let update_node_key = prepare_update_request_consensus(transfer, consensus_secret_key, 2);
+    expect_tx_revert!(
+        update_node_key,
+        &update_socket,
+        ExecutionError::OnlyAccountOwner
+    );
+
+    // Assure that Flk balance has not changed
+    assert_eq!(query_runner.get_flk_balance(&recipient), zero_balance);
+}
+
+#[tokio::test]
+async fn test_revert_transfer_when_insufficient_balance() {
+    let (update_socket, query_runner) = init_app(None);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let recipient: EthAddress = AccountOwnerSecretKey::generate().to_pk().into();
+
+    let balance = 10_u64.into();
+    let zero_balance = 0u64.into();
+
+    deposit!(&update_socket, &owner_secret_key, 1, &balance);
+    assert_eq!(query_runner.get_flk_balance(&recipient), zero_balance);
+
+    // Check that trying to transfer insufficient funds reverts
+    let update = prepare_transfer_request(&11u64.into(), &recipient, &owner_secret_key, 2);
+    expect_tx_revert!(update, &update_socket, ExecutionError::InsufficientBalance);
+
+    // Assure that Flk balance has not changed
+    assert_eq!(query_runner.get_flk_balance(&recipient), zero_balance);
+}
+
+#[tokio::test]
+async fn test_transfer_works_properly() {
+    let (update_socket, query_runner) = init_app(None);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner: EthAddress = owner_secret_key.to_pk().into();
+    let recipient: EthAddress = AccountOwnerSecretKey::generate().to_pk().into();
+
+    let balance = 1_000u64.into();
+    let zero_balance = 0u64.into();
+    let transfer_amount: HpUfixed<18> = 10_u64.into();
+
+    deposit!(&update_socket, &owner_secret_key, 1, &balance);
+
+    assert_eq!(query_runner.get_flk_balance(&owner), balance);
+    assert_eq!(query_runner.get_flk_balance(&recipient), zero_balance);
+
+    // Check that trying to transfer funds to yourself reverts
+    let update = prepare_transfer_request(&10_u64.into(), &recipient, &owner_secret_key, 2);
+    expect_tx_success!(update, &update_socket);
+
+    // Assure that Flk balance has decreased for sender
+    assert_eq!(
+        query_runner.get_flk_balance(&owner),
+        balance - transfer_amount.clone()
+    );
+    // Assure that Flk balance has increased for recipient
+    assert_eq!(
+        query_runner.get_flk_balance(&recipient),
+        zero_balance + transfer_amount
+    );
 }
