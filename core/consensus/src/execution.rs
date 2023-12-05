@@ -101,19 +101,9 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
     pub(crate) async fn submit_batch(&self, payload: Vec<Transaction>, digest: Digest) -> bool {
         let mut change_epoch = false;
 
-        let mut executed_txns = self.executed_txns.lock().await;
         let transactions = payload
             .into_iter()
             .filter_map(|txn| TransactionRequest::try_from(txn).ok())
-            .filter(|txn| {
-                let hash = txn.hash();
-                if executed_txns.contains(&hash) {
-                    false
-                } else {
-                    executed_txns.insert(hash);
-                    true
-                }
-            })
             .collect::<Vec<_>>();
 
         if transactions.is_empty() {
@@ -136,7 +126,6 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
         info!("Consensus submitted new block to application");
 
         if results.change_epoch {
-            //executed_txns.clear();
             change_epoch = true;
         }
 
@@ -177,8 +166,19 @@ impl<Q: SyncQueryRunnerInterface> ExecutionState for Execution<Q> {
                 let mut batch_payload =
                     Vec::with_capacity(batches.iter().fold(0, |acc, batch| acc + batch.size()));
 
-                for mut batch in batches {
-                    batch_payload.extend(batch.transactions_mut().to_owned());
+                let mut executed_txns = self.executed_txns.lock().await;
+                for batch in batches {
+                    for tx in batch.transactions() {
+                        let hash = fleek_blake3::hash(tx).as_bytes().to_owned();
+                        if !executed_txns.contains(&hash) {
+                            batch_payload.push(tx.to_owned());
+                        }
+                        executed_txns.insert(hash);
+                    }
+                }
+
+                if batch_payload.is_empty() {
+                    continue;
                 }
 
                 // We have batches in the payload send them over broadcast along with an attestion
@@ -191,6 +191,9 @@ impl<Q: SyncQueryRunnerInterface> ExecutionState for Execution<Q> {
                 };
 
                 let epoch_changed = self.submit_batch(batch_payload, parcel.to_digest()).await;
+                if epoch_changed {
+                    executed_txns.clear();
+                }
 
                 if let Err(e) = self.tx_narwhal_batches.send((parcel, epoch_changed)).await {
                     // This shouldnt ever happen. But if it does there is no critical tasks
