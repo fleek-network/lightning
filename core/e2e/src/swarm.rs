@@ -95,6 +95,28 @@ impl Swarm {
         Ok(())
     }
 
+    pub async fn launch_bootstrap_nodes(&self) -> anyhow::Result<()> {
+        try_join_all(
+            self.nodes
+                .values()
+                .filter(|node| node.is_bootstrap_node())
+                .map(|node| node.start()),
+        )
+        .await?;
+        Ok(())
+    }
+
+    pub async fn launch_non_bootstrap_nodes(&self) -> anyhow::Result<()> {
+        try_join_all(
+            self.nodes
+                .values()
+                .filter(|node| !node.is_bootstrap_node())
+                .map(|node| node.start()),
+        )
+        .await?;
+        Ok(())
+    }
+
     pub fn shutdown(mut self) {
         self.shutdown_internal();
     }
@@ -132,9 +154,10 @@ impl Swarm {
             .collect()
     }
 
-    pub fn get_dht_sockets(&self) -> Vec<Option<Dht<FinalTypes>>> {
+    pub fn get_dht_handle(&self) -> Vec<Option<Dht<FinalTypes>>> {
         self.nodes
             .values()
+            .filter(|node| !node.is_bootstrap_node())
             .map(|node| node.take_dht_socket())
             .collect()
     }
@@ -148,6 +171,19 @@ impl Swarm {
 
     pub fn get_blockstore(&self, node: &NodePublicKey) -> Option<Blockstore<FinalTypes>> {
         self.nodes.get(node).and_then(|node| node.take_blockstore())
+    }
+
+    pub fn get_bootstrap_nodes_pk(&self) -> Vec<NodePublicKey> {
+        self.nodes
+            .iter()
+            .filter_map(|(key, node)| {
+                if node.is_bootstrap_node() {
+                    Some(*key)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     fn shutdown_internal(&mut self) {
@@ -172,6 +208,7 @@ pub struct SwarmBuilder {
     archiver: bool,
     use_persistence: bool,
     committee_size: Option<u64>,
+    add_bootstrap_node: bool,
 }
 
 impl SwarmBuilder {
@@ -197,11 +234,6 @@ impl SwarmBuilder {
 
     pub fn with_port_assigner(mut self, port_assigner: PortAssigner) -> Self {
         self.port_assigner = Some(port_assigner);
-        self
-    }
-
-    pub fn with_bootstrappers(mut self, bootstrappers: Vec<NodePublicKey>) -> Self {
-        self.bootstrappers = Some(bootstrappers);
         self
     }
 
@@ -235,13 +267,17 @@ impl SwarmBuilder {
         self
     }
 
+    pub fn with_bootstrap_node(mut self) -> Self {
+        self.add_bootstrap_node = true;
+        self
+    }
+
     pub fn build(self) -> Swarm {
         let num_nodes = self.num_nodes.expect("Number of nodes must be provided.");
         let directory = self.directory.expect("Directory must be provided.");
         let min_port = self.min_port.expect("Minimum port must be provided.");
         let max_port = self.max_port.expect("Maximum port must be provided.");
 
-        let bootstrappers = self.bootstrappers.unwrap_or_default();
         let mut port_assigner = self.port_assigner.unwrap_or_default();
 
         // Load the default genesis. Clear the committee and node info and overwrite
@@ -260,6 +296,11 @@ impl SwarmBuilder {
         // we can pass to the containerized nodes.
         let mut tmp_nodes = Vec::with_capacity(num_nodes);
 
+        // If a bootstrap node has to be added, the first node will be assigned and the remaining
+        // will be configured to bootstrap to that one.
+        // Care must be taken to not take or replace this value once it is set to Some.
+        // Todo: make this setup for bootstraps more extensible and explicit.
+        let mut bootstrappers: Option<Vec<NodePublicKey>> = None;
         for index in 0..num_nodes {
             let root = directory.join(format!("node-{index}"));
             fs::create_dir_all(&root).expect("Failed to create node directory");
@@ -301,7 +342,7 @@ impl SwarmBuilder {
             let config = build_config(
                 &root,
                 ports.clone(),
-                bootstrappers.clone(),
+                bootstrappers.clone().unwrap_or(Vec::new()),
                 self.archiver,
                 self.syncronizer_delta.unwrap_or(Duration::from_secs(300)),
             );
@@ -311,6 +352,11 @@ impl SwarmBuilder {
             let owner_sk = AccountOwnerSecretKey::generate();
             let owner_pk = owner_sk.to_pk();
             let owner_eth: EthAddress = owner_pk.into();
+
+            let is_bootstrap_node = self.add_bootstrap_node && bootstrappers.is_none();
+            if is_bootstrap_node {
+                bootstrappers.replace(vec![node_pk.clone()]);
+            }
 
             let is_committee = (index as u64) < genesis.committee_size;
 
@@ -330,14 +376,16 @@ impl SwarmBuilder {
             );
             genesis.node_info.push(node_info);
 
-            tmp_nodes.push((owner_sk, node_pk, config));
+            tmp_nodes.push((owner_sk, node_pk, config, is_bootstrap_node));
         }
 
         // Now that we have built the configuration of all nodes and also have compiled the
         // proper genesis config. We can inject the genesis config.
 
         let mut nodes = HashMap::new();
-        for (index, (owner_sk, node_pk, config)) in tmp_nodes.into_iter().enumerate() {
+        for (index, (owner_sk, node_pk, config, is_bootstrap_node)) in
+            tmp_nodes.into_iter().enumerate()
+        {
             let is_committee = (index as u64) < genesis.committee_size;
             let root = directory.join(format!("node-{index}"));
             let storage = if self.use_persistence {
@@ -354,7 +402,8 @@ impl SwarmBuilder {
                 db_options: None,
             });
 
-            let node = ContainerizedNode::new(config, owner_sk, index, is_committee);
+            let node =
+                ContainerizedNode::new(config, owner_sk, index, is_committee, is_bootstrap_node);
             nodes.insert(node_pk, node);
         }
 

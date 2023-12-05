@@ -1,21 +1,18 @@
 use std::fs;
-use std::net::SocketAddr;
-use std::sync::Arc;
 use std::time::SystemTime;
 
 use anyhow::Result;
 use clap::Parser;
-use fleek_crypto::{NodeSecretKey, PublicKey, SecretKey};
+use fleek_crypto::PublicKey;
 use lightning_application::app::Application;
 use lightning_dht::Dht;
 use lightning_e2e::swarm::Swarm;
-use lightning_e2e::utils::networking::{PortAssigner, Transport};
+use lightning_e2e::utils::networking::PortAssigner;
 use lightning_e2e::utils::{logging, shutdown};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::partial;
 use lightning_topology::Topology;
 use resolved_pathbuf::ResolvedPathBuf;
-use tokio::sync::Notify;
 
 partial!(PartialBinding {
     ApplicationInterface = Application<Self>;
@@ -50,19 +47,7 @@ async fn main() -> Result<()> {
     }
 
     // Start bootstrapper
-    let mut port_assigner = PortAssigner::default();
-    let bootstrapper_port = port_assigner
-        .get_port(12001, 13000, Transport::Udp)
-        .expect("Failed to assign port");
-
-    // Todo: get IP from application.
-    let bootstrapper_address: SocketAddr =
-        format!("127.0.0.1:{bootstrapper_port}").parse().unwrap();
-    let bootstrap_secret_key = NodeSecretKey::generate();
-    let bootstrap_ready = Arc::new(Notify::new());
-
-    // Wait for bootstrapper to start
-    bootstrap_ready.notified().await;
+    let port_assigner = PortAssigner::default();
 
     let epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -82,18 +67,17 @@ async fn main() -> Result<()> {
         .with_epoch_time(args.epoch_time)
         .with_epoch_start(epoch_start)
         .with_archiver()
-        .with_bootstrappers(vec![bootstrap_secret_key.to_pk()])
+        .with_bootstrap_node()
         .with_port_assigner(port_assigner)
         .build();
     swarm.launch().await.unwrap();
 
+    // Todo: print bootstrapper info.
     let mut s = String::from("#####################################\n\n");
+    s.push_str(&format!("DHT Bootstrapper Address: \n"));
     s.push_str(&format!(
-        "DHT Bootstrapper Address: {bootstrapper_address}\n"
-    ));
-    s.push_str(&format!(
-        "DHT Bootstrapper Public Key: {}\n\n",
-        bootstrap_secret_key.to_pk().to_base58()
+        "DHT Bootstrapper Public Key: \n\n",
+        /* bootstrap_secret_key.to_pk().to_base58() */
     ));
 
     s.push_str("#####################################\n\n");
