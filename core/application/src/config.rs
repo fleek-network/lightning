@@ -5,9 +5,9 @@ use crate::genesis::Genesis;
 
 #[derive(Serialize, Deserialize, Default)]
 pub enum Mode {
-    #[default]
     Dev,
     Test,
+    #[default]
     Prod,
 }
 
