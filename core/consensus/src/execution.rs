@@ -116,6 +116,10 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
             })
             .collect::<Vec<_>>();
 
+        if transactions.is_empty() {
+            return false;
+        }
+
         let block = Block {
             transactions,
             digest,
