@@ -11,8 +11,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            max_conc_req: 10,
-            max_conc_res: 10,
+            max_conc_req: 50,
+            max_conc_res: 50,
         }
     }
 }
