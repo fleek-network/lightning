@@ -51,6 +51,7 @@ enum Status {
 /// Maintains the DHT.
 #[allow(clippy::type_complexity, unused)]
 pub struct Dht<C: Collection> {
+    address: SocketAddr,
     table: DhtTable,
     pool: DhtPool,
     status: Arc<Mutex<Option<Status>>>,
@@ -61,6 +62,7 @@ pub struct Dht<C: Collection> {
 impl<C: Collection> Clone for Dht<C> {
     fn clone(&self) -> Self {
         Self {
+            address: self.address,
             table: self.table.clone(),
             pool: self.pool.clone(),
             status: self.status.clone(),
@@ -95,8 +97,7 @@ where
             } => {
                 let shutdown = Arc::new(Notify::new());
                 // Todo: clean up socket in shutdown.
-                let address: SocketAddr = "0.0.0.0:0".parse().unwrap();
-                let udp_socket = Arc::new(UdpSocket::bind(address).await.unwrap());
+                let udp_socket = Arc::new(UdpSocket::bind(self.address).await.unwrap());
                 let socket = UdpTransport::new(udp_socket, self.sync_query.clone());
 
                 let looker: LookUpType<C> = DhtLookUp::new(
@@ -130,6 +131,13 @@ where
                     event_queue_rx,
                     shutdown.clone(),
                 );
+
+                // If it's empty, we're the bootstrap node.
+                if !self.bootstrap_nodes.is_empty() {
+                    if let Err(e) = self.table.bootstrap(self.bootstrap_nodes.clone()) {
+                        tracing::error!("failed to bootstrap: {e:?}");
+                    }
+                }
 
                 status = Status::Running {
                     table_worker_handle: table_worker.spawn(),
@@ -194,6 +202,7 @@ where
         let pool = DhtPool::new(task_queue_tx);
 
         Ok(Dht {
+            address: config.address,
             sk,
             table,
             pool,

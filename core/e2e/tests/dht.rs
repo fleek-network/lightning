@@ -6,7 +6,6 @@ use lightning_application::app::Application;
 use lightning_dht::Dht;
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::logging;
-use lightning_e2e::utils::networking::PortAssigner;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, KeyPrefix};
 use lightning_interfaces::{partial, DhtInterface};
@@ -24,8 +23,7 @@ partial!(PartialBinding {
 #[tokio::test]
 #[serial]
 async fn e2e_dht_put_and_get() -> Result<()> {
-    // logging::setup();
-    env_logger::init();
+    logging::setup();
 
     // Start epoch now and let it end in 20 seconds.
     let epoch_start = SystemTime::now()
@@ -58,28 +56,27 @@ async fn e2e_dht_put_and_get() -> Result<()> {
     let value: [u8; 4] = rand::random();
 
     #[allow(clippy::filter_map_identity)]
-    let dht_sockets: Vec<Dht<FinalTypes>> = swarm
+    let dht_handles: Vec<Dht<FinalTypes>> = swarm
         .get_dht_handle()
         .into_iter()
         .filter_map(|s| s)
         .collect();
 
     // Send DHT put to an arbitrary node in the swarm
-    dht_sockets[0].put(KeyPrefix::ContentRegistry, key.as_ref(), value.as_ref());
+    dht_handles[1].put(KeyPrefix::ContentRegistry, key.as_ref(), value.as_ref());
 
     // Wait some time for the DHT to do its magic
-    tokio::time::sleep(Duration::from_secs(10)).await;
+    tokio::time::sleep(Duration::from_secs(15)).await;
 
     // Perform a DHT lookup on every node in the swarm
-    for dht_socket in dht_sockets {
-        let res = dht_socket
+    for dht_handle in dht_handles {
+        let res = dht_handle
             .get(KeyPrefix::ContentRegistry, key.as_ref())
             .await;
         match res {
             Some(entry) => {
                 // Make sure the retrieved value equals the value we stored
                 assert_eq!(value.to_vec(), entry.value);
-                print!("Passed!!");
             },
             _ => panic!("Unexpected response"),
         }
