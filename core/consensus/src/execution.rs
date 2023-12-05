@@ -132,7 +132,7 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
         info!("Consensus submitted new block to application");
 
         if results.change_epoch {
-            executed_txns.clear();
+            //executed_txns.clear();
             change_epoch = true;
         }
 
