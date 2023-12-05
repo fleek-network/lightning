@@ -38,7 +38,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             genesis: None,
-            mode: Mode::Dev,
+            mode: Mode::Prod,
             testnet: true,
             storage: StorageConfig::RocksDb,
             db_path: Some(
