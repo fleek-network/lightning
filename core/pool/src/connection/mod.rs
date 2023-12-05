@@ -149,6 +149,7 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
     Ok(())
 }
 
+#[inline]
 fn report_metrics(metrics: Stats) {
     histogram!(
         "lost_packets",

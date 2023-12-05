@@ -16,6 +16,7 @@ use lightning_interfaces::{
     ServiceScope,
     SyncQueryRunnerInterface,
 };
+use lightning_metrics::histogram;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use x509_parser::nom::AsBytes;
@@ -49,6 +50,8 @@ where
     sync_query: c![C::ApplicationInterface::SyncExecutor],
     /// Local node index.
     index: OnceCell<NodeIndex>,
+    /// Stats.
+    stats: Stats,
     /// Local node public key.
     pk: NodePublicKey,
 }
@@ -74,6 +77,7 @@ where
             send_request_rx: stream_request_rx,
             sync_query,
             index,
+            stats: Stats::default(),
             pk,
         }
     }
@@ -190,6 +194,24 @@ where
                 .or_insert(info.clone());
         }
 
+        // Report stats.
+        histogram!(
+            "pool_neighborhood_size",
+            Some("Size of peers (not pinned and from topology) in our neighborhood."),
+            peers.len() as f64
+        );
+
+        histogram!(
+            "pool_connection_reuse_count",
+            Some(
+                "Count of times we've been able to re-use topology-based \
+                connections for request-response service."
+            ),
+            self.stats.handshake_avoided_count as f64
+        );
+        // Reset.
+        self.stats.handshake_avoided_count = 0;
+
         // We tell the pool who to connect to.
         BroadcastTask::Update {
             keep: self.peers.clone(),
@@ -274,6 +296,16 @@ where
         self.sync_query.index_to_pubkey(index)
     }
 
+    #[inline]
+    pub fn count_connection_reuse(&mut self, peer: &NodeIndex) {
+        if let Some(info) = self.peers.get(peer) {
+            // If it's pinned, it means it's already been accounted for.
+            if info.from_topology && !info.pinned {
+                self.stats.handshake_avoided_count += 1;
+            }
+        }
+    }
+
     pub async fn next(&mut self) -> Option<PoolTask> {
         loop {
             tokio::select! {
@@ -281,6 +313,7 @@ where
                     let send_request = send_request?;
                     match self.node_info_from_state(&send_request.peer) {
                         Some(info) => {
+                            self.count_connection_reuse(&send_request.peer);
                             self.pin_connection(send_request.peer, info.clone());
                             return Some(PoolTask::SendRequest(SendRequestTask {
                                     peer: info,
@@ -427,4 +460,12 @@ impl TryFrom<BytesMut> for Message {
         let payload = bytes[1..bytes.len()].to_vec();
         Ok(Self { service, payload })
     }
+}
+
+/// Overlay stats.
+#[derive(Default)]
+pub struct Stats {
+    /// Count of how many times we've been able to use topology-based connections
+    /// for request-response service.
+    handshake_avoided_count: usize,
 }
