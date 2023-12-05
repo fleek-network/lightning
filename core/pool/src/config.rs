@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     pub max_idle_timeout: Duration,
     pub address: SocketAddr,
+    pub http: SocketAddr,
 }
 
 impl Default for Config {
@@ -14,6 +15,7 @@ impl Default for Config {
         Self {
             max_idle_timeout: Duration::from_millis(30000),
             address: "0.0.0.0:4300".parse().expect("Hardcoded socket address"),
+            http: "0.0.0.0:8701".parse().expect("Hardcoded socket address"),
         }
     }
 }

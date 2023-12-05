@@ -38,7 +38,7 @@ use crate::endpoint::Endpoint;
 use crate::muxer::quinn::QuinnMuxer;
 use crate::muxer::{BoxedChannel, MuxerInterface};
 use crate::overlay::{BroadcastRequest, Param, SendRequest};
-use crate::{muxer, tls};
+use crate::{http, muxer, tls};
 
 pub struct Pool<C, M = QuinnMuxer>
 where
@@ -46,6 +46,7 @@ where
     M: MuxerInterface,
 {
     state: Mutex<Option<State<C, M>>>,
+    config: Config,
     shutdown_notify: Arc<Notify>,
 }
 
@@ -54,11 +55,12 @@ where
     C: Collection,
     M: MuxerInterface,
 {
-    fn new(endpoint: Endpoint<C, M>) -> Result<Self> {
+    fn new(endpoint: Endpoint<C, M>, config: Config) -> Result<Self> {
         Ok(Self {
             state: Mutex::new(Some(State::NotRunning {
                 endpoint: Some(endpoint),
             })),
+            config,
             shutdown_notify: Arc::new(Notify::new()),
         })
     }
@@ -122,6 +124,11 @@ where
             },
             State::NotRunning { mut endpoint } => {
                 let mut endpoint = endpoint.take().expect("There to be an Endpoint");
+                let http_server_address = self.config.http;
+                let shutdown_http_server = shutdown.clone();
+                tokio::spawn(async move {
+                    http::spawn_http_server(http_server_address, shutdown_http_server).await
+                });
                 tokio::spawn(async move {
                     if let Err(e) = endpoint.start(shutdown).await {
                         error!("unexpected endpoint failure: {e:?}");
@@ -200,15 +207,18 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
         let (notifier_tx, notifier_rx) = mpsc::channel(32);
         notifier.notify_on_new_epoch(notifier_tx);
 
-        Pool::new(Endpoint::<C, QuinnMuxer>::new(
-            topology,
-            sync_query,
-            notifier_rx,
-            rep_reporter,
-            muxer_config,
-            public_key,
-            OnceCell::new(),
-        ))
+        Pool::new(
+            Endpoint::<C, QuinnMuxer>::new(
+                topology,
+                sync_query,
+                notifier_rx,
+                rep_reporter,
+                muxer_config,
+                public_key,
+                OnceCell::new(),
+            ),
+            config,
+        )
     }
 
     fn open_event(&self, service: ServiceScope) -> Self::EventHandler {

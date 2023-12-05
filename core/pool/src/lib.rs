@@ -1,6 +1,7 @@
 mod config;
 mod connection;
 mod endpoint;
+mod http;
 pub mod muxer;
 mod overlay;
 mod pool;
