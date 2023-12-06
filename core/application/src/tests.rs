@@ -2475,3 +2475,138 @@ async fn test_stake_works() {
         peer_pub_key
     );
 }
+
+#[tokio::test]
+async fn test_stake_lock_reverts_not_account_key() {
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, _query_runner) = test_init_app(committee);
+
+    let stake_lock = UpdateMethod::StakeLock {
+        node: NodeSecretKey::generate().to_pk(),
+        locked_for: 365,
+    };
+
+    // Check that trying to Stake funds with Node Key reverts
+    let node_secret_key = &keystore[0].node_secret_key;
+    let update_node_key = prepare_update_request_node(stake_lock.clone(), node_secret_key, 1);
+    expect_tx_revert!(
+        update_node_key,
+        &update_socket,
+        ExecutionError::OnlyAccountOwner
+    );
+
+    // Check that trying to Stake funds with Consensus Key reverts
+    let consensus_secret_key = &keystore[0].consensus_secret_key;
+    let update_node_key = prepare_update_request_consensus(stake_lock, consensus_secret_key, 2);
+    expect_tx_revert!(
+        update_node_key,
+        &update_socket,
+        ExecutionError::OnlyAccountOwner
+    );
+}
+
+#[tokio::test]
+async fn test_stake_lock_reverts_node_does_not_exist() {
+    let (update_socket, _query_runner) = init_app(None);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_pub_key = NodeSecretKey::generate().to_pk();
+    let locked_for = 365;
+    let stake_lock_req = prepare_stake_lock_update(&node_pub_key, locked_for, &owner_secret_key, 1);
+
+    expect_tx_revert!(
+        stake_lock_req,
+        &update_socket,
+        ExecutionError::NodeDoesNotExist
+    );
+}
+
+#[tokio::test]
+async fn test_stake_lock_reverts_not_node_owner() {
+    let (update_socket, query_runner) = init_app(None);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_pub_key = NodeSecretKey::generate().to_pk();
+    let amount: HpUfixed<18> = 1_000u64.into();
+
+    deposit_and_stake!(
+        &update_socket,
+        &owner_secret_key,
+        1,
+        &amount,
+        &node_pub_key,
+        [0; 96].into()
+    );
+
+    assert_eq!(query_runner.get_staked(&node_pub_key), amount);
+
+    let locked_for = 365;
+    let stake_lock_req = prepare_stake_lock_update(
+        &node_pub_key,
+        locked_for,
+        &AccountOwnerSecretKey::generate(),
+        1,
+    );
+
+    expect_tx_revert!(stake_lock_req, &update_socket, ExecutionError::NotNodeOwner);
+}
+
+#[tokio::test]
+async fn test_stake_lock_reverts_insufficient_stake() {
+    let (update_socket, query_runner) = init_app(None);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_pub_key = NodeSecretKey::generate().to_pk();
+    let amount: HpUfixed<18> = 0u64.into();
+
+    deposit_and_stake!(
+        &update_socket,
+        &owner_secret_key,
+        1,
+        &amount,
+        &node_pub_key,
+        [0; 96].into()
+    );
+
+    assert_eq!(query_runner.get_staked(&node_pub_key), amount);
+
+    let locked_for = 365;
+    let stake_lock_req = prepare_stake_lock_update(&node_pub_key, locked_for, &owner_secret_key, 3);
+
+    expect_tx_revert!(
+        stake_lock_req,
+        &update_socket,
+        ExecutionError::InsufficientStake
+    );
+}
+
+#[tokio::test]
+async fn test_stake_lock_reverts_lock_exceeded_max_stake_lock_time() {
+    let (update_socket, query_runner) = init_app(None);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_pub_key = NodeSecretKey::generate().to_pk();
+    let amount: HpUfixed<18> = 1000u64.into();
+
+    deposit_and_stake!(
+        &update_socket,
+        &owner_secret_key,
+        1,
+        &amount,
+        &node_pub_key,
+        [0; 96].into()
+    );
+
+    assert_eq!(query_runner.get_staked(&node_pub_key), amount);
+
+    // max locked time from genesis
+    let locked_for = 1460 + 1;
+    let stake_lock_req = prepare_stake_lock_update(&node_pub_key, locked_for, &owner_secret_key, 3);
+
+    expect_tx_revert!(
+        stake_lock_req,
+        &update_socket,
+        ExecutionError::LockExceededMaxStakeLockTime
+    );
+}
