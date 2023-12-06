@@ -37,7 +37,7 @@ pub trait EthApi {
     async fn protocol_version(&self) -> RpcResult<u64>;
 
     #[method(name = "chainId")]
-    async fn chain_id(&self) -> RpcResult<u32>;
+    async fn chain_id(&self) -> RpcResult<U256>;
 
     #[method(name = "syncing")]
     async fn syncing(&self) -> RpcResult<bool>;
