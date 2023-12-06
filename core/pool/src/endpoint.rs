@@ -1,7 +1,6 @@
 use std::cell::OnceCell;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
-use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -20,7 +19,6 @@ use lightning_interfaces::{
     ServiceScope,
     TopologyInterface,
 };
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinSet;
@@ -38,7 +36,7 @@ use crate::overlay::{
     SendRequestTask,
 };
 use crate::pool::Request;
-use crate::state::{PeerInfo, State};
+use crate::state::{PeerInfo, Query, State};
 
 type ConnectionId = usize;
 
@@ -119,7 +117,7 @@ where
     /// Multiplexed transport.
     muxer: Option<M>,
     /// Request state from the pool.
-    state_request: Receiver<oneshot::Sender<State>>,
+    query_queue: Receiver<Query>,
     /// Config for the multiplexed transport.
     config: M::Config,
 }
@@ -138,7 +136,7 @@ where
         config: M::Config,
         node_public_key: NodePublicKey,
         index: OnceCell<NodeIndex>,
-        state_request: Receiver<oneshot::Sender<State>>,
+        query_queue: Receiver<Query>,
     ) -> Self {
         let (connection_event_tx, connection_event_rx) = mpsc::channel(1024);
 
@@ -157,7 +155,7 @@ where
             config,
             redundant_pool: HashMap::new(),
             connection_buffer: Vec::new(),
-            state_request,
+            query_queue,
             cleanup_notify: Arc::new(Notify::new()),
         }
     }
@@ -572,6 +570,36 @@ where
         });
     }
 
+    #[inline]
+    pub fn peer_info(&self, index: NodeIndex, respond: oneshot::Sender<Option<PeerInfo>>) {
+        if let Some(handle) = self.pool.get(&index) {
+            let info = self.network_overlay.node_info_from_state(&index);
+            let (respond_tx, respond_rx) = oneshot::channel();
+            if handle
+                .service_request_tx
+                .try_send(ServiceRequest::Stats {
+                    respond: respond_tx,
+                })
+                .is_ok()
+            {
+                tokio::spawn(async move {
+                    let stats = respond_rx.await.ok();
+                    let _ = respond.send(Some(PeerInfo { info, stats }));
+                });
+            } else {
+                let _ = respond.send(None);
+            }
+        }
+    }
+
+    #[inline]
+    pub fn handle_query(&self, query: Query) {
+        match query {
+            Query::State { respond } => self.state(respond),
+            Query::Peer { index, respond } => self.peer_info(index, respond),
+        }
+    }
+
     // Todo: Return metrics.
     pub async fn start(&mut self, shutdown: Arc<Notify>) -> Result<()> {
         let muxer = M::init(self.config.clone())?;
@@ -695,9 +723,9 @@ where
                         }
                     }
                 }
-                request = self.state_request.recv() => {
-                    if let Some(respond) = request {
-                        self.state(respond);
+                next_query = self.query_queue.recv() => {
+                    if let Some(query) = next_query {
+                        self.handle_query(query);
                     };
                 }
             }
@@ -717,14 +745,6 @@ pub enum ConnectionEvent {
         service_scope: ServiceScope,
         request: (RequestHeader, Request),
     },
-}
-
-/// Info of a node.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct NodeInfo {
-    pub index: NodeIndex,
-    pub pk: NodePublicKey,
-    pub socket_address: SocketAddr,
 }
 
 pub struct OngoingConnectionHandle {

@@ -13,9 +13,8 @@ use futures::{Sink, Stream};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-use crate::endpoint::NodeInfo;
 use crate::muxer::sealed::Sealed;
-use crate::state::Stats;
+use crate::state::{NodeInfo, Stats};
 
 pub type BoxedChannel =
     Box<dyn StreamAndSink<Error = io::Error, Item = io::Result<Bytes>> + Send + Sync + Unpin>;
