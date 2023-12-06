@@ -5,7 +5,6 @@ use std::io;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -16,18 +15,10 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 use crate::endpoint::NodeInfo;
 use crate::muxer::sealed::Sealed;
+use crate::state::Stats;
 
 pub type BoxedChannel =
     Box<dyn StreamAndSink<Error = io::Error, Item = io::Result<Bytes>> + Send + Sync + Unpin>;
-
-pub struct Stats {
-    pub rtt: Duration,
-    pub lost_packets: u64,
-    pub sent_packets: u64,
-    pub congestion_events: u64,
-    pub cwnd: u64,
-    pub black_holes_detected: u64,
-}
 
 // Todo: It might be more convenient to move this interface
 // in `/interfaces` so we can pass it to `PoolInterface::init`.

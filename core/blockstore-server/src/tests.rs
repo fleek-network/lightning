@@ -167,6 +167,7 @@ async fn get_peers(
             address: format!("0.0.0.0:{}", port_offset + i as u16)
                 .parse()
                 .unwrap(),
+            ..Default::default()
         };
         let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
             config,

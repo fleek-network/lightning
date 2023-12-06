@@ -5,6 +5,7 @@ mod http;
 pub mod muxer;
 mod overlay;
 mod pool;
+mod state;
 #[cfg(test)]
 mod tests;
 mod tls;

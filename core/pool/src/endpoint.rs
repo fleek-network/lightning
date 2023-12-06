@@ -20,8 +20,9 @@ use lightning_interfaces::{
     ServiceScope,
     TopologyInterface,
 };
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinSet;
 
 use crate::connection::connector::{ConnectionResult, Connector};
@@ -37,6 +38,7 @@ use crate::overlay::{
     SendRequestTask,
 };
 use crate::pool::Request;
+use crate::state::{PeerInfo, State};
 
 type ConnectionId = usize;
 
@@ -116,6 +118,8 @@ where
     cleanup_notify: Arc<Notify>,
     /// Multiplexed transport.
     muxer: Option<M>,
+    /// Request state from the pool.
+    state_request: Receiver<oneshot::Sender<State>>,
     /// Config for the multiplexed transport.
     config: M::Config,
 }
@@ -125,6 +129,7 @@ where
     C: Collection,
     M: MuxerInterface,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         topology: c!(C::TopologyInterface),
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
@@ -133,6 +138,7 @@ where
         config: M::Config,
         node_public_key: NodePublicKey,
         index: OnceCell<NodeIndex>,
+        state_request: Receiver<oneshot::Sender<State>>,
     ) -> Self {
         let (connection_event_tx, connection_event_rx) = mpsc::channel(1024);
 
@@ -151,6 +157,7 @@ where
             config,
             redundant_pool: HashMap::new(),
             connection_buffer: Vec::new(),
+            state_request,
             cleanup_notify: Arc::new(Notify::new()),
         }
     }
@@ -493,6 +500,78 @@ where
             .await;
     }
 
+    pub fn state(&self, respond: oneshot::Sender<State>) {
+        let logical_connections = self.network_overlay.connections();
+
+        let mut info_actual_connection = self
+            .pool
+            .keys()
+            .map(|index| (*index, self.network_overlay.node_info_from_state(index)))
+            .collect::<HashMap<_, _>>();
+        let mut info_redundant_connection = self
+            .redundant_pool
+            .keys()
+            .map(|index| (*index, self.network_overlay.node_info_from_state(index)))
+            .collect::<HashMap<_, _>>();
+
+        let handles_actual_connection = self
+            .pool
+            .iter()
+            .map(|(index, handle)| (*index, handle.service_request_tx.clone()))
+            .collect::<HashMap<_, _>>();
+        let handles_redundant_connection = self
+            .pool
+            .iter()
+            .map(|(index, handle)| (*index, handle.service_request_tx.clone()))
+            .collect::<HashMap<_, _>>();
+
+        tokio::spawn(async move {
+            let mut actual_connections = HashMap::new();
+            for (index, handle) in handles_actual_connection {
+                let (respond_tx, respond_rx) = oneshot::channel();
+                // We avoid burdening an already-busy queue.
+                let peer_info = if handle
+                    .try_send(ServiceRequest::Stats {
+                        respond: respond_tx,
+                    })
+                    .is_ok()
+                {
+                    let stats = respond_rx.await.ok();
+                    let info = info_actual_connection.remove(&index).flatten();
+                    PeerInfo { info, stats }
+                } else {
+                    PeerInfo::default()
+                };
+                actual_connections.insert(index, peer_info);
+            }
+
+            let mut redundant_connections = HashMap::new();
+            for (index, handle) in handles_redundant_connection {
+                let (respond_tx, respond_rx) = oneshot::channel();
+                // We avoid burdening an already-busy queue.
+                let peer_info = if handle
+                    .try_send(ServiceRequest::Stats {
+                        respond: respond_tx,
+                    })
+                    .is_ok()
+                {
+                    let stats = respond_rx.await.ok();
+                    let info = info_redundant_connection.remove(&index).flatten();
+                    PeerInfo { info, stats }
+                } else {
+                    PeerInfo::default()
+                };
+                redundant_connections.insert(index, peer_info);
+            }
+
+            let _ = respond.send(State {
+                actual_connections,
+                redundant_connections,
+                logical_connections,
+            });
+        });
+    }
+
     // Todo: Return metrics.
     pub async fn start(&mut self, shutdown: Arc<Notify>) -> Result<()> {
         let muxer = M::init(self.config.clone())?;
@@ -616,6 +695,11 @@ where
                         }
                     }
                 }
+                request = self.state_request.recv() => {
+                    if let Some(respond) = request {
+                        self.state(respond);
+                    };
+                }
             }
         }
         Ok(())
@@ -636,7 +720,7 @@ pub enum ConnectionEvent {
 }
 
 /// Info of a node.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NodeInfo {
     pub index: NodeIndex,
     pub pk: NodePublicKey,

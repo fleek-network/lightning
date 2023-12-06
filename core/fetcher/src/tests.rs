@@ -182,6 +182,7 @@ async fn get_fetchers(
             address: format!("0.0.0.0:{}", pool_port_offset + i as u16)
                 .parse()
                 .unwrap(),
+            ..Default::default()
         };
         let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
             config,
