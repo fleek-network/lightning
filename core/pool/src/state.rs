@@ -8,8 +8,6 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-use crate::overlay::ConnectionInfo;
-
 pub type QuerySender = Sender<Query>;
 
 pub enum Query {
@@ -18,20 +16,32 @@ pub enum Query {
     /// Request for information and stats from a specific peer.
     Peer {
         index: NodeIndex,
-        respond: oneshot::Sender<Option<PeerInfo>>,
+        respond: oneshot::Sender<Option<ConnectionInfo>>,
     },
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct State {
-    pub logical_connections: HashMap<NodeIndex, ConnectionInfo>,
-    pub actual_connections: HashMap<NodeIndex, PeerInfo>,
-    pub redundant_connections: HashMap<NodeIndex, PeerInfo>,
+    pub connections: HashMap<NodeIndex, ConnectionInfo>,
+    pub broadcast_queue_cap: usize,
+    pub broadcast_queue_max_cap: usize,
+    pub send_req_queue_cap: usize,
+    pub send_req_queue_max_cap: usize,
 }
 
 #[derive(Default, Deserialize, Serialize)]
-pub struct PeerInfo {
-    pub info: Option<NodeInfo>,
+pub struct ConnectionInfo {
+    pub from_topology: bool,
+    pub pinned: bool,
+    pub peer: Option<NodeInfo>,
+    pub work_queue_cap: usize,
+    pub work_queue_max_cap: usize,
+    pub actual_connections: Vec<TransportConnectionInfo>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct TransportConnectionInfo {
+    pub redundant: bool,
     pub stats: Option<Stats>,
 }
 
