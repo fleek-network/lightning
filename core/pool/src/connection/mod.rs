@@ -14,9 +14,10 @@ use tokio::sync::oneshot;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 use crate::endpoint::ConnectionEvent;
-use crate::muxer::{ConnectionInterface, NetChannel, Stats};
+use crate::muxer::{ConnectionInterface, NetChannel};
 use crate::overlay::Message;
 use crate::pool::{Request, Response, Status};
+use crate::state::Stats;
 
 /// Context for driving the connection.
 pub struct Context<C> {
@@ -130,6 +131,10 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                                 );
                             }
                         });
+                    }
+                    Some(ServiceRequest::Stats { respond }) => {
+                        tracing::debug!("handling new stats request");
+                        let _ = respond.send(ctx.connection.stats());
                     }
                     None => {
                         tracing::trace!(
@@ -286,5 +291,8 @@ pub enum ServiceRequest {
         service: ServiceScope,
         request: Bytes,
         respond: oneshot::Sender<io::Result<Response>>,
+    },
+    Stats {
+        respond: oneshot::Sender<Stats>,
     },
 }

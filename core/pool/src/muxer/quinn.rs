@@ -12,7 +12,8 @@ use quinn::{ClientConfig, Endpoint, RecvStream, SendStream, ServerConfig, Transp
 use rustls::Certificate;
 
 use crate::endpoint::NodeInfo;
-use crate::muxer::{ConnectionInterface, MuxerInterface, Stats};
+use crate::muxer::{ConnectionInterface, MuxerInterface};
+use crate::state::Stats;
 use crate::tls;
 
 #[derive(Clone)]

@@ -200,6 +200,7 @@ fn create_peer(
     let config = Config {
         max_idle_timeout: Duration::from_secs(5),
         address,
+        ..Default::default()
     };
     let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         config,

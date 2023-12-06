@@ -17,6 +17,7 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
 };
 use lightning_metrics::histogram;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use x509_parser::nom::AsBytes;
@@ -306,6 +307,11 @@ where
         }
     }
 
+    #[inline]
+    pub fn connections(&self) -> HashMap<NodeIndex, ConnectionInfo> {
+        self.peers.clone()
+    }
+
     pub async fn next(&mut self) -> Option<PoolTask> {
         loop {
             tokio::select! {
@@ -418,7 +424,7 @@ pub struct SendRequest {
     pub respond: oneshot::Sender<io::Result<Response>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ConnectionInfo {
     /// Pinned connections should not be dropped
     /// on topology changes.
