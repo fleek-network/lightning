@@ -49,10 +49,6 @@ impl<C: Collection> EthApiServer for EthApi<C> {
     ) -> RpcResult<U256> {
         trace!(target: "rpc::eth", ?address, "Serving eth_getTransactionCount");
 
-        if block.is_some() {
-            return Err(RPCError::custom("block number not supported".to_string()).into());
-        }
-
         Ok(U256::from(
             self.data.query_runner.get_account_nonce(&address) + 1,
         ))
