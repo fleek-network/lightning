@@ -6,7 +6,6 @@ use lightning_interfaces::SyncQueryRunnerInterface;
 use tracing::trace;
 
 use crate::api::NetApiServer;
-use crate::error::RPCError;
 use crate::Data;
 
 pub struct NetApi<C: Collection> {
@@ -22,12 +21,15 @@ impl<C: Collection> NetApi<C> {
 #[async_trait::async_trait]
 impl<C: Collection> NetApiServer for NetApi<C> {
     async fn peer_count(&self) -> RpcResult<Option<String>> {
-        trace!(target: "rpc::eth", "Serving eth_chainId");
-        Ok(Some(self.data.query_runner.get_chain_id().to_string()))
+        // todo(dalton): Figure out what this is used for in ethereum instead of just mocking it
+        // here. Shouldnt be relevent for us but may need to return something here for
+        // compatability
+        Ok(Some("0x86".to_string()))
     }
 
     async fn version(&self) -> RpcResult<Option<String>> {
-        Err(RPCError::unimplemented().into())
+        trace!(target: "rpc::eth", "Serving net_version");
+        Ok(Some(self.data.query_runner.get_chain_id().to_string()))
     }
 
     async fn listening(&self) -> RpcResult<bool> {
