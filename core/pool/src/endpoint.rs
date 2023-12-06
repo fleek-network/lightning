@@ -36,7 +36,7 @@ use crate::overlay::{
     SendRequestTask,
 };
 use crate::pool::Request;
-use crate::state::{PeerInfo, Query, State};
+use crate::state::{ConnectionInfo, Query, State, TransportConnectionInfo};
 
 type ConnectionId = usize;
 
@@ -498,94 +498,153 @@ where
             .await;
     }
 
+    #[inline]
     pub fn state(&self, respond: oneshot::Sender<State>) {
         let logical_connections = self.network_overlay.connections();
 
-        let mut info_actual_connection = self
+        let actual_connections = self
             .pool
-            .keys()
-            .map(|index| (*index, self.network_overlay.node_info_from_state(index)))
-            .collect::<HashMap<_, _>>();
-        let mut info_redundant_connection = self
-            .redundant_pool
-            .keys()
-            .map(|index| (*index, self.network_overlay.node_info_from_state(index)))
+            .iter()
+            .map(|(index, handle)| {
+                (
+                    *index,
+                    (
+                        self.network_overlay.node_info_from_state(index),
+                        handle.service_request_tx.clone(),
+                    ),
+                )
+            })
             .collect::<HashMap<_, _>>();
 
-        let handles_actual_connection = self
+        let redundant_connections = self
             .pool
             .iter()
             .map(|(index, handle)| (*index, handle.service_request_tx.clone()))
             .collect::<HashMap<_, _>>();
-        let handles_redundant_connection = self
-            .pool
-            .iter()
-            .map(|(index, handle)| (*index, handle.service_request_tx.clone()))
-            .collect::<HashMap<_, _>>();
+
+        let (broadcast_queue_cap, broadcast_queue_max_cap) =
+            self.network_overlay.broadcast_queue_cap();
+        let (send_req_queue_cap, send_req_queue_max_cap) =
+            self.network_overlay.send_req_queue_cap();
 
         tokio::spawn(async move {
-            let mut actual_connections = HashMap::new();
-            for (index, handle) in handles_actual_connection {
+            let mut connections = HashMap::new();
+
+            // We get information from actual running connections.
+            for (index, (info, queue)) in actual_connections {
                 let (respond_tx, respond_rx) = oneshot::channel();
                 // We avoid burdening an already-busy queue.
-                let peer_info = if handle
+                let stats = if queue
                     .try_send(ServiceRequest::Stats {
                         respond: respond_tx,
                     })
-                    .is_ok()
+                    .is_err()
                 {
-                    let stats = respond_rx.await.ok();
-                    let info = info_actual_connection.remove(&index).flatten();
-                    PeerInfo { info, stats }
+                    respond_rx.await.ok()
                 } else {
-                    PeerInfo::default()
+                    None
                 };
-                actual_connections.insert(index, peer_info);
+
+                if let Some(logical_connection_info) = logical_connections.get(&index) {
+                    let transport_connection = TransportConnectionInfo {
+                        redundant: false,
+                        stats,
+                    };
+
+                    let work_queue_cap = queue.capacity();
+                    let work_queue_max_cap = queue.max_capacity();
+
+                    connections.insert(
+                        index,
+                        ConnectionInfo {
+                            from_topology: logical_connection_info.from_topology,
+                            pinned: logical_connection_info.pinned,
+                            peer: info,
+                            work_queue_cap,
+                            work_queue_max_cap,
+                            actual_connections: vec![transport_connection],
+                        },
+                    );
+                } else {
+                    tracing::warn!(
+                        "logical connection corresponding to actual connection does not exist"
+                    )
+                }
             }
 
-            let mut redundant_connections = HashMap::new();
-            for (index, handle) in handles_redundant_connection {
+            // We get information from actual running redundant connections.
+            for (index, handle) in redundant_connections {
                 let (respond_tx, respond_rx) = oneshot::channel();
                 // We avoid burdening an already-busy queue.
-                let peer_info = if handle
+                let stats = if handle
                     .try_send(ServiceRequest::Stats {
                         respond: respond_tx,
                     })
                     .is_ok()
                 {
-                    let stats = respond_rx.await.ok();
-                    let info = info_redundant_connection.remove(&index).flatten();
-                    PeerInfo { info, stats }
+                    respond_rx.await.ok()
                 } else {
-                    PeerInfo::default()
+                    None
                 };
-                redundant_connections.insert(index, peer_info);
+
+                if let Some(connection) = connections.get_mut(&index) {
+                    let transport_connection = TransportConnectionInfo {
+                        redundant: true,
+                        stats,
+                    };
+                    connection.actual_connections.push(transport_connection);
+                }
             }
 
             let _ = respond.send(State {
-                actual_connections,
-                redundant_connections,
-                logical_connections,
+                broadcast_queue_cap,
+                broadcast_queue_max_cap,
+                send_req_queue_cap,
+                send_req_queue_max_cap,
+                connections,
             });
         });
     }
 
     #[inline]
-    pub fn peer_info(&self, index: NodeIndex, respond: oneshot::Sender<Option<PeerInfo>>) {
+    pub fn peer_info(&self, index: NodeIndex, respond: oneshot::Sender<Option<ConnectionInfo>>) {
         if let Some(handle) = self.pool.get(&index) {
             let info = self.network_overlay.node_info_from_state(&index);
-            let (respond_tx, respond_rx) = oneshot::channel();
-            if handle
-                .service_request_tx
-                .try_send(ServiceRequest::Stats {
-                    respond: respond_tx,
-                })
-                .is_ok()
-            {
-                tokio::spawn(async move {
-                    let stats = respond_rx.await.ok();
-                    let _ = respond.send(Some(PeerInfo { info, stats }));
-                });
+            if let Some(connection_info) = self.network_overlay.get_connection_info(&index) {
+                let from_topology = connection_info.from_topology;
+                let pinned = connection_info.pinned;
+
+                let (respond_tx, respond_rx) = oneshot::channel();
+                if handle
+                    .service_request_tx
+                    .try_send(ServiceRequest::Stats {
+                        respond: respond_tx,
+                    })
+                    .is_ok()
+                {
+                    let work_queue_cap = handle.service_request_tx.capacity();
+                    let work_queue_max_cap = handle.service_request_tx.max_capacity();
+
+                    tokio::spawn(async move {
+                        let stats = respond_rx.await.ok();
+                        let transport_connection = TransportConnectionInfo {
+                            redundant: false,
+                            stats,
+                        };
+                        let _ = respond.send(Some(ConnectionInfo {
+                            from_topology,
+                            pinned,
+                            peer: info,
+                            work_queue_cap,
+                            work_queue_max_cap,
+                            actual_connections: vec![transport_connection],
+                        }));
+                    });
+                } else {
+                    let _ = respond.send(None);
+                }
+                // Note: we ignore redundant connection because they should not get used much
+                // and should not happen often unless there's some malicious nodes.
             } else {
                 let _ = respond.send(None);
             }

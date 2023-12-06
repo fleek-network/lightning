@@ -45,7 +45,7 @@ where
     send_request_service_handles: HashMap<ServiceScope, Sender<(RequestHeader, Request)>>,
     /// Receive requests for a multiplexed stream.
     send_request_rx: Receiver<SendRequest>,
-    /// Send handle to return to users as they register with the stream service.
+    /// Send handle to return to users as they register with the send-request service.
     send_request_tx: Sender<SendRequest>,
     /// Sync query runner.
     sync_query: c![C::ApplicationInterface::SyncExecutor],
@@ -231,13 +231,13 @@ where
         }
     }
 
-    pub fn node_info_from_state(&self, index: &NodeIndex) -> Option<NodeInfo> {
-        let pk = self.sync_query.index_to_pubkey(*index)?;
+    pub fn node_info_from_state(&self, peer: &NodeIndex) -> Option<NodeInfo> {
+        let pk = self.sync_query.index_to_pubkey(*peer)?;
 
         let info = self.sync_query.get_node_info(&pk)?;
 
         Some(NodeInfo {
-            index: *index,
+            index: *peer,
             pk,
             socket_address: SocketAddr::from((info.domain, info.ports.pool)),
         })
@@ -289,12 +289,12 @@ where
         self.sync_query.pubkey_to_index(pk)
     }
 
-    pub fn pubkey_to_index(&self, key: NodePublicKey) -> Option<NodeIndex> {
-        self.sync_query.pubkey_to_index(key)
+    pub fn pubkey_to_index(&self, peer: NodePublicKey) -> Option<NodeIndex> {
+        self.sync_query.pubkey_to_index(peer)
     }
 
-    pub fn _index_to_pubkey(&self, index: NodeIndex) -> Option<NodePublicKey> {
-        self.sync_query.index_to_pubkey(index)
+    pub fn _index_to_pubkey(&self, peer: NodeIndex) -> Option<NodePublicKey> {
+        self.sync_query.index_to_pubkey(peer)
     }
 
     #[inline]
@@ -310,6 +310,27 @@ where
     #[inline]
     pub fn connections(&self) -> HashMap<NodeIndex, ConnectionInfo> {
         self.peers.clone()
+    }
+
+    #[inline]
+    pub fn get_connection_info(&self, peer: &NodeIndex) -> Option<&ConnectionInfo> {
+        self.peers.get(peer)
+    }
+
+    #[inline]
+    pub fn broadcast_queue_cap(&self) -> (usize, usize) {
+        (
+            self.broadcast_request_tx.capacity(),
+            self.broadcast_request_tx.max_capacity(),
+        )
+    }
+
+    #[inline]
+    pub fn send_req_queue_cap(&self) -> (usize, usize) {
+        (
+            self.send_request_tx.capacity(),
+            self.send_request_tx.max_capacity(),
+        )
     }
 
     pub async fn next(&mut self) -> Option<PoolTask> {
