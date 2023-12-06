@@ -2610,3 +2610,73 @@ async fn test_stake_lock_reverts_lock_exceeded_max_stake_lock_time() {
         ExecutionError::LockExceededMaxStakeLockTime
     );
 }
+
+#[tokio::test]
+async fn test_unstake_reverts_not_account_key() {
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, _query_runner) = test_init_app(committee);
+
+    let unstake = UpdateMethod::Unstake {
+        amount: 100u64.into(),
+        node: NodeSecretKey::generate().to_pk(),
+    };
+
+    // Check that trying to Stake funds with Node Key reverts
+    let node_secret_key = &keystore[0].node_secret_key;
+    let update_node_key = prepare_update_request_node(unstake.clone(), node_secret_key, 1);
+    expect_tx_revert!(
+        update_node_key,
+        &update_socket,
+        ExecutionError::OnlyAccountOwner
+    );
+
+    // Check that trying to Stake funds with Consensus Key reverts
+    let consensus_secret_key = &keystore[0].consensus_secret_key;
+    let update_node_key = prepare_update_request_consensus(unstake, consensus_secret_key, 2);
+    expect_tx_revert!(
+        update_node_key,
+        &update_socket,
+        ExecutionError::OnlyAccountOwner
+    );
+}
+
+#[tokio::test]
+async fn test_unstake_reverts_node_does_not_exist() {
+    let (update_socket, _query_runner) = init_app(None);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_pub_key = NodeSecretKey::generate().to_pk();
+    let update = prepare_unstake_update(&100u64.into(), &node_pub_key, &owner_secret_key, 1);
+
+    expect_tx_revert!(update, &update_socket, ExecutionError::NodeDoesNotExist);
+}
+
+#[tokio::test]
+async fn test_unstake_reverts_insufficient_balance() {
+    let (update_socket, query_runner) = init_app(None);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_pub_key = NodeSecretKey::generate().to_pk();
+    let amount: HpUfixed<18> = 1_000u64.into();
+
+    deposit_and_stake!(
+        &update_socket,
+        &owner_secret_key,
+        1,
+        &amount,
+        &node_pub_key,
+        [0; 96].into()
+    );
+
+    assert_eq!(query_runner.get_staked(&node_pub_key), amount);
+
+    let update = prepare_unstake_update(
+        &(amount + <u64 as Into<HpUfixed<18>>>::into(1)),
+        &node_pub_key,
+        &owner_secret_key,
+        3,
+    );
+
+    expect_tx_revert!(update, &update_socket, ExecutionError::InsufficientBalance);
+}
