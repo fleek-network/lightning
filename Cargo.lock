@@ -7781,9 +7781,9 @@ dependencies = [
 
 [[package]]
 name = "ring"
-version = "0.17.3"
+version = "0.17.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9babe80d5c16becf6594aa32ad2be8fe08498e7ae60b77de8df700e67f191d7e"
+checksum = "688c63d65483050968b2a8937f7995f443e27041a0f7700aa59b0822aedebb74"
 dependencies = [
  "cc",
  "getrandom",
@@ -10198,7 +10198,7 @@ version = "0.22.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed63aea5ce73d0ff405984102c42de94fc55a6b75765d621c65262469b3c9b53"
 dependencies = [
- "ring 0.17.3",
+ "ring 0.17.7",
  "untrusted 0.9.0",
 ]
 
@@ -10455,28 +10455,33 @@ dependencies = [
 
 [[package]]
 name = "wtransport"
-version = "0.1.7"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c14e2f72e73898b8369710f9ab04b52671ecd5c234453594e5e25838a91bccc3"
+checksum = "11b4c2a373ff5467c7beed825cb48607ace7db369c7bd97fa1a43cba3efd47cc"
 dependencies = [
+ "base64 0.21.4",
  "bytes",
  "quinn",
+ "rcgen 0.11.3",
+ "ring 0.17.7",
  "rustls 0.21.7",
  "rustls-native-certs",
  "rustls-pemfile",
  "socket2 0.5.4",
  "thiserror",
+ "time",
  "tokio",
  "tracing",
  "url",
  "wtransport-proto",
+ "x509-parser 0.15.1",
 ]
 
 [[package]]
 name = "wtransport-proto"
-version = "0.1.7"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79dd49f3326280fb4b7a09638d563d84ea7ad225eb5324e91a0db7169caa94a3"
+checksum = "d4a56f366050f96cc2823e034da18389e67419a939789d4e968ae536de6a174f"
 dependencies = [
  "ls-qpack",
  "octets",

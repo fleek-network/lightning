@@ -192,10 +192,10 @@ pub fn create_cert_hash_and_server_config(
         cert_hash,
         ServerConfig::builder()
             .with_bind_address(config.address)
-            .with_certificate(Certificate::new(
-                vec![cert_der],
-                cert.serialize_private_key_der(),
-            ))
+            .with_certificate(
+                Certificate::new(vec![cert_der], cert.serialize_private_key_der())
+                    .expect("failed to create serialized certificate"),
+            )
             .keep_alive_interval(config.keep_alive)
             .build(),
     ))
