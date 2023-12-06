@@ -11,9 +11,8 @@ use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use quinn::{ClientConfig, Endpoint, RecvStream, SendStream, ServerConfig, TransportConfig};
 use rustls::Certificate;
 
-use crate::endpoint::NodeInfo;
 use crate::muxer::{ConnectionInterface, MuxerInterface};
-use crate::state::Stats;
+use crate::state::{NodeInfo, Stats};
 use crate::tls;
 
 #[derive(Clone)]

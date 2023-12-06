@@ -22,9 +22,9 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use x509_parser::nom::AsBytes;
 
-use crate::endpoint::NodeInfo;
 use crate::muxer::{ConnectionInterface, MuxerInterface};
 use crate::pool::{Request, Response};
+use crate::state::NodeInfo;
 
 pub type BoxedFilterCallback = Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>;
 

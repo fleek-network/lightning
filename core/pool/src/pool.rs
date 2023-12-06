@@ -38,7 +38,7 @@ use crate::endpoint::Endpoint;
 use crate::muxer::quinn::QuinnMuxer;
 use crate::muxer::{BoxedChannel, MuxerInterface};
 use crate::overlay::{BroadcastRequest, Param, SendRequest};
-use crate::state::StateRequestSender;
+use crate::state::QuerySender;
 use crate::{http, muxer, tls};
 
 pub struct Pool<C, M = QuinnMuxer>
@@ -48,7 +48,7 @@ where
 {
     state: Mutex<Option<State<C, M>>>,
     config: Config,
-    state_request: StateRequestSender,
+    state_request: QuerySender,
     shutdown_notify: Arc<Notify>,
 }
 
@@ -57,11 +57,7 @@ where
     C: Collection,
     M: MuxerInterface,
 {
-    fn new(
-        endpoint: Endpoint<C, M>,
-        config: Config,
-        state_request: StateRequestSender,
-    ) -> Result<Self> {
+    fn new(endpoint: Endpoint<C, M>, config: Config, state_request: QuerySender) -> Result<Self> {
         Ok(Self {
             state: Mutex::new(Some(State::NotRunning {
                 endpoint: Some(endpoint),

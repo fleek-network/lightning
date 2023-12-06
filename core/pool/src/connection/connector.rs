@@ -8,8 +8,8 @@ use futures::{FutureExt, StreamExt};
 use lightning_interfaces::types::NodeIndex;
 use tokio_util::sync::CancellationToken;
 
-use crate::endpoint::NodeInfo;
 use crate::muxer::{ConnectionInterface, MuxerInterface};
+use crate::state::NodeInfo;
 
 pub struct Connector<M>
 where
