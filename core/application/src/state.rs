@@ -85,7 +85,7 @@ const REP_EWMA_WEIGHT: f64 = 0.7;
 
 /// If a node responded to less than 10% of pings from its peers, it will set to inactive until it
 /// submits an OptIn transaction.
-const MINIMUM_UPTIME: u8 = 10;
+const MINIMUM_UPTIME: u8 = 40;
 
 /// To support ethereum tooling, all signed ethereum transactions will be pointed to this address
 /// otherwise, if there is a value and a different address they are trying to transfer the native
