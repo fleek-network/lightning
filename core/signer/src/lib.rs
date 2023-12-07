@@ -36,6 +36,7 @@ use lightning_interfaces::types::{
 };
 use lightning_interfaces::{ApplicationInterface, MempoolSocket, SyncQueryRunnerInterface};
 use tokio::sync::{mpsc, Notify};
+use tracing::error;
 
 // If a transaction does not get ordered, the signer will try to resend it.
 // `TIMEOUT` specifies the duration the signer will wait before resending transactions to the
@@ -292,10 +293,13 @@ impl SignerInner {
                         signature: signature.into(),
                         payload: update_payload,
                     };
-                    mempool_socket.run(update_request.clone().into())
+
+                    if let Err(e) = mempool_socket.run(update_request.clone().into())
                         .await
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
-                        .expect("Failed to send transaction to mempool.");
+                    {
+                        error!("Failed to send transaction to mempool: {e:?}");
+                    }
 
                     // Optimistically increment nonce
                     next_nonce += 1;
@@ -362,11 +366,15 @@ impl SignerInner {
                             continue;
                         }
                         *next_nonce += 1;
-                        mempool_socket
+
+                        if let Err(e) = mempool_socket
                             .run(pending_tx.update_request.clone().into())
                             .await
                             .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
-                            .expect("Failed to send transaction to mempool.");
+                        {
+                            error!("Failed to send transaction to mempool: {e:?}");
+                        }
+
                         // Update timestamp to resending time.
                         pending_tx.timestamp = SystemTime::now();
                         if base_timestamp.is_none() {
