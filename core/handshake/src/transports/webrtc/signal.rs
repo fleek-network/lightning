@@ -35,7 +35,10 @@ pub fn router(
             conn_tx,
             host: udp_addrs
                 .into_iter()
-                .map(|s| Candidate::host(s).expect("failed to parse candidate from socket address"))
+                .map(|s| {
+                    Candidate::host(s, "udp")
+                        .expect("failed to parse candidate from socket address")
+                })
                 .collect(),
         })))
 }
