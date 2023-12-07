@@ -73,18 +73,14 @@ impl<C: Collection> EthApiServer for EthApi<C> {
 
     async fn protocol_version(&self) -> RpcResult<U64> {
         trace!(target: "rpc::eth", "Serving eth_protocolVersion");
-        Ok("0".parse::<U64>().map_err(RPCError::from)?)
+        Ok(U64::from(0))
     }
 
     async fn chain_id(&self) -> RpcResult<Option<U64>> {
         trace!(target: "rpc::eth", "Serving eth_chainId");
+
         Ok(Some(
-            self.data
-                .query_runner
-                .get_chain_id()
-                .to_string()
-                .parse::<U64>()
-                .map_err(RPCError::from)?,
+            U64::from(self.data.query_runner.get_chain_id())
         ))
     }
 
