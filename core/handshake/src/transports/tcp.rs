@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use anyhow::Result;
 use arrayref::array_ref;
 use async_trait::async_trait;
@@ -15,13 +17,16 @@ use crate::schema::{self, RES_SERVICE_PAYLOAD_TAG};
 use crate::shutdown::ShutdownWaiter;
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct TcpConfig {
-    port: u16,
+    pub address: SocketAddr,
 }
 
 impl Default for TcpConfig {
     fn default() -> Self {
-        Self { port: 4221 }
+        Self {
+            address: ([0, 0, 0, 0], 4221).into(),
+        }
     }
 }
 
@@ -39,8 +44,8 @@ impl Transport for TcpTransport {
         shutdown: ShutdownWaiter,
         config: Self::Config,
     ) -> Result<(Self, Option<Router>)> {
-        let listener = TcpListener::bind(("0.0.0.0", config.port)).await?;
-        info!("Binding TCP transport to 0.0.0.0:{}", config.port);
+        let listener = TcpListener::bind(config.address).await?;
+        info!("Binding TCP transport to {}", config.address);
         // bounded channel to provide some back pressure for incoming connections
         let (tx, rx) = mpsc::channel(256);
 
@@ -271,11 +276,13 @@ mod tests {
     async fn handshake() -> Result<()> {
         // Bind the server
         let notifier = ShutdownNotifier::default();
-        let config = TcpConfig { port: 20000 };
+        let config = TcpConfig {
+            address: ([127, 0, 0, 1], 20000).into(),
+        };
         let (mut transport, _) = TcpTransport::bind(notifier.waiter(), config.clone()).await?;
 
         // Connect a dummy client
-        let mut client = TcpStream::connect(("127.0.0.1", config.port))
+        let mut client = TcpStream::connect(config.address)
             .await
             .expect("should connect");
 

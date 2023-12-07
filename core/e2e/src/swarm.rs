@@ -465,7 +465,7 @@ fn build_config(
     config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
         // TODO: figure out how to have e2e testing for the different transports (browser oriented)
         transports: vec![TransportConfig::WebRTC(WebRtcConfig {
-            udp_address: ([0, 0, 0, 0], ports.handshake.webrtc).into(),
+            address: ([0, 0, 0, 0], ports.handshake.webrtc).into(),
         })],
         http_address: ([127, 0, 0, 1], ports.handshake.http).into(),
     });
