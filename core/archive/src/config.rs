@@ -12,7 +12,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            is_archive: false,
+            is_archive: true,
             store_path: "~/.lightning/data/archiver"
                 .try_into()
                 .expect("Failed to resolve path"),
