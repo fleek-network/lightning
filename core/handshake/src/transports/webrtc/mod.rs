@@ -25,14 +25,15 @@ use crate::transports::webrtc::signal::router;
 pub const MAX_PAYLOAD_SIZE: usize = 48 << 10;
 
 #[derive(Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct WebRtcConfig {
-    pub udp_address: SocketAddr,
+    pub address: SocketAddr,
 }
 
 impl Default for WebRtcConfig {
     fn default() -> Self {
         Self {
-            udp_address: ([0, 0, 0, 0], 4320).into(),
+            address: ([0, 0, 0, 0], 4320).into(),
         }
     }
 }
@@ -56,11 +57,11 @@ impl Transport for WebRtcTransport {
     type Receiver = WebRtcReceiver;
 
     async fn bind(waiter: ShutdownWaiter, config: Self::Config) -> Result<(Self, Option<Router>)> {
-        info!("Binding WebRTC transport on {}", config.udp_address);
+        info!("Binding WebRTC transport on {}", config.address);
         let conns = Arc::new(DashMap::new());
 
         // Bind the driver to the udp socket
-        let driver = WebRtcDriver::bind(config.udp_address, conns.clone()).await?;
+        let driver = WebRtcDriver::bind(config.address, conns.clone()).await?;
 
         let stun = StunClient::new(
             "stun.l.google.com:19302"

@@ -47,6 +47,7 @@ pub struct MockTransport {
 }
 
 #[derive(Default, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct MockTransportConfig {
     port: u16,
 }

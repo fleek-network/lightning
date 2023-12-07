@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::transports;
 
 #[derive(Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct HandshakeConfig {
     #[serde(rename = "transport")]
     pub transports: Vec<TransportConfig>,
