@@ -799,6 +799,12 @@ impl<B: Backend> State<B> {
         tracing::error!("###################### change_epoch [4]");
 
         let mut current_committee = self.committee_info.get(&current_epoch).unwrap_or_default();
+
+        tracing::error!(
+            "###################### READY TO CHANGE: {:?}",
+            current_committee.ready_to_change
+        );
+
         // If sender is not on the current committee revert early, or if they have already signaled;
         if !current_committee.members.contains(&index) {
             tracing::error!("###################### change_epoch not member");
