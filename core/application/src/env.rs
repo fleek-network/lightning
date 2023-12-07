@@ -154,7 +154,9 @@ impl Env<UpdatePerm> {
             for (index, txn) in &mut block.transactions.iter_mut().enumerate() {
                 let results = match app.verify_transaction(txn) {
                     Ok(_) => app.execute_transaction(txn.clone()),
-                    Err(err) => TransactionResponse::Revert(err),
+                    Err(err) =>{
+                        tracing::error!("Verify transaction failed:{:?}", err );
+                         TransactionResponse::Revert(err)},
                 };
 
                 // If the transaction moved the epoch forward, acknowledge that in the block
