@@ -612,13 +612,16 @@ where
 
     #[inline]
     pub fn peer_info(&self, index: NodeIndex, respond: oneshot::Sender<Option<ConnectionInfo>>) {
-        if let Some(handle) = self.pool.get(&index) {
-            let info = self.network_overlay.node_info_from_state(&index);
-            if let Some(connection_info) = self.network_overlay.get_connection_info(&index) {
-                let from_topology = connection_info.from_topology;
-                let pinned = connection_info.pinned;
+        let info = self.network_overlay.node_info_from_state(&index);
+        if let Some(connection_info) = self.network_overlay.get_connection_info(&index) {
+            let from_topology = connection_info.from_topology;
+            let pinned = connection_info.pinned;
 
+            if let Some(handle) = self.pool.get(&index) {
                 let (respond_tx, respond_rx) = oneshot::channel();
+                let work_queue_cap = handle.service_request_tx.capacity();
+                let work_queue_max_cap = handle.service_request_tx.max_capacity();
+
                 if handle
                     .service_request_tx
                     .try_send(ServiceRequest::Stats {
@@ -626,9 +629,6 @@ where
                     })
                     .is_ok()
                 {
-                    let work_queue_cap = handle.service_request_tx.capacity();
-                    let work_queue_max_cap = handle.service_request_tx.max_capacity();
-
                     tokio::spawn(async move {
                         let stats = respond_rx.await.ok();
                         let transport_connection = TransportConnectionInfo {
@@ -645,7 +645,14 @@ where
                         }));
                     });
                 } else {
-                    let _ = respond.send(None);
+                    let _ = respond.send(Some(ConnectionInfo {
+                        from_topology,
+                        pinned,
+                        peer: info,
+                        work_queue_cap,
+                        work_queue_max_cap,
+                        actual_connections: vec![],
+                    }));
                 }
                 // Note: we ignore redundant connection because they should not get used much
                 // and should not happen often unless there's some malicious nodes.
