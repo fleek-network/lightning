@@ -566,9 +566,17 @@ where
                         },
                     );
                 } else {
-                    tracing::warn!(
-                        "logical connection corresponding to actual connection does not exist"
-                    )
+                    connections.insert(
+                        index,
+                        ConnectionInfo {
+                            from_topology: logical_connection_info.from_topology,
+                            pinned: logical_connection_info.pinned,
+                            peer: None,
+                            work_queue_cap: 0,
+                            work_queue_max_cap: 0,
+                            actual_connections: vec![],
+                        },
+                    );
                 }
             }
 
@@ -649,15 +657,22 @@ where
                         from_topology,
                         pinned,
                         peer: info,
-                        work_queue_cap,
-                        work_queue_max_cap,
+                        work_queue_cap: 0,
+                        work_queue_max_cap: 0,
                         actual_connections: vec![],
                     }));
                 }
                 // Note: we ignore redundant connection because they should not get used much
                 // and should not happen often unless there's some malicious nodes.
             } else {
-                let _ = respond.send(None);
+                let _ = respond.send(Some(ConnectionInfo {
+                    from_topology,
+                    pinned,
+                    peer: info,
+                    work_queue_cap: 0,
+                    work_queue_max_cap: 0,
+                    actual_connections: vec![],
+                }));
             }
         }
     }
