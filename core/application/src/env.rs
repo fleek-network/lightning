@@ -30,6 +30,7 @@ use lightning_interfaces::types::{
     TotalServed,
     TransactionReceipt,
     TransactionResponse,
+    TxHash,
     Value,
 };
 use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
@@ -101,12 +102,14 @@ impl Env<UpdatePerm> {
             .with_table::<Epoch, TotalServed>("total_served")
             .with_table::<CommodityTypes, HpUfixed<6>>("commodity_prices")
             .with_table::<ServiceId, ServiceRevenue>("service_revenue")
+            .with_table::<TxHash, ()>("executed_digests")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("submitted_rep_measurements")
             .enable_iter("rep_scores")
             .enable_iter("latencies")
             .enable_iter("node")
+            .enable_iter("executed_digests")
             .enable_iter("service_revenue");
 
         #[cfg(debug_assertions)]

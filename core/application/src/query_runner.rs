@@ -25,6 +25,7 @@ use lightning_interfaces::types::{
     TotalServed,
     TransactionRequest,
     TransactionResponse,
+    TxHash,
     Value,
 };
 use lightning_interfaces::PagingParams;
@@ -52,6 +53,7 @@ pub struct QueryRunner {
     total_served_table: ResolvedTableReference<Epoch, TotalServed>,
     _service_revenue: ResolvedTableReference<ServiceId, ServiceRevenue>,
     _commodity_price: ResolvedTableReference<CommodityTypes, HpUfixed<6>>,
+    executed_digests_table: ResolvedTableReference<TxHash, ()>,
 }
 
 impl QueryRunner {
@@ -74,6 +76,7 @@ impl QueryRunner {
             total_served_table: atomo.resolve::<Epoch, TotalServed>("total_served"),
             _commodity_price: atomo.resolve::<CommodityTypes, HpUfixed<6>>("commodity_prices"),
             _service_revenue: atomo.resolve::<ServiceId, ServiceRevenue>("service_revenue"),
+            executed_digests_table: atomo.resolve::<TxHash, ()>("executed_digests"),
             inner: atomo,
         }
     }
@@ -521,5 +524,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 _ => 0,
             },
         )
+    }
+
+    fn has_executed_digest(&self, digest: [u8; 32]) -> bool {
+        self.inner
+            .run(|ctx| self.executed_digests_table.get(ctx).get(digest).is_some())
     }
 }

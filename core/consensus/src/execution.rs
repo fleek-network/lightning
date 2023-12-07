@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -16,7 +15,7 @@ use narwhal_crypto::DefaultHashFunction;
 use narwhal_executor::ExecutionState;
 use narwhal_types::{BatchAPI, BatchDigest, ConsensusOutput, Transaction};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, Mutex, Notify};
+use tokio::sync::{mpsc, Notify};
 use tracing::{error, info};
 
 pub type Digest = [u8; 32];
@@ -73,8 +72,6 @@ pub struct Execution<Q: SyncQueryRunnerInterface> {
     /// If this socket is present it means the node is in archive node and should send all blocks
     /// and transactions it executes to the archiver to be indexed
     index_socket: Option<IndexSocket>,
-    /// The digest of the transactions we already executed this epoch.
-    executed_txns: Mutex<HashSet<Digest>>,
 }
 
 impl<Q: SyncQueryRunnerInterface> Execution<Q> {
@@ -93,7 +90,6 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
             tx_narwhal_batches,
             query_runner,
             index_socket,
-            executed_txns: Mutex::new(HashSet::new()),
         }
     }
 
@@ -162,14 +158,13 @@ impl<Q: SyncQueryRunnerInterface> ExecutionState for Execution<Q> {
                 let mut batch_payload =
                     Vec::with_capacity(batches.iter().fold(0, |acc, batch| acc + batch.size()));
 
-                let mut executed_txns = self.executed_txns.lock().await;
                 for batch in batches {
-                    for tx in batch.transactions() {
-                        let hash = fleek_blake3::hash(tx).as_bytes().to_owned();
-                        if !executed_txns.contains(&hash) {
-                            batch_payload.push(tx.to_owned());
+                    for tx_bytes in batch.transactions() {
+                        if let Ok(tx) = TransactionRequest::try_from(tx_bytes.to_owned()) {
+                            if !self.query_runner.has_executed_digest(tx.hash()) {
+                                batch_payload.push(tx_bytes.to_owned());
+                            }
                         }
-                        executed_txns.insert(hash);
                     }
                 }
 
@@ -187,9 +182,6 @@ impl<Q: SyncQueryRunnerInterface> ExecutionState for Execution<Q> {
                 };
 
                 let epoch_changed = self.submit_batch(batch_payload, parcel.to_digest()).await;
-                if epoch_changed {
-                    executed_txns.clear();
-                }
 
                 if let Err(e) = self.tx_narwhal_batches.send((parcel, epoch_changed)).await {
                     // This shouldnt ever happen. But if it does there is no critical tasks
