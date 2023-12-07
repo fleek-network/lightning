@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use alloy_primitives::U64;
 use ethers::types::{
     Address,
     Block,
@@ -42,16 +43,13 @@ impl<C: Collection> EthApiServer for EthApi<C> {
         Ok(U256::from(self.data.query_runner.get_block_number()))
     }
 
+    /// todo this function always returns the current nonce
     async fn transaction_count(
         &self,
         address: EthAddress,
-        block: Option<BlockNumber>,
+        _block: Option<BlockNumber>,
     ) -> RpcResult<U256> {
         trace!(target: "rpc::eth", ?address, "Serving eth_getTransactionCount");
-
-        if block.is_some() {
-            return Err(RPCError::custom("block number not supported".to_string()).into());
-        }
 
         Ok(U256::from(
             self.data.query_runner.get_account_nonce(&address) + 1,
@@ -73,14 +71,21 @@ impl<C: Collection> EthApiServer for EthApi<C> {
             .unwrap_or(U256::zero()))
     }
 
-    async fn protocol_version(&self) -> RpcResult<u64> {
+    async fn protocol_version(&self) -> RpcResult<U64> {
         trace!(target: "rpc::eth", "Serving eth_protocolVersion");
-        Ok(0x41)
+        Ok("0".parse::<U64>().map_err(RPCError::from)?)
     }
 
-    async fn chain_id(&self) -> RpcResult<u32> {
+    async fn chain_id(&self) -> RpcResult<Option<U64>> {
         trace!(target: "rpc::eth", "Serving eth_chainId");
-        Ok(self.data.query_runner.get_chain_id())
+        Ok(Some(
+            self.data
+                .query_runner
+                .get_chain_id()
+                .to_string()
+                .parse::<U64>()
+                .map_err(RPCError::from)?,
+        ))
     }
 
     /// todo(n)
@@ -89,11 +94,15 @@ impl<C: Collection> EthApiServer for EthApi<C> {
         Ok(false)
     }
 
-    async fn block_by_number(&self, number: BlockNumber, full: bool) -> RpcResult<Option<H256>> {
+    async fn block_by_number(
+        &self,
+        number: BlockNumber,
+        full: bool,
+    ) -> RpcResult<Option<Block<H256>>> {
         trace!(target: "rpc::eth", ?number, ?full, "Serving eth_getBlockByNumber");
         if let Some(socket) = &self.data.archive_socket {
             match socket.run(ArchiveRequest::GetBlockByNumber(number)).await {
-                Ok(Ok(ArchiveResponse::Block(block))) => Ok(Some(block.block_hash.into())),
+                Ok(Ok(ArchiveResponse::Block(block))) => Ok(Some(block.into())),
                 Ok(Ok(ArchiveResponse::None)) => Ok(None),
                 _ => Err(RPCError::custom("Failed to query block".to_string()).into()),
             }

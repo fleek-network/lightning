@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use jsonrpsee::core::RpcResult;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::SyncQueryRunnerInterface;
 use tracing::trace;
 
 use crate::api::NetApiServer;
@@ -10,20 +9,21 @@ use crate::error::RPCError;
 use crate::Data;
 
 pub struct NetApi<C: Collection> {
-    data: Arc<Data<C>>,
+    _data: Arc<Data<C>>,
 }
 
 impl<C: Collection> NetApi<C> {
     pub(crate) fn new(data: Arc<Data<C>>) -> Self {
-        Self { data }
+        Self { _data: data }
     }
 }
 
 #[async_trait::async_trait]
 impl<C: Collection> NetApiServer for NetApi<C> {
+    /// todo!()
     async fn peer_count(&self) -> RpcResult<Option<String>> {
         trace!(target: "rpc::eth", "Serving eth_chainId");
-        Ok(Some(self.data.query_runner.get_chain_id().to_string()))
+        Ok(Some("0x40".into()))
     }
 
     async fn version(&self) -> RpcResult<Option<String>> {

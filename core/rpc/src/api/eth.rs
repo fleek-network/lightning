@@ -1,3 +1,4 @@
+use alloy_primitives::U64;
 use ethers::types::{
     Address,
     Block,
@@ -34,11 +35,12 @@ pub trait EthApi {
     ) -> RpcResult<U256>;
 
     #[method(name = "protocolVersion")]
-    async fn protocol_version(&self) -> RpcResult<u64>;
+    async fn protocol_version(&self) -> RpcResult<U64>;
 
     #[method(name = "chainId")]
-    async fn chain_id(&self) -> RpcResult<u32>;
+    async fn chain_id(&self) -> RpcResult<Option<U64>>;
 
+    /// todo!
     #[method(name = "syncing")]
     async fn syncing(&self) -> RpcResult<bool>;
 
@@ -52,11 +54,11 @@ pub trait EthApi {
     async fn block_by_number(
         &self,
         block_number: BlockNumber,
-        hydrated: bool,
-    ) -> RpcResult<Option<H256>>;
+        full: bool,
+    ) -> RpcResult<Option<Block<H256>>>;
 
     #[method(name = "getBlockByHash")]
-    async fn block_by_hash(&self, hash: H256, hydrated: bool) -> RpcResult<Option<Block<H256>>>;
+    async fn block_by_hash(&self, hash: H256, full: bool) -> RpcResult<Option<Block<H256>>>;
 
     #[method(name = "gasPrice")]
     async fn gas_price(&self) -> RpcResult<U256>;
@@ -65,7 +67,7 @@ pub trait EthApi {
     async fn estimate_gas(&self, request: CallRequest) -> RpcResult<U256>;
 
     #[method(name = "sendRawTransaction")]
-    async fn send_raw_transaction(&self, transaction: Bytes) -> RpcResult<H256>;
+    async fn send_raw_transaction(&self, bytes: Bytes) -> RpcResult<H256>;
 
     #[method(name = "getCode")]
     async fn code(
@@ -112,7 +114,7 @@ pub trait EthApi {
     #[method(name = "call")]
     async fn call(
         &self,
-        tx: TransactionRequest,
+        request: TransactionRequest,
         block_number: Option<BlockNumber>,
         state_overrides: Option<StateOverride>,
     ) -> RpcResult<Bytes>;
