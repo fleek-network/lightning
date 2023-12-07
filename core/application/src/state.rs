@@ -772,31 +772,39 @@ impl<B: Backend> State<B> {
     }
 
     fn change_epoch(&self, sender: TransactionSender, epoch: Epoch) -> TransactionResponse {
+        tracing::error!("###################### change_epoch [1]");
         // Only Nodes can call this function
         let index = match self.only_node(sender) {
             Ok(account) => account,
             Err(e) => return e,
         };
+        tracing::error!("###################### change_epoch [2]");
         let mut current_epoch = match self.metadata.get(&Metadata::Epoch) {
             Some(Value::Epoch(epoch)) => epoch,
             _ => 0,
         };
+        tracing::error!("###################### change_epoch [3]");
 
         match epoch.cmp(&current_epoch) {
             Ordering::Less => {
+                tracing::error!("###################### change_epoch already changed");
                 return TransactionResponse::Revert(ExecutionError::EpochAlreadyChanged);
             },
             Ordering::Greater => {
+                tracing::error!("###################### change_epoch not started");
                 return TransactionResponse::Revert(ExecutionError::EpochHasNotStarted);
             },
             _ => (),
         }
+        tracing::error!("###################### change_epoch [4]");
 
         let mut current_committee = self.committee_info.get(&current_epoch).unwrap_or_default();
         // If sender is not on the current committee revert early, or if they have already signaled;
         if !current_committee.members.contains(&index) {
+            tracing::error!("###################### change_epoch not member");
             return TransactionResponse::Revert(ExecutionError::NotCommitteeMember);
         } else if current_committee.ready_to_change.contains(&index) {
+            tracing::error!("###################### change_epoch already signaled");
             return TransactionResponse::Revert(ExecutionError::AlreadySignaled);
         }
         current_committee.ready_to_change.push(index);
