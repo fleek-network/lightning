@@ -502,7 +502,7 @@ where
     pub fn state(&self, respond: oneshot::Sender<State>) {
         let logical_connections = self.network_overlay.connections();
 
-        let actual_connections = self
+        let mut actual_connections = self
             .pool
             .iter()
             .map(|(index, handle)| {
@@ -531,21 +531,21 @@ where
             let mut connections = HashMap::new();
 
             // We get information from actual running connections.
-            for (index, (info, queue)) in actual_connections {
+            for (index, logical_connection_info) in logical_connections {
                 let (respond_tx, respond_rx) = oneshot::channel();
-                // We avoid burdening an already-busy queue.
-                let stats = if queue
-                    .try_send(ServiceRequest::Stats {
-                        respond: respond_tx,
-                    })
-                    .is_err()
-                {
-                    respond_rx.await.ok()
-                } else {
-                    None
-                };
+                if let Some((info, queue)) = actual_connections.remove(&index) {
+                    // We avoid burdening an already-busy queue.
+                    let stats = if queue
+                        .try_send(ServiceRequest::Stats {
+                            respond: respond_tx,
+                        })
+                        .is_err()
+                    {
+                        respond_rx.await.ok()
+                    } else {
+                        None
+                    };
 
-                if let Some(logical_connection_info) = logical_connections.get(&index) {
                     let transport_connection = TransportConnectionInfo {
                         redundant: false,
                         stats,
@@ -570,6 +570,10 @@ where
                         "logical connection corresponding to actual connection does not exist"
                     )
                 }
+            }
+
+            if !actual_connections.is_empty() {
+                tracing::warn!("found actual connections that are not in the overlay state")
             }
 
             // We get information from actual running redundant connections.
@@ -608,13 +612,16 @@ where
 
     #[inline]
     pub fn peer_info(&self, index: NodeIndex, respond: oneshot::Sender<Option<ConnectionInfo>>) {
-        if let Some(handle) = self.pool.get(&index) {
-            let info = self.network_overlay.node_info_from_state(&index);
-            if let Some(connection_info) = self.network_overlay.get_connection_info(&index) {
-                let from_topology = connection_info.from_topology;
-                let pinned = connection_info.pinned;
+        let info = self.network_overlay.node_info_from_state(&index);
+        if let Some(connection_info) = self.network_overlay.get_connection_info(&index) {
+            let from_topology = connection_info.from_topology;
+            let pinned = connection_info.pinned;
 
+            if let Some(handle) = self.pool.get(&index) {
                 let (respond_tx, respond_rx) = oneshot::channel();
+                let work_queue_cap = handle.service_request_tx.capacity();
+                let work_queue_max_cap = handle.service_request_tx.max_capacity();
+
                 if handle
                     .service_request_tx
                     .try_send(ServiceRequest::Stats {
@@ -622,9 +629,6 @@ where
                     })
                     .is_ok()
                 {
-                    let work_queue_cap = handle.service_request_tx.capacity();
-                    let work_queue_max_cap = handle.service_request_tx.max_capacity();
-
                     tokio::spawn(async move {
                         let stats = respond_rx.await.ok();
                         let transport_connection = TransportConnectionInfo {
@@ -641,7 +645,14 @@ where
                         }));
                     });
                 } else {
-                    let _ = respond.send(None);
+                    let _ = respond.send(Some(ConnectionInfo {
+                        from_topology,
+                        pinned,
+                        peer: info,
+                        work_queue_cap,
+                        work_queue_max_cap,
+                        actual_connections: vec![],
+                    }));
                 }
                 // Note: we ignore redundant connection because they should not get used much
                 // and should not happen often unless there's some malicious nodes.
