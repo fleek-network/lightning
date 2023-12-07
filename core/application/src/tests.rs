@@ -2838,3 +2838,121 @@ async fn test_withdraw_unstaked_works_properly() {
         HpUfixed::zero()
     );
 }
+
+#[tokio::test]
+async fn test_submit_reputations_measurements_reverts_account_key() {
+    // Create a genesis committee and seed the application state with it.
+    let committee_size = 4;
+    let (committee, _keystore) = create_genesis_committee(committee_size);
+    let (update_socket, _query_runner) = test_init_app(committee);
+
+    // Account Secret Key
+    let secret_key = AccountOwnerSecretKey::generate();
+    let opt_in = UpdateMethod::SubmitReputationMeasurements {
+        measurements: Default::default(),
+    };
+    let update = prepare_update_request_account(opt_in, &secret_key, 1);
+    expect_tx_revert!(update, &update_socket, ExecutionError::OnlyNode);
+}
+
+#[tokio::test]
+async fn test_submit_reputations_measurements_reverts_node_does_not_exist() {
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+    let mut rng = random::get_seedable_rng();
+
+    let mut measurements = BTreeMap::new();
+    let _ = update_reputation_measurements(
+        &query_runner,
+        &mut measurements,
+        &keystore[1].node_secret_key.to_pk(),
+        reputation::generate_reputation_measurements(&mut rng, 0.1),
+    );
+
+    let update = prepare_update_request_node(
+        UpdateMethod::SubmitReputationMeasurements { measurements },
+        &NodeSecretKey::generate(),
+        1,
+    );
+
+    expect_tx_revert!(update, &update_socket, ExecutionError::NodeDoesNotExist);
+}
+
+#[tokio::test]
+async fn test_submit_reputations_measurements_reverts_insufficient_stake() {
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+    let mut rng = random::get_seedable_rng();
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_secret_key = NodeSecretKey::generate();
+
+    // Stake less than the minimum required amount.
+    let minimum_stake_amount: HpUfixed<18> = query_runner.get_staking_amount().into();
+    let less_than_minimum_skate_amount: HpUfixed<18> =
+        minimum_stake_amount / HpUfixed::<18>::from(2u16);
+    deposit_and_stake!(
+        &update_socket,
+        &owner_secret_key,
+        1,
+        &less_than_minimum_skate_amount,
+        &node_secret_key.to_pk(),
+        [0; 96].into()
+    );
+
+    let mut measurements = BTreeMap::new();
+    let _ = update_reputation_measurements(
+        &query_runner,
+        &mut measurements,
+        &keystore[1].node_secret_key.to_pk(),
+        reputation::generate_reputation_measurements(&mut rng, 0.1),
+    );
+
+    let update = prepare_update_request_node(
+        UpdateMethod::SubmitReputationMeasurements { measurements },
+        &node_secret_key,
+        1,
+    );
+
+    expect_tx_revert!(update, &update_socket, ExecutionError::InsufficientStake);
+}
+
+#[tokio::test]
+async fn test_submit_reputations_measurements_too_many_measurementse() {
+    let committee_size = 4;
+    let (committee, _keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+    let mut rng = random::get_seedable_rng();
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_secret_key = NodeSecretKey::generate();
+
+    // Stake minimum required amount.
+    deposit_and_stake!(
+        &update_socket,
+        &owner_secret_key,
+        1,
+        &query_runner.get_staking_amount().into(),
+        &node_secret_key.to_pk(),
+        [0; 96].into()
+    );
+
+    let mut measurements = BTreeMap::new();
+
+    // create many dummy measurements that len >
+    for i in 1..10 {
+        measurements.insert(
+            i,
+            reputation::generate_reputation_measurements(&mut rng, i as f64 / 10.0),
+        );
+    }
+    let update = prepare_update_request_node(
+        UpdateMethod::SubmitReputationMeasurements { measurements },
+        &node_secret_key,
+        1,
+    );
+
+    expect_tx_revert!(update, &update_socket, ExecutionError::TooManyMeasurements);
+}
