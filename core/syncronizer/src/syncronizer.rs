@@ -3,6 +3,7 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
+use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{
     Blake3Hash,
@@ -10,6 +11,7 @@ use lightning_interfaces::types::{
     EpochInfo,
     NodeIndex,
     NodeInfo,
+    Participation,
     ServerRequest,
 };
 use lightning_interfaces::{
@@ -18,6 +20,7 @@ use lightning_interfaces::{
     BlockStoreServerSocket,
     ConfigConsumer,
     Notification,
+    SignerInterface,
     SyncQueryRunnerInterface,
     SyncronizerInterface,
     WithStartAndShutdown,
@@ -30,7 +33,14 @@ use tokio::task::JoinHandle;
 use tracing::info;
 
 use crate::config::Config;
-use crate::rpc::{rpc_epoch, rpc_last_epoch_hash, rpc_request};
+use crate::rpc::{
+    rpc_epoch,
+    rpc_epoch_info,
+    rpc_is_valid_node,
+    rpc_last_epoch_hash,
+    rpc_node_info,
+    rpc_request,
+};
 
 pub struct Syncronizer<C: Collection> {
     inner: Mutex<Option<SyncronizerInner<C>>>,
@@ -40,6 +50,7 @@ pub struct Syncronizer<C: Collection> {
 }
 
 pub struct SyncronizerInner<C: Collection> {
+    our_public_key: NodePublicKey,
     query_runner: c![C::ApplicationInterface::SyncExecutor],
     blockstore_server_socket: BlockStoreServerSocket,
     rx_epoch_change: Receiver<Notification>,
@@ -98,9 +109,11 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
         config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore_server: &C::BlockStoreServerInterface,
+        signer: &C::SignerInterface,
         rx_epoch_change: Receiver<Notification>,
     ) -> Result<Self> {
         let inner = SyncronizerInner::new(
+            signer.get_ed25519_pk(),
             query_runner,
             blockstore_server,
             rx_epoch_change,
@@ -124,6 +137,7 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
 
 impl<C: Collection> SyncronizerInner<C> {
     fn new(
+        our_public_key: NodePublicKey,
         query_runner: c![C::ApplicationInterface::SyncExecutor],
         blockstore_server: &C::BlockStoreServerInterface,
         rx_epoch_change: Receiver<Notification>,
@@ -140,6 +154,7 @@ impl<C: Collection> SyncronizerInner<C> {
             .build()?;
 
         Ok(Self {
+            our_public_key,
             query_runner,
             blockstore_server_socket: blockstore_server.get_socket(),
             rx_epoch_change,
@@ -154,8 +169,11 @@ impl<C: Collection> SyncronizerInner<C> {
         tx_update_ready: oneshot::Sender<Blake3Hash>,
         mut shutdown: oneshot::Receiver<()>,
     ) {
-        // When we first start we want to immiedetly check if we should checkpoint instead of
-        // waiting
+        if !cfg!(debug_assertions) {
+            // We only run the prelude in prod mode to avoid interfering with tests.
+            self.prelude().await;
+        }
+        // When we first start we want to check if we should checkpoint
         if let Ok(checkpoint_hash) = self.try_sync().await {
             // Our blockstore succesfully downloaded the checkpoint lets send up the hash and return
             let _ = tx_update_ready.send(checkpoint_hash);
@@ -194,6 +212,70 @@ impl<C: Collection> SyncronizerInner<C> {
 
                 _ = &mut shutdown => return
             }
+        }
+    }
+
+    async fn prelude(&self) {
+        // Check if node is on genesis committee.
+        for (_, node_info) in &self.genesis_committee {
+            if self.our_public_key == node_info.public_key {
+                // If the node is a member of the genesis committee, we skip the prelude.
+                return;
+            }
+        }
+
+        // Check if node is staked.
+        if !self
+            .check_is_valid_node()
+            .await
+            .expect("Cannot reach bootstrap nodes")
+        {
+            panic!("The node is not staked. Only staked nodes can participate in the network")
+        }
+
+        let node_info = self
+            .get_node_info()
+            .await
+            .expect("Cannot reach bootstrap nodes")
+            .unwrap(); // safe unwrap because we check if the node is valid above
+
+        let epoch_info = self
+            .get_epoch_info()
+            .await
+            .expect("Cannot reach bootstrap nodes");
+
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let until_epoch_ends: u64 = (epoch_info.epoch_end as u128)
+            .saturating_sub(now)
+            .try_into()
+            .unwrap();
+        let until_epoch_ends = Duration::from_millis(until_epoch_ends);
+
+        // Check if node staked this epoch.
+        if node_info.staked_since == epoch_info.epoch {
+            // The node staked this epoch, therefore we have to wait until next epoch to join the
+            // network.
+            info!("Waiting until next epoch to join the network.");
+            // TODO(matthias): add a timer?
+            tokio::time::sleep(until_epoch_ends + Duration::from_secs(30)).await;
+        }
+
+        // Check participation status.
+        match node_info.participation {
+            Participation::False => {
+                panic!(
+                    "The node is currently not participating in the network. Submit a OptIn transaction using the CLI if you want to participate again."
+                )
+            },
+            Participation::OptedIn => {
+                info!("Waiting until next epoch to join the network.");
+                // TODO(matthias): add a timer?
+                tokio::time::sleep(until_epoch_ends + Duration::from_secs(30)).await;
+            },
+            _ => (),
         }
     }
 
@@ -266,6 +348,23 @@ impl<C: Collection> SyncronizerInner<C> {
     /// Returns the epoch the bootstrap nodes are on
     async fn get_current_epoch(&self) -> Result<Epoch> {
         self.ask_bootstrap_nodes(rpc_epoch().to_string()).await
+    }
+
+    /// Returns the epoch info from the epoch the bootstrap nodes are on
+    async fn get_epoch_info(&self) -> Result<EpochInfo> {
+        self.ask_bootstrap_nodes(rpc_epoch_info().to_string()).await
+    }
+
+    /// Returns the node info for our node, if it's already on the state.
+    async fn get_node_info(&self) -> Result<Option<NodeInfo>> {
+        self.ask_bootstrap_nodes(rpc_node_info(self.our_public_key).to_string())
+            .await
+    }
+
+    /// Returns the node info for our node, if it's already on the state.
+    async fn check_is_valid_node(&self) -> Result<bool> {
+        self.ask_bootstrap_nodes(rpc_is_valid_node(self.our_public_key).to_string())
+            .await
     }
 }
 

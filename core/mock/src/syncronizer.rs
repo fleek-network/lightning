@@ -42,6 +42,7 @@ impl<C: Collection> SyncronizerInterface<C> for MockSyncronizer<C> {
         _config: Self::Config,
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
         _blockstore_server: &C::BlockStoreServerInterface,
+        _signer: &C::SignerInterface,
         _rx_epoch_change: Receiver<Notification>,
     ) -> Result<Self> {
         let (tx, rx) = oneshot::channel();

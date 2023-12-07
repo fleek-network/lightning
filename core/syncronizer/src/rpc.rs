@@ -1,6 +1,7 @@
 use std::net::IpAddr;
 
 use anyhow::{anyhow, Result};
+use fleek_crypto::NodePublicKey;
 use serde::de::DeserializeOwned;
 
 pub async fn rpc_request<T: DeserializeOwned>(
@@ -50,6 +51,33 @@ pub fn rpc_epoch() -> serde_json::Value {
         "jsonrpc": "2.0",
         "method":"flk_get_epoch",
         "params":[],
+        "id":1,
+    })
+}
+
+pub fn rpc_epoch_info() -> serde_json::Value {
+    serde_json::json!({
+        "jsonrpc": "2.0",
+        "method":"flk_get_epoch_info",
+        "params":[],
+        "id":1,
+    })
+}
+
+pub fn rpc_node_info(public_key: NodePublicKey) -> serde_json::Value {
+    serde_json::json!({
+        "jsonrpc": "2.0",
+        "method":"flk_get_node_info",
+        "params":{"public_key": public_key},
+        "id":1,
+    })
+}
+
+pub fn rpc_is_valid_node(public_key: NodePublicKey) -> serde_json::Value {
+    serde_json::json!({
+        "jsonrpc": "2.0",
+        "method":"flk_is_valid_node",
+        "params":{"public_key": public_key},
         "id":1,
     })
 }
