@@ -67,7 +67,9 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
         // If there is no open connections try and make a connection with the targeted number of
         // peers or the rest of committee we have not tried yet
         if self.active_connections.len() < self.min_connections {
+            error!("FORWARDER: MAKING CONNECTIONS[1]");
             self.make_connections().await?;
+            error!("FORWARDER: DONE MAKING CONNECTIONS[2]");
         }
 
         // serialize transaction
@@ -81,10 +83,11 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
         // can try and send the transaction to each worker we have a connection with. If the
         // send was successful we keep the connection, if the send was not successful we assume it a
         // bad connection and drop the client
+        error!("FORWARDER: [3]");
         let cap = self.active_connections.capacity();
         let active_connections =
             std::mem::replace(&mut self.active_connections, HashMap::with_capacity(cap));
-
+        error!("FORWARDER: [4]");
         self.active_connections.extend(
             futures::future::join_all(active_connections.into_iter().map(|mut e| async {
                 e.1.submit_transaction(request.clone())
@@ -99,10 +102,12 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
             // then it will be an empty iterator.
             .flatten(),
         );
+        error!("FORWARDER: [5]");
 
         if self.active_connections.is_empty() {
             bail!("Failed sending transaction to any worker")
         }
+        error!("FORWARDER: [6]");
         Ok(())
     }
 
