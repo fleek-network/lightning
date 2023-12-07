@@ -2,18 +2,19 @@ use std::sync::Arc;
 
 use jsonrpsee::core::RpcResult;
 use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::SyncQueryRunnerInterface;
 use tracing::trace;
 
 use crate::api::NetApiServer;
 use crate::Data;
 
 pub struct NetApi<C: Collection> {
-    _data: Arc<Data<C>>,
+    data: Arc<Data<C>>,
 }
 
 impl<C: Collection> NetApi<C> {
     pub(crate) fn new(data: Arc<Data<C>>) -> Self {
-        Self { _data: data }
+        Self { data }
     }
 }
 

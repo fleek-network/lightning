@@ -78,7 +78,14 @@ impl<C: Collection> EthApiServer for EthApi<C> {
 
     async fn chain_id(&self) -> RpcResult<Option<U64>> {
         trace!(target: "rpc::eth", "Serving eth_chainId");
-        Ok(Some(self.data.query_runner.get_chain_id().into()))
+        Ok(Some(
+            self.data
+                .query_runner
+                .get_chain_id()
+                .to_string()
+                .parse::<U64>()
+                .map_err(RPCError::from)?,
+        ))
     }
 
     /// todo(n)
