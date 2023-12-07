@@ -5,7 +5,7 @@ use affair::Socket;
 use anyhow::Result;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use lightning_types::{AccountInfo, NodeIndex, NodeInfoWithIndex, TransactionRequest};
+use lightning_types::{AccountInfo, NodeIndex, NodeInfoWithIndex, TransactionRequest, TxHash};
 use serde::{Deserialize, Serialize};
 
 use crate::common::WithStartAndShutdown;
@@ -206,6 +206,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Returns the current block number
     fn get_block_number(&self) -> u64;
+
+    /// Checks if an transaction digest has been executed this epoch.
+    fn has_executed_digest(&self, digest: TxHash) -> bool;
 }
 
 #[derive(Clone, Debug)]

@@ -29,6 +29,8 @@ use super::{
 };
 use crate::{NodeIndex, NodePorts, TransactionDestination};
 
+pub type TxHash = [u8; 32];
+
 // TODO: Change this to capital and non-abrv version.
 const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";
 
@@ -127,7 +129,7 @@ impl TransactionRequest {
         }
     }
 
-    pub fn hash(&self) -> [u8; 32] {
+    pub fn hash(&self) -> TxHash {
         match self {
             Self::UpdateRequest(payload) => payload.payload.to_digest(),
             Self::EthereumRequest(payload) => payload.hash().0,

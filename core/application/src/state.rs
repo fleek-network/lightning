@@ -47,6 +47,7 @@ use lightning_interfaces::types::{
     TotalServed,
     TransactionRequest,
     TransactionResponse,
+    TxHash,
     UnstakeCall,
     UpdateMethod,
     UpdateRequest,
@@ -119,6 +120,7 @@ pub struct State<B: Backend> {
     pub total_served: B::Ref<Epoch, TotalServed>,
     pub service_revenue: B::Ref<ServiceId, ServiceRevenue>,
     pub commodity_prices: B::Ref<CommodityTypes, HpUfixed<6>>,
+    pub executed_digests: B::Ref<TxHash, ()>,
     pub backend: B,
 }
 
@@ -143,11 +145,13 @@ impl<B: Backend> State<B> {
             total_served: backend.get_table_reference("total_served"),
             commodity_prices: backend.get_table_reference("commodity_prices"),
             service_revenue: backend.get_table_reference("service_revenue"),
+            executed_digests: backend.get_table_reference("executed_digests"),
             backend,
         }
     }
 
     pub fn execute_transaction(&self, txn: TransactionRequest) -> TransactionResponse {
+        let hash = txn.hash();
         let (sender, response) = match txn {
             TransactionRequest::UpdateRequest(payload) => (
                 payload.payload.sender,
@@ -158,6 +162,7 @@ impl<B: Backend> State<B> {
                 self.execute_ethereum_transaction(payload.into()),
             ),
         };
+        self.executed_digests.set(hash, ());
         // Increment nonce of the sender
         self.increment_nonce(sender);
         response
@@ -807,6 +812,11 @@ impl<B: Backend> State<B> {
             // Todo: Reward nodes, choose new committee, increment epoch.
             self.calculate_reputation_scores();
             self.distribute_rewards();
+
+            // Clear executed digests.
+            for digest in self.executed_digests.keys() {
+                self.executed_digests.remove(&digest);
+            }
 
             // calculate the next epoch endstamp
             let epoch_duration = self.parameters.get(&ProtocolParams::EpochTime).unwrap_or(1);
