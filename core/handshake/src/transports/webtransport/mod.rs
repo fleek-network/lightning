@@ -11,7 +11,7 @@ pub use config::WebTransportConfig;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::StreamExt;
 use tokio::sync::mpsc::{self, Receiver};
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 use wtransport::tls::Certificate;
 use wtransport::{Endpoint, SendStream, ServerConfig};
 
@@ -41,13 +41,15 @@ impl Transport for WebTransport {
         shutdown: ShutdownWaiter,
         config: Self::Config,
     ) -> anyhow::Result<(Self, Option<Router>)> {
+        info!("Binding WebTransport on {}", config.address);
+
         let (cert_hash, server_config) =
             create_cert_hash_and_server_config(NodeSecretKey::generate(), config.clone())?;
 
         let shared_cert_hash = Arc::new(RwLock::new(cert_hash));
         let router = Router::new()
             .route(
-                "certificate-hash",
+                "/certificate-hash",
                 axum::routing::get(
                     |Extension(cert_hash): Extension<Arc<RwLock<Vec<u8>>>>| async move {
                         cert_hash.read().unwrap().to_vec()

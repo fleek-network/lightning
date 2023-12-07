@@ -7,7 +7,6 @@ use bytes::Bytes;
 use futures::{SinkExt, StreamExt};
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{RequestHeader, ServiceScope};
-use lightning_metrics::histogram;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
@@ -55,7 +54,6 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                 let (stream_tx, stream_rx) = match accept_result {
                     Ok(streams) => streams,
                     Err(e) => {
-                        report_metrics(ctx.connection.stats());
                         return Err(e.into());
                     }
                 };
@@ -79,7 +77,6 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                 let stream_rx = match accept_result {
                     Ok(stream) => stream,
                     Err(e) => {
-                        report_metrics(ctx.connection.stats());
                         return Err(e.into());
                     }
                 };
@@ -149,38 +146,7 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
         }
     }
 
-    report_metrics(ctx.connection.stats());
-
     Ok(())
-}
-
-#[inline]
-fn report_metrics(metrics: Stats) {
-    histogram!(
-        "lost_packets",
-        Some("Lost packets"),
-        metrics.lost_packets as f64
-    );
-    histogram!(
-        "sent_packets",
-        Some("Sent packets"),
-        metrics.sent_packets as f64
-    );
-    histogram!(
-        "congestion_events",
-        Some("Congestion packets"),
-        metrics.congestion_events as f64
-    );
-    histogram!(
-        "congestion_window",
-        Some("Congestion window"),
-        metrics.cwnd as f64
-    );
-    histogram!(
-        "black_holes_detected",
-        Some("Black holes"),
-        metrics.black_holes_detected as f64
-    );
 }
 
 async fn handle_incoming_uni_stream<C: ConnectionInterface>(

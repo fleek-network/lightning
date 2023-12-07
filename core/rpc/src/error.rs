@@ -3,6 +3,7 @@ use std::error::Error;
 use ethers::utils::rlp;
 use jsonrpsee::types::error::INTERNAL_ERROR_CODE;
 use jsonrpsee::types::ErrorObject;
+use ruint::ParseError;
 
 #[derive(Debug)]
 pub struct SocketErrorWrapper(String);
@@ -36,6 +37,9 @@ pub enum RPCError {
 
     #[error("Unimplemented")]
     Unimplemented,
+
+    #[error("Failed to parse uint {}", .0)]
+    ParseError(#[from] ParseError),
 
     #[error("RPCError {}", .0)]
     Custom(String),
@@ -75,6 +79,7 @@ impl From<RPCError> for ErrorObject<'static> {
             RPCError::SocketError(e) => internal_err(e),
             RPCError::Unimplemented => internal_err_from_string("Unimplemented".to_string()),
             RPCError::Custom(s) => internal_err_from_string(s),
+            RPCError::ParseError(e) => internal_err(e),
         }
     }
 }
