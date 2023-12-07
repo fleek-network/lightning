@@ -217,7 +217,7 @@ impl<B: Backend> State<B> {
             },
 
             UpdateMethod::WithdrawUnstaked { node, recipient } => {
-                self.withdrawl_unstaked(txn.payload.sender, node, recipient)
+                self.withdraw_unstaked(txn.payload.sender, node, recipient)
             },
 
             UpdateMethod::ChangeEpoch { epoch } => self.change_epoch(txn.payload.sender, epoch),
@@ -297,7 +297,7 @@ impl<B: Backend> State<B> {
                 Ok(FleekContractCalls::WithdrawUnstaked(WithdrawUnstakedCall {
                     node_public_key,
                     recipient,
-                })) => self.withdrawl_unstaked(sender.into(), node_public_key.into(), None),
+                })) => self.withdraw_unstaked(sender.into(), node_public_key.into(), None),
                 Ok(FleekContractCalls::Stake(StakeCall {
                     amount,
                     node_public_key,
@@ -717,7 +717,7 @@ impl<B: Backend> State<B> {
         TransactionResponse::Success(ExecutionData::None)
     }
 
-    fn withdrawl_unstaked(
+    fn withdraw_unstaked(
         &self,
         sender: TransactionSender,
         node_public_key: NodePublicKey,
