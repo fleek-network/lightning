@@ -17,6 +17,7 @@ impl Default for HandshakeConfig {
         Self {
             transports: vec![
                 TransportConfig::WebRTC(Default::default()),
+                TransportConfig::WebTransport(Default::default()),
                 TransportConfig::Tcp(Default::default()),
             ],
             http_address: ([0, 0, 0, 0], 4220).into(),
