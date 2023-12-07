@@ -13,7 +13,6 @@ tracing.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 infusion.workspace = true
-affair.workspace = true
 fleek-crypto.workspace = true
 async-trait.workspace = true
 futures.workspace = true
@@ -21,17 +20,14 @@ tokio.workspace = true
 tokio-util = { workspace = true, features = ["codec"] }
 bytes = "1.4"
 arrayref = "0.3"
-arrayvec = "0.7"
 dashmap = "5.5"
-ahash = "0.8"
 fxhash = "0.2"
 derive_more = "0.99"
 enum_dispatch = "0.3.12"
 triomphe = "0.1.9"
 smallvec = "1.11"
-heapless = "0.7.16"
 axum = { version = "0.6", features = ["macros"]}
-str0m = "0.3.0"
+str0m = "0.4.1"
 wtransport = { version = "0.1.9", features = ["dangerous-configuration"] }
 rand = "0.8"
 rcgen = "0.11"

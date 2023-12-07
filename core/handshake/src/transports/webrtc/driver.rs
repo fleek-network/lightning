@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Result};
 use dashmap::DashMap;
 use str0m::channel::{ChannelData, ChannelId};
-use str0m::net::{Receive, Transmit};
+use str0m::net::{Protocol, Receive, Transmit};
 use str0m::{Event, IceConnectionState, Input, Output, Rtc};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
@@ -75,6 +75,7 @@ impl WebRtcDriver {
                                             [127,0,0,1],
                                             self.socket.local_addr().unwrap().port()
                                         ).into(),
+                                        proto: Protocol::Udp,
                                         contents: buf[..n].try_into().unwrap(),
                                     },
                                 )) {
