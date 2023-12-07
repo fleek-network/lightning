@@ -502,7 +502,7 @@ where
     pub fn state(&self, respond: oneshot::Sender<State>) {
         let logical_connections = self.network_overlay.connections();
 
-        let actual_connections = self
+        let mut actual_connections = self
             .pool
             .iter()
             .map(|(index, handle)| {
@@ -531,21 +531,21 @@ where
             let mut connections = HashMap::new();
 
             // We get information from actual running connections.
-            for (index, (info, queue)) in actual_connections {
+            for (index, logical_connection_info) in logical_connections {
                 let (respond_tx, respond_rx) = oneshot::channel();
-                // We avoid burdening an already-busy queue.
-                let stats = if queue
-                    .try_send(ServiceRequest::Stats {
-                        respond: respond_tx,
-                    })
-                    .is_err()
-                {
-                    respond_rx.await.ok()
-                } else {
-                    None
-                };
+                if let Some((info, queue)) = actual_connections.remove(&index) {
+                    // We avoid burdening an already-busy queue.
+                    let stats = if queue
+                        .try_send(ServiceRequest::Stats {
+                            respond: respond_tx,
+                        })
+                        .is_err()
+                    {
+                        respond_rx.await.ok()
+                    } else {
+                        None
+                    };
 
-                if let Some(logical_connection_info) = logical_connections.get(&index) {
                     let transport_connection = TransportConnectionInfo {
                         redundant: false,
                         stats,
@@ -570,6 +570,10 @@ where
                         "logical connection corresponding to actual connection does not exist"
                     )
                 }
+            }
+
+            if !actual_connections.is_empty() {
+                tracing::warn!("found actual connections that are not in the overlay state")
             }
 
             // We get information from actual running redundant connections.
