@@ -793,7 +793,6 @@ impl<B: Backend> State<B> {
         }
 
         let mut current_committee = self.committee_info.get(&current_epoch).unwrap_or_default();
-
         // If sender is not on the current committee revert early, or if they have already signaled;
         if !current_committee.members.contains(&index) {
             return TransactionResponse::Revert(ExecutionError::NotCommitteeMember);
@@ -801,6 +800,13 @@ impl<B: Backend> State<B> {
             return TransactionResponse::Revert(ExecutionError::AlreadySignaled);
         }
         current_committee.ready_to_change.push(index);
+
+        tracing::error!("######################");
+        tracing::error!(
+            "EPOCH CHANGE is called, ready to change: {} out of {}",
+            current_committee.ready_to_change.len(),
+            current_committee.members.len()
+        );
 
         // If more than 2/3rds of the committee have signaled, start the epoch change process
         if current_committee.ready_to_change.len() > (2 * current_committee.members.len() / 3) {
@@ -828,10 +834,12 @@ impl<B: Backend> State<B> {
                 },
             );
 
+            tracing::error!("###################### Changing epoch");
             self.metadata
                 .set(Metadata::Epoch, Value::Epoch(current_epoch));
             TransactionResponse::Success(ExecutionData::EpochChange)
         } else {
+            tracing::error!("###################### Not changing epoch");
             self.committee_info.set(current_epoch, current_committee);
             TransactionResponse::Success(ExecutionData::None)
         }

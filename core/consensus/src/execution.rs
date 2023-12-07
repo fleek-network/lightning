@@ -204,8 +204,10 @@ impl<Q: SyncQueryRunnerInterface> ExecutionState for Execution<Q> {
 
                 // Submit the batches to application layer and if the epoch changed reset last
                 // executed
+                tracing::error!("###################### before notify waiters");
                 if epoch_changed {
                     self.reconfigure_notify.notify_waiters();
+                    tracing::error!("###################### notify waiters");
                 }
             }
         }
