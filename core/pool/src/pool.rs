@@ -160,7 +160,7 @@ where
 
         let mut endpoint = match state {
             State::Running { handle } => {
-                self.shutdown_notify.notify_one();
+                self.shutdown_notify.notify_waiters();
                 handle.await.context("endpoint tasked failed").unwrap()
             },
             State::NotRunning { .. } => {
