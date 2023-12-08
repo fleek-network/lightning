@@ -6,8 +6,43 @@ document.getElementById("start")!.onclick = async () => {
   await startSession();
 };
 
-const transport = new WebTransport("url");
+// Temporary internal hash for big buck bunny
+const bbb_blake3 = new Uint8Array([
+  16,
+  101,
+  178,
+  253,
+  130,
+  145,
+  238,
+  45,
+  55,
+  180,
+  144,
+  250,
+  71,
+  121,
+  27,
+  31,
+  201,
+  144,
+  67,
+  224,
+  179,
+  36,
+  52,
+  86,
+  242,
+  33,
+  164,
+  55,
+  27,
+  140,
+  43,
+  209,
+]);
 
+let transport: WebTransport;
 let readStream: ReadableStream;
 let writeStream: WritableStream;
 let sourceBuffer: SourceBuffer | undefined;
@@ -15,32 +50,45 @@ let readBuffer: Uint8Array = new Uint8Array(256 * 1024 + 4);
 const queue: Uint8Array[] = [];
 
 const handshake = async () => {
+  // Request the certificate hash for the node
+  const res = await fetch("http://localhost:4220/certificate-hash");
+  const hash = await res.arrayBuffer();
+  console.log(hash);
+
   // Make connection.
+  transport = new WebTransport("https://localhost:4321", {
+    serverCertificateHashes: [{ algorithm: "sha-256", value: hash }],
+  });
   await transport.ready;
+
   // Open a bi-directional stream.
   const stream = await transport.createBidirectionalStream();
 
   readStream = stream.readable;
   writeStream = stream.writable;
 
-  await send(
+  send(
     schema.HandshakeRequest.encode({
       tag: schema.HandshakeRequest.Tag.Handshake,
-      service: 1 as schema.ServiceId,
+      service: 0 as schema.ServiceId,
       pk: new Uint8Array(96) as schema.ClientPublicKey,
       pop: new Uint8Array(48) as schema.ClientSignature,
     }),
   );
 };
 
-const send = async (buffer: ArrayBuffer) => {
+const send = (buffer: ArrayBuffer) => {
   if (!writeStream) {
+    console.log("failed to write to stream");
   }
+
   const length = buffer.byteLength;
-  const view = new DataView(buffer);
-  view.setUint32(0, length, false);
+  const delim = new DataView(new ArrayBuffer(4));
+  delim.setUint32(0, length, false);
+
   const writer = writeStream.getWriter();
-  writer.write(view);
+  writer.write(delim);
+  writer.write(buffer);
 };
 
 const recv = async () => {
@@ -48,7 +96,7 @@ const recv = async () => {
 
   // Read the length header.
   while (readBuffer.length < 4) {
-    let { value, done } = await reader.read();
+    const { value, done } = await reader.read();
     readBuffer.set(value, readBuffer.length);
     if (done) {
       console.error("reader ended unexpectedly");
@@ -88,26 +136,26 @@ const startSession = async () => {
   await handshake();
 
   // Send a request for the CID.
-  const buffer = new ArrayBuffer(4);
-  await send(schema.Request.encode({
+  const reqWriter = new schema.Writer(bbb_blake3.length + 1);
+  reqWriter.putU8(0); // Blake3 origin id
+  reqWriter.put(bbb_blake3);
+  send(schema.Request.encode({
     tag: schema.Request.Tag.ServicePayload,
-    bytes: new Uint8Array(buffer),
+    bytes: new Uint8Array(reqWriter.getBuffer()),
   }));
 
   // Read the number of blocks we should receive back from the first frame.
-  let frame = await recv();
-
+  const frame = await recv();
   if (!frame || frame.tag !== schema.Response.Tag.ServicePayload) {
     console.error("invalid tag");
     return;
   }
-
-  appendBuffer(frame.bytes);
-
   const view = new DataView(frame.bytes.buffer);
   const blockCount = view.getUint32(0, false);
+
+  // Read each block from the stream
   for (let i = 0; i < blockCount; i++) {
-    let frame = await recv();
+    const frame = await recv();
     if (!frame || frame.tag !== schema.Response.Tag.ServicePayload) {
       console.error("invalid tag");
       return;
@@ -119,7 +167,6 @@ const startSession = async () => {
 
 // --------------------------------------------
 // MediaSource
-
 // Need to be specific for Blink regarding codecs
 // ./mp4info frag_bunny.mp4 | grep Codec
 const mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';

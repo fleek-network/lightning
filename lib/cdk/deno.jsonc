@@ -2,7 +2,10 @@
   "tasks": {
     "demo:watch": "deno bundle --watch ./demo/main.ts ./demo/main.js",
     "demo:serve": "deno run --allow-net --allow-read https://deno.land/std@0.201.0/http/file_server.ts demo",
-    "dev": "deno task demo:watch & deno task demo:serve"
+    "dev": "deno task demo:watch & deno task demo:serve",
+    "demo-wt:watch": "deno bundle --watch ./demo-wt/main.ts ./demo-wt/main.js",
+    "demo-wt:serve": "deno run --allow-net --allow-read https://deno.land/std@0.201.0/http/file_server.ts demo-wt",
+    "dev-wt": "deno task demo-wt:watch & deno task demo-wt:serve"
   },
   "compilerOptions": {
     "lib": ["dom", "dom.iterable", "dom.asynciterable", "deno.ns"]
