@@ -45,18 +45,18 @@ const bbb_blake3 = new Uint8Array([
 let transport: WebTransport;
 let readStream: ReadableStream;
 let writeStream: WritableStream;
+let writer: WritableStreamDefaultWriter;
 let sourceBuffer: SourceBuffer | undefined;
 let readBuffer: Uint8Array = new Uint8Array(256 * 1024 + 4);
 const queue: Uint8Array[] = [];
 
 const handshake = async () => {
   // Request the certificate hash for the node
-  const res = await fetch("http://localhost:4220/certificate-hash");
+  const res = await fetch("http://127.0.0.1:4220/certificate-hash");
   const hash = await res.arrayBuffer();
-  console.log(hash);
 
   // Make connection.
-  transport = new WebTransport("https://localhost:4321", {
+  transport = new WebTransport("https://127.0.0.1:4321", {
     serverCertificateHashes: [{ algorithm: "sha-256", value: hash }],
   });
   await transport.ready;
@@ -66,6 +66,7 @@ const handshake = async () => {
 
   readStream = stream.readable;
   writeStream = stream.writable;
+  writer = writeStream.getWriter();
 
   send(
     schema.HandshakeRequest.encode({
@@ -86,7 +87,6 @@ const send = (buffer: ArrayBuffer) => {
   const delim = new DataView(new ArrayBuffer(4));
   delim.setUint32(0, length, false);
 
-  const writer = writeStream.getWriter();
   writer.write(delim);
   writer.write(buffer);
 };
