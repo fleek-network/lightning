@@ -29,7 +29,6 @@ const FLEEK_CONTRACT: EthAddress = EthAddress([6; 20]);
 
 const FLEEK_CONTRACT_BYTES: &[u8; 172] = b"73000000000000000000000000000000000000000030146080604052600080fdfea264697066735822122012d3570051ca11eb882745693b7b2af91a10ad5074b3486da80280731d9af73164736f6c63430008120033";
 
-
 pub struct EthApi<C: Collection> {
     data: Arc<Data<C>>,
 }
@@ -195,12 +194,12 @@ impl<C: Collection> EthApiServer for EthApi<C> {
         block_number: Option<BlockNumber>,
     ) -> RpcResult<Bytes> {
         trace!(target: "rpc::eth", ?address, ?block_number, "Serving eth_getCode");
-        
+
         if address == FLEEK_CONTRACT {
             Ok(Bytes::from(FLEEK_CONTRACT_BYTES))
         } else {
             Ok(Bytes::new())
-        } 
+        }
     }
 
     async fn max_priority_fee_per_gas(&self) -> RpcResult<U256> {
