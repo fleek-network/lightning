@@ -1,19 +1,24 @@
 use anyhow::Result;
-use fleek_crypto::{NodeSecretKey, SecretKey};
-use rcgen::{CertificateParams, DistinguishedName, DnType, KeyPair, PKCS_ED25519};
+use fleek_crypto::NodeSecretKey;
+use rcgen::{CertificateParams, DistinguishedName, DnType, PKCS_ECDSA_P256_SHA256};
 use time::{Duration, OffsetDateTime};
 
 const COMMON_NAME: &str = "lightning";
 
-pub fn generate_certificate(sk: NodeSecretKey) -> Result<rcgen::Certificate> {
+pub fn generate_certificate(_sk: NodeSecretKey) -> Result<rcgen::Certificate> {
     let mut dname = DistinguishedName::new();
     dname.push(DnType::CommonName, COMMON_NAME);
 
-    let key_pair = KeyPair::from_pem(&sk.encode_pem())?;
+    let mut params = CertificateParams::new(vec![
+        // "localhost".to_string(),
+        // "127.0.0.1".to_string(),
+        COMMON_NAME.to_string(),
+    ]);
 
-    let mut params = CertificateParams::new(vec![COMMON_NAME.to_string()]);
-    params.key_pair = Some(key_pair);
-    params.alg = &PKCS_ED25519;
+    // params.key_pair = Some();
+    // let key_pair = KeyPair::from_pem(&sk.encode_pem())?;
+
+    params.alg = &PKCS_ECDSA_P256_SHA256;
     params.distinguished_name = dname;
     params.not_before = OffsetDateTime::now_utc();
     // Unwrap is OK because this gets called during start up and
