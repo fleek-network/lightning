@@ -320,7 +320,7 @@ impl SignerInner {
                 }
                 _ = new_block_notify.notified() => {
                     SignerInner::sync_with_application(
-                        self.node_public_key,
+                        &self.node_public_key,
                         &self.node_secret_key,
                         &query_runner,
                         &mempool_socket,
@@ -338,7 +338,7 @@ impl SignerInner {
 
     #[allow(clippy::too_many_arguments)]
     async fn sync_with_application<Q: SyncQueryRunnerInterface>(
-        node_public_key: NodePublicKey,
+        node_public_key: &NodePublicKey,
         node_secret_key: &NodeSecretKey,
         query_runner: &Q,
         mempool_socket: &MempoolSocket,
@@ -349,12 +349,12 @@ impl SignerInner {
     ) {
         // If node_info does not exist for the node, there is no point in sending a transaction
         // because it will revert. However, this can still be useful for testing.
-        let application_nonce =
-            if let Some(node_info) = query_runner.get_node_info(&node_public_key) {
-                node_info.nonce
-            } else {
-                0
-            };
+        let application_nonce = if let Some(node_info) = query_runner.get_node_info(node_public_key)
+        {
+            node_info.nonce
+        } else {
+            0
+        };
 
         // All transactions in range [base_nonce, application_nonce] have
         // been ordered, so we can remove them from `pending_transactions`.
@@ -366,52 +366,49 @@ impl SignerInner {
         }
         if pending_transactions.is_empty() {
             *base_timestamp = None;
-        } else {
-            //*base_timestamp = Some(pending_transactions[0].timestamp);
-            if let Some(base_timestamp_) = base_timestamp {
-                if base_timestamp_.elapsed().unwrap() >= TIMEOUT {
-                    // At this point we assume that the transactions in the buffer will never get
-                    // ordered.
-                    *base_timestamp = None;
-                    // Reset `next_nonce` to the nonce the application is expecting.
-                    *next_nonce = *base_nonce + 1;
-                    // Resend all transactions in the buffer.
+        } else if let Some(base_timestamp_) = base_timestamp {
+            if base_timestamp_.elapsed().unwrap() >= TIMEOUT {
+                // At this point we assume that the transactions in the buffer will never get
+                // ordered.
+                *base_timestamp = None;
+                // Reset `next_nonce` to the nonce the application is expecting.
+                *next_nonce = *base_nonce + 1;
+                // Resend all transactions in the buffer.
 
-                    pending_transactions.retain_mut(|tx| {
-                        if let TransactionResponse::Revert(_) =
-                            query_runner.validate_txn(tx.update_request.clone().into())
-                        {
-                            // If transaction reverts, don't retry.
-                            false
-                        } else if tx.tries < MAX_RETRIES {
-                            if tx.update_request.payload.nonce != *next_nonce {
-                                tx.update_request.payload.nonce = *next_nonce;
-                                let digest = tx.update_request.payload.to_digest();
-                                let signature = node_secret_key.sign(&digest);
-                                tx.update_request.signature = signature.into();
-                            }
-                            // Update timestamp to resending time.
-                            tx.timestamp = SystemTime::now();
-                            if base_timestamp.is_none() {
-                                *base_timestamp = Some(tx.timestamp);
-                            }
-                            *next_nonce += 1;
-                            true
-                        } else {
-                            false
+                pending_transactions.retain_mut(|tx| {
+                    if let TransactionResponse::Revert(_) =
+                        query_runner.validate_txn(tx.update_request.clone().into())
+                    {
+                        // If transaction reverts, don't retry.
+                        false
+                    } else if tx.tries < MAX_RETRIES {
+                        if tx.update_request.payload.nonce != *next_nonce {
+                            tx.update_request.payload.nonce = *next_nonce;
+                            let digest = tx.update_request.payload.to_digest();
+                            let signature = node_secret_key.sign(&digest);
+                            tx.update_request.signature = signature.into();
                         }
-                    });
+                        // Update timestamp to resending time.
+                        tx.timestamp = SystemTime::now();
+                        if base_timestamp.is_none() {
+                            *base_timestamp = Some(tx.timestamp);
+                        }
+                        *next_nonce += 1;
+                        true
+                    } else {
+                        false
+                    }
+                });
 
-                    for pending_tx in pending_transactions.iter_mut() {
-                        if let Err(e) = mempool_socket
-                            .run(pending_tx.update_request.clone().into())
-                            .await
-                            .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
-                        {
-                            error!("Failed to send transaction to mempool: {e:?}");
-                        } else {
-                            pending_tx.tries += 1;
-                        }
+                for pending_tx in pending_transactions.iter_mut() {
+                    if let Err(e) = mempool_socket
+                        .run(pending_tx.update_request.clone().into())
+                        .await
+                        .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
+                    {
+                        error!("Failed to send transaction to mempool: {e:?}");
+                    } else {
+                        pending_tx.tries += 1;
                     }
                 }
             }
