@@ -321,6 +321,7 @@ impl SignerInner {
                 _ = new_block_notify.notified() => {
                     SignerInner::sync_with_application(
                         self.node_public_key,
+                        &self.node_secret_key,
                         &query_runner,
                         &mempool_socket,
                         &mut base_nonce,
@@ -335,8 +336,10 @@ impl SignerInner {
         *self.rx.lock().unwrap() = Some(rx);
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn sync_with_application<Q: SyncQueryRunnerInterface>(
         node_public_key: NodePublicKey,
+        node_secret_key: &NodeSecretKey,
         query_runner: &Q,
         mempool_socket: &MempoolSocket,
         base_nonce: &mut u64,
@@ -381,7 +384,12 @@ impl SignerInner {
                             // If transaction reverts, don't retry.
                             false
                         } else if tx.tries < MAX_RETRIES {
-                            tx.update_request.payload.nonce = *next_nonce;
+                            if tx.update_request.payload.nonce != *next_nonce {
+                                tx.update_request.payload.nonce = *next_nonce;
+                                let digest = tx.update_request.payload.to_digest();
+                                let signature = node_secret_key.sign(&digest);
+                                tx.update_request.signature = signature.into();
+                            }
                             // Update timestamp to resending time.
                             tx.timestamp = SystemTime::now();
                             if base_timestamp.is_none() {
