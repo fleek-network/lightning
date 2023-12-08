@@ -15,11 +15,7 @@ impl Default for Config {
         Self {
             max_idle_timeout: Duration::from_millis(30000),
             address: "0.0.0.0:4300".parse().expect("Hardcoded socket address"),
-            http: Some(
-                "0.0.0.0:4369"
-                    .parse()
-                    .expect("Failed to parse socket address"),
-            ),
+            http: None,
         }
     }
 }
