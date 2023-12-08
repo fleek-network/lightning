@@ -154,13 +154,13 @@ impl Swarm {
             .collect()
     }
 
-    pub fn get_dht_handle(&self) -> Vec<Option<Dht<FinalTypes>>> {
-        self.nodes
-            .values()
-            .filter(|node| !node.is_bootstrap_node())
-            .map(|node| node.take_dht_socket())
-            .collect()
-    }
+    // pub fn get_dht_handle(&self) -> Vec<Option<Dht<FinalTypes>>> {
+    //     self.nodes
+    //         .values()
+    //         .filter(|node| !node.is_bootstrap_node())
+    //         .map(|node| node.take_dht_socket())
+    //         .collect()
+    // }
 
     pub fn get_blockstores(&self) -> Vec<Option<Blockstore<FinalTypes>>> {
         self.nodes
@@ -481,6 +481,7 @@ fn build_config(
 
     config.inject::<Pool<FinalTypes>>(PoolConfig {
         address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
+        http: None,
         ..Default::default()
     });
 

@@ -5,7 +5,6 @@ use anyhow::Result;
 use clap::Parser;
 use fleek_crypto::PublicKey;
 use lightning_application::app::Application;
-use lightning_dht::Dht;
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::networking::PortAssigner;
 use lightning_e2e::utils::{logging, shutdown};
@@ -17,7 +16,7 @@ use resolved_pathbuf::ResolvedPathBuf;
 partial!(PartialBinding {
     ApplicationInterface = Application<Self>;
     TopologyInterface = Topology<Self>;
-    DhtInterface = Dht<Self>;
+   // DhtInterface = Dht<Self>;
 });
 
 #[derive(Parser)]

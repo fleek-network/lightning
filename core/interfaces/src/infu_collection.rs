@@ -24,7 +24,7 @@ collection!([
     ReputationAggregatorInterface,
     ResolverInterface,
     RpcInterface,
-    DhtInterface,
+    //  DhtInterface,
     ServiceExecutorInterface,
     SignerInterface,
     FetcherInterface,
@@ -89,7 +89,7 @@ impl<C: Collection> Node<C> {
         provider.get::<C::ReputationAggregatorInterface>();
         provider.get::<C::ResolverInterface>();
         provider.get::<C::RpcInterface>();
-        provider.get::<C::DhtInterface>();
+        // provider.get::<C::DhtInterface>();
         provider.get::<C::ServiceExecutorInterface>();
         provider.get::<C::FetcherInterface>();
         provider.get::<C::PoolInterface>();
@@ -109,7 +109,7 @@ forward!(async fn start_or_shutdown_node(this, start: bool) on [
     HandshakeInterface,
     ArchiveInterface,
     ConsensusInterface,
-    DhtInterface,
+  //  DhtInterface,
     ResolverInterface,
     DeliveryAcknowledgmentAggregatorInterface,
     OriginProviderInterface,

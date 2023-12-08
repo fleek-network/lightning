@@ -51,7 +51,7 @@ impl CollectionBase for FinalTypes {
     type ReputationAggregatorInterface<C: Collection> = ReputationAggregator<C>;
     type ResolverInterface<C: Collection> = Resolver<C>;
     type RpcInterface<C: Collection> = Rpc<C>;
-    type DhtInterface<C: Collection> = Dht<C>;
+    // type DhtInterface<C: Collection> = Dht<C>;
     type ServiceExecutorInterface<C: Collection> = ServiceExecutor<C>;
     type SignerInterface<C: Collection> = Signer<C>;
     type FetcherInterface<C: Collection> = Fetcher<C>;
