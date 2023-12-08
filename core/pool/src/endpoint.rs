@@ -517,7 +517,7 @@ where
             .collect::<HashMap<_, _>>();
 
         let redundant_connections = self
-            .pool
+            .redundant_pool
             .iter()
             .map(|(index, handle)| (*index, handle.service_request_tx.clone()))
             .collect::<HashMap<_, _>>();
@@ -532,14 +532,14 @@ where
 
             // We get information from actual running connections.
             for (index, logical_connection_info) in logical_connections {
-                let (respond_tx, respond_rx) = oneshot::channel();
                 if let Some((info, queue)) = actual_connections.remove(&index) {
                     // We avoid burdening an already-busy queue.
+                    let (respond_tx, respond_rx) = oneshot::channel();
                     let stats = if queue
                         .try_send(ServiceRequest::Stats {
                             respond: respond_tx,
                         })
-                        .is_err()
+                        .is_ok()
                     {
                         respond_rx.await.ok()
                     } else {
@@ -580,9 +580,10 @@ where
                 }
             }
 
-            if !actual_connections.is_empty() {
-                tracing::warn!("found actual connections that are not in the overlay state")
-            }
+            debug_assert!(
+                !actual_connections.is_empty(),
+                "we found actual connections that are not in the overlay state"
+            );
 
             // We get information from actual running redundant connections.
             for (index, handle) in redundant_connections {
@@ -619,69 +620,70 @@ where
     }
 
     #[inline]
-    pub fn peer_info(&self, index: NodeIndex, respond: oneshot::Sender<Option<ConnectionInfo>>) {
-        let info = self.network_overlay.node_info_from_state(&index);
-        if let Some(connection_info) = self.network_overlay.get_connection_info(&index) {
-            let from_topology = connection_info.from_topology;
-            let pinned = connection_info.pinned;
+    pub fn peer_connection(
+        &self,
+        index: NodeIndex,
+        respond: oneshot::Sender<Option<ConnectionInfo>>,
+    ) {
+        let peer_info = self.network_overlay.node_info_from_state(&index);
+        let Some((from_topology, pinned)) = self
+            .network_overlay
+            .get_connection_info(&index)
+            .map(|info| (info.from_topology, info.pinned))
+        else {
+            // No logical connection to this peer.
+            // There is nothing to report.
+            let _ = respond.send(None);
+            return;
+        };
 
-            if let Some(handle) = self.pool.get(&index) {
-                let (respond_tx, respond_rx) = oneshot::channel();
-                let work_queue_cap = handle.service_request_tx.capacity();
-                let work_queue_max_cap = handle.service_request_tx.max_capacity();
+        if let Some(handle) = self.pool.get(&index) {
+            let work_queue_cap = handle.service_request_tx.capacity();
+            let work_queue_max_cap = handle.service_request_tx.max_capacity();
 
-                if handle
-                    .service_request_tx
-                    .try_send(ServiceRequest::Stats {
-                        respond: respond_tx,
-                    })
-                    .is_ok()
-                {
-                    tokio::spawn(async move {
-                        let stats = respond_rx.await.ok();
-                        let transport_connection = TransportConnectionInfo {
-                            redundant: false,
-                            stats,
-                        };
-                        let _ = respond.send(Some(ConnectionInfo {
-                            from_topology,
-                            pinned,
-                            peer: info,
-                            work_queue_cap,
-                            work_queue_max_cap,
-                            actual_connections: vec![transport_connection],
-                        }));
-                    });
-                } else {
+            let (respond_tx, respond_rx) = oneshot::channel();
+            if handle
+                .service_request_tx
+                .try_send(ServiceRequest::Stats {
+                    respond: respond_tx,
+                })
+                .is_ok()
+            {
+                tokio::spawn(async move {
+                    let stats = respond_rx.await.ok();
+                    let transport_connection = TransportConnectionInfo {
+                        redundant: false,
+                        stats,
+                    };
                     let _ = respond.send(Some(ConnectionInfo {
                         from_topology,
                         pinned,
-                        peer: info,
-                        work_queue_cap: 0,
-                        work_queue_max_cap: 0,
-                        actual_connections: vec![],
+                        peer: peer_info,
+                        work_queue_cap,
+                        work_queue_max_cap,
+                        actual_connections: vec![transport_connection],
                     }));
-                }
-                // Note: we ignore redundant connection because they should not get used much
-                // and should not happen often unless there's some malicious nodes.
-            } else {
-                let _ = respond.send(Some(ConnectionInfo {
-                    from_topology,
-                    pinned,
-                    peer: info,
-                    work_queue_cap: 0,
-                    work_queue_max_cap: 0,
-                    actual_connections: vec![],
-                }));
+                });
+                // Task will respond so there is nothing left to do.
+                return;
             }
-        }
+        };
+
+        let _ = respond.send(Some(ConnectionInfo {
+            from_topology,
+            pinned,
+            peer: peer_info,
+            work_queue_cap: 0,
+            work_queue_max_cap: 0,
+            actual_connections: vec![],
+        }));
     }
 
     #[inline]
     pub fn handle_query(&self, query: Query) {
         match query {
             Query::State { respond } => self.state(respond),
-            Query::Peer { index, respond } => self.peer_info(index, respond),
+            Query::Peer { index, respond } => self.peer_connection(index, respond),
         }
     }
 
