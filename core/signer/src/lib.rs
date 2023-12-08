@@ -41,10 +41,14 @@ use tracing::error;
 // If a transaction does not get ordered, the signer will try to resend it.
 // `TIMEOUT` specifies the duration the signer will wait before resending transactions to the
 // mempool.
+// In mainnet, this should be less than 12 secs.
 #[cfg(not(test))]
-const TIMEOUT: Duration = Duration::from_secs(300);
+const TIMEOUT: Duration = Duration::from_secs(60);
 #[cfg(test)]
 const TIMEOUT: Duration = Duration::from_secs(3);
+
+// Maximum number of times we will resend a transaction.
+const MAX_RETRIES: u8 = 3;
 
 pub struct Signer<C: Collection> {
     inner: Arc<SignerInner>,
@@ -307,6 +311,7 @@ impl SignerInner {
                     pending_transactions.push_back(PendingTransaction {
                         update_request,
                         timestamp,
+                        tries: 1,
                     });
                     // Set timer
                     if base_timestamp.is_none() {
@@ -347,55 +352,60 @@ impl SignerInner {
             } else {
                 0
             };
-        if *base_nonce == application_nonce && *next_nonce > *base_nonce + 1 {
-            // Application nonce has not been incremented even though we sent out
-            // a transaction
+
+        // All transactions in range [base_nonce, application_nonce] have
+        // been ordered, so we can remove them from `pending_transactions`.
+        *base_nonce = application_nonce;
+        while !pending_transactions.is_empty()
+            && pending_transactions[0].update_request.payload.nonce <= application_nonce
+        {
+            pending_transactions.pop_front();
+        }
+        if pending_transactions.is_empty() {
+            *base_timestamp = None;
+        } else {
+            //*base_timestamp = Some(pending_transactions[0].timestamp);
             if let Some(base_timestamp_) = base_timestamp {
                 if base_timestamp_.elapsed().unwrap() >= TIMEOUT {
-                    // At this point we assume that the transaction with nonce `base_nonce` will
-                    // never arrive at the mempool
+                    // At this point we assume that the transactions in the buffer will never get
+                    // ordered.
                     *base_timestamp = None;
                     // Reset `next_nonce` to the nonce the application is expecting.
                     *next_nonce = *base_nonce + 1;
-                    // Resend all transactions with nonce >= base_nonce.
-                    for pending_tx in pending_transactions.iter_mut() {
+                    // Resend all transactions in the buffer.
+
+                    pending_transactions.retain_mut(|tx| {
                         if let TransactionResponse::Revert(_) =
-                            query_runner.validate_txn(pending_tx.update_request.clone().into())
+                            query_runner.validate_txn(tx.update_request.clone().into())
                         {
                             // If transaction reverts, don't retry.
-                            continue;
+                            false
+                        } else if tx.tries < MAX_RETRIES {
+                            tx.update_request.payload.nonce = *next_nonce;
+                            // Update timestamp to resending time.
+                            tx.timestamp = SystemTime::now();
+                            if base_timestamp.is_none() {
+                                *base_timestamp = Some(tx.timestamp);
+                            }
+                            *next_nonce += 1;
+                            true
+                        } else {
+                            false
                         }
-                        *next_nonce += 1;
+                    });
 
+                    for pending_tx in pending_transactions.iter_mut() {
                         if let Err(e) = mempool_socket
                             .run(pending_tx.update_request.clone().into())
                             .await
                             .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                         {
                             error!("Failed to send transaction to mempool: {e:?}");
-                        }
-
-                        // Update timestamp to resending time.
-                        pending_tx.timestamp = SystemTime::now();
-                        if base_timestamp.is_none() {
-                            *base_timestamp = Some(pending_tx.timestamp);
+                        } else {
+                            pending_tx.tries += 1;
                         }
                     }
                 }
-            }
-        } else if application_nonce > *base_nonce {
-            *base_nonce = application_nonce;
-            // All transactions in range [base_nonce, application_nonce] have
-            // been ordered, so we can remove them from `pending_transactions`.
-            while !pending_transactions.is_empty()
-                && pending_transactions[0].update_request.payload.nonce <= application_nonce
-            {
-                pending_transactions.pop_front();
-            }
-            if pending_transactions.is_empty() {
-                *base_timestamp = None;
-            } else {
-                *base_timestamp = Some(pending_transactions[0].timestamp);
             }
         }
     }
@@ -405,6 +415,7 @@ impl SignerInner {
 struct PendingTransaction {
     pub update_request: UpdateRequest,
     pub timestamp: SystemTime,
+    pub tries: u8,
 }
 
 impl<C: Collection> ConfigConsumer for Signer<C> {
