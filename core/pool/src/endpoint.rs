@@ -21,7 +21,8 @@ use lightning_interfaces::{
 };
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, Notify};
-use tokio::task::JoinSet;
+use tokio::task::{JoinHandle, JoinSet};
+use tokio_util::sync::CancellationToken;
 
 use crate::connection::connector::{ConnectionResult, Connector};
 use crate::connection::{self, Context, ServiceRequest};
@@ -685,8 +686,16 @@ where
         }
     }
 
-    // Todo: Return metrics.
-    pub async fn start(&mut self, shutdown: Arc<Notify>) -> Result<()> {
+    pub fn spawn(mut self, shutdown: CancellationToken) -> JoinHandle<Self> {
+        tokio::spawn(async move {
+            if let Err(e) = self.start(shutdown).await {
+                tracing::error!("unexpected endpoint failure: {e:?}");
+            }
+            self
+        })
+    }
+
+    pub async fn start(&mut self, shutdown: CancellationToken) -> Result<()> {
         let muxer = M::init(self.config.clone())?;
         self.muxer = Some(muxer.clone());
 
@@ -705,7 +714,7 @@ where
 
         loop {
             tokio::select! {
-                _ = shutdown.notified() => {
+                _ = shutdown.cancelled() => {
                     break;
                 }
                 connecting = muxer.accept() => {
