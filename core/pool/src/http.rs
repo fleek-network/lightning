@@ -1,5 +1,4 @@
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use anyhow::Context;
 use axum::extract::Path;
@@ -7,13 +6,14 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Router};
 use lightning_interfaces::types::NodeIndex;
-use tokio::sync::{oneshot, Notify};
+use tokio::sync::oneshot;
+use tokio_util::sync::CancellationToken;
 
 use crate::state::{Query, QuerySender};
 
 pub async fn spawn_http_server(
     addr: SocketAddr,
-    shutdown: Arc<Notify>,
+    shutdown: CancellationToken,
     state_request: QuerySender,
 ) -> anyhow::Result<()> {
     let app = Router::new()
@@ -23,7 +23,7 @@ pub async fn spawn_http_server(
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
-        .with_graceful_shutdown(shutdown.notified())
+        .with_graceful_shutdown(shutdown.cancelled())
         .await
         .context("failed to run http server")
         .map(Into::into)
