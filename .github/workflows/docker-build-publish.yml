@@ -5,6 +5,7 @@ on:
     # TODO: enable for main only after testnet
     branches:
       - testnet-*
+      - chore/use-cargo-install-locked-path
     paths:
       - core/**
       - etc/**
