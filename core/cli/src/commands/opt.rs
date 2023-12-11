@@ -56,6 +56,7 @@ async fn opt_in<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>
         genesis_committee_rpc::<Option<NodeInfo>>(&genesis_committee, get_node_info(public_key))
             .await
             .context("Failed to get node info from genesis committee")?;
+
     let node_info = node_info.context("Node not found on state.")?;
     if node_info.participation == Participation::True {
         println!("Your node is already participating in the network.");
@@ -178,7 +179,7 @@ fn send_transaction(update_request: UpdateRequest) -> String {
     json!({
         "jsonrpc": "2.0",
         "method":"flk_send_txn",
-        "params": TransactionRequest::UpdateRequest(update_request),
+        "params": {"tx": TransactionRequest::UpdateRequest(update_request)},
         "id":1,
     })
     .to_string()
