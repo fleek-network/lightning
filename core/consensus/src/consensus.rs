@@ -13,7 +13,7 @@ use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
-use lightning_interfaces::types::{Epoch, EpochInfo, UpdateMethod};
+use lightning_interfaces::types::{Epoch, EpochInfo, UpdateMethod, Event};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
@@ -387,6 +387,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
         indexer_socket: Option<IndexSocket>,
+        _event_socket: tokio::sync::mpsc::Sender<Event>,
     ) -> anyhow::Result<Self> {
         // Spawn the registry for narwhal
         let registry = Registry::new();

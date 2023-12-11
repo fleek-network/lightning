@@ -1,11 +1,49 @@
 //! The types used by the Application interface.
 
 use ethers::types::{Block as EthersBlock, H256, U64};
-use fleek_crypto::NodePublicKey;
+use fleek_crypto::{NodePublicKey, EthAddress};
 use hp_fixed::unsigned::HpUfixed;
 use serde::{Deserialize, Serialize};
+use crate::Tokens;
 
 use crate::TransactionReceipt;
+
+#[derive(Eq, Hash, Debug, PartialEq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
+pub enum Event {
+    Transfer {
+        token: Tokens,
+        from: EthAddress,
+        to: EthAddress,
+        amount: HpUfixed<18>
+    },
+    ServiceEvent {
+        service_id: u32,
+        event: Vec<u8>,
+    },
+}
+
+impl Event {
+    pub fn transfer(
+        token: Tokens,
+        from: EthAddress,
+        to: EthAddress,
+        amount: HpUfixed<18>
+    ) -> Self {
+        Self::Transfer {
+            token,
+            from,
+            to,
+            amount
+        }
+    }
+
+    pub fn service_event(service_id: u32, event: Vec<u8>) -> Self {
+        Self::ServiceEvent {
+            service_id,
+            event,
+        }
+    }
+}
 
 /// The response generated from executing an entire batch of transactions (aka a block).
 #[derive(Debug, Hash, Clone)]

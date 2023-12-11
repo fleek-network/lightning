@@ -22,6 +22,7 @@ num-traits.workspace = true
 rand.workspace = true
 fleek-blake3 = "1.5"
 tracing.workspace = true
+lightning-types = { path = "../types" }
 
 # Our libraries
 affair.workspace = true

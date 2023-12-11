@@ -122,6 +122,9 @@ async fn init_pinger() -> Pinger<TestBinding> {
         transactions_to_lose: HashSet::new(),
         new_block_interval: Duration::from_secs(5),
     };
+
+    let (tx, _) = tokio::sync::mpsc::channel::<lightning_interfaces::types::Event>(1);
+
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
@@ -129,6 +132,7 @@ async fn init_pinger() -> Pinger<TestBinding> {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        tx
     )
     .unwrap();
 

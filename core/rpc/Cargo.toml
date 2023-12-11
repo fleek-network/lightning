@@ -29,6 +29,8 @@ affair.workspace = true
 autometrics.workspace = true
 reqwest.workspace = true
 clap = { version = "4.4.10", features = ["derive"]}
+lightning-types = { path = "../types" }
+
 
 lightning-interfaces = { path = "../interfaces" }
 lightning-openrpc = { path = "../rpc-openrpc" }

@@ -111,6 +111,7 @@ async fn test_start_shutdown() {
     )
     .unwrap();
 
+    let (tx, _) = tokio::sync::mpsc::channel::<lightning_interfaces::types::Event>(1);
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
@@ -118,6 +119,7 @@ async fn test_start_shutdown() {
         query_runner,
         broadcast.get_pubsub(Topic::Consensus),
         None,
+        tx
     )
     .unwrap();
 
