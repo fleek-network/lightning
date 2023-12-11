@@ -28,7 +28,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     rustup default stable && \
     cargo +stable install --locked --path core/cli && \
     cargo strip && \
-    cp /root/.cargo/bin/lightning-node /build
+    cp /usr/local/cargo/bin/lightning-node /build
 
 FROM ubuntu:latest
 ARG LIGHTNING_PORTS="4200-4299 4300-4399"
