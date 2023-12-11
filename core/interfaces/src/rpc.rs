@@ -13,6 +13,8 @@ use crate::{
     ConsensusInterface,
     FetcherInterface,
 };
+use crate::types::Event;
+use tokio::sync::mpsc::Sender;
 
 /// The interface for the *RPC* server. Which is supposed to be opening a public
 /// port (possibly an HTTP server) and accepts queries or updates from the user.
@@ -47,4 +49,6 @@ pub trait RpcInterface<C: Collection>:
         fetcher: &C::FetcherInterface,
         archive_socket: Option<ArchiveSocket>,
     ) -> anyhow::Result<Self>;
+
+    fn event_tx(&self) -> Sender<Event>;
 }

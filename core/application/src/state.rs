@@ -152,6 +152,7 @@ impl<B: Backend> State<B> {
 
     pub fn execute_transaction(&self, txn: TransactionRequest) -> TransactionResponse {
         let hash = txn.hash();
+
         let (sender, response) = match txn {
             TransactionRequest::UpdateRequest(payload) => (
                 payload.payload.sender,
@@ -165,6 +166,7 @@ impl<B: Backend> State<B> {
         self.executed_digests.set(hash, ());
         // Increment nonce of the sender
         self.increment_nonce(sender);
+
         response
     }
 

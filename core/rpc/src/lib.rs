@@ -15,19 +15,22 @@ use lightning_interfaces::{
     MempoolSocket,
     RpcInterface,
     WithStartAndShutdown,
+    types::Event,
 };
 use tokio::sync::Mutex;
 use tower::layer::util::{Identity, Stack};
+use crate::event::EventDistributor;
 
 pub use crate::api::{EthApiServer, FleekApiServer, NetApiServer};
 pub use crate::config::Config;
 pub use crate::logic::{EthApi, FleekApi, NetApi};
 pub mod api;
-mod api_types;
+pub mod api_types;
 pub mod config;
-mod error;
-mod logic;
+pub mod error;
+pub mod logic;
 pub mod utils;
+pub mod event;
 
 #[cfg(test)]
 mod tests;
@@ -35,6 +38,7 @@ mod tests;
 type Server = JSONRPCServer<Stack<ProxyGetRequestLayer, Stack<ProxyGetRequestLayer, Identity>>>;
 
 pub(crate) struct Data<C: Collection> {
+    pub event_distributor: EventDistributor,
     pub query_runner: c!(C::ApplicationInterface::SyncExecutor),
     pub mempool_socket: MempoolSocket,
     pub fetcher_socket: FetcherSocket,
@@ -51,6 +55,8 @@ pub struct Rpc<C: Collection> {
     handle: Mutex<Option<ServerHandle>>,
 
     phantom: std::marker::PhantomData<C>,
+
+    data: Arc<Data<C>>
 }
 
 impl<C: Collection> Rpc<C> {
@@ -133,7 +139,10 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         fetcher: &C::FetcherInterface,
         archive_socket: Option<ArchiveSocket>,
     ) -> anyhow::Result<Self> {
+        let distributor = EventDistributor::spawn();
+
         let data: Arc<Data<C>> = Arc::new(Data {
+            event_distributor: distributor,
             query_runner,
             mempool_socket: mempool,
             fetcher_socket: fetcher.get_socket(),
@@ -141,14 +150,19 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
             archive_socket,
         });
 
-        let module = Self::create_modules_from_config(&config, data)?;
+        let module = Self::create_modules_from_config(&config, data.clone())?;
 
         Ok(Self {
             config,
             module,
+            data,
             handle: Mutex::new(None),
             phantom: PhantomData,
         })
+    }
+
+    fn event_tx(&self) -> tokio::sync::mpsc::Sender<Event> {
+        self.data.event_distributor.sender()
     }
 }
 

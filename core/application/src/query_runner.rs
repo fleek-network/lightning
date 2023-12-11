@@ -395,6 +395,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 table_selector: ctx,
             };
             let app = State::new(backend);
+            
             app.execute_transaction(txn.clone())
         })
     }

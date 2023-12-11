@@ -89,6 +89,7 @@ async fn test_send_two_txs_in_a_row() {
         transactions_to_lose: HashSet::new(),
         new_block_interval: Duration::from_secs(5),
     };
+    let (tx, _) = tokio::sync::mpsc::channel::<lightning_interfaces::types::Event>(1);
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
@@ -96,6 +97,7 @@ async fn test_send_two_txs_in_a_row() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        tx
     )
     .unwrap();
 
@@ -183,6 +185,7 @@ async fn test_retry_send() {
         transactions_to_lose: HashSet::from([2]), // drop the 2nd transaction arriving
         new_block_interval: Duration::from_secs(5),
     };
+    let (tx, _) = tokio::sync::mpsc::channel::<lightning_interfaces::types::Event>(1);
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
@@ -190,6 +193,7 @@ async fn test_retry_send() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        tx
     )
     .unwrap();
 
@@ -225,6 +229,7 @@ async fn test_shutdown() {
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
     let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
+    let (tx, _) = tokio::sync::mpsc::channel::<lightning_interfaces::types::Event>(1);
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
@@ -232,6 +237,7 @@ async fn test_shutdown() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        tx
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());
@@ -252,6 +258,7 @@ async fn test_shutdown_and_start_again() {
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
     let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
+    let (tx, _) = tokio::sync::mpsc::channel::<lightning_interfaces::types::Event>(1);
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
@@ -259,6 +266,7 @@ async fn test_shutdown_and_start_again() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        tx
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());
@@ -285,6 +293,7 @@ async fn test_sign_raw_digest() {
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
     let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
+    let (tx, _) = tokio::sync::mpsc::channel::<lightning_interfaces::types::Event>(1);
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
@@ -292,6 +301,7 @@ async fn test_sign_raw_digest() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        tx
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());

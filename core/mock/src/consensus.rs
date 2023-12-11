@@ -10,7 +10,7 @@ use axum::extract::State;
 use axum::routing::post;
 use axum::{Json, Router};
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::types::{Block, TransactionRequest};
+use lightning_interfaces::types::{Block, TransactionRequest, Event};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
@@ -160,6 +160,7 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
         _pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
         _indexer_socket: Option<IndexSocket>,
+        _event_socket: mpsc::Sender<Event>,
     ) -> anyhow::Result<Self> {
         let (tx, rx) = mpsc::channel(128);
         let block_notifier = Arc::new(Notify::new());
