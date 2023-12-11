@@ -10,6 +10,7 @@ use fleek_crypto::{
     TransactionSender,
     TransactionSignature,
 };
+use lightning_application::genesis::Genesis;
 use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::ToDigest;
@@ -17,7 +18,6 @@ use lightning_node::config::TomlConfigProvider;
 use lightning_rpc::{utils, Rpc};
 use lightning_signer::Signer;
 use lightning_types::{
-    NodeIndex,
     NodeInfo,
     Participation,
     TransactionRequest,
@@ -25,7 +25,6 @@ use lightning_types::{
     UpdatePayload,
     UpdateRequest,
 };
-use rand::seq::SliceRandom;
 use reqwest::Client;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::de::DeserializeOwned;
@@ -50,11 +49,8 @@ async fn opt_in<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>
     let config = Arc::new(TomlConfigProvider::<C>::load_or_write_config(config_path).await?);
     let secret_key = load_secret_key(config.clone())?;
     let public_key = secret_key.to_pk();
-    let port = get_rpc_port(config);
 
-    let genesis_committee = get_genesis_committee(port)
-        .await
-        .context("Failed to get genesis committee via rpc. Is your node running?")?;
+    let genesis_committee = get_genesis_committee().context("Failed to load genesis committee.")?;
 
     let node_info =
         genesis_committee_rpc::<Option<NodeInfo>>(&genesis_committee, get_node_info(public_key))
@@ -86,11 +82,8 @@ async fn opt_out<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C
     let config = Arc::new(TomlConfigProvider::<C>::load_or_write_config(config_path).await?);
     let secret_key = load_secret_key(config.clone())?;
     let public_key = secret_key.to_pk();
-    let port = get_rpc_port(config);
 
-    let genesis_committee = get_genesis_committee(port)
-        .await
-        .context("Failed to get genesis committee via rpc. Is your node running?")?;
+    let genesis_committee = get_genesis_committee().context("Failed to load genesis committee.")?;
 
     let node_info =
         genesis_committee_rpc::<Option<NodeInfo>>(&genesis_committee, get_node_info(public_key))
@@ -124,10 +117,8 @@ async fn status<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>
     let config = Arc::new(TomlConfigProvider::<C>::load_or_write_config(config_path).await?);
     let secret_key = load_secret_key(config.clone())?;
     let public_key = secret_key.to_pk();
-    let port = get_rpc_port(config);
 
-    let genesis_committee = get_genesis_committee(port)
-        .await
+    let genesis_committee = get_genesis_committee()
         .context("Failed to get genesis committee via rpc. Is your node running?")?;
 
     let node_info =
@@ -163,10 +154,6 @@ fn load_secret_key<C: Collection<SignerInterface = Signer<C>>>(
     } else {
         Err(anyhow::anyhow!("Node public key does not exist"))
     }
-}
-
-fn get_rpc_port<C: Collection<RpcInterface = Rpc<C>>>(config: Arc<TomlConfigProvider<C>>) -> u16 {
-    config.get::<C::RpcInterface>().port()
 }
 
 fn create_update_request(
@@ -210,33 +197,22 @@ fn get_node_info(public_key: NodePublicKey) -> String {
     .to_string()
 }
 
-async fn get_genesis_committee(port: u16) -> Result<Vec<(NodeIndex, NodeInfo)>> {
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_genesis_committee",
-        "params": [],
-        "id":1,
-    })
-    .to_string();
-
-    let client = Client::new();
-    let res = utils::rpc_request::<Vec<(NodeIndex, NodeInfo)>>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        request.to_string(),
-    )
-    .await?;
-    let mut genesis_committee = res.result;
-    genesis_committee.shuffle(&mut rand::thread_rng());
-    Ok(genesis_committee)
+fn get_genesis_committee() -> Result<Vec<NodeInfo>> {
+    let genesis = Genesis::load()?;
+    Ok(genesis
+        .node_info
+        .iter()
+        .filter(|node| node.genesis_committee)
+        .map(NodeInfo::from)
+        .collect())
 }
 
 async fn genesis_committee_rpc<T: DeserializeOwned>(
-    genesis_committee: &Vec<(NodeIndex, NodeInfo)>,
+    genesis_committee: &Vec<NodeInfo>,
     request: String,
 ) -> Result<T> {
     let client = Client::new();
-    for (_, node) in genesis_committee {
+    for node in genesis_committee {
         if let Ok(res) = utils::rpc_request::<T>(
             &client,
             format!("http://{}:{}/rpc/v0", node.domain, node.ports.rpc),
@@ -253,7 +229,7 @@ async fn genesis_committee_rpc<T: DeserializeOwned>(
 }
 
 async fn wait_for_participation_status(
-    genesis_committee: &Vec<(NodeIndex, NodeInfo)>,
+    genesis_committee: &Vec<NodeInfo>,
     public_key: NodePublicKey,
     target_status: Participation,
     max_tries: u32,
