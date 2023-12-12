@@ -67,7 +67,7 @@ use crate::table::{Backend, TableRef};
 /// Minimum number of reported measurements that have to be available for a node.
 /// If less measurements have been reported, no reputation score will be computed in that epoch.
 #[cfg(all(not(test), not(debug_assertions)))]
-const MIN_NUM_MEASUREMENTS: usize = 10;
+const MIN_NUM_MEASUREMENTS: usize = 3;
 #[cfg(any(test, debug_assertions))]
 const MIN_NUM_MEASUREMENTS: usize = 2;
 
@@ -86,7 +86,7 @@ const REP_EWMA_WEIGHT: f64 = 0.7;
 
 /// If a node responded to less than 10% of pings from its peers, it will set to inactive until it
 /// submits an OptIn transaction.
-const MINIMUM_UPTIME: u8 = 10;
+const MINIMUM_UPTIME: u8 = 40;
 
 /// To support ethereum tooling, all signed ethereum transactions will be pointed to this address
 /// otherwise, if there is a value and a different address they are trying to transfer the native
@@ -602,7 +602,7 @@ impl<B: Backend> State<B> {
                         domain,
                         worker_domain,
                         ports,
-                        participation: Participation::True,
+                        participation: Participation::False,
                         nonce: 0,
                     };
                     self.create_node(node);

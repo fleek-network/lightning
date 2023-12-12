@@ -3,6 +3,7 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
+use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{
     Blake3Hash,
@@ -10,6 +11,7 @@ use lightning_interfaces::types::{
     EpochInfo,
     NodeIndex,
     NodeInfo,
+    Participation,
     ServerRequest,
 };
 use lightning_interfaces::{
@@ -18,6 +20,7 @@ use lightning_interfaces::{
     BlockStoreServerSocket,
     ConfigConsumer,
     Notification,
+    SignerInterface,
     SyncQueryRunnerInterface,
     SyncronizerInterface,
     WithStartAndShutdown,
@@ -30,7 +33,8 @@ use tokio::task::JoinHandle;
 use tracing::info;
 
 use crate::config::Config;
-use crate::rpc::{rpc_epoch, rpc_last_epoch_hash, rpc_request};
+use crate::rpc::{self, rpc_epoch, rpc_last_epoch_hash};
+use crate::utils;
 
 pub struct Syncronizer<C: Collection> {
     inner: Mutex<Option<SyncronizerInner<C>>>,
@@ -98,13 +102,33 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
         config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore_server: &C::BlockStoreServerInterface,
+        signer: &C::SignerInterface,
         rx_epoch_change: Receiver<Notification>,
     ) -> Result<Self> {
+        let mut genesis_committee = query_runner.genesis_committee();
+        // Shuffle this since we often hit this list in order until one responds. This will give our
+        // network a bit of diversity on which bootstrap node they try first
+        genesis_committee.shuffle(&mut rand::thread_rng());
+
+        let our_public_key = signer.get_ed25519_pk();
+
+        let rpc_client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .connect_timeout(Duration::from_secs(5))
+            .build()?;
+
+        if !cfg!(debug_assertions) {
+            // We only run the prelude in prod mode to avoid interfering with tests.
+            Syncronizer::<C>::prelude(our_public_key, &genesis_committee, &rpc_client);
+        }
+
         let inner = SyncronizerInner::new(
+            genesis_committee,
             query_runner,
             blockstore_server,
             rx_epoch_change,
             config.epoch_change_delta,
+            rpc_client,
         )?;
 
         Ok(Self {
@@ -122,23 +146,77 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
     }
 }
 
+impl<C: Collection> Syncronizer<C> {
+    fn prelude(
+        our_public_key: NodePublicKey,
+        genesis_committee: &Vec<(NodeIndex, NodeInfo)>,
+        rpc_client: &reqwest::Client,
+    ) {
+        // Check if node is on genesis committee.
+        for (_, node_info) in genesis_committee {
+            if our_public_key == node_info.public_key {
+                // If the node is a member of the genesis committee, we skip the prelude.
+                return;
+            }
+        }
+
+        // The rpc calls are using a lot of clones. This is necessary because the futures are
+        // passed into a thread, and thus need to satisfy the 'static lifetime.
+
+        // Check if node is staked.
+        if !rpc::sync_call(rpc::check_is_valid_node(
+            our_public_key,
+            genesis_committee.clone(),
+            rpc_client.clone(),
+        ))
+        .expect("Cannot reach bootstrap nodes")
+        {
+            // TODO(matthias): print this message in a loop?
+            println!(
+                "The node is not staked. Only staked nodes can participate in the network. Submit a stake transaction and try again."
+            );
+            std::process::exit(0);
+        }
+        let node_info = rpc::sync_call(rpc::get_node_info(
+            our_public_key,
+            genesis_committee.clone(),
+            rpc_client.clone(),
+        ))
+        .expect("Cannot reach bootstrap nodes")
+        .unwrap(); // safe unwrap because we check if the node is valid above
+
+        let epoch_info = rpc::sync_call(rpc::get_epoch_info(
+            genesis_committee.clone(),
+            rpc_client.clone(),
+        ))
+        .expect("Cannot reach bootstrap nodes");
+
+        // Check participation status.
+        match node_info.participation {
+            Participation::False => {
+                // TODO(matthias): print this message in a loop?
+                println!(
+                    "The node is currently not participating in the network. Submit an OptIn transaction using the CLI to participate and try again."
+                );
+                std::process::exit(0);
+            },
+            Participation::OptedIn => {
+                utils::wait_to_next_epoch(epoch_info, genesis_committee, rpc_client);
+            },
+            _ => (),
+        }
+    }
+}
+
 impl<C: Collection> SyncronizerInner<C> {
     fn new(
+        genesis_committee: Vec<(NodeIndex, NodeInfo)>,
         query_runner: c![C::ApplicationInterface::SyncExecutor],
         blockstore_server: &C::BlockStoreServerInterface,
         rx_epoch_change: Receiver<Notification>,
         epoch_change_delta: Duration,
+        rpc_client: reqwest::Client,
     ) -> Result<Self> {
-        let mut genesis_committee = query_runner.genesis_committee();
-        // Shuffle this since we often hit this list in order until one responds. This will give our
-        // network a bit of diversity on which bootstrap node they try first
-        genesis_committee.shuffle(&mut rand::thread_rng());
-
-        let rpc_client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(5))
-            .connect_timeout(Duration::from_secs(5))
-            .build()?;
-
         Ok(Self {
             query_runner,
             blockstore_server_socket: blockstore_server.get_socket(),
@@ -154,8 +232,7 @@ impl<C: Collection> SyncronizerInner<C> {
         tx_update_ready: oneshot::Sender<Blake3Hash>,
         mut shutdown: oneshot::Receiver<()>,
     ) {
-        // When we first start we want to immiedetly check if we should checkpoint instead of
-        // waiting
+        // When we first start we want to check if we should checkpoint
         if let Ok(checkpoint_hash) = self.try_sync().await {
             // Our blockstore succesfully downloaded the checkpoint lets send up the hash and return
             let _ = tx_update_ready.send(checkpoint_hash);
@@ -203,6 +280,7 @@ impl<C: Collection> SyncronizerInner<C> {
 
         // Get the epoch the bootstrap nodes are at
         let bootstrap_epoch = self.get_current_epoch().await?;
+        //let bootstrap_epoch = self.ask_bootstrap_nodes(rpc_epoch().to_string()).await?;
 
         if bootstrap_epoch <= current_epoch {
             bail!("Bootstrap nodes are on the same epoch");
@@ -226,14 +304,7 @@ impl<C: Collection> SyncronizerInner<C> {
 
     /// This function will rpc request genesis nodes in sequence and stop when one of them responds
     async fn ask_bootstrap_nodes<T: DeserializeOwned>(&self, req: String) -> Result<T> {
-        for (_, node) in &self.genesis_committee {
-            if let Ok(res) =
-                rpc_request::<T>(&self.rpc_client, node.domain, node.ports.rpc, req.clone()).await
-            {
-                return Ok(res.result);
-            }
-        }
-        Err(anyhow!("Unable to get a responce from bootstrap nodes"))
+        rpc::ask_nodes(req, &self.genesis_committee, &self.rpc_client).await
     }
 
     async fn download_checkpoint_from_bootstrap(&self, checkpoint_hash: [u8; 32]) -> Result<()> {

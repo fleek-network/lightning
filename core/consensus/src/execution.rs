@@ -102,6 +102,10 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
             .filter_map(|txn| TransactionRequest::try_from(txn).ok())
             .collect::<Vec<_>>();
 
+        if transactions.is_empty() {
+            return false;
+        }
+
         let block = Block {
             transactions,
             digest,
