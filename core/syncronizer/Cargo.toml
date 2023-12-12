@@ -15,4 +15,5 @@ serde_json.workspace = true
 serde.workspace = true
 tokio.workspace = true
 rand.workspace = true
+fleek-crypto.workspace = true
 

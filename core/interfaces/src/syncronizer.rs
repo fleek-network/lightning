@@ -11,6 +11,7 @@ use crate::{
     ConfigProviderInterface,
     Notification,
     NotifierInterface,
+    SignerInterface,
     WithStartAndShutdown,
 };
 
@@ -24,6 +25,7 @@ pub trait SyncronizerInterface<C: Collection>:
         config: ::ConfigProviderInterface,
         app: ::ApplicationInterface,
         blockstore_server: ::BlockStoreServerInterface,
+        signer: ::SignerInterface,
         notifier: ::NotifierInterface,
     ) {
         let sqr = app.sync_query();
@@ -33,6 +35,7 @@ pub trait SyncronizerInterface<C: Collection>:
             config.get::<Self>(),
             sqr,
             blockstore_server,
+            signer,
             rx_epoch_change,
         )
     }
@@ -42,6 +45,7 @@ pub trait SyncronizerInterface<C: Collection>:
         config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore_server: &C::BlockStoreServerInterface,
+        signer: &C::SignerInterface,
         rx_epoch_change: Receiver<Notification>,
     ) -> anyhow::Result<Self>;
 

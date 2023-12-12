@@ -602,7 +602,7 @@ impl<B: Backend> State<B> {
                         domain,
                         worker_domain,
                         ports,
-                        participation: Participation::True,
+                        participation: Participation::False,
                         nonce: 0,
                     };
                     self.create_node(node);

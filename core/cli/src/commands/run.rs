@@ -20,6 +20,7 @@ use crate::shutdown::ShutdownController;
 
 pub type CustomStartShutdown<C> = Box<dyn for<'a> Fn(&'a Node<C>, bool) -> Fut<'a>>;
 pub type Fut<'a> = Pin<Box<dyn Future<Output = ()> + 'a>>;
+
 pub async fn exec<C>(
     config_path: ResolvedPathBuf,
     custom_start_shutdown: Option<CustomStartShutdown<C>>,
