@@ -86,7 +86,10 @@ where
     async fn start(&self) {
         // Todo: Fix this because index may not be available.
         let local_pk = self.sk.to_pk();
-        let local_index = self.sync_query.pubkey_to_index(local_pk).unwrap();
+        let local_index = self
+            .sync_query
+            .pubkey_to_index(local_pk)
+            .unwrap_or(u32::MAX);
         let mut guard = self.status.lock().await;
         let mut status = guard.take().unwrap();
 
