@@ -45,7 +45,7 @@ impl TransactionStore {
             last_executed_timestamp: None,
             // TODO(matthias): do some napkin math for these initial estimates
             estimated_tbe: Duration::from_secs(30),
-            deviation_tbe: Duration::from_secs(10),
+            deviation_tbe: Duration::from_secs(5),
         }
     }
 
@@ -98,7 +98,10 @@ impl TransactionStore {
     }
 
     pub fn get_timeout(&self) -> Duration {
-        4 * self.deviation_tbe + self.estimated_tbe
+        let mut timeout = 4 * self.deviation_tbe + self.estimated_tbe;
+        timeout = timeout.max(MIN_TBE);
+        timeout = timeout.min(MAX_TBE);
+        timeout
     }
 
     // Threshold should be 2f + 1 of the committee
@@ -212,8 +215,6 @@ impl TransactionStore {
                 let estimated_tbe = self.estimated_tbe.as_millis() as f64;
                 let new_estimated_tbe = (1.0 - TBE_EMA) * estimated_tbe + TBE_EMA * sample_tbe;
                 self.estimated_tbe = Duration::from_millis(new_estimated_tbe as u64);
-                self.estimated_tbe = self.estimated_tbe.max(MIN_TBE);
-                self.estimated_tbe = self.estimated_tbe.min(MAX_TBE);
 
                 let deviation_tbe = self.deviation_tbe.as_millis() as f64;
                 let new_deviation_tbe = (1.0 - TBE_EMA) * deviation_tbe
