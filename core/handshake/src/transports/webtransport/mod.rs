@@ -126,22 +126,20 @@ impl TransportSender for WebTransportSender {
     }
 
     fn start_write(&mut self, len: usize) {
+        let len = len as u32;
         debug_assert!(
             self.current_write == 0,
             "data should be written completely before calling start_write again"
         );
 
-        self.current_write = len as u32;
+        self.current_write = len;
 
-        // add 1 to the length to include the frame tag
-        let len = len as u32 + 1;
         let mut buffer = Vec::with_capacity(5);
-        buffer.put_u32(len);
+        // add 1 to the delimiter to include the frame tag
+        buffer.put_u32(len + 1);
         buffer.put_u8(RES_SERVICE_PAYLOAD_TAG);
         // write the delimiter and payload tag to the stream
         self.send_inner(buffer.into());
-
-        self.current_write = len;
     }
 
     fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
