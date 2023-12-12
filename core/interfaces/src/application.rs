@@ -8,11 +8,15 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_types::{
     AccountInfo,
     Blake3Hash,
+    Committee,
     NodeIndex,
     NodeInfoWithIndex,
     TransactionRequest,
     TxHash,
+    Value,
 };
+
+use schemars::schema::Metadata;
 use serde::{Deserialize, Serialize};
 
 use crate::common::WithStartAndShutdown;
@@ -44,6 +48,66 @@ use crate::{BlockStoreInterface, ConfigProviderInterface};
 /// this socket should be sealed and preferably not accessible out side of the scope in which
 /// it is created.
 pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
+
+pub trait QueryRunnerInterface: Clone + Send + Sync + 'static {
+    /// Query Metadata Table
+    fn get_metadata(&self, key: &Metadata) -> Value;
+
+    /// Query Account Table
+    fn get_account_info<T: Clone>(
+        &self,
+        address: &EthAddress,
+        selector: impl Fn(AccountInfo) -> T,
+    ) -> T;
+
+    /// Query Client Table
+    fn get_client_info(self, pub_key: &ClientPublicKey) -> EthAddress;
+
+    /// Query Node Table
+    fn get_node_info<T: Clone>(&self, node: &NodeIndex, selector: impl Fn(NodeInfo) -> T) -> T;
+
+    /// Query Pub Key to Node Index Table
+    fn pub_key_to_index(&self, pub_key: &NodePublicKey) -> NodeIndex;
+
+    /// Query Committe Table
+    fn get_committe_info<T: Clone>(&self, epoch: &Epoch, selector: impl Fn(Committee) -> T) -> T;
+
+    /// Query Services Table
+    fn get_service_info(&self, id: &ServiceId) -> Service;
+
+    /// Query Params Table
+    fn get_protocol_param(&self, param: &ProtocolParams) -> u128;
+
+    /// Query Current Epoch Served Table
+    fn get_current_epoch_served(&self, node: &NodeIndex) -> NodeServed;
+
+    /// Query Reputation Measurements
+    fn get_reputation_measurements(&self, node: &NodeIndex) -> Vec<ReportedReputationMeasurements>;
+
+    /// Query Latencies Table
+    fn get_latencies(&self, node_1: &NodeIndex, node_2: &NodeIndex) -> Duration;
+
+    /// Query Reputation Scores Table
+    fn get_reputation_score(&self, node: &NodeIndex) -> u8;
+
+    /// Query Total Served Table
+    fn get_total_served(&self, epoch: &Epoch) -> TotalServed;
+
+    /// Autometrics
+    fn get_committee_members(&self) -> Vec<NodePublicKey>;
+
+    /// Get Current Committee Members' indices
+    fn get_committee_members_by_index(&self) -> Vec<NodeIndex>;
+
+    /// Get Current Epoch Info
+    fn get_epoch_info(&self) -> EpochInfo;
+
+    /// Get Node Public Key based on Node Index
+    fn index_to_pubkey(&self, node_index: NodeIndex) -> Option<NodePublicKey>;
+
+    /// Simulate Transaction
+    fn simulate_txn(&self, txn: TransactionRequest) -> TransactionResponse;
+}
 
 #[infusion::service]
 pub trait ApplicationInterface<C: Collection>:
