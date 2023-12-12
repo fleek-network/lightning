@@ -47,8 +47,9 @@ let readStream: ReadableStream;
 let writeStream: WritableStream;
 let writer: WritableStreamDefaultWriter;
 let sourceBuffer: SourceBuffer | undefined;
-let readBuffer: Uint8Array = new Uint8Array(256 * 1024 + 4);
 const queue: Uint8Array[] = [];
+let reader: ReadableStreamDefaultReader;
+let readBuffer: Uint8Array = new Uint8Array(0);
 
 const handshake = async () => {
   // Request the certificate hash for the node
@@ -92,43 +93,58 @@ const send = (buffer: ArrayBuffer) => {
 };
 
 const recv = async () => {
-  const reader = readStream.getReader();
+  if (!reader) {
+    reader = readStream.getReader();
+  }
 
   // Read the length header.
-  while (readBuffer.length < 4) {
+  while (readBuffer.byteLength < 4) {
+    // The value is a Uint8Array.
     const { value, done } = await reader.read();
-    readBuffer.set(value, readBuffer.length);
-    if (done) {
+    const len: number = readBuffer.length + value.length;
+    const tmp = new Uint8Array(len);
+    tmp.set(readBuffer, 0);
+    tmp.set(value, readBuffer.length);
+    readBuffer = tmp;
+
+    if (done && readBuffer.length < 4) {
       console.error("reader ended unexpectedly");
       return;
     }
   }
 
-  const view = new DataView(readBuffer.buffer);
+  const view = new DataView(readBuffer.buffer.slice(0, 4));
   const lengthPrefix = view.getUint32(0, false);
   readBuffer = readBuffer.slice(4);
 
   // Read the frame.
   while (readBuffer.length < lengthPrefix) {
     const { value, done } = await reader.read();
-    readBuffer.set(value, readBuffer.length);
-    if (done) {
+
+    const tmp = new Uint8Array(readBuffer.length + value.length);
+    tmp.set(readBuffer, 0);
+    tmp.set(value, readBuffer.length);
+    readBuffer = tmp;
+
+    if (done && readBuffer.length < lengthPrefix) {
       console.error("reader ended unexpectedly");
       return;
     }
   }
 
-  const frame = schema.Response.decode(readBuffer.slice(0, lengthPrefix));
+  const serialized = readBuffer.buffer.slice(0, lengthPrefix);
+  const frame = schema.Response.decode(serialized);
   readBuffer = readBuffer.slice(lengthPrefix);
+
   return frame;
 };
 
 function appendBuffer(buffer: Uint8Array) {
   if (sourceBuffer!.updating || queue.length != 0) {
     queue.push(buffer);
-    return;
+  } else {
+    sourceBuffer!.appendBuffer(buffer);
   }
-  sourceBuffer!.appendBuffer(buffer);
 }
 
 // Todo: Handle errors and log.
@@ -163,6 +179,8 @@ const startSession = async () => {
 
     appendBuffer(frame.bytes);
   }
+
+  transport.close();
 };
 
 // --------------------------------------------
@@ -173,7 +191,6 @@ const mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
 
 if ("MediaSource" in window && MediaSource.isTypeSupported(mimeCodec)) {
   const mediaSource = new MediaSource();
-  //console.log(mediaSource.readyState); // closed
   video.src = URL.createObjectURL(mediaSource);
   mediaSource.addEventListener("sourceopen", sourceOpen);
 } else {
