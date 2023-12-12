@@ -15,8 +15,6 @@ use lightning_types::{
     TxHash,
     Value,
 };
-
-use schemars::schema::Metadata;
 use serde::{Deserialize, Serialize};
 
 use crate::common::WithStartAndShutdown;
@@ -51,59 +49,75 @@ pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
 
 pub trait QueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Query Metadata Table
-    fn get_metadata(&self, key: &Metadata) -> Value;
+    fn get_metadata(&self, key: &lightning_types::Metadata) -> Option<Value>;
 
     /// Query Account Table
     fn get_account_info<T: Clone>(
         &self,
         address: &EthAddress,
-        selector: impl Fn(AccountInfo) -> T,
-    ) -> T;
+        selector: impl FnOnce(AccountInfo) -> T,
+    ) -> Option<T>;
 
     /// Query Client Table
-    fn get_client_info(self, pub_key: &ClientPublicKey) -> EthAddress;
+    fn get_client_info(self, pub_key: &ClientPublicKey) -> Option<EthAddress>;
 
     /// Query Node Table
-    fn get_node_info<T: Clone>(&self, node: &NodeIndex, selector: impl Fn(NodeInfo) -> T) -> T;
+    /// Returns information about a single node.
+    fn get_node_info<T: Clone>(
+        &self,
+        node: &NodeIndex,
+        selector: impl FnOnce(NodeInfo) -> T,
+    ) -> Option<T>;
 
     /// Query Pub Key to Node Index Table
-    fn pub_key_to_index(&self, pub_key: &NodePublicKey) -> NodeIndex;
+    fn pub_key_to_index(&self, pub_key: &NodePublicKey) -> Option<NodeIndex>;
 
     /// Query Committe Table
-    fn get_committe_info<T: Clone>(&self, epoch: &Epoch, selector: impl Fn(Committee) -> T) -> T;
+    fn get_committe_info<T: Clone>(
+        &self,
+        epoch: &Epoch,
+        selector: impl FnOnce(Committee) -> T,
+    ) -> Option<T>;
 
     /// Query Services Table
-    fn get_service_info(&self, id: &ServiceId) -> Service;
+    fn get_service_info(&self, id: &ServiceId) -> Option<Service>;
 
     /// Query Params Table
-    fn get_protocol_param(&self, param: &ProtocolParams) -> u128;
+    fn get_protocol_param(&self, param: &ProtocolParams) -> Option<u128>;
 
     /// Query Current Epoch Served Table
-    fn get_current_epoch_served(&self, node: &NodeIndex) -> NodeServed;
+    fn get_current_epoch_served(&self, node: &NodeIndex) -> Option<NodeServed>;
 
     /// Query Reputation Measurements
-    fn get_reputation_measurements(&self, node: &NodeIndex) -> Vec<ReportedReputationMeasurements>;
+    fn get_reputation_measurements(
+        &self,
+        node: &NodeIndex,
+    ) -> Option<Vec<ReportedReputationMeasurements>>;
 
     /// Query Latencies Table
-    fn get_latencies(&self, node_1: &NodeIndex, node_2: &NodeIndex) -> Duration;
+    fn get_latencies(&self, node_1: &NodeIndex, node_2: &NodeIndex) -> Option<Duration>;
 
     /// Query Reputation Scores Table
-    fn get_reputation_score(&self, node: &NodeIndex) -> u8;
+    fn get_reputation_score(&self, node: &NodeIndex) -> Option<u8>;
 
     /// Query Total Served Table
-    fn get_total_served(&self, epoch: &Epoch) -> TotalServed;
+    fn get_total_served(&self, epoch: &Epoch) -> Option<TotalServed>;
 
     /// Autometrics
+    /// Returns the committee members of the current epoch
     fn get_committee_members(&self) -> Vec<NodePublicKey>;
 
-    /// Get Current Committee Members' indices
+    /// Returns the committee members of the current epoch by NodeIndex
     fn get_committee_members_by_index(&self) -> Vec<NodeIndex>;
+
+    /// Get Current Epoch
+    fn get_current_epoch(&self) -> Epoch;
 
     /// Get Current Epoch Info
     fn get_epoch_info(&self) -> EpochInfo;
 
     /// Get Node Public Key based on Node Index
-    fn index_to_pubkey(&self, node_index: NodeIndex) -> Option<NodePublicKey>;
+    fn index_to_pubkey(&self, node_index: &NodeIndex) -> Option<NodePublicKey>;
 
     /// Simulate Transaction
     fn simulate_txn(&self, txn: TransactionRequest) -> TransactionResponse;
@@ -189,9 +203,6 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Existence of this data can allow future optimizations of the network topology.
     fn get_relative_score(&self, n1: &NodePublicKey, n2: &NodePublicKey) -> u128;
 
-    /// Returns information about a single node.
-    fn get_node_info(&self, id: &NodePublicKey) -> Option<NodeInfo>;
-
     /// Returns information about a single node using its index.
     fn get_node_info_with_index(&self, node_index: &NodeIndex) -> Option<NodeInfo>;
 
@@ -214,11 +225,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Returns the randomness that was used to start the current epoch.
     fn get_epoch_randomness_seed(&self) -> &[u8; 32];
 
-    /// Returns the committee members of the current epoch.
     fn get_committee_members(&self) -> Vec<NodePublicKey>;
-
-    /// Returns the committee members of the current epoch by NodeIndex
-    fn get_committee_members_by_index(&self) -> Vec<NodeIndex>;
 
     /// Returns just the current epoch
     fn get_epoch(&self) -> Epoch;
@@ -252,10 +259,6 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// returns the service information for a given [`ServiceId`]
     fn get_service_info(&self, service_id: ServiceId) -> Service;
-
-    fn pubkey_to_index(&self, node: NodePublicKey) -> Option<u32>;
-
-    fn index_to_pubkey(&self, node_index: u32) -> Option<NodePublicKey>;
 
     /// Returns the hash of the last epoch.
     fn get_last_epoch_hash(&self) -> [u8; 32];

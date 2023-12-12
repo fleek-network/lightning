@@ -5,7 +5,7 @@ use atomo::{Atomo, QueryPerm, ResolvedTableReference};
 use autometrics::autometrics;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use lightning_interfaces::application::SyncQueryRunnerInterface;
+use lightning_interfaces::application::{QueryRunnerInterface, SyncQueryRunnerInterface};
 use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,
@@ -34,6 +34,15 @@ use lightning_interfaces::PagingParams;
 use crate::state::State;
 use crate::storage::AtomoStorage;
 use crate::table::StateTables;
+
+macro_rules! query {
+    ($self:ident, $table:ident, $key:expr) => {
+        $self.inner.run(|ctx| $self.$table.get(ctx).get($key))
+    };
+    ($self:ident, $table:ident, $key:expr, $selector:expr) => {
+        query!($self, $table, $key).map($selector)
+    };
+}
 
 #[derive(Clone)]
 pub struct QueryRunner {
@@ -99,6 +108,131 @@ impl QueryRunner {
                 .get(public_key)
                 .map(|index| self.node_table.get(ctx).get(index).map(f))
                 .unwrap_or(None)
+        })
+    }
+}
+
+impl QueryRunnerInterface for QueryRunner {
+    fn get_metadata(&self, key: &Metadata) -> Option<Value> {
+        query!(self, metadata_table, key)
+    }
+
+    fn get_account_info<T: Clone>(
+        &self,
+        address: &EthAddress,
+        selector: impl FnOnce(AccountInfo) -> T,
+    ) -> Option<T> {
+        query!(self, account_table, address, selector)
+    }
+
+    fn get_client_info(self, pub_key: &ClientPublicKey) -> Option<EthAddress> {
+        query!(self, client_table, pub_key)
+    }
+
+    fn get_node_info<T: Clone>(
+        &self,
+        node: &NodeIndex,
+        selector: impl FnOnce(NodeInfo) -> T,
+    ) -> Option<T> {
+        query!(self, node_table, node, selector)
+    }
+
+    fn pub_key_to_index(&self, pub_key: &NodePublicKey) -> Option<NodeIndex> {
+        query!(self, pub_key_to_index, pub_key)
+    }
+
+    fn get_committe_info<T: Clone>(
+        &self,
+        epoch: &Epoch,
+        selector: impl FnOnce(Committee) -> T,
+    ) -> Option<T> {
+        query!(self, committee_table, epoch, selector)
+    }
+
+    fn get_service_info(&self, id: &ServiceId) -> Option<Service> {
+        query!(self, services_table, id)
+    }
+
+    fn get_protocol_param(&self, param: &ProtocolParams) -> Option<u128> {
+        query!(self, param_table, param)
+    }
+
+    fn get_current_epoch_served(&self, node: &NodeIndex) -> Option<NodeServed> {
+        query!(self, current_epoch_served, node)
+    }
+
+    fn get_reputation_measurements(
+        &self,
+        node: &NodeIndex,
+    ) -> Option<Vec<ReportedReputationMeasurements>> {
+        query!(self, rep_measurements, node)
+    }
+
+    fn get_latencies(&self, node_1: &NodeIndex, node_2: &NodeIndex) -> Option<Duration> {
+        query!(self, latencies, &(*node_1, *node_2))
+    }
+
+    fn get_reputation_score(&self, node: &NodeIndex) -> Option<u8> {
+        query!(self, rep_scores, node)
+    }
+
+    fn get_total_served(&self, epoch: &Epoch) -> Option<TotalServed> {
+        query!(self, total_served_table, epoch)
+    }
+
+    /// Autometrics
+    /// Returns the committee members of the current epoch
+    fn get_committee_members(&self) -> Vec<NodePublicKey> {
+        self.get_committee_members_by_index()
+            .into_iter()
+            .filter_map(|node_index| self.index_to_pubkey(&node_index))
+            .collect()
+    }
+
+    fn get_committee_members_by_index(&self) -> Vec<NodeIndex> {
+        let current_epoch = self.get_current_epoch();
+
+        self.get_committe_info(&current_epoch, |committee| committee.members)
+            .unwrap_or_default()
+    }
+
+    fn get_current_epoch(&self) -> Epoch {
+        match self.get_metadata(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        }
+    }
+
+    fn get_epoch_info(&self) -> EpochInfo {
+        let current_epoch = self.get_current_epoch();
+
+        let committee = self
+            .get_committe_info::<Committee>(&current_epoch, |c| c)
+            .unwrap_or_default();
+
+        EpochInfo {
+            committee: committee
+                .members
+                .iter()
+                .filter_map(|member| self.get_node_info::<NodeInfo>(member, |n| n))
+                .collect(),
+            epoch: current_epoch,
+            epoch_end: committee.epoch_end_timestamp,
+        }
+    }
+
+    fn index_to_pubkey(&self, node_index: &NodeIndex) -> Option<NodePublicKey> {
+        self.get_node_info::<NodePublicKey>(node_index, |node_info| node_info.public_key)
+    }
+
+    fn simulate_txn(&self, txn: TransactionRequest) -> TransactionResponse {
+        self.inner.run(|ctx| {
+            // Create the app/execution environment
+            let backend = StateTables {
+                table_selector: ctx,
+            };
+            let app = State::new(backend);
+            app.execute_transaction(txn.clone())
         })
     }
 }
@@ -180,10 +314,6 @@ impl SyncQueryRunnerInterface for QueryRunner {
         todo!()
     }
 
-    fn get_node_info(&self, id: &NodePublicKey) -> Option<NodeInfo> {
-        self.get_node_info_with_pub_key(id, |node_info| node_info)
-    }
-
     fn get_node_info_with_index(&self, node_index: &NodeIndex) -> Option<NodeInfo> {
         self.inner
             .run(|ctx| self.node_table.get(ctx).get(node_index))
@@ -238,8 +368,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     fn is_valid_node(&self, id: &NodePublicKey) -> bool {
-        self.get_node_info(id)
-            .is_some_and(|node_info| node_info.stake.staked >= self.get_staking_amount().into())
+        self.pub_key_to_index(id).is_some_and(|id| {
+            self.get_node_info::<HpUfixed<18>>(&id, |node_info| node_info.stake.staked)
+                .is_some_and(|staked| staked >= self.get_staking_amount().into())
+        })
     }
 
     fn get_staking_amount(&self) -> u128 {
@@ -278,22 +410,6 @@ impl SyncQueryRunnerInterface for QueryRunner {
                         .map(|node| node.public_key)
                 })
                 .collect()
-        })
-    }
-
-    fn get_committee_members_by_index(&self) -> Vec<NodeIndex> {
-        self.inner.run(|ctx| {
-            // get current epoch
-            let epoch = match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
-                Some(Value::Epoch(epoch)) => epoch,
-                _ => 0,
-            };
-
-            self.committee_table
-                .get(ctx)
-                .get(epoch)
-                .map(|c| c.members)
-                .unwrap_or_default()
         })
     }
 
@@ -422,8 +538,8 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 })
             })
             .filter_map(|((index_lhs, index_rhs), latency)| {
-                let node_lhs = self.index_to_pubkey(index_lhs);
-                let node_rhs = self.index_to_pubkey(index_rhs);
+                let node_lhs = self.index_to_pubkey(&index_lhs);
+                let node_rhs = self.index_to_pubkey(&index_rhs);
                 match (node_lhs, node_rhs) {
                     (Some(node_lhs), Some(node_rhs)) => Some(((node_lhs, node_rhs), latency)),
                     _ => None,
@@ -434,20 +550,6 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn get_service_info(&self, service_id: ServiceId) -> Service {
         self.inner
             .run(|ctx| self.services_table.get(ctx).get(service_id).unwrap())
-    }
-
-    fn pubkey_to_index(&self, node: NodePublicKey) -> Option<NodeIndex> {
-        self.inner
-            .run(|ctx| self.pub_key_to_index.get(ctx).get(node))
-    }
-
-    fn index_to_pubkey(&self, node_index: NodeIndex) -> Option<NodePublicKey> {
-        self.inner.run(|ctx| {
-            self.node_table
-                .get(ctx)
-                .get(node_index)
-                .map(|info| info.public_key)
-        })
     }
 
     fn get_last_epoch_hash(&self) -> [u8; 32] {
