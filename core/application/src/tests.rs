@@ -63,8 +63,6 @@ partial!(TestBinding {
     ApplicationInterface = Application<Self>;
 });
 
-use lightning_interfaces::QueryRunnerInterface;
-
 pub struct Params {
     epoch_time: Option<u64>,
     max_inflation: Option<u16>,
