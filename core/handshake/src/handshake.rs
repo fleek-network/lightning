@@ -1,5 +1,5 @@
 use std::sync::atomic::AtomicU64;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use async_channel::{bounded, Sender};
 use async_trait::async_trait;
@@ -32,20 +32,13 @@ use crate::transports::{
     TransportSender,
 };
 
-/// Default connection timeout. This is the amount of time we will wait
-/// to close a connection after all transports have dropped.
-const CONNECTION_TIMEOUT: Duration = Duration::from_secs(5);
-/// Default access token timeouts. This is the amount of time a new
-/// access token will be valid for, before needing an extension.
-const ACCESS_TOKEN_TIMEOUT: Duration = Duration::from_secs(15 * 60);
-
 pub struct Handshake<C: Collection> {
     status: Mutex<Option<Run<C>>>,
     config: HandshakeConfig,
 }
 
 struct Run<C: Collection> {
-    ctx: Arc<Context<c![C::ServiceExecutorInterface::Provider]>>,
+    ctx: Context<c![C::ServiceExecutorInterface::Provider]>,
     shutdown: ShutdownNotifier,
 }
 
@@ -57,7 +50,7 @@ impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
     ) -> anyhow::Result<Self> {
         let shutdown = ShutdownNotifier::default();
         let (_, _) = signer.get_sk();
-        let ctx = Context::new(provider, shutdown.waiter()).into();
+        let ctx = Context::new(provider, shutdown.waiter());
 
         Ok(Self {
             status: Mutex::new(Some(Run::<C> { ctx, shutdown })),
@@ -116,11 +109,12 @@ pub struct TokenState {
     pub timeout: Option<u128>,
 }
 
+#[derive(Clone)]
 pub struct Context<P: ExecutorProviderInterface> {
     /// Service unix socket provider
     provider: P,
     pub(crate) shutdown: ShutdownWaiter,
-    connection_id: AtomicU64,
+    connection_counter: Arc<AtomicU64>,
     secondary_senders: Arc<DashMap<u64, Sender<TransportPair>>>,
     access_tokens: Arc<DashMap<[u8; 48], TokenState>>,
 }
@@ -130,7 +124,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
         Self {
             provider,
             shutdown: waiter,
-            connection_id: AtomicU64::new(0),
+            connection_counter: AtomicU64::new(0).into(),
             secondary_senders: DashMap::new().into(),
             access_tokens: DashMap::new().into(),
         }
@@ -163,7 +157,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
                 };
 
                 let connection_id = self
-                    .connection_id
+                    .connection_counter
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
                 let (tx, rx) = bounded(1);

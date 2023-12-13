@@ -4,7 +4,6 @@ use bytes::{BufMut, Bytes, BytesMut};
 use lightning_interfaces::ExecutorProviderInterface;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use triomphe::Arc;
 
 use self::mock::{MockTransportReceiver, MockTransportSender};
 use self::tcp::{TcpReceiver, TcpSender};
@@ -74,7 +73,7 @@ pub trait Transport: Sized + Send + Sync + 'static {
 
     /// Spawn a thread loop accepting connections and initializing the connection to the service.
     #[inline(always)]
-    fn spawn_listener_task(mut self, ctx: Arc<Context<impl ExecutorProviderInterface>>)
+    fn spawn_listener_task(mut self, ctx: Context<impl ExecutorProviderInterface>)
     where
         (Self::Sender, Self::Receiver): Into<TransportPair>,
     {
@@ -125,7 +124,7 @@ pub trait TransportReceiver: Send + Sync + 'static {
 
 pub async fn spawn_transport_by_config(
     shutdown: ShutdownWaiter,
-    ctx: Arc<Context<impl ExecutorProviderInterface>>,
+    ctx: Context<impl ExecutorProviderInterface>,
     config: TransportConfig,
 ) -> anyhow::Result<Option<Router>> {
     match config {
