@@ -26,6 +26,8 @@ use lightning_interfaces::types::{
     ExecutionData,
     ExecutionError,
     HandshakePorts,
+    NodeIndex,
+    NodeInfo,
     NodePorts,
     Participation,
     ProofOfConsensus,
@@ -60,6 +62,8 @@ use crate::query_runner::QueryRunner;
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
 });
+
+use lightning_interfaces::QueryRunnerInterface;
 
 pub struct Params {
     epoch_time: Option<u64>,
@@ -227,11 +231,7 @@ macro_rules! simple_epoch_change {
             .enumerate()
             .take(required_signals)
         {
-            let nonce = $query_runner
-                .get_node_info(&node.node_secret_key.to_pk())
-                .unwrap()
-                .nonce
-                + 1;
+            let nonce = get_node_nonce($query_runner, &node.node_secret_key.to_pk()) + 1;
             let req = prepare_change_epoch_request($epoch, &node.node_secret_key, nonce);
 
             let res = run_update!(req, $socket);
@@ -384,7 +384,7 @@ macro_rules! assert_rep_measurements_update {
 /// * `node_pk: &NodePublicKey` - Node's public key
 macro_rules! assert_valid_node {
     ($valid_nodes:expr,$query_runner:expr,$node_pk:expr) => {{
-        let node_info = $query_runner.get_node_info($node_pk).unwrap();
+        let node_info = get_node_info($query_runner, $node_pk);
         // Node registry contains the first valid node
         assert!($valid_nodes.contains(&node_info));
     }};
@@ -399,7 +399,7 @@ macro_rules! assert_valid_node {
 /// * `node_pk: &NodePublicKey` - Node's public key
 macro_rules! assert_not_valid_node {
     ($valid_nodes:expr,$query_runner:expr,$node_pk:expr) => {{
-        let node_info = $query_runner.get_node_info($node_pk).unwrap();
+        let node_info = get_node_info($query_runner, $node_pk);
         // Node registry contains the first valid node
         assert!(!$valid_nodes.contains(&node_info));
     }};
@@ -1035,7 +1035,7 @@ fn update_reputation_measurements(
     peer: &NodePublicKey,
     measurements: ReputationMeasurements,
 ) -> (u32, ReputationMeasurements) {
-    let peer_index = query_runner.pubkey_to_index(*peer).unwrap();
+    let peer_index = get_node_index(&query_runner, peer);
     map.insert(peer_index, measurements.clone());
     (peer_index, measurements)
 }
@@ -1119,6 +1119,37 @@ fn prepare_new_committee(
     (new_committee, new_keystore)
 }
 
+/// Convert NodePublicKey to NodeIndex
+fn get_node_index(query_runner: &QueryRunner, pub_key: &NodePublicKey) -> NodeIndex {
+    query_runner.pubkey_to_index(pub_key).unwrap()
+}
+
+/// Query NodeTable
+fn do_get_node_info<T: Clone>(
+    query_runner: &QueryRunner,
+    pub_key: &NodePublicKey,
+    selector: impl FnOnce(NodeInfo) -> T,
+) -> T {
+    let node_idx = get_node_index(&query_runner, pub_key);
+    query_runner
+        .get_node_info::<T>(&node_idx, selector)
+        .unwrap()
+}
+
+/// Query NodeInfo from NodeTable
+fn get_node_info(query_runner: &QueryRunner, pub_key: &NodePublicKey) -> NodeInfo {
+    do_get_node_info(query_runner, pub_key, |n| n)
+}
+
+/// Query Node's Nonce from NodeTable
+fn get_node_nonce(query_runner: &QueryRunner, pub_key: &NodePublicKey) -> u64 {
+    do_get_node_info::<u64>(query_runner, pub_key, |n| n.nonce)
+}
+
+/// Query Node's Participation from NodeTable
+fn get_node_participation(query_runner: &QueryRunner, pub_key: &NodePublicKey) -> Participation {
+    do_get_node_info::<Participation>(query_runner, pub_key, |n| n.participation)
+}
 //////////////////////////////////////////////////////////////////////////////////
 ////////////////// This is where the actual tests are defined ////////////////////
 //////////////////////////////////////////////////////////////////////////////////
@@ -1194,7 +1225,7 @@ async fn test_submit_rep_measurements() {
     );
 
     let reporting_node_key = keystore[0].node_secret_key.to_pk();
-    let reporting_node_index = query_runner.pubkey_to_index(reporting_node_key).unwrap();
+    let reporting_node_index = get_node_index(&query_runner, &reporting_node_key);
 
     submit_reputation_measurements!(&update_socket, &keystore[0].node_secret_key, 1, map);
 
@@ -1374,8 +1405,8 @@ async fn test_uptime_participation() {
         change_epoch!(&update_socket, &node.node_secret_key, 2, epoch);
     }
 
-    let node_info1 = query_runner.get_node_info(&peer_1).unwrap();
-    let node_info2 = query_runner.get_node_info(&peer_2).unwrap();
+    let node_info1 = get_node_info(&query_runner, &peer_1);
+    let node_info2 = get_node_info(&query_runner, &peer_2);
 
     assert_eq!(node_info1.participation, Participation::False);
     assert_eq!(node_info2.participation, Participation::True);
@@ -1533,8 +1564,10 @@ async fn test_pod_without_proof() {
         vec![bandwidth_commodity, compute_commodity]
     );
 
+    let epoch = 0;
+
     assert_eq!(
-        query_runner.get_total_served(0),
+        query_runner.get_total_served(&epoch).unwrap(),
         TotalServed {
             served: vec![bandwidth_commodity, compute_commodity],
             reward_pool: (0.1 * bandwidth_commodity as f64 + 0.2 * compute_commodity as f64).into()
@@ -1823,7 +1856,7 @@ async fn test_distribute_rewards() {
 
     // assert service balances with service id 0 and 1
     for s in 0..2 {
-        let service_owner = query_runner.get_service_info(s).owner;
+        let service_owner = query_runner.get_service_info(&s).unwrap().owner;
         let service_balance = query_runner.get_flk_balance(&service_owner);
         assert_eq!(
             service_balance,
@@ -2004,10 +2037,7 @@ async fn test_supply_across_epoch() {
     // 365 epoch changes to see if the current supply and year start suppply are ok
     for epoch in 0..365 {
         // add at least one transaction per epoch, so reward pool is not zero
-        let nonce = query_runner
-            .get_node_info(&node_secret_key.to_pk())
-            .unwrap()
-            .nonce;
+        let nonce = get_node_nonce(&query_runner, &node_secret_key.to_pk());
         let pod_10 = prepare_pod_request(10000, 0, &node_secret_key, nonce + 1);
         expect_tx_success!(pod_10, &update_socket);
 
@@ -2030,11 +2060,7 @@ async fn test_supply_across_epoch() {
                     measurements.clone(),
                 );
             }
-            let nonce = query_runner
-                .get_node_info(&node.node_secret_key.to_pk())
-                .unwrap()
-                .nonce
-                + 1;
+            let nonce = get_node_nonce(&query_runner, &node.node_secret_key.to_pk()) + 1;
 
             submit_reputation_measurements!(&update_socket, &node.node_secret_key, nonce, map);
         }
@@ -2305,10 +2331,7 @@ async fn test_opt_in_reverts_insufficient_stake() {
     let update = prepare_update_request_node(opt_in, &node_secret_key, 1);
     expect_tx_revert!(update, &update_socket, ExecutionError::InsufficientStake);
     assert_ne!(
-        query_runner
-            .get_node_info(&node_secret_key.to_pk())
-            .unwrap()
-            .participation,
+        get_node_participation(&query_runner, &node_secret_key.to_pk()),
         Participation::OptedIn
     );
 }
@@ -2337,10 +2360,7 @@ async fn test_opt_in_works() {
     );
 
     assert_ne!(
-        query_runner
-            .get_node_info(&node_pub_key)
-            .unwrap()
-            .participation,
+        get_node_participation(&query_runner, &node_pub_key),
         Participation::OptedIn
     );
 
@@ -2349,10 +2369,7 @@ async fn test_opt_in_works() {
     expect_tx_success!(update, &update_socket);
 
     assert_eq!(
-        query_runner
-            .get_node_info(&node_pub_key)
-            .unwrap()
-            .participation,
+        get_node_participation(&query_runner, &node_pub_key),
         Participation::OptedIn
     );
 }
@@ -2413,10 +2430,7 @@ async fn test_opt_out_reverts_insufficient_stake() {
     let update = prepare_update_request_node(opt_out, &node_secret_key, 1);
     expect_tx_revert!(update, &update_socket, ExecutionError::InsufficientStake);
     assert_ne!(
-        query_runner
-            .get_node_info(&node_secret_key.to_pk())
-            .unwrap()
-            .participation,
+        get_node_participation(&query_runner, &node_secret_key.to_pk()),
         Participation::OptedOut
     );
 }
@@ -2445,10 +2459,7 @@ async fn test_opt_out_works() {
     );
 
     assert_ne!(
-        query_runner
-            .get_node_info(&node_pub_key)
-            .unwrap()
-            .participation,
+        get_node_participation(&query_runner, &node_pub_key),
         Participation::OptedOut
     );
 
@@ -2457,10 +2468,7 @@ async fn test_opt_out_works() {
     expect_tx_success!(update, &update_socket);
 
     assert_eq!(
-        query_runner
-            .get_node_info(&node_pub_key)
-            .unwrap()
-            .participation,
+        get_node_participation(&query_runner, &node_pub_key),
         Participation::OptedOut
     );
 }
@@ -2635,7 +2643,7 @@ async fn test_stake_works() {
         balance - stake.clone()
     );
 
-    let node_info = query_runner.get_node_info(&peer_pub_key).unwrap();
+    let node_info = get_node_info(&query_runner, &peer_pub_key);
     assert_eq!(node_info.consensus_key, consensus_key);
     assert_eq!(node_info.domain, node_domain);
     assert_eq!(node_info.worker_public_key, worker_pub_key);
@@ -2645,9 +2653,9 @@ async fn test_stake_works() {
     // Query the new node and make sure he has the proper stake
     assert_eq!(query_runner.get_staked(&peer_pub_key), stake);
 
-    let node_idx = query_runner.pubkey_to_index(peer_pub_key).unwrap();
+    let node_idx = query_runner.pubkey_to_index(&peer_pub_key).unwrap();
     assert_eq!(
-        query_runner.index_to_pubkey(node_idx).unwrap(),
+        query_runner.index_to_pubkey(&node_idx).unwrap(),
         peer_pub_key
     );
 }
@@ -3007,10 +3015,11 @@ async fn test_withdraw_unstaked_works_properly() {
     // Assert reset the nodes locked stake state
     assert_eq!(
         query_runner
-            .get_node_info(&node_pub_key)
-            .unwrap()
-            .stake
-            .locked,
+            .get_node_info::<HpUfixed<18>>(
+                &query_runner.pubkey_to_index(&node_pub_key).unwrap(),
+                |n| n.stake.locked
+            )
+            .unwrap(),
         HpUfixed::zero()
     );
 }

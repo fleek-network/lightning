@@ -70,7 +70,7 @@ pub trait QueryRunnerInterface: Clone + Send + Sync + 'static {
     ) -> Option<T>;
 
     /// Query Pub Key to Node Index Table
-    fn pub_key_to_index(&self, pub_key: &NodePublicKey) -> Option<NodeIndex>;
+    fn pubkey_to_index(&self, pub_key: &NodePublicKey) -> Option<NodeIndex>;
 
     /// Query Committe Table
     fn get_committe_info<T: Clone>(
@@ -225,16 +225,16 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Returns the randomness that was used to start the current epoch.
     fn get_epoch_randomness_seed(&self) -> &[u8; 32];
 
-    fn get_committee_members(&self) -> Vec<NodePublicKey>;
+    // fn get_committee_members(&self) -> Vec<NodePublicKey>;
 
     /// Returns just the current epoch
     fn get_epoch(&self) -> Epoch;
 
-    /// Returns all the information on the current epoch that Narwhal needs to run
-    fn get_epoch_info(&self) -> EpochInfo;
+    // /// Returns all the information on the current epoch that Narwhal needs to run
+    // fn get_epoch_info(&self) -> EpochInfo;
 
-    /// Returns total served for all commodities from the state for a given epoch
-    fn get_total_served(&self, epoch: Epoch) -> TotalServed;
+    // /// Returns total served for all commodities from the state for a given epoch
+    // fn get_total_served(&self, epoch: Epoch) -> TotalServed;
 
     /// Return all commodity served for a give node for current epoch
     fn get_node_served(&self, node: &NodePublicKey) -> NodeServed;
@@ -257,8 +257,8 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Return all latencies measurements for the current epoch.
     fn get_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration>;
 
-    /// returns the service information for a given [`ServiceId`]
-    fn get_service_info(&self, service_id: ServiceId) -> Service;
+    // /// returns the service information for a given [`ServiceId`]
+    // fn get_service_info(&self, service_id: ServiceId) -> Service;
 
     /// Returns the hash of the last epoch.
     fn get_last_epoch_hash(&self) -> [u8; 32];
