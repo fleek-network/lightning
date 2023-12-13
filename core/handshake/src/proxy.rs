@@ -319,3 +319,228 @@ impl<PS: TransportSender, PR: TransportReceiver, SS: TransportSender, SR: Transp
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use anyhow::Result;
+    use async_trait::async_trait;
+    use fleek_crypto::{ClientPublicKey, ClientSignature};
+    use futures::{SinkExt, StreamExt};
+    use lightning_interfaces::types::ServiceId;
+    use lightning_interfaces::ExecutorProviderInterface;
+    use lightning_schema::handshake::{
+        HandshakeRequestFrame,
+        RequestFrame,
+        ResponseFrame,
+        TerminationReason,
+    };
+    use tokio::net::UnixStream;
+    use tokio::time::timeout;
+    use tokio_util::codec::Framed;
+
+    use crate::handshake::Context;
+    use crate::shutdown::ShutdownNotifier;
+    use crate::transports::mock::{dial_mock, MockTransport, MockTransportConfig};
+    use crate::transports::Transport;
+
+    const ECHO_SERVICE: u32 = 1001;
+    const TEST_PAYLOAD: &[u8] = &[69; 420];
+
+    #[derive(Clone)]
+    struct MockServiceProvider;
+
+    impl MockServiceProvider {
+        fn echo_service(stream: UnixStream) {
+            tokio::spawn(async move {
+                let mut framed =
+                    Framed::new(stream, tokio_util::codec::LengthDelimitedCodec::new());
+
+                while let Some(Ok(bytes)) = framed.next().await {
+                    if framed.send(bytes.into()).await.is_err() {
+                        return;
+                    }
+                }
+            });
+        }
+    }
+
+    #[async_trait]
+    impl ExecutorProviderInterface for MockServiceProvider {
+        async fn connect(&self, service_id: ServiceId) -> Option<UnixStream> {
+            match service_id {
+                ECHO_SERVICE => {
+                    let (left, right) = UnixStream::pair().ok()?;
+                    Self::echo_service(left);
+                    Some(right)
+                },
+                _ => None,
+            }
+        }
+    }
+
+    async fn start_mock_node(id: u16) -> Result<ShutdownNotifier> {
+        let shutdown = ShutdownNotifier::default();
+        let context = Context::new(MockServiceProvider, shutdown.waiter());
+        let (transport, _) =
+            MockTransport::bind(shutdown.waiter(), MockTransportConfig { port: id }).await?;
+        transport.spawn_listener_task(context);
+
+        Ok(shutdown)
+    }
+
+    #[tokio::test]
+    async fn primary_connection_service_payloads() -> Result<()> {
+        // start and connect to the mock node
+        let shutdown = start_mock_node(0).await?;
+        let (tx, rx) = dial_mock(0).await.expect("failed to dial");
+
+        // send handshake req
+        tx.send(
+            HandshakeRequestFrame::Handshake {
+                retry: None,
+                service: ECHO_SERVICE,
+                pk: ClientPublicKey([0; 96]),
+                pop: ClientSignature([0; 48]),
+            }
+            .encode(),
+        )
+        .await?;
+
+        // interact with the service over the secondary connection
+        for _ in 0..10 {
+            tx.send(
+                RequestFrame::ServicePayload {
+                    bytes: TEST_PAYLOAD.into(),
+                }
+                .encode(),
+            )
+            .await?;
+            match ResponseFrame::decode(&rx.recv().await?)? {
+                ResponseFrame::ServicePayload { bytes } => assert_eq!(&bytes, TEST_PAYLOAD),
+                f => panic!("expected payload, got {f:?}"),
+            }
+        }
+
+        shutdown.shutdown();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn secondary_connection_service_payloads() -> Result<()> {
+        // start and connect to the mock node
+        let shutdown = start_mock_node(0).await?;
+        let (primary_tx, primary_rx) = dial_mock(0)
+            .await
+            .expect("failed to dial primary connection");
+
+        // send handshake request
+        primary_tx
+            .send(
+                HandshakeRequestFrame::Handshake {
+                    retry: None,
+                    service: ECHO_SERVICE,
+                    pk: ClientPublicKey([0; 96]),
+                    pop: ClientSignature([0; 48]),
+                }
+                .encode(),
+            )
+            .await?;
+
+        // request and get access token
+        primary_tx
+            .send(RequestFrame::AccessToken { ttl: 60 }.encode())
+            .await?;
+        let access_token = match ResponseFrame::decode(&primary_rx.recv().await?)? {
+            ResponseFrame::AccessToken { access_token, .. } => *access_token,
+            f => panic!("expected access token, got {f:?}"),
+        };
+
+        // open secondary connection
+        let (secondary_tx, secondary_rx) = dial_mock(0)
+            .await
+            .expect("failed to dial secondary connection");
+
+        // send join request
+        secondary_tx
+            .send(HandshakeRequestFrame::JoinRequest { access_token }.encode())
+            .await?;
+
+        // interact with the service over the secondary connection
+        for _ in 0..10 {
+            secondary_tx
+                .send(
+                    RequestFrame::ServicePayload {
+                        bytes: TEST_PAYLOAD.into(),
+                    }
+                    .encode(),
+                )
+                .await?;
+            match ResponseFrame::decode(&secondary_rx.recv().await?)? {
+                ResponseFrame::ServicePayload { bytes } => assert_eq!(&bytes, TEST_PAYLOAD),
+                f => panic!("expected payload, got {f:?}"),
+            }
+        }
+
+        shutdown.shutdown();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn reject_invalid_token_ttl() -> Result<()> {
+        // start and connect to the mock node
+        let shutdown = start_mock_node(0).await?;
+        let (primary_tx, primary_rx) = dial_mock(0)
+            .await
+            .expect("failed to dial primary connection");
+
+        // send handshake request
+        primary_tx
+            .send(
+                HandshakeRequestFrame::Handshake {
+                    retry: None,
+                    service: ECHO_SERVICE,
+                    pk: ClientPublicKey([0; 96]),
+                    pop: ClientSignature([0; 48]),
+                }
+                .encode(),
+            )
+            .await?;
+
+        // request and get access token
+        primary_tx
+            .send(RequestFrame::AccessToken { ttl: 1 }.encode())
+            .await?;
+        let access_token = match ResponseFrame::decode(&primary_rx.recv().await?)? {
+            ResponseFrame::AccessToken { access_token, .. } => *access_token,
+            f => panic!("expected access token, got {f:?}"),
+        };
+
+        // wait for the token to expire
+        tokio::time::sleep(Duration::from_millis(1001)).await;
+
+        // open secondary connection
+        let (secondary_tx, secondary_rx) = dial_mock(0)
+            .await
+            .expect("failed to dial secondary connection");
+
+        // send join request
+        secondary_tx
+            .send(HandshakeRequestFrame::JoinRequest { access_token }.encode())
+            .await?;
+
+        // connection should be immediately terminated
+        let bytes = timeout(Duration::from_secs(1), secondary_rx.recv())
+            .await
+            .expect("termination frame should be sent within 1 second")?;
+        assert_eq!(
+            ResponseFrame::decode(&bytes)?,
+            ResponseFrame::Termination {
+                reason: TerminationReason::InvalidToken
+            }
+        );
+
+        shutdown.shutdown();
+        Ok(())
+    }
+}
