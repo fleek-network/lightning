@@ -137,7 +137,7 @@ impl QueryRunnerInterface for QueryRunner {
         query!(self, node_table, node, selector)
     }
 
-    fn pub_key_to_index(&self, pub_key: &NodePublicKey) -> Option<NodeIndex> {
+    fn pubkey_to_index(&self, pub_key: &NodePublicKey) -> Option<NodeIndex> {
         query!(self, pub_key_to_index, pub_key)
     }
 
@@ -180,8 +180,8 @@ impl QueryRunnerInterface for QueryRunner {
         query!(self, total_served_table, epoch)
     }
 
-    /// Autometrics
     /// Returns the committee members of the current epoch
+    #[autometrics]
     fn get_committee_members(&self) -> Vec<NodePublicKey> {
         self.get_committee_members_by_index()
             .into_iter()
@@ -368,7 +368,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     fn is_valid_node(&self, id: &NodePublicKey) -> bool {
-        self.pub_key_to_index(id).is_some_and(|id| {
+        self.pubkey_to_index(id).is_some_and(|id| {
             self.get_node_info::<HpUfixed<18>>(&id, |node_info| node_info.stake.staked)
                 .is_some_and(|staked| staked >= self.get_staking_amount().into())
         })
@@ -387,31 +387,31 @@ impl SyncQueryRunnerInterface for QueryRunner {
         todo!()
     }
 
-    #[autometrics]
-    fn get_committee_members(&self) -> Vec<NodePublicKey> {
-        self.inner.run(|ctx| {
-            // get current epoch first
-            let epoch = match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
-                Some(Value::Epoch(epoch)) => epoch,
-                _ => 0,
-            };
+    // #[autometrics]
+    // fn get_committee_members(&self) -> Vec<NodePublicKey> {
+    //     self.inner.run(|ctx| {
+    //         // get current epoch first
+    //         let epoch = match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
+    //             Some(Value::Epoch(epoch)) => epoch,
+    //             _ => 0,
+    //         };
 
-            // look up current committee
-            self.committee_table
-                .get(ctx)
-                .get(epoch)
-                .map(|c| c.members)
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|index| {
-                    self.node_table
-                        .get(ctx)
-                        .get(index)
-                        .map(|node| node.public_key)
-                })
-                .collect()
-        })
-    }
+    //         // look up current committee
+    //         self.committee_table
+    //             .get(ctx)
+    //             .get(epoch)
+    //             .map(|c| c.members)
+    //             .unwrap_or_default()
+    //             .into_iter()
+    //             .filter_map(|index| {
+    //                 self.node_table
+    //                     .get(ctx)
+    //                     .get(index)
+    //                     .map(|node| node.public_key)
+    //             })
+    //             .collect()
+    //     })
+    // }
 
     fn get_epoch(&self) -> Epoch {
         self.inner.run(
@@ -422,39 +422,39 @@ impl SyncQueryRunnerInterface for QueryRunner {
         )
     }
 
-    fn get_epoch_info(&self) -> EpochInfo {
-        self.inner.run(|ctx| {
-            let node_table = self.node_table.get(ctx);
+    // fn get_epoch_info(&self) -> EpochInfo {
+    //     self.inner.run(|ctx| {
+    //         let node_table = self.node_table.get(ctx);
 
-            // get current epoch
-            let epoch = match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
-                Some(Value::Epoch(epoch)) => epoch,
-                _ => 0,
-            };
+    //         // get current epoch
+    //         let epoch = match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
+    //             Some(Value::Epoch(epoch)) => epoch,
+    //             _ => 0,
+    //         };
 
-            // look up current committee
-            let committee = self.committee_table.get(ctx).get(epoch).unwrap_or_default();
+    //         // look up current committee
+    //         let committee = self.committee_table.get(ctx).get(epoch).unwrap_or_default();
 
-            EpochInfo {
-                committee: committee
-                    .members
-                    .iter()
-                    .filter_map(|member| node_table.get(member))
-                    .collect(),
-                epoch,
-                epoch_end: committee.epoch_end_timestamp,
-            }
-        })
-    }
+    //         EpochInfo {
+    //             committee: committee
+    //                 .members
+    //                 .iter()
+    //                 .filter_map(|member| node_table.get(member))
+    //                 .collect(),
+    //             epoch,
+    //             epoch_end: committee.epoch_end_timestamp,
+    //         }
+    //     })
+    // }
 
-    fn get_total_served(&self, epoch: Epoch) -> TotalServed {
-        self.inner.run(|ctx| {
-            self.total_served_table
-                .get(ctx)
-                .get(epoch)
-                .unwrap_or_default()
-        })
-    }
+    // fn get_total_served(&self, epoch: Epoch) -> TotalServed {
+    //     self.inner.run(|ctx| {
+    //         self.total_served_table
+    //             .get(ctx)
+    //             .get(epoch)
+    //             .unwrap_or_default()
+    //     })
+    // }
 
     fn get_node_served(&self, node: &NodePublicKey) -> NodeServed {
         self.inner.run(|ctx| {
@@ -547,10 +547,11 @@ impl SyncQueryRunnerInterface for QueryRunner {
             })
             .collect()
     }
-    fn get_service_info(&self, service_id: ServiceId) -> Service {
-        self.inner
-            .run(|ctx| self.services_table.get(ctx).get(service_id).unwrap())
-    }
+
+    // fn get_service_info(&self, service_id: ServiceId) -> Service {
+    //     self.inner
+    //         .run(|ctx| self.services_table.get(ctx).get(service_id).unwrap())
+    // }
 
     fn get_last_epoch_hash(&self) -> [u8; 32] {
         self.inner.run(
