@@ -111,7 +111,7 @@ fn run_clients(n: usize) -> Vec<JoinHandle<()>> {
     for _ in 0..n {
         let handle = tokio::spawn(async {
             loop {
-                let Some((tx, rx)) = dial_mock(69).await else {
+                let Ok((tx, rx)) = dial_mock(69).await else {
                     break;
                 };
 
