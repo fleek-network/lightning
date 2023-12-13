@@ -15,6 +15,7 @@ pub use config::Config;
 use divisive::DivisiveHierarchy;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::types::Participation;
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
@@ -58,6 +59,7 @@ impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
             .query
             .get_node_registry(None)
             .into_iter()
+            .filter(|node_info| node_info.participation == Participation::True)
             .map(|node_info| node_info.public_key)
             .collect();
 
