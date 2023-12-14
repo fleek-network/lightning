@@ -1,6 +1,8 @@
+use std::ops::Add;
 use std::sync::atomic::AtomicU64;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use anyhow::anyhow;
 use async_channel::{bounded, Sender};
 use async_trait::async_trait;
 use axum::Router;
@@ -109,6 +111,7 @@ pub struct TokenState {
     pub timeout: Option<u128>,
 }
 
+/// Shared context given to the transport listener tasks and the connection proxies.
 #[derive(Clone)]
 pub struct Context<P: ExecutorProviderInterface> {
     /// Service unix socket provider
@@ -181,17 +184,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
                     },
                 );
 
-                Proxy::new(
-                    sender,
-                    receiver,
-                    socket,
-                    rx,
-                    access_token,
-                    self.access_tokens.clone(),
-                    self.secondary_senders.clone(),
-                    self.shutdown.clone(),
-                )
-                .spawn();
+                Proxy::new(sender, receiver, socket, rx, access_token, self.clone()).spawn();
             },
             // Join request to an existing connection
             HandshakeRequestFrame::JoinRequest { access_token } => {
@@ -226,6 +219,66 @@ impl<P: ExecutorProviderInterface> Context<P> {
             HandshakeRequestFrame::Handshake { retry: Some(_), .. } => {
                 // TODO: Retry logic for primary connections
             },
+        }
+    }
+
+    /// Initialize the token with a time to live.
+    /// Returns an error if token has already been initialized.
+    pub async fn handle_access_token_request(
+        &self,
+        access_token: &[u8; 48],
+        ttl: u64,
+    ) -> anyhow::Result<u64> {
+        let mut state = self
+            .access_tokens
+            .get_mut(access_token)
+            .expect("token state must exist");
+
+        if state.timeout.is_some() {
+            return Err(anyhow!("token already initialized"));
+        }
+
+        state.timeout = Some(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("failed to get current time")
+                .add(Duration::from_secs(ttl))
+                .as_millis(),
+        );
+
+        Ok(ttl)
+    }
+
+    /// Extend an access token with a new ttl.
+    /// Returns an error if the token has not been initialized.
+    pub async fn handle_extend_access_token_request(
+        &self,
+        access_token: &[u8; 48],
+        new_ttl: u64,
+    ) -> anyhow::Result<()> {
+        let mut state = self
+            .access_tokens
+            .get_mut(access_token)
+            .expect("token state must exist");
+
+        if state.timeout.is_none() {
+            return Err(anyhow!("token has not been initialized"));
+        }
+
+        state.timeout = Some(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("failed to get current time")
+                .add(Duration::from_secs(new_ttl))
+                .as_millis(),
+        );
+
+        Ok(())
+    }
+
+    pub fn cleanup_connection(&self, access_token: &[u8; 48]) {
+        if let Some((_, state)) = self.access_tokens.remove(access_token) {
+            self.secondary_senders.remove(&state.connection_id);
         }
     }
 }
