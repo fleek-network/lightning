@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::ops::{Add, Div, Mul, Sub};
 
 use hp_fixed::signed::HpFixed;
-use lightning_interfaces::types::{NodeIndex, ReputationMeasurements};
+use lightning_interfaces::types::{NodeIndex, ReputationMeasurements, PRECISION};
 
-use crate::{statistics, PRECISION};
+use crate::statistics;
 
 pub trait WeightedValue {
     fn get_weighted_value(&self) -> HpFixed<PRECISION>;
@@ -290,7 +290,7 @@ impl From<Vec<WeightedReputationMeasurements>> for CollectedMeasurements {
                     HpFixed::<PRECISION>::from(m.weight as i16) / weight_sum_uptime.clone()
                 };
                 measurements.uptime.push(WeightedFloat {
-                    value: i128::try_from(uptime).unwrap_or(i128::MAX).into(),
+                    value: uptime,
                     weight,
                 });
             }

@@ -3,9 +3,10 @@ use std::fmt;
 use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 use std::str::FromStr;
 
-use num_bigint::Sign::{Minus, Plus};
+use num_bigint::Sign::{self, Minus, Plus};
 use num_bigint::{BigInt, BigUint};
 use num_traits::{FromPrimitive, Signed, ToPrimitive, Zero};
+use schemars::{schema_for_value, JsonSchema};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
@@ -44,6 +45,38 @@ use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
 ///
 /// * `BigInt`: The underlying large signed integer value that the `HpFixed` wraps around.
 pub struct HpFixed<const P: usize>(BigInt);
+
+impl JsonSchema for HpFixed<6> {
+    fn schema_name() -> String {
+        "HpUfixed".to_string()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed(concat!(module_path!(), "::HpFixed"))
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        let ui = BigInt::new(Sign::Plus, vec![1, 1]);
+
+        schema_for_value!(Self(ui)).schema.into()
+    }
+}
+
+impl JsonSchema for HpFixed<18> {
+    fn schema_name() -> String {
+        "HpUfixed".to_string()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed(concat!(module_path!(), "::HpFixed"))
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        let ui = BigInt::new(Sign::Plus, vec![1, 1]);
+
+        schema_for_value!(Self(ui)).schema.into()
+    }
+}
 
 impl<const P: usize> HpFixed<P> {
     pub fn new(value: BigInt) -> Self {

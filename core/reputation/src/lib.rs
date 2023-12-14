@@ -4,7 +4,6 @@ pub mod statistics;
 #[cfg(test)]
 mod test_utils;
 pub mod types;
-
 use lightning_interfaces::types::NodeIndex;
 use types::{
     CollectedMeasurements,
@@ -12,8 +11,6 @@ use types::{
     NormalizedMeasurements,
     WeightedReputationMeasurements,
 };
-
-pub(crate) const PRECISION: usize = 18;
 
 pub fn calculate_reputation_scores(
     weighted_measurements_map: HashMap<NodeIndex, Vec<WeightedReputationMeasurements>>,
@@ -50,6 +47,7 @@ fn calculate_normalized_measurements(
 mod tests {
 
     use hp_fixed::signed::HpFixed;
+    use lightning_interfaces::types::PRECISION;
     use lightning_test_utils::random;
     use rand::Rng;
 
@@ -236,11 +234,8 @@ mod tests {
                 collected_measurements.bytes_sent[0].value
             );
         }
-        if let Some(uptime) = weighted_measurements[0].measurements.uptime {
-            assert_eq!(
-                HpFixed::<PRECISION>::from(i128::try_from(uptime).unwrap()),
-                collected_measurements.uptime[0].value
-            );
+        if let Some(uptime) = weighted_measurements[0].measurements.uptime.clone() {
+            assert_eq!(uptime, collected_measurements.uptime[0].value);
         }
     }
 

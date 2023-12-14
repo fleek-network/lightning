@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 lightning-interfaces = {path="../interfaces"}
 lightning-reputation = {path="../reputation"}
+hp-fixed.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 async-trait.workspace = true

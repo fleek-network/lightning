@@ -4937,6 +4937,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "fleek-crypto",
+ "hp-fixed",
  "infusion",
  "lightning-application",
  "lightning-interfaces",

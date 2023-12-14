@@ -13,6 +13,7 @@ use fleek_crypto::{
     NodeSecretKey,
     SecretKey,
 };
+use hp_fixed::signed::HpFixed;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
@@ -524,7 +525,7 @@ fn test_reputation_measurements(uptime: u8) -> ReputationMeasurements {
         outbound_bandwidth: None,
         bytes_received: None,
         bytes_sent: None,
-        uptime: Some(uptime),
+        uptime: Some(HpFixed::from(uptime as i32)),
         hops: None,
     }
 }
