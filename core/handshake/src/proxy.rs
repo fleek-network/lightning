@@ -1,26 +1,21 @@
-use std::ops::Add;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
 use anyhow::{anyhow, Result};
 use arrayref::array_ref;
-use async_channel::{Receiver, Sender};
+use async_channel::Receiver;
 use bytes::BytesMut;
-use dashmap::DashMap;
-use lightning_schema::handshake::ResponseFrame;
+use lightning_interfaces::ExecutorProviderInterface;
+use lightning_schema::handshake::{ResponseFrame, TerminationReason};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
 use tokio::task::JoinHandle;
 use tracing::error;
-use triomphe::Arc;
 
-use crate::handshake::TokenState;
+use crate::handshake::Context;
 use crate::schema::RequestFrame;
-use crate::shutdown::ShutdownWaiter;
 use crate::transports::{match_transport, TransportPair, TransportReceiver, TransportSender};
 
 /// A proxy for a session with a single primary connection
 // TODO: Every single error state should have a termination reason
-pub struct Proxy<S: TransportSender, R: TransportReceiver> {
+pub struct Proxy<S: TransportSender, R: TransportReceiver, P: ExecutorProviderInterface> {
     sender: S,
     receiver: R,
     socket: UnixStream,
@@ -28,9 +23,7 @@ pub struct Proxy<S: TransportSender, R: TransportReceiver> {
     current_write: usize,
     secondary_rx: Receiver<TransportPair>,
     token: [u8; 48],
-    token_state: Arc<DashMap<[u8; 48], TokenState>>,
-    secondary_senders: Arc<DashMap<u64, Sender<TransportPair>>>,
-    shutdown: ShutdownWaiter,
+    context: Context<P>,
 }
 
 /// Shared handler for forwarding outgoing payloads from the service socket to a transport
@@ -63,16 +56,16 @@ fn handle_socket_bytes<S: TransportSender>(
     Ok(())
 }
 
-impl<S: TransportSender, R: TransportReceiver> Drop for Proxy<S, R> {
+impl<S: TransportSender, R: TransportReceiver, P: ExecutorProviderInterface> Drop
+    for Proxy<S, R, P>
+{
     fn drop(&mut self) {
         // cleanup shared state with the transport context
-        if let Some((_, state)) = self.token_state.remove(&self.token) {
-            self.secondary_senders.remove(&state.connection_id);
-        }
+        self.context.cleanup_connection(&self.token);
     }
 }
 
-impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
+impl<S: TransportSender, R: TransportReceiver, P: ExecutorProviderInterface> Proxy<S, R, P> {
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
     pub fn new(
@@ -81,9 +74,7 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
         socket: UnixStream,
         secondary_rx: Receiver<TransportPair>,
         token: [u8; 48],
-        token_state: Arc<DashMap<[u8; 48], TokenState>>,
-        secondary_senders: Arc<DashMap<u64, Sender<TransportPair>>>,
-        shutdown: ShutdownWaiter,
+        context: Context<P>,
     ) -> Self {
         Self {
             sender,
@@ -91,10 +82,8 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
             secondary_rx,
             socket,
             current_write: 0,
-            shutdown,
             token,
-            token_state,
-            secondary_senders,
+            context,
             socket_buffer: BytesMut::new(),
         }
     }
@@ -108,6 +97,10 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
                 error!("connection proxy encountered an error: {e}");
             }
         })
+    }
+
+    fn terminate(&mut self, reason: TerminationReason) {
+        self.sender.send(ResponseFrame::Termination { reason })
     }
 
     /// Main loop, handling incoming frames and outgoing bytes until the shutdown
@@ -130,7 +123,10 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
                             &mut self.sender
                         )?
                     },
-                    Err(e) => break Err(e.into()),
+                    Err(e) => {
+                        self.terminate(TerminationReason::InternalError);
+                        break Err(e.into())
+                    },
                 },
                 // Handle a secondary connection joining the session
                 res = self.secondary_rx.recv() => match res {
@@ -140,10 +136,16 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
                         // secondary connection ends. If there is an incomplete payload to the secondary,
                         // flush it.
                     },
-                    Err(e) => break Err(e.into()),
+                    Err(e) => {
+                        self.terminate(TerminationReason::InternalError);
+                        break Err(e.into())
+                    },
                 },
                 // Shutdown signal from the node
-                _ = self.shutdown.wait_for_shutdown() => break Ok(()),
+                _ = self.context.shutdown.wait_for_shutdown() => {
+                    self.terminate(TerminationReason::Shutdown);
+                    break Ok(())
+                },
             }
         }
     }
@@ -153,53 +155,41 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
         match req {
             RequestFrame::ServicePayload { bytes } => {
                 // write delimiter and payload to the socket
-                self.socket.write_u32(bytes.len() as u32).await?;
-                self.socket.write_all(&bytes).await?
+                self.socket
+                    .write_u32(bytes.len() as u32)
+                    .await
+                    .map_err(|e| {
+                        self.terminate(TerminationReason::InvalidToken);
+                        e
+                    })?;
+                self.socket.write_all(&bytes).await.map_err(|e| {
+                    self.terminate(TerminationReason::InvalidToken);
+                    e
+                })?;
             },
             RequestFrame::AccessToken { ttl } => {
-                // respond with the token, and set a time to live. If token has already been
-                // initialized, close the connection.
-                match self.token_state.get_mut(&self.token) {
-                    Some(mut state) => {
-                        if state.timeout.is_some() {
-                            return Err(anyhow!("token already initialized"));
-                        }
-                        state.timeout = Some(
-                            SystemTime::now()
-                                .duration_since(UNIX_EPOCH)
-                                .expect("failed to get current time")
-                                .add(Duration::from_secs(ttl))
-                                .as_millis(),
-                        );
-                        self.sender.send(ResponseFrame::AccessToken {
-                            ttl,
-                            access_token: self.token.into(),
-                        })
-                    },
-                    None => {
-                        panic!("token state must exist for the session")
-                    },
-                }
+                let ttl = self
+                    .context
+                    .handle_access_token_request(&self.token, ttl)
+                    .await
+                    .map_err(|e| {
+                        self.terminate(TerminationReason::InvalidToken);
+                        e
+                    })?;
+
+                self.sender.send(ResponseFrame::AccessToken {
+                    ttl,
+                    access_token: self.token.into(),
+                });
             },
-            RequestFrame::ExtendAccessToken { ttl } => {
-                match self.token_state.get_mut(&self.token) {
-                    Some(mut state) => {
-                        if state.timeout.is_none() {
-                            return Err(anyhow!("token has not been initialized"));
-                        }
-                        state.timeout = Some(
-                            SystemTime::now()
-                                .duration_since(UNIX_EPOCH)
-                                .expect("failed to get current time")
-                                .add(Duration::from_secs(ttl))
-                                .as_millis(),
-                        );
-                    },
-                    None => {
-                        panic!("token state must exist for the session")
-                    },
-                }
-            },
+            RequestFrame::ExtendAccessToken { ttl } => self
+                .context
+                .handle_extend_access_token_request(&self.token, ttl)
+                .await
+                .map_err(|e| {
+                    self.terminate(TerminationReason::InvalidToken);
+                    e
+                })?,
             RequestFrame::DeliveryAcknowledgment {} => todo!("verify and submit client DACK"),
             _ => unimplemented!(),
         }
@@ -213,13 +203,20 @@ impl<S: TransportSender, R: TransportReceiver> Proxy<S, R> {
         if self.current_write != 0 {
             // Read and flush the remaining bytes from the socket to the primary connection
             while self.socket_buffer.len() < self.current_write {
-                if self.socket.read_buf(&mut self.socket_buffer).await? == 0 {
-                    return Err(anyhow!("primary connection disconnected"));
+                if matches!(
+                    self.socket.read_buf(&mut self.socket_buffer).await,
+                    Ok(0) | Err(_)
+                ) {
+                    self.terminate(TerminationReason::InternalError);
+                    return Err(anyhow!("service disconnected"));
                 }
             }
 
             let bytes = self.socket_buffer.split_to(self.current_write);
-            self.sender.write(&bytes)?;
+            self.sender.write(&bytes).map_err(|e| {
+                self.terminate(TerminationReason::InternalError);
+                e
+            })?;
             self.current_write = 0;
         }
 
@@ -235,21 +232,32 @@ struct ProxyWithSecondary<
     PR: TransportReceiver,
     SS: TransportSender,
     SR: TransportReceiver,
+    P: ExecutorProviderInterface,
 > {
-    inner: Proxy<PS, PR>,
+    inner: Proxy<PS, PR, P>,
     secondary_sender: SS,
     secondary_receiver: SR,
 }
 
-impl<PS: TransportSender, PR: TransportReceiver, SS: TransportSender, SR: TransportReceiver>
-    ProxyWithSecondary<PS, PR, SS, SR>
+impl<
+    PS: TransportSender,
+    PR: TransportReceiver,
+    SS: TransportSender,
+    SR: TransportReceiver,
+    P: ExecutorProviderInterface,
+> ProxyWithSecondary<PS, PR, SS, SR, P>
 {
-    fn new(inner: Proxy<PS, PR>, secondary_sender: SS, secondary_receiver: SR) -> Self {
+    fn new(inner: Proxy<PS, PR, P>, secondary_sender: SS, secondary_receiver: SR) -> Self {
         ProxyWithSecondary {
             inner,
             secondary_sender,
             secondary_receiver,
         }
+    }
+
+    fn terminate(&mut self, reason: TerminationReason) {
+        self.secondary_sender
+            .send(ResponseFrame::Termination { reason })
     }
 
     /// Main loop, handling incoming frames and outgoing bytes until the shutdown
@@ -282,7 +290,7 @@ impl<PS: TransportSender, PR: TransportReceiver, SS: TransportSender, SR: Transp
                     Err(_) => break Ok(()),
                 },
                 // Shutdown signal from the node
-                _ = self.inner.shutdown.wait_for_shutdown() => break Ok(()),
+                _ = self.inner.context.shutdown.wait_for_shutdown() => break Ok(()),
             }
         }
     }
@@ -290,8 +298,17 @@ impl<PS: TransportSender, PR: TransportReceiver, SS: TransportSender, SR: Transp
     /// Handle incoming request frame from the primary connection
     async fn handle_primary_request(&mut self, req: RequestFrame) -> Result<()> {
         match req {
-            RequestFrame::ExtendAccessToken { .. } => todo!(),
-            RequestFrame::DeliveryAcknowledgment {} => todo!(),
+            RequestFrame::ExtendAccessToken { ttl } => {
+                self.inner
+                    .context
+                    .handle_extend_access_token_request(&self.inner.token, ttl)
+                    .await
+                    .map_err(|e| {
+                        self.terminate(TerminationReason::InvalidToken);
+                        e
+                    })?;
+            },
+            RequestFrame::DeliveryAcknowledgment {} => todo!("verify and submit client DACK"),
             RequestFrame::AccessToken { .. } | RequestFrame::ServicePayload { .. } => {
                 // should this be considered client misbehavior?
             },
@@ -305,8 +322,18 @@ impl<PS: TransportSender, PR: TransportReceiver, SS: TransportSender, SR: Transp
     async fn handle_secondary_request(&mut self, req: RequestFrame) -> Result<()> {
         match req {
             RequestFrame::ServicePayload { bytes } => {
-                self.inner.socket.write_u32(bytes.len() as u32).await?;
-                self.inner.socket.write_all(&bytes).await?;
+                self.inner
+                    .socket
+                    .write_u32(bytes.len() as u32)
+                    .await
+                    .map_err(|e| {
+                        self.terminate(TerminationReason::InternalError);
+                        e
+                    })?;
+                self.inner.socket.write_all(&bytes).await.map_err(|e| {
+                    self.terminate(TerminationReason::InternalError);
+                    e
+                })?;
             },
             RequestFrame::AccessToken { .. }
             | RequestFrame::ExtendAccessToken { .. }
@@ -390,7 +417,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn primary_connection_service_payloads() -> Result<()> {
+    async fn primary_connection() -> Result<()> {
         // start and connect to the mock node
         let shutdown = start_mock_node(0).await?;
         let (tx, rx) = dial_mock(0).await.expect("failed to dial");
@@ -416,6 +443,7 @@ mod tests {
                 .encode(),
             )
             .await?;
+
             match ResponseFrame::decode(&rx.recv().await?)? {
                 ResponseFrame::ServicePayload { bytes } => assert_eq!(&bytes, TEST_PAYLOAD),
                 f => panic!("expected payload, got {f:?}"),
@@ -427,7 +455,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn secondary_connection_service_payloads() -> Result<()> {
+    async fn join_secondary_connection() -> Result<()> {
         // start and connect to the mock node
         let shutdown = start_mock_node(0).await?;
         let (primary_tx, primary_rx) = dial_mock(0)
@@ -449,7 +477,7 @@ mod tests {
 
         // request and get access token
         primary_tx
-            .send(RequestFrame::AccessToken { ttl: 60 }.encode())
+            .send(RequestFrame::AccessToken { ttl: 1 }.encode())
             .await?;
         let access_token = match ResponseFrame::decode(&primary_rx.recv().await?)? {
             ResponseFrame::AccessToken { access_token, .. } => *access_token,
@@ -476,6 +504,7 @@ mod tests {
                     .encode(),
                 )
                 .await?;
+
             match ResponseFrame::decode(&secondary_rx.recv().await?)? {
                 ResponseFrame::ServicePayload { bytes } => assert_eq!(&bytes, TEST_PAYLOAD),
                 f => panic!("expected payload, got {f:?}"),
@@ -487,7 +516,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn reject_invalid_token_ttl() -> Result<()> {
+    async fn reject_expired_token() -> Result<()> {
         // start and connect to the mock node
         let shutdown = start_mock_node(0).await?;
         let (primary_tx, primary_rx) = dial_mock(0)
@@ -539,6 +568,75 @@ mod tests {
                 reason: TerminationReason::InvalidToken
             }
         );
+
+        shutdown.shutdown();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn extend_token() -> Result<()> {
+        // start and connect to the mock node
+        let shutdown = start_mock_node(0).await?;
+        let (primary_tx, primary_rx) = dial_mock(0)
+            .await
+            .expect("failed to dial primary connection");
+
+        // send handshake request
+        primary_tx
+            .send(
+                HandshakeRequestFrame::Handshake {
+                    retry: None,
+                    service: ECHO_SERVICE,
+                    pk: ClientPublicKey([0; 96]),
+                    pop: ClientSignature([0; 48]),
+                }
+                .encode(),
+            )
+            .await?;
+
+        // request and get access token
+        primary_tx
+            .send(RequestFrame::AccessToken { ttl: 1 }.encode())
+            .await?;
+        let access_token = match ResponseFrame::decode(&primary_rx.recv().await?)? {
+            ResponseFrame::AccessToken { access_token, .. } => *access_token,
+            f => panic!("expected access token, got {f:?}"),
+        };
+
+        // wait for the token to expire
+        tokio::time::sleep(Duration::from_millis(1001)).await;
+
+        // extend the token
+        primary_tx
+            .send(RequestFrame::ExtendAccessToken { ttl: 1 }.encode())
+            .await?;
+
+        // open secondary connection
+        let (secondary_tx, secondary_rx) = dial_mock(0)
+            .await
+            .expect("failed to dial secondary connection");
+
+        // send join request
+        secondary_tx
+            .send(HandshakeRequestFrame::JoinRequest { access_token }.encode())
+            .await?;
+
+        // interact with the service over the secondary connection
+        for _ in 0..10 {
+            secondary_tx
+                .send(
+                    RequestFrame::ServicePayload {
+                        bytes: TEST_PAYLOAD.into(),
+                    }
+                    .encode(),
+                )
+                .await?;
+
+            match ResponseFrame::decode(&secondary_rx.recv().await?)? {
+                ResponseFrame::ServicePayload { bytes } => assert_eq!(&bytes, TEST_PAYLOAD),
+                f => panic!("expected payload, got {f:?}"),
+            }
+        }
 
         shutdown.shutdown();
         Ok(())
