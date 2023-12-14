@@ -276,10 +276,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfoWithIndex> {
         self.inner.run(|ctx| {
-            let staking_amount: HpUfixed<18> =
-                do_query!(self, param_table, ctx, ProtocolParams::MinimumNodeStake)
-                    .unwrap_or(0)
-                    .into();
+            let staking_amount: HpUfixed<18> = self.get_staking_amount().into();
             let nodes = do_keys!(self, node_table, ctx).map(|index| NodeInfoWithIndex {
                 index,
                 info: do_query!(self, node_table, ctx, &index).unwrap(),
@@ -310,6 +307,11 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
+    fn get_staking_amount(&self) -> u128 {
+        self.get_protocol_param(&ProtocolParams::MinimumNodeStake)
+            .unwrap_or(0)
+    }
+
     fn has_executed_digest(&self, digest: [u8; 32]) -> bool {
         query!(self, executed_digests_table, digest).is_some()
     }
@@ -320,15 +322,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     fn is_valid_node(&self, id: &NodePublicKey) -> bool {
         self.inner.run(|ctx| {
+            let minimum_stake_amount = self.get_staking_amount().into();
             do_query!(self, pub_key_to_index, ctx, id).is_some_and(|node_idx| {
-                do_query!(self, node_table, ctx, &node_idx, |n| n.stake.staked).is_some_and(
-                    |node_stake| {
-                        node_stake
-                            >= do_query!(self, param_table, ctx, &ProtocolParams::MinimumNodeStake)
-                                .unwrap_or(0)
-                                .into()
-                    },
-                )
+                do_query!(self, node_table, ctx, &node_idx, |n| n.stake.staked)
+                    .is_some_and(|node_stake| node_stake >= minimum_stake_amount)
             })
         })
     }
