@@ -172,6 +172,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// from starting index and specified amount.
     fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfoWithIndex>;
 
+    /// Returns the amount that is required to be a valid node in the network.
+    fn get_staking_amount(&self) -> u128;
+
     /// Checks if an transaction digest has been executed this epoch.
     fn has_executed_digest(&self, digest: TxHash) -> bool;
 

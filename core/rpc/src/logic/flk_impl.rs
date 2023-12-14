@@ -159,11 +159,7 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
     }
 
     async fn get_staking_amount(&self) -> RpcResult<u128> {
-        Ok(self
-            .data
-            .query_runner
-            .get_protocol_param(&ProtocolParams::MinimumNodeStake)
-            .unwrap_or(0))
+        Ok(self.data.query_runner.get_staking_amount())
     }
 
     async fn get_committee_members(&self) -> RpcResult<Vec<NodePublicKey>> {
