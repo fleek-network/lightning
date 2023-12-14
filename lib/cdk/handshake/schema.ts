@@ -302,6 +302,8 @@ export namespace Response {
     ServiceTerminated,
     ConnectionInUse,
     WrongPermssion,
+    InternalError,
+    Shutdown,
     Unknown = 0xFF,
   }
 
@@ -380,6 +382,8 @@ export namespace Response {
         5: TerminationReason.ServiceTerminated,
         6: TerminationReason.ConnectionInUse,
         7: TerminationReason.WrongPermssion,
+        8: TerminationReason.InternalError,
+        9: TerminationReason.Shutdown,
       }[tag - 0x80] || TerminationReason.Unknown,
     };
   }
