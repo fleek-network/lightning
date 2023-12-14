@@ -74,7 +74,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
     let mut committee = query_runner.get_committee_members_by_index();
     let mut quorom_threshold = (committee.len() * 2) / 3 + 1;
     let mut our_index = query_runner
-        .pubkey_to_index(node_public_key)
+        .pubkey_to_index(&node_public_key)
         .unwrap_or(u32::MAX);
     let mut on_committee = committee.contains(&our_index);
     let (timeout_tx, mut timeout_rx) = mpsc::channel(128);
@@ -122,7 +122,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                     // We recheck our index incase it was non existant before
                     // and we staked during this epoch and finally got the certificate
                     our_index = query_runner
-                        .pubkey_to_index(node_public_key)
+                        .pubkey_to_index(&node_public_key)
                         .unwrap_or(u32::MAX);
                     on_committee = committee.contains(&our_index);
                 }
@@ -130,7 +130,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
             Some(mut msg) = pub_sub.recv_event() => {
                 match msg.take().unwrap() {
                     PubSubMsg::Transactions(parcel) => {
-                        let epoch = query_runner.get_epoch();
+                        let epoch = query_runner.get_current_epoch();
                         let originator = msg.originator();
                         let is_committee = committee.contains(&originator);
                         if !is_valid_message(is_committee, parcel.epoch, epoch) {
@@ -186,7 +186,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                         // We recheck our index incase it was non existant before and
                                         // we staked during this epoch and finally got the certificate
                                         our_index = query_runner
-                                            .pubkey_to_index(node_public_key)
+                                            .pubkey_to_index(&node_public_key)
                                             .unwrap_or(u32::MAX);
                                         on_committee = committee.contains(&our_index);
                                         reconfigure_notify.notify_waiters();
@@ -210,7 +210,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                     PubSubMsg::Attestation(att) => {
                         let originator = msg.originator();
 
-                        let epoch = query_runner.get_epoch();
+                        let epoch = query_runner.get_current_epoch();
                         let is_committee = committee.contains(&originator);
                         if originator != att.node_index
                             || !is_valid_message(is_committee, att.epoch, epoch) {
@@ -251,7 +251,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                         // We recheck our index incase it was non existant before and
                                         // we staked during this epoch and finally got the certificate
                                         our_index = query_runner
-                                            .pubkey_to_index(node_public_key)
+                                            .pubkey_to_index(&node_public_key)
                                             .unwrap_or(u32::MAX);
                                         on_committee = committee.contains(&our_index);
                                         reconfigure_notify.notify_waiters();

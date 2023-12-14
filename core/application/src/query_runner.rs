@@ -80,7 +80,7 @@ pub struct QueryRunner {
     total_served_table: ResolvedTableReference<Epoch, TotalServed>,
     _service_revenue: ResolvedTableReference<ServiceId, ServiceRevenue>,
     _commodity_price: ResolvedTableReference<CommodityTypes, HpUfixed<6>>,
-    _executed_digests_table: ResolvedTableReference<TxHash, ()>,
+    executed_digests_table: ResolvedTableReference<TxHash, ()>,
     uptime_table: ResolvedTableReference<NodeIndex, u8>,
     _cid_to_node: ResolvedTableReference<Blake3Hash, BTreeSet<NodeIndex>>,
     _node_to_cid: ResolvedTableReference<NodeIndex, BTreeSet<Blake3Hash>>,
@@ -106,7 +106,7 @@ impl QueryRunner {
             total_served_table: atomo.resolve::<Epoch, TotalServed>("total_served"),
             _commodity_price: atomo.resolve::<CommodityTypes, HpUfixed<6>>("commodity_prices"),
             _service_revenue: atomo.resolve::<ServiceId, ServiceRevenue>("service_revenue"),
-            _executed_digests_table: atomo.resolve::<TxHash, ()>("executed_digests"),
+            executed_digests_table: atomo.resolve::<TxHash, ()>("executed_digests"),
             uptime_table: atomo.resolve::<NodeIndex, u8>("uptime"),
             _cid_to_node: atomo.resolve::<Blake3Hash, BTreeSet<NodeIndex>>("cid_to_node"),
             _node_to_cid: atomo.resolve::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_cid"),
@@ -181,6 +181,13 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     fn get_total_served(&self, epoch: &Epoch) -> Option<TotalServed> {
         query!(self, total_served_table, epoch)
+    }
+
+    fn get_chain_id(&self) -> u32 {
+        match self.get_metadata(&Metadata::ChainId) {
+            Some(Value::ChainId(id)) => id,
+            _ => 0,
+        }
     }
 
     /// Returns the committee members of the current epoch
@@ -260,6 +267,13 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
+    fn get_last_block(&self) -> [u8; 32] {
+        match self.get_metadata(&Metadata::LastBlockHash) {
+            Some(Value::Hash(hash)) => hash,
+            _ => [0; 32],
+        }
+    }
+
     fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfoWithIndex> {
         self.inner.run(|ctx| {
             let staking_amount: HpUfixed<18> =
@@ -294,6 +308,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 },
             }
         })
+    }
+
+    fn has_executed_digest(&self, digest: [u8; 32]) -> bool {
+        query!(self, executed_digests_table, digest).is_some()
     }
 
     fn index_to_pubkey(&self, node_index: &NodeIndex) -> Option<NodePublicKey> {

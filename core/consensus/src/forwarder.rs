@@ -57,7 +57,7 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
 
     async fn handle_forward(&mut self, req: &TransactionRequest) -> Result<()> {
         // Grab the epoch
-        let epoch = self.query_runner.get_epoch();
+        let epoch = self.query_runner.get_current_epoch();
 
         // If the epoch is different then the last time we grabbed the committee refresh
         if epoch != self.epoch || epoch == 0 {
