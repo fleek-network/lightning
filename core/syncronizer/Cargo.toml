@@ -16,4 +16,3 @@ serde.workspace = true
 tokio.workspace = true
 rand.workspace = true
 fleek-crypto.workspace = true
-

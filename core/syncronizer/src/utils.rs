@@ -1,4 +1,5 @@
-use std::io::{stdout, Write};
+use std::io::{stdin, stdout, Write};
+use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, SystemTime};
 
 use lightning_interfaces::types::{EpochInfo, NodeIndex, NodeInfo};
@@ -11,7 +12,13 @@ pub fn wait_to_next_epoch(
     rpc_client: &reqwest::Client,
 ) {
     let mut stdout = stdout();
+    let shutdown_rx = spawn_stdin_listener();
     loop {
+        if shutdown_rx.try_recv().is_ok() {
+            println!("Exiting...");
+            std::process::exit(0);
+        }
+
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
@@ -34,13 +41,25 @@ pub fn wait_to_next_epoch(
             let delta = Duration::from_millis(delta);
 
             print!(
-                "\rWaiting for new epoch to start. Joining the network in {}...",
+                "\rWaiting for new epoch to start. Joining the network in {}... (hit ENTER to exit)",
                 get_timer(delta)
             );
             stdout.flush().unwrap();
             std::thread::sleep(Duration::from_millis(100));
         }
     }
+}
+
+fn spawn_stdin_listener() -> Receiver<()> {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        loop {
+            let mut buffer = String::new();
+            stdin().read_line(&mut buffer).unwrap();
+            tx.send(()).unwrap();
+        }
+    });
+    rx
 }
 
 fn get_timer(duration: Duration) -> String {
