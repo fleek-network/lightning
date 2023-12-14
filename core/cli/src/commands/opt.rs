@@ -1,6 +1,7 @@
 use std::fs::read_to_string;
+use std::io::stdin;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
 use fleek_crypto::{
@@ -18,6 +19,7 @@ use lightning_node::config::TomlConfigProvider;
 use lightning_rpc::{utils, Rpc};
 use lightning_signer::Signer;
 use lightning_types::{
+    EpochInfo,
     NodeInfo,
     Participation,
     TransactionRequest,
@@ -46,11 +48,17 @@ pub async fn exec<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<
 async fn opt_in<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>>>(
     config_path: ResolvedPathBuf,
 ) -> Result<()> {
+    println!(
+        "After sending the OptIn transaction, you are expected to start your node immediately. Is your node built and ready to start? (y/N)"
+    );
+    get_user_confirmation();
+
     let config = Arc::new(TomlConfigProvider::<C>::load_or_write_config(config_path).await?);
     let secret_key = load_secret_key(config.clone())?;
     let public_key = secret_key.to_pk();
 
-    let genesis_committee = get_genesis_committee().context("Failed to load genesis committee.")?;
+    let genesis_committee =
+        get_genesis_committee().context("Failed to load genesis committee info.")?;
 
     let node_info =
         genesis_committee_rpc::<Option<NodeInfo>>(&genesis_committee, get_node_info(public_key))
@@ -62,12 +70,24 @@ async fn opt_in<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>
         println!("Your node is already participating in the network.");
         return Ok(());
     }
+
+    let epoch_end_delta = get_epoch_end_delta(&genesis_committee)
+        .await
+        .context("Failed to get epoch info from genesis committee")?;
+    if epoch_end_delta < Duration::from_secs(300) {
+        println!(
+            "The current epoch will end in less than 5 minutes. Please wait until the epoch change to send the OptIn transaction."
+        );
+        return Ok(());
+    }
+
     let tx = create_update_request(UpdateMethod::OptIn {}, secret_key, node_info.nonce + 1);
 
     genesis_committee_rpc::<()>(&genesis_committee, send_transaction(tx))
         .await
         .context("Failed to send transaction to genesis committee")?;
 
+    println!("Confirming transaction...");
     wait_for_participation_status(&genesis_committee, public_key, Participation::OptedIn, 10)
         .await
         .context("Timed out while trying to confirm opt in transaction.")?;
@@ -80,11 +100,17 @@ async fn opt_in<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>
 async fn opt_out<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>>>(
     config_path: ResolvedPathBuf,
 ) -> Result<()> {
+    println!(
+        "Even after sending the OptOut transaction, your node is expected to stay online until the end of the current epoch. Do you want to continue? (y/N)"
+    );
+    get_user_confirmation();
+
     let config = Arc::new(TomlConfigProvider::<C>::load_or_write_config(config_path).await?);
     let secret_key = load_secret_key(config.clone())?;
     let public_key = secret_key.to_pk();
 
-    let genesis_committee = get_genesis_committee().context("Failed to load genesis committee.")?;
+    let genesis_committee =
+        get_genesis_committee().context("Failed to load genesis committee info.")?;
 
     let node_info =
         genesis_committee_rpc::<Option<NodeInfo>>(&genesis_committee, get_node_info(public_key))
@@ -103,6 +129,7 @@ async fn opt_out<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C
         .await
         .context("Failed to send transaction to genesis committee")?;
 
+    println!("Confirming transaction...");
     wait_for_participation_status(&genesis_committee, public_key, Participation::OptedOut, 10)
         .await
         .context("Timed out while trying to confirm opt out transaction.")?;
@@ -119,8 +146,8 @@ async fn status<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>
     let secret_key = load_secret_key(config.clone())?;
     let public_key = secret_key.to_pk();
 
-    let genesis_committee = get_genesis_committee()
-        .context("Failed to get genesis committee via rpc. Is your node running?")?;
+    let genesis_committee =
+        get_genesis_committee().context("Failed to load genesis committee info.")?;
 
     let node_info =
         genesis_committee_rpc::<Option<NodeInfo>>(&genesis_committee, get_node_info(public_key))
@@ -132,14 +159,38 @@ async fn status<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>
         Participation::True => println!("Your node is participating in the network."),
         Participation::False => println!("Your node is not participating in the network."),
         Participation::OptedIn => {
-            println!("Your node is opted in. Your node will be participating next epoch.")
+            let delta = get_epoch_end_delta(&genesis_committee)
+                .await
+                .context("Failed to get epoch info from genesis committee")?;
+            println!(
+                "Your node is opted in. Your node will be participating once the next epoch starts in {}",
+                get_timestamp(delta)
+            )
         },
         Participation::OptedOut => {
-            println!("Your node is opted out. You can shutdown your node next epoch.")
+            let delta = get_epoch_end_delta(&genesis_committee)
+                .await
+                .context("Failed to get epoch info from genesis committee")?;
+            println!(
+                "Your node is opted out. You can shutdown your node once the current epoch ends in {}",
+                get_timestamp(delta)
+            )
         },
     }
 
     Ok(())
+}
+
+async fn get_epoch_end_delta(genesis_committee: &Vec<NodeInfo>) -> Result<Duration> {
+    let epoch_info = genesis_committee_rpc::<EpochInfo>(genesis_committee, get_epoch_info())
+        .await
+        .context("Failed to get node info from genesis committee")?;
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    let delta = (epoch_info.epoch_end).saturating_sub(now);
+    Ok(Duration::from_millis(delta))
 }
 
 fn load_secret_key<C: Collection<SignerInterface = Signer<C>>>(
@@ -198,6 +249,16 @@ fn get_node_info(public_key: NodePublicKey) -> String {
     .to_string()
 }
 
+fn get_epoch_info() -> String {
+    json!({
+        "jsonrpc": "2.0",
+        "method":"flk_get_epoch_info",
+        "params":[],
+        "id":1,
+    })
+    .to_string()
+}
+
 fn get_genesis_committee() -> Result<Vec<NodeInfo>> {
     let genesis = Genesis::load()?;
     Ok(genesis
@@ -248,4 +309,35 @@ async fn wait_for_participation_status(
     Err(anyhow::anyhow!(
         "Failed to get status after {max_tries} tries."
     ))
+}
+
+fn get_user_confirmation() {
+    loop {
+        let mut input = String::new();
+        match stdin().read_line(&mut input) {
+            Ok(len) => match &input[0..len - 1] {
+                "y" => break,
+                "N" => {
+                    println!("Not sending transaction.");
+                    std::process::exit(1);
+                },
+                _ => {
+                    println!(
+                        "Invalid input, please type `y` for yes or `N` for no, and hit ENTER."
+                    );
+                },
+            },
+            Err(e) => {
+                eprintln!("Failed to read from stdin: {e:?}");
+                std::process::exit(1);
+            },
+        }
+    }
+}
+
+fn get_timestamp(duration: Duration) -> String {
+    let s = duration.as_secs() % 60;
+    let m = (duration.as_secs() / 60) % 60;
+    let h = (duration.as_secs() / 60) / 60;
+    format!("{:02}:{:02}:{:02}", h, m, s)
 }
