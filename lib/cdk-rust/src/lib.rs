@@ -57,7 +57,7 @@ mod frame;
 mod mode;
 mod tls;
 
-pub mod schema;
 pub mod transport;
 
 pub use builder::Builder;
+pub use lightning_schema::handshake as schema;

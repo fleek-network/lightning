@@ -1295,6 +1295,7 @@ dependencies = [
  "bytes",
  "fleek-crypto",
  "futures",
+ "lightning-schema",
  "log",
  "ring 0.16.20",
  "rustls 0.21.7",

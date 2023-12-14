@@ -19,8 +19,7 @@ rustls = "0.21"
 tokio = { version = "1.32", features = ["rt-multi-thread", "time", "sync", "io-util"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 wtransport = { version = "0.1", features = ["dangerous-configuration"] }
-
-# For temporary schema module.
+lightning-schema = { path = "../../core/schema" }
 
 arrayref = "0.3"
 fleek-crypto = { path = "../fleek-crypto"}
