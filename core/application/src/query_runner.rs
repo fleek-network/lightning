@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::time::Duration;
 
 use atomo::{Atomo, QueryPerm, ResolvedTableReference};
@@ -16,6 +16,7 @@ use lightning_interfaces::types::{
     Metadata,
     NodeIndex,
     NodeInfo,
+    NodeInfoWithIndex,
     NodeServed,
     ProtocolParams,
     ReportedReputationMeasurements,
@@ -28,17 +29,35 @@ use lightning_interfaces::types::{
     TxHash,
     Value,
 };
+use lightning_interfaces::PagingParams;
 
 use crate::state::State;
 use crate::storage::AtomoStorage;
 use crate::table::StateTables;
 
+macro_rules! do_keys {
+    ($self:ident, $table:ident, $ctx:expr) => {
+        $self.$table.get($ctx).keys()
+    };
+}
+
+macro_rules! do_query {
+    ($self:ident, $table:ident, $ctx:expr, $key:expr) => {
+        $self.$table.get($ctx).get($key)
+    };
+    ($self:ident, $table:ident, $ctx:expr, $key:expr, $selector:expr) => {
+        do_query!($self, $table, $ctx, $key).map($selector)
+    };
+}
+
 macro_rules! query {
     ($self:ident, $table:ident, $key:expr) => {
-        $self.inner.run(|ctx| $self.$table.get(ctx).get($key))
+        $self.inner.run(|ctx| do_query!($self, $table, &ctx, $key))
     };
     ($self:ident, $table:ident, $key:expr, $selector:expr) => {
-        query!($self, $table, $key).map($selector)
+        $self
+            .inner
+            .run(|ctx| do_query!($self, $table, &ctx, $key, $selector))
     };
 }
 
@@ -205,10 +224,96 @@ impl SyncQueryRunnerInterface for QueryRunner {
         }
     }
 
+    fn get_current_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration> {
+        self.inner.run(|ctx| {
+            do_keys!(self, latencies, ctx)
+                .filter_map(|key| {
+                    do_query!(self, latencies, ctx, &key).map(|latency| (key, latency))
+                })
+                .filter_map(|((index_lhs, index_rhs), latency)| {
+                    let pub_key_selector = { |n: NodeInfo| n.public_key };
+                    let node_lhs = do_query!(self, node_table, ctx, &index_lhs, pub_key_selector);
+                    let node_rhs = do_query!(self, node_table, ctx, &index_rhs, pub_key_selector);
+                    match (node_lhs, node_rhs) {
+                        (Some(node_lhs), Some(node_rhs)) => Some(((node_lhs, node_rhs), latency)),
+                        _ => None,
+                    }
+                })
+                .collect()
+        })
+    }
+
+    fn get_genesis_committee(&self) -> Vec<(NodeIndex, NodeInfo)> {
+        self.inner.run(|ctx| {
+            match do_query!(self, metadata_table, ctx, &Metadata::GenesisCommittee) {
+                Some(Value::GenesisCommittee(committee)) => committee
+                    .iter()
+                    .filter_map(|index| {
+                        do_query!(self, node_table, ctx, index).map(|node_info| (*index, node_info))
+                    })
+                    .collect(),
+                _ => {
+                    // unreachable seeded at genesis
+                    Vec::new()
+                },
+            }
+        })
+    }
+
+    fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfoWithIndex> {
+        self.inner.run(|ctx| {
+            let staking_amount: HpUfixed<18> =
+                do_query!(self, param_table, ctx, ProtocolParams::MinimumNodeStake)
+                    .unwrap_or(0)
+                    .into();
+            let nodes = do_keys!(self, node_table, ctx).map(|index| NodeInfoWithIndex {
+                index,
+                info: do_query!(self, node_table, ctx, &index).unwrap(),
+            });
+
+            match paging {
+                None => nodes
+                    .filter(|node| node.info.stake.staked >= staking_amount)
+                    .collect(),
+                Some(PagingParams {
+                    ignore_stake,
+                    limit,
+                    start,
+                }) => {
+                    let mut nodes = nodes
+                        .filter(|node| ignore_stake || node.info.stake.staked >= staking_amount)
+                        .collect::<Vec<NodeInfoWithIndex>>();
+
+                    nodes.sort_by_key(|info| info.index);
+
+                    nodes
+                        .into_iter()
+                        .filter(|info| info.index >= start)
+                        .take(limit)
+                        .collect()
+                },
+            }
+        })
+    }
+
     fn index_to_pubkey(&self, node_index: &NodeIndex) -> Option<NodePublicKey> {
         self.get_node_info::<NodePublicKey>(node_index, |node_info| node_info.public_key)
     }
 
+    fn is_valid_node(&self, id: &NodePublicKey) -> bool {
+        self.inner.run(|ctx| {
+            do_query!(self, pub_key_to_index, ctx, id).is_some_and(|node_idx| {
+                do_query!(self, node_table, ctx, &node_idx, |n| n.stake.staked).is_some_and(
+                    |node_stake| {
+                        node_stake
+                            >= do_query!(self, param_table, ctx, &ProtocolParams::MinimumNodeStake)
+                                .unwrap_or(0)
+                                .into()
+                    },
+                )
+            })
+        })
+    }
     fn simulate_txn(&self, txn: TransactionRequest) -> TransactionResponse {
         self.inner.run(|ctx| {
             // Create the app/execution environment
