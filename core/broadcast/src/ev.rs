@@ -463,9 +463,8 @@ async fn main_loop<C: Collection>(
 fn topic_to_index(topic: Topic) -> usize {
     match topic {
         Topic::Consensus => 0,
-        Topic::DistributedHashTable => 1,
-        Topic::Resolver => 2,
-        Topic::Debug => 3,
+        Topic::Resolver => 1,
+        Topic::Debug => 2,
     }
 }
 

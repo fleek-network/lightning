@@ -225,7 +225,6 @@ pub struct NodePorts {
     pub mempool: u16,
     pub rpc: u16,
     pub pool: u16,
-    pub dht: u16,
     pub pinger: u16,
     pub handshake: HandshakePorts,
 }
@@ -239,7 +238,6 @@ impl Default for NodePorts {
             mempool: 4210,
             handshake: Default::default(),
             rpc: 4230,
-            dht: 4340,
             pinger: 4350,
         }
     }

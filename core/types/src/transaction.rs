@@ -470,7 +470,6 @@ impl ToDigest for UpdatePayload {
                     .with("mempool_port", &ports.as_ref().map(|p| p.mempool))
                     .with("rpc_port", &ports.as_ref().map(|p| p.rpc))
                     .with("pool_port", &ports.as_ref().map(|p| p.pool))
-                    .with("dht_port", &ports.as_ref().map(|p| p.dht))
                     .with(
                         "handshake_http_port",
                         &ports.as_ref().map(|p| p.handshake.http),

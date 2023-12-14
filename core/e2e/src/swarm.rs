@@ -25,8 +25,6 @@ use lightning_blockstore_server::{BlockStoreServer, Config as BlockStoreServerCo
 use lightning_broadcast::{Broadcast, Config as BroadcastConfig};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
-use lightning_dht::config::Config as DhtConfig;
-use lightning_dht::Dht;
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::webrtc::WebRtcConfig;
@@ -151,14 +149,6 @@ impl Swarm {
             .iter()
             .filter(|(_pubkey, node)| !node.is_genesis_committee())
             .map(|(pubkey, node)| (*pubkey, node.take_ckpt_rx()))
-            .collect()
-    }
-
-    pub fn get_dht_handle(&self) -> Vec<Option<Dht<FinalTypes>>> {
-        self.nodes
-            .values()
-            .filter(|node| !node.is_bootstrap_node())
-            .map(|node| node.take_dht_socket())
             .collect()
     }
 
@@ -320,9 +310,6 @@ impl SwarmBuilder {
                 pool: port_assigner
                     .get_port(min_port, max_port, Transport::Udp)
                     .expect("Could not get port"),
-                dht: port_assigner
-                    .get_port(min_port, max_port, Transport::Udp)
-                    .expect("Could not get port"),
                 pinger: port_assigner
                     .get_port(min_port, max_port, Transport::Udp)
                     .expect("Could not get port"),
@@ -341,7 +328,6 @@ impl SwarmBuilder {
             let config = build_config(
                 &root,
                 ports.clone(),
-                bootstrappers.clone().unwrap_or(Vec::new()),
                 self.archiver,
                 self.syncronizer_delta.unwrap_or(Duration::from_secs(300)),
             );
@@ -414,7 +400,6 @@ impl SwarmBuilder {
 fn build_config(
     root: &Path,
     ports: NodePorts,
-    bootstrappers: Vec<NodePublicKey>,
     archiver: bool,
     syncronizer_delta: Duration,
 ) -> TomlConfigProvider<FinalTypes> {
@@ -433,11 +418,6 @@ fn build_config(
             .join("data/narwhal_store")
             .try_into()
             .expect("Failed to resolve path"),
-    });
-
-    config.inject::<Dht<FinalTypes>>(DhtConfig {
-        address: format!("127.0.0.1:{}", ports.dht).parse().unwrap(),
-        bootstrappers,
     });
 
     config.inject::<Signer<FinalTypes>>(SignerConfig {

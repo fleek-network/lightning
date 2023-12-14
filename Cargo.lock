@@ -2511,19 +2511,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "env_logger"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85cdab6a89accf66733ad5a1693a4dcced6aeff64602b634530dd73c1f3ee9f0"
-dependencies = [
- "humantime",
- "is-terminal",
- "log",
- "regex",
- "termcolor",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4484,7 +4471,6 @@ dependencies = [
  "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-consensus",
- "lightning-dht",
  "lightning-fetcher",
  "lightning-handshake",
  "lightning-interfaces",
@@ -4553,34 +4539,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lightning-dht"
-version = "0.0.0"
-dependencies = [
- "affair 0.1.2",
- "anyhow",
- "async-trait",
- "bincode",
- "bytes",
- "clap 4.4.10",
- "env_logger 0.10.0",
- "fleek-crypto",
- "futures",
- "hex",
- "infusion",
- "lightning-application",
- "lightning-interfaces",
- "lightning-rep-collector",
- "lightning-signer",
- "lightning-topology",
- "rand 0.8.5",
- "serde",
- "thiserror",
- "tokio",
- "tokio-util 0.7.9",
- "tracing",
-]
-
-[[package]]
 name = "lightning-e2e"
 version = "0.0.0"
 dependencies = [
@@ -4598,7 +4556,6 @@ dependencies = [
  "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-consensus",
- "lightning-dht",
  "lightning-handshake",
  "lightning-interfaces",
  "lightning-node",
@@ -4764,7 +4721,6 @@ dependencies = [
  "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-consensus",
- "lightning-dht",
  "lightning-fetcher",
  "lightning-handshake",
  "lightning-interfaces",
@@ -5525,7 +5481,7 @@ dependencies = [
  "bytes",
  "cc",
  "downcast-rs",
- "env_logger 0.9.3",
+ "env_logger",
  "erasable",
  "futures",
  "lazy_static",

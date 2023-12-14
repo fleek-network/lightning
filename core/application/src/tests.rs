@@ -585,7 +585,6 @@ fn create_committee_member(
             mempool: 7000 + index,
             rpc: 6000 + index,
             pool: 5000 + index,
-            dht: 4000 + index,
             pinger: 2000 + index,
             handshake: HandshakePorts {
                 http: 5000 + index,
@@ -935,7 +934,6 @@ fn add_to_committee(
             mempool: 7000 + index,
             rpc: 6000 + index,
             pool: 5000 + index,
-            dht: 4000 + index,
             pinger: 2000 + index,
             handshake: HandshakePorts {
                 http: 5000 + index,
@@ -2430,7 +2428,6 @@ async fn test_stake_works() {
         mempool: 4003,
         rpc: 4004,
         pool: 4005,
-        dht: 4006,
         pinger: 4007,
         handshake: HandshakePorts {
             http: 5001,

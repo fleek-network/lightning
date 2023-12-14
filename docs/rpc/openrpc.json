@@ -1144,7 +1144,6 @@
         "description": "The ports a node has open for its processes",
         "type": "object",
         "required": [
-          "dht",
           "handshake",
           "mempool",
           "pinger",
@@ -1154,11 +1153,6 @@
           "worker"
         ],
         "properties": {
-          "dht": {
-            "type": "integer",
-            "format": "uint16",
-            "minimum": 0.0
-          },
           "handshake": {
             "$ref": "#/components/schemas/HandshakePorts"
           },
