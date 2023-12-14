@@ -249,7 +249,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
 
                 tokio::select! {
                     _ = time_to_sleep => {
-                        let new_epoch = query_runner.get_epoch();
+                        let new_epoch = query_runner.get_current_epoch();
                         if new_epoch != epoch {
                             break;
                         }

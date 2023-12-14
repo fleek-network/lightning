@@ -11,6 +11,7 @@ use lightning_types::{
     NodeIndex,
     NodeInfoWithIndex,
     TransactionRequest,
+    TxHash,
     Value,
 };
 use serde::{Deserialize, Serialize};
@@ -141,6 +142,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Query Total Served Table
     fn get_total_served(&self, epoch: &Epoch) -> Option<TotalServed>;
 
+    /// Returns the chain id
+    fn get_chain_id(&self) -> u32;
+
     /// Autometrics
     /// Returns the committee members of the current epoch
     fn get_committee_members(&self) -> Vec<NodePublicKey>;
@@ -160,10 +164,16 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Returns the node info of the genesis committee members
     fn get_genesis_committee(&self) -> Vec<(NodeIndex, NodeInfo)>;
 
+    /// Returns last executed block hash. [0;32] is genesis
+    fn get_last_block(&self) -> [u8; 32];
+
     // Returns a full copy of the entire node-registry,
     /// Paging Params - filtering nodes that are still a valid node and have enough stake; Takes
     /// from starting index and specified amount.
     fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfoWithIndex>;
+
+    /// Checks if an transaction digest has been executed this epoch.
+    fn has_executed_digest(&self, digest: TxHash) -> bool;
 
     /// Get Node Public Key based on Node Index
     fn index_to_pubkey(&self, node_index: &NodeIndex) -> Option<NodePublicKey>;
