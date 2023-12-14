@@ -1,9 +1,18 @@
+use std::collections::HashMap;
 use std::time::Duration;
 
 use affair::Socket;
 use anyhow::Result;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
-use lightning_types::{AccountInfo, Blake3Hash, Committee, NodeIndex, TransactionRequest, Value};
+use lightning_types::{
+    AccountInfo,
+    Blake3Hash,
+    Committee,
+    NodeIndex,
+    NodeInfoWithIndex,
+    TransactionRequest,
+    Value,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::common::WithStartAndShutdown;
@@ -145,8 +154,22 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Get Current Epoch Info
     fn get_epoch_info(&self) -> EpochInfo;
 
+    /// Return all latencies measurements for the current epoch.
+    fn get_current_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration>;
+
+    /// Returns the node info of the genesis committee members
+    fn get_genesis_committee(&self) -> Vec<(NodeIndex, NodeInfo)>;
+
+    // Returns a full copy of the entire node-registry,
+    /// Paging Params - filtering nodes that are still a valid node and have enough stake; Takes
+    /// from starting index and specified amount.
+    fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfoWithIndex>;
+
     /// Get Node Public Key based on Node Index
     fn index_to_pubkey(&self, node_index: &NodeIndex) -> Option<NodePublicKey>;
+
+    /// Returns true if the node is a valid node in the network, with enough stake.
+    fn is_valid_node(&self, id: &NodePublicKey) -> bool;
 
     /// Simulate Transaction
     fn simulate_txn(&self, txn: TransactionRequest) -> TransactionResponse;
