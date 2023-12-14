@@ -103,6 +103,7 @@ impl Env<UpdatePerm> {
             .with_table::<CommodityTypes, HpUfixed<6>>("commodity_prices")
             .with_table::<ServiceId, ServiceRevenue>("service_revenue")
             .with_table::<TxHash, ()>("executed_digests")
+            .with_table::<NodeIndex, u8>("uptime")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("submitted_rep_measurements")
@@ -110,6 +111,7 @@ impl Env<UpdatePerm> {
             .enable_iter("latencies")
             .enable_iter("node")
             .enable_iter("executed_digests")
+            .enable_iter("uptime")
             .enable_iter("service_revenue");
 
         #[cfg(debug_assertions)]

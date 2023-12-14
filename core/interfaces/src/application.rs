@@ -209,6 +209,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Checks if an transaction digest has been executed this epoch.
     fn has_executed_digest(&self, digest: TxHash) -> bool;
+
+    /// Returns the uptime for a node from the past epoch.
+    fn get_node_uptime(&self, node_index: &NodeIndex) -> Option<u8>;
 }
 
 #[derive(Clone, Debug)]

@@ -54,6 +54,7 @@ pub struct QueryRunner {
     _service_revenue: ResolvedTableReference<ServiceId, ServiceRevenue>,
     _commodity_price: ResolvedTableReference<CommodityTypes, HpUfixed<6>>,
     executed_digests_table: ResolvedTableReference<TxHash, ()>,
+    uptime_table: ResolvedTableReference<NodeIndex, u8>,
 }
 
 impl QueryRunner {
@@ -77,6 +78,7 @@ impl QueryRunner {
             _commodity_price: atomo.resolve::<CommodityTypes, HpUfixed<6>>("commodity_prices"),
             _service_revenue: atomo.resolve::<ServiceId, ServiceRevenue>("service_revenue"),
             executed_digests_table: atomo.resolve::<TxHash, ()>("executed_digests"),
+            uptime_table: atomo.resolve::<NodeIndex, u8>("uptime"),
             inner: atomo,
         }
     }
@@ -529,5 +531,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn has_executed_digest(&self, digest: [u8; 32]) -> bool {
         self.inner
             .run(|ctx| self.executed_digests_table.get(ctx).get(digest).is_some())
+    }
+
+    fn get_node_uptime(&self, node_index: &NodeIndex) -> Option<u8> {
+        self.inner
+            .run(|ctx| self.uptime_table.get(ctx).get(node_index))
     }
 }

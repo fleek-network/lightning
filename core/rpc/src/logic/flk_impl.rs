@@ -77,6 +77,14 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
         Ok(self.data.query_runner.get_node_info(&pk))
     }
 
+    async fn get_node_uptime(&self, pk: NodePublicKey) -> RpcResult<Option<u8>> {
+        if let Some(index) = self.data.query_runner.pubkey_to_index(pk) {
+            Ok(self.data.query_runner.get_node_uptime(&index))
+        } else {
+            Ok(None)
+        }
+    }
+
     async fn get_account_info(&self, pk: EthAddress) -> RpcResult<Option<AccountInfo>> {
         Ok(self.data.query_runner.get_account_info(&pk))
     }

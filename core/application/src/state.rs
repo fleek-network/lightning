@@ -121,6 +121,7 @@ pub struct State<B: Backend> {
     pub service_revenue: B::Ref<ServiceId, ServiceRevenue>,
     pub commodity_prices: B::Ref<CommodityTypes, HpUfixed<6>>,
     pub executed_digests: B::Ref<TxHash, ()>,
+    pub uptime: B::Ref<NodeIndex, u8>,
     pub backend: B,
 }
 
@@ -146,6 +147,7 @@ impl<B: Backend> State<B> {
             commodity_prices: backend.get_table_reference("commodity_prices"),
             service_revenue: backend.get_table_reference("service_revenue"),
             executed_digests: backend.get_table_reference("executed_digests"),
+            uptime: backend.get_table_reference("uptime"),
             backend,
         }
     }
@@ -883,6 +885,9 @@ impl<B: Backend> State<B> {
                 }
             }
         }
+        // Clear the uptime measurements from the previous epoch.
+        let nodes = self.uptime.keys();
+        nodes.for_each(|node| self.uptime.remove(&node));
 
         // Store new scores in application state.
         let new_rep_scores = lightning_reputation::calculate_reputation_scores(map);
@@ -913,6 +918,7 @@ impl<B: Backend> State<B> {
             self.node_info.set(node, node_info);
 
             if let Some(uptime) = uptime {
+                self.uptime.set(node, uptime);
                 if uptime < MINIMUM_UPTIME {
                     if let Some(mut node_info) = self.node_info.get(&node) {
                         node_info.participation = Participation::False;
