@@ -344,7 +344,8 @@ async fn test_submit_measurements() {
     loop {
         tokio::select! {
             _ = interval.tick() => {
-                let measurements = query_runner.get_reputation_measurements(&peer_index).unwrap_or(Vec::new());
+                let measurements =
+                    query_runner.get_reputation_measurements(&peer_index).unwrap_or(Vec::new());
                 if !measurements.is_empty() {
                     // Make sure that the reported measurements were submitted to the application
                     // state.
@@ -569,8 +570,10 @@ async fn test_reputation_calculation_and_query() {
     loop {
         tokio::select! {
             _ = interval.tick() => {
-                let measure_alice = query_runner.get_reputation_measurements(&alice).unwrap_or(Vec::new());
-                let measure_bob = query_runner.get_reputation_measurements(&bob).unwrap_or(Vec::new());
+                let measure_alice =
+                    query_runner.get_reputation_measurements(&alice).unwrap_or(Vec::new());
+                let measure_bob =
+                    query_runner.get_reputation_measurements(&bob).unwrap_or(Vec::new());
                 if measure_alice.len() == 2 && measure_bob.len() == 2 {
                     // Wait until all measurements were submitted to the application.
                     break;
