@@ -25,6 +25,7 @@ use lightning_fetcher::fetcher::Fetcher;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     EpochInfo,
+    Metadata,
     NodeInfo,
     NodePorts,
     NodeServed,
@@ -32,6 +33,7 @@ use lightning_interfaces::types::{
     Staking,
     TotalServed,
     TransactionRequest,
+    Value,
 };
 use lightning_interfaces::{
     partial,
@@ -874,7 +876,7 @@ async fn test_rpc_get_epoch() -> Result<()> {
         req.to_string(),
     )
     .await?;
-    assert_eq!(query_runner.get_epoch(), response.result);
+    assert_eq!(query_runner.get_current_epoch(), response.result);
 
     Ok(())
 }
@@ -928,7 +930,13 @@ async fn test_rpc_get_total_supply() -> Result<()> {
         req.to_string(),
     )
     .await?;
-    assert_eq!(query_runner.get_total_supply(), response.result);
+
+    let total_supply = match query_runner.get_metadata(&Metadata::TotalSupply) {
+        Some(Value::HpUfixed(s)) => s,
+        _ => panic!("TotalSupply is set genesis and should never be empty"),
+    };
+
+    assert_eq!(total_supply, response.result);
 
     Ok(())
 }
@@ -956,7 +964,12 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
     )
     .await?;
 
-    assert_eq!(query_runner.get_year_start_supply(), response.result);
+    let supply_year_start = match query_runner.get_metadata(&Metadata::SupplyYearStart) {
+        Some(Value::HpUfixed(s)) => s,
+        _ => panic!("SupplyYearStart is set genesis and should never be empty"),
+    };
+
+    assert_eq!(supply_year_start, response.result);
 
     Ok(())
 }
@@ -983,7 +996,13 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
         req.to_string(),
     )
     .await?;
-    assert_eq!(query_runner.get_protocol_fund_address(), response.result);
+
+    let protocol_account = match query_runner.get_metadata(&Metadata::ProtocolFundAddress) {
+        Some(Value::AccountPublicKey(s)) => s,
+        _ => panic!("AccountPublicKey is set genesis and should never be empty"),
+    };
+
+    assert_eq!(protocol_account, response.result);
 
     Ok(())
 }
@@ -1012,7 +1031,10 @@ async fn test_rpc_get_protocol_params() -> Result<()> {
         req.to_string(),
     )
     .await?;
-    assert_eq!(query_runner.get_protocol_params(params), response.result);
+    assert_eq!(
+        query_runner.get_protocol_param(&params).unwrap(),
+        response.result
+    );
 
     Ok(())
 }
