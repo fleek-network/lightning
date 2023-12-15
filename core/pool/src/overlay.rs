@@ -202,16 +202,26 @@ where
             peers.len() as f64
         );
 
+        // We would like to measure how many times we are
+        // using request-response service with peers in our cluster.
         histogram!(
-            "pool_connection_reuse_count",
-            Some(
-                "Count of times we've been able to re-use topology-based \
-                connections for request-response service."
-            ),
-            self.stats.handshake_avoided_count as f64
+            "pool_total_req_res_requests",
+            Some("Total number of req-res requests"),
+            self.stats.total_req_res_requests as f64
         );
         // Reset.
-        self.stats.handshake_avoided_count = 0;
+        self.stats.total_req_res_requests = 0;
+
+        histogram!(
+            "pool_cluster_hit",
+            Some(
+                "Number of times that we are using request-response \
+                service with peers in our cluster"
+            ),
+            self.stats.cluster_hit_count as f64
+        );
+        // Reset.
+        self.stats.cluster_hit_count = 0;
 
         // We tell the pool who to connect to.
         BroadcastTask::Update {
@@ -298,11 +308,13 @@ where
     }
 
     #[inline]
-    pub fn count_connection_reuse(&mut self, peer: &NodeIndex) {
+    pub fn record_req_res_request(&mut self, peer: &NodeIndex) {
+        self.stats.total_req_res_requests += 1;
+
         if let Some(info) = self.peers.get(peer) {
             // If it's pinned, it means it's already been accounted for.
             if info.from_topology && !info.pinned {
-                self.stats.handshake_avoided_count += 1;
+                self.stats.cluster_hit_count += 1;
             }
         }
     }
@@ -340,7 +352,7 @@ where
                     let send_request = send_request?;
                     match self.node_info_from_state(&send_request.peer) {
                         Some(info) => {
-                            self.count_connection_reuse(&send_request.peer);
+                            self.record_req_res_request(&send_request.peer);
                             self.pin_connection(send_request.peer, info.clone());
                             return Some(PoolTask::SendRequest(SendRequestTask {
                                     peer: info,
@@ -492,7 +504,8 @@ impl TryFrom<BytesMut> for Message {
 /// Overlay stats.
 #[derive(Default)]
 pub struct Stats {
-    /// Count of how many times we've been able to use topology-based connections
-    /// for request-response service.
-    handshake_avoided_count: usize,
+    total_req_res_requests: usize,
+    /// Number of times that we are using request-response
+    /// service with peers in our cluster.
+    cluster_hit_count: usize,
 }
