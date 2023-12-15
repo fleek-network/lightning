@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use affair::Socket;
 use anyhow::Result;
+use atomo::KeyIterator;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use lightning_types::{
     AccountInfo,
@@ -91,43 +92,47 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_metadata(&self, key: &lightning_types::Metadata) -> Option<Value>;
 
     /// Query Account Table
-    fn get_account_info<F: Clone>(
+    /// Returns information about an account.
+    fn get_account_info<V>(
         &self,
         address: &EthAddress,
-        selector: impl FnOnce(AccountInfo) -> F,
-    ) -> Option<F>;
+        selector: impl FnOnce(AccountInfo) -> V,
+    ) -> Option<V>;
 
     /// Query Client Table
-    fn get_client_info(self, pub_key: &ClientPublicKey) -> Option<EthAddress>;
+    fn client_key_to_account_key(self, pub_key: &ClientPublicKey) -> Option<EthAddress>;
 
     /// Query Node Table
     /// Returns information about a single node.
-    fn get_node_info<F: Clone>(
-        &self,
-        node: &NodeIndex,
-        selector: impl FnOnce(NodeInfo) -> F,
-    ) -> Option<F>;
+    fn get_node_info<V>(&self, node: &NodeIndex, selector: impl FnOnce(NodeInfo) -> V)
+    -> Option<V>;
+
+    /// Returns an Iterator to Node Table
+    fn get_node_table_iter(&self) -> KeyIterator<NodeIndex>;
 
     /// Query Pub Key to Node Index Table
     fn pubkey_to_index(&self, pub_key: &NodePublicKey) -> Option<NodeIndex>;
 
     /// Query Committe Table
-    fn get_committe_info<F: Clone>(
+    fn get_committe_info<V>(
         &self,
         epoch: &Epoch,
-        selector: impl FnOnce(Committee) -> F,
-    ) -> Option<F>;
+        selector: impl FnOnce(Committee) -> V,
+    ) -> Option<V>;
 
     /// Query Services Table
+    /// Returns the service information for a given [`ServiceId`]
     fn get_service_info(&self, id: &ServiceId) -> Option<Service>;
 
     /// Query Params Table
+    /// Returns the passed in protocol parameter
     fn get_protocol_param(&self, param: &ProtocolParams) -> Option<u128>;
 
     /// Query Current Epoch Served Table
     fn get_current_epoch_served(&self, node: &NodeIndex) -> Option<NodeServed>;
 
-    /// Query Reputation Measurements
+    /// Query Reputation Measurements Table
+    /// Returns the reported reputation measurements for a node.
     fn get_reputation_measurements(
         &self,
         node: &NodeIndex,
@@ -137,9 +142,11 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_latencies(&self, node_1: &NodeIndex, node_2: &NodeIndex) -> Option<Duration>;
 
     /// Query Reputation Scores Table
+    /// Returns the global reputation of a node.
     fn get_reputation_score(&self, node: &NodeIndex) -> Option<u8>;
 
     /// Query Total Served Table
+    /// Returns total served for all commodities from the state for a given epoch
     fn get_total_served(&self, epoch: &Epoch) -> Option<TotalServed>;
 
     /// Returns the chain id
@@ -153,9 +160,11 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_committee_members_by_index(&self) -> Vec<NodeIndex>;
 
     /// Get Current Epoch
+    /// Returns just the current epoch
     fn get_current_epoch(&self) -> Epoch;
 
     /// Get Current Epoch Info
+    /// Returns all the information on the current epoch that Narwhal needs to run
     fn get_epoch_info(&self) -> EpochInfo;
 
     /// Return all latencies measurements for the current epoch.
@@ -178,7 +187,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Checks if an transaction digest has been executed this epoch.
     fn has_executed_digest(&self, digest: TxHash) -> bool;
 
-    /// Get Node Public Key based on Node Index
+    /// Get Node's Public Key based on the Node's Index
     fn index_to_pubkey(&self, node_index: &NodeIndex) -> Option<NodePublicKey>;
 
     /// Returns true if the node is a valid node in the network, with enough stake.
