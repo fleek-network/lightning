@@ -7,8 +7,8 @@
 //! the entire thing in a central event loop.
 
 use std::cell::OnceCell;
-use std::collections::HashSet;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::collections::{HashMap, HashSet};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use bytes::Bytes;
 use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
@@ -27,6 +27,7 @@ use lightning_interfaces::{
     Weight,
 };
 use lightning_metrics::{histogram, increment_counter};
+use rand::{Rng, SeedableRng};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, trace};
@@ -69,6 +70,8 @@ pub struct Context<C: Collection> {
     sk: NodeSecretKey,
     pk: NodePublicKey,
     current_node_index: OnceCell<NodeIndex>,
+    ignored_digest: HashMap<Digest, SystemTime>,
+    rng: rand::rngs::SmallRng,
 }
 
 impl<C: Collection> Context<C> {
@@ -102,6 +105,8 @@ impl<C: Collection> Context<C> {
             sk,
             pk,
             current_node_index: OnceCell::new(), // will be set upon spawn.
+            ignored_digest: HashMap::new(),
+            rng: rand::rngs::SmallRng::from_entropy(),
         }
     }
 
@@ -161,6 +166,22 @@ impl<C: Collection> Context<C> {
         // If we have already propagated a message we really don't care about it anymore.
         if self.db.is_propagated(&digest) {
             trace!("skipping {digest:?}");
+            return;
+        }
+
+        // We "drop" all advertisements for a randomly chosen digest for 20 seconds.
+        if let Some(timestamp) = self.ignored_digest.get(&digest) {
+            if timestamp.elapsed().unwrap() > Duration::from_secs(20) {
+                self.ignored_digest.remove(&digest);
+                // don't drop adv
+            } else {
+                // drop adv
+                return;
+            }
+        } else if self.rng.gen_bool(0.1) {
+            self.ignored_digest.insert(digest, SystemTime::now());
+            println!("IGNORE DIGEST: {digest:?}");
+            // drop adv
             return;
         }
 
