@@ -44,6 +44,7 @@ pub struct Syncronizer<C: Collection> {
 }
 
 pub struct SyncronizerInner<C: Collection> {
+    our_public_key: NodePublicKey,
     query_runner: c![C::ApplicationInterface::SyncExecutor],
     blockstore_server_socket: BlockStoreServerSocket,
     rx_epoch_change: Receiver<Notification>,
@@ -123,6 +124,7 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
         }
 
         let inner = SyncronizerInner::new(
+            our_public_key,
             genesis_committee,
             query_runner,
             blockstore_server,
@@ -210,6 +212,7 @@ impl<C: Collection> Syncronizer<C> {
 
 impl<C: Collection> SyncronizerInner<C> {
     fn new(
+        our_public_key: NodePublicKey,
         genesis_committee: Vec<(NodeIndex, NodeInfo)>,
         query_runner: c![C::ApplicationInterface::SyncExecutor],
         blockstore_server: &C::BlockStoreServerInterface,
@@ -218,6 +221,7 @@ impl<C: Collection> SyncronizerInner<C> {
         rpc_client: reqwest::Client,
     ) -> Result<Self> {
         Ok(Self {
+            our_public_key,
             query_runner,
             blockstore_server_socket: blockstore_server.get_socket(),
             rx_epoch_change,
@@ -266,6 +270,19 @@ impl<C: Collection> SyncronizerInner<C> {
                     if notification.is_none() {
                         // We must be shutting down
                         return;
+                    }
+                    if !cfg!(debug_assertions) {
+                        // We only run the prelude in prod mode to avoid interfering with tests.
+                        if !self.query_runner.is_valid_node(&self.our_public_key) {
+                            println!("The node doesn't have enough stake to participate in the network.");
+                            std::process::exit(1);
+                        }
+                        let node_info = self.query_runner.get_node_info(&self.our_public_key)
+                            .unwrap();
+                        if node_info.participation == Participation::False {
+                            println!("The node is currently not participating in the network. You either submitted a OptOut transaction, or the node did not respond to enough pings.");
+                            std::process::exit(1);
+                        }
                     }
                 }
 
