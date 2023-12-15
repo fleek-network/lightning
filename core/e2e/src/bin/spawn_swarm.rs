@@ -44,7 +44,6 @@ async fn main() -> Result<()> {
         panic!("Committee size can not be larger than number of nodes.")
     }
 
-    // Start bootstrapper
     let port_assigner = PortAssigner::default();
 
     let epoch_start = SystemTime::now()

@@ -18,7 +18,6 @@ pub struct ContainerizedNode {
     runtime_type: RuntimeType,
     index: usize,
     is_genesis_committee: bool,
-    is_bootstrap_node: bool,
 }
 
 impl ContainerizedNode {
@@ -27,7 +26,6 @@ impl ContainerizedNode {
         owner_secret_key: AccountOwnerSecretKey,
         index: usize,
         is_genesis_committee: bool,
-        is_bootstrap_node: bool,
     ) -> Self {
         Self {
             config,
@@ -36,7 +34,6 @@ impl ContainerizedNode {
             runtime_type: RuntimeType::MultiThreaded,
             index,
             is_genesis_committee,
-            is_bootstrap_node,
         }
     }
 
@@ -96,10 +93,6 @@ impl ContainerizedNode {
 
     pub fn is_genesis_committee(&self) -> bool {
         self.is_genesis_committee
-    }
-
-    pub fn is_bootstrap_node(&self) -> bool {
-        self.is_bootstrap_node
     }
 }
 
