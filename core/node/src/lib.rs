@@ -6,7 +6,6 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore_server::BlockStoreServer;
 use lightning_broadcast::Broadcast;
 use lightning_consensus::consensus::Consensus;
-use lightning_dht::Dht;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_handshake::handshake::Handshake;
 use lightning_interfaces::infu_collection::{

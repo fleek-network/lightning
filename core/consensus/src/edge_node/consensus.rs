@@ -6,6 +6,7 @@ use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::Epoch;
 use lightning_interfaces::{BroadcastEventInterface, PubSub, SyncQueryRunnerInterface, ToDigest};
 use quick_cache::unsync::Cache;
+use rand::{Rng, SeedableRng};
 use tokio::pin;
 use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinHandle;
@@ -84,6 +85,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
     let mut pending_requests = Cache::new(100);
 
     let mut txn_store = TransactionStore::new();
+    let mut rng = rand::rngs::SmallRng::from_entropy();
     loop {
         // todo(dalton): revisit pinning these and using Notify over oneshot
         let shutdown_future = shutdown_notify.notified();
@@ -130,6 +132,11 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
             Some(mut msg) = pub_sub.recv_event() => {
                 match msg.take().unwrap() {
                     PubSubMsg::Transactions(parcel) => {
+                        if !on_committee && rng.gen_bool(0.1) {
+                            // drop 10% of incoming parcels
+                            continue;
+                        }
+
                         let epoch = query_runner.get_epoch();
                         let originator = msg.originator();
                         let is_committee = committee.contains(&originator);
@@ -208,6 +215,11 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         }
                     },
                     PubSubMsg::Attestation(att) => {
+                        if !on_committee && rng.gen_bool(0.1) {
+                            // drop 10% of incoming attestations
+                            continue;
+                        }
+
                         let originator = msg.originator();
 
                         let epoch = query_runner.get_epoch();

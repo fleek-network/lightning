@@ -19,7 +19,7 @@ tracing.workspace = true
 serde.workspace = true
 tokio.workspace = true
 
-rand = "0.8.5"
+rand = { version = "0.8.5", features = ["small_rng"] }
 derive_more = "0.99.17"
 futures-util = "0.3.28"
 fxhash = "0.2.1"
