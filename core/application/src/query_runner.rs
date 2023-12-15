@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::time::Duration;
 
-use atomo::{Atomo, QueryPerm, ResolvedTableReference};
+use atomo::{Atomo, KeyIterator, QueryPerm, ResolvedTableReference};
 use autometrics::autometrics;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
@@ -34,32 +34,6 @@ use lightning_interfaces::PagingParams;
 use crate::state::State;
 use crate::storage::AtomoStorage;
 use crate::table::StateTables;
-
-macro_rules! do_keys {
-    ($self:ident, $table:ident, $ctx:expr) => {
-        $self.$table.get($ctx).keys()
-    };
-}
-
-macro_rules! do_query {
-    ($self:ident, $table:ident, $ctx:expr, $key:expr) => {
-        $self.$table.get($ctx).get($key)
-    };
-    ($self:ident, $table:ident, $ctx:expr, $key:expr, $selector:expr) => {
-        do_query!($self, $table, $ctx, $key).map($selector)
-    };
-}
-
-macro_rules! query {
-    ($self:ident, $table:ident, $key:expr) => {
-        $self.inner.run(|ctx| do_query!($self, $table, &ctx, $key))
-    };
-    ($self:ident, $table:ident, $key:expr, $selector:expr) => {
-        $self
-            .inner
-            .run(|ctx| do_query!($self, $table, &ctx, $key, $selector))
-    };
-}
 
 #[derive(Clone)]
 pub struct QueryRunner {
@@ -117,70 +91,89 @@ impl QueryRunner {
 
 impl SyncQueryRunnerInterface for QueryRunner {
     fn get_metadata(&self, key: &Metadata) -> Option<Value> {
-        query!(self, metadata_table, key)
+        self.inner.run(|ctx| self.metadata_table.get(ctx).get(key))
     }
 
-    fn get_account_info<F: Clone>(
+    #[inline]
+    fn get_account_info<V>(
         &self,
         address: &EthAddress,
-        selector: impl FnOnce(AccountInfo) -> F,
-    ) -> Option<F> {
-        query!(self, account_table, address, selector)
+        selector: impl FnOnce(AccountInfo) -> V,
+    ) -> Option<V> {
+        self.inner
+            .run(|ctx| self.account_table.get(ctx).get(address))
+            .map(selector)
     }
 
-    fn get_client_info(self, pub_key: &ClientPublicKey) -> Option<EthAddress> {
-        query!(self, client_table, pub_key)
+    fn client_key_to_account_key(self, pub_key: &ClientPublicKey) -> Option<EthAddress> {
+        self.inner
+            .run(|ctx| self.client_table.get(ctx).get(pub_key))
     }
 
-    fn get_node_info<F: Clone>(
+    #[inline]
+    fn get_node_info<V>(
         &self,
         node: &NodeIndex,
-        selector: impl FnOnce(NodeInfo) -> F,
-    ) -> Option<F> {
-        query!(self, node_table, node, selector)
+        selector: impl FnOnce(NodeInfo) -> V,
+    ) -> Option<V> {
+        self.inner
+            .run(|ctx| self.node_table.get(ctx).get(node))
+            .map(selector)
+    }
+
+    fn get_node_table_iter(&self) -> KeyIterator<NodeIndex> {
+        self.inner.run(|ctx| self.node_table.get(ctx).keys())
     }
 
     fn pubkey_to_index(&self, pub_key: &NodePublicKey) -> Option<NodeIndex> {
-        query!(self, pub_key_to_index, pub_key)
+        self.inner
+            .run(|ctx| self.pub_key_to_index.get(ctx).get(pub_key))
     }
 
-    fn get_committe_info<F: Clone>(
+    #[inline]
+    fn get_committe_info<V>(
         &self,
         epoch: &Epoch,
-        selector: impl FnOnce(Committee) -> F,
-    ) -> Option<F> {
-        query!(self, committee_table, epoch, selector)
+        selector: impl FnOnce(Committee) -> V,
+    ) -> Option<V> {
+        self.inner
+            .run(|ctx| self.committee_table.get(ctx).get(epoch))
+            .map(selector)
     }
 
     fn get_service_info(&self, id: &ServiceId) -> Option<Service> {
-        query!(self, services_table, id)
+        self.inner.run(|ctx| self.services_table.get(ctx).get(id))
     }
 
     fn get_protocol_param(&self, param: &ProtocolParams) -> Option<u128> {
-        query!(self, param_table, param)
+        self.inner.run(|ctx| self.param_table.get(ctx).get(param))
     }
 
     fn get_current_epoch_served(&self, node: &NodeIndex) -> Option<NodeServed> {
-        query!(self, current_epoch_served, node)
+        self.inner
+            .run(|ctx| self.current_epoch_served.get(ctx).get(node))
     }
 
     fn get_reputation_measurements(
         &self,
         node: &NodeIndex,
     ) -> Option<Vec<ReportedReputationMeasurements>> {
-        query!(self, rep_measurements, node)
+        self.inner
+            .run(|ctx| self.rep_measurements.get(ctx).get(node))
     }
 
     fn get_latencies(&self, node_1: &NodeIndex, node_2: &NodeIndex) -> Option<Duration> {
-        query!(self, latencies, &(*node_1, *node_2))
+        self.inner
+            .run(|ctx| self.latencies.get(ctx).get((*node_1, *node_2)))
     }
 
     fn get_reputation_score(&self, node: &NodeIndex) -> Option<u8> {
-        query!(self, rep_scores, node)
+        self.inner.run(|ctx| self.rep_scores.get(ctx).get(node))
     }
 
     fn get_total_served(&self, epoch: &Epoch) -> Option<TotalServed> {
-        query!(self, total_served_table, epoch)
+        self.inner
+            .run(|ctx| self.total_served_table.get(ctx).get(epoch))
     }
 
     fn get_chain_id(&self) -> u32 {
@@ -200,10 +193,19 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     fn get_committee_members_by_index(&self) -> Vec<NodeIndex> {
-        let current_epoch = self.get_current_epoch();
+        self.inner.run(|ctx| {
+            // get current epoch
+            let epoch = match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
+                Some(Value::Epoch(epoch)) => epoch,
+                _ => 0,
+            };
 
-        self.get_committe_info(&current_epoch, |committee| committee.members)
-            .unwrap_or_default()
+            self.committee_table
+                .get(ctx)
+                .get(epoch)
+                .map(|c| c.members)
+                .unwrap_or_default()
+        })
     }
 
     fn get_current_epoch(&self) -> Epoch {
@@ -214,33 +216,42 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     fn get_epoch_info(&self) -> EpochInfo {
-        let current_epoch = self.get_current_epoch();
+        self.inner.run(|ctx| {
+            let node_table = self.node_table.get(ctx);
 
-        let committee = self
-            .get_committe_info::<Committee>(&current_epoch, |c| c)
-            .unwrap_or_default();
+            // get current epoch
+            let epoch = match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
+                Some(Value::Epoch(epoch)) => epoch,
+                _ => 0,
+            };
 
-        EpochInfo {
-            committee: committee
-                .members
-                .iter()
-                .filter_map(|member| self.get_node_info::<NodeInfo>(member, |n| n))
-                .collect(),
-            epoch: current_epoch,
-            epoch_end: committee.epoch_end_timestamp,
-        }
+            // look up current committee
+            let committee = self.committee_table.get(ctx).get(epoch).unwrap_or_default();
+
+            EpochInfo {
+                committee: committee
+                    .members
+                    .iter()
+                    .filter_map(|member| node_table.get(member))
+                    .collect(),
+                epoch,
+                epoch_end: committee.epoch_end_timestamp,
+            }
+        })
     }
 
     fn get_current_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration> {
+        let pub_key_selector = { |n: NodeInfo| n.public_key };
         self.inner.run(|ctx| {
-            do_keys!(self, latencies, ctx)
-                .filter_map(|key| {
-                    do_query!(self, latencies, ctx, &key).map(|latency| (key, latency))
-                })
+            let latencies_table = self.latencies.get(ctx);
+            let node_table = self.node_table.get(ctx);
+
+            latencies_table
+                .keys()
+                .filter_map(|key| latencies_table.get(key).map(|latency| (key, latency)))
                 .filter_map(|((index_lhs, index_rhs), latency)| {
-                    let pub_key_selector = { |n: NodeInfo| n.public_key };
-                    let node_lhs = do_query!(self, node_table, ctx, &index_lhs, pub_key_selector);
-                    let node_rhs = do_query!(self, node_table, ctx, &index_rhs, pub_key_selector);
+                    let node_lhs = node_table.get(index_lhs).map(pub_key_selector);
+                    let node_rhs = node_table.get(index_rhs).map(pub_key_selector);
                     match (node_lhs, node_rhs) {
                         (Some(node_lhs), Some(node_rhs)) => Some(((node_lhs, node_rhs), latency)),
                         _ => None,
@@ -252,12 +263,16 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     fn get_genesis_committee(&self) -> Vec<(NodeIndex, NodeInfo)> {
         self.inner.run(|ctx| {
-            match do_query!(self, metadata_table, ctx, &Metadata::GenesisCommittee) {
+            let node_table = self.node_table.get(ctx);
+
+            match self
+                .metadata_table
+                .get(ctx)
+                .get(&Metadata::GenesisCommittee)
+            {
                 Some(Value::GenesisCommittee(committee)) => committee
                     .iter()
-                    .filter_map(|index| {
-                        do_query!(self, node_table, ctx, index).map(|node_info| (*index, node_info))
-                    })
+                    .filter_map(|index| node_table.get(index).map(|node_info| (*index, node_info)))
                     .collect(),
                 _ => {
                     // unreachable seeded at genesis
@@ -277,9 +292,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfoWithIndex> {
         self.inner.run(|ctx| {
             let staking_amount: HpUfixed<18> = self.get_staking_amount().into();
-            let nodes = do_keys!(self, node_table, ctx).map(|index| NodeInfoWithIndex {
+            let node_table = self.node_table.get(ctx);
+            let nodes = node_table.keys().map(|index| NodeInfoWithIndex {
                 index,
-                info: do_query!(self, node_table, ctx, &index).unwrap(),
+                info: node_table.get(index).unwrap(),
             });
 
             match paging {
@@ -313,7 +329,9 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     fn has_executed_digest(&self, digest: [u8; 32]) -> bool {
-        query!(self, executed_digests_table, digest).is_some()
+        self.inner
+            .run(|ctx| self.executed_digests_table.get(ctx).get(digest))
+            .is_some()
     }
 
     fn index_to_pubkey(&self, node_index: &NodeIndex) -> Option<NodePublicKey> {
@@ -321,12 +339,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     fn is_valid_node(&self, id: &NodePublicKey) -> bool {
-        self.inner.run(|ctx| {
-            let minimum_stake_amount = self.get_staking_amount().into();
-            do_query!(self, pub_key_to_index, ctx, id).is_some_and(|node_idx| {
-                do_query!(self, node_table, ctx, &node_idx, |n| n.stake.staked)
-                    .is_some_and(|node_stake| node_stake >= minimum_stake_amount)
-            })
+        let minimum_stake_amount = self.get_staking_amount().into();
+        self.pubkey_to_index(id).is_some_and(|node_idx| {
+            self.get_node_info(&node_idx, |n| n.stake.staked)
+                .is_some_and(|node_stake| node_stake >= minimum_stake_amount)
         })
     }
     fn simulate_txn(&self, txn: TransactionRequest) -> TransactionResponse {
@@ -336,12 +352,13 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 table_selector: ctx,
             };
             let app = State::new(backend);
-            app.execute_transaction(txn.clone())
+            app.execute_transaction(txn)
         })
     }
 
     fn get_node_uptime(&self, node_index: &NodeIndex) -> Option<u8> {
-        query!(self, uptime_table, node_index)
+        self.inner
+            .run(|ctx| self.uptime_table.get(ctx).get(node_index))
     }
 
     fn cid_to_providers(&self, cid: &Blake3Hash) -> Vec<NodeIndex> {

@@ -1039,7 +1039,7 @@ fn update_reputation_measurements(
     peer: &NodePublicKey,
     measurements: ReputationMeasurements,
 ) -> (u32, ReputationMeasurements) {
-    let peer_index = get_node_index(&query_runner, peer);
+    let peer_index = get_node_index(query_runner, peer);
     map.insert(peer_index, measurements.clone());
     (peer_index, measurements)
 }
@@ -1134,7 +1134,7 @@ fn do_get_node_info<T: Clone>(
     pub_key: &NodePublicKey,
     selector: impl FnOnce(NodeInfo) -> T,
 ) -> T {
-    let node_idx = get_node_index(&query_runner, pub_key);
+    let node_idx = get_node_index(query_runner, pub_key);
     query_runner
         .get_node_info::<T>(&node_idx, selector)
         .unwrap()
@@ -3235,13 +3235,13 @@ async fn test_submit_content_registry_update() {
 
     // Then: registry indicates that the nodes are providing the correct content.
     for (sk, cid) in expected_records.iter() {
-        let index = query_runner.pubkey_to_index(sk.to_pk()).unwrap();
+        let index = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
         let cids = query_runner.content_registry(&index);
         assert_eq!(cids, vec![*cid]);
     }
     // Then: all providers are accounted for.
     for (sk, cid) in expected_records.iter() {
-        let index = query_runner.pubkey_to_index(sk.to_pk()).unwrap();
+        let index = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
         let providers = query_runner.cid_to_providers(cid);
         assert_eq!(providers, vec![index]);
     }
@@ -3260,7 +3260,7 @@ async fn test_submit_content_registry_update() {
     for (sk, cid) in expected_records.iter() {
         let providers = query_runner.cid_to_providers(cid);
         assert!(providers.is_empty());
-        let index = query_runner.pubkey_to_index(sk.to_pk()).unwrap();
+        let index = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
         let cids = query_runner.content_registry(&index);
         assert!(cids.is_empty());
     }
@@ -3290,7 +3290,7 @@ async fn test_submit_content_registry_update_multiple_providers_per_cid() {
         .into_iter()
         .map(|ck| {
             query_runner
-                .pubkey_to_index(ck.node_secret_key.to_pk())
+                .pubkey_to_index(&ck.node_secret_key.to_pk())
                 .unwrap()
         })
         .collect::<Vec<_>>();
@@ -3315,7 +3315,7 @@ async fn test_submit_content_registry_update_multiple_providers_per_cid() {
     assert!(providers.is_empty());
     for node in keystore {
         let index = query_runner
-            .pubkey_to_index(node.node_secret_key.to_pk())
+            .pubkey_to_index(&node.node_secret_key.to_pk())
             .unwrap();
         let cids = query_runner.content_registry(&index);
         assert!(cids.is_empty());
@@ -3374,7 +3374,7 @@ async fn test_submit_content_registry_update_mix_of_add_and_remove_updates() {
     assert!(!removed.is_empty());
     assert!(removed.len() < cids.len());
     let node = query_runner
-        .pubkey_to_index(keystore[0].node_secret_key.to_pk())
+        .pubkey_to_index(&keystore[0].node_secret_key.to_pk())
         .unwrap();
     for cid in &cids {
         if removed.contains(cid) {
@@ -3440,10 +3440,10 @@ async fn test_submit_content_registry_update_multiple_cids_per_provider() {
 
     // Then: nodes show up as providers for the cids.
     let node1 = query_runner
-        .pubkey_to_index(keystore[0].node_secret_key.to_pk())
+        .pubkey_to_index(&keystore[0].node_secret_key.to_pk())
         .unwrap();
     let node2 = query_runner
-        .pubkey_to_index(keystore[1].node_secret_key.to_pk())
+        .pubkey_to_index(&keystore[1].node_secret_key.to_pk())
         .unwrap();
 
     for cid in &cids {
