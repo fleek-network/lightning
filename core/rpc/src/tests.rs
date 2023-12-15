@@ -149,6 +149,7 @@ fn init_rpc(app: Application<TestBinding>, port: u16) -> Result<Rpc<TestBinding>
         app.sync_query(),
         blockstore,
         &fetcher,
+        &signer,
         None,
     )?;
     Ok(rpc)

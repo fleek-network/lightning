@@ -12,6 +12,7 @@ use crate::{
     ConfigProviderInterface,
     ConsensusInterface,
     FetcherInterface,
+    SignerInterface,
 };
 
 /// The interface for the *RPC* server. Which is supposed to be opening a public
@@ -26,6 +27,7 @@ pub trait RpcInterface<C: Collection>:
         app: ::ApplicationInterface,
         blockstore: ::BlockStoreInterface,
         fetcher: ::FetcherInterface,
+        signer: ::SignerInterface,
         archive: ::ArchiveInterface,
     ) {
         Self::init(
@@ -34,6 +36,7 @@ pub trait RpcInterface<C: Collection>:
             app.sync_query(),
             blockstore.clone(),
             fetcher,
+            signer,
             archive.archive_socket(),
         )
     }
@@ -45,6 +48,7 @@ pub trait RpcInterface<C: Collection>:
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore: C::BlockStoreInterface,
         fetcher: &C::FetcherInterface,
+        signer: &C::SignerInterface,
         archive_socket: Option<ArchiveSocket>,
     ) -> anyhow::Result<Self>;
 }

@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
+use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
 use jsonrpsee::server::middleware::ProxyGetRequestLayer;
 use jsonrpsee::server::{Server as JSONRPCServer, ServerHandle};
 use jsonrpsee::RpcModule;
@@ -14,6 +15,7 @@ use lightning_interfaces::{
     FetcherSocket,
     MempoolSocket,
     RpcInterface,
+    SignerInterface,
     WithStartAndShutdown,
 };
 use tokio::sync::Mutex;
@@ -39,6 +41,8 @@ pub(crate) struct Data<C: Collection> {
     pub mempool_socket: MempoolSocket,
     pub fetcher_socket: FetcherSocket,
     pub _blockstore: C::BlockStoreInterface,
+    pub node_public_key: NodePublicKey,
+    pub consensus_public_key: ConsensusPublicKey,
     /// If this is some it means the node is in archive mode
     pub archive_socket: Option<ArchiveSocket>,
 }
@@ -131,6 +135,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore: C::BlockStoreInterface,
         fetcher: &C::FetcherInterface,
+        signer: &C::SignerInterface,
         archive_socket: Option<ArchiveSocket>,
     ) -> anyhow::Result<Self> {
         let data: Arc<Data<C>> = Arc::new(Data {
@@ -138,6 +143,8 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
             mempool_socket: mempool,
             fetcher_socket: fetcher.get_socket(),
             _blockstore: blockstore,
+            node_public_key: signer.get_ed25519_pk(),
+            consensus_public_key: signer.get_bls_pk(),
             archive_socket,
         });
 

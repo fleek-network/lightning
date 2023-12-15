@@ -19,6 +19,7 @@ use lightning_interfaces::types::{
     NodeServed,
     OriginProvider,
     ProtocolParams,
+    PublicKeys,
     ReportedReputationMeasurements,
     TotalServed,
     TransactionRequest,
@@ -75,6 +76,13 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
 
     async fn get_node_info(&self, pk: NodePublicKey) -> RpcResult<Option<NodeInfo>> {
         Ok(self.data.query_runner.get_node_info(&pk))
+    }
+
+    async fn get_public_keys(&self) -> RpcResult<PublicKeys> {
+        Ok(PublicKeys {
+            node_public_key: self.data.node_public_key,
+            consensus_public_key: self.data.consensus_public_key,
+        })
     }
 
     async fn get_node_uptime(&self, pk: NodePublicKey) -> RpcResult<Option<u8>> {

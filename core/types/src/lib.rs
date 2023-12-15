@@ -17,6 +17,7 @@ mod pod;
 mod pool;
 mod reputation;
 mod response;
+mod rpc;
 mod state;
 mod transaction;
 
@@ -37,6 +38,7 @@ pub use pod::*;
 pub use pool::*;
 pub use reputation::*;
 pub use response::*;
+pub use rpc::*;
 pub use state::*;
 pub use transaction::*;
 
