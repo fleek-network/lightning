@@ -52,9 +52,7 @@ export namespace Challenge {
 }
 
 export namespace HandshakeRequest {
-  export type Frame =
-    | Handshake
-    | JoinRequest;
+  export type Frame = Handshake | JoinRequest;
 
   export enum Tag {
     Handshake,
@@ -172,10 +170,7 @@ export namespace HandshakeResponse {
 }
 
 export namespace Request {
-  export type Frame =
-    | ServicePayload
-    | AccessToken
-    | ExtendAccessToken;
+  export type Frame = ServicePayload | AccessToken | ExtendAccessToken;
 
   export enum Tag {
     ServicePayload,
@@ -304,7 +299,7 @@ export namespace Response {
     WrongPermssion,
     InternalError,
     Shutdown,
-    Unknown = 0xFF,
+    Unknown = 0xff,
   }
 
   export function encode(frame: Frame): ArrayBuffer {
