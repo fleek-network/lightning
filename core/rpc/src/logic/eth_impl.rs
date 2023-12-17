@@ -14,16 +14,22 @@ use ethers::types::{
 };
 use ethers::utils::rlp;
 use fleek_crypto::EthAddress;
-use jsonrpsee::core::RpcResult;
+use jsonrpsee::{PendingSubscriptionSink, SubscriptionMessage};
+use jsonrpsee::core::{RpcResult, SubscriptionResult};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{ArchiveRequest, ArchiveResponse};
 use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_types::{Event, Tokens};
 use tracing::trace;
 
 use crate::api::EthApiServer;
-use crate::api_types::{CallRequest, StateOverride};
+use crate::api_types::{CallRequest, EthereumEvent, StateOverride};
 use crate::error::RPCError;
 use crate::Data;
+
+lazy_static::lazy_static! {
+    pub static ref USDC_CONTRACT: EthAddress = Tokens::USDC.address();
+}
 
 const FLEEK_CONTRACT: EthAddress = EthAddress([6; 20]);
 
@@ -205,6 +211,50 @@ impl<C: Collection> EthApiServer for EthApi<C> {
     async fn max_priority_fee_per_gas(&self) -> RpcResult<U256> {
         trace!(target: "rpc::eth", "Serving eth_maxPriorityFeePerGas");
         Ok(U256::zero())
+    }
+
+    async fn get_logs(
+        &self,
+        pending: PendingSubscriptionSink,
+        from_block: BlockNumber,
+        to_block: BlockNumber,
+        address: Vec<EthAddress>,
+        topics: Vec<H256>,
+    ) -> SubscriptionResult {
+        trace!(target: "rpc::eth", ?from_block, ?to_block, ?address, ?topics, "Serving eth_getLogs");
+        let sink = pending.accept().await?;
+        let mut listener = self.data.event_distributor.register_listener();
+
+        if address.len() > 1 {
+            return Err(RPCError::custom("Only events from the USDC are currently supported".to_string()).into());
+        }
+
+        for addr in address {
+            if addr != *USDC_CONTRACT {
+                return Err(RPCError::custom("Only events from the USDC contract are avaliable".to_string()).into());
+            }
+        }
+
+        while let Ok(event) = listener.recv().await {
+            match event {
+                Event::Transfer { token, from, to, amount } => {
+                    if token.address() == *USDC_CONTRACT {
+                        let event = EthereumEvent {
+                            address: token.address().0.into(),
+                            // todo:n actually endcode the topics and formats
+                            topics: vec![],
+                            data: Bytes::new(),
+                            ..Default::default()
+                        };
+
+                        sink.send(SubscriptionMessage::from(serde_json::to_string(&event)?)).await?;
+                    }
+                },
+                _ => {}
+            }
+        }
+
+        Ok(())
     }
 
     async fn fee_history(&self) -> RpcResult<String> {

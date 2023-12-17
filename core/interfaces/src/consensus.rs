@@ -67,7 +67,7 @@ pub trait ConsensusInterface<C: Collection>:
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
         indexer_socket: Option<IndexSocket>,
-        event_socket: Sender<Event>
+        event_socket: Sender<Vec<Event>>
     ) -> anyhow::Result<Self>;
 
     /// Returns a socket that can be used to submit transactions to the consensus,

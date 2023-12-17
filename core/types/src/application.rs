@@ -1,5 +1,6 @@
 //! The types used by the Application interface.
 
+use ethers::core::k256::pkcs8::SubjectPublicKeyInfo;
 use ethers::types::{Block as EthersBlock, H256, U64};
 use fleek_crypto::{NodePublicKey, EthAddress};
 use hp_fixed::unsigned::HpUfixed;
@@ -20,6 +21,22 @@ pub enum Event {
         service_id: u32,
         event: Vec<u8>,
     },
+}
+
+// todo!:n macro for this
+#[derive(Eq, Hash, Debug, PartialEq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
+pub enum EventType {
+    Transfer,
+    ServiceEvent,
+}
+
+impl From<&Event> for EventType {
+    fn from(event: &Event) -> Self {
+        match event {
+            Event::Transfer { .. } => Self::Transfer,
+            Event::ServiceEvent { .. } => Self::ServiceEvent,
+        }
+    }
 }
 
 impl Event {
@@ -43,6 +60,10 @@ impl Event {
             event,
         }
     }
+
+    pub fn event_type(&self) -> EventType {
+        self.into()
+    }
 }
 
 /// The response generated from executing an entire batch of transactions (aka a block).
@@ -61,6 +82,16 @@ pub struct BlockExecutionResponse {
     pub node_registry_delta: Vec<(NodePublicKey, NodeRegistryChange)>,
     /// Receipts of all executed transactions
     pub txn_receipts: Vec<TransactionReceipt>,
+}
+
+impl BlockExecutionResponse {
+    pub fn events(&self) -> Vec<Event> {
+        self.txn_receipts
+            .iter()
+            .cloned()
+            .filter_map(|receipt| receipt.event)
+            .collect()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]

@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use ethers::types::{Address, Bytes, H256, U256};
 use serde::{Deserialize, Serialize};
 
+pub type EthereumEvent = ethers::types::Log;
+
 /// A set of account overrides
 pub type StateOverride = HashMap<Address, AccountOverride>;
 
