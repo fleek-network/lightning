@@ -387,7 +387,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
         indexer_socket: Option<IndexSocket>,
-        _event_socket: tokio::sync::mpsc::Sender<Event>,
+        event_socket: tokio::sync::mpsc::Sender<Vec<Event>>,
     ) -> anyhow::Result<Self> {
         // Spawn the registry for narwhal
         let registry = Registry::new();
@@ -417,6 +417,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             tx_narwhal_batches,
             query_runner.clone(),
             indexer_socket,
+            event_socket
         ));
 
         let shutdown_notify = Arc::new(Notify::new());

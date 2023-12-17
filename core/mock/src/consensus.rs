@@ -160,7 +160,7 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
         _pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
         _indexer_socket: Option<IndexSocket>,
-        _event_socket: mpsc::Sender<Event>,
+        _event_socket: mpsc::Sender<Vec<Event>>,
     ) -> anyhow::Result<Self> {
         let (tx, rx) = mpsc::channel(128);
         let block_notifier = Arc::new(Notify::new());

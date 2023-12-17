@@ -5114,6 +5114,7 @@ dependencies = [
  "hyper",
  "infusion",
  "jsonrpsee",
+ "lazy_static",
  "lightning-application",
  "lightning-blockstore",
  "lightning-blockstore-server",

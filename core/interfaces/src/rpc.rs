@@ -54,5 +54,5 @@ pub trait RpcInterface<C: Collection>:
         archive_socket: Option<ArchiveSocket>,
     ) -> anyhow::Result<Self>;
 
-    fn event_tx(&self) -> Sender<Event>;
+    fn event_tx(&self) -> Sender<Vec<Event>>;
 }

@@ -217,7 +217,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         })
     }
 
-    fn event_tx(&self) -> tokio::sync::mpsc::Sender<Event> {
+    fn event_tx(&self) -> tokio::sync::mpsc::Sender<Vec<Event>> {
         self.data.event_distributor.sender()
     }
 }

@@ -123,7 +123,7 @@ async fn init_pinger() -> Pinger<TestBinding> {
         new_block_interval: Duration::from_secs(5),
     };
 
-    let (tx, _) = tokio::sync::mpsc::channel::<lightning_interfaces::types::Event>(1);
+    let (tx, _) = tokio::sync::mpsc::channel::<Vec<lightning_interfaces::types::Event>>(1);
 
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,

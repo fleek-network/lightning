@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use fastcrypto::hash::HashFunction;
 use fleek_blake3 as blake3;
-use lightning_interfaces::types::{Block, Epoch, IndexRequest, NodeIndex, TransactionRequest};
+use lightning_interfaces::types::{Block, Epoch, IndexRequest, NodeIndex, TransactionRequest, Event};
 use lightning_interfaces::{
     ExecutionEngineSocket,
     IndexSocket,
@@ -73,6 +73,8 @@ pub struct Execution<Q: SyncQueryRunnerInterface> {
     /// If this socket is present it means the node is in archive node and should send all blocks
     /// and transactions it executes to the archiver to be indexed
     index_socket: Option<IndexSocket>,
+    /// The socket to send transaction events to RPC subscrivers
+    event_socket: tokio::sync::mpsc::Sender<Vec<Event>>
 }
 
 impl<Q: SyncQueryRunnerInterface> Execution<Q> {
@@ -83,6 +85,7 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
         tx_narwhal_batches: mpsc::Sender<(AuthenticStampedParcel, bool)>,
         query_runner: Q,
         index_socket: Option<IndexSocket>,
+        event_socket: tokio::sync::mpsc::Sender<Vec<Event>>
     ) -> Self {
         Self {
             executor,
@@ -91,6 +94,7 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
             tx_narwhal_batches,
             query_runner,
             index_socket,
+            event_socket
         }
     }
 
@@ -121,6 +125,13 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
         // Unfailable
         let results = self.executor.run(block).await.unwrap();
         info!("Consensus submitted new block to application");
+
+        match self.event_socket.send(results.events()).await {
+            Ok(_) => {}
+            Err(e) => {
+                error!("couldn't send a message to the event socket: {e}");
+            }
+        }
 
         if results.change_epoch {
             change_epoch = true;
