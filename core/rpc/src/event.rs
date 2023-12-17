@@ -7,6 +7,7 @@ use tokio::sync::oneshot;
 use tokio::sync::{mpsc, Mutex};
 
 pub struct EventDistributor {
+    /// An internal counter of how many people are using the broadcast rx
     listeners: Arc<Mutex<usize>>,
 
     /// A sender that receives events from the application layer
@@ -27,7 +28,7 @@ impl EventDistributor {
 
         let listeners = Arc::new(Mutex::new(0));
 
-        let distributor = Self {
+        let this = Self {
             listeners: listeners.clone(),
             event_tx: event_tx.clone(),
             broadcast_tx: broadcast_tx.clone(),
@@ -37,8 +38,13 @@ impl EventDistributor {
         let fut = async move {
             // Recieve events from the application layer
             while let Some(event) = event_rx.recv().await {
+                let lock = listeners.lock().await;
+                let listeners = *lock;
+                // sanity
+                drop(lock);
+
                 // If there are no listeners, don't bother broadcasting anything
-                if *listeners.lock().await > 0 {
+                if listeners > 0 {
                     match broadcast_tx.send(event) {
                         Ok(_) => {}
                         Err(_) => {
@@ -52,7 +58,7 @@ impl EventDistributor {
         tokio::spawn(async {
             tokio::select! {
                 _ = fut => {
-                    tracing::error!("Event distributor future returned; this is a bug")
+                    tracing::error!("Event distrubutor future returned; this is a bug")
                 }
                 _ = shutdown_rx => {
                     tracing::trace!("Event recieved shutdown signal")
@@ -60,14 +66,14 @@ impl EventDistributor {
             }
         });
 
-        distributor
+        this
     }
 
     pub fn sender(&self) -> mpsc::Sender<Event> {
         self.event_tx.clone()
     }
 
-    pub fn register_listener(&self) -> broadcast::Receiver<Event> {
+    pub fn register_listener(&self) -> EventReceiver<'_> {
         let listeners = self.listeners.clone();
 
         tokio::spawn(async move {
@@ -75,7 +81,9 @@ impl EventDistributor {
             *listeners += 1;
         });
 
-        self.broadcast_tx.subscribe()
+        let rx = self.broadcast_tx.subscribe();
+
+        EventReceiver::new(self, rx)
     }
 
     pub async fn shutdown(self) {
@@ -86,24 +94,23 @@ impl EventDistributor {
 /// This is a wrapper over a broadcast receiver that can be used in exactly the same way
 pub struct EventReceiver<'a> {
     distributor: &'a EventDistributor,
-    receiver: broadcast::Receiver<Event>,
+    rx: broadcast::Receiver<Event>,
 }
 
 impl<'a> EventReceiver<'a> {
-    pub fn new(distributor: &'a EventDistributor) -> Self {
-        let receiver = distributor.register_listener();
+    pub fn new(distributor: &'a EventDistributor, rx: broadcast::Receiver<Event>) -> Self {
         Self {
             distributor,
-            receiver,
+            rx,
         }
     }
 
     pub async fn recv(&mut self) -> Result<Event, RecvError> {
-        self.receiver.recv().await
+        self.rx.recv().await
     }
 }
 
-impl<'a> Drop for EventReceiver<'a> {
+impl Drop for EventReceiver<'_> {
     fn drop(&mut self) {
         let listeners = self.distributor.listeners.clone();
 
