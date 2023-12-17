@@ -14,6 +14,7 @@ use lightning_interfaces::types::{
     NodeInfoWithIndex,
     NodeServed,
     ProtocolParams,
+    PublicKeys,
     ReportedReputationMeasurements,
     TotalServed,
     TransactionRequest,
@@ -52,6 +53,12 @@ pub trait FleekApi {
 
     #[method(name = "get_node_info")]
     async fn get_node_info(&self, public_key: NodePublicKey) -> RpcResult<Option<NodeInfo>>;
+
+    #[method(name = "get_public_keys")]
+    async fn get_public_keys(&self) -> RpcResult<PublicKeys>;
+
+    #[method(name = "get_node_uptime")]
+    async fn get_node_uptime(&self, public_key: NodePublicKey) -> RpcResult<Option<u8>>;
 
     #[method(name = "get_account_info")]
     async fn get_account_info(&self, public_key: EthAddress) -> RpcResult<Option<AccountInfo>>;

@@ -4,9 +4,11 @@ use bytes::{BufMut, Bytes, BytesMut};
 use lightning_interfaces::ExecutorProviderInterface;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use tracing::warn;
-use triomphe::Arc;
 
+use self::mock::{MockTransportReceiver, MockTransportSender};
+use self::tcp::{TcpReceiver, TcpSender};
+use self::webrtc::{WebRtcReceiver, WebRtcSender};
+use self::webtransport::{WebTransportReceiver, WebTransportSender};
 use crate::config::TransportConfig;
 use crate::handshake::Context;
 use crate::schema;
@@ -16,6 +18,41 @@ pub mod mock;
 pub mod tcp;
 pub mod webrtc;
 pub mod webtransport;
+
+macro_rules! transport_pairs {
+    {$($name:ident($sender:tt, $receiver:tt),)*} => {
+        /// Static enum of transport pairs for handling secondary connections
+        #[non_exhaustive]
+        pub enum TransportPair {
+            $($name($sender, $receiver),)*
+        }
+
+        $(
+        impl From<($sender, $receiver)> for TransportPair {
+            fn from(value: ($sender, $receiver)) -> Self {
+                TransportPair::$name(value.0, value.1)
+            }
+        }
+        )*
+
+        macro_rules! match_transport {
+            ($pair:tt { ($tx:ident, $rx:ident) => $call:expr }) => {
+                match $pair {
+                    $(TransportPair::$name($tx, $rx) => { $call },)*
+                }
+            };
+        }
+
+        pub(super) use match_transport;
+    }
+}
+
+transport_pairs! {
+    Mock(MockTransportSender, MockTransportReceiver),
+    Tcp(TcpSender, TcpReceiver),
+    WebRtc(WebRtcSender, WebRtcReceiver),
+    WebTransport(WebTransportSender, WebTransportReceiver),
+}
 
 #[async_trait]
 pub trait Transport: Sized + Send + Sync + 'static {
@@ -33,6 +70,27 @@ pub trait Transport: Sized + Send + Sync + 'static {
     async fn accept(
         &mut self,
     ) -> Option<(schema::HandshakeRequestFrame, Self::Sender, Self::Receiver)>;
+
+    /// Spawn a thread loop accepting connections and initializing the connection to the service.
+    #[inline(always)]
+    fn spawn_listener_task(mut self, ctx: Context<impl ExecutorProviderInterface>)
+    where
+        (Self::Sender, Self::Receiver): Into<TransportPair>,
+    {
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    res = self.accept() => match res {
+                        // Connection established with a handshake frame
+                        Some((req, tx, rx)) => ctx.handle_new_connection(req, tx, rx).await,
+                        // The transport listener has closed
+                        None => break,
+                    },
+                    _ = ctx.shutdown.wait_for_shutdown() => break,
+                }
+            }
+        });
+    }
 }
 
 // TODO: Explore being able to make this async while also avoiding dynamic dispatch after support
@@ -64,64 +122,35 @@ pub trait TransportReceiver: Send + Sync + 'static {
     async fn recv(&mut self) -> Option<schema::RequestFrame>;
 }
 
-pub async fn spawn_transport_by_config<P: ExecutorProviderInterface>(
+pub async fn spawn_transport_by_config(
     shutdown: ShutdownWaiter,
-    ctx: Arc<Context<P>>,
+    ctx: Context<impl ExecutorProviderInterface>,
     config: TransportConfig,
 ) -> anyhow::Result<Option<Router>> {
     match config {
         TransportConfig::Mock(config) => {
             let (transport, router) = mock::MockTransport::bind(shutdown.clone(), config).await?;
-            spawn_listener_task(transport, ctx);
+            transport.spawn_listener_task(ctx);
             Ok(router)
         },
         TransportConfig::Tcp(config) => {
             let (transport, router) = tcp::TcpTransport::bind(shutdown.clone(), config).await?;
-            spawn_listener_task(transport, ctx);
+            transport.spawn_listener_task(ctx);
             Ok(router)
         },
         TransportConfig::WebRTC(config) => {
             let (transport, router) =
                 webrtc::WebRtcTransport::bind(shutdown.clone(), config).await?;
-            spawn_listener_task(transport, ctx);
+            transport.spawn_listener_task(ctx);
             Ok(router)
         },
         TransportConfig::WebTransport(config) => {
             let (transport, router) =
                 webtransport::WebTransport::bind(shutdown.clone(), config).await?;
-            spawn_listener_task(transport, ctx);
+            transport.spawn_listener_task(ctx);
             Ok(router)
         },
     }
-}
-
-/// Spawn a thread loop accepting connections and initializing the connection to the service.
-fn spawn_listener_task<T: Transport, P: ExecutorProviderInterface>(
-    mut transport: T,
-    ctx: Arc<Context<P>>,
-) {
-    tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                res = transport.accept() => match res {
-                    // Connection established with a handshake frame
-                    Some((req, tx, rx)) => {
-                        match req {
-                            schema::HandshakeRequestFrame::Handshake {
-                                retry: None,
-                                service,
-                                ..
-                            } => ctx.handle_new_connection(service, tx, rx).await,
-                            _ => warn!("TODO: support resumption and secondary connections"),
-                        }
-                    },
-                    // The transport listener has closed
-                    None => break,
-                },
-                _ = ctx.shutdown.wait_for_shutdown() => break,
-            }
-        }
-    });
 }
 
 /// Delimit a complete frame with a u32 length.

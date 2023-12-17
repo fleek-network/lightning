@@ -1,7 +1,7 @@
 use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::io;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -76,6 +76,7 @@ async fn get_pools(
     test_name: &str,
     port_offset: u16,
     num_peers: usize,
+    state_server_address_port: Option<u16>,
 ) -> (Vec<Peer<TestBinding>>, Application<TestBinding>, PathBuf) {
     let mut signers_configs = Vec::new();
     let mut genesis = Genesis::load().unwrap();
@@ -118,7 +119,6 @@ async fn get_pools(
                 mempool: 48202_u16,
                 rpc: 48300_u16,
                 pool: port_offset + i as u16,
-                dht: 48500_u16,
                 pinger: 48600_u16,
                 // Handshake is unused so the defaults are fine.
                 handshake: Default::default(),
@@ -148,7 +148,13 @@ async fn get_pools(
         let address: SocketAddr = format!("0.0.0.0:{}", port_offset + i as u16)
             .parse()
             .unwrap();
-        let peer = create_peer(&app, signer_config, address, true);
+        let peer = create_peer(
+            &app,
+            signer_config,
+            address,
+            true,
+            state_server_address_port.map(|port| port + i as u16),
+        );
         peers.push(peer);
     }
 
@@ -172,7 +178,7 @@ fn create_unknown_peer(
         node_key_path: node_key_path.try_into().unwrap(),
         consensus_key_path: consensus_key_path.try_into().unwrap(),
     };
-    create_peer(app, signer_config, address, false)
+    create_peer(app, signer_config, address, false, None)
 }
 
 fn create_peer(
@@ -180,6 +186,7 @@ fn create_peer(
     signer_config: SignerConfig,
     address: SocketAddr,
     in_state: bool,
+    state_server_address_port: Option<u16>,
 ) -> Peer<TestBinding> {
     let (_, query_runner) = (app.transaction_executor(), app.sync_query());
     let signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
@@ -197,10 +204,14 @@ fn create_peer(
         query_runner.clone(),
     )
     .unwrap();
+
+    let http = state_server_address_port
+        .map(|port| SocketAddr::from((IpAddr::from([127, 0, 0, 1]), port)));
+
     let config = Config {
         max_idle_timeout: Duration::from_secs(5),
         address,
-        ..Default::default()
+        http,
     };
     let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         config,
@@ -231,7 +242,7 @@ fn create_peer(
 #[tokio::test]
 async fn test_send_to_one() {
     // Given: two peers.
-    let (peers, app, path) = get_pools("send_to_one", 48000, 2).await;
+    let (peers, app, path) = get_pools("send_to_one", 48000, 2, None).await;
     let query_runner = app.sync_query();
 
     let node_index1 = query_runner
@@ -270,7 +281,7 @@ async fn test_send_to_one() {
 async fn test_send_to_all() {
     // Given: a list of peers that are in state and some that are not.
     let port_offset = 49000;
-    let (peers, app, path) = get_pools("send_to_all", port_offset, 4).await;
+    let (peers, app, path) = get_pools("send_to_all", port_offset, 4, None).await;
     let unknown_peer = create_unknown_peer(
         path.clone(),
         &app,
@@ -333,7 +344,7 @@ async fn test_send_to_all() {
 #[tokio::test]
 async fn test_open_req_res() {
     // Given: two peers.
-    let (peers, app, path) = get_pools("open_req_res", 50000, 2).await;
+    let (peers, app, path) = get_pools("open_req_res", 50000, 2, None).await;
     let query_runner = app.sync_query();
 
     let node_index1 = query_runner
@@ -402,7 +413,7 @@ async fn test_open_req_res() {
 #[tokio::test]
 async fn test_open_req_res_unknown_peer() {
     // Give: a peer.
-    let (peers, _app, path) = get_pools("test_open_req_res_unknown_peer", 55000, 1).await;
+    let (peers, _app, path) = get_pools("test_open_req_res_unknown_peer", 55000, 1, None).await;
     let (requester1, _responder1) = peers[0].pool.open_req_res(ServiceScope::BlockstoreServer);
     peers[0].pool.start().await;
 
@@ -429,7 +440,7 @@ async fn test_open_req_res_unknown_peer() {
 #[tokio::test]
 async fn test_overlay_get_index() {
     // We never bind.
-    let (peers, app, path) = get_pools("test_overlay_get_index", 8000, 4).await;
+    let (peers, app, path) = get_pools("test_overlay_get_index", 8000, 4, None).await;
     let query_runner = app.sync_query();
     let overlay =
         NetworkOverlay::<TestBinding>::new(query_runner, peers[0].node_public_key, OnceCell::new());
@@ -444,7 +455,7 @@ async fn test_overlay_get_index() {
 async fn test_overlay_update_connections() {
     // Given: a network of 4 nodes.
     // We never bind.
-    let (peers, app, path) = get_pools("test_overlay_update_connections", 8000, 4).await;
+    let (peers, app, path) = get_pools("test_overlay_update_connections", 8000, 4, None).await;
     let query_runner = app.sync_query();
     let mut overlay = NetworkOverlay::<TestBinding>::new(
         query_runner,
@@ -524,7 +535,8 @@ async fn test_overlay_update_connections() {
 async fn test_overlay_pinning_peers_from_topology() {
     // Given: a network of 4 nodes.
     // We never bind.
-    let (peers, app, path) = get_pools("test_overlay_pinning_peers_from_topology", 8000, 4).await;
+    let (peers, app, path) =
+        get_pools("test_overlay_pinning_peers_from_topology", 8000, 4, None).await;
     let query_runner = app.sync_query();
     let mut overlay = NetworkOverlay::<TestBinding>::new(
         query_runner.clone(),
@@ -587,6 +599,7 @@ async fn test_overlay_pinning_peers_outside_topology_cluster() {
         "test_overlay_pinning_peers_outside_topology_cluster",
         8000, // We never bind.
         2,
+        None,
     )
     .await;
     let query_runner = app.sync_query();
@@ -635,6 +648,7 @@ async fn test_overlay_only_broadcast_to_peers_in_topology_cluster() {
         "test_overlay_only_broadcast_to_peers_in_topology_cluster",
         8000, // We never bind.
         4,
+        None,
     )
     .await;
     let query_runner = app.sync_query();
@@ -709,6 +723,7 @@ async fn test_overlay_only_broadcast_to_one_peer() {
         "test_overlay_only_broadcast_to_one_peer",
         8000, // We never bind.
         4,
+        None,
     )
     .await;
     let query_runner = app.sync_query();
@@ -773,6 +788,54 @@ async fn test_overlay_only_broadcast_to_one_peer() {
             .await
             .is_err()
     );
+
+    if path.exists() {
+        std::fs::remove_dir_all(&path).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn test_start_shutdown() {
+    // Given: two peers.
+    let (peers, app, path) = get_pools("start_shutdown", 60000, 2, Some(60010)).await;
+    let query_runner = app.sync_query();
+
+    let node_index1 = query_runner
+        .pubkey_to_index(peers[0].node_public_key)
+        .unwrap();
+    let node_index2 = query_runner
+        .pubkey_to_index(peers[1].node_public_key)
+        .unwrap();
+
+    let event_handler1 = peers[0].pool.open_event(ServiceScope::Broadcast);
+    let mut event_handler2 = peers[1].pool.open_event(ServiceScope::Broadcast);
+
+    // Given: we start the peers.
+    for peer in &peers {
+        peer.pool.start().await;
+    }
+
+    // Given: we exchange data over the network.
+    let msg = Bytes::from("hello");
+    event_handler1.send_to_one(node_index2, msg.clone());
+    let (sender, recv_msg) = event_handler2.receive().await.unwrap();
+    assert_eq!(recv_msg, msg);
+    assert_eq!(sender, node_index1);
+
+    // When: we shutdown.
+    for peer in &peers {
+        peer.pool.shutdown().await;
+    }
+
+    // Then: we should be able to restart immediately again without issues.
+    for peer in &peers {
+        peer.pool.start().await;
+    }
+
+    // Clean up.
+    for peer in &peers {
+        peer.pool.shutdown().await;
+    }
 
     if path.exists() {
         std::fs::remove_dir_all(&path).unwrap();

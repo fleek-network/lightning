@@ -3,17 +3,6 @@ use std::collections::HashMap;
 use ethers::types::{Address, Bytes, H256, U256};
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
-pub struct DhtPutParam {
-    pub key: Vec<u8>,
-    pub value: Vec<u8>,
-}
-
-#[derive(Deserialize)]
-pub struct DhtGetParam {
-    pub key: Vec<u8>,
-}
-
 /// A set of account overrides
 pub type StateOverride = HashMap<Address, AccountOverride>;
 

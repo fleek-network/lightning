@@ -86,7 +86,7 @@ const REP_EWMA_WEIGHT: f64 = 0.7;
 
 /// If a node responded to less than 10% of pings from its peers, it will set to inactive until it
 /// submits an OptIn transaction.
-const MINIMUM_UPTIME: u8 = 10;
+const MINIMUM_UPTIME: u8 = 40;
 
 /// To support ethereum tooling, all signed ethereum transactions will be pointed to this address
 /// otherwise, if there is a value and a different address they are trying to transfer the native
@@ -121,6 +121,7 @@ pub struct State<B: Backend> {
     pub service_revenue: B::Ref<ServiceId, ServiceRevenue>,
     pub commodity_prices: B::Ref<CommodityTypes, HpUfixed<6>>,
     pub executed_digests: B::Ref<TxHash, ()>,
+    pub uptime: B::Ref<NodeIndex, u8>,
     pub backend: B,
 }
 
@@ -146,6 +147,7 @@ impl<B: Backend> State<B> {
             commodity_prices: backend.get_table_reference("commodity_prices"),
             service_revenue: backend.get_table_reference("service_revenue"),
             executed_digests: backend.get_table_reference("executed_digests"),
+            uptime: backend.get_table_reference("uptime"),
             backend,
         }
     }
@@ -604,7 +606,7 @@ impl<B: Backend> State<B> {
                         domain,
                         worker_domain,
                         ports,
-                        participation: Participation::True,
+                        participation: Participation::False,
                         nonce: 0,
                     };
                     self.create_node(node);
@@ -885,6 +887,9 @@ impl<B: Backend> State<B> {
                 }
             }
         }
+        // Clear the uptime measurements from the previous epoch.
+        let nodes = self.uptime.keys();
+        nodes.for_each(|node| self.uptime.remove(&node));
 
         // Store new scores in application state.
         let new_rep_scores = lightning_reputation::calculate_reputation_scores(map);
@@ -915,6 +920,7 @@ impl<B: Backend> State<B> {
             self.node_info.set(node, node_info);
 
             if let Some(uptime) = uptime {
+                self.uptime.set(node, uptime);
                 if uptime < MINIMUM_UPTIME {
                     if let Some(mut node_info) = self.node_info.get(&node) {
                         node_info.participation = Participation::False;

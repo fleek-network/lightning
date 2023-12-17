@@ -1,3 +1,4 @@
+use anyhow::Context;
 use async_channel::bounded;
 use async_trait::async_trait;
 use axum::routing::get;
@@ -19,9 +20,11 @@ static LISTENERS: OnceCell<
 /// Users are in charge of sending the initial [`HandshakeRequestFrame`].
 pub async fn dial_mock(
     port: u16,
-) -> Option<(async_channel::Sender<Bytes>, async_channel::Receiver<Bytes>)> {
+) -> anyhow::Result<(async_channel::Sender<Bytes>, async_channel::Receiver<Bytes>)> {
     let map = LISTENERS.get_or_init(|| async { DashMap::new() }).await;
-    let conn_tx = map.get(&port)?;
+    let conn_tx = map
+        .get(&port)
+        .context("failed to get sender for the connection")?;
 
     let (tx1, rx2) = bounded(256);
     let (tx2, rx1) = bounded(256);
@@ -34,10 +37,9 @@ pub async fn dial_mock(
             },
             MockTransportReceiver { rx: rx1 },
         ))
-        .await
-        .ok()?;
+        .await?;
 
-    Some((tx2, rx2))
+    Ok((tx2, rx2))
 }
 
 /// Mock memory transport backed by tokio channels
@@ -49,7 +51,7 @@ pub struct MockTransport {
 #[derive(Default, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct MockTransportConfig {
-    port: u16,
+    pub port: u16,
 }
 
 impl Drop for MockTransport {
@@ -126,15 +128,16 @@ impl TransportSender for MockTransportSender {
     fn start_write(&mut self, len: usize) {
         debug_assert!(self.buffer.is_empty());
         self.buffer.reserve(len);
+        self.current_write = len;
     }
 
     fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
         debug_assert!(buf.len() <= self.current_write);
-        self.current_write -= buf.len();
         self.buffer.put(buf);
-        if self.current_write == 0 {
-            let bytes = self.buffer.split().freeze();
-            self.send_inner(bytes);
+        if self.buffer.len() >= self.current_write {
+            let bytes = self.buffer.split_to(self.current_write).into();
+            self.current_write = 0;
+            self.send(schema::ResponseFrame::ServicePayload { bytes });
         }
         Ok(buf.len())
     }
@@ -161,7 +164,7 @@ mod tests {
     use crate::shutdown::ShutdownNotifier;
 
     #[tokio::test]
-    async fn dial() -> anyhow::Result<()> {
+    async fn handshake() -> anyhow::Result<()> {
         let notifier = ShutdownNotifier::default();
         let mut server =
             MockTransport::bind(notifier.waiter(), MockTransportConfig { port: 420 }).await?;

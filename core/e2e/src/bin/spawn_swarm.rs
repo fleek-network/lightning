@@ -5,7 +5,6 @@ use anyhow::Result;
 use clap::Parser;
 use fleek_crypto::PublicKey;
 use lightning_application::app::Application;
-use lightning_dht::Dht;
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::networking::PortAssigner;
 use lightning_e2e::utils::{logging, shutdown};
@@ -17,7 +16,6 @@ use resolved_pathbuf::ResolvedPathBuf;
 partial!(PartialBinding {
     ApplicationInterface = Application<Self>;
     TopologyInterface = Topology<Self>;
-    DhtInterface = Dht<Self>;
 });
 
 #[derive(Parser)]
@@ -46,7 +44,6 @@ async fn main() -> Result<()> {
         panic!("Committee size can not be larger than number of nodes.")
     }
 
-    // Start bootstrapper
     let port_assigner = PortAssigner::default();
 
     let epoch_start = SystemTime::now()
@@ -67,20 +64,11 @@ async fn main() -> Result<()> {
         .with_epoch_time(args.epoch_time)
         .with_epoch_start(epoch_start)
         .with_archiver()
-        .with_bootstrap_node()
         .with_port_assigner(port_assigner)
         .build();
     swarm.launch().await.unwrap();
 
-    // Todo: print bootstrapper info.
     let mut s = String::from("#####################################\n\n");
-    s.push_str(&format!("DHT Bootstrapper Address: \n"));
-    s.push_str(&format!(
-        "DHT Bootstrapper Public Key: \n\n",
-        /* bootstrap_secret_key.to_pk().to_base58() */
-    ));
-
-    s.push_str("#####################################\n\n");
     for (pub_key, rpc_address) in swarm.get_rpc_addresses() {
         s.push_str(&format!(
             "Public Key: {}\nRPC Address: {}\n\n",

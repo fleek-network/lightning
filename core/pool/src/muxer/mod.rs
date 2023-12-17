@@ -26,7 +26,7 @@ pub type BoxedChannel =
 pub trait MuxerInterface: Clone + Send + Sync + 'static {
     type Connecting: Future<Output = io::Result<Self::Connection>> + Send;
     type Connection: ConnectionInterface;
-    type Config: Clone;
+    type Config: Clone + Send;
 
     fn init(config: Self::Config) -> io::Result<Self>;
     async fn connect(&self, peer: NodeInfo, server_name: &str) -> io::Result<Self::Connecting>;

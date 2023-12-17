@@ -29,9 +29,9 @@ use lightning_interfaces::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{mpsc, oneshot, Notify};
+use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
-use tracing::error;
+use tokio_util::sync::CancellationToken;
 
 use crate::config::Config;
 use crate::endpoint::Endpoint;
@@ -49,7 +49,7 @@ where
     state: Mutex<Option<State<C, M>>>,
     config: Config,
     state_request: QuerySender,
-    shutdown_notify: Arc<Notify>,
+    shutdown: CancellationToken,
 }
 
 impl<C, M> Pool<C, M>
@@ -64,7 +64,7 @@ where
             })),
             config,
             state_request,
-            shutdown_notify: Arc::new(Notify::new()),
+            shutdown: CancellationToken::new(),
         })
     }
 
@@ -118,7 +118,6 @@ where
     }
 
     async fn start(&self) {
-        let shutdown = self.shutdown_notify.clone();
         let mut guard = self.state.lock().unwrap();
         let state = guard.take().expect("There to be a state");
         let handle = match state {
@@ -126,7 +125,8 @@ where
                 panic!("failed to start: endpoint is already running");
             },
             State::NotRunning { mut endpoint } => {
-                let mut endpoint = endpoint.take().expect("There to be an Endpoint");
+                let endpoint = endpoint.take().expect("There to be an Endpoint");
+                let shutdown = self.shutdown.clone();
 
                 if let Some(http_server_address) = self.config.http {
                     let shutdown_http_server = shutdown.clone();
@@ -141,12 +141,7 @@ where
                     });
                 }
 
-                tokio::spawn(async move {
-                    if let Err(e) = endpoint.start(shutdown).await {
-                        error!("unexpected endpoint failure: {e:?}");
-                    }
-                    endpoint
-                })
+                endpoint.spawn(shutdown)
             },
         };
         *guard = Some(State::Running { handle });
@@ -160,7 +155,7 @@ where
 
         let mut endpoint = match state {
             State::Running { handle } => {
-                self.shutdown_notify.notify_waiters();
+                self.shutdown.cancel();
                 handle.await.context("endpoint tasked failed").unwrap()
             },
             State::NotRunning { .. } => {

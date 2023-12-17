@@ -128,6 +128,7 @@ impl<T: Transport> PrimaryConnection<T> {
                 // This assumption may not be true in the future.
                 panic!("received an invalid frame: received a service payload frame");
             },
+            _ => unimplemented!(),
         }
     }
 

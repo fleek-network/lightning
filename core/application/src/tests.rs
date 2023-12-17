@@ -13,6 +13,7 @@ use fleek_crypto::{
     NodeSecretKey,
     SecretKey,
 };
+use hp_fixed::signed::HpFixed;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
@@ -524,7 +525,7 @@ fn test_reputation_measurements(uptime: u8) -> ReputationMeasurements {
         outbound_bandwidth: None,
         bytes_received: None,
         bytes_sent: None,
-        uptime: Some(uptime),
+        uptime: Some(HpFixed::from(uptime as i32)),
         hops: None,
     }
 }
@@ -584,7 +585,6 @@ fn create_committee_member(
             mempool: 7000 + index,
             rpc: 6000 + index,
             pool: 5000 + index,
-            dht: 4000 + index,
             pinger: 2000 + index,
             handshake: HandshakePorts {
                 http: 5000 + index,
@@ -934,7 +934,6 @@ fn add_to_committee(
             mempool: 7000 + index,
             rpc: 6000 + index,
             pool: 5000 + index,
-            dht: 4000 + index,
             pinger: 2000 + index,
             handshake: HandshakePorts {
                 http: 5000 + index,
@@ -1172,13 +1171,13 @@ async fn test_uptime_participation() {
         &query_runner,
         &mut map,
         &peer_1,
-        test_reputation_measurements(5),
+        test_reputation_measurements(20),
     );
     let _ = update_reputation_measurements(
         &query_runner,
         &mut map,
         &peer_2,
-        test_reputation_measurements(20),
+        test_reputation_measurements(40),
     );
 
     submit_reputation_measurements!(&update_socket, &keystore[0].node_secret_key, nonce, map);
@@ -1188,14 +1187,14 @@ async fn test_uptime_participation() {
         &query_runner,
         &mut map,
         &peer_1,
-        test_reputation_measurements(9),
+        test_reputation_measurements(30),
     );
 
     let _ = update_reputation_measurements(
         &query_runner,
         &mut map,
         &peer_2,
-        test_reputation_measurements(25),
+        test_reputation_measurements(45),
     );
     submit_reputation_measurements!(&update_socket, &keystore[1].node_secret_key, nonce, map);
 
@@ -2429,7 +2428,6 @@ async fn test_stake_works() {
         mempool: 4003,
         rpc: 4004,
         pool: 4005,
-        dht: 4006,
         pinger: 4007,
         handshake: HandshakePorts {
             http: 5001,

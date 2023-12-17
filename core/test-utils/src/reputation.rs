@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use hp_fixed::signed::HpFixed;
 use lightning_interfaces::types::ReputationMeasurements;
 use rand::rngs::StdRng;
 use rand::Rng;
@@ -43,7 +44,7 @@ pub fn generate_reputation_measurements(
     let uptime = if rng.gen_bool(prob_measurement_present) {
         None
     } else {
-        Some(rng.gen_range(0..100))
+        Some(HpFixed::from(rng.gen_range(0..100)))
     };
     ReputationMeasurements {
         latency,

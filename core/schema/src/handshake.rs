@@ -337,6 +337,8 @@ pub enum TerminationReason {
     ConnectionInUse,
     WrongPermssion,
     ResourcesUnavailable,
+    InternalError,
+    Shutdown,
     Unknown = 0xFF,
 }
 

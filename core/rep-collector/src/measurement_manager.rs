@@ -3,7 +3,8 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::Duration;
 
-use lightning_interfaces::types::{NodeIndex, ReputationMeasurements};
+use hp_fixed::signed::HpFixed;
+use lightning_interfaces::types::{NodeIndex, ReputationMeasurements, PRECISION};
 use lightning_interfaces::Weight;
 use lightning_reputation::statistics::try_min_max_normalize;
 use lru::LruCache;
@@ -16,6 +17,13 @@ const MAX_CAPACITY: usize = 200;
 /// For example, `REP_EWMA_WEIGHT=0.7` means that 70% of the current rep score is based on past
 /// epochs and 30% is based on the current epoch.
 const REP_EWMA_WEIGHT: f64 = 0.7;
+
+/// The minimum number of pings that must be recorded for a peer, in order to report uptime
+/// measurements for that peer.
+#[cfg(not(debug_assertions))]
+const MIN_NUM_PINGS: usize = 3;
+#[cfg(debug_assertions)]
+const MIN_NUM_PINGS: usize = 1;
 
 /// Manages the measurements for all the peers.
 pub struct MeasurementManager {
@@ -423,13 +431,18 @@ impl Pings {
         }
     }
 
-    fn get(&self) -> Option<u8> {
-        if self.num_pings == 0 {
+    fn get(&self) -> Option<HpFixed<PRECISION>> {
+        if self.num_pings < MIN_NUM_PINGS {
             None
         } else {
             // ratio is in range [0, 1]
             let ratio = self.num_pings_responded as f64 / self.num_pings as f64;
-            Some((ratio * 100.0) as u8)
+            let ratio = HpFixed::from(ratio) * HpFixed::from(100);
+            if ratio > HpFixed::from(100) {
+                Some(HpFixed::from(100))
+            } else {
+                Some(ratio)
+            }
         }
     }
 }
@@ -782,7 +795,10 @@ impl NormalizedMeasurements {
             outbound_bandwidth,
             bytes_received,
             bytes_sent,
-            uptime: values.uptime.map(|x| x as f64 / 100.0),
+            uptime: values
+                .uptime
+                .map(|x| x / HpFixed::from(100))
+                .and_then(|x| f64::try_from(x).ok()),
         }
     }
 }
@@ -894,13 +910,25 @@ mod tests {
         let mut manager = MeasurementManager::new();
         let peer = 0;
         manager.report_ping(peer, false);
-        assert_eq!(manager.peers.get(&peer).unwrap().pings.get(), Some(0));
+        assert_eq!(
+            manager.peers.get(&peer).unwrap().pings.get(),
+            Some(HpFixed::from(0))
+        );
         manager.report_ping(peer, true);
-        assert_eq!(manager.peers.get(&peer).unwrap().pings.get(), Some(50));
+        assert_eq!(
+            manager.peers.get(&peer).unwrap().pings.get(),
+            Some(HpFixed::from(50))
+        );
         manager.report_ping(peer, true);
-        assert_eq!(manager.peers.get(&peer).unwrap().pings.get(), Some(66));
+        assert_eq!(
+            manager.peers.get(&peer).unwrap().pings.get(),
+            Some(HpFixed::from(66.66666666666666))
+        );
         manager.report_ping(peer, false);
-        assert_eq!(manager.peers.get(&peer).unwrap().pings.get(), Some(50));
+        assert_eq!(
+            manager.peers.get(&peer).unwrap().pings.get(),
+            Some(HpFixed::from(50))
+        );
     }
 
     #[test]

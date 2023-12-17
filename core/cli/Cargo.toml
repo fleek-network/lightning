@@ -13,7 +13,6 @@ lightning-broadcast = { path = "../broadcast" }
 lightning-blockstore = { path = "../blockstore" }
 lightning-blockstore-server = { path = "../blockstore-server" }
 lightning-consensus = { path = "../consensus" }
-lightning-dht = { path = "../dht" }
 lightning-fetcher = { path = "../fetcher" }
 lightning-handshake = { path = "../handshake" }
 lightning-notifier = { path = "../notifier" }

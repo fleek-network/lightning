@@ -2,7 +2,10 @@
 
 use std::time::Duration;
 
+use hp_fixed::signed::HpFixed;
 use serde::{Deserialize, Serialize};
+
+pub const PRECISION: usize = 18;
 
 /// Contains the peer measurements that node A has about node B, that
 /// will be taken into account when computing B's reputation score.
@@ -16,7 +19,7 @@ pub struct ReputationMeasurements {
     pub outbound_bandwidth: Option<u128>,
     pub bytes_received: Option<u128>,
     pub bytes_sent: Option<u128>,
-    pub uptime: Option<u8>,
+    pub uptime: Option<HpFixed<PRECISION>>,
     pub hops: Option<u8>,
 }
 
@@ -43,7 +46,7 @@ impl ReputationMeasurements {
         // TODO: should bytes received and bytes sent even be included here since we alreay have
         // bandwidth?
         if let Some(uptime) = &self.uptime {
-            if *uptime > 100 {
+            if *uptime > HpFixed::from(100) {
                 return false;
             }
         }

@@ -13,12 +13,10 @@ pub type Digest = [u8; 32];
 pub enum Topic {
     /// The gossip topic for
     Consensus = 0x00,
-    /// The gossip topic for Fleek Network's indexer DHT.
-    DistributedHashTable = 0x01,
     /// The gossip topic for the resolver for content lookups
-    Resolver = 0x02,
+    Resolver = 0x01,
     /// The debug topic for tests
-    Debug = 0xFF,
+    Debug = 0x02,
 }
 
 impl ink_quill::TranscriptBuilderInput for Topic {

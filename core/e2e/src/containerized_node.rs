@@ -2,7 +2,6 @@ use std::sync::Mutex;
 
 use fleek_crypto::AccountOwnerSecretKey;
 use lightning_blockstore::blockstore::Blockstore;
-use lightning_dht::Dht;
 use lightning_interfaces::types::Blake3Hash;
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
@@ -19,7 +18,6 @@ pub struct ContainerizedNode {
     runtime_type: RuntimeType,
     index: usize,
     is_genesis_committee: bool,
-    is_bootstrap_node: bool,
 }
 
 impl ContainerizedNode {
@@ -28,7 +26,6 @@ impl ContainerizedNode {
         owner_secret_key: AccountOwnerSecretKey,
         index: usize,
         is_genesis_committee: bool,
-        is_bootstrap_node: bool,
     ) -> Self {
         Self {
             config,
@@ -37,7 +34,6 @@ impl ContainerizedNode {
             runtime_type: RuntimeType::MultiThreaded,
             index,
             is_genesis_committee,
-            is_bootstrap_node,
         }
     }
 
@@ -83,18 +79,6 @@ impl ContainerizedNode {
         }
     }
 
-    pub fn take_dht_socket(&self) -> Option<Dht<FinalTypes>> {
-        let container = self.container.lock().unwrap().take();
-        if let Some(mut container) = container {
-            let dht_socket = container.take_dht_socket();
-            *self.container.lock().unwrap() = Some(container);
-            dht_socket
-        } else {
-            *self.container.lock().unwrap() = None;
-            None
-        }
-    }
-
     pub fn take_blockstore(&self) -> Option<Blockstore<FinalTypes>> {
         let container = self.container.lock().unwrap().take();
         if let Some(mut container) = container {
@@ -109,10 +93,6 @@ impl ContainerizedNode {
 
     pub fn is_genesis_committee(&self) -> bool {
         self.is_genesis_committee
-    }
-
-    pub fn is_bootstrap_node(&self) -> bool {
-        self.is_bootstrap_node
     }
 }
 

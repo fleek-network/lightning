@@ -52,9 +52,7 @@ export namespace Challenge {
 }
 
 export namespace HandshakeRequest {
-  export type Frame =
-    | Handshake
-    | JoinRequest;
+  export type Frame = Handshake | JoinRequest;
 
   export enum Tag {
     Handshake,
@@ -172,10 +170,7 @@ export namespace HandshakeResponse {
 }
 
 export namespace Request {
-  export type Frame =
-    | ServicePayload
-    | AccessToken
-    | ExtendAccessToken;
+  export type Frame = ServicePayload | AccessToken | ExtendAccessToken;
 
   export enum Tag {
     ServicePayload,
@@ -302,7 +297,9 @@ export namespace Response {
     ServiceTerminated,
     ConnectionInUse,
     WrongPermssion,
-    Unknown = 0xFF,
+    InternalError,
+    Shutdown,
+    Unknown = 0xff,
   }
 
   export function encode(frame: Frame): ArrayBuffer {
@@ -380,6 +377,8 @@ export namespace Response {
         5: TerminationReason.ServiceTerminated,
         6: TerminationReason.ConnectionInUse,
         7: TerminationReason.WrongPermssion,
+        8: TerminationReason.InternalError,
+        9: TerminationReason.Shutdown,
       }[tag - 0x80] || TerminationReason.Unknown,
     };
   }

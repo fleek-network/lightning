@@ -44,10 +44,6 @@ stateDiagram-v2
   ConsensusInterface --> RpcInterface
   ApplicationInterface --> RpcInterface
   FetcherInterface --> RpcInterface
-  SignerInterface --> DhtInterface
-  TopologyInterface --> DhtInterface
-  ConfigProviderInterface --> DhtInterface
-  ReputationAggregatorInterface --> DhtInterface
   ConfigProviderInterface --> ServiceExecutorInterface
   BlockStoreInterface --> ServiceExecutorInterface
   ConfigProviderInterface --> SignerInterface

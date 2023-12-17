@@ -17,7 +17,6 @@ use std::io::Write;
 use serde::{Deserialize, Serialize};
 
 pub mod broadcast;
-pub mod dht;
 pub mod envelope;
 pub mod handshake;
 

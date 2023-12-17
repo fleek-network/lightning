@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.3-labs
+
 # The Fleek Network Lightning Docker container is hosted at:
 # https://github.com/fleek-network/lightning/pkgs/container/lightning
 FROM rust:latest as build
@@ -22,9 +24,11 @@ ENV RUST_BACKTRACE=1
 RUN mkdir -p /build/target/release
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/build/target \
-    cargo build --profile release --bin lightning-node && \
+    rustup toolchain install stable && \
+    rustup default stable && \
+    cargo +stable install --locked --path core/cli && \
     cargo strip && \
-    cp /build/target/release/lightning-node /build
+    cp /usr/local/cargo/bin/lightning-node /build
 
 FROM ubuntu:latest
 ARG LIGHTNING_PORTS="4200-4299 4300-4399"
