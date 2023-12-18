@@ -232,12 +232,9 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
 
             let serialized = serde_json::to_string(&event)?;
 
-            match sink.send(SubscriptionMessage::from(serialized)).await {
-                Ok(_) => {}
-                Err(_) => {
-                    tracing::trace!("flk subscription closed");
-                    break;
-                }
+            if let Err(e) = sink.send(SubscriptionMessage::from(serialized)).await {
+                tracing::trace!("flk subscription closed");
+                break;
             }
         }
 
