@@ -166,10 +166,7 @@ impl TransactionRequest {
                         service_id,
                         metadata: event,
                         ..
-                    } => match event {
-                        Some(event) => {
-                            Some(Event::service_event(service_id.clone(), event.clone()))
-                        },
+                    } => event.map(|e| Event::service_event(service_id.clone(), e.clone())),
                         None => None,
                     },
                     _ => None,
