@@ -125,6 +125,8 @@ pub struct State<B: Backend> {
     pub commodity_prices: B::Ref<CommodityTypes, HpUfixed<6>>,
     pub executed_digests: B::Ref<TxHash, ()>,
     pub uptime: B::Ref<NodeIndex, u8>,
+    pub cid_to_node: B::Ref<(Blake3Hash, NodeIndex), ()>,
+    pub node_to_cid: B::Ref<(NodeIndex, Blake3Hash), ()>,
     pub backend: B,
 }
 
@@ -151,6 +153,8 @@ impl<B: Backend> State<B> {
             service_revenue: backend.get_table_reference("service_revenue"),
             executed_digests: backend.get_table_reference("executed_digests"),
             uptime: backend.get_table_reference("uptime"),
+            cid_to_node: backend.get_table_reference("cid_to_node"),
+            node_to_cid: backend.get_table_reference("node_to_cid"),
             backend,
         }
     }

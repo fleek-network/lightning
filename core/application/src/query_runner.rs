@@ -6,28 +6,7 @@ use autometrics::autometrics;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::application::SyncQueryRunnerInterface;
-use lightning_interfaces::types::{
-    AccountInfo,
-    Committee,
-    CommodityTypes,
-    Epoch,
-    EpochInfo,
-    Metadata,
-    NodeIndex,
-    NodeInfo,
-    NodeInfoWithIndex,
-    NodeServed,
-    ProtocolParams,
-    ReportedReputationMeasurements,
-    Service,
-    ServiceId,
-    ServiceRevenue,
-    TotalServed,
-    TransactionRequest,
-    TransactionResponse,
-    TxHash,
-    Value,
-};
+use lightning_interfaces::types::{AccountInfo, Blake3Hash, Committee, CommodityTypes, Epoch, EpochInfo, Metadata, NodeIndex, NodeInfo, NodeInfoWithIndex, NodeServed, ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, ServiceRevenue, TotalServed, TransactionRequest, TransactionResponse, TxHash, Value};
 use lightning_interfaces::PagingParams;
 
 use crate::state::State;
@@ -55,6 +34,8 @@ pub struct QueryRunner {
     _commodity_price: ResolvedTableReference<CommodityTypes, HpUfixed<6>>,
     executed_digests_table: ResolvedTableReference<TxHash, ()>,
     uptime_table: ResolvedTableReference<NodeIndex, u8>,
+    _cid_to_node: ResolvedTableReference<(Blake3Hash, NodeIndex), ()>,
+    _node_to_cid: ResolvedTableReference<(NodeIndex, Blake3Hash), ()>,
 }
 
 impl QueryRunner {
@@ -79,6 +60,8 @@ impl QueryRunner {
             _service_revenue: atomo.resolve::<ServiceId, ServiceRevenue>("service_revenue"),
             executed_digests_table: atomo.resolve::<TxHash, ()>("executed_digests"),
             uptime_table: atomo.resolve::<NodeIndex, u8>("uptime"),
+            _cid_to_node: atomo.resolve::<(Blake3Hash, NodeIndex), ()>("cid_to_node"),
+            _node_to_cid: atomo.resolve::<(NodeIndex, Blake3Hash), ()>("node_to_cid"),
             inner: atomo,
         }
     }

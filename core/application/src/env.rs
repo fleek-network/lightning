@@ -9,30 +9,7 @@ use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::{
-    AccountInfo,
-    Block,
-    BlockExecutionResponse,
-    Committee,
-    CommodityTypes,
-    CompressionAlgorithm,
-    Epoch,
-    ExecutionData,
-    Metadata,
-    NodeIndex,
-    NodeInfo,
-    NodeServed,
-    ProtocolParams,
-    ReportedReputationMeasurements,
-    Service,
-    ServiceId,
-    ServiceRevenue,
-    TotalServed,
-    TransactionReceipt,
-    TransactionResponse,
-    TxHash,
-    Value,
-};
+use lightning_interfaces::types::{AccountInfo, Blake3Hash, Block, BlockExecutionResponse, Committee, CommodityTypes, CompressionAlgorithm, Epoch, ExecutionData, Metadata, NodeIndex, NodeInfo, NodeServed, ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, ServiceRevenue, TotalServed, TransactionReceipt, TransactionResponse, TxHash, Value};
 use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
 use tracing::warn;
 
@@ -104,6 +81,8 @@ impl Env<UpdatePerm> {
             .with_table::<ServiceId, ServiceRevenue>("service_revenue")
             .with_table::<TxHash, ()>("executed_digests")
             .with_table::<NodeIndex, u8>("uptime")
+            .with_table::<(Blake3Hash, NodeIndex), ()>("cid_to_node")
+            .with_table::<(NodeIndex, Blake3Hash), ()>("node_to_cid")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("submitted_rep_measurements")
@@ -112,7 +91,9 @@ impl Env<UpdatePerm> {
             .enable_iter("node")
             .enable_iter("executed_digests")
             .enable_iter("uptime")
-            .enable_iter("service_revenue");
+            .enable_iter("service_revenue")
+            .enable_iter("cid_to_node")
+            .enable_iter("node_to_cid");
 
         #[cfg(debug_assertions)]
         {
