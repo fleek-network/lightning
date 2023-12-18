@@ -14,7 +14,7 @@ const TBE_EMA: f64 = 0.125;
 
 // Bounds for the estimated time between executions.
 const MIN_TBE: Duration = Duration::from_secs(30);
-const MAX_TBE: Duration = Duration::from_secs(60);
+const MAX_TBE: Duration = Duration::from_secs(40);
 
 pub struct TransactionStore {
     parcels: RingBuffer,
