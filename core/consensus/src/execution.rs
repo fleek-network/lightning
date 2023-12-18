@@ -126,11 +126,8 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
         let results = self.executor.run(block).await.unwrap();
         info!("Consensus submitted new block to application");
 
-        match self.event_socket.send(results.events()).await {
-            Ok(_) => {}
-            Err(e) => {
-                error!("couldn't send a message to the event socket: {e}");
-            }
+        if let Err(e) = self.event_socket.send(results.events()).await {
+          error!("couldn't send a message to the event socket: {e}");
         }
 
         if results.change_epoch {
