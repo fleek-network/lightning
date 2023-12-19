@@ -5,7 +5,14 @@ use affair::Socket;
 use anyhow::Result;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use lightning_types::{AccountInfo, NodeIndex, NodeInfoWithIndex, TransactionRequest, TxHash};
+use lightning_types::{
+    AccountInfo,
+    Blake3Hash,
+    NodeIndex,
+    NodeInfoWithIndex,
+    TransactionRequest,
+    TxHash,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::common::WithStartAndShutdown;
@@ -212,6 +219,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Returns the uptime for a node from the past epoch.
     fn get_node_uptime(&self, node_index: &NodeIndex) -> Option<u8>;
+
+    /// Returns nodes that are providing the content addressed by the cid.
+    fn cid_to_providers(&self, cid: &Blake3Hash) -> Vec<NodeIndex>;
 }
 
 #[derive(Clone, Debug)]

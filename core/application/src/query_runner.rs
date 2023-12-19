@@ -542,4 +542,18 @@ impl SyncQueryRunnerInterface for QueryRunner {
         self.inner
             .run(|ctx| self.uptime_table.get(ctx).get(node_index))
     }
+
+    fn cid_to_providers(&self, cid: &Blake3Hash) -> Vec<NodeIndex> {
+        // Todo: Optimize this search.
+        self.inner.run(|ctx| {
+            self._cid_to_node
+                .get(ctx)
+                .keys()
+                .filter_map(|(hash, index)| match &hash == cid {
+                    true => Some(index),
+                    false => None,
+                })
+                .collect()
+        })
+    }
 }
