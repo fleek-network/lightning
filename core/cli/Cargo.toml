@@ -25,6 +25,7 @@ lightning-topology = { path = "../topology" }
 lightning-types = { path = "../types" }
 lightning-pool = { path = "../pool" }
 lightning-signer = { path = "../signer" }
+lightning-utils = { path = "../utils" }
 lightning-node = { path = "../node" }
 mock = { path = "../mock" }
 fleek-crypto.workspace = true

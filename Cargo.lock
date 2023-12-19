@@ -4485,6 +4485,7 @@ dependencies = [
  "lightning-signer",
  "lightning-topology",
  "lightning-types",
+ "lightning-utils",
  "mock",
  "rand 0.8.5",
  "reqwest",
@@ -5123,6 +5124,10 @@ dependencies = [
 [[package]]
 name = "lightning-utils"
 version = "0.0.0"
+dependencies = [
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "linked-hash-map"

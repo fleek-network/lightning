@@ -12,11 +12,10 @@ use lightning_interfaces::{
     SyncronizerInterface,
 };
 use lightning_node::config::TomlConfigProvider;
+use lightning_utils::shutdown::ShutdownController;
 use resolved_pathbuf::ResolvedPathBuf;
 use tokio::pin;
 use tracing::warn;
-
-use crate::shutdown::ShutdownController;
 
 pub type CustomStartShutdown<C> = Box<dyn for<'a> Fn(&'a Node<C>, bool) -> Fut<'a>>;
 pub type Fut<'a> = Pin<Box<dyn Future<Output = ()> + 'a>>;
