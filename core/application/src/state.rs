@@ -96,6 +96,9 @@ const MINIMUM_UPTIME: u8 = 40;
 /// token FLK
 const FLEEK_CONTRACT: H160 = H160([6; 20]);
 
+/// Max number of updates allowed in a content registry update transaction.
+const MAX_UPDATES_CONTENT_REGISTRY: usize = 100;
+
 lazy_static! {
     static ref BIG_HUNDRED: HpUfixed<18> = HpUfixed::<18>::from(100_u64);
 }
@@ -1149,10 +1152,8 @@ impl<B: Backend> State<B> {
     }
 
     fn update_content_registry(&self, updates: Vec<ContentUpdate>) -> TransactionResponse {
-        // Todo: Add const for this magic number.
-        if updates.len() > 100 {
-            // Todo: Add error enum.
-            return TransactionResponse::Revert(ExecutionError::Unimplemented);
+        if updates.len() > MAX_UPDATES_CONTENT_REGISTRY {
+            return TransactionResponse::Revert(ExecutionError::TooManyUpdates);
         }
 
         for update in updates {

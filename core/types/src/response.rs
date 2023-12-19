@@ -139,4 +139,5 @@ pub enum ExecutionError {
     ConsensusKeyAlreadyIndexed,
     Unimplemented,
     TooManyMeasurements,
+    TooManyUpdates,
 }
