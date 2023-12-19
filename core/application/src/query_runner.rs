@@ -6,7 +6,29 @@ use autometrics::autometrics;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::application::SyncQueryRunnerInterface;
-use lightning_interfaces::types::{AccountInfo, Blake3Hash, Committee, CommodityTypes, Epoch, EpochInfo, Metadata, NodeIndex, NodeInfo, NodeInfoWithIndex, NodeServed, ProtocolParams, ReportedReputationMeasurements, Service, ServiceId, ServiceRevenue, TotalServed, TransactionRequest, TransactionResponse, TxHash, Value};
+use lightning_interfaces::types::{
+    AccountInfo,
+    Blake3Hash,
+    Committee,
+    CommodityTypes,
+    Epoch,
+    EpochInfo,
+    Metadata,
+    NodeIndex,
+    NodeInfo,
+    NodeInfoWithIndex,
+    NodeServed,
+    ProtocolParams,
+    ReportedReputationMeasurements,
+    Service,
+    ServiceId,
+    ServiceRevenue,
+    TotalServed,
+    TransactionRequest,
+    TransactionResponse,
+    TxHash,
+    Value,
+};
 use lightning_interfaces::PagingParams;
 
 use crate::state::State;

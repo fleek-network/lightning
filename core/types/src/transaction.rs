@@ -27,6 +27,7 @@ use super::{
     ServiceId,
     Tokens,
 };
+use crate::content_registry::ContentUpdate;
 use crate::{NodeIndex, NodePorts, TransactionDestination};
 
 pub type TxHash = [u8; 32];
@@ -362,6 +363,12 @@ pub enum UpdateMethod {
     OptOut {},
     /// Opt into participating in the network.
     OptIn {},
+    /// Update the content registry.
+    ///
+    /// The content registry records the contents that are being
+    /// provided by the network and the corresponding nodes that
+    /// are providing that content.
+    UpdateContentRegistry { updates: Vec<ContentUpdate> },
 }
 
 impl ToDigest for UpdatePayload {
@@ -567,6 +574,21 @@ impl ToDigest for UpdatePayload {
             },
             UpdateMethod::OptOut {} => {
                 transcript_builder = transcript_builder.with("transaction_name", &"opt_out");
+            },
+            UpdateMethod::UpdateContentRegistry { updates } => {
+                transcript_builder =
+                    transcript_builder.with("transaction_name", &"update_content_registry");
+                for (idx, update) in updates.iter().enumerate() {
+                    // Todo: is it allowed to send two transactions that cancel each other out?
+                    // For example, sending a a update remove=false and also an update remove=true
+                    // for the same content and provider.
+                    // Todo: can prefix be unique only for these transactions?
+                    transcript_builder = transcript_builder
+                        .with_prefix(format!("{}-{}", idx, update.provider))
+                        .with("cid", &update.cid)
+                        .with("provider", &update.provider)
+                        .with("remove", &(update.remove as u8));
+                }
             },
         }
 

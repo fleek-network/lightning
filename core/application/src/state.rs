@@ -259,6 +259,9 @@ impl<B: Backend> State<B> {
             },
             UpdateMethod::OptIn {} => self.opt_in(txn.payload.sender),
             UpdateMethod::OptOut {} => self.opt_out(txn.payload.sender),
+            UpdateMethod::UpdateContentRegistry { updates } => {
+                self.update_content_registry(updates)
+            },
         };
 
         #[cfg(debug_assertions)]
@@ -1142,6 +1145,26 @@ impl<B: Backend> State<B> {
                     self.rep_measurements.set(peer_index, node_measurements);
                 }
             });
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    fn update_content_registry(&self, updates: Vec<ContentUpdate>) -> TransactionResponse {
+        // Todo: Add const for this magic number.
+        if updates.len() > 100 {
+            // Todo: Add error enum.
+            return TransactionResponse::Revert(ExecutionError::Unimplemented);
+        }
+
+        for update in updates {
+            if update.remove {
+                self.cid_to_node.remove(&(update.cid, update.provider));
+                self.node_to_cid.remove(&(update.provider, update.cid));
+            } else {
+                self.cid_to_node.set((update.cid, update.provider), ());
+                self.node_to_cid.set((update.provider, update.cid), ());
+            }
+        }
+
         TransactionResponse::Success(ExecutionData::None)
     }
 
