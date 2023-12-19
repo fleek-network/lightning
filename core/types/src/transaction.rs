@@ -579,12 +579,8 @@ impl ToDigest for UpdatePayload {
                 transcript_builder =
                     transcript_builder.with("transaction_name", &"update_content_registry");
                 for (idx, update) in updates.iter().enumerate() {
-                    // Todo: is it allowed to send two transactions that cancel each other out?
-                    // For example, sending a a update remove=false and also an update remove=true
-                    // for the same content and provider.
-                    // Todo: can prefix be unique only for these transactions?
                     transcript_builder = transcript_builder
-                        .with_prefix(format!("{}-{}", idx, update.provider))
+                        .with_prefix(idx.to_string())
                         .with("cid", &update.cid)
                         .with("provider", &update.provider)
                         .with("remove", &(update.remove as u8));

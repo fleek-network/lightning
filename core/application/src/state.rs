@@ -129,8 +129,8 @@ pub struct State<B: Backend> {
     pub commodity_prices: B::Ref<CommodityTypes, HpUfixed<6>>,
     pub executed_digests: B::Ref<TxHash, ()>,
     pub uptime: B::Ref<NodeIndex, u8>,
-    pub cid_to_node: B::Ref<(Blake3Hash, NodeIndex), ()>,
-    pub node_to_cid: B::Ref<(NodeIndex, Blake3Hash), ()>,
+    pub cid_to_node: B::Ref<Blake3Hash, Vec<NodeIndex>>,
+    pub node_to_cid: B::Ref<NodeIndex, Vec<Blake3Hash>>,
     pub backend: B,
 }
 
@@ -1158,13 +1158,32 @@ impl<B: Backend> State<B> {
         }
 
         for update in updates {
-            if update.remove {
-                self.cid_to_node.remove(&(update.cid, update.provider));
-                self.node_to_cid.remove(&(update.provider, update.cid));
-            } else {
-                self.cid_to_node.set((update.cid, update.provider), ());
-                self.node_to_cid.set((update.provider, update.cid), ());
+            let providers = self.cid_to_node.get(&update.cid);
+            let cids = self.node_to_cid.get(&update.provider);
+
+            if update.remove && (providers.is_none() || cids.is_none()) {
+                // We avoid doing work and vector allocations for
+                // invalid mappings that are not in state.
+                continue;
             }
+
+            let mut providers = providers.unwrap_or_default();
+            let mut cids = cids.unwrap_or_default();
+
+            if update.remove {
+                if let Some(idx) = providers.iter().position(|index| index == &update.provider) {
+                    providers.remove(idx);
+                }
+                if let Some(idx) = cids.iter().position(|cid| cid == &update.cid) {
+                    cids.remove(idx);
+                }
+            } else {
+                providers.push(update.provider);
+                cids.push(update.cid);
+            }
+
+            self.cid_to_node.set(update.cid, providers);
+            self.node_to_cid.set(update.provider, cids);
         }
 
         TransactionResponse::Success(ExecutionData::None)
