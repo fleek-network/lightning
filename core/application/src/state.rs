@@ -21,6 +21,7 @@ use lightning_interfaces::types::{
     Committee,
     CommodityTypes,
     DeliveryAcknowledgment,
+    ContentUpdate,
     Epoch,
     ExecutionData,
     ExecutionError,
