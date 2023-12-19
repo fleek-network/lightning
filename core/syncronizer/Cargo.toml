@@ -7,6 +7,7 @@ edition.workspace = true
 
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
+lightning-utils = { path = "../utils" }
 anyhow.workspace = true
 async-trait.workspace = true
 tracing.workspace = true

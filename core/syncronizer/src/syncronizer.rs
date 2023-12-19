@@ -203,7 +203,12 @@ impl<C: Collection> Syncronizer<C> {
                 std::process::exit(0);
             },
             Participation::OptedIn => {
-                utils::wait_to_next_epoch(epoch_info, genesis_committee, rpc_client);
+                rpc::sync_call(utils::wait_to_next_epoch(
+                    epoch_info,
+                    genesis_committee.clone(),
+                    rpc_client.clone(),
+                ));
+                println!(" after...");
             },
             _ => (),
         }

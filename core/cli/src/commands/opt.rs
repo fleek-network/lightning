@@ -76,7 +76,8 @@ async fn opt_in<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>
         .context("Failed to get epoch info from genesis committee")?;
     if epoch_end_delta < Duration::from_secs(300) {
         println!(
-            "The current epoch will end in less than 5 minutes. Please wait until the epoch change to send the OptIn transaction."
+            "The current epoch will end in less than 5 minutes. Please wait until the epoch change
+     to send the OptIn transaction."
         );
         return Ok(());
     }
