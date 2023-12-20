@@ -6,6 +6,7 @@ use std::time::{Duration, SystemTime};
 use affair::{Executor, TokioSpawn};
 use async_trait::async_trait;
 use derive_more::{From, IsVariant, TryInto};
+use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
 use lightning_interfaces::application::ExecutionEngineSocket;
 use lightning_interfaces::common::WithStartAndShutdown;
 use lightning_interfaces::config::ConfigConsumer;
@@ -71,6 +72,10 @@ pub struct Consensus<C: Collection> {
 
 /// This struct contains mutable state only for the current epoch.
 struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
+    /// The node public key of the node.
+    node_public_key: NodePublicKey,
+    /// The consensus public key of the node.
+    consensus_public_key: ConsensusPublicKey,
     /// The Narwhal service for the current epoch.
     consensus: Option<NarwhalService>,
     /// Used to query the application data
@@ -97,6 +102,8 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
 #[allow(clippy::too_many_arguments)]
 impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, P> {
     fn new(
+        node_public_key: NodePublicKey,
+        consensus_public_key: ConsensusPublicKey,
         query_runner: Q,
         narwhal_args: NarwhalArgs,
         store_path: ResolvedPathBuf,
@@ -107,6 +114,8 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         shutdown_notify: Arc<Notify>,
     ) -> Self {
         Self {
+            node_public_key,
+            consensus_public_key,
             consensus: None,
             query_runner,
             narwhal_args,
@@ -276,8 +285,14 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
         // to change epochs.
 
         // Create the narwhal service
-        let service =
-            NarwhalService::new(self.narwhal_args.clone(), store, committee, worker_cache);
+        let service = NarwhalService::new(
+            self.node_public_key,
+            self.consensus_public_key,
+            self.narwhal_args.clone(),
+            store,
+            committee,
+            worker_cache,
+        );
 
         service.start(self.execution_state.clone()).await;
 
@@ -405,6 +420,8 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         let shutdown_notify = Arc::new(Notify::new());
 
         let epoch_state = EpochState::new(
+            signer.get_ed25519_pk(),
+            signer.get_bls_pk(),
             query_runner,
             narwhal_args,
             config.store_path,

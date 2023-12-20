@@ -5,7 +5,6 @@ use std::ops::DerefMut;
 use std::time::Duration;
 
 use ethers::abi::AbiDecode;
-use ethers::types::transaction::eip2718::TypedTransaction;
 use ethers::types::{Transaction as EthersTransaction, H160};
 use fleek_blake3::Hasher;
 use fleek_crypto::{
@@ -1485,14 +1484,7 @@ impl<B: Backend> State<B> {
             return Err(ExecutionError::InvalidNonce);
         }
 
-        let typed_txn: TypedTransaction = (&*txn).into();
-
-        let mut sig = [0u8; 65];
-        txn.r.to_big_endian(&mut sig[0..32]);
-        txn.s.to_big_endian(&mut sig[32..64]);
-        sig[64] = normalize_recovery_id(txn.v.as_u64());
-
-        if sender.verify(&sig.into(), typed_txn.rlp().as_ref()) {
+        if lightning_utils::eth::verify_signature(txn, sender) {
             Ok(())
         } else {
             Err(ExecutionError::InvalidSignature)
@@ -1700,16 +1692,5 @@ impl<B: Backend> State<B> {
             // unreachable set at genesis
             0
         }
-    }
-}
-
-fn normalize_recovery_id(v: u64) -> u8 {
-    match v {
-        0 => 0,
-        1 => 1,
-        27 => 0,
-        28 => 1,
-        v if v >= 35 => ((v - 1) % 2) as _,
-        _ => 4,
     }
 }

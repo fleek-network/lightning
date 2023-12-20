@@ -4516,6 +4516,7 @@ dependencies = [
  "fxhash",
  "lightning-interfaces",
  "lightning-schema",
+ "lightning-utils",
  "multiaddr",
  "mysten-metrics",
  "mysten-network",
@@ -5128,6 +5129,7 @@ name = "lightning-utils"
 version = "0.0.0"
 dependencies = [
  "ethers",
+ "fleek-crypto",
  "tokio",
  "tracing",
 ]

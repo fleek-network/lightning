@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use fastcrypto::traits::KeyPair as _;
+use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
 use mysten_metrics::RegistryService;
 use narwhal_config::{Committee, Parameters, WorkerCache};
 use narwhal_crypto::{KeyPair, NetworkKeyPair};
@@ -25,6 +26,8 @@ const MAX_RETRIES: u32 = 2;
 
 /// Manages running the narwhal and bullshark as a service.
 pub struct NarwhalService {
+    node_public_key: NodePublicKey,
+    consensus_public_key: ConsensusPublicKey,
     arguments: NarwhalArgs,
     store: NodeStorage,
     primary: PrimaryNode,
@@ -52,6 +55,8 @@ enum Status {
 impl NarwhalService {
     /// Create a new narwhal service using the provided arguments.
     pub fn new(
+        node_public_key: NodePublicKey,
+        consensus_public_key: ConsensusPublicKey,
         arguments: NarwhalArgs,
         store: NodeStorage,
         committee: Committee,
@@ -85,6 +90,8 @@ impl NarwhalService {
         );
 
         Self {
+            node_public_key,
+            consensus_public_key,
             arguments,
             store,
             primary,
@@ -168,7 +175,7 @@ impl NarwhalService {
                     self.worker_cache.clone(),
                     network_client.clone(),
                     &self.store,
-                    Validator::new(),
+                    Validator::new(self.node_public_key, self.consensus_public_key),
                     None,
                 )
                 .await

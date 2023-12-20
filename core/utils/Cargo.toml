@@ -9,3 +9,4 @@ edition = "2021"
 tokio.workspace = true
 tracing.workspace = true
 ethers.workspace = true
+fleek-crypto.workspace = true
