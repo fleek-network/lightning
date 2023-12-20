@@ -3101,45 +3101,39 @@ async fn test_submit_reputation_measurements_too_many_measurements() {
 }
 
 #[tokio::test]
-async fn test_submit_content_registry_update_one_provider_per_cid() {
+async fn test_submit_content_registry_update() {
     // Given: committee and setup.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
     let (update_socket, query_runner) = test_init_app(committee);
 
-    // Given: each committee node provides some content.
-    let mut updates = Vec::new();
+    // Given: each node provides some content.
     let mut expected_records = Vec::new();
-    for (list_idx, pk) in keystore.iter().enumerate() {
-        let index = query_runner
-            .pubkey_to_index(pk.node_secret_key.to_pk())
-            .unwrap();
+    for (list_idx, ck) in keystore.iter().enumerate() {
         let cid = [list_idx as u8; 32];
-        expected_records.push((index, cid));
-        updates.push(ContentUpdate { cid, remove: false });
+        expected_records.push((ck.node_secret_key.clone(), cid));
+
+        let updates = vec![ContentUpdate { cid, remove: false }];
+        let update = prepare_content_registry_update(updates, &ck.node_secret_key, 1);
+        expect_tx_success!(update, &update_socket);
     }
 
-    // When: we submit a content registry update transaction.
-    let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 1);
-    expect_tx_success!(update, &update_socket);
-
-    // Then: state indicates that each node is providing the correct content.
-    for (index, cid) in expected_records.iter() {
+    // Then: each node is providing the correct content.
+    for (sk, cid) in expected_records.iter() {
+        let index = query_runner.pubkey_to_index(sk.to_pk()).unwrap();
         let providers = query_runner.cid_to_providers(cid);
-        assert_eq!(providers, vec![*index]);
+        assert_eq!(providers, vec![index]);
     }
 
-    // When: we change updates to remove the records.
-    let mut updates = Vec::new();
-    for (_, cid) in expected_records.iter() {
-        updates.push(ContentUpdate {
+    // When: remove the records.
+    for (sk, cid) in expected_records.iter() {
+        let updates = vec![ContentUpdate {
             cid: *cid,
             remove: true,
-        });
+        }];
+        let update = prepare_content_registry_update(updates, sk, 2);
+        expect_tx_success!(update, &update_socket);
     }
-
-    let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 2);
-    expect_tx_success!(update, &update_socket);
 
     // Then: records are removed.
     for (_, cid) in expected_records.iter() {
@@ -3149,48 +3143,42 @@ async fn test_submit_content_registry_update_one_provider_per_cid() {
 }
 
 #[tokio::test]
-async fn test_submit_content_registry_update_many_providers_per_cid() {
+async fn test_submit_content_registry_update_multiple_providers_per_cid() {
     // Given: committee and setup.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
     let (update_socket, query_runner) = test_init_app(committee);
-
     // Given: a CID.
     let cid = [69u8; 32];
     // Given: providers for that CID.
-    let expected_providers = keystore
-        .iter()
-        .skip(1)
-        .map(|ks| {
+    let providers = keystore.clone();
+
+    // When: all nodes send an update for that CID.
+    for ck in &providers {
+        let updates = vec![ContentUpdate { cid, remove: false }];
+        let update = prepare_content_registry_update(updates, &ck.node_secret_key, 1);
+        expect_tx_success!(update, &update_socket);
+    }
+
+    // Then: state shows that they all provide the CID.
+    let expected_providers = providers
+        .into_iter()
+        .map(|ck| {
             query_runner
-                .pubkey_to_index(ks.node_secret_key.to_pk())
+                .pubkey_to_index(ck.node_secret_key.to_pk())
                 .unwrap()
         })
         .collect::<Vec<_>>();
-
-    let mut updates = Vec::new();
-    for _ in &expected_providers {
-        updates.push(ContentUpdate { cid, remove: false });
-    }
-
-    // When: we submit a content registry update transaction.
-    let update = prepare_content_registry_update(updates.clone(), &keystore[0].node_secret_key, 1);
-    expect_tx_success!(update, &update_socket);
-
-    // Then: state indicates the correct list of providers for that cid.
     let providers = query_runner.cid_to_providers(&cid);
     assert_eq!(providers, expected_providers);
 
-    // When: we change updates to remove the records.
-    let updates = updates
-        .into_iter()
-        .map(|mut update| {
-            update.remove = true;
-            update
-        })
-        .collect::<Vec<_>>();
-    let update = prepare_content_registry_update(updates.clone(), &keystore[0].node_secret_key, 2);
-    expect_tx_success!(update, &update_socket);
+    // When: we remove the records.
+    let providers = keystore.clone();
+    for ck in &providers {
+        let updates = vec![ContentUpdate { cid, remove: true }];
+        let update = prepare_content_registry_update(updates, &ck.node_secret_key, 2);
+        expect_tx_success!(update, &update_socket);
+    }
 
     // Then: records are removed.
     let providers = query_runner.cid_to_providers(&cid);
@@ -3216,4 +3204,235 @@ async fn test_submit_content_registry_update_too_many_updates_in_transaction() {
 
     // Then: the transaction reverts because the list went past the limit.
     expect_tx_revert!(update, &update_socket, ExecutionError::TooManyUpdates);
+}
+
+#[tokio::test]
+async fn test_submit_content_registry_update_multiple_cids_per_provider() {
+    // Given: committee and setup.
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+
+    // Given: multiple CIDs that some nodes will provide.
+    let mut cids = Vec::new();
+    let mut updates = Vec::new();
+    for i in 0..6 {
+        let cid = [i as u8; 32];
+        cids.push(cid);
+        updates.push(ContentUpdate { cid, remove: false });
+    }
+
+    // When: each node will submit a content registry update transaction.
+    let update = prepare_content_registry_update(updates.clone(), &keystore[0].node_secret_key, 1);
+    expect_tx_success!(update, &update_socket);
+
+    let update = prepare_content_registry_update(updates, &keystore[1].node_secret_key, 1);
+    expect_tx_success!(update, &update_socket);
+
+    // Then: state indicates that each node is providing the correct content.
+    let node1 = query_runner
+        .pubkey_to_index(keystore[0].node_secret_key.to_pk())
+        .unwrap();
+    let node2 = query_runner
+        .pubkey_to_index(keystore[1].node_secret_key.to_pk())
+        .unwrap();
+
+    for cid in &cids {
+        let providers = query_runner.cid_to_providers(cid);
+        assert_eq!(providers, vec![node1, node2]);
+    }
+
+    // When: one of the nodes submits an update to remove a record for one CID.
+    let updates = vec![ContentUpdate {
+        cid: cids[0],
+        remove: true,
+    }];
+    let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 2);
+    expect_tx_success!(update, &update_socket);
+
+    // Then: the record is removed for that one provider.
+    let providers = query_runner.cid_to_providers(&cids[0]);
+    assert_eq!(providers, vec![node2]);
+
+    // Then: the rest of the records are not affected.
+    for cid in cids.iter().skip(1) {
+        let providers = query_runner.cid_to_providers(cid);
+        assert_eq!(providers, vec![node1, node2]);
+    }
+
+    // When: we remove the rest for that same node.
+    let mut updates = Vec::new();
+    for cid in cids.iter().skip(1) {
+        updates.push(ContentUpdate {
+            cid: *cid,
+            remove: true,
+        })
+    }
+    let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 3);
+    expect_tx_success!(update, &update_socket);
+
+    // Then: all records for that provider are gone.
+    for cid in cids {
+        let providers = query_runner.cid_to_providers(&cid);
+        assert_eq!(providers, vec![node2]);
+    }
+}
+
+#[tokio::test]
+async fn test_submit_content_registry_update_two_updates_for_same_cid() {
+    // Given: committee and setup.
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, _) = test_init_app(committee);
+
+    // Given: some CIDs that some nodes will provide.
+    let mut cids = Vec::new();
+    for i in 0..6 {
+        let cid = [i as u8; 32];
+        cids.push(cid);
+    }
+
+    // Given: two of those CIDs are the same.
+    cids[2] = cids[5];
+
+    // When: we submit the updates.
+    let mut updates = Vec::new();
+    for cid in cids {
+        updates.push(ContentUpdate { cid, remove: false });
+    }
+    let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 1);
+
+    // Then: the transaction is reverted.
+    expect_tx_revert!(
+        update,
+        &update_socket,
+        ExecutionError::TooManyUpdatesForContent
+    );
+}
+
+#[tokio::test]
+async fn test_submit_content_registry_update_remove_unknown_cid() {
+    // Given: committee and setup.
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, _) = test_init_app(committee);
+
+    // Given: some CID that is not in the registry.
+    let updates = vec![ContentUpdate {
+        cid: [68u8; 32],
+        remove: true,
+    }];
+    let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 1);
+
+    // Then: the transaction is reverted.
+    expect_tx_revert!(
+        update,
+        &update_socket,
+        ExecutionError::InvalidContentRemoval
+    );
+}
+
+#[tokio::test]
+async fn test_submit_content_registry_update_mix_of_add_and_remove_updates() {
+    // Given: committee and setup.
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+
+    // Given: multiple CIDs.
+    let mut cids = Vec::new();
+    for i in 0..6 {
+        let cid = [i as u8; 32];
+        cids.push(cid);
+    }
+
+    // Given: a node provides the given CIDs.
+    let mut updates = Vec::new();
+    for cid in &cids {
+        updates.push(ContentUpdate {
+            cid: *cid,
+            remove: false,
+        });
+    }
+
+    let update = prepare_content_registry_update(updates.clone(), &keystore[0].node_secret_key, 1);
+    expect_tx_success!(update, &update_socket);
+
+    // When: we remove some records and add some new ones.
+    let mut removed = Vec::new();
+    let mut updates = updates
+        .into_iter()
+        .step_by(2)
+        .map(|mut update| {
+            update.remove = true;
+            removed.push(update.cid);
+            update
+        })
+        .collect::<Vec<_>>();
+
+    for i in 6..9 {
+        let cid = [i as u8; 32];
+        cids.push(cid);
+        updates.push(ContentUpdate { cid, remove: false });
+    }
+
+    let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 2);
+    expect_tx_success!(update, &update_socket);
+
+    // Then: the state is updated appropriately.
+    // Check that removed is a subset so that both branches below can be asserted.
+    assert!(!removed.is_empty());
+    assert!(removed.len() < cids.len());
+    let node = query_runner
+        .pubkey_to_index(keystore[0].node_secret_key.to_pk())
+        .unwrap();
+    for cid in cids {
+        if removed.contains(&cid) {
+            let providers = query_runner.cid_to_providers(&cid);
+            assert!(providers.is_empty());
+        } else {
+            let providers = query_runner.cid_to_providers(&cid);
+            assert_eq!(providers, vec![node]);
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_submit_content_registry_update_invalid_removal_of_cid_with_one_provider() {
+    // Given: committee and setup.
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, _) = test_init_app(committee);
+
+    // Given: multiple CIDs.
+    let mut cids = Vec::new();
+    let mut updates = Vec::new();
+    for i in 0..3 {
+        let cid = [i as u8; 32];
+        cids.push(cid);
+        updates.push(ContentUpdate { cid, remove: false });
+    }
+
+    // Given: one node provides all CIDs.
+    let update = prepare_content_registry_update(updates.clone(), &keystore[0].node_secret_key, 1);
+    expect_tx_success!(update, &update_socket);
+
+    // Given: another node provides all but one of the CIDs.
+    let updates = updates.into_iter().skip(1).collect::<Vec<_>>();
+    let update = prepare_content_registry_update(updates, &keystore[1].node_secret_key, 1);
+    expect_tx_success!(update, &update_socket);
+
+    // When: that node tries to remove content it doesn't have.
+    let updates = vec![ContentUpdate {
+        cid: cids[0],
+        remove: true,
+    }];
+    let update = prepare_content_registry_update(updates, &keystore[1].node_secret_key, 2);
+
+    // Then: the transaction is reverted.
+    expect_tx_revert!(
+        update,
+        &update_socket,
+        ExecutionError::InvalidContentRemoval
+    )
 }
