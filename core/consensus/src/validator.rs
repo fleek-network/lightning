@@ -12,7 +12,6 @@ use narwhal_worker::TransactionValidator;
 use sui_protocol_config::ProtocolConfig;
 
 #[derive(Clone)]
-#[allow(unused)]
 pub struct Validator {
     node_public_key: NodePublicKey,
     consensus_public_key: ConsensusPublicKey,
@@ -34,25 +33,24 @@ impl TransactionValidator for Validator {
     fn validate(&self, t: &[u8]) -> Result<()> {
         match TransactionRequest::try_from(t).context("Failed to deserialize transaction")? {
             TransactionRequest::UpdateRequest(UpdateRequest { signature, payload }) => {
+                let digest = payload.to_digest();
+                if !payload.sender.verify(signature, &digest) {
+                    return Err(anyhow!("Invalid signature"));
+                }
+
+                // skip further checks if the transaction was sent from this node
                 match payload.sender {
                     TransactionSender::NodeMain(public_key) => {
                         if public_key == self.node_public_key {
-                            // skip checks if the transaction was sent from this node
                             return Ok(());
                         }
                     },
                     TransactionSender::NodeConsensus(public_key) => {
                         if public_key == self.consensus_public_key {
-                            // skip checks if the transaction was sent from this node
                             return Ok(());
                         }
                     },
                     _ => (),
-                }
-
-                let digest = payload.to_digest();
-                if !payload.sender.verify(signature, &digest) {
-                    return Err(anyhow!("Invalid signature"));
                 }
             },
             TransactionRequest::EthereumRequest(mut eth_tx) => {
