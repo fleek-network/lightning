@@ -172,10 +172,10 @@ impl TryFrom<&TransactionRequest> for Vec<u8> {
     }
 }
 
-impl TryFrom<Vec<u8>> for TransactionRequest {
+impl TryFrom<&[u8]> for TransactionRequest {
     type Error = anyhow::Error;
 
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let magic_byte = value[value.len() - 1];
         match magic_byte {
             0x00 => {
@@ -230,7 +230,7 @@ impl TryFrom<Vec<u8>> for Block {
                 .get(pointer..pointer + tx_len)
                 .context("Out of bounds")?;
             // TODO(matthias): can we get rid of this allocation?
-            let tx: TransactionRequest = tx_bytes.to_vec().try_into()?;
+            let tx: TransactionRequest = tx_bytes.try_into()?;
             transactions.push(tx);
             pointer += tx_len;
         }
@@ -647,10 +647,10 @@ mod tests {
         let tx = EthersTransaction::default();
         let tx_req = TransactionRequest::EthereumRequest(tx.into());
         let bytes: Vec<u8> = (&tx_req).try_into().unwrap();
-        let tx_req_r = TransactionRequest::try_from(bytes).unwrap();
+        let tx_req_r = TransactionRequest::try_from(bytes.as_ref()).unwrap();
 
         let bytes: Vec<u8> = (&tx_req_r).try_into().unwrap();
-        let tx_req_rr = TransactionRequest::try_from(bytes).unwrap();
+        let tx_req_rr = TransactionRequest::try_from(bytes.as_ref()).unwrap();
         assert_eq!(tx_req_r, tx_req_rr);
     }
 
@@ -671,7 +671,7 @@ mod tests {
         };
         let tx = TransactionRequest::UpdateRequest(update_req);
         let bytes: Vec<u8> = (&tx).try_into().unwrap();
-        let tx_r = TransactionRequest::try_from(bytes).unwrap();
+        let tx_r = TransactionRequest::try_from(bytes.as_ref()).unwrap();
         assert_eq!(tx, tx_r);
     }
 

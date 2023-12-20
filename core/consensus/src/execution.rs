@@ -99,7 +99,7 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
 
         let transactions = payload
             .into_iter()
-            .filter_map(|txn| TransactionRequest::try_from(txn).ok())
+            .filter_map(|txn| TransactionRequest::try_from(txn.as_ref()).ok())
             .collect::<Vec<_>>();
 
         if transactions.is_empty() {
@@ -164,7 +164,7 @@ impl<Q: SyncQueryRunnerInterface> ExecutionState for Execution<Q> {
 
                 for batch in batches {
                     for tx_bytes in batch.transactions() {
-                        if let Ok(tx) = TransactionRequest::try_from(tx_bytes.to_owned()) {
+                        if let Ok(tx) = TransactionRequest::try_from(tx_bytes.as_ref()) {
                             if !self.query_runner.has_executed_digest(tx.hash()) {
                                 batch_payload.push(tx_bytes.to_owned());
                             }
