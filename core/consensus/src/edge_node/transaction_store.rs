@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
-use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_interfaces::{QueryRunnerExt, SyncQueryRunnerInterface};
 
 use super::ring_buffer::RingBuffer;
 use crate::execution::{AuthenticStampedParcel, Digest, Execution};
@@ -106,7 +106,7 @@ impl TransactionStore {
 
     // Threshold should be 2f + 1 of the committee
     // Returns true if the epoch has changed
-    pub async fn try_execute<Q: SyncQueryRunnerInterface>(
+    pub async fn try_execute<Q: SyncQueryRunnerInterface + QueryRunnerExt>(
         &mut self,
         digest: Digest,
         threshold: usize,
@@ -140,7 +140,7 @@ impl TransactionStore {
         Ok(epoch_changed)
     }
 
-    async fn try_execute_internal<Q: SyncQueryRunnerInterface>(
+    async fn try_execute_internal<Q: SyncQueryRunnerInterface + QueryRunnerExt>(
         &mut self,
         digest: Digest,
         threshold: usize,
@@ -161,7 +161,7 @@ impl TransactionStore {
         Err(NotExecuted::MissingAttestations(digest))
     }
 
-    async fn try_execute_chain<Q: SyncQueryRunnerInterface>(
+    async fn try_execute_chain<Q: SyncQueryRunnerInterface + QueryRunnerExt>(
         &mut self,
         digest: Digest,
         execution: &Arc<Execution<Q>>,

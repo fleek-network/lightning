@@ -29,7 +29,7 @@ use lightning_interfaces::types::{
     TxHash,
     Value,
 };
-use lightning_interfaces::PagingParams;
+use lightning_interfaces::{PagingParams, QueryRunnerExt};
 
 use crate::state::State;
 use crate::storage::AtomoStorage;
@@ -121,8 +121,9 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .map(selector)
     }
 
-    fn get_node_table_iter(&self) -> KeyIterator<NodeIndex> {
-        self.inner.run(|ctx| self.node_table.get(ctx).keys())
+    fn get_node_table_iter<V>(&self, closure: impl FnOnce(KeyIterator<NodeIndex>) -> V) -> V {
+        self.inner
+            .run(|ctx| closure(self.node_table.get(ctx).keys()))
     }
 
     fn pubkey_to_index(&self, pub_key: &NodePublicKey) -> Option<NodeIndex> {
@@ -176,6 +177,43 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .run(|ctx| self.total_served_table.get(ctx).get(epoch))
     }
 
+    fn has_executed_digest(&self, digest: [u8; 32]) -> bool {
+        self.inner
+            .run(|ctx| self.executed_digests_table.get(ctx).get(digest))
+            .is_some()
+    }
+
+    fn index_to_pubkey(&self, node_index: &NodeIndex) -> Option<NodePublicKey> {
+        self.get_node_info::<NodePublicKey>(node_index, |node_info| node_info.public_key)
+    }
+
+    fn simulate_txn(&self, txn: TransactionRequest) -> TransactionResponse {
+        self.inner.run(|ctx| {
+            // Create the app/execution environment
+            let backend = StateTables {
+                table_selector: ctx,
+            };
+            let app = State::new(backend);
+            app.execute_transaction(txn)
+        })
+    }
+
+    fn get_node_uptime(&self, node_index: &NodeIndex) -> Option<u8> {
+        self.inner
+            .run(|ctx| self.uptime_table.get(ctx).get(node_index))
+    }
+
+    fn get_cid_providers(&self, cid: &Blake3Hash) -> Option<BTreeSet<NodeIndex>> {
+        self.inner.run(|ctx| self._cid_to_node.get(ctx).get(cid))
+    }
+
+    fn get_content_registry(&self, node_index: &NodeIndex) -> Option<BTreeSet<Blake3Hash>> {
+        self.inner
+            .run(|ctx| self._node_to_cid.get(ctx).get(node_index))
+    }
+}
+
+impl QueryRunnerExt for QueryRunner {
     fn get_chain_id(&self) -> u32 {
         match self.get_metadata(&Metadata::ChainId) {
             Some(Value::ChainId(id)) => id,
@@ -293,33 +331,41 @@ impl SyncQueryRunnerInterface for QueryRunner {
         self.inner.run(|ctx| {
             let staking_amount: HpUfixed<18> = self.get_staking_amount().into();
             let node_table = self.node_table.get(ctx);
-            let nodes = node_table.keys().map(|index| NodeInfoWithIndex {
-                index,
-                info: node_table.get(index).unwrap(),
-            });
 
-            match paging {
-                None => nodes
-                    .filter(|node| node.info.stake.staked >= staking_amount)
-                    .collect(),
-                Some(PagingParams {
-                    ignore_stake,
-                    limit,
-                    start,
-                }) => {
-                    let mut nodes = nodes
-                        .filter(|node| ignore_stake || node.info.stake.staked >= staking_amount)
-                        .collect::<Vec<NodeInfoWithIndex>>();
+            let closure = {
+                |nodes: KeyIterator<NodeIndex>| -> Vec<NodeInfoWithIndex> {
+                    let nodes = nodes.map(|index| NodeInfoWithIndex {
+                        index,
+                        info: node_table.get(index).unwrap(),
+                    });
+                    match paging {
+                        None => nodes
+                            .filter(|node| node.info.stake.staked >= staking_amount)
+                            .collect(),
+                        Some(PagingParams {
+                            ignore_stake,
+                            limit,
+                            start,
+                        }) => {
+                            let mut nodes = nodes
+                                .filter(|node| {
+                                    ignore_stake || node.info.stake.staked >= staking_amount
+                                })
+                                .collect::<Vec<NodeInfoWithIndex>>();
 
-                    nodes.sort_by_key(|info| info.index);
+                            nodes.sort_by_key(|info| info.index);
 
-                    nodes
-                        .into_iter()
-                        .filter(|info| info.index >= start)
-                        .take(limit)
-                        .collect()
-                },
-            }
+                            nodes
+                                .into_iter()
+                                .filter(|info| info.index >= start)
+                                .take(limit)
+                                .collect()
+                        },
+                    }
+                }
+            };
+
+            self.get_node_table_iter::<Vec<NodeInfoWithIndex>>(closure)
         })
     }
 
@@ -328,57 +374,11 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .unwrap_or(0)
     }
 
-    fn has_executed_digest(&self, digest: [u8; 32]) -> bool {
-        self.inner
-            .run(|ctx| self.executed_digests_table.get(ctx).get(digest))
-            .is_some()
-    }
-
-    fn index_to_pubkey(&self, node_index: &NodeIndex) -> Option<NodePublicKey> {
-        self.get_node_info::<NodePublicKey>(node_index, |node_info| node_info.public_key)
-    }
-
     fn is_valid_node(&self, id: &NodePublicKey) -> bool {
         let minimum_stake_amount = self.get_staking_amount().into();
         self.pubkey_to_index(id).is_some_and(|node_idx| {
             self.get_node_info(&node_idx, |n| n.stake.staked)
                 .is_some_and(|node_stake| node_stake >= minimum_stake_amount)
-        })
-    }
-    fn simulate_txn(&self, txn: TransactionRequest) -> TransactionResponse {
-        self.inner.run(|ctx| {
-            // Create the app/execution environment
-            let backend = StateTables {
-                table_selector: ctx,
-            };
-            let app = State::new(backend);
-            app.execute_transaction(txn)
-        })
-    }
-
-    fn get_node_uptime(&self, node_index: &NodeIndex) -> Option<u8> {
-        self.inner
-            .run(|ctx| self.uptime_table.get(ctx).get(node_index))
-    }
-
-    fn cid_to_providers(&self, cid: &Blake3Hash) -> Vec<NodeIndex> {
-        // Todo: Optimize this search.
-        self.inner.run(|ctx| {
-            self._cid_to_node
-                .get(ctx)
-                .get(cid)
-                .map(|nodes| nodes.into_iter().collect::<Vec<_>>())
-                .unwrap_or_default()
-        })
-    }
-
-    fn content_registry(&self, node_index: &NodeIndex) -> Vec<Blake3Hash> {
-        self.inner.run(|ctx| {
-            self._node_to_cid
-                .get(ctx)
-                .get(node_index)
-                .map(|nodes| nodes.into_iter().collect::<Vec<_>>())
-                .unwrap_or_default()
         })
     }
 }

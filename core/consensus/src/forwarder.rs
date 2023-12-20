@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use fastcrypto::bls12381::min_sig::BLS12381PublicKey;
 use fleek_crypto::ConsensusPublicKey;
 use lightning_interfaces::types::{Epoch, EpochInfo, NodeInfo, TransactionRequest};
-use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_interfaces::{QueryRunnerExt, SyncQueryRunnerInterface};
 use narwhal_types::{TransactionProto, TransactionsClient};
 use rand::seq::SliceRandom;
 use tonic::transport::channel::Channel;
@@ -21,7 +21,7 @@ use tracing::error;
 
 const TARGETED_CONNECTION_NUM: usize = 10;
 
-pub struct Forwarder<Q: SyncQueryRunnerInterface> {
+pub struct Forwarder<Q: SyncQueryRunnerInterface + QueryRunnerExt> {
     /// Query runner used to read application state
     query_runner: Q,
     /// The public key of this node
@@ -41,7 +41,7 @@ pub struct Forwarder<Q: SyncQueryRunnerInterface> {
     active_connections: HashMap<usize, TransactionsClient<Channel>>,
 }
 
-impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
+impl<Q: SyncQueryRunnerInterface + QueryRunnerExt> Forwarder<Q> {
     pub fn new(query_runner: Q, primary_name: BLS12381PublicKey) -> Self {
         Self {
             query_runner,
@@ -171,7 +171,7 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
 }
 
 #[async_trait]
-impl<Q: SyncQueryRunnerInterface + 'static> AsyncWorker for Forwarder<Q> {
+impl<Q: SyncQueryRunnerInterface + QueryRunnerExt + 'static> AsyncWorker for Forwarder<Q> {
     type Request = TransactionRequest;
     type Response = ();
 

@@ -12,6 +12,7 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{
     ApplicationInterface,
+    QueryRunnerExt,
     RequestHeader,
     ServiceScope,
     SyncQueryRunnerInterface,

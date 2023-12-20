@@ -20,6 +20,7 @@ use lightning_interfaces::{
     BlockStoreServerSocket,
     ConfigConsumer,
     Notification,
+    QueryRunnerExt,
     SignerInterface,
     SyncQueryRunnerInterface,
     SyncronizerInterface,
