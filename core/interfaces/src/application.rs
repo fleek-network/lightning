@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::time::Duration;
 
 use affair::Socket;
@@ -57,7 +57,7 @@ pub trait ApplicationInterface<C: Collection>:
     }
 
     /// The type for the sync query executor.
-    type SyncExecutor: SyncQueryRunnerInterface;
+    type SyncExecutor: SyncQueryRunnerInterface + QueryRunnerExt;
 
     /// Create a new instance of the application layer using the provided configuration.
     fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self>;
@@ -108,7 +108,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     -> Option<V>;
 
     /// Returns an Iterator to Node Table
-    fn get_node_table_iter(&self) -> KeyIterator<NodeIndex>;
+    fn get_node_table_iter<V>(&self, closure: impl FnOnce(KeyIterator<NodeIndex>) -> V) -> V;
 
     /// Query Pub Key to Node Index Table
     fn pubkey_to_index(&self, pub_key: &NodePublicKey) -> Option<NodeIndex>;
@@ -149,6 +149,27 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Returns total served for all commodities from the state for a given epoch
     fn get_total_served(&self, epoch: &Epoch) -> Option<TotalServed>;
 
+    /// Checks if an transaction digest has been executed this epoch.
+    fn has_executed_digest(&self, digest: TxHash) -> bool;
+
+    /// Get Node's Public Key based on the Node's Index
+    fn index_to_pubkey(&self, node_index: &NodeIndex) -> Option<NodePublicKey>;
+
+    /// Simulate Transaction
+    fn simulate_txn(&self, txn: TransactionRequest) -> TransactionResponse;
+
+    /// Returns the uptime for a node from the past epoch.
+    fn get_node_uptime(&self, node_index: &NodeIndex) -> Option<u8>;
+
+    /// Returns nodes that are providing the content addressed by the cid.
+    fn get_cid_providers(&self, cid: &Blake3Hash) -> Option<BTreeSet<NodeIndex>>;
+
+    /// Returns the node's content registry.
+    fn get_content_registry(&self, node_index: &NodeIndex) -> Option<BTreeSet<Blake3Hash>>;
+}
+
+#[infusion::blank]
+pub trait QueryRunnerExt: Clone + Send + Sync + 'static {
     /// Returns the chain id
     fn get_chain_id(&self) -> u32;
 
@@ -176,7 +197,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Returns last executed block hash. [0;32] is genesis
     fn get_last_block(&self) -> [u8; 32];
 
-    // Returns a full copy of the entire node-registry,
+    /// Returns a full copy of the entire node-registry,
     /// Paging Params - filtering nodes that are still a valid node and have enough stake; Takes
     /// from starting index and specified amount.
     fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfoWithIndex>;
@@ -184,26 +205,8 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Returns the amount that is required to be a valid node in the network.
     fn get_staking_amount(&self) -> u128;
 
-    /// Checks if an transaction digest has been executed this epoch.
-    fn has_executed_digest(&self, digest: TxHash) -> bool;
-
-    /// Get Node's Public Key based on the Node's Index
-    fn index_to_pubkey(&self, node_index: &NodeIndex) -> Option<NodePublicKey>;
-
     /// Returns true if the node is a valid node in the network, with enough stake.
     fn is_valid_node(&self, id: &NodePublicKey) -> bool;
-
-    /// Simulate Transaction
-    fn simulate_txn(&self, txn: TransactionRequest) -> TransactionResponse;
-
-    /// Returns the uptime for a node from the past epoch.
-    fn get_node_uptime(&self, node_index: &NodeIndex) -> Option<u8>;
-
-    /// Returns nodes that are providing the content addressed by the cid.
-    fn cid_to_providers(&self, cid: &Blake3Hash) -> Vec<NodeIndex>;
-
-    /// Returns the node's content registry.
-    fn content_registry(&self, node_index: &NodeIndex) -> Vec<Blake3Hash>;
 }
 
 #[derive(Clone, Debug)]

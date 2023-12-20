@@ -2,7 +2,7 @@ use std::sync::{Arc, Weak};
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
-use lightning_interfaces::application::SyncQueryRunnerInterface;
+use lightning_interfaces::application::QueryRunnerExt;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::notifier::{Notification, NotifierInterface};
 use lightning_interfaces::ApplicationInterface;

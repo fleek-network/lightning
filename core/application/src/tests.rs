@@ -19,6 +19,7 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     AccountInfo,
+    Blake3Hash,
     Block,
     BlockExecutionResponse,
     CommodityTypes,
@@ -53,6 +54,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     ExecutionEngineSocket,
     PagingParams,
+    QueryRunnerExt,
     SyncQueryRunnerInterface,
     ToDigest,
 };
@@ -1199,6 +1201,22 @@ fn get_account_balance(query_runner: &QueryRunner, address: &EthAddress) -> u128
 fn get_stables_balance(query_runner: &QueryRunner, address: &EthAddress) -> HpUfixed<6> {
     do_get_account_info::<HpUfixed<6>>(query_runner, address, |a| a.stables_balance)
         .unwrap_or(HpUfixed::<6>::zero())
+}
+
+fn cid_to_providers(query_runner: &QueryRunner, cid: &Blake3Hash) -> Vec<NodeIndex> {
+    query_runner
+        .get_cid_providers(cid)
+        .unwrap_or_default()
+        .into_iter()
+        .collect()
+}
+
+fn content_registry(query_runner: &QueryRunner, node: &NodeIndex) -> Vec<Blake3Hash> {
+    query_runner
+        .get_content_registry(node)
+        .unwrap_or_default()
+        .into_iter()
+        .collect()
 }
 //////////////////////////////////////////////////////////////////////////////////
 ////////////////// This is where the actual tests are defined ////////////////////
@@ -3236,13 +3254,13 @@ async fn test_submit_content_registry_update() {
     // Then: registry indicates that the nodes are providing the correct content.
     for (sk, cid) in expected_records.iter() {
         let index = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
-        let cids = query_runner.content_registry(&index);
+        let cids = content_registry(&query_runner, &index);
         assert_eq!(cids, vec![*cid]);
     }
     // Then: all providers are accounted for.
     for (sk, cid) in expected_records.iter() {
         let index = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
-        let providers = query_runner.cid_to_providers(cid);
+        let providers = cid_to_providers(&query_runner, cid);
         assert_eq!(providers, vec![index]);
     }
 
@@ -3258,10 +3276,10 @@ async fn test_submit_content_registry_update() {
 
     // Then: records are removed.
     for (sk, cid) in expected_records.iter() {
-        let providers = query_runner.cid_to_providers(cid);
+        let providers = cid_to_providers(&query_runner, cid);
         assert!(providers.is_empty());
         let index = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
-        let cids = query_runner.content_registry(&index);
+        let cids = content_registry(&query_runner, &index);
         assert!(cids.is_empty());
     }
 }
@@ -3294,11 +3312,11 @@ async fn test_submit_content_registry_update_multiple_providers_per_cid() {
                 .unwrap()
         })
         .collect::<Vec<_>>();
-    let providers = query_runner.cid_to_providers(&cid);
+    let providers = cid_to_providers(&query_runner, &cid);
     assert_eq!(providers, expected_providers);
     // Then: cid is in every node's registry.
     for provider in providers {
-        let cids = query_runner.content_registry(&provider);
+        let cids = content_registry(&query_runner, &provider);
         assert_eq!(vec![cid], cids);
     }
 
@@ -3311,13 +3329,13 @@ async fn test_submit_content_registry_update_multiple_providers_per_cid() {
     }
 
     // Then: records are removed.
-    let providers = query_runner.cid_to_providers(&cid);
+    let providers = cid_to_providers(&query_runner, &cid);
     assert!(providers.is_empty());
     for node in keystore {
         let index = query_runner
             .pubkey_to_index(&node.node_secret_key.to_pk())
             .unwrap();
-        let cids = query_runner.content_registry(&index);
+        let cids = content_registry(&query_runner, &index);
         assert!(cids.is_empty());
     }
 }
@@ -3378,10 +3396,10 @@ async fn test_submit_content_registry_update_mix_of_add_and_remove_updates() {
         .unwrap();
     for cid in &cids {
         if removed.contains(cid) {
-            let providers = query_runner.cid_to_providers(cid);
+            let providers = cid_to_providers(&query_runner, cid);
             assert!(providers.is_empty());
         } else {
-            let providers = query_runner.cid_to_providers(cid);
+            let providers = cid_to_providers(&query_runner, cid);
             assert_eq!(providers, vec![node]);
         }
     }
@@ -3390,7 +3408,7 @@ async fn test_submit_content_registry_update_mix_of_add_and_remove_updates() {
         .copied()
         .filter(|cid| !removed.contains(cid))
         .collect::<Vec<_>>();
-    let cids_for_node = query_runner.content_registry(&node);
+    let cids_for_node = content_registry(&query_runner, &node);
     assert_eq!(expected_cids, cids_for_node);
 }
 
@@ -3447,13 +3465,13 @@ async fn test_submit_content_registry_update_multiple_cids_per_provider() {
         .unwrap();
 
     for cid in &cids {
-        let providers = query_runner.cid_to_providers(cid);
+        let providers = cid_to_providers(&query_runner, cid);
         assert_eq!(providers, vec![node1, node2]);
     }
     // Then: each node is providing the correct set of cids.
-    let cids1 = query_runner.content_registry(&node1);
+    let cids1 = content_registry(&query_runner, &node1);
     assert_eq!(cids1, cids);
-    let cids2 = query_runner.content_registry(&node2);
+    let cids2 = content_registry(&query_runner, &node2);
     assert_eq!(cids2, cids);
 
     // When: one of the nodes submits an update to remove a record for one cid.
@@ -3465,15 +3483,15 @@ async fn test_submit_content_registry_update_multiple_cids_per_provider() {
     expect_tx_success!(update, &update_socket);
 
     // Then: the record is removed for that one provider.
-    let providers = query_runner.cid_to_providers(&cids[0]);
+    let providers = cid_to_providers(&query_runner, &cids[0]);
     assert_eq!(providers, vec![node2]);
     // Then: the rest of the records are not affected.
     for cid in cids.iter().skip(1) {
-        let providers = query_runner.cid_to_providers(cid);
+        let providers = cid_to_providers(&query_runner, cid);
         assert_eq!(providers, vec![node1, node2]);
     }
     let expected_cids = cids.clone()[1..].to_vec();
-    let cids1 = query_runner.content_registry(&node1);
+    let cids1 = content_registry(&query_runner, &node1);
     assert_eq!(cids1, expected_cids);
 
     // When: we remove the rest for that same node.
@@ -3489,10 +3507,10 @@ async fn test_submit_content_registry_update_multiple_cids_per_provider() {
 
     // Then: all records for that provider are gone.
     for cid in cids {
-        let providers = query_runner.cid_to_providers(&cid);
+        let providers = cid_to_providers(&query_runner, &cid);
         assert_eq!(providers, vec![node2]);
     }
-    let cids = query_runner.content_registry(&node1);
+    let cids = content_registry(&query_runner, &node1);
     assert!(cids.is_empty());
 }
 

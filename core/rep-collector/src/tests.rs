@@ -18,6 +18,7 @@ use lightning_interfaces::signer::SignerInterface;
 use lightning_interfaces::types::{Block, NodePorts, UpdateMethod, UpdatePayload, UpdateRequest};
 use lightning_interfaces::{
     partial,
+    QueryRunnerExt,
     ReputationQueryInteface,
     SyncQueryRunnerInterface,
     ToDigest,

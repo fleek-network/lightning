@@ -46,6 +46,7 @@ use lightning_interfaces::{
     OriginProviderInterface,
     PagingParams,
     PoolInterface,
+    QueryRunnerExt,
     ReputationAggregatorInterface,
     RpcInterface,
     SignerInterface,

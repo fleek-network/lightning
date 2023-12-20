@@ -14,6 +14,7 @@ use lightning_interfaces::{
     Notification,
     NotifierInterface,
     PingerInterface,
+    QueryRunnerExt,
     ReputationAggregatorInterface,
     ReputationReporterInterface,
     SignerInterface,
