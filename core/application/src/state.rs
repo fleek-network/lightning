@@ -264,7 +264,7 @@ impl<B: Backend> State<B> {
             UpdateMethod::OptIn {} => self.opt_in(txn.payload.sender),
             UpdateMethod::OptOut {} => self.opt_out(txn.payload.sender),
             UpdateMethod::UpdateContentRegistry { updates } => {
-                self.update_content_registry(updates)
+                self.update_content_registry(txn.payload.sender, updates)
             },
         };
 
@@ -1152,38 +1152,61 @@ impl<B: Backend> State<B> {
         TransactionResponse::Success(ExecutionData::None)
     }
 
-    fn update_content_registry(&self, updates: Vec<ContentUpdate>) -> TransactionResponse {
+    fn update_content_registry(
+        &self,
+        sender: TransactionSender,
+        updates: Vec<ContentUpdate>,
+    ) -> TransactionResponse {
         if updates.len() > MAX_UPDATES_CONTENT_REGISTRY {
             return TransactionResponse::Revert(ExecutionError::TooManyUpdates);
         }
 
+        let node_index = match self.only_node(sender) {
+            Ok(index) => index,
+            Err(e) => return e,
+        };
+
+        let mut staged_cid_to_node = HashMap::new();
+        let mut staged_node_to_cid = self.node_to_cid.get(&node_index).unwrap_or_default();
+        let empty_node_to_cid = staged_node_to_cid.is_empty();
+
         for update in updates {
             let providers = self.cid_to_node.get(&update.cid);
-            let cids = self.node_to_cid.get(&update.provider);
 
-            if update.remove && (providers.is_none() || cids.is_none()) {
-                // We avoid doing work and vector allocations for
-                // invalid mappings that are not in state.
-                continue;
+            if update.remove && (providers.is_none() || empty_node_to_cid) {
+                return TransactionResponse::Revert(ExecutionError::InvalidContentRemoval);
             }
 
             let mut providers = providers.unwrap_or_default();
-            let mut cids = cids.unwrap_or_default();
 
             if update.remove {
-                if let Some(idx) = providers.iter().position(|index| index == &update.provider) {
-                    providers.remove(idx);
-                }
-                if let Some(idx) = cids.iter().position(|cid| cid == &update.cid) {
-                    cids.remove(idx);
-                }
+                match providers.iter().position(|index| index == &node_index) {
+                    None => {
+                        return TransactionResponse::Revert(ExecutionError::InvalidContentRemoval);
+                    },
+                    Some(idx) => providers.remove(idx),
+                };
+
+                match staged_node_to_cid.iter().position(|cid| cid == &update.cid) {
+                    None => {
+                        return TransactionResponse::Revert(ExecutionError::InvalidContentRemoval);
+                    },
+                    Some(idx) => staged_node_to_cid.remove(idx),
+                };
             } else {
-                providers.push(update.provider);
-                cids.push(update.cid);
+                providers.push(node_index);
+                staged_node_to_cid.push(update.cid);
             }
 
-            self.cid_to_node.set(update.cid, providers);
-            self.node_to_cid.set(update.provider, cids);
+            if staged_cid_to_node.insert(update.cid, providers).is_some() {
+                return TransactionResponse::Revert(ExecutionError::TooManyUpdatesForContent);
+            }
+        }
+
+        self.node_to_cid.set(node_index, staged_node_to_cid);
+
+        for (cid, providers) in staged_cid_to_node {
+            self.cid_to_node.set(cid, providers);
         }
 
         TransactionResponse::Success(ExecutionData::None)

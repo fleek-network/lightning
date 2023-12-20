@@ -3116,11 +3116,7 @@ async fn test_submit_content_registry_update_one_provider_per_cid() {
             .unwrap();
         let cid = [list_idx as u8; 32];
         expected_records.push((index, cid));
-        updates.push(ContentUpdate {
-            provider: index,
-            cid,
-            remove: false,
-        });
+        updates.push(ContentUpdate { cid, remove: false });
     }
 
     // When: we submit a content registry update transaction.
@@ -3135,9 +3131,8 @@ async fn test_submit_content_registry_update_one_provider_per_cid() {
 
     // When: we change updates to remove the records.
     let mut updates = Vec::new();
-    for (index, cid) in expected_records.iter() {
+    for (_, cid) in expected_records.iter() {
         updates.push(ContentUpdate {
-            provider: *index,
             cid: *cid,
             remove: true,
         });
@@ -3174,12 +3169,8 @@ async fn test_submit_content_registry_update_many_providers_per_cid() {
         .collect::<Vec<_>>();
 
     let mut updates = Vec::new();
-    for index in &expected_providers {
-        updates.push(ContentUpdate {
-            provider: *index,
-            cid,
-            remove: false,
-        });
+    for _ in &expected_providers {
+        updates.push(ContentUpdate { cid, remove: false });
     }
 
     // When: we submit a content registry update transaction.
@@ -3216,12 +3207,8 @@ async fn test_submit_content_registry_update_too_many_updates_in_transaction() {
     // Given: a big list of updates.
     let cid = [69u8; 32];
     let mut updates = Vec::new();
-    for index in 0..101u32 {
-        updates.push(ContentUpdate {
-            provider: index,
-            cid,
-            remove: false,
-        });
+    for _ in 0..101u32 {
+        updates.push(ContentUpdate { cid, remove: false });
     }
 
     // When: we submit the update transaction.

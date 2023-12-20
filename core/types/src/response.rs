@@ -118,6 +118,7 @@ pub enum ExecutionError {
     InvalidStateFunction,
     InvalidConsensusKey,
     InvalidToken,
+    InvalidContentRemoval,
     NoLockedTokens,
     TokensLocked,
     NotNodeOwner,
@@ -140,4 +141,5 @@ pub enum ExecutionError {
     Unimplemented,
     TooManyMeasurements,
     TooManyUpdates,
+    TooManyUpdatesForContent,
 }

@@ -582,7 +582,6 @@ impl ToDigest for UpdatePayload {
                     transcript_builder = transcript_builder
                         .with_prefix(idx.to_string())
                         .with("cid", &update.cid)
-                        .with("provider", &update.provider)
                         .with("remove", &(update.remove as u8));
                 }
             },
