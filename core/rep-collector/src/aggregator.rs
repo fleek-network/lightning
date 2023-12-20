@@ -9,7 +9,12 @@ use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::notifier::{Notification, NotifierInterface};
 use lightning_interfaces::reputation::ReputationAggregatorInterface;
 use lightning_interfaces::signer::SubmitTxSocket;
-use lightning_interfaces::types::{NodeIndex, ReputationMeasurements, UpdateMethod};
+use lightning_interfaces::types::{
+    NodeIndex,
+    ReputationMeasurements,
+    UpdateMethod,
+    MAX_MEASUREMENTS_PER_TX,
+};
 use lightning_interfaces::{
     ApplicationInterface,
     ReputationQueryInteface,
@@ -199,16 +204,58 @@ impl<C: Collection> ReputationAggregatorInner<C> {
             .into_iter()
             .collect();
         if !measurements.is_empty() {
-            let submit_tx = self.submit_tx.clone();
-            tokio::spawn(async move {
-                info!("Submitting reputation measurements");
-                if let Err(e) = submit_tx
-                    .run(UpdateMethod::SubmitReputationMeasurements { measurements })
-                    .await
-                {
-                    error!("Submitting reputation measurements failed: {e:?}");
+            if measurements.len() <= MAX_MEASUREMENTS_PER_TX {
+                let submit_tx = self.submit_tx.clone();
+                tokio::spawn(async move {
+                    info!("Submitting reputation measurements");
+                    if let Err(e) = submit_tx
+                        .run(UpdateMethod::SubmitReputationMeasurements { measurements })
+                        .await
+                    {
+                        error!("Submitting reputation measurements failed: {e:?}");
+                    }
+                });
+            } else {
+                // Number of measurements exceeds maximum, we have to split the transaction into
+                // two.
+                let mut measurements1 = BTreeMap::new();
+                let mut measurements2 = BTreeMap::new();
+                for (node, m) in measurements.into_iter() {
+                    if measurements1.len() < MAX_MEASUREMENTS_PER_TX {
+                        measurements1.insert(node, m);
+                    } else if measurements2.len() < MAX_MEASUREMENTS_PER_TX {
+                        measurements2.insert(node, m);
+                    } else {
+                        // If both hashmaps exceed the maximum, we will drop the remaining
+                        // measurements. Enough is enough.
+                        break;
+                    }
                 }
-            });
+                let submit_tx = self.submit_tx.clone();
+                tokio::spawn(async move {
+                    info!("Submitting reputation measurements (1)");
+                    if let Err(e) = submit_tx
+                        .run(UpdateMethod::SubmitReputationMeasurements {
+                            measurements: measurements1,
+                        })
+                        .await
+                    {
+                        error!("Submitting reputation measurements failed: {e:?}");
+                    }
+                });
+                let submit_tx = self.submit_tx.clone();
+                tokio::spawn(async move {
+                    info!("Submitting reputation measurements (2)");
+                    if let Err(e) = submit_tx
+                        .run(UpdateMethod::SubmitReputationMeasurements {
+                            measurements: measurements2,
+                        })
+                        .await
+                    {
+                        error!("Submitting reputation measurements failed: {e:?}");
+                    }
+                });
+            }
         } else {
             info!("No reputation measurements to submit");
         }

@@ -35,6 +35,8 @@ use lightning_interfaces::types::{
     UpdateMethod,
     UpdatePayload,
     UpdateRequest,
+    MAX_MEASUREMENTS_PER_TX,
+    MAX_MEASUREMENTS_SUBMIT,
 };
 use lightning_interfaces::{
     partial,
@@ -1063,7 +1065,7 @@ async fn test_submit_rep_measurements() {
 }
 
 #[tokio::test]
-async fn test_submit_rep_measurements_twice() {
+async fn test_submit_rep_measurements_too_many_times() {
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
     let (update_socket, query_runner) = test_init_app(committee);
@@ -1078,22 +1080,28 @@ async fn test_submit_rep_measurements_twice() {
         reputation::generate_reputation_measurements(&mut rng, 0.1),
     );
 
-    // Submit the reputation measurements
-    submit_reputation_measurements!(&update_socket, &keystore[0].node_secret_key, 1, map.clone());
-
-    // Attempt to submit reputation measurements twice per epoch.
+    // Attempt to submit reputation measurements 1 more time than allowed per epoch.
     // This transaction should revert because each node only can submit its reputation measurements
-    // once per epoch.
+    // `MAX_MEASUREMENTS_SUBMIT` times.
+    for i in 0..MAX_MEASUREMENTS_SUBMIT {
+        let req = prepare_update_request_node(
+            UpdateMethod::SubmitReputationMeasurements {
+                measurements: map.clone(),
+            },
+            &keystore[0].node_secret_key,
+            1 + i as u64,
+        );
+        expect_tx_success!(req, &update_socket);
+    }
     let req = prepare_update_request_node(
         UpdateMethod::SubmitReputationMeasurements { measurements: map },
         &keystore[0].node_secret_key,
-        2,
+        1 + MAX_MEASUREMENTS_SUBMIT as u64,
     );
-
     expect_tx_revert!(
         req,
         &update_socket,
-        ExecutionError::AlreadySubmittedMeasurements
+        ExecutionError::SubmittedTooManyTransactions
     );
 }
 
@@ -2838,7 +2846,7 @@ async fn test_withdraw_unstaked_works_properly() {
 }
 
 #[tokio::test]
-async fn test_submit_reputations_measurements_reverts_account_key() {
+async fn test_submit_reputation_measurements_reverts_account_key() {
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
@@ -2854,7 +2862,7 @@ async fn test_submit_reputations_measurements_reverts_account_key() {
 }
 
 #[tokio::test]
-async fn test_submit_reputations_measurements_reverts_node_does_not_exist() {
+async fn test_submit_reputation_measurements_reverts_node_does_not_exist() {
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
     let (update_socket, query_runner) = test_init_app(committee);
@@ -2878,7 +2886,7 @@ async fn test_submit_reputations_measurements_reverts_node_does_not_exist() {
 }
 
 #[tokio::test]
-async fn test_submit_reputations_measurements_reverts_insufficient_stake() {
+async fn test_submit_reputation_measurements_reverts_insufficient_stake() {
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
     let (update_socket, query_runner) = test_init_app(committee);
@@ -2918,7 +2926,7 @@ async fn test_submit_reputations_measurements_reverts_insufficient_stake() {
 }
 
 #[tokio::test]
-async fn test_submit_reputations_measurements_too_many_measurementse() {
+async fn test_submit_reputation_measurements_too_many_measurements() {
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
     let (update_socket, query_runner) = test_init_app(committee);
@@ -2940,10 +2948,10 @@ async fn test_submit_reputations_measurements_too_many_measurementse() {
     let mut measurements = BTreeMap::new();
 
     // create many dummy measurements that len >
-    for i in 1..10 {
+    for i in 1..MAX_MEASUREMENTS_PER_TX + 2 {
         measurements.insert(
-            i,
-            reputation::generate_reputation_measurements(&mut rng, i as f64 / 10.0),
+            i as u32,
+            reputation::generate_reputation_measurements(&mut rng, 0.5),
         );
     }
     let update = prepare_update_request_node(

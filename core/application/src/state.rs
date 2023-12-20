@@ -47,6 +47,8 @@ use lightning_interfaces::types::{
     UpdateMethod,
     UpdateRequest,
     Value,
+    MAX_MEASUREMENTS_PER_TX,
+    MAX_MEASUREMENTS_SUBMIT,
 };
 use lightning_interfaces::ToDigest;
 use lightning_reputation::statistics;
@@ -115,7 +117,7 @@ pub struct State<B: Backend> {
     pub parameters: B::Ref<ProtocolParams, u128>,
     pub rep_measurements: B::Ref<NodeIndex, Vec<ReportedReputationMeasurements>>,
     pub rep_scores: B::Ref<NodeIndex, u8>,
-    pub submitted_rep_measurements: B::Ref<NodeIndex, bool>,
+    pub submitted_rep_measurements: B::Ref<NodeIndex, u8>,
     pub current_epoch_served: B::Ref<NodeIndex, NodeServed>,
     pub last_epoch_served: B::Ref<NodeIndex, NodeServed>,
     pub total_served: B::Ref<Epoch, TotalServed>,
@@ -1101,16 +1103,18 @@ impl<B: Backend> State<B> {
             Ok(index) => index,
             Err(e) => return e,
         };
-        if self
+        let num_submissions = self
             .submitted_rep_measurements
             .get(&reporting_node)
-            .unwrap_or(false)
-        {
-            return TransactionResponse::Revert(ExecutionError::AlreadySubmittedMeasurements);
+            .unwrap_or(0);
+        if num_submissions >= MAX_MEASUREMENTS_SUBMIT {
+            return TransactionResponse::Revert(ExecutionError::SubmittedTooManyTransactions);
         }
-        self.submitted_rep_measurements.set(reporting_node, true);
+        // We set this value before the `TooManyMeasurements` revert on purpose.
+        self.submitted_rep_measurements
+            .set(reporting_node, num_submissions + 1);
 
-        if measurements.len() > self.node_info.keys().count() {
+        if measurements.len() > MAX_MEASUREMENTS_PER_TX {
             return TransactionResponse::Revert(ExecutionError::TooManyMeasurements);
         }
 

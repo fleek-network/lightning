@@ -5,6 +5,12 @@ use std::time::Duration;
 use hp_fixed::signed::HpFixed;
 use serde::{Deserialize, Serialize};
 
+/// How many measurements each`SubmitReputationMeasurements` transaction can contain.
+pub const MAX_MEASUREMENTS_PER_TX: usize = 10_000;
+
+/// How many `SubmitReputationMeasurements` transactions a node can submit per epoch.
+pub const MAX_MEASUREMENTS_SUBMIT: u8 = 2;
+
 pub const PRECISION: usize = 18;
 
 /// Contains the peer measurements that node A has about node B, that
