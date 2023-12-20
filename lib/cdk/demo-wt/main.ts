@@ -1,8 +1,5 @@
 import * as schema from "../handshake/schema.ts";
-import {
-  FleekTransport,
-  FleekTransportStream,
-} from "../handshake/transports/webtransport.ts";
+import { FleekTransport } from "../handshake/transports/webtransport.ts";
 
 const video = document.querySelector("video")!;
 
@@ -47,14 +44,8 @@ const bbb_blake3 = new Uint8Array([
 ]);
 
 const transport = new FleekTransport("127.0.0.1");
-let stream: FleekTransportStream;
 let sourceBuffer: SourceBuffer | undefined;
 const queue: Uint8Array[] = [];
-
-const handshake = async () => {
-  stream = await transport.connect();
-  await stream.handshake_primary(0);
-};
 
 function appendBuffer(buffer: Uint8Array) {
   if (sourceBuffer!.updating || queue.length != 0) {
@@ -66,22 +57,23 @@ function appendBuffer(buffer: Uint8Array) {
 
 // Todo: Handle errors and log.
 const startSession = async () => {
-  await handshake();
+  // connect and handshake
+  const stream = await transport.connect();
+  await stream.handshakePrimary(0);
 
   // Send a request for the CID.
-  const reqWriter = new schema.Writer(bbb_blake3.length + 1);
-  reqWriter.putU8(0); // Blake3 origin id
-  reqWriter.put(bbb_blake3);
-
+  const buffer = new Uint8Array(33);
+  buffer[0] = 0; // Blake3 Origin
+  buffer.set(bbb_blake3, 1); // UID
   await stream.send({
     tag: schema.Request.Tag.ServicePayload,
-    bytes: new Uint8Array(reqWriter.getBuffer()),
+    bytes: buffer,
   });
 
   // Read the number of blocks we should receive back from the first frame.
   const frame = await stream.recv();
   if (!frame || frame.tag !== schema.Response.Tag.ServicePayload) {
-    console.error("invalid tag");
+    console.error("invalid frame: ", frame);
     return;
   }
   const view = new DataView(frame.bytes.buffer);
@@ -119,7 +111,7 @@ function sourceOpen(this: MediaSource) {
   console.log(this.readyState); // open
   sourceBuffer = this.addSourceBuffer(mimeCodec);
 
-  sourceBuffer!.addEventListener("updateend", function (_) {
+  sourceBuffer!.addEventListener("updateend", function(_) {
     if (queue.length != 0) {
       sourceBuffer!.appendBuffer(queue.shift()!);
     }
