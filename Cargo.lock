@@ -5110,6 +5110,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "derive_more",
+ "ethers",
  "fleek-crypto",
  "hp-fixed",
  "ink-quill",
