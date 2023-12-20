@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::time::Duration;
 
 use atomo::{Atomo, QueryPerm, ResolvedTableReference};
@@ -56,8 +56,8 @@ pub struct QueryRunner {
     _commodity_price: ResolvedTableReference<CommodityTypes, HpUfixed<6>>,
     executed_digests_table: ResolvedTableReference<TxHash, ()>,
     uptime_table: ResolvedTableReference<NodeIndex, u8>,
-    _cid_to_node: ResolvedTableReference<Blake3Hash, Vec<NodeIndex>>,
-    _node_to_cid: ResolvedTableReference<NodeIndex, Vec<Blake3Hash>>,
+    _cid_to_node: ResolvedTableReference<Blake3Hash, BTreeSet<NodeIndex>>,
+    _node_to_cid: ResolvedTableReference<NodeIndex, BTreeSet<Blake3Hash>>,
 }
 
 impl QueryRunner {
@@ -82,8 +82,8 @@ impl QueryRunner {
             _service_revenue: atomo.resolve::<ServiceId, ServiceRevenue>("service_revenue"),
             executed_digests_table: atomo.resolve::<TxHash, ()>("executed_digests"),
             uptime_table: atomo.resolve::<NodeIndex, u8>("uptime"),
-            _cid_to_node: atomo.resolve::<Blake3Hash, Vec<NodeIndex>>("cid_to_node"),
-            _node_to_cid: atomo.resolve::<NodeIndex, Vec<Blake3Hash>>("node_to_cid"),
+            _cid_to_node: atomo.resolve::<Blake3Hash, BTreeSet<NodeIndex>>("cid_to_node"),
+            _node_to_cid: atomo.resolve::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_cid"),
             inner: atomo,
         }
     }
@@ -545,7 +545,12 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     fn cid_to_providers(&self, cid: &Blake3Hash) -> Vec<NodeIndex> {
         // Todo: Optimize this search.
-        self.inner
-            .run(|ctx| self._cid_to_node.get(ctx).get(cid).unwrap_or_default())
+        self.inner.run(|ctx| {
+            self._cid_to_node
+                .get(ctx)
+                .get(cid)
+                .map(|nodes| nodes.into_iter().collect::<Vec<_>>())
+                .unwrap_or_default()
+        })
     }
 }

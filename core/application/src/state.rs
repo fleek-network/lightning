@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::net::IpAddr;
 use std::ops::DerefMut;
 use std::time::Duration;
@@ -18,10 +18,11 @@ use hp_fixed::unsigned::HpUfixed;
 use lazy_static::lazy_static;
 use lightning_interfaces::types::{
     AccountInfo,
+    Blake3Hash,
     Committee,
     CommodityTypes,
-    DeliveryAcknowledgment,
     ContentUpdate,
+    DeliveryAcknowledgment,
     Epoch,
     ExecutionData,
     ExecutionError,
@@ -129,8 +130,8 @@ pub struct State<B: Backend> {
     pub commodity_prices: B::Ref<CommodityTypes, HpUfixed<6>>,
     pub executed_digests: B::Ref<TxHash, ()>,
     pub uptime: B::Ref<NodeIndex, u8>,
-    pub cid_to_node: B::Ref<Blake3Hash, Vec<NodeIndex>>,
-    pub node_to_cid: B::Ref<NodeIndex, Vec<Blake3Hash>>,
+    pub cid_to_node: B::Ref<Blake3Hash, BTreeSet<NodeIndex>>,
+    pub node_to_cid: B::Ref<NodeIndex, BTreeSet<Blake3Hash>>,
     pub backend: B,
 }
 
@@ -1167,43 +1168,46 @@ impl<B: Backend> State<B> {
         };
 
         let mut staged_cid_to_node = HashMap::new();
-        let mut staged_node_to_cid = self.node_to_cid.get(&node_index).unwrap_or_default();
-        let empty_node_to_cid = staged_node_to_cid.is_empty();
+        let mut staged_cids_provided = self.node_to_cid.get(&node_index).unwrap_or_default();
+        let empty_cids_provided = staged_cids_provided.is_empty();
 
         for update in updates {
+            // Check if they sent multiple updates for the same CID.
+            if staged_cid_to_node.contains_key(&update.cid) {
+                return TransactionResponse::Revert(ExecutionError::TooManyUpdatesForContent);
+            }
+
             let providers = self.cid_to_node.get(&update.cid);
 
-            if update.remove && (providers.is_none() || empty_node_to_cid) {
-                return TransactionResponse::Revert(ExecutionError::InvalidContentRemoval);
+            // Check if a removal request makes sense given our state.
+            if update.remove && (providers.is_none() || empty_cids_provided) {
+                return TransactionResponse::Revert(ExecutionError::InvalidStateForContentRemoval);
             }
 
             let mut providers = providers.unwrap_or_default();
 
             if update.remove {
-                match providers.iter().position(|index| index == &node_index) {
-                    None => {
-                        return TransactionResponse::Revert(ExecutionError::InvalidContentRemoval);
-                    },
-                    Some(idx) => providers.remove(idx),
-                };
-
-                match staged_node_to_cid.iter().position(|cid| cid == &update.cid) {
-                    None => {
-                        return TransactionResponse::Revert(ExecutionError::InvalidContentRemoval);
-                    },
-                    Some(idx) => staged_node_to_cid.remove(idx),
-                };
+                if !providers.remove(&node_index) {
+                    return TransactionResponse::Revert(ExecutionError::InvalidContentRemoval);
+                }
+                if !staged_cids_provided.remove(&update.cid) {
+                    // Unreachable.
+                    return TransactionResponse::Revert(ExecutionError::InvalidContentRemoval);
+                }
             } else {
-                providers.push(node_index);
-                staged_node_to_cid.push(update.cid);
+                if !providers.insert(node_index) {
+                    return TransactionResponse::Revert(ExecutionError::ContentAlreadyRegistered);
+                }
+                if !staged_cids_provided.insert(update.cid) {
+                    // Unreachable.
+                    return TransactionResponse::Revert(ExecutionError::ContentAlreadyRegistered);
+                }
             }
 
-            if staged_cid_to_node.insert(update.cid, providers).is_some() {
-                return TransactionResponse::Revert(ExecutionError::TooManyUpdatesForContent);
-            }
+            staged_cid_to_node.insert(update.cid, providers);
         }
 
-        self.node_to_cid.set(node_index, staged_node_to_cid);
+        self.node_to_cid.set(node_index, staged_cids_provided);
 
         for (cid, providers) in staged_cid_to_node {
             self.cid_to_node.set(cid, providers);

@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
@@ -105,8 +106,8 @@ impl Env<UpdatePerm> {
             .with_table::<ServiceId, ServiceRevenue>("service_revenue")
             .with_table::<TxHash, ()>("executed_digests")
             .with_table::<NodeIndex, u8>("uptime")
-            .with_table::<Blake3Hash, Vec<NodeIndex>>("cid_to_node")
-            .with_table::<NodeIndex, Vec<Blake3Hash>>("node_to_cid")
+            .with_table::<Blake3Hash, BTreeSet<NodeIndex>>("cid_to_node")
+            .with_table::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_cid")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("submitted_rep_measurements")
