@@ -36,6 +36,23 @@ impl TransactionValidator for Validator {
     type Error = Error;
 
     fn validate(&self, t: &[u8]) -> Result<()> {
+        self.validate_txn(t, true)
+    }
+
+    async fn validate_batch(&self, b: &Batch, _protocol_config: &ProtocolConfig) -> Result<()> {
+        let txns = match b {
+            Batch::V1(batch) => &batch.transactions,
+            Batch::V2(batch) => &batch.transactions,
+        };
+        for txn in txns {
+            self.validate_txn(txn, false)?;
+        }
+        Ok(())
+    }
+}
+
+impl Validator {
+    fn validate_txn(&self, t: &[u8], mempool: bool) -> Result<()> {
         match TransactionRequest::try_from(t).context("Failed to deserialize transaction")? {
             TransactionRequest::UpdateRequest(UpdateRequest { signature, payload }) => {
                 // TODO(matthias): before checking anything, we should enforce a hard cap on
@@ -46,19 +63,22 @@ impl TransactionValidator for Validator {
                     return Err(anyhow!("Invalid signature"));
                 }
 
-                // skip further checks if the transaction was sent from this node
-                match payload.sender {
-                    TransactionSender::NodeMain(public_key) => {
-                        if public_key == self.node_public_key {
-                            return Ok(());
-                        }
-                    },
-                    TransactionSender::NodeConsensus(public_key) => {
-                        if public_key == self.consensus_public_key {
-                            return Ok(());
-                        }
-                    },
-                    _ => (),
+                if mempool {
+                    // Skip further checks if the transaction was sent from this node.
+                    // We only do this if the transaction was sent to the node's local mempool.
+                    match payload.sender {
+                        TransactionSender::NodeMain(public_key) => {
+                            if public_key == self.node_public_key {
+                                return Ok(());
+                            }
+                        },
+                        TransactionSender::NodeConsensus(public_key) => {
+                            if public_key == self.consensus_public_key {
+                                return Ok(());
+                            }
+                        },
+                        _ => (),
+                    }
                 }
 
                 #[allow(clippy::single_match)]
@@ -82,10 +102,6 @@ impl TransactionValidator for Validator {
                 }
             },
         }
-        Ok(())
-    }
-
-    async fn validate_batch(&self, _b: &Batch, _protocol_config: &ProtocolConfig) -> Result<()> {
         Ok(())
     }
 }
