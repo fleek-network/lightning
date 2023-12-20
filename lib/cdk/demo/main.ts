@@ -1,4 +1,5 @@
 import * as schema from "../handshake/schema.ts";
+import { FleekRTC } from "../handshake/transports/webrtc.ts";
 
 const video = document.querySelector("video")!;
 
@@ -50,137 +51,63 @@ const bbb_blake3 = new Uint8Array([
 // ]);
 
 // State variables.
-const queue: Uint8Array[] = []; // Because MediaStream sucks.
+const transport = new FleekRTC("127.0.0.1");
 let sourceBuffer: SourceBuffer | undefined;
-let bytesRead = 0;
-let receivedBlockCount = false;
-
-// --------------------------------------------
-// WebRTC
-//
-// For webRTC:
-// 1. We need to make a RTCPeerConnection with the ice server we have.
-// 2. We then create a data channel over the RTCPeerConnection
-//    This will get the messages from the node, and other events.
-// 3. We send /sdp request to a node on click and start the negotiation with the node.
-
-const pc = new RTCPeerConnection({
-  iceServers: [
-    {
-      urls: "stun:stun.l.google.com:19302",
-    },
-  ],
-});
-
-const dataChan = pc.createDataChannel("fleek", {
-  ordered: true,
-});
-
-dataChan.onclose = () => {
-  console.log("dataChan closed.");
-};
-
-dataChan.onopen = () => {
-  console.log("dataChan opened.");
-
-  // Send a handshake.
-  dataChan.send(schema.HandshakeRequest.encode({
-    tag: schema.HandshakeRequest.Tag.Handshake,
-    service: 0 as schema.ServiceId,
-    pk: new Uint8Array(96) as schema.ClientPublicKey,
-    pop: new Uint8Array(48) as schema.ClientSignature,
-  }));
-
-  console.log("sent handshake");
-
-  const buffer = new Uint8Array(33);
-  buffer[0] = 0; // Blake3 Origin
-  buffer.set(bbb_blake3, 1); // UID
-
-  // Send the request
-  dataChan.send(schema.Request.encode({
-    tag: schema.Request.Tag.ServicePayload,
-    bytes: buffer,
-  }));
-
-  console.log("sent request");
-};
-
-dataChan.onmessage = (e: MessageEvent) => {
-  // handle first frame
-  if (!receivedBlockCount) {
-    console.log("got block count");
-    receivedBlockCount = true;
-    return;
-  }
-
-  const decoded = schema.Response.decode(e.data);
-  if (
-    decoded &&
-    (decoded.tag ===
-        schema.Response.Tag.ServicePayload ||
-      decoded.tag ===
-        schema.Response.Tag.ChunkedServicePayload)
-  ) {
-    bytesRead += decoded.bytes.length;
-    appendBuffer(decoded.bytes);
-  }
-};
+const queue: Uint8Array[] = [];
 
 function appendBuffer(buffer: Uint8Array) {
-  if (queue.length != 0 || sourceBuffer!.updating) {
+  if (sourceBuffer!.updating || queue.length != 0) {
     queue.push(buffer);
   } else {
     sourceBuffer!.appendBuffer(buffer);
   }
 }
 
-pc.oniceconnectionstatechange = () => {
-  console.log("pc status: ", pc.iceConnectionState);
-};
-
-pc.onicecandidate = (e) => {
-  if (e.candidate === null) {
-    console.log("pc description: ", pc.localDescription);
-  }
-};
-
-pc.onnegotiationneeded = async (e) => {
-  try {
-    console.log("connection negotiation ended", e);
-    const d = await pc.createOffer();
-    pc.setLocalDescription(d);
-  } catch (e) {
-    console.error("error: ", e);
-  }
-};
-
+// Todo: Handle errors and log.
 const startSession = async () => {
-  console.log("sending sdp signal");
+  const stream = await transport.connect();
+  await stream.handshakePrimary(0);
 
-  const res = await fetch("http://localhost:4220/sdp", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(pc.localDescription),
+  // Send a request for the CID.
+  const buffer = new Uint8Array(33);
+  buffer[0] = 0; // Blake3 Origin
+  buffer.set(bbb_blake3, 1); // UID
+
+  await stream.send({
+    tag: schema.Request.Tag.ServicePayload,
+    bytes: buffer,
   });
 
-  const sd = await res.json();
+  // Read the number of blocks we should receive back from the first frame.
+  const frame = await stream.recv();
+  if (!frame || frame.tag !== schema.Response.Tag.ServicePayload) {
+    console.error("invalid frame: ", frame);
+    return;
+  }
+  const view = new DataView(frame.bytes.buffer);
+  const blockCount = view.getUint32(0, false);
 
-  if (sd === "") {
-    return alert("Session Description must not be empty");
+  // Read each block from the stream
+  for (let i = 0; i < blockCount;) {
+    const frame = await stream.recv();
+    if (
+      !frame ||
+      (frame.tag !== schema.Response.Tag.ServicePayload &&
+        frame.tag !== schema.Response.Tag.ChunkedServicePayload)
+    ) {
+      console.error("invalid frame: ", frame);
+      return;
+    }
+
+    if (frame.tag === schema.Response.Tag.ServicePayload) {
+      i += 1;
+    }
+
+    appendBuffer(frame.bytes);
   }
 
-  console.log("got sdp response: ", sd);
-
-  try {
-    pc.setRemoteDescription(new RTCSessionDescription(sd));
-  } catch (e) {
-    alert(e);
-  }
+  transport.close();
 };
-
 // --------------------------------------------
 // MediaSource
 // Need to be specific for Blink regarding codecs
@@ -200,11 +127,9 @@ function sourceOpen(this: MediaSource) {
   console.log(this.readyState); // open
   sourceBuffer = this.addSourceBuffer(mimeCodec);
 
-  sourceBuffer!.addEventListener("updateend", function (_) {
+  sourceBuffer!.addEventListener("updateend", function(_) {
     if (queue.length != 0) {
-      sourceBuffer!.appendBuffer(
-        queue.shift()!,
-      );
+      sourceBuffer!.appendBuffer(queue.shift()!);
     }
   });
 }
