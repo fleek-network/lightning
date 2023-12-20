@@ -17,13 +17,11 @@ use fleek_crypto::{
 };
 use hp_fixed::unsigned::HpUfixed;
 use lazy_static::lazy_static;
-use lightning_interfaces::types::fleek_contract::FleekContractCalls;
 use lightning_interfaces::types::{
     AccountInfo,
     Committee,
     CommodityTypes,
     DeliveryAcknowledgment,
-    DepositCall,
     Epoch,
     ExecutionData,
     ExecutionError,
@@ -41,23 +39,27 @@ use lightning_interfaces::types::{
     Service,
     ServiceId,
     ServiceRevenue,
-    StakeCall,
     Staking,
     Tokens,
     TotalServed,
     TransactionRequest,
     TransactionResponse,
     TxHash,
-    UnstakeCall,
     UpdateMethod,
     UpdateRequest,
     Value,
-    WithdrawCall,
-    WithdrawUnstakedCall,
 };
 use lightning_interfaces::ToDigest;
 use lightning_reputation::statistics;
 use lightning_reputation::types::WeightedReputationMeasurements;
+use lightning_utils::eth::fleek_contract::FleekContractCalls;
+use lightning_utils::eth::{
+    DepositCall,
+    StakeCall,
+    UnstakeCall,
+    WithdrawCall,
+    WithdrawUnstakedCall,
+};
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;

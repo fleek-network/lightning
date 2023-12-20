@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 tokio.workspace = true
 tracing.workspace = true
+ethers.workspace = true

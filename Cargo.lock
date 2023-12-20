@@ -4341,6 +4341,7 @@ dependencies = [
  "lightning-interfaces",
  "lightning-reputation",
  "lightning-test-utils",
+ "lightning-utils",
  "multiaddr",
  "num-traits",
  "rand 0.8.5",
@@ -5109,7 +5110,6 @@ dependencies = [
  "anyhow",
  "bincode",
  "derive_more",
- "ethers",
  "fleek-crypto",
  "hp-fixed",
  "ink-quill",
@@ -5126,6 +5126,7 @@ dependencies = [
 name = "lightning-utils"
 version = "0.0.0"
 dependencies = [
+ "ethers",
  "tokio",
  "tracing",
 ]
