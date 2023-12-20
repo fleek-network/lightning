@@ -4,7 +4,12 @@
 use anyhow::{anyhow, Context, Error, Result};
 use async_trait::async_trait;
 use fleek_crypto::{ConsensusPublicKey, EthAddress, NodePublicKey, TransactionSender};
-use lightning_interfaces::types::{TransactionRequest, UpdateRequest};
+use lightning_interfaces::types::{
+    TransactionRequest,
+    UpdateMethod,
+    UpdateRequest,
+    MAX_MEASUREMENTS_PER_TX,
+};
 use lightning_interfaces::ToDigest;
 use lightning_utils::eth;
 use narwhal_types::Batch;
@@ -33,6 +38,9 @@ impl TransactionValidator for Validator {
     fn validate(&self, t: &[u8]) -> Result<()> {
         match TransactionRequest::try_from(t).context("Failed to deserialize transaction")? {
             TransactionRequest::UpdateRequest(UpdateRequest { signature, payload }) => {
+                // TODO(matthias): before checking anything, we should enforce a hard cap on
+                // transaction size.
+
                 let digest = payload.to_digest();
                 if !payload.sender.verify(signature, &digest) {
                     return Err(anyhow!("Invalid signature"));
@@ -48,6 +56,16 @@ impl TransactionValidator for Validator {
                     TransactionSender::NodeConsensus(public_key) => {
                         if public_key == self.consensus_public_key {
                             return Ok(());
+                        }
+                    },
+                    _ => (),
+                }
+
+                #[allow(clippy::single_match)]
+                match payload.method {
+                    UpdateMethod::SubmitReputationMeasurements { measurements } => {
+                        if measurements.len() > MAX_MEASUREMENTS_PER_TX {
+                            return Err(anyhow!("Too many reputation measurements"));
                         }
                     },
                     _ => (),

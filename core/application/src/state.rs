@@ -1114,7 +1114,9 @@ impl<B: Backend> State<B> {
         self.submitted_rep_measurements
             .set(reporting_node, num_submissions + 1);
 
-        if measurements.len() > MAX_MEASUREMENTS_PER_TX {
+        if measurements.len() > MAX_MEASUREMENTS_PER_TX
+            || measurements.len() > self.node_info.keys().count()
+        {
             return TransactionResponse::Revert(ExecutionError::TooManyMeasurements);
         }
 
