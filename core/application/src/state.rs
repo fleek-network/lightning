@@ -830,20 +830,23 @@ impl<B: Backend> State<B> {
             self.calculate_reputation_scores();
             self.distribute_rewards();
 
-            if !self.is_participating(&index) {
-                // Todo: We can't really fail after here
-                // because changes have already been submitted above
-                // in the call to calculate_reputation_scores.
-                // Should we refactor change_epoch so it operates in two steps?
-                //  1. Validate all mutations that will be made and stage them.
-                //  2. Submit staged changes.
-                // Then, `clear_content_registry` could become
-                // `stage_clear_content_registry' and return the new state for the
-                // tables instead of applying the changes itself.
-                //
-                // Note: Unless there is a bug in the content registry system,
-                // this operation should not fail.
-                let _ = self.clear_content_registry(&index);
+            // Todo: avoid many calls to `get_node_registry` in this method.
+            for (index, info) in self.get_node_registry() {
+                if self.is_not_participating(info) {
+                    // Todo: We can't really fail after here
+                    // because changes have already been submitted above
+                    // in the call to calculate_reputation_scores.
+                    // Should we refactor change_epoch so it operates in two steps?
+                    //  1. Validate all mutations that will be made and stage them.
+                    //  2. Submit staged changes.
+                    // Then, `clear_content_registry` could become
+                    // `stage_clear_content_registry' and return the new state for the
+                    // tables instead of applying the changes itself.
+                    //
+                    // Note: Unless there is a bug in the content registry system,
+                    // this operation should not fail.
+                    let _ = self.clear_content_registry(&index);
+                }
             }
 
             // Clear executed digests.
@@ -1791,16 +1794,9 @@ impl<B: Backend> State<B> {
         }
     }
 
-    fn is_participating(&self, node_index: &NodeIndex) -> bool {
-        let info = match self.node_info.get(node_index) {
-            None => return false,
-            Some(info) => info,
-        };
-        // Todo: is the True variant enough here?
-        matches!(
-            info.participation,
-            Participation::True | Participation::OptedIn
-        )
+    #[inline]
+    fn is_not_participating(&self, info: NodeInfo) -> bool {
+        matches!(info.participation, Participation::False)
     }
 
     fn clear_content_registry(&self, node_index: &NodeIndex) -> Result<(), ExecutionError> {
