@@ -57,7 +57,7 @@ pub trait ApplicationInterface<C: Collection>:
     }
 
     /// The type for the sync query executor.
-    type SyncExecutor: SyncQueryRunnerInterface + QueryRunnerExt;
+    type SyncExecutor: QueryRunnerExt;
 
     /// Create a new instance of the application layer using the provided configuration.
     fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self>;
@@ -169,7 +169,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 }
 
 #[infusion::blank]
-pub trait QueryRunnerExt: Clone + Send + Sync + 'static {
+pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     /// Returns the chain id
     fn get_chain_id(&self) -> u32;
 
