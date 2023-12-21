@@ -207,15 +207,15 @@ pub struct NodeInfoWithIndex {
 
 #[rustfmt::skip]
 #[derive(
-    Debug, 
-    Hash, 
-    PartialEq, 
-    PartialOrd, 
-    Ord, 
-    Eq, 
-    Serialize, 
-    Deserialize, 
-    Clone, 
+    Debug,
+    Hash,
+    PartialEq,
+    PartialOrd,
+    Ord,
+    Eq,
+    Serialize,
+    Deserialize,
+    Clone,
     schemars::JsonSchema,
 )]
 /// The ports a node has open for its processes
@@ -246,15 +246,15 @@ impl Default for NodePorts {
 /// The ports a node has open for the handshake server
 #[rustfmt::skip]
 #[derive(
-    Debug, 
-    Hash, 
-    PartialEq, 
-    PartialOrd, 
-    Ord, 
-    Eq, 
-    Serialize, 
-    Deserialize, 
-    Clone, 
+    Debug,
+    Hash,
+    PartialEq,
+    PartialOrd,
+    Ord,
+    Eq,
+    Serialize,
+    Deserialize,
+    Clone,
     schemars::JsonSchema,
 )]
 pub struct HandshakePorts {

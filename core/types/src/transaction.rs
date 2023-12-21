@@ -470,17 +470,18 @@ impl ToDigest for UpdatePayload {
                     .with("mempool_port", &ports.as_ref().map(|p| p.mempool))
                     .with("rpc_port", &ports.as_ref().map(|p| p.rpc))
                     .with("pool_port", &ports.as_ref().map(|p| p.pool))
+                    .with("pinger_port", &ports.as_ref().map(|p| p.pinger))
                     .with(
                         "handshake_http_port",
                         &ports.as_ref().map(|p| p.handshake.http),
                     )
                     .with(
                         "handshake_webrtc_port",
-                        &ports.as_ref().map(|p| p.handshake.http),
+                        &ports.as_ref().map(|p| p.handshake.webrtc),
                     )
                     .with(
                         "handshake_webtransport_port",
-                        &ports.as_ref().map(|p| p.handshake.http),
+                        &ports.as_ref().map(|p| p.handshake.webtransport),
                     )
             },
             UpdateMethod::StakeLock { node, locked_for } => {
