@@ -222,6 +222,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Returns nodes that are providing the content addressed by the cid.
     fn cid_to_providers(&self, cid: &Blake3Hash) -> Vec<NodeIndex>;
+
+    /// Returns the node's content registry.
+    fn content_registry(&self, node_index: &NodeIndex) -> Vec<Blake3Hash>;
 }
 
 #[derive(Clone, Debug)]

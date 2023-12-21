@@ -553,4 +553,14 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 .unwrap_or_default()
         })
     }
+
+    fn content_registry(&self, node_index: &NodeIndex) -> Vec<Blake3Hash> {
+        self.inner.run(|ctx| {
+            self._node_to_cid
+                .get(ctx)
+                .get(node_index)
+                .map(|nodes| nodes.into_iter().collect::<Vec<_>>())
+                .unwrap_or_default()
+        })
+    }
 }
