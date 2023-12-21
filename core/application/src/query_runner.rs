@@ -1,8 +1,7 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::time::Duration;
 
 use atomo::{Atomo, KeyIterator, QueryPerm, ResolvedTableReference};
-use autometrics::autometrics;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::application::SyncQueryRunnerInterface;
@@ -12,11 +11,9 @@ use lightning_interfaces::types::{
     Committee,
     CommodityTypes,
     Epoch,
-    EpochInfo,
     Metadata,
     NodeIndex,
     NodeInfo,
-    NodeInfoWithIndex,
     NodeServed,
     ProtocolParams,
     ReportedReputationMeasurements,
@@ -29,7 +26,7 @@ use lightning_interfaces::types::{
     TxHash,
     Value,
 };
-use lightning_interfaces::{PagingParams, QueryRunnerExt};
+use lightning_interfaces::QueryRunnerExt;
 
 use crate::state::State;
 use crate::storage::AtomoStorage;
@@ -121,6 +118,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .map(selector)
     }
 
+    #[inline]
     fn get_node_table_iter<V>(&self, closure: impl FnOnce(KeyIterator<NodeIndex>) -> V) -> V {
         self.inner
             .run(|ctx| closure(self.node_table.get(ctx).keys()))
@@ -163,9 +161,17 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .run(|ctx| self.rep_measurements.get(ctx).get(node))
     }
 
-    fn get_latencies(&self, node_1: &NodeIndex, node_2: &NodeIndex) -> Option<Duration> {
+    fn get_latencies(&self, nodes: &(NodeIndex, NodeIndex)) -> Option<Duration> {
+        self.inner.run(|ctx| self.latencies.get(ctx).get(nodes))
+    }
+
+    /// Returns an Iterator to Latencies Table
+    fn get_latencies_iter<V>(
+        &self,
+        closure: impl FnOnce(KeyIterator<(NodeIndex, NodeIndex)>) -> V,
+    ) -> V {
         self.inner
-            .run(|ctx| self.latencies.get(ctx).get((*node_1, *node_2)))
+            .run(|ctx| closure(self.latencies.get(ctx).keys()))
     }
 
     fn get_reputation_score(&self, node: &NodeIndex) -> Option<u8> {
@@ -213,172 +219,4 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 }
 
-impl QueryRunnerExt for QueryRunner {
-    fn get_chain_id(&self) -> u32 {
-        match self.get_metadata(&Metadata::ChainId) {
-            Some(Value::ChainId(id)) => id,
-            _ => 0,
-        }
-    }
-
-    /// Returns the committee members of the current epoch
-    #[autometrics]
-    fn get_committee_members(&self) -> Vec<NodePublicKey> {
-        self.get_committee_members_by_index()
-            .into_iter()
-            .filter_map(|node_index| self.index_to_pubkey(&node_index))
-            .collect()
-    }
-
-    fn get_committee_members_by_index(&self) -> Vec<NodeIndex> {
-        self.inner.run(|ctx| {
-            // get current epoch
-            let epoch = match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
-                Some(Value::Epoch(epoch)) => epoch,
-                _ => 0,
-            };
-
-            self.committee_table
-                .get(ctx)
-                .get(epoch)
-                .map(|c| c.members)
-                .unwrap_or_default()
-        })
-    }
-
-    fn get_current_epoch(&self) -> Epoch {
-        match self.get_metadata(&Metadata::Epoch) {
-            Some(Value::Epoch(epoch)) => epoch,
-            _ => 0,
-        }
-    }
-
-    fn get_epoch_info(&self) -> EpochInfo {
-        self.inner.run(|ctx| {
-            let node_table = self.node_table.get(ctx);
-
-            // get current epoch
-            let epoch = match self.metadata_table.get(ctx).get(&Metadata::Epoch) {
-                Some(Value::Epoch(epoch)) => epoch,
-                _ => 0,
-            };
-
-            // look up current committee
-            let committee = self.committee_table.get(ctx).get(epoch).unwrap_or_default();
-
-            EpochInfo {
-                committee: committee
-                    .members
-                    .iter()
-                    .filter_map(|member| node_table.get(member))
-                    .collect(),
-                epoch,
-                epoch_end: committee.epoch_end_timestamp,
-            }
-        })
-    }
-
-    fn get_current_latencies(&self) -> HashMap<(NodePublicKey, NodePublicKey), Duration> {
-        let pub_key_selector = { |n: NodeInfo| n.public_key };
-        self.inner.run(|ctx| {
-            let latencies_table = self.latencies.get(ctx);
-            let node_table = self.node_table.get(ctx);
-
-            latencies_table
-                .keys()
-                .filter_map(|key| latencies_table.get(key).map(|latency| (key, latency)))
-                .filter_map(|((index_lhs, index_rhs), latency)| {
-                    let node_lhs = node_table.get(index_lhs).map(pub_key_selector);
-                    let node_rhs = node_table.get(index_rhs).map(pub_key_selector);
-                    match (node_lhs, node_rhs) {
-                        (Some(node_lhs), Some(node_rhs)) => Some(((node_lhs, node_rhs), latency)),
-                        _ => None,
-                    }
-                })
-                .collect()
-        })
-    }
-
-    fn get_genesis_committee(&self) -> Vec<(NodeIndex, NodeInfo)> {
-        self.inner.run(|ctx| {
-            let node_table = self.node_table.get(ctx);
-
-            match self
-                .metadata_table
-                .get(ctx)
-                .get(&Metadata::GenesisCommittee)
-            {
-                Some(Value::GenesisCommittee(committee)) => committee
-                    .iter()
-                    .filter_map(|index| node_table.get(index).map(|node_info| (*index, node_info)))
-                    .collect(),
-                _ => {
-                    // unreachable seeded at genesis
-                    Vec::new()
-                },
-            }
-        })
-    }
-
-    fn get_last_block(&self) -> [u8; 32] {
-        match self.get_metadata(&Metadata::LastBlockHash) {
-            Some(Value::Hash(hash)) => hash,
-            _ => [0; 32],
-        }
-    }
-
-    fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfoWithIndex> {
-        self.inner.run(|ctx| {
-            let staking_amount: HpUfixed<18> = self.get_staking_amount().into();
-            let node_table = self.node_table.get(ctx);
-
-            let closure = {
-                |nodes: KeyIterator<NodeIndex>| -> Vec<NodeInfoWithIndex> {
-                    let nodes = nodes.map(|index| NodeInfoWithIndex {
-                        index,
-                        info: node_table.get(index).unwrap(),
-                    });
-                    match paging {
-                        None => nodes
-                            .filter(|node| node.info.stake.staked >= staking_amount)
-                            .collect(),
-                        Some(PagingParams {
-                            ignore_stake,
-                            limit,
-                            start,
-                        }) => {
-                            let mut nodes = nodes
-                                .filter(|node| {
-                                    ignore_stake || node.info.stake.staked >= staking_amount
-                                })
-                                .collect::<Vec<NodeInfoWithIndex>>();
-
-                            nodes.sort_by_key(|info| info.index);
-
-                            nodes
-                                .into_iter()
-                                .filter(|info| info.index >= start)
-                                .take(limit)
-                                .collect()
-                        },
-                    }
-                }
-            };
-
-            self.get_node_table_iter::<Vec<NodeInfoWithIndex>>(closure)
-        })
-    }
-
-    fn get_staking_amount(&self) -> u128 {
-        self.get_protocol_param(&ProtocolParams::MinimumNodeStake)
-            .unwrap_or(0)
-    }
-
-    fn is_valid_node(&self, id: &NodePublicKey) -> bool {
-        let minimum_stake_amount = self.get_staking_amount().into();
-        self.pubkey_to_index(id).is_some_and(|node_idx| {
-            self.get_node_info(&node_idx, |n| n.stake.staked)
-                .is_some_and(|node_stake| node_stake >= minimum_stake_amount)
-        })
-    }
-}
+impl QueryRunnerExt for QueryRunner {}
