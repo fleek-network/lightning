@@ -830,6 +830,22 @@ impl<B: Backend> State<B> {
             self.calculate_reputation_scores();
             self.distribute_rewards();
 
+            if !self.is_participating(&index) {
+                // Todo: We can't really fail after here
+                // because changes have already been submitted above
+                // in the call to calculate_reputation_scores.
+                // Should we refactor change_epoch so it operates in two steps?
+                //  1. Validate all mutations that will be made and stage them.
+                //  2. Submit staged changes.
+                // Then, `clear_content_registry` could become
+                // `stage_clear_content_registry' and return the new state for the
+                // tables instead of applying the changes itself.
+                //
+                // Note: Unless there is a bug in the content registry system,
+                // this operation should not fail.
+                let _ = self.clear_content_registry(&index);
+            }
+
             // Clear executed digests.
             for digest in self.executed_digests.keys() {
                 self.executed_digests.remove(&digest);
@@ -1773,5 +1789,42 @@ impl<B: Backend> State<B> {
             // unreachable set at genesis
             0
         }
+    }
+
+    fn is_participating(&self, node_index: &NodeIndex) -> bool {
+        let info = match self.node_info.get(node_index) {
+            None => return false,
+            Some(info) => info,
+        };
+        // Todo: is the True variant enough here?
+        matches!(
+            info.participation,
+            Participation::True | Participation::OptedIn
+        )
+    }
+
+    fn clear_content_registry(&self, node_index: &NodeIndex) -> Result<(), ExecutionError> {
+        let cids = self.node_to_cid.get(node_index).unwrap_or_default();
+
+        // Let's stage the changes before applying.
+        let mut staged_cid_to_node = HashMap::new();
+        for cid in cids {
+            let mut providers = self
+                .cid_to_node
+                .get(&cid)
+                .ok_or(ExecutionError::InvalidStateForContentRemoval)?;
+            if !providers.remove(node_index) {
+                return Err(ExecutionError::InvalidStateForContentRemoval);
+            }
+            staged_cid_to_node.insert(cid, providers);
+        }
+
+        // Apply changes.
+        for (cid, providers) in staged_cid_to_node {
+            self.cid_to_node.set(cid, providers);
+        }
+        self.node_to_cid.remove(node_index);
+
+        Ok(())
     }
 }

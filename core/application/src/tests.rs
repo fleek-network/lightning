@@ -1311,6 +1311,30 @@ async fn test_uptime_participation() {
     let peer_2 = keystore[3].node_secret_key.to_pk();
     let nonce = 1;
 
+    // Add records in the content registry for all nodes.
+    let updates = vec![ContentUpdate {
+        cid: [0u8; 32],
+        remove: false,
+    }];
+    let content_registry_update =
+        prepare_content_registry_update(updates.clone(), &keystore[2].node_secret_key, 1);
+    expect_tx_success!(content_registry_update, &update_socket);
+    let content_registry_update =
+        prepare_content_registry_update(updates, &keystore[3].node_secret_key, 1);
+    expect_tx_success!(content_registry_update, &update_socket);
+
+    // Assert that registries have been updated.
+    let index_peer1 = query_runner.pubkey_to_index(peer_1).unwrap();
+    let content_registry1 = query_runner.content_registry(&index_peer1);
+    assert!(!content_registry1.is_empty());
+
+    let index_peer2 = query_runner.pubkey_to_index(peer_2).unwrap();
+    let content_registry2 = query_runner.content_registry(&index_peer2);
+    assert!(!content_registry2.is_empty());
+
+    let providers = query_runner.cid_to_providers(&[0u8; 32]);
+    assert_eq!(providers.len(), 2);
+
     let mut map = BTreeMap::new();
     let _ = update_reputation_measurements(
         &query_runner,
@@ -1345,10 +1369,8 @@ async fn test_uptime_participation() {
 
     let epoch = 0;
     // Change epoch so that rep scores will be calculated from the measurements.
-    for (i, node) in keystore.iter().enumerate().take(required_signals) {
-        // Not the prettiest solution but we have to keep track of the nonces somehow.
-        let nonce = if i < 2 { 2 } else { 1 };
-        change_epoch!(&update_socket, &node.node_secret_key, nonce, epoch);
+    for node in keystore.iter().take(required_signals) {
+        change_epoch!(&update_socket, &node.node_secret_key, 2, epoch);
     }
 
     let node_info1 = query_runner.get_node_info(&peer_1).unwrap();
@@ -1356,6 +1378,16 @@ async fn test_uptime_participation() {
 
     assert_eq!(node_info1.participation, Participation::False);
     assert_eq!(node_info2.participation, Participation::True);
+
+    // Assert that registries have been updated.
+    let content_registry1 = query_runner.content_registry(&index_peer1);
+    assert!(content_registry1.is_empty());
+
+    let content_registry2 = query_runner.content_registry(&index_peer2);
+    assert!(!content_registry2.is_empty());
+
+    let providers = query_runner.cid_to_providers(&[0u8; 32]);
+    assert_eq!(providers.len(), 1);
 }
 
 #[tokio::test]
