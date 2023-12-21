@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
@@ -49,12 +48,14 @@ pub(crate) struct Data<C: Collection> {
 
 pub struct Rpc<C: Collection> {
     config: Config,
+    
     /// The final RPCModule containting selected methods
     module: RpcModule<()>,
+
     // need interior mutability to support restarts
     handle: Mutex<Option<ServerHandle>>,
 
-    phantom: std::marker::PhantomData<C>,
+    _data: Arc<Data<C>>
 }
 
 impl<C: Collection> Rpc<C> {
@@ -148,13 +149,13 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
             archive_socket,
         });
 
-        let module = Self::create_modules_from_config(&config, data)?;
+        let module = Self::create_modules_from_config(&config, data.clone())?;
 
         Ok(Self {
             config,
             module,
             handle: Mutex::new(None),
-            phantom: PhantomData,
+            _data: data
         })
     }
 }
