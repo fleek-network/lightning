@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use affair::{Socket, Task};
 use async_trait::async_trait;
-use lightning_interfaces::application::{ExecutionEngineSocket, QueryRunnerExt};
+use lightning_interfaces::application::ExecutionEngineSocket;
 use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
@@ -14,6 +14,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     IndexSocket,
+    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use rand::Rng;
@@ -32,7 +33,7 @@ pub struct MockConsensus<C: Collection> {
     new_block_notify: Arc<Notify>,
 }
 
-struct MockConsensusInner<Q: QueryRunnerExt + 'static> {
+struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static> {
     _query_runner: Q,
     executor: ExecutionEngineSocket,
     config: Config,
@@ -124,7 +125,7 @@ impl<C: Collection> ConfigConsumer for MockConsensus<C> {
     type Config = Config;
 }
 
-impl<Q: QueryRunnerExt> MockConsensusInner<Q> {
+impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
     async fn handle(
         self: Arc<Self>,
         mut rx: mpsc::Receiver<Task<TransactionRequest, ()>>,
