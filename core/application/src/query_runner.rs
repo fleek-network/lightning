@@ -26,7 +26,6 @@ use lightning_interfaces::types::{
     TxHash,
     Value,
 };
-use lightning_interfaces::QueryRunnerExt;
 
 use crate::state::State;
 use crate::storage::AtomoStorage;
@@ -165,7 +164,6 @@ impl SyncQueryRunnerInterface for QueryRunner {
         self.inner.run(|ctx| self.latencies.get(ctx).get(nodes))
     }
 
-    /// Returns an Iterator to Latencies Table
     fn get_latencies_iter<V>(
         &self,
         closure: impl FnOnce(KeyIterator<(NodeIndex, NodeIndex)>) -> V,
@@ -218,5 +216,3 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .run(|ctx| self._node_to_cid.get(ctx).get(node_index))
     }
 }
-
-impl QueryRunnerExt for QueryRunner {}

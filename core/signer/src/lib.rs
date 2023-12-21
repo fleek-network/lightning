@@ -34,7 +34,7 @@ use lightning_interfaces::types::{
     UpdatePayload,
     UpdateRequest,
 };
-use lightning_interfaces::{ApplicationInterface, MempoolSocket, QueryRunnerExt};
+use lightning_interfaces::{ApplicationInterface, MempoolSocket, SyncQueryRunnerInterface};
 use tokio::sync::{mpsc, Notify};
 use tracing::error;
 
@@ -259,7 +259,7 @@ impl SignerInner {
         })
     }
 
-    async fn handle<Q: QueryRunnerExt>(
+    async fn handle<Q: SyncQueryRunnerInterface>(
         self: Arc<Self>,
         shutdown_notify: Arc<Notify>,
         mempool_socket: MempoolSocket,
@@ -335,7 +335,7 @@ impl SignerInner {
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn sync_with_application<Q: QueryRunnerExt>(
+    async fn sync_with_application<Q: SyncQueryRunnerInterface>(
         node_public_key: &NodePublicKey,
         node_secret_key: &NodeSecretKey,
         query_runner: &Q,

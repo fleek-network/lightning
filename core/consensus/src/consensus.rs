@@ -20,6 +20,7 @@ use lightning_interfaces::{
     IndexSocket,
     PubSub,
     QueryRunnerExt,
+    SyncQueryRunnerInterface,
 };
 use lightning_schema::AutoImplSerde;
 use mysten_metrics::RegistryService;
@@ -71,7 +72,7 @@ pub struct Consensus<C: Collection> {
 }
 
 /// This struct contains mutable state only for the current epoch.
-struct EpochState<Q: QueryRunnerExt, P: PubSub<PubSubMsg> + 'static> {
+struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     /// The node public key of the node.
     node_public_key: NodePublicKey,
     /// The consensus public key of the node.
@@ -100,7 +101,7 @@ struct EpochState<Q: QueryRunnerExt, P: PubSub<PubSubMsg> + 'static> {
 }
 
 #[allow(clippy::too_many_arguments)]
-impl<Q: QueryRunnerExt, P: PubSub<PubSubMsg> + 'static> EpochState<Q, P> {
+impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, P> {
     fn new(
         node_public_key: NodePublicKey,
         consensus_public_key: ConsensusPublicKey,

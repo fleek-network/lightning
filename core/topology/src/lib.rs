@@ -20,6 +20,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
     QueryRunnerExt,
+    SyncQueryRunnerInterface,
     TopologyInterface,
 };
 use ndarray::{Array, Array2};
@@ -38,7 +39,7 @@ impl<C: Collection> Clone for Topology<C> {
     }
 }
 
-struct TopologyInner<Q: QueryRunnerExt + 'static> {
+struct TopologyInner<Q: SyncQueryRunnerInterface + 'static> {
     query: Q,
     our_public_key: NodePublicKey,
     // TODO(qti3e): Use ArcSwap instead.
@@ -49,7 +50,7 @@ struct TopologyInner<Q: QueryRunnerExt + 'static> {
     min_nodes: usize,
 }
 
-impl<Q: QueryRunnerExt> TopologyInner<Q> {
+impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
     /// Build a latency matrix according to the current application state.
     /// Returns the matrix, a map of node ids to public keys, and an optional node index for
     /// ourselves if we're included in the topology.
