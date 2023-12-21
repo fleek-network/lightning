@@ -1,5 +1,6 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::net::IpAddr;
+use std::str::FromStr;
 use std::time::SystemTime;
 
 use affair::Socket;
@@ -19,6 +20,7 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     Block,
     BlockExecutionResponse,
+    CommodityTypes,
     DeliveryAcknowledgment,
     ExecutionData,
     ExecutionError,
@@ -28,6 +30,7 @@ use lightning_interfaces::types::{
     ProofOfConsensus,
     ProtocolParams,
     ReputationMeasurements,
+    Staking,
     Tokens,
     TotalServed,
     TransactionRequest,
@@ -50,7 +53,7 @@ use lightning_test_utils::{random, reputation};
 
 use crate::app::Application;
 use crate::config::{Config, Mode, StorageConfig};
-use crate::genesis::{Genesis, GenesisNode};
+use crate::genesis::{Genesis, GenesisAccount, GenesisNode, GenesisPrices, GenesisService};
 use crate::query_runner::QueryRunner;
 
 partial!(TestBinding {
@@ -415,9 +418,128 @@ macro_rules! assert_paging_node_registry {
     }};
 }
 
-/// Load Tests Genesis configuration
+/// Prepare Genesis Node's Ports
+fn test_genesis_ports(index: u16) -> NodePorts {
+    let base: u16 = index * 10000;
+    NodePorts {
+        primary: base + 4310,
+        worker: base + 4311,
+        mempool: base + 4210,
+        rpc: base + 4230,
+        pool: base + 4300,
+        pinger: base + 4350,
+        handshake: HandshakePorts {
+            http: base + 4220,
+            webrtc: base + 4320,
+            webtransport: base + 4321,
+        },
+    }
+}
+
+/// Prepare Test Genesis
 fn test_genesis() -> Genesis {
-    Genesis::load().expect("Failed to load genesis from file.")
+    let genesis_node_owner =
+        EthAddress::from_str("0x959807B8D94B324A74117956731F09E2893aCd72").unwrap();
+    let domain = "127.0.0.1".parse().unwrap();
+
+    let node_pub_key_1 =
+        NodePublicKey::from_str("F5tV4PLSzx1Lt4mYBe13aYQ8hsLMTCfjgY2pLr82AumH").unwrap();
+    let consensus_key_1 = ConsensusPublicKey::from_str("u76G7q22Qc5nRC5Fi6dzbNE7FQxqRKEtTS9qjDftWFwhBKmoozGLv8wFiFmGnYDFMEKyYxozWRdM3wgjs1Na3fvxDARxi9CSNJUZJfPXC2WUu3uLnUw96jPBRp7rtHEzS5H").unwrap();
+    let node_pub_key_2 =
+        NodePublicKey::from_str("Qt1DzUoTEn7n4itYpAPhaDsXhcriuXe1e7n7uZztGfg").unwrap();
+    let consensus_key_2 = ConsensusPublicKey::from_str("21cq5icj1pWKk9DBwdUFSW6nqBrwtzHtvKWcLNrqFRxZV8UbdKYzdoSs8C1u7s7M4FKADDqsHnxETh56hdSK2Z65nsbW3xME1fNcT1s8dfHwCFk567mV4fmSSgH73mTe1H3a").unwrap();
+    let node_pub_key_3 =
+        NodePublicKey::from_str("8XT8Kb1PCd2kzmwHLQ8Nw9aAuKJin6tihaPQBCyf6ymn").unwrap();
+    let consensus_key_3 = ConsensusPublicKey::from_str("uNHES9wjYK3HkbcPWrBiQQZ2NmcfBVKke8tbH9X7RFT9ZvjL5f55FfPvpjh2RWpxTRyMhKAxYG42TaRv2RGyEZkYcx2aJMfgPYqYaiT8KC1EPHzJYgVmYc7z2ER69LNWC7r").unwrap();
+    let node_pub_key_4 =
+        NodePublicKey::from_str("DA3mDUC5y7s5dNF4bL5MfTy7TtXjwt16rtspGuJcwZHS").unwrap();
+    let consensus_key_4 = ConsensusPublicKey::from_str("rnSokyL9vj1cnxsrHVmuMCP677Ns4Xh6N5FmfKvjinxVCA9W8w6DiqXSQTX92TtoapS5eqcHCuKnNKamqxh5MnLpHGZ9UkjKUPWsc7hnQXqQobHTXdw1GSh88wEir94mEba").unwrap();
+
+    let test_staking = Staking {
+        staked: HpUfixed::<18>::from(1000u32),
+        stake_locked_until: 0,
+        locked: HpUfixed::<18>::zero(),
+        locked_until: 0,
+    };
+
+    let genesis_nodes: Vec<GenesisNode> = vec![
+        (node_pub_key_1, consensus_key_1),
+        (node_pub_key_2, consensus_key_2),
+        (node_pub_key_3, consensus_key_3),
+        (node_pub_key_4, consensus_key_4),
+    ]
+    .iter()
+    .enumerate()
+    .map(|(pos, (pub_key, consensus_key))| {
+        GenesisNode::new(
+            genesis_node_owner,
+            *pub_key,
+            domain,
+            *consensus_key,
+            domain,
+            *pub_key,
+            test_genesis_ports(pos as u16 + 1),
+            Some(test_staking.clone()),
+            true,
+        )
+    })
+    .collect();
+
+    let protocol_address =
+        EthAddress::from_str("0x2a8cf657769c264b0c7f88e3a716afdeaec1c318").unwrap();
+
+    Genesis {
+        chain_id: 1337,
+        epoch_start: 1684276288383,
+        epoch_time: 120000,
+        committee_size: 10,
+        min_stake: 1000,
+        eligibility_time: 1,
+        lock_time: 5,
+        protocol_share: 0,
+        node_share: 80,
+        service_builder_share: 20,
+        max_inflation: 10,
+        consumer_rebate: 0,
+        max_boost: 4,
+        // 1460 days(epoch) meaning 4 years
+        max_lock_time: 1460,
+        // Set to 1 million for testing, to be determined when initial allocations are set
+        supply_at_genesis: 1000000,
+        protocol_fund_address: protocol_address,
+        governance_address: protocol_address,
+        node_info: genesis_nodes,
+        service: vec![
+            GenesisService {
+                id: 0,
+                owner: EthAddress::from_str("0xDC0A31F9eeb151f82BF1eE6831095284fC215Ee7").unwrap(),
+                commodity_type: CommodityTypes::Bandwidth,
+            },
+            GenesisService {
+                id: 1,
+                owner: EthAddress::from_str("0x684166BDbf530a256d7c92Fa0a4128669aFd9B9F").unwrap(),
+                commodity_type: CommodityTypes::Compute,
+            },
+        ],
+        account: vec![GenesisAccount {
+            public_key: genesis_node_owner,
+            flk_balance: HpUfixed::<18>::from(100690000000000000000u128),
+            stables_balance: 100,
+            bandwidth_balance: 100,
+        }],
+        commodity_prices: vec![
+            GenesisPrices {
+                commodity: CommodityTypes::Bandwidth,
+                price: 0.1,
+            },
+            GenesisPrices {
+                commodity: CommodityTypes::Compute,
+                price: 0.2,
+            },
+        ],
+        total_served: HashMap::new(),
+        latencies: None,
+    }
 }
 
 /// Initialize application state with provided or default configuration.
