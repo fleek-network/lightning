@@ -29,7 +29,7 @@ pub struct Putter<S> {
 enum PutterMode {
     WithIncrementalVerification {
         root_hash: [u8; 32],
-        verifier: IncrementalVerifier,
+        verifier: Box<IncrementalVerifier>,
     },
     Trusted {
         counter: usize,
@@ -48,7 +48,7 @@ where
             store,
             PutterMode::WithIncrementalVerification {
                 root_hash: root,
-                verifier,
+                verifier: Box::new(verifier),
             },
         )
     }
