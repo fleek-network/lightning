@@ -51,7 +51,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
     /// 1. `SERVICE_ID`
     /// 2. `BLOCKSTORE_PATH`
     /// 3. `IPC_PATH`
-    async fn run_service(id: u32);
+    fn run_service(id: u32);
 }
 
 #[async_trait]

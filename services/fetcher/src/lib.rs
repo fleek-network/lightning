@@ -48,6 +48,7 @@ impl From<Origin> for ApiOrigin {
     }
 }
 
+#[tokio::main]
 pub async fn main() {
     fn_sdk::ipc::init_from_env();
     info!("Initialized IPFS fetcher service!");

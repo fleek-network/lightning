@@ -99,13 +99,13 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
         }
     }
 
-    async fn run_service(id: u32) {
+    fn run_service(id: u32) {
         match id {
             0 => {
-                fleek_service_fetcher::main().await;
+                fleek_service_fetcher::main();
             },
             1001 => {
-                crate::test_services::io_stress::main().await;
+                crate::test_services::io_stress::main();
             },
             _ => eprintln!("Service {id} not found."),
         }

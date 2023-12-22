@@ -102,6 +102,7 @@ async fn connection_loop(conn: Connection) {
     }
 }
 
+#[tokio::main]
 pub async fn main() {
     fn_sdk::ipc::init_from_env();
     info!("Running io_stress service!");
