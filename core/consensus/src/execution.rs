@@ -7,11 +7,11 @@ use lightning_interfaces::types::{Block, Epoch, IndexRequest, NodeIndex, Transac
 use lightning_interfaces::{
     ExecutionEngineSocket,
     IndexSocket,
-    QueryRunnerExt,
     SyncQueryRunnerInterface,
     ToDigest,
     TranscriptBuilder,
 };
+use lightning_utils::application::QueryRunnerExt;
 use narwhal_crypto::DefaultHashFunction;
 use narwhal_executor::ExecutionState;
 use narwhal_types::{BatchAPI, BatchDigest, ConsensusOutput, Transaction};

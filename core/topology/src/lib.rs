@@ -19,10 +19,10 @@ use lightning_interfaces::types::Participation;
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
-    QueryRunnerExt,
     SyncQueryRunnerInterface,
     TopologyInterface,
 };
+use lightning_utils::application::QueryRunnerExt;
 use ndarray::{Array, Array2};
 use rand::SeedableRng;
 use tracing::info;

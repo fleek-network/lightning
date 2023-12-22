@@ -26,7 +26,8 @@ use lightning_interfaces::types::{
     TransactionRequest,
     Value,
 };
-use lightning_interfaces::{PagingParams, QueryRunnerExt, SyncQueryRunnerInterface};
+use lightning_interfaces::{PagingParams, SyncQueryRunnerInterface};
+use lightning_utils::application::QueryRunnerExt;
 
 use crate::api::FleekApiServer;
 use crate::error::RPCError;

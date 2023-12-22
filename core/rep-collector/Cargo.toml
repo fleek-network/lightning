@@ -20,6 +20,7 @@ tracing.workspace = true
 
 [dev-dependencies]
 lightning-test-utils = {path="../test-utils"}
+lightning-utils = { path = "../utils" }
 lightning-signer = {path="../signer"}
 lightning-application = {path="../application", features = ["test"]}
 lightning-notifier = {path="../notifier"}

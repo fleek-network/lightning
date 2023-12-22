@@ -4771,7 +4771,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "atomo",
- "autometrics",
  "blake3-tree",
  "bytes",
  "fleek-crypto",
@@ -4847,6 +4846,7 @@ dependencies = [
  "infusion",
  "lightning-application",
  "lightning-interfaces",
+ "lightning-utils",
  "tokio",
 ]
 
@@ -4930,6 +4930,7 @@ dependencies = [
  "lightning-rep-collector",
  "lightning-signer",
  "lightning-test-utils",
+ "lightning-utils",
  "rand 0.8.5",
  "serde",
  "tokio",
@@ -4969,6 +4970,7 @@ dependencies = [
  "lightning-rep-collector",
  "lightning-signer",
  "lightning-topology",
+ "lightning-utils",
  "quinn",
  "rcgen 0.11.3",
  "ring 0.16.20",
@@ -4999,6 +5001,7 @@ dependencies = [
  "lightning-reputation",
  "lightning-signer",
  "lightning-test-utils",
+ "lightning-utils",
  "lru",
  "rand 0.8.5",
  "scc",
@@ -5068,6 +5071,7 @@ dependencies = [
  "lightning-pool",
  "lightning-rep-collector",
  "lightning-signer",
+ "lightning-utils",
  "reqwest",
  "ruint",
  "serde",
@@ -5202,6 +5206,7 @@ dependencies = [
  "infusion",
  "lightning-application",
  "lightning-interfaces",
+ "lightning-utils",
  "mcmf",
  "ndarray",
  "ndarray-rand",
@@ -5240,8 +5245,11 @@ dependencies = [
 name = "lightning-utils"
 version = "0.0.0"
 dependencies = [
+ "autometrics",
  "ethers",
  "fleek-crypto",
+ "lightning-interfaces",
+ "lightning-types",
  "tokio",
  "tracing",
 ]

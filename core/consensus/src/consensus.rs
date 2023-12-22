@@ -19,10 +19,10 @@ use lightning_interfaces::{
     BroadcastInterface,
     IndexSocket,
     PubSub,
-    QueryRunnerExt,
     SyncQueryRunnerInterface,
 };
 use lightning_schema::AutoImplSerde;
+use lightning_utils::application::QueryRunnerExt;
 use mysten_metrics::RegistryService;
 use mysten_network::Multiaddr;
 use narwhal_config::{Committee, CommitteeBuilder, WorkerCache, WorkerIndex, WorkerInfo};

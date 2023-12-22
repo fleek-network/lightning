@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 infusion.workspace = true
 anyhow.workspace = true
-autometrics.workspace = true
 serde.workspace = true
 serde-big-array.workspace = true
 async-trait.workspace = true
