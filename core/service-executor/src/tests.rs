@@ -150,7 +150,7 @@ async fn init_service_executor(
         ConsensusConfig::default(),
         &signer,
         update_socket.clone(),
-        query_runner,
+        query_runner.clone(),
         broadcast.get_pubsub(Topic::Consensus),
         None,
     )
@@ -214,8 +214,13 @@ async fn init_service_executor(
         ipc_path: path.join("ipc").try_into().unwrap(),
     };
 
-    let service_exec =
-        ServiceExecutor::<TestBinding>::init(config, &blockstore, fetcher.get_socket()).unwrap();
+    let service_exec = ServiceExecutor::<TestBinding>::init(
+        config,
+        &blockstore,
+        fetcher.get_socket(),
+        query_runner,
+    )
+    .unwrap();
 
     broadcast.start().await;
     ipfs_origin.start().await;

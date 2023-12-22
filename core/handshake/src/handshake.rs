@@ -314,6 +314,7 @@ mod tests {
             ServiceExecutorConfig::test_default(),
             &blockstore,
             affair::Socket::raw_bounded(1).0,
+            Default::default(),
         )?;
         signer.start().await;
         service_executor.start().await;

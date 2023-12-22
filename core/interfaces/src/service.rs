@@ -1,10 +1,12 @@
 use async_trait::async_trait;
+use infusion::c;
 use tokio::net::UnixStream;
 
 use crate::blockstore::BlockStoreInterface;
 use crate::infu_collection::Collection;
 use crate::types::ServiceId;
 use crate::{
+    ApplicationInterface,
     ConfigConsumer,
     ConfigProviderInterface,
     FetcherInterface,
@@ -26,8 +28,14 @@ pub trait ServiceExecutorInterface<C: Collection>:
         config: ::ConfigProviderInterface,
         blockstore: ::BlockStoreInterface,
         fetcher: ::FetcherInterface,
+        app: ::ApplicationInterface,
     ) {
-        Self::init(config.get::<Self>(), blockstore, fetcher.get_socket())
+        Self::init(
+            config.get::<Self>(),
+            blockstore,
+            fetcher.get_socket(),
+            app.sync_query(),
+        )
     }
 
     /// The provider which can be used to get a handle on a service during runtime.
@@ -38,6 +46,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
         config: Self::Config,
         blockstore: &C::BlockStoreInterface,
         fetcher_socket: FetcherSocket,
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self>;
 
     /// Returns the service handle provider which can be used establish connections to the

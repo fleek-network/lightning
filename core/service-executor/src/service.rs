@@ -5,7 +5,9 @@ use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use fn_sdk::ipc_types::{self, IpcMessage};
-use lightning_interfaces::FetcherSocket;
+use infusion::c;
+use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::{ApplicationInterface, FetcherSocket};
 use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::process::Command;
@@ -15,14 +17,16 @@ use tokio::{pin, select};
 use triomphe::Arc;
 
 /// The shared object with every service.
-pub struct Context {
+#[allow(unused)]
+pub struct Context<C: Collection> {
     pub kill: Arc<Notify>,
     pub blockstore_path: PathBuf,
     pub ipc_path: PathBuf,
     pub fetcher_socket: FetcherSocket,
+    pub query_runner: c!(C::ApplicationInterface::SyncExecutor),
 }
 
-impl Context {
+impl<C: Collection> Context<C> {
     pub async fn run(&self, request: ipc_types::Request) -> ipc_types::Response {
         match request {
             ipc_types::Request::QueryClientBalance { pk: _ } => {
@@ -89,7 +93,7 @@ impl ServiceCollection {
 pub struct ServiceHandle {}
 
 #[allow(unused)]
-pub async fn spawn_service(id: u32, cx: Arc<Context>) -> ServiceHandle {
+pub async fn spawn_service<C: Collection>(id: u32, cx: Arc<Context<C>>) -> ServiceHandle {
     let ipc_dir = cx.ipc_path.join(format!("service-{id}"));
     tracing::trace!("Spawning service {id} [IPC={ipc_dir:?}.");
 
@@ -131,7 +135,11 @@ pub async fn spawn_service(id: u32, cx: Arc<Context>) -> ServiceHandle {
     ServiceHandle {}
 }
 
-async fn run_ctrl_loop(ipc_path: &Path, ctx: Arc<Context>, cmd_permit: Arc<Notify>) {
+async fn run_ctrl_loop<C: Collection>(
+    ipc_path: &Path,
+    ctx: Arc<Context<C>>,
+    cmd_permit: Arc<Notify>,
+) {
     let ctrl_path = ipc_path.join("ctrl");
 
     // The file might not exist so ignore the error.
@@ -167,7 +175,10 @@ async fn run_ctrl_loop(ipc_path: &Path, ctx: Arc<Context>, cmd_permit: Arc<Notif
     drop(listener);
 }
 
-async fn handle_stream(stream: UnixStream, ctx: Arc<Context>) -> Result<(), Box<dyn Error>> {
+async fn handle_stream<C: Collection>(
+    stream: UnixStream,
+    ctx: Arc<Context<C>>,
+) -> Result<(), Box<dyn Error>> {
     const IPC_MESSAGE_SIZE: usize = std::mem::size_of::<ipc_types::IpcMessage>();
     const IPC_REQUEST_SIZE: usize = std::mem::size_of::<ipc_types::IpcRequest>();
 

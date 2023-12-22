@@ -8,6 +8,7 @@ edition.workspace = true
 [dependencies]
 lightning-interfaces = { path = "../interfaces/" }
 fn-sdk = { path = "../../lib/sdk" }
+infusion.workspace = true
 tokio.workspace = true
 async-trait.workspace = true
 anyhow.workspace = true
@@ -45,4 +46,3 @@ lightning-topology = {path="../topology"}
 lightning-test-utils = { path="../test-utils" }
 lightning-rep-collector = {path="../rep-collector"}
 fleek-crypto.workspace = true
-infusion.workspace = true
