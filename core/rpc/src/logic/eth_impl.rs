@@ -18,7 +18,8 @@ use hp_fixed::unsigned::HpUfixed;
 use jsonrpsee::core::RpcResult;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{ArchiveRequest, ArchiveResponse};
-use lightning_interfaces::{QueryRunnerExt, SyncQueryRunnerInterface};
+use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_utils::application::QueryRunnerExt;
 use tracing::trace;
 
 use crate::api::EthApiServer;

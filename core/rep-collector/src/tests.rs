@@ -18,7 +18,6 @@ use lightning_interfaces::signer::SignerInterface;
 use lightning_interfaces::types::{Block, NodePorts, UpdateMethod, UpdatePayload, UpdateRequest};
 use lightning_interfaces::{
     partial,
-    QueryRunnerExt,
     ReputationQueryInteface,
     SyncQueryRunnerInterface,
     ToDigest,
@@ -27,6 +26,7 @@ use lightning_interfaces::{
 use lightning_notifier::Notifier;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+use lightning_utils::application::QueryRunnerExt;
 
 use crate::aggregator::ReputationAggregator;
 use crate::config::Config;

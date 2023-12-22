@@ -54,11 +54,11 @@ use lightning_interfaces::{
     ApplicationInterface,
     ExecutionEngineSocket,
     PagingParams,
-    QueryRunnerExt,
     SyncQueryRunnerInterface,
     ToDigest,
 };
 use lightning_test_utils::{random, reputation};
+use lightning_utils::application::QueryRunnerExt;
 
 use crate::app::Application;
 use crate::config::{Config, Mode, StorageConfig};

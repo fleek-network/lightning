@@ -20,12 +20,12 @@ use lightning_interfaces::{
     BlockStoreServerSocket,
     ConfigConsumer,
     Notification,
-    QueryRunnerExt,
     SignerInterface,
     SyncQueryRunnerInterface,
     SyncronizerInterface,
     WithStartAndShutdown,
 };
+use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
 use tokio::sync::mpsc::Receiver;

@@ -12,12 +12,12 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{
     ApplicationInterface,
-    QueryRunnerExt,
     RequestHeader,
     ServiceScope,
     SyncQueryRunnerInterface,
 };
 use lightning_metrics::histogram;
+use lightning_utils::application::QueryRunnerExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};

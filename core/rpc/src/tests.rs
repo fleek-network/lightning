@@ -46,7 +46,6 @@ use lightning_interfaces::{
     OriginProviderInterface,
     PagingParams,
     PoolInterface,
-    QueryRunnerExt,
     ReputationAggregatorInterface,
     RpcInterface,
     SignerInterface,
@@ -58,6 +57,7 @@ use lightning_origin_ipfs::{Config as OriginIPFSConfig, IPFSOrigin};
 use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{Config as SignerConfig, Signer};
+use lightning_utils::application::QueryRunnerExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;

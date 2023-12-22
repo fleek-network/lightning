@@ -17,6 +17,7 @@ fleek-crypto.workspace = true
 futures.workspace = true
 lightning-interfaces = { path="../interfaces" }
 lightning-metrics = { path = "../metrics" }
+lightning-utils = { path = "../utils" }
 tracing.workspace = true
 serde.workspace = true
 tokio.workspace = true

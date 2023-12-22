@@ -14,13 +14,13 @@ use lightning_interfaces::{
     Notification,
     NotifierInterface,
     PingerInterface,
-    QueryRunnerExt,
     ReputationAggregatorInterface,
     ReputationReporterInterface,
     SignerInterface,
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
+use lightning_utils::application::QueryRunnerExt;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};

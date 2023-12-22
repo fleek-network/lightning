@@ -4,13 +4,8 @@ use std::time::Duration;
 
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::Epoch;
-use lightning_interfaces::{
-    BroadcastEventInterface,
-    PubSub,
-    QueryRunnerExt,
-    SyncQueryRunnerInterface,
-    ToDigest,
-};
+use lightning_interfaces::{BroadcastEventInterface, PubSub, SyncQueryRunnerInterface, ToDigest};
+use lightning_utils::application::QueryRunnerExt;
 use quick_cache::unsync::Cache;
 use tokio::pin;
 use tokio::sync::{mpsc, Notify};

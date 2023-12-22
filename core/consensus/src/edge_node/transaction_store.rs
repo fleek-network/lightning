@@ -3,7 +3,8 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
-use lightning_interfaces::{QueryRunnerExt, SyncQueryRunnerInterface};
+use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_utils::application::QueryRunnerExt;
 
 use super::ring_buffer::RingBuffer;
 use crate::execution::{AuthenticStampedParcel, Digest, Execution};
