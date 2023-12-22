@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 
 use anyhow::{Context, Result};
-use fleek_crypto::{ConsensusPublicKey, EthAddress, NodePublicKey};
+use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
     CommodityTypes,
@@ -35,6 +35,7 @@ pub struct Genesis {
     pub node_info: Vec<GenesisNode>,
     pub service: Vec<GenesisService>,
     pub account: Vec<GenesisAccount>,
+    pub client: HashMap<ClientPublicKey, EthAddress>,
     pub commodity_prices: Vec<GenesisPrices>,
     pub supply_at_genesis: u64,
     pub protocol_fund_address: EthAddress,

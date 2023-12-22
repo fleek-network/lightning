@@ -4,10 +4,11 @@ use std::process::Stdio;
 use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
+use fleek_crypto::ClientPublicKey;
 use fn_sdk::ipc_types::{self, IpcMessage};
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::{ApplicationInterface, FetcherSocket};
+use lightning_interfaces::{ApplicationInterface, FetcherSocket, SyncQueryRunnerInterface};
 use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::process::Command;
@@ -17,7 +18,6 @@ use tokio::{pin, select};
 use triomphe::Arc;
 
 /// The shared object with every service.
-#[allow(unused)]
 pub struct Context<C: Collection> {
     pub kill: Arc<Notify>,
     pub blockstore_path: PathBuf,
@@ -29,9 +29,9 @@ pub struct Context<C: Collection> {
 impl<C: Collection> Context<C> {
     pub async fn run(&self, request: ipc_types::Request) -> ipc_types::Response {
         match request {
-            ipc_types::Request::QueryClientBalance { pk: _ } => {
-                // TODO(qti3e)
-                ipc_types::Response::QueryClientBalance { balance: 27 }
+            ipc_types::Request::QueryClientBalance { pk } => {
+                let balance = self.query_runner.get_client_balance(&ClientPublicKey(pk));
+                ipc_types::Response::QueryClientBalance { balance }
             },
             ipc_types::Request::FetchFromOrigin { origin, uri } => {
                 let hash = match self

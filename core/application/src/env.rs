@@ -257,6 +257,7 @@ impl Env<UpdatePerm> {
 
             let mut node_table = ctx.get_table::<NodeIndex, NodeInfo>("node");
             let mut account_table = ctx.get_table::<EthAddress, AccountInfo>("account");
+            let mut client_table = ctx.get_table::<ClientPublicKey, EthAddress>("client_keys");
             let mut service_table = ctx.get_table::<ServiceId, Service>("service");
             let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
             let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
@@ -392,6 +393,10 @@ impl Env<UpdatePerm> {
                     nonce: 0,
                 };
                 account_table.insert(account.public_key, info);
+            }
+
+            for (client_key, address) in genesis.client {
+                client_table.insert(client_key, address);
             }
 
             // add commodity prices

@@ -1,10 +1,16 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use fleek_crypto::{ClientPublicKey, ConsensusSecretKey, SecretKey};
+use fleek_crypto::{
+    AccountOwnerSecretKey,
+    ClientPublicKey,
+    ConsensusSecretKey,
+    EthAddress,
+    SecretKey,
+};
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
-use lightning_application::genesis::Genesis;
+use lightning_application::genesis::{Genesis, GenesisAccount};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::{BlockStoreServer, Config as BlockServerConfig};
@@ -74,6 +80,7 @@ struct Peer<C: Collection> {
 }
 
 async fn init_service_executor(
+    genesis: Genesis,
     path: PathBuf,
     pool_port: u16,
     gateway_port: u16,
@@ -84,7 +91,6 @@ async fn init_service_executor(
     })
     .unwrap();
 
-    let genesis = Genesis::load().unwrap();
     let app = Application::<TestBinding>::init(
         AppConfig {
             genesis: Some(genesis),
@@ -255,7 +261,21 @@ async fn test_query_balance() {
     }
     std::fs::create_dir_all(&path).unwrap();
 
-    let (node, _app) = init_service_executor(path.clone(), 30309, 40309, 1069).await;
+    let secret_key = ConsensusSecretKey::generate();
+    let client_pk = ClientPublicKey(secret_key.to_pk().0);
+    let account_key = AccountOwnerSecretKey::generate();
+    let address: EthAddress = account_key.to_pk().into();
+
+    let mut genesis = Genesis::load().unwrap();
+    genesis.client.insert(client_pk, address);
+    genesis.account.push(GenesisAccount {
+        public_key: address,
+        flk_balance: 0_u32.into(),
+        stables_balance: 0,
+        bandwidth_balance: 27,
+    });
+
+    let (node, _app) = init_service_executor(genesis, path.clone(), 30309, 40309, 1069).await;
     node.service_exec.start().await;
     tokio::time::sleep(Duration::from_secs(2)).await;
 
@@ -263,9 +283,6 @@ async fn test_query_balance() {
     fn_sdk::ipc::init_from_env();
 
     // Get the client balance from the the network
-    let secret_key = ConsensusSecretKey::generate();
-    let client_pk = ClientPublicKey(secret_key.to_pk().0);
-
     let balance = fn_sdk::api::query_client_balance(client_pk).await;
     assert_eq!(balance, 27);
 

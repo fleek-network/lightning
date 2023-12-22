@@ -133,3 +133,5 @@ price = 0.2
 [total_served]
 
 [current_epoch_served]
+
+[client]

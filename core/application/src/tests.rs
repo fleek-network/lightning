@@ -528,6 +528,7 @@ fn test_genesis() -> Genesis {
             stables_balance: 100,
             bandwidth_balance: 100,
         }],
+        client: HashMap::new(),
         commodity_prices: vec![
             GenesisPrices {
                 commodity: CommodityTypes::Bandwidth,
