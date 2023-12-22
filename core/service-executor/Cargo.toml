@@ -29,3 +29,20 @@ bincode = "1.3.3"
 # fleek-service-ping-example = { path = "../../services/ping" }
 # fleek-service-big-buck-bunny = { path = "../../services/big-buck-bunny" }
 fleek-service-fetcher = { path = "../../services/fetcher" }
+
+[dev-dependencies]
+lightning-fetcher = { path = "../fetcher" }
+lightning-origin-ipfs = { path = "../origin-ipfs" }
+lightning-broadcast = { path="../broadcast" }
+lightning-blockstore = { path = "../blockstore" }
+lightning-blockstore-server = { path = "../blockstore-server" }
+lightning-signer = {path="../signer"}
+lightning-resolver = { path = "../resolver" }
+lightning-application = { path="../application", features = ["test"] }
+lightning-pool = { path = "../pool" }
+lightning-notifier = {path="../notifier"}
+lightning-topology = {path="../topology"}
+lightning-test-utils = { path="../test-utils" }
+lightning-rep-collector = {path="../rep-collector"}
+fleek-crypto.workspace = true
+infusion.workspace = true

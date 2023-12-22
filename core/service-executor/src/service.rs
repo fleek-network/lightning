@@ -88,6 +88,7 @@ impl ServiceCollection {
 #[derive(Clone, Copy)]
 pub struct ServiceHandle {}
 
+#[allow(unused)]
 pub async fn spawn_service(id: u32, cx: Arc<Context>) -> ServiceHandle {
     let ipc_dir = cx.ipc_path.join(format!("service-{id}"));
     tracing::trace!("Spawning service {id} [IPC={ipc_dir:?}.");
@@ -114,6 +115,7 @@ pub async fn spawn_service(id: u32, cx: Arc<Context>) -> ServiceHandle {
     let cmd_permit = Arc::new(Notify::new());
     let permit = cmd_permit.clone();
     let conn_path = ipc_dir.join("conn");
+    #[cfg(not(test))]
     tokio::spawn(async move {
         // Wait until we have the UDS listener listening.
         permit.notified().await;
