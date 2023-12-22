@@ -829,25 +829,16 @@ impl<B: Backend> State<B> {
             // Todo: Reward nodes, choose new committee, increment epoch.
             self.calculate_reputation_scores();
             self.distribute_rewards();
-
-            // Todo: avoid many calls to `get_node_registry` in this method.
-            for (index, info) in self.get_node_registry() {
-                if self.is_not_participating(info) {
-                    // Todo: We can't really fail after here
-                    // because changes have already been submitted above
-                    // in the call to calculate_reputation_scores.
-                    // Should we refactor change_epoch so it operates in two steps?
-                    //  1. Validate all mutations that will be made and stage them.
-                    //  2. Submit staged changes.
-                    // Then, `clear_content_registry` could become
-                    // `stage_clear_content_registry' and return the new state for the
-                    // tables instead of applying the changes itself.
-                    //
-                    // Note: Unless there is a bug in the content registry system,
-                    // this operation should not fail.
-                    let _ = self.clear_content_registry(&index);
-                }
-            }
+            // Todo: We can't really fail after here
+            // because changes have already been submitted above
+            // in the call to calculate_reputation_scores.
+            // Should we refactor change_epoch so it operates in two steps?
+            //  1. Validate all mutations that will be made and stage them.
+            //  2. Submit staged changes.
+            // Then, `clear_content_registry` could become
+            // `stage_clear_content_registry' and return the new state for the
+            // tables instead of applying the changes itself.
+            self.clean_up_content_registry();
 
             // Clear executed digests.
             for digest in self.executed_digests.keys() {
@@ -1794,11 +1785,6 @@ impl<B: Backend> State<B> {
         }
     }
 
-    #[inline]
-    fn is_not_participating(&self, info: NodeInfo) -> bool {
-        matches!(info.participation, Participation::False)
-    }
-
     fn clear_content_registry(&self, node_index: &NodeIndex) -> Result<(), ExecutionError> {
         let cids = self.node_to_cid.get(node_index).unwrap_or_default();
 
@@ -1822,5 +1808,15 @@ impl<B: Backend> State<B> {
         self.node_to_cid.remove(node_index);
 
         Ok(())
+    }
+
+    fn clean_up_content_registry(&self) {
+        for (index, info) in self.get_node_registry() {
+            if matches!(info.participation, Participation::False) {
+                // Note: Unless there is a bug in the content registry system,
+                // this operation should not fail.
+                let _ = self.clear_content_registry(&index);
+            }
+        }
     }
 }
