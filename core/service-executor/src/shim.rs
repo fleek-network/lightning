@@ -108,6 +108,9 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
             0 => {
                 fleek_service_fetcher::main();
             },
+            1 => {
+                fleek_service_js_poc::main();
+            },
             1001 => {
                 crate::test_services::io_stress::main();
             },
