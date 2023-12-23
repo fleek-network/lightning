@@ -8,6 +8,7 @@ pub mod config;
 pub mod consensus;
 pub mod fetcher;
 pub mod handshake;
+mod indexer;
 pub mod infu_collection;
 pub mod notifier;
 pub mod origin;
