@@ -1,11 +1,9 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::ServiceExecutorInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::{FinalTypes, WithMockConsensus};
 use lightning_rpc::Rpc;
-use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 use resolved_pathbuf::ResolvedPathBuf;
 use tracing::{info, warn};
@@ -33,17 +31,6 @@ impl Cli {
     }
 
     pub async fn exec(self) -> Result<()> {
-        // In case of spawning the binary with the `SERVICE_ID` env abort the default flow and
-        // instead run the code for that service.
-        if let Ok(service_id) = std::env::var("SERVICE_ID") {
-            self.setup_logging(true);
-            ServiceExecutor::<FinalTypes>::run_service(
-                service_id.parse().expect("SERVICE_ID to be a number"),
-            )
-            .await;
-            std::process::exit(0);
-        }
-
         self.setup_logging(false);
         let config_path = self.resolve_config_path()?;
         match self.args.with_mock_consensus {
@@ -89,7 +76,7 @@ impl Cli {
         }
     }
 
-    fn setup_logging(&self, is_subprocess: bool) {
+    pub fn setup_logging(&self, is_subprocess: bool) {
         // Build the filter from cli args, or override if environment variable is set.
         let mut did_override = false;
         let env_filter = EnvFilter::builder()

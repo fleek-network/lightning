@@ -4,9 +4,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
 use fxhash::FxHashSet;
+use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::ServiceId;
 use lightning_interfaces::{
+    ApplicationInterface,
     BlockStoreInterface,
     ConfigConsumer,
     ExecutorProviderInterface,
@@ -27,7 +29,7 @@ pub struct ServiceExecutor<C: Collection> {
     config: ServiceExecutorConfig,
     is_running: Arc<AtomicBool>,
     collection: ServiceCollection,
-    ctx: Arc<Context>,
+    ctx: Arc<Context<C>>,
     p: PhantomData<C>,
 }
 
@@ -75,12 +77,14 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
         config: Self::Config,
         blockstore: &C::BlockStoreInterface,
         fetcher_socket: FetcherSocket,
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self> {
         let ctx = Arc::new(Context {
             kill: Arc::new(Notify::new()),
             blockstore_path: blockstore.get_root_dir(),
             ipc_path: config.ipc_path.clone(),
             fetcher_socket,
+            query_runner,
         });
 
         Ok(ServiceExecutor {
@@ -99,13 +103,16 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
         }
     }
 
-    async fn run_service(id: u32) {
+    fn run_service(id: u32) {
         match id {
             0 => {
-                fleek_service_fetcher::main().await;
+                fleek_service_fetcher::main();
+            },
+            1 => {
+                fleek_service_js_poc::main();
             },
             1001 => {
-                crate::test_services::io_stress::main().await;
+                crate::test_services::io_stress::main();
             },
             _ => eprintln!("Service {id} not found."),
         }

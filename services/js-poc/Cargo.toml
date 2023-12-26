@@ -1,0 +1,21 @@
+[package]
+name = "fleek-service-js-poc"
+version = "0.0.1"
+edition.workspace = true
+
+[dependencies]
+fn-sdk = { path = "../../lib/sdk" }
+blake3-tree = { path = "../../lib/blake3-tree" }
+tokio.workspace = true
+bytes.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+arrayref = "0.3"
+serde.workspace = true
+serde_json.workspace = true
+deno_core = "0.232"
+
+[dev-dependencies]
+lightning-schema = { path = "../../core/schema" }
+hex = "0.4"
+cid = "0.11"

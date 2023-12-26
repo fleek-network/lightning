@@ -265,10 +265,9 @@ criterion_group! {
 
 fn main() {
     if let Ok(service_id) = std::env::var("SERVICE_ID") {
-        let rt = Runtime::new().unwrap();
-        rt.block_on(ServiceExecutor::<TestBinding>::run_service(
+        ServiceExecutor::<TestBinding>::run_service(
             service_id.parse().expect("SERVICE_ID to be a number"),
-        ));
+        );
         std::process::exit(0);
     }
 
