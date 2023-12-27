@@ -30,7 +30,14 @@ impl<C: Collection> Context<C> {
     pub async fn run(&self, request: ipc_types::Request) -> ipc_types::Response {
         match request {
             ipc_types::Request::QueryClientBalance { pk } => {
-                let balance = self.query_runner.get_client_balance(&ClientPublicKey(pk));
+                let balance = self
+                    .query_runner
+                    .client_key_to_account_key(&ClientPublicKey(pk))
+                    .and_then(|address| {
+                        self.query_runner
+                            .get_account_info(&address, |a| a.bandwidth_balance)
+                    })
+                    .unwrap_or(0);
                 ipc_types::Response::QueryClientBalance { balance }
             },
             ipc_types::Request::FetchFromOrigin { origin, uri } => {

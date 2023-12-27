@@ -98,7 +98,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     ) -> Option<V>;
 
     /// Query Client Table
-    fn client_key_to_account_key(self, pub_key: &ClientPublicKey) -> Option<EthAddress>;
+    fn client_key_to_account_key(&self, pub_key: &ClientPublicKey) -> Option<EthAddress>;
 
     /// Query Node Table
     /// Returns information about a single node.
