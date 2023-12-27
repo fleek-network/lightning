@@ -101,7 +101,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .map(selector)
     }
 
-    fn client_key_to_account_key(self, pub_key: &ClientPublicKey) -> Option<EthAddress> {
+    fn client_key_to_account_key(&self, pub_key: &ClientPublicKey) -> Option<EthAddress> {
         self.inner
             .run(|ctx| self.client_table.get(ctx).get(pub_key))
     }

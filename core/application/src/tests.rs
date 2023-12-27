@@ -1424,15 +1424,15 @@ async fn test_uptime_participation() {
     expect_tx_success!(content_registry_update, &update_socket);
 
     // Assert that registries have been updated.
-    let index_peer1 = query_runner.pubkey_to_index(peer_1).unwrap();
-    let content_registry1 = query_runner.content_registry(&index_peer1);
+    let index_peer1 = query_runner.pubkey_to_index(&peer_1).unwrap();
+    let content_registry1 = content_registry(&query_runner, &index_peer1);
     assert!(!content_registry1.is_empty());
 
-    let index_peer2 = query_runner.pubkey_to_index(peer_2).unwrap();
-    let content_registry2 = query_runner.content_registry(&index_peer2);
+    let index_peer2 = query_runner.pubkey_to_index(&peer_2).unwrap();
+    let content_registry2 = content_registry(&query_runner, &index_peer2);
     assert!(!content_registry2.is_empty());
 
-    let providers = query_runner.cid_to_providers(&[0u8; 32]);
+    let providers = cid_to_providers(&query_runner, &[0u8; 32]);
     assert_eq!(providers.len(), 2);
 
     let mut map = BTreeMap::new();
@@ -1480,13 +1480,13 @@ async fn test_uptime_participation() {
     assert_eq!(node_info2.participation, Participation::True);
 
     // Assert that registries have been updated.
-    let content_registry1 = query_runner.content_registry(&index_peer1);
+    let content_registry1 = content_registry(&query_runner, &index_peer1);
     assert!(content_registry1.is_empty());
 
-    let content_registry2 = query_runner.content_registry(&index_peer2);
+    let content_registry2 = content_registry(&query_runner, &index_peer2);
     assert!(!content_registry2.is_empty());
 
-    let providers = query_runner.cid_to_providers(&[0u8; 32]);
+    let providers = cid_to_providers(&query_runner, &[0u8; 32]);
     assert_eq!(providers.len(), 1);
 }
 
