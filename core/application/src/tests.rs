@@ -3653,10 +3653,9 @@ async fn test_invalid_chain_id() {
     let chain_id = CHAIN_ID + 1;
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(committee);
 
-    // Submit a OptIn transaction that will revert (InvalidChainID) and ensure that the
-    // `simulate_txn` method of the query runner returns the same error.
+    // Submit a OptIn transaction that will revert (InvalidChainID).
 
     // Regular Txn Execution
     let secret_key = &keystore[0].node_secret_key;
@@ -3672,23 +3671,5 @@ async fn test_invalid_chain_id() {
         signature: signature.into(),
         payload: payload.clone(),
     };
-
-    let expected_error = ExecutionError::InvalidChainId;
-    expect_tx_revert!(update, &update_socket, expected_error.clone());
-
-    // Simulate Txn via Query Runner
-    let mut payload_2 = payload;
-    payload_2.nonce = 2;
-
-    let digest_2 = payload_2.to_digest();
-    let signature_2 = secret_key.sign(&digest_2);
-    let update_2 = UpdateRequest {
-        signature: signature_2.into(),
-        payload: payload_2,
-    };
-
-    assert_eq!(
-        TransactionResponse::Revert(expected_error),
-        query_runner.simulate_txn(update_2.into())
-    );
+    expect_tx_revert!(update, &update_socket, ExecutionError::InvalidChainId);
 }
