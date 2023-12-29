@@ -35,6 +35,7 @@ use lightning_interfaces::types::{
     UpdateRequest,
 };
 use lightning_interfaces::{ApplicationInterface, MempoolSocket, SyncQueryRunnerInterface};
+use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::{mpsc, Notify};
 use tracing::error;
 
@@ -268,6 +269,7 @@ impl SignerInner {
     ) {
         let mut pending_transactions = VecDeque::new();
         let mut base_timestamp = None;
+        let chain_id = query_runner.get_chain_id();
         let application_nonce = query_runner
             .pubkey_to_index(&self.node_public_key)
             .and_then(|node_index| query_runner.get_node_info::<u64>(&node_index, |n| n.nonce))
@@ -287,7 +289,8 @@ impl SignerInner {
                     let update_payload = UpdatePayload {
                         sender:  TransactionSender::NodeMain(self.node_public_key),
                         method: update_method,
-                        nonce: next_nonce
+                        nonce: next_nonce,
+                        chain_id
                     };
                     let digest = update_payload.to_digest();
                     let signature = self.node_secret_key.sign(&digest);

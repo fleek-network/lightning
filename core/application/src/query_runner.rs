@@ -198,7 +198,13 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 table_selector: ctx,
             };
             let app = State::new(backend);
-            app.execute_transaction(txn)
+            let mut tx = txn;
+            match app.verify_transaction(&mut tx) {
+                Ok(_) => (),
+                Err(e) => return TransactionResponse::Revert(e),
+            }
+
+            app.execute_transaction(tx)
         })
     }
 

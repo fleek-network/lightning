@@ -22,6 +22,7 @@ use lightning_interfaces::types::{
     Blake3Hash,
     Block,
     BlockExecutionResponse,
+    ChainId,
     CommodityTypes,
     ContentUpdate,
     DeliveryAcknowledgment,
@@ -68,6 +69,8 @@ use crate::query_runner::QueryRunner;
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
 });
+
+const CHAIN_ID: ChainId = 1337;
 
 pub struct Params {
     epoch_time: Option<u64>,
@@ -496,7 +499,7 @@ fn test_genesis() -> Genesis {
         EthAddress::from_str("0x2a8cf657769c264b0c7f88e3a716afdeaec1c318").unwrap();
 
     Genesis {
-        chain_id: 1337,
+        chain_id: CHAIN_ID,
         epoch_start: 1684276288383,
         epoch_time: 120000,
         committee_size: 10,
@@ -740,6 +743,7 @@ fn prepare_update_request_node(
         sender: secret_key.to_pk().into(),
         nonce,
         method,
+        chain_id: CHAIN_ID,
     };
     let digest = payload.to_digest();
     let signature = secret_key.sign(&digest);
@@ -760,6 +764,7 @@ fn prepare_update_request_consensus(
         sender: secret_key.to_pk().into(),
         nonce,
         method,
+        chain_id: CHAIN_ID,
     };
     let digest = payload.to_digest();
     let signature = secret_key.sign(&digest);
@@ -780,6 +785,7 @@ fn prepare_update_request_account(
         sender: secret_key.to_pk().into(),
         nonce,
         method,
+        chain_id: CHAIN_ID,
     };
     let digest = payload.to_digest();
     let signature = secret_key.sign(&digest);
@@ -3639,5 +3645,50 @@ async fn test_submit_content_registry_update_remove_unknown_cid_empty_registry()
         update,
         &update_socket,
         ExecutionError::InvalidStateForContentRemoval
+    );
+}
+
+#[tokio::test]
+async fn test_invalid_chain_id() {
+    let chain_id = CHAIN_ID + 1;
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+
+    // Submit a OptIn transaction that will revert (InvalidChainID) and ensure that the
+    // `simulate_txn` method of the query runner returns the same error.
+
+    // Regular Txn Execution
+    let secret_key = &keystore[0].node_secret_key;
+    let payload = UpdatePayload {
+        sender: secret_key.to_pk().into(),
+        nonce: 1,
+        method: UpdateMethod::OptIn {},
+        chain_id,
+    };
+    let digest = payload.to_digest();
+    let signature = secret_key.sign(&digest);
+    let update = UpdateRequest {
+        signature: signature.into(),
+        payload: payload.clone(),
+    };
+
+    let expected_error = ExecutionError::InvalidChainId;
+    expect_tx_revert!(update, &update_socket, expected_error.clone());
+
+    // Simulate Txn via Query Runner
+    let mut payload_2 = payload;
+    payload_2.nonce = 2;
+
+    let digest_2 = payload_2.to_digest();
+    let signature_2 = secret_key.sign(&digest_2);
+    let update_2 = UpdateRequest {
+        signature: signature_2.into(),
+        payload: payload_2,
+    };
+
+    assert_eq!(
+        TransactionResponse::Revert(expected_error),
+        query_runner.simulate_txn(update_2.into())
     );
 }

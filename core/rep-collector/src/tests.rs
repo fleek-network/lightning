@@ -384,6 +384,8 @@ async fn test_reputation_calculation_and_query() {
 
     let (committee, mut keystore) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
+    let chain_id = genesis.chain_id;
+
     genesis.node_info = committee;
 
     let node_public_key1 = node_secret_key1.to_pk();
@@ -600,6 +602,7 @@ async fn test_reputation_calculation_and_query() {
             sender: node.node_secret_key.to_pk().into(),
             nonce,
             method,
+            chain_id,
         };
         let digest = payload.to_digest();
         let signature = node.node_secret_key.sign(&digest);
