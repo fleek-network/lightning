@@ -1051,6 +1051,7 @@ dependencies = [
  "criterion",
  "fleek-blake3",
  "rand 0.8.5",
+ "smol_str",
  "thiserror",
 ]
 
