@@ -4,4 +4,5 @@
 mod hash;
 mod types;
 
+pub use hash::hash_directory;
 pub use types::*;

@@ -72,57 +72,51 @@ impl DirectoryEntry {
     pub fn link(&self) -> &Link {
         &self.link
     }
-    
+
     pub fn to_name(self) -> SmolStr {
         self.name
     }
-    
-    pub fn to_link(&self) -> Link {
+
+    pub fn to_link(self) -> Link {
         self.link
     }
 
     /// Returns a length-prefixed encoding of this directory entry which can be used
     /// for hashing the entry.
-    #[doc(hidden)]
-    pub fn transcript(&self) -> Vec<u8> {
+    #[inline(always)]
+    pub(crate) fn transcript(&self, out: &mut Vec<u8>, counter: usize, is_root: bool) {
         let name_bytes = self.name.as_bytes();
         let name_len: [u8; 4] = (name_bytes.len() as u32).to_le_bytes();
+        let counter: [u8; 4] = (counter as u32).to_le_bytes();
 
-        let mut size = 4 + name_bytes.len();
+        let mut size = 1 + 4 + 4 + name_bytes.len();
         size += match &self.link.0 {
             LinkRep::Symlink(path) => 5 + path.len(),
             LinkRep::File(_) => 33,
             LinkRep::Directory(_) => 33,
         };
 
-        let mut vec = Vec::with_capacity(size);
-        vec.extend_from_slice(name_len.as_slice());
-        vec.extend_from_slice(name_bytes);
+        out.reserve(size);
+        out.push(if is_root { 1 } else { 0 });
+        out.extend_from_slice(counter.as_slice());
+        out.extend_from_slice(name_len.as_slice());
+        out.extend_from_slice(name_bytes);
         match &self.link.0 {
             LinkRep::Symlink(path) => {
                 let bytes = path.as_bytes();
                 let len: [u8; 4] = (bytes.len() as u32).to_le_bytes();
-                vec.push(0);
-                vec.extend_from_slice(len.as_slice());
-                vec.extend_from_slice(bytes);
+                out.push(0);
+                out.extend_from_slice(len.as_slice());
+                out.extend_from_slice(bytes);
             },
             LinkRep::File(digest) => {
-                vec.push(1);
-                vec.extend_from_slice(digest);
+                out.push(1);
+                out.extend_from_slice(digest);
             },
             LinkRep::Directory(digest) => {
-                vec.push(2);
-                vec.extend_from_slice(digest);
+                out.push(2);
+                out.extend_from_slice(digest);
             },
         }
-        vec
-    }
-
-    /// Return the hash of the directory entry. Note that this is not the hash of the content that
-    /// this entry is linking to, but is simply a compression over informations stored in this
-    /// entry.
-    pub fn digest(&self) -> fleek_blake3::Hash {
-        let transcript = self.transcript();
-        super::hash::hash_directory_entry_transcript(&transcript)
     }
 }
