@@ -10,6 +10,7 @@ const ROOT: u8 = 1 << 3;
 const PARENT: u8 = 1 << 2;
 const KEYED_HASH: u8 = 1 << 4;
 
+/// Blake3 hash of the word `"DIRECTORY"` used as the key for the hashing.
 pub const KEY: [u8; 32] = [
     139, 88, 112, 131, 96, 138, 152, 197, 238, 63, 142, 210, 224, 88, 97, 183, 244, 210, 116, 213,
     84, 215, 9, 16, 21, 175, 61, 72, 251, 174, 76, 21,
@@ -77,7 +78,8 @@ pub fn hash_directory(collect_tree: bool, entries: &[DirectoryEntry]) -> HashDir
         buffer.clear();
 
         container.push(digest);
-        counter -= 1;
+        counter += 1;
+
         let mut total_entries = counter;
         while (total_entries & 1) == 0 {
             let right_cv = container.pop();
@@ -135,6 +137,7 @@ fn merge(platform: Platform, left_cv: &[u8; 32], right_cv: &[u8; 32], is_root: b
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::directory::Link;
 
     #[test]
     fn constants() {
@@ -142,5 +145,104 @@ mod tests {
         assert_eq!(key, KEY);
         let empty_hash = *fleek_blake3::keyed_hash(&key, &[]).as_bytes();
         assert_eq!(empty_hash, EMPTY_HASH);
+    }
+
+    fn hash_entry(is_root: bool, counter: usize, entry: &DirectoryEntry) -> [u8; 32] {
+        let mut buffer = Vec::with_capacity(128);
+        entry.transcript(&mut buffer, counter, is_root);
+        *fleek_blake3::keyed_hash(&KEY, &buffer).as_bytes()
+    }
+
+    #[test]
+    fn test() {
+        let dirs = vec![
+            DirectoryEntry::new("A".into(), Link::file([0; 32])),
+            DirectoryEntry::new("B".into(), Link::file([1; 32])),
+            DirectoryEntry::new("C".into(), Link::file([2; 32])),
+            DirectoryEntry::new("D".into(), Link::file([3; 32])),
+            DirectoryEntry::new("E".into(), Link::file([4; 32])),
+            DirectoryEntry::new("F".into(), Link::file([5; 32])),
+            DirectoryEntry::new("G".into(), Link::file([6; 32])),
+            DirectoryEntry::new("H".into(), Link::file([7; 32])),
+            DirectoryEntry::new("I".into(), Link::file([8; 32])),
+            DirectoryEntry::new("J".into(), Link::file([9; 32])),
+        ];
+
+        let platform = Platform::detect();
+
+        let output = hash_directory(false, &dirs[0..1]);
+        let actual = *output.hash.as_bytes();
+        let expected = hash_entry(true, 0, &dirs[0]);
+        assert_eq!(actual, expected);
+
+        let output = hash_directory(false, &dirs[0..2]);
+        let actual = *output.hash.as_bytes();
+        let expected = merge(
+            platform,
+            &hash_entry(false, 0, &dirs[0]),
+            &hash_entry(false, 1, &dirs[1]),
+            true,
+        );
+        assert_eq!(actual, expected);
+
+        let output = hash_directory(false, &dirs[0..3]);
+        let actual = *output.hash.as_bytes();
+        let expected = merge(
+            platform,
+            &merge(
+                platform,
+                &hash_entry(false, 0, &dirs[0]),
+                &hash_entry(false, 1, &dirs[1]),
+                false,
+            ),
+            &hash_entry(false, 2, &dirs[2]),
+            true,
+        );
+        assert_eq!(actual, expected);
+
+        let output = hash_directory(false, &dirs[0..4]);
+        let actual = *output.hash.as_bytes();
+        let expected = merge(
+            platform,
+            &merge(
+                platform,
+                &hash_entry(false, 0, &dirs[0]),
+                &hash_entry(false, 1, &dirs[1]),
+                false,
+            ),
+            &merge(
+                platform,
+                &hash_entry(false, 2, &dirs[2]),
+                &hash_entry(false, 3, &dirs[3]),
+                false,
+            ),
+            true,
+        );
+        assert_eq!(actual, expected);
+
+        let output = hash_directory(false, &dirs[0..5]);
+        let actual = *output.hash.as_bytes();
+        let expected = merge(
+            platform,
+            &merge(
+                platform,
+                &merge(
+                    platform,
+                    &hash_entry(false, 0, &dirs[0]),
+                    &hash_entry(false, 1, &dirs[1]),
+                    false,
+                ),
+                &merge(
+                    platform,
+                    &hash_entry(false, 2, &dirs[2]),
+                    &hash_entry(false, 3, &dirs[3]),
+                    false,
+                ),
+                false,
+            ),
+            &hash_entry(false, 4, &dirs[4]),
+            true,
+        );
+        assert_eq!(actual, expected);
     }
 }
