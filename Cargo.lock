@@ -3178,6 +3178,7 @@ dependencies = [
  "blake3-tree",
  "derive_more",
  "fleek-crypto",
+ "hp-fixed",
  "ringbuf",
  "tokio",
  "triomphe",
