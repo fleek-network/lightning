@@ -1,6 +1,14 @@
 use smol_str::SmolStr;
 
+use super::hash_directory;
+use crate::utils::HashTree;
+
 pub type Digest = [u8; 32];
+
+pub struct Directory {
+    pub entries: Vec<DirectoryEntry>,
+    pub tree: HashTree,
+}
 
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct DirectoryEntry {
@@ -16,6 +24,20 @@ pub enum LinkRep {
     Symlink(SmolStr),
     File(Digest),
     Directory(Digest),
+}
+
+impl Directory {
+    /// Create a new directory from a list of entries. The `sorted` parameters must be set to false
+    /// if the provided list of entries is not already sorted.
+    pub fn new(mut entries: Vec<DirectoryEntry>, sorted: bool) -> Self {
+        if !sorted {
+            entries.sort_unstable_by(|a, b| a.name.cmp(&b.name))
+        }
+
+        let tree = hash_directory(true, &entries).tree.unwrap();
+
+        Self { entries, tree }
+    }
 }
 
 impl Link {
