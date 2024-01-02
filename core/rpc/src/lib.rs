@@ -2,9 +2,9 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
-use jsonrpsee::server::middleware::ProxyGetRequestLayer;
-use jsonrpsee::server::{Server as JSONRPCServer, ServerHandle};
-use jsonrpsee::RpcModule;
+use hyper::service::{make_service_fn, service_fn};
+use jsonrpsee::server::{stop_channel, Server as JSONRPCServer, ServerHandle};
+use jsonrpsee::{Methods, RpcModule};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::{
     ApplicationInterface,
@@ -17,8 +17,9 @@ use lightning_interfaces::{
     SignerInterface,
     WithStartAndShutdown,
 };
+use reqwest::StatusCode;
 use tokio::sync::Mutex;
-use tower::layer::util::{Identity, Stack};
+use tower::Service;
 
 pub use crate::api::{EthApiServer, FleekApiServer, NetApiServer};
 pub use crate::config::Config;
@@ -33,8 +34,6 @@ pub mod utils;
 #[cfg(test)]
 mod tests;
 
-type Server = JSONRPCServer<Stack<ProxyGetRequestLayer, Stack<ProxyGetRequestLayer, Identity>>>;
-
 pub(crate) struct Data<C: Collection> {
     pub query_runner: c!(C::ApplicationInterface::SyncExecutor),
     pub mempool_socket: MempoolSocket,
@@ -48,33 +47,28 @@ pub(crate) struct Data<C: Collection> {
 
 pub struct Rpc<C: Collection> {
     config: Config,
-    
+
     /// The final RPCModule containting selected methods
     module: RpcModule<()>,
 
     // need interior mutability to support restarts
     handle: Mutex<Option<ServerHandle>>,
 
-    _data: Arc<Data<C>>
+    _data: Arc<Data<C>>,
+}
+
+async fn health() -> &'static str {
+    "OK"
+}
+
+async fn metrics() -> (StatusCode, String) {
+    match autometrics::prometheus_exporter::encode_to_string() {
+        Ok(metrics) => (StatusCode::OK, metrics),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+    }
 }
 
 impl<C: Collection> Rpc<C> {
-    async fn build_server_from_config(&self) -> anyhow::Result<Server> {
-        let builder = JSONRPCServer::builder();
-
-        let heatlh_intercept = ProxyGetRequestLayer::new("/health", "flk_health")?;
-        let metrics_intercept = ProxyGetRequestLayer::new("/metrics", "flk_metrics")?;
-
-        let middleware = tower::ServiceBuilder::new()
-            .layer(heatlh_intercept)
-            .layer(metrics_intercept);
-
-        Ok(builder
-            .set_middleware(middleware)
-            .build(self.config.addr())
-            .await?)
-    }
-
     fn create_modules_from_config(
         config: &Config,
         data: Arc<Data<C>>,
@@ -102,21 +96,78 @@ impl<C: Collection> Rpc<C> {
 #[async_trait::async_trait]
 impl<C: Collection> WithStartAndShutdown for Rpc<C> {
     async fn start(&self) {
-        let server = self
-            .build_server_from_config()
-            .await
-            .expect("RPC Server to build");
+        let (stop, server_handle) = stop_channel();
+        let json_rpc_service = JSONRPCServer::builder()
+            .to_service_builder()
+            .build(Methods::from(self.module.clone()), stop.clone());
 
-        let handle = server.start(self.module.clone());
+        let make_service = make_service_fn(move |_| {
+            let json_rpc_service = json_rpc_service.clone();
 
-        *self.handle.lock().await = Some(handle);
+            async move {
+                Ok::<_, hyper::Error>(service_fn(move |req: hyper::Request<hyper::Body>| {
+                    let mut json_rpc_service = json_rpc_service.clone();
+
+                    async move {
+                        let path = req.uri().path().to_string().to_ascii_lowercase();
+                        let method = req.method();
+
+                        match path.as_str() {
+                            "/health" => {
+                                let res = health().await;
+
+                                hyper::Response::builder()
+                                    .status(StatusCode::OK)
+                                    .body(hyper::Body::from(res))
+                            },
+                            "/metrics" => {
+                                let (status, res) = metrics().await;
+
+                                hyper::Response::builder()
+                                    .status(status)
+                                    .body(hyper::Body::from(res))
+                            },
+                            _ => {
+                                if method == hyper::Method::POST {
+                                    match json_rpc_service.call(req).await {
+                                        Ok(res) => Ok(res),
+                                        Err(err) => hyper::Response::builder()
+                                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                            .body(hyper::Body::from(err.to_string())),
+                                    }
+                                } else {
+                                    hyper::Response::builder()
+                                        .status(StatusCode::NOT_FOUND)
+                                        .body(hyper::Body::empty())
+                                }
+                            },
+                        }
+                    }
+                }))
+            }
+        });
+
+        let addr = self.config.addr();
+        tokio::spawn(async move {
+            match axum::Server::bind(&addr)
+                .serve(make_service)
+                .with_graceful_shutdown(
+                    async move { stop.shutdown().await },
+                )
+                .await {
+                    Ok(_) => (),
+                    Err(err) => tracing::error!("RPC server error: {}", err),
+                }
+        });
+
+        *self.handle.lock().await = Some(server_handle);
     }
 
     async fn shutdown(&self) {
         if let Some(handle) = std::mem::take(self.handle.lock().await.deref_mut()) {
             match handle.stop() {
                 Ok(_) => (),
-                Err(_) => return, // already stopped
+                Err(_) => return,
             };
 
             handle.stopped().await;
@@ -155,7 +206,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
             config,
             module,
             handle: Mutex::new(None),
-            _data: data
+            _data: data,
         })
     }
 }
