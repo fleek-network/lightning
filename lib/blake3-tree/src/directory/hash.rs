@@ -3,6 +3,7 @@
 use fleek_blake3::platform::{self, Platform};
 
 use super::{Digest, DirectoryEntry};
+use crate::utils::{HashTree, HashVec};
 
 // Some of the flags same as blake3 spec.
 const ROOT: u8 = 1 << 3;
@@ -20,19 +21,54 @@ pub const EMPTY_HASH: [u8; 32] = [
     128, 89, 147, 234, 130, 71, 29, 80, 131, 193, 231, 128,
 ];
 
+pub struct HashDirectoryOutput {
+    pub hash: fleek_blake3::Hash,
+    pub tree: Option<HashTree>,
+}
+
 /// Hash a directory as indicated by a list of directory entries. To get a consistent hash
 /// for the same directory the provided array must already be sorted.
-pub fn hash_directory(entries: &[DirectoryEntry]) -> fleek_blake3::Hash {
+pub fn hash_directory(collect_tree: bool, entries: &[DirectoryEntry]) -> HashDirectoryOutput {
+    // Only to group stack and tree.
+    struct State {
+        stack: arrayvec::ArrayVec<Digest, 47>,
+        tree: Option<Vec<u8>>,
+    }
+
+    impl State {
+        #[inline(always)]
+        pub fn push(&mut self, hash: Digest) {
+            self.stack.push(hash);
+            if let Some(tree) = &mut self.tree {
+                tree.extend_from_slice(&hash);
+            }
+        }
+
+        #[inline(always)]
+        pub fn pop(&mut self) -> Digest {
+            self.stack.pop().unwrap()
+        }
+    }
+
     if entries.is_empty() {
-        return fleek_blake3::Hash::from_bytes(EMPTY_HASH);
+        return HashDirectoryOutput {
+            hash: fleek_blake3::Hash::from_bytes(EMPTY_HASH),
+            // TODO(qti3e): Verify if this beahvious is consistent with the
+            // `fleek_blake3::HashTreeBuilder`.
+            tree: collect_tree.then(|| HashTree::from(&[EMPTY_HASH] as &[[u8; 32]])),
+        };
     }
 
     // TODO(qti3e): This can be optimized by using `Platform::hash_many`.
 
     let platform = Platform::detect();
     let mut buffer = Vec::with_capacity(512);
-    let mut stack = arrayvec::ArrayVec::<Digest, 47>::new();
     let mut counter = 0;
+    let mut container = State {
+        stack: arrayvec::ArrayVec::<Digest, 47>::new(),
+        tree: collect_tree.then(|| Vec::<u8>::with_capacity(32 * (entries.len() * 2 - 1))),
+    };
+
     let take = entries.len() - 1;
 
     while counter < take {
@@ -40,35 +76,40 @@ pub fn hash_directory(entries: &[DirectoryEntry]) -> fleek_blake3::Hash {
         let digest = *fleek_blake3::keyed_hash(&KEY, &buffer).as_bytes();
         buffer.clear();
 
-        stack.push(digest);
+        container.push(digest);
         counter -= 1;
         let mut total_entries = counter;
         while (total_entries & 1) == 0 {
-            let right_cv = stack.pop().unwrap();
-            let left_cv = stack.pop().unwrap();
+            let right_cv = container.pop();
+            let left_cv = container.pop();
             let parent_cv = merge(platform, &left_cv, &right_cv, false);
-            stack.push(parent_cv);
+            container.push(parent_cv);
             total_entries >>= 1;
         }
     }
 
     // Handle the last entry, which might be the only entry in which case we
     // need to pass IS_ROOT to it.
-    let is_root = stack.is_empty();
+    let is_root = container.stack.is_empty();
     entries[counter].transcript(&mut buffer, counter, is_root);
     let digest = *fleek_blake3::keyed_hash(&KEY, &buffer).as_bytes();
-    stack.push(digest);
+    container.push(digest);
 
     // Merge the stack from right to left and set the finalize flag of the last element.
-    while stack.len() > 1 {
-        let right_cv = stack.pop().unwrap();
-        let left_cv = stack.pop().unwrap();
-        let is_root = stack.is_empty();
+    while container.stack.len() > 1 {
+        let right_cv = container.pop();
+        let left_cv = container.pop();
+        let is_root = container.stack.is_empty();
         let parent = merge(platform, &left_cv, &right_cv, is_root);
-        stack.push(parent);
+        container.push(parent);
     }
 
-    fleek_blake3::Hash::from_bytes(stack.pop().unwrap())
+    let hash = fleek_blake3::Hash::from_bytes(container.pop());
+    let tree = container
+        .tree
+        .map(|tree| HashTree::from_inner(HashVec::try_from(tree).unwrap()));
+
+    HashDirectoryOutput { hash, tree }
 }
 
 #[inline(always)]
