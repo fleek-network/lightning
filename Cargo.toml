@@ -11,7 +11,7 @@ edition = "2021"
 anyhow = "1.0"
 async-trait = "0.1"
 autometrics = { version = "0.6.0", features = ["prometheus-exporter"] }
-axum = "0.6.18"
+axum = {version = "0.6.18", features = ["tokio"]}
 bincode = "1.3.3"
 cid = "0.10.1"
 ethers = "2.0.10"
