@@ -151,13 +151,12 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
         tokio::spawn(async move {
             match axum::Server::bind(&addr)
                 .serve(make_service)
-                .with_graceful_shutdown(
-                    async move { stop.shutdown().await },
-                )
-                .await {
-                    Ok(_) => (),
-                    Err(err) => tracing::error!("RPC server error: {}", err),
-                }
+                .with_graceful_shutdown(async move { stop.shutdown().await })
+                .await
+            {
+                Ok(_) => (),
+                Err(err) => tracing::error!("RPC server error: {}", err),
+            }
         });
 
         *self.handle.lock().await = Some(server_handle);
