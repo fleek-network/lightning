@@ -1552,8 +1552,8 @@ version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43b5affba7c91c039a483065125dd8c6d4a0985e1e9ac5ab6dffdea4fe4e637f"
 dependencies = [
- "proc-macro2 1.0.70",
- "quote 1.0.33",
+ "proc-macro2 1.0.74",
+ "quote 1.0.35",
  "syn 1.0.109",
 ]
 
@@ -2732,7 +2732,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syn 2.0.46",
- "toml 0.8.2",
+ "toml 0.8.8",
  "walkdir",
 ]
 
@@ -3804,7 +3804,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "toml 0.8.8",
- "uuid 1.4.1",
+ "uuid 1.6.1",
 ]
 
 [[package]]
@@ -4247,7 +4247,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d94b7505034e2737e688e1153bf81e6f93ad296695c43958d6da2e4321f0a990"
 dependencies = [
  "heck",
- "proc-macro-crate 2.0.1",
+ "proc-macro-crate 2.0.0",
  "proc-macro2 1.0.74",
  "quote 1.0.35",
  "syn 1.0.109",
@@ -4605,7 +4605,7 @@ name = "lightning-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 4.4.10",
+ "clap 4.4.12",
  "compile-time-run",
  "console-subscriber",
  "fleek-blake3",
@@ -6236,7 +6236,7 @@ version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
 dependencies = [
- "bitflags 2.4.0",
+ "bitflags 2.4.1",
  "cfg-if",
  "libc",
 ]
@@ -6432,7 +6432,7 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c11e44798ad209ccdd91fc192f0526a369a01234f7373e1b141c96d7cee4f0e"
 dependencies = [
- "proc-macro-crate 2.0.1",
+ "proc-macro-crate 1.1.3",
  "proc-macro2 1.0.74",
  "quote 1.0.35",
  "syn 2.0.46",
@@ -6717,7 +6717,7 @@ version = "3.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be30eaf4b0a9fba5336683b38de57bb86d179a35862ba6bfcf57625d006bde5b"
 dependencies = [
- "proc-macro-crate 2.0.1",
+ "proc-macro-crate 2.0.0",
  "proc-macro2 1.0.74",
  "quote 1.0.35",
  "syn 1.0.109",
@@ -7197,11 +7197,10 @@ dependencies = [
 
 [[package]]
 name = "proc-macro-crate"
-version = "2.0.1"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97dc5fea232fc28d2f597b37c4876b348a40e33f3b02cc975c8d006d78d94b1a"
+checksum = "7e8366a6159044a37876a2b9817124296703c586a5c92e2c53751fa06d8d43e8"
 dependencies = [
- "toml_datetime",
  "toml_edit 0.20.2",
 ]
 
@@ -9005,6 +9004,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4dccd0940a2dcdf68d092b8cbab7dc0ad8fa938bf95787e1b916b0e3d0e8e970"
 
 [[package]]
+name = "smol_str"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74212e6bbe9a4352329b2f68ba3130c15a3f26fe88ff22dbdc6cdd58fa85e99c"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "snap"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9835,8 +9843,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "396e4d48bbb2b7554c944bde63101b5ae446cff6ec4a24227428f15eb72ef338"
 dependencies = [
  "indexmap 2.1.0",
- "serde",
- "serde_spanned",
  "toml_datetime",
  "winnow",
 ]
@@ -9847,10 +9853,11 @@ version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d34d383cd00a163b4a5b85053df514d45bc330f6de7737edfe0a93311d1eaa03"
 dependencies = [
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "serde",
  "serde_spanned",
  "toml_datetime",
+ "winnow",
 ]
 
 [[package]]
