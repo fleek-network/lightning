@@ -1030,6 +1030,7 @@ dependencies = [
  "criterion",
  "fleek-blake3",
  "rand 0.8.5",
+ "smol_str",
  "thiserror",
 ]
 
@@ -1543,6 +1544,17 @@ checksum = "35ed6e9d84f0b51a7f52daf1c7d71dd136fd7a3f41a8462b8cdb8c78d920fad4"
 dependencies = [
  "bytes",
  "memchr",
+]
+
+[[package]]
+name = "compile-time-run"
+version = "0.2.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43b5affba7c91c039a483065125dd8c6d4a0985e1e9ac5ab6dffdea4fe4e637f"
+dependencies = [
+ "proc-macro2 1.0.70",
+ "quote 1.0.33",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -3179,6 +3191,7 @@ dependencies = [
  "blake3-tree",
  "derive_more",
  "fleek-crypto",
+ "hp-fixed",
  "ringbuf",
  "tokio",
  "triomphe",
@@ -3777,6 +3790,22 @@ name = "httpdate"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
+
+[[package]]
+name = "human-panic"
+version = "1.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a79a67745be0cb8dd2771f03b24c2f25df98d5471fe7a595d668cfa2e6f843d"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "backtrace",
+ "os_info",
+ "serde",
+ "serde_derive",
+ "toml 0.8.8",
+ "uuid 1.4.1",
+]
 
 [[package]]
 name = "humantime"
@@ -4576,10 +4605,12 @@ name = "lightning-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 4.4.12",
+ "clap 4.4.10",
+ "compile-time-run",
  "console-subscriber",
  "fleek-blake3",
  "fleek-crypto",
+ "human-panic",
  "infusion",
  "lightning-application",
  "lightning-blockstore",
@@ -4602,6 +4633,7 @@ dependencies = [
  "lightning-types",
  "lightning-utils",
  "mock",
+ "nix",
  "rand 0.8.5",
  "reqwest",
  "resolved-pathbuf",
@@ -4866,6 +4898,7 @@ dependencies = [
  "infusion",
  "lightning-application",
  "lightning-interfaces",
+ "lightning-utils",
  "tokio",
 ]
 
@@ -4949,6 +4982,7 @@ dependencies = [
  "lightning-rep-collector",
  "lightning-signer",
  "lightning-test-utils",
+ "lightning-utils",
  "rand 0.8.5",
  "serde",
  "tokio",
@@ -4988,6 +5022,7 @@ dependencies = [
  "lightning-rep-collector",
  "lightning-signer",
  "lightning-topology",
+ "lightning-utils",
  "quinn",
  "rcgen 0.11.3",
  "ring 0.16.20",
@@ -5018,6 +5053,7 @@ dependencies = [
  "lightning-reputation",
  "lightning-signer",
  "lightning-test-utils",
+ "lightning-utils",
  "lru",
  "rand 0.8.5",
  "scc",
@@ -5089,6 +5125,7 @@ dependencies = [
  "lightning-pool",
  "lightning-rep-collector",
  "lightning-signer",
+ "lightning-utils",
  "reqwest",
  "ruint",
  "serde",
@@ -5168,6 +5205,7 @@ dependencies = [
  "lightning-application",
  "lightning-interfaces",
  "lightning-test-utils",
+ "lightning-utils",
  "resolved-pathbuf",
  "serde",
  "tokio",
@@ -5223,6 +5261,7 @@ dependencies = [
  "infusion",
  "lightning-application",
  "lightning-interfaces",
+ "lightning-utils",
  "mcmf",
  "ndarray",
  "ndarray-rand",
@@ -5248,6 +5287,7 @@ dependencies = [
  "fleek-crypto",
  "hp-fixed",
  "ink-quill",
+ "lightning-interfaces",
  "multiaddr",
  "num-bigint",
  "num-derive",
@@ -5261,8 +5301,11 @@ dependencies = [
 name = "lightning-utils"
 version = "0.0.0"
 dependencies = [
+ "autometrics",
  "ethers",
  "fleek-crypto",
+ "lightning-interfaces",
+ "lightning-types",
  "tokio",
  "tracing",
 ]
@@ -6188,6 +6231,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 
 [[package]]
+name = "nix"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
+dependencies = [
+ "bitflags 2.4.0",
+ "cfg-if",
+ "libc",
+]
+
+[[package]]
 name = "no-std-compat"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6589,6 +6643,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1e1c390732d15f1d48471625cd92d154e66db2c56645e29a9cd26f4699f72dc"
 dependencies = [
  "num-traits",
+]
+
+[[package]]
+name = "os_info"
+version = "3.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "006e42d5b888366f1880eda20371fedde764ed2213dc8496f49622fa0c99cd5e"
+dependencies = [
+ "log",
+ "serde",
+ "winapi",
 ]
 
 [[package]]
@@ -9731,21 +9796,21 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.8.2"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "185d8ab0dfbb35cf1399a6344d8484209c088f75f8f68230da55d48d95d43e3d"
+checksum = "a1a195ec8c9da26928f773888e0742ca3ca1040c6cd859c919c9f59c1954ab35"
 dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "toml_edit 0.20.2",
+ "toml_edit 0.21.0",
 ]
 
 [[package]]
 name = "toml_datetime"
-version = "0.6.3"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cda73e2f1397b1262d6dfdcef8aafae14d1de7748d66822d3bfeeb6d03e5e4b"
+checksum = "3550f4e9685620ac18a50ed434eb3aec30db8ba93b0287467bca5826ea25baf1"
 dependencies = [
  "serde",
 ]
@@ -9774,6 +9839,18 @@ dependencies = [
  "serde_spanned",
  "toml_datetime",
  "winnow",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d34d383cd00a163b4a5b85053df514d45bc330f6de7737edfe0a93311d1eaa03"
+dependencies = [
+ "indexmap 2.0.2",
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
 ]
 
 [[package]]

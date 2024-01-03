@@ -14,6 +14,7 @@ use fastcrypto::bls12381::min_sig::BLS12381PublicKey;
 use fleek_crypto::ConsensusPublicKey;
 use lightning_interfaces::types::{Epoch, EpochInfo, NodeInfo, TransactionRequest};
 use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_utils::application::QueryRunnerExt;
 use narwhal_types::{TransactionProto, TransactionsClient};
 use rand::seq::SliceRandom;
 use tonic::transport::channel::Channel;
@@ -57,7 +58,7 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
 
     async fn handle_forward(&mut self, req: &TransactionRequest) -> Result<()> {
         // Grab the epoch
-        let epoch = self.query_runner.get_epoch();
+        let epoch = self.query_runner.get_current_epoch();
 
         // If the epoch is different then the last time we grabbed the committee refresh
         if epoch != self.epoch || epoch == 0 {

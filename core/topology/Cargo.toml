@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
+lightning-utils = { path = "../utils" }
 anyhow = "1.0"
 ndarray = "0.15.6"
 num-traits = "0.2.9"

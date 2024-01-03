@@ -153,7 +153,7 @@ impl<C: Collection> ResolverInner<C> {
             tokio::select! {
                 _ = shutdown_notify.notified() => break,
                 Some(record) = pubsub.recv() => {
-                    match self.query_runner.index_to_pubkey(record.originator) {
+                    match self.query_runner.index_to_pubkey(&record.originator) {
                         Some(peer_public_key) => {
                             let digest = record.to_digest();
                             peer_public_key.verify(&record.signature, &digest);
@@ -179,7 +179,7 @@ impl<C: Collection> ResolverInner<C> {
                 None => {
                     let node_index = self
                         .query_runner
-                        .pubkey_to_index(self.node_sk.to_pk())
+                        .pubkey_to_index(&self.node_sk.to_pk())
                         .expect("Called `publish` without being on the application state.");
                     self.node_index
                         .set(node_index)

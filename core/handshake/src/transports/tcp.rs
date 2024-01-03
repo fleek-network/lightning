@@ -10,7 +10,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
-use tracing::{info, warn};
+use tracing::{info, trace, warn};
 
 use super::{delimit_frame, Transport, TransportReceiver, TransportSender};
 use crate::schema::{self, RES_SERVICE_PAYLOAD_TAG};
@@ -95,8 +95,8 @@ fn spawn_handshake_task(
         // Parse the length delimiter
         // TODO: Do better, there are only 3 different handshake request variants/sizes
         let len = u32::from_be_bytes(*array_ref!(buf, 0, 4)) as usize;
-        if len > 157 {
-            warn!("dropping connection, handshake request delimiter is too large");
+        if len > 157 || len == 0 {
+            trace!("dropping connection, handshake request delimiter is >157 or 0");
             return;
         }
         buf.reserve(len);
