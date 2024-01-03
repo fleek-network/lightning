@@ -11,6 +11,7 @@ use lightning_interfaces::{
     ToDigest,
     TranscriptBuilder,
 };
+use lightning_utils::application::QueryRunnerExt;
 use narwhal_crypto::DefaultHashFunction;
 use narwhal_executor::ExecutionState;
 use narwhal_types::{BatchAPI, BatchDigest, ConsensusOutput, Transaction};
@@ -149,7 +150,7 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
 impl<Q: SyncQueryRunnerInterface> ExecutionState for Execution<Q> {
     async fn handle_consensus_output(&self, consensus_output: ConsensusOutput) {
         for (cert, batches) in consensus_output.batches {
-            let current_epoch = self.query_runner.get_epoch();
+            let current_epoch = self.query_runner.get_current_epoch();
             if cert.epoch() != current_epoch {
                 // If the certificate epoch does not match the current epoch in the application
                 // state do not execute this transaction, This could only happen in

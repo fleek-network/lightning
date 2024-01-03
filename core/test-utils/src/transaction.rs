@@ -27,6 +27,7 @@ pub fn get_update_transactions(num_txns: usize) -> Vec<UpdateRequest> {
                 sender,
                 nonce: 0,
                 method,
+                chain_id: 1337,
             };
             let digest = payload.to_digest();
             UpdateRequest {

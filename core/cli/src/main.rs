@@ -6,6 +6,7 @@ mod utils;
 use anyhow::Result;
 use clap::Parser;
 use cli::Cli;
+use compile_time_run::run_command_str;
 use lightning_interfaces::ServiceExecutorInterface;
 use lightning_node::FinalTypes;
 use lightning_service_executor::shim::ServiceExecutor;
@@ -26,6 +27,18 @@ fn main() -> Result<()> {
         );
         std::process::exit(0);
     }
+
+    human_panic::setup_panic!(Metadata {
+        version: concat!(
+            env!("CARGO_PKG_VERSION"),
+            "-",
+            run_command_str!("git", "rev-parse", "HEAD")
+        )
+        .into(),
+        name: "lightning-node".into(),
+        authors: "Fleek Network Team <reports@fleek.network>".into(),
+        homepage: "https://github.com/fleek-network/lightning".into()
+    });
 
     // Create the tokio runtime and execute the cli
     tokio::runtime::Builder::new_multi_thread()

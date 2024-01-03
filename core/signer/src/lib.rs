@@ -35,6 +35,7 @@ use lightning_interfaces::types::{
     UpdateRequest,
 };
 use lightning_interfaces::{ApplicationInterface, MempoolSocket, SyncQueryRunnerInterface};
+use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::{mpsc, Notify};
 use tracing::error;
 
@@ -268,12 +269,11 @@ impl SignerInner {
     ) {
         let mut pending_transactions = VecDeque::new();
         let mut base_timestamp = None;
-        let application_nonce =
-            if let Some(node_info) = query_runner.get_node_info(&self.node_public_key) {
-                node_info.nonce
-            } else {
-                0
-            };
+        let chain_id = query_runner.get_chain_id();
+        let application_nonce = query_runner
+            .pubkey_to_index(&self.node_public_key)
+            .and_then(|node_index| query_runner.get_node_info::<u64>(&node_index, |n| n.nonce))
+            .unwrap_or(0);
         let mut base_nonce = application_nonce;
         let mut next_nonce = application_nonce + 1;
 
@@ -289,7 +289,8 @@ impl SignerInner {
                     let update_payload = UpdatePayload {
                         sender:  TransactionSender::NodeMain(self.node_public_key),
                         method: update_method,
-                        nonce: next_nonce
+                        nonce: next_nonce,
+                        chain_id
                     };
                     let digest = update_payload.to_digest();
                     let signature = self.node_secret_key.sign(&digest);
@@ -349,12 +350,10 @@ impl SignerInner {
     ) {
         // If node_info does not exist for the node, there is no point in sending a transaction
         // because it will revert. However, this can still be useful for testing.
-        let application_nonce = if let Some(node_info) = query_runner.get_node_info(node_public_key)
-        {
-            node_info.nonce
-        } else {
-            0
-        };
+        let application_nonce = query_runner
+            .pubkey_to_index(node_public_key)
+            .and_then(|node_index| query_runner.get_node_info::<u64>(&node_index, |n| n.nonce))
+            .unwrap_or(0);
 
         // All transactions in range [base_nonce, application_nonce] have
         // been ordered, so we can remove them from `pending_transactions`.
@@ -377,7 +376,7 @@ impl SignerInner {
 
                 pending_transactions.retain_mut(|tx| {
                     if let TransactionResponse::Revert(_) =
-                        query_runner.validate_txn(tx.update_request.clone().into())
+                        query_runner.simulate_txn(tx.update_request.clone().into())
                     {
                         // If transaction reverts, don't retry.
                         false
