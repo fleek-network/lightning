@@ -19,10 +19,10 @@ pub struct DirectoryEntry {
 }
 
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct Link(LinkRep);
+pub struct Link(pub(crate) LinkRep);
 
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub enum LinkRep {
+pub(crate) enum LinkRep {
     Symlink(SmolStr),
     File(Digest),
     Directory(Digest),
@@ -156,45 +156,6 @@ impl DirectoryEntry {
 
     pub fn to_link(self) -> Link {
         self.link
-    }
-
-    /// Returns a length-prefixed encoding of this directory entry which can be used
-    /// for hashing the entry.
-    #[inline(always)]
-    pub(crate) fn transcript(&self, out: &mut Vec<u8>, counter: usize, is_root: bool) {
-        let name_bytes = self.name.as_bytes();
-        let name_len: [u8; 4] = (name_bytes.len() as u32).to_le_bytes();
-        let counter: [u8; 4] = (counter as u32).to_le_bytes();
-
-        let mut size = 1 + 4 + 4 + name_bytes.len();
-        size += match &self.link.0 {
-            LinkRep::Symlink(path) => 5 + path.len(),
-            LinkRep::File(_) => 33,
-            LinkRep::Directory(_) => 33,
-        };
-
-        out.reserve(size);
-        out.push(if is_root { 1 } else { 0 });
-        out.extend_from_slice(counter.as_slice());
-        out.extend_from_slice(name_len.as_slice());
-        out.extend_from_slice(name_bytes);
-        match &self.link.0 {
-            LinkRep::Symlink(path) => {
-                let bytes = path.as_bytes();
-                let len: [u8; 4] = (bytes.len() as u32).to_le_bytes();
-                out.push(0);
-                out.extend_from_slice(len.as_slice());
-                out.extend_from_slice(bytes);
-            },
-            LinkRep::File(digest) => {
-                out.push(1);
-                out.extend_from_slice(digest);
-            },
-            LinkRep::Directory(digest) => {
-                out.push(2);
-                out.extend_from_slice(digest);
-            },
-        }
     }
 }
 
