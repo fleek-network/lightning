@@ -37,8 +37,8 @@ impl EventDistributor {
         let listeners = Arc::new(Mutex::new(0));
 
         let this = Self {
-            listeners: listeners.clone(),
-            event_tx: event_tx.clone(),
+            listeners,
+            event_tx,
             broadcast_tx: broadcast_tx.clone(),
             shutdown: shutdown_tx,
             start_broadcasting: start_broadcasting.clone(),

@@ -132,7 +132,7 @@ async fn init_pinger() -> Pinger<TestBinding> {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
-        tx
+        tx,
     )
     .unwrap();
 

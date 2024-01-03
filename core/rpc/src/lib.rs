@@ -6,6 +6,7 @@ use hyper::service::{make_service_fn, service_fn};
 use jsonrpsee::server::{stop_channel, Server as JSONRPCServer, ServerHandle};
 use jsonrpsee::{Methods, RpcModule};
 use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::types::Event;
 use lightning_interfaces::{
     ApplicationInterface,
     ArchiveSocket,
@@ -16,24 +17,22 @@ use lightning_interfaces::{
     RpcInterface,
     SignerInterface,
     WithStartAndShutdown,
-    types::Event,
 };
 use reqwest::StatusCode;
 use tokio::sync::Mutex;
 use tower::Service;
-use tower::layer::util::{Identity, Stack};
-use crate::event::EventDistributor;
 
 pub use crate::api::{EthApiServer, FleekApiServer, NetApiServer};
 pub use crate::config::Config;
+use crate::event::EventDistributor;
 pub use crate::logic::{EthApi, FleekApi, NetApi};
 pub mod api;
 pub mod api_types;
 pub mod config;
 pub mod error;
+pub mod event;
 pub mod logic;
 pub mod utils;
-pub mod event;
 
 #[cfg(test)]
 mod tests;

@@ -15,14 +15,13 @@ use ethers::types::{
 use ethers::utils::rlp;
 use fleek_crypto::EthAddress;
 use hp_fixed::unsigned::HpUfixed;
-use jsonrpsee::core::RpcResult;
+use jsonrpsee::core::{RpcResult, SubscriptionResult};
+use jsonrpsee::{PendingSubscriptionSink, SubscriptionMessage};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{ArchiveRequest, ArchiveResponse};
 use lightning_interfaces::SyncQueryRunnerInterface;
-use lightning_utils::application::QueryRunnerExt;
-use jsonrpsee::{PendingSubscriptionSink, SubscriptionMessage};
-use jsonrpsee::core::SubscriptionResult;
 use lightning_types::{Event, Tokens};
+use lightning_utils::application::QueryRunnerExt;
 use tracing::trace;
 
 use crate::api::EthApiServer;
@@ -240,31 +239,35 @@ impl<C: Collection> EthApiServer for EthApi<C> {
         let mut listener = self.data.event_distributor.register_listener();
 
         if address.len() > 1 {
-            return Err(RPCError::custom("Only events from the USDC are currently supported".to_string()).into());
+            return Err(RPCError::custom(
+                "Only events from the USDC are currently supported".to_string(),
+            )
+            .into());
         }
 
         for addr in address {
             if addr != *USDC_CONTRACT {
-                return Err(RPCError::custom("Only events from the USDC contract are avaliable".to_string()).into());
+                return Err(RPCError::custom(
+                    "Only events from the USDC contract are avaliable".to_string(),
+                )
+                .into());
             }
         }
 
         while let Ok(event) = listener.recv().await {
-            match event {
-                Event::Transfer { token, from, to, amount } => {
-                    if token.address() == *USDC_CONTRACT {
-                        let event = EthereumEvent {
-                            address: token.address().0.into(),
-                            // todo:n actually endcode the topics and formats
-                            topics: vec![],
-                            data: Bytes::new(),
-                            ..Default::default()
-                        };
+            if let Event::Transfer { token, .. } = event {
+                if token.address() == *USDC_CONTRACT {
+                    let event = EthereumEvent {
+                        address: token.address().0.into(),
+                        // todo:n actually endcode the topics and formats
+                        topics: vec![],
+                        data: Bytes::new(),
+                        ..Default::default()
+                    };
 
-                        sink.send(SubscriptionMessage::from(serde_json::to_string(&event)?)).await?;
-                    }
-                },
-                _ => {}
+                    sink.send(SubscriptionMessage::from(serde_json::to_string(&event)?))
+                        .await?;
+                }
             }
         }
 

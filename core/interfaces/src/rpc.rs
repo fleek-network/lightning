@@ -1,9 +1,11 @@
 use infusion::c;
+use tokio::sync::mpsc::Sender;
 
 use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
 use crate::consensus::MempoolSocket;
 use crate::infu_collection::Collection;
+use crate::types::Event;
 use crate::{
     ApplicationInterface,
     ArchiveInterface,
@@ -14,8 +16,6 @@ use crate::{
     FetcherInterface,
     SignerInterface,
 };
-use crate::types::Event;
-use tokio::sync::mpsc::Sender;
 
 /// The interface for the *RPC* server. Which is supposed to be opening a public
 /// port (possibly an HTTP server) and accepts queries or updates from the user.

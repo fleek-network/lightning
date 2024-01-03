@@ -119,7 +119,7 @@ async fn test_start_shutdown() {
         query_runner,
         broadcast.get_pubsub(Topic::Consensus),
         None,
-        tx
+        tx,
     )
     .unwrap();
 

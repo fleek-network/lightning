@@ -13,7 +13,7 @@ use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
-use lightning_interfaces::types::{Epoch, EpochInfo, UpdateMethod, Event};
+use lightning_interfaces::types::{Epoch, EpochInfo, Event, UpdateMethod};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
@@ -417,7 +417,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             tx_narwhal_batches,
             query_runner.clone(),
             indexer_socket,
-            event_socket
+            event_socket,
         ));
 
         let shutdown_notify = Arc::new(Notify::new());

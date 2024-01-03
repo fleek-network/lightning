@@ -96,7 +96,7 @@ async fn test_send_two_txs_in_a_row() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
-        tx
+        tx,
     )
     .unwrap();
 
@@ -193,7 +193,7 @@ async fn test_retry_send() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
-        tx
+        tx,
     )
     .unwrap();
 
@@ -239,7 +239,7 @@ async fn test_shutdown() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
-        tx
+        tx,
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());
@@ -268,7 +268,7 @@ async fn test_shutdown_and_start_again() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
-        tx
+        tx,
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());
@@ -303,7 +303,7 @@ async fn test_sign_raw_digest() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
-        tx
+        tx,
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());

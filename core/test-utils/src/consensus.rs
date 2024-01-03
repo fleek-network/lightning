@@ -9,7 +9,7 @@ use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::SignerInterface;
-use lightning_interfaces::types::{Block, TransactionRequest, Event};
+use lightning_interfaces::types::{Block, Event, TransactionRequest};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,

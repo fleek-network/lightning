@@ -13,7 +13,7 @@ use fleek_crypto::EthAddress;
 use jsonrpsee::core::{RpcResult, SubscriptionResult};
 use jsonrpsee::proc_macros::rpc;
 
-use crate::api_types::{CallRequest, StateOverride, EthereumEvent};
+use crate::api_types::{CallRequest, EthereumEvent, StateOverride};
 
 #[rpc(client, server, namespace = "eth")]
 pub trait EthApi {

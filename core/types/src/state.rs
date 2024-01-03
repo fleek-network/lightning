@@ -29,9 +29,7 @@ pub enum Tokens {
 impl Tokens {
     // Todo:(n) check if this will be ok
     pub fn address(&self) -> EthAddress {
-        match self {
-            _ => EthAddress::zero(),
-        }
+        EthAddress::zero()
     }
 }
 

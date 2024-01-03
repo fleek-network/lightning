@@ -169,19 +169,16 @@ impl TransactionRequest {
         if let TransactionSender::AccountOwner(sender) = self.sender() {
             match self {
                 Self::UpdateRequest(payload) => match &payload.payload.method {
-                    UpdateMethod::Transfer { amount, token, to } => Some(Event::transfer(
-                        token.clone(),
-                        sender.clone(),
-                        to.clone(),
-                        amount.clone(),
-                    )),
+                    UpdateMethod::Transfer { amount, token, to } => {
+                        Some(Event::transfer(token.clone(), sender, *to, amount.clone()))
+                    },
                     UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
                         service_id,
                         metadata: event,
                         ..
-                    } => event.map(|e| Event::service_event(service_id.clone(), e.clone())),
-                        None => None,
-                    },
+                    } => event
+                        .to_owned()
+                        .map(|e| Event::service_event(*service_id, e)),
                     _ => None,
                 },
                 _ => None,

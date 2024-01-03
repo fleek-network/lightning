@@ -211,7 +211,7 @@ async fn get_fetchers(
             query_runner,
             broadcast.get_pubsub(Topic::Consensus),
             None,
-            tx
+            tx,
         )
         .unwrap();
 

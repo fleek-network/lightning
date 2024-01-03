@@ -96,7 +96,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
                 from: tx.payload.sender,
                 to: to.clone(),
                 response: TransactionResponse::Success(ExecutionData::None),
-                event: None
+                event: None,
             }
         })
         .collect();

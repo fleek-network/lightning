@@ -152,6 +152,8 @@ async fn init_service_executor(
     )
     .unwrap();
 
+    let (tx, _) = tokio::sync::mpsc::channel(1);
+
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
@@ -159,6 +161,7 @@ async fn init_service_executor(
         query_runner.clone(),
         broadcast.get_pubsub(Topic::Consensus),
         None,
+        tx,
     )
     .unwrap();
 

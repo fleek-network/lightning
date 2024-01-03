@@ -3,7 +3,7 @@ use fleek_crypto::{EthAddress, TransactionSender};
 use serde::{Deserialize, Serialize};
 
 use super::{Epoch, NodeInfo};
-use crate::{UpdateMethod, Event};
+use crate::{Event, UpdateMethod};
 
 /// Info on a Narwhal epoch
 #[derive(

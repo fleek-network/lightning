@@ -15,7 +15,19 @@ use crate::hex_array;
 use crate::keys::{AccountOwnerPublicKey, AccountOwnerSignature};
 
 #[derive(
-    From, AsRef, Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Deserialize, JsonSchema, Default
+    From,
+    AsRef,
+    Debug,
+    Hash,
+    PartialEq,
+    PartialOrd,
+    Ord,
+    Eq,
+    Clone,
+    Copy,
+    Deserialize,
+    JsonSchema,
+    Default,
 )]
 pub struct EthAddress(#[serde(deserialize_with = "hex_array::deserialize")] pub [u8; 20]);
 

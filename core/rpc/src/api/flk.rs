@@ -5,12 +5,12 @@ use hp_fixed::unsigned::HpUfixed;
 use jsonrpsee::core::{RpcResult, SubscriptionResult};
 use jsonrpsee::proc_macros::rpc;
 use lightning_interfaces::types::{
-    EventType,
-    Event,
     AccountInfo,
     Blake3Hash,
     Epoch,
     EpochInfo,
+    Event,
+    EventType,
     NodeIndex,
     NodeInfo,
     NodeInfoWithIndex,
