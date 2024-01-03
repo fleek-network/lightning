@@ -14,7 +14,6 @@ use lightning_interfaces::{
     ApplicationInterface,
     Notification,
     ReputationAggregatorInterface,
-    ReputationReporterInterface,
     RequestHeader,
     ServiceScope,
     TopologyInterface,
@@ -88,7 +87,7 @@ where
     /// Epoch notifier for triggering polling of topology.
     notifier: Receiver<Notification>,
     /// Report metrics of peers.
-    rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
+    _rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     /// Receiver of events from a connection.
     connection_event_rx: Receiver<ConnectionEvent>,
     /// Sender of events from a connection.
@@ -146,7 +145,7 @@ where
             network_overlay: NetworkOverlay::new(sync_query, node_public_key, index),
             topology,
             notifier,
-            rep_reporter,
+            _rep_reporter: rep_reporter,
             connection_event_rx,
             connection_event_tx,
             connector: Connector::new(),
@@ -368,10 +367,6 @@ where
             // we could inadvertently drop the wrong connection if we only
             // rely on `NodeIndex`.
             let connection_id = connection.connection_id();
-
-            // Report the latency of this peer.
-            self.rep_reporter
-                .report_ping(peer_index, Some(connection.stats().rtt / 2));
 
             // Start worker to drive the connection.
             let (request_tx, request_rx) = mpsc::channel(1024);
