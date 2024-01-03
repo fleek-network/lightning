@@ -28,7 +28,7 @@ use super::{
     Tokens,
 };
 use crate::content_registry::ContentUpdate;
-use crate::{NodeIndex, NodePorts, TransactionDestination};
+use crate::{Event, NodeIndex, NodePorts, TransactionDestination};
 
 pub type ChainId = u32;
 
@@ -40,7 +40,7 @@ const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";
 /// Create this wrapper so we can implement JsonSchema for EthersTransaction
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct EthersTransactionWrapper {
-    pub tx: EthersTransaction,
+    pub inner: EthersTransaction,
 }
 
 impl schemars::JsonSchema for EthersTransactionWrapper {
@@ -62,25 +62,25 @@ impl std::ops::Deref for EthersTransactionWrapper {
     type Target = EthersTransaction;
 
     fn deref(&self) -> &Self::Target {
-        &self.tx
+        &self.inner
     }
 }
 
 impl std::ops::DerefMut for EthersTransactionWrapper {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.tx
+        &mut self.inner
     }
 }
 
 impl From<EthersTransaction> for EthersTransactionWrapper {
-    fn from(tx: EthersTransaction) -> Self {
-        Self { tx }
+    fn from(inner: EthersTransaction) -> Self {
+        Self { inner }
     }
 }
 
 impl From<EthersTransactionWrapper> for EthersTransaction {
     fn from(wrapper: EthersTransactionWrapper) -> Self {
-        wrapper.tx
+        wrapper.inner
     }
 }
 
@@ -162,6 +162,29 @@ impl TransactionRequest {
                 .chain_id
                 .expect("Chain ID should be included in Ethereum Transaction")
                 .as_u32(),
+        }
+    }
+
+    pub fn event(&self) -> Option<Event> {
+        if let TransactionSender::AccountOwner(sender) = self.sender() {
+            match self {
+                Self::UpdateRequest(payload) => match &payload.payload.method {
+                    UpdateMethod::Transfer { amount, token, to } => {
+                        Some(Event::transfer(token.clone(), sender, *to, amount.clone()))
+                    },
+                    UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+                        service_id,
+                        metadata: event,
+                        ..
+                    } => event
+                        .to_owned()
+                        .map(|e| Event::service_event(*service_id, e)),
+                    _ => None,
+                },
+                _ => None,
+            }
+        } else {
+            None
         }
     }
 }

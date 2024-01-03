@@ -1,11 +1,60 @@
 //! The types used by the Application interface.
 
 use ethers::types::{Block as EthersBlock, H256, U64};
-use fleek_crypto::NodePublicKey;
+use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use serde::{Deserialize, Serialize};
 
-use crate::TransactionReceipt;
+use crate::{Tokens, TransactionReceipt};
+
+#[derive(Eq, Hash, Debug, PartialEq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
+pub enum Event {
+    Transfer {
+        token: Tokens,
+        from: EthAddress,
+        to: EthAddress,
+        amount: HpUfixed<18>,
+    },
+    ServiceEvent {
+        service_id: u32,
+        event: Vec<u8>,
+    },
+}
+
+// todo!:n macro for this
+#[derive(Eq, Hash, Debug, PartialEq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
+pub enum EventType {
+    Transfer,
+    ServiceEvent,
+}
+
+impl From<&Event> for EventType {
+    fn from(event: &Event) -> Self {
+        match event {
+            Event::Transfer { .. } => Self::Transfer,
+            Event::ServiceEvent { .. } => Self::ServiceEvent,
+        }
+    }
+}
+
+impl Event {
+    pub fn transfer(token: Tokens, from: EthAddress, to: EthAddress, amount: HpUfixed<18>) -> Self {
+        Self::Transfer {
+            token,
+            from,
+            to,
+            amount,
+        }
+    }
+
+    pub fn service_event(service_id: u32, event: Vec<u8>) -> Self {
+        Self::ServiceEvent { service_id, event }
+    }
+
+    pub fn event_type(&self) -> EventType {
+        self.into()
+    }
+}
 
 /// The response generated from executing an entire batch of transactions (aka a block).
 #[derive(Debug, Hash, Clone)]
@@ -23,6 +72,16 @@ pub struct BlockExecutionResponse {
     pub node_registry_delta: Vec<(NodePublicKey, NodeRegistryChange)>,
     /// Receipts of all executed transactions
     pub txn_receipts: Vec<TransactionReceipt>,
+}
+
+impl BlockExecutionResponse {
+    pub fn events(&self) -> Vec<Event> {
+        self.txn_receipts
+            .iter()
+            .cloned()
+            .filter_map(|receipt| receipt.event)
+            .collect()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]

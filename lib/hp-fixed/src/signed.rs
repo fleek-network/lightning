@@ -46,23 +46,7 @@ use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
 /// * `BigInt`: The underlying large signed integer value that the `HpFixed` wraps around.
 pub struct HpFixed<const P: usize>(BigInt);
 
-impl JsonSchema for HpFixed<6> {
-    fn schema_name() -> String {
-        "HpUfixed".to_string()
-    }
-
-    fn schema_id() -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Borrowed(concat!(module_path!(), "::HpFixed"))
-    }
-
-    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        let ui = BigInt::new(Sign::Plus, vec![1, 1]);
-
-        schema_for_value!(Self(ui)).schema.into()
-    }
-}
-
-impl JsonSchema for HpFixed<18> {
+impl<const P: usize> JsonSchema for HpFixed<P> {
     fn schema_name() -> String {
         "HpUfixed".to_string()
     }

@@ -26,6 +26,13 @@ pub enum Tokens {
     FLK,
 }
 
+impl Tokens {
+    // Todo:(n) check if this will be ok
+    pub fn address(&self) -> EthAddress {
+        EthAddress::zero()
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, schemars::JsonSchema)]
 pub struct NodeServed {
     pub served: CommodityServed,

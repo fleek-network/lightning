@@ -3,13 +3,15 @@ use std::time::Duration;
 
 use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use jsonrpsee::core::RpcResult;
+use jsonrpsee::core::{RpcResult, SubscriptionResult};
+use jsonrpsee::{PendingSubscriptionSink, SubscriptionMessage};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,
     Epoch,
     EpochInfo,
+    EventType,
     FetcherRequest,
     FetcherResponse,
     ImmutablePointer,
@@ -345,14 +347,32 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
         }
     }
 
-    async fn health(&self) -> RpcResult<String> {
-        Ok("OK".to_string())
-    }
+    async fn handle_subscription(
+        &self,
+        pending: PendingSubscriptionSink,
+        event_type: EventType,
+    ) -> SubscriptionResult {
+        let sink = pending.accept().await?;
 
-    async fn metrics(&self) -> RpcResult<String> {
-        match autometrics::prometheus_exporter::encode_to_string() {
-            Ok(metrics) => Ok(metrics),
-            Err(err) => Err(RPCError::custom(err.to_string()).into()),
+        let mut rx = self.data.event_distributor.register_listener();
+
+        while let Ok(event) = rx.recv().await {
+            if event.event_type() != event_type {
+                continue;
+            }
+
+            let serialized = serde_json::to_string(&event)?;
+
+            if sink
+                .send(SubscriptionMessage::from(serialized))
+                .await
+                .is_err()
+            {
+                tracing::trace!("flk subscription closed");
+                break;
+            }
         }
+
+        Ok(())
     }
 }

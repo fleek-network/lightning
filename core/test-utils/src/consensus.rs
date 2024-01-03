@@ -9,7 +9,7 @@ use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::SignerInterface;
-use lightning_interfaces::types::{Block, TransactionRequest};
+use lightning_interfaces::types::{Block, Event, TransactionRequest};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
@@ -52,6 +52,7 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         _pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
         _indexer_socket: Option<IndexSocket>,
+        _event_socket: mpsc::Sender<Vec<Event>>,
     ) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
         let new_block_notify = Arc::new(Notify::new());

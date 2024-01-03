@@ -160,6 +160,8 @@ impl Env<UpdatePerm> {
 
             // Execute each transaction and add the results to the block response
             for (index, txn) in &mut block.transactions.iter_mut().enumerate() {
+                let event = txn.event();
+
                 let results = match app.verify_transaction(txn) {
                     Ok(_) => app.execute_transaction(txn.clone()),
                     Err(err) => TransactionResponse::Revert(err),
@@ -179,6 +181,7 @@ impl Env<UpdatePerm> {
                     from: txn.sender(),
                     to: txn.to(),
                     response: results,
+                    event,
                 };
                 /* Todo(dalton): Check if the transaction resulted in the committee change(Like a current validator getting slashed)
                     if so acknowledge that in the block response

@@ -6,6 +6,7 @@ use hyper::service::{make_service_fn, service_fn};
 use jsonrpsee::server::{stop_channel, Server as JSONRPCServer, ServerHandle};
 use jsonrpsee::{Methods, RpcModule};
 use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::types::Event;
 use lightning_interfaces::{
     ApplicationInterface,
     ArchiveSocket,
@@ -23,18 +24,21 @@ use tower::Service;
 
 pub use crate::api::{EthApiServer, FleekApiServer, NetApiServer};
 pub use crate::config::Config;
+use crate::event::EventDistributor;
 pub use crate::logic::{EthApi, FleekApi, NetApi};
 pub mod api;
-mod api_types;
+pub mod api_types;
 pub mod config;
-mod error;
-mod logic;
+pub mod error;
+pub mod event;
+pub mod logic;
 pub mod utils;
 
 #[cfg(test)]
 mod tests;
 
 pub(crate) struct Data<C: Collection> {
+    pub event_distributor: EventDistributor,
     pub query_runner: c!(C::ApplicationInterface::SyncExecutor),
     pub mempool_socket: MempoolSocket,
     pub fetcher_socket: FetcherSocket,
@@ -54,7 +58,7 @@ pub struct Rpc<C: Collection> {
     // need interior mutability to support restarts
     handle: Mutex<Option<ServerHandle>>,
 
-    _data: Arc<Data<C>>,
+    data: Arc<Data<C>>,
 }
 
 async fn health() -> &'static str {
@@ -189,7 +193,10 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         signer: &C::SignerInterface,
         archive_socket: Option<ArchiveSocket>,
     ) -> anyhow::Result<Self> {
+        let distributor = EventDistributor::spawn();
+
         let data: Arc<Data<C>> = Arc::new(Data {
+            event_distributor: distributor,
             query_runner,
             mempool_socket: mempool,
             fetcher_socket: fetcher.get_socket(),
@@ -204,9 +211,13 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         Ok(Self {
             config,
             module,
+            data,
             handle: Mutex::new(None),
-            _data: data,
         })
+    }
+
+    fn event_tx(&self) -> tokio::sync::mpsc::Sender<Vec<Event>> {
+        self.data.event_distributor.sender()
     }
 }
 

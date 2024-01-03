@@ -3,6 +3,7 @@ use std::sync::Arc;
 use affair::Socket;
 use infusion::c;
 use lightning_schema::LightningMessage;
+use tokio::sync::mpsc::Sender;
 use tokio::sync::Notify;
 
 use crate::application::ExecutionEngineSocket;
@@ -10,13 +11,14 @@ use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
 use crate::signer::SignerInterface;
-use crate::types::TransactionRequest;
+use crate::types::{Event, TransactionRequest};
 use crate::{
     ApplicationInterface,
     ArchiveInterface,
     BroadcastInterface,
     ConfigProviderInterface,
     IndexSocket,
+    RpcInterface,
 };
 
 /// A socket that gives services and other sub-systems the required functionality to
@@ -39,6 +41,7 @@ pub trait ConsensusInterface<C: Collection>:
         app: ::ApplicationInterface,
         broadcast: ::BroadcastInterface,
         archive: ::ArchiveInterface,
+        rpc: ::RpcInterface,
     ) {
         let executor = app.transaction_executor();
         let sqr = app.sync_query();
@@ -50,6 +53,7 @@ pub trait ConsensusInterface<C: Collection>:
             sqr,
             pubsub,
             archive.index_socket(),
+            rpc.event_tx(),
         )
     }
 
@@ -63,6 +67,7 @@ pub trait ConsensusInterface<C: Collection>:
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
         indexer_socket: Option<IndexSocket>,
+        event_socket: Sender<Vec<Event>>,
     ) -> anyhow::Result<Self>;
 
     /// Returns a socket that can be used to submit transactions to the consensus,

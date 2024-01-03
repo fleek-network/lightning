@@ -10,10 +10,10 @@ use ethers::types::{
     U256,
 };
 use fleek_crypto::EthAddress;
-use jsonrpsee::core::RpcResult;
+use jsonrpsee::core::{RpcResult, SubscriptionResult};
 use jsonrpsee::proc_macros::rpc;
 
-use crate::api_types::{CallRequest, StateOverride};
+use crate::api_types::{CallRequest, EthereumEvent, StateOverride};
 
 #[rpc(client, server, namespace = "eth")]
 pub trait EthApi {
@@ -127,4 +127,13 @@ pub trait EthApi {
 
     #[method(name = "getTransactionReceipt")]
     async fn transaction_receipt(&self, hash: H256) -> RpcResult<Option<TransactionReceipt>>;
+
+    #[subscription(name = "getLogs", item = EthereumEvent, unsubscribe = "unsubscribe_getLogs")]
+    async fn get_logs(
+        &self,
+        from_block: BlockNumber,
+        to_block: BlockNumber,
+        address: Vec<EthAddress>,
+        topics: Vec<H256>,
+    ) -> SubscriptionResult;
 }

@@ -92,12 +92,12 @@ impl Validator {
                 }
             },
             TransactionRequest::EthereumRequest(mut eth_tx) => {
-                let sender: EthAddress = if let Ok(address) = eth_tx.tx.recover_from_mut() {
+                let sender: EthAddress = if let Ok(address) = eth_tx.inner.recover_from_mut() {
                     address.0.into()
                 } else {
                     return Err(anyhow!("Invalid signature"));
                 };
-                if !eth::verify_signature(&eth_tx.tx, sender) {
+                if !eth::verify_signature(&eth_tx.inner, sender) {
                     return Err(anyhow!("Invalid signature"));
                 }
             },
