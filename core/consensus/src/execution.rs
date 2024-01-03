@@ -119,7 +119,8 @@ impl<Q: SyncQueryRunnerInterface> Execution<Q> {
         };
 
         // Unfailable
-        let results = self.executor.run(block).await.unwrap();
+        let guard = self.executor.lock().await;
+        let results = guard.run(block).await.unwrap();
         info!("Consensus submitted new block to application");
 
         if results.change_epoch {

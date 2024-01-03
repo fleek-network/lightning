@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::sync::Arc;
 use std::time::Duration;
 
 use affair::Socket;
@@ -15,6 +16,7 @@ use lightning_types::{
     Value,
 };
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 
 use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
@@ -43,7 +45,7 @@ use crate::{BlockStoreInterface, ConfigProviderInterface};
 /// This socket should be used with as much caution as possible, for all intend and purposes
 /// this socket should be sealed and preferably not accessible out side of the scope in which
 /// it is created.
-pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
+pub type ExecutionEngineSocket = Arc<Mutex<Socket<Block, BlockExecutionResponse>>>;
 
 #[infusion::service]
 pub trait ApplicationInterface<C: Collection>:
