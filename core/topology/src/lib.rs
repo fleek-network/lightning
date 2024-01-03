@@ -22,7 +22,6 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
     TopologyInterface,
 };
-use lightning_utils::application::QueryRunnerExt;
 use ndarray::{Array, Array2};
 use rand::SeedableRng;
 use tracing::info;
@@ -55,13 +54,13 @@ impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
     /// Returns the matrix, a map of node ids to public keys, and an optional node index for
     /// ourselves if we're included in the topology.
     fn build_latency_matrix(&self) -> (Array2<i32>, HashMap<usize, NodePublicKey>, Option<usize>) {
-        let latencies = self.query.get_current_latencies();
+        let latencies = self.query.get_latencies();
         let valid_pubkeys: BTreeSet<NodePublicKey> = self
             .query
             .get_node_registry(None)
             .into_iter()
-            .filter(|node_info| node_info.info.participation == Participation::True)
-            .map(|node_info| node_info.info.public_key)
+            .filter(|node_info| node_info.participation == Participation::True)
+            .map(|node_info| node_info.public_key)
             .collect();
 
         let mut max_latency = Duration::ZERO;
@@ -97,7 +96,7 @@ impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
     }
 
     fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>> {
-        let epoch = self.query.get_current_epoch();
+        let epoch = self.query.get_epoch();
         let mut current = self.current_peers.lock().expect("failed to acquire lock");
         let mut current_epoch = self.current_epoch.lock().expect("failed to acquire lock");
 

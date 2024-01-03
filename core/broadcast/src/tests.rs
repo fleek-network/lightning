@@ -173,7 +173,7 @@ async fn create_peer(
 
     let node_public_key = signer.get_ed25519_pk();
     let node_index = if in_state {
-        query_runner.pubkey_to_index(&node_public_key).unwrap()
+        query_runner.pubkey_to_index(node_public_key).unwrap()
     } else {
         u32::MAX
     };

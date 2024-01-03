@@ -22,7 +22,6 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
 };
 use lightning_schema::AutoImplSerde;
-use lightning_utils::application::QueryRunnerExt;
 use mysten_metrics::RegistryService;
 use mysten_network::Multiaddr;
 use narwhal_config::{Committee, CommitteeBuilder, WorkerCache, WorkerIndex, WorkerInfo};
@@ -250,7 +249,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
 
                 tokio::select! {
                     _ = time_to_sleep => {
-                        let new_epoch = query_runner.get_current_epoch();
+                        let new_epoch = query_runner.get_epoch();
                         if new_epoch != epoch {
                             break;
                         }

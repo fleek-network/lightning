@@ -216,7 +216,7 @@ async fn init_service_executor(
         path.join("ipc").join(format!("service-{}", service_id)),
     );
     let config = ServiceExecutorConfig {
-        services: [service_id].into_iter().collect(),
+        services: [1069].into_iter().collect(),
         ipc_path: path.join("ipc").try_into().unwrap(),
     };
 
@@ -252,8 +252,10 @@ async fn init_service_executor(
 }
 
 #[tokio::test]
-async fn test_query_client_info() {
-    let path = std::env::temp_dir().join("lightning-service-ex-test-1");
+async fn test_query_balance() {
+    let path = std::env::temp_dir()
+        .join("lightning-service_executor-test")
+        .join("query_balance");
     if path.exists() {
         std::fs::remove_dir_all(&path).unwrap();
     }
@@ -268,7 +270,7 @@ async fn test_query_client_info() {
     genesis.client.insert(client_pk, address);
     genesis.account.push(GenesisAccount {
         public_key: address,
-        flk_balance: 47_u32.into(),
+        flk_balance: 0_u32.into(),
         stables_balance: 0,
         bandwidth_balance: 27,
     });
@@ -280,13 +282,9 @@ async fn test_query_client_info() {
     // Start the service
     fn_sdk::ipc::init_from_env();
 
-    // Get the client bandwidth balance
-    let balance = fn_sdk::api::query_client_bandwidth_balance(client_pk).await;
+    // Get the client balance from the the network
+    let balance = fn_sdk::api::query_client_balance(client_pk).await;
     assert_eq!(balance, 27);
-
-    // Get the client FLK balance
-    let balance = fn_sdk::api::query_client_flk_balance(client_pk).await;
-    assert_eq!(balance, 47);
 
     if path.exists() {
         std::fs::remove_dir_all(&path).unwrap();

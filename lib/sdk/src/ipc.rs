@@ -253,7 +253,7 @@ mod tests {
         let started = std::time::Instant::now();
         for i in 0..100 {
             let send_task = tokio::spawn(async move {
-                send_and_await_response(Request::QueryClientBandwidth { pk: [i; 96] }).await
+                send_and_await_response(Request::QueryClientBalance { pk: [i; 96] }).await
             });
 
             let mut buffer = [0; std::mem::size_of::<IpcRequest>()];
@@ -278,11 +278,11 @@ mod tests {
             assert_eq!(pos, std::mem::size_of::<IpcRequest>());
 
             let req = unsafe { std::mem::transmute::<_, IpcRequest>(buffer) };
-            assert_eq!(req.request, Request::QueryClientBandwidth { pk: [i; 96] });
+            assert_eq!(req.request, Request::QueryClientBalance { pk: [i; 96] });
 
             let result = IpcMessage::Response {
                 request_ctx: req.request_ctx.unwrap(),
-                response: Response::QueryClientBandwidth {
+                response: Response::QueryClientBalance {
                     balance: i as u128 + 100,
                 },
             };
@@ -308,7 +308,7 @@ mod tests {
             let result = send_task.await.unwrap();
             assert_eq!(
                 result,
-                Response::QueryClientBandwidth {
+                Response::QueryClientBalance {
                     balance: i as u128 + 100
                 }
             );

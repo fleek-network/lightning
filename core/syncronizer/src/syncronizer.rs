@@ -25,7 +25,6 @@ use lightning_interfaces::{
     SyncronizerInterface,
     WithStartAndShutdown,
 };
-use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
 use tokio::sync::mpsc::Receiver;
@@ -107,7 +106,7 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
         signer: &C::SignerInterface,
         rx_epoch_change: Receiver<Notification>,
     ) -> Result<Self> {
-        let mut genesis_committee = query_runner.get_genesis_committee();
+        let mut genesis_committee = query_runner.genesis_committee();
         // Shuffle this since we often hit this list in order until one responds. This will give our
         // network a bit of diversity on which bootstrap node they try first
         genesis_committee.shuffle(&mut rand::thread_rng());
@@ -283,16 +282,8 @@ impl<C: Collection> SyncronizerInner<C> {
                             println!("The node doesn't have enough stake to participate in the network.");
                             std::process::exit(1);
                         }
-                        let node_idx = self
-                        .query_runner
-                        .pubkey_to_index(&self.our_public_key)
-                        .unwrap();
-
-                        let node_info = self
-                        .query_runner
-                        .get_node_info::<NodeInfo>(&node_idx, |n| n)
-                        .unwrap();
-
+                        let node_info = self.query_runner.get_node_info(&self.our_public_key)
+                            .unwrap();
                         if node_info.participation == Participation::False {
                             println!("The node is currently not participating in the network. You either submitted a OptOut transaction, or the node did not respond to enough pings.");
                             std::process::exit(1);
@@ -307,7 +298,7 @@ impl<C: Collection> SyncronizerInner<C> {
 
     async fn try_sync(&self) -> Result<[u8; 32]> {
         // Get the epoch this edge node is on
-        let current_epoch = self.query_runner.get_current_epoch();
+        let current_epoch = self.query_runner.get_epoch();
 
         // Get the epoch the bootstrap nodes are at
         let bootstrap_epoch = self.get_current_epoch().await?;

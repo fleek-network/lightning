@@ -127,7 +127,7 @@ impl<C: Collection> Context<C> {
 
     #[inline]
     fn get_node_pk(&self, index: NodeIndex) -> Option<NodePublicKey> {
-        self.sqr.index_to_pubkey(&index)
+        self.sqr.index_to_pubkey(index)
     }
 
     /// Handle a message sent from another node.
@@ -293,7 +293,7 @@ impl<C: Collection> Context<C> {
             Command::Send(cmd) => {
                 let node_index = self
                     .sqr
-                    .pubkey_to_index(&self.pk)
+                    .pubkey_to_index(self.pk)
                     .expect("Tried to send message before node index was available");
                 let node_index = self.current_node_index.get_or_init(|| node_index);
 
@@ -423,7 +423,7 @@ async fn main_loop<C: Collection>(
     //
     // We need the node index because when we're sending messages out (when the current
     // node is the origin of the message.), we have to put our own id as the origin.
-    if let Some(node_index) = ctx.sqr.pubkey_to_index(&ctx.pk) {
+    if let Some(node_index) = ctx.sqr.pubkey_to_index(ctx.pk) {
         let _ = ctx.current_node_index.set(node_index);
     }
 

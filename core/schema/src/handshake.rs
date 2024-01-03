@@ -103,10 +103,6 @@ impl HandshakeRequestFrame {
 
     /// Decode a complete buffer into a frame.
     pub fn decode(bytes: &[u8]) -> Result<Self> {
-        if bytes.is_empty() {
-            return Err(anyhow!("cannot decode empty buffer"));
-        }
-
         match bytes[0] {
             HANDSHAKE_REQ_TAG => {
                 if bytes.len() != 149 {
@@ -221,10 +217,6 @@ impl RequestFrame {
 
     /// Decode a complete buffer of bytes into a frame.
     pub fn decode(bytes: &[u8]) -> Result<Self> {
-        if bytes.is_empty() {
-            return Err(anyhow!("cannot decode empty buffer"));
-        }
-
         match bytes[0] {
             REQ_SERVICE_PAYLOAD_TAG => {
                 let bytes = bytes[1..].to_vec().into();
@@ -301,10 +293,6 @@ impl ResponseFrame {
 
     /// Decode a complete buffer into a frame.
     pub fn decode(bytes: &[u8]) -> Result<Self> {
-        if bytes.is_empty() {
-            return Err(anyhow!("cannot decode empty buffer"));
-        }
-
         match bytes[0] {
             RES_SERVICE_PAYLOAD_TAG => {
                 let bytes = bytes[1..].to_vec().into();

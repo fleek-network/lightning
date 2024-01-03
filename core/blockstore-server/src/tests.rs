@@ -297,7 +297,7 @@ async fn test_send_and_receive() {
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     let node_index1 = query_runner
-        .pubkey_to_index(&peers[0].node_public_key)
+        .pubkey_to_index(peers[0].node_public_key)
         .unwrap();
 
     let content = create_content();

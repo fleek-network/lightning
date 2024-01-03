@@ -42,8 +42,6 @@ fleek-blake3 = "1.5"
 serde_json.workspace = true
 reqwest = { workspace = true, features = ["json"] }
 rand.workspace = true
-human-panic = "1.2.2"
-compile-time-run = "0.2.12"
 
 [[bin]]
 name = "lightning-node"

@@ -1500,12 +1500,8 @@ impl<B: Backend> State<B> {
 
     /// This function takes in the Transaction and verifies the Signature matches the Sender. It
     /// also checks the nonce of the sender and makes sure it is equal to the account nonce + 1,
-    /// to prevent replay attacks and enforce ordering. Additionally, it verifies ChainID
-    /// with the current value from Metadata Table
-
+    /// to prevent replay attacks and enforce ordering
     pub fn verify_transaction(&self, txn: &mut TransactionRequest) -> Result<(), ExecutionError> {
-        self.verify_chain_id(txn)?;
-
         match txn {
             TransactionRequest::UpdateRequest(payload) => self.verify_fleek_transaction(payload),
             TransactionRequest::EthereumRequest(payload) => {
@@ -1514,18 +1510,6 @@ impl<B: Backend> State<B> {
         }
     }
 
-    fn verify_chain_id(&self, txn: &TransactionRequest) -> Result<(), ExecutionError> {
-        match self.metadata.get(&Metadata::ChainId) {
-            Some(Value::ChainId(chain_id)) => {
-                if chain_id == txn.chain_id() {
-                    Ok(())
-                } else {
-                    Err(ExecutionError::InvalidChainId)
-                }
-            },
-            _ => Ok(()),
-        }
-    }
     fn verify_fleek_transaction(&self, txn: &UpdateRequest) -> Result<(), ExecutionError> {
         // Check nonce
         match txn.payload.sender {

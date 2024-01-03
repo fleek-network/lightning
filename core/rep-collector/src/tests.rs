@@ -26,7 +26,6 @@ use lightning_interfaces::{
 use lightning_notifier::Notifier;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
-use lightning_utils::application::QueryRunnerExt;
 
 use crate::aggregator::ReputationAggregator;
 use crate::config::Config;
@@ -330,7 +329,7 @@ async fn test_submit_measurements() {
     rep_aggregator.start().await;
 
     // Report some measurements to the reputation aggregator.
-    let peer_index = query_runner.pubkey_to_index(&peer_public_key).unwrap();
+    let peer_index = query_runner.pubkey_to_index(peer_public_key).unwrap();
     rep_reporter.report_sat(peer_index, Weight::Weak);
     rep_reporter.report_sat(peer_index, Weight::Strong);
     rep_reporter.report_ping(peer_index, Some(Duration::from_millis(300)));
@@ -339,14 +338,13 @@ async fn test_submit_measurements() {
     rep_reporter.report_bytes_received(peer_index, 20_000, Some(Duration::from_millis(100)));
     rep_reporter.report_hops(peer_index, 4);
 
-    let reporting_node_index = query_runner.pubkey_to_index(&node_public_key).unwrap();
+    let reporting_node_index = query_runner.pubkey_to_index(node_public_key).unwrap();
 
     let mut interval = tokio::time::interval(Duration::from_millis(100));
     loop {
         tokio::select! {
             _ = interval.tick() => {
-                let measurements =
-                    query_runner.get_reputation_measurements(&peer_index).unwrap_or(Vec::new());
+                let measurements = query_runner.get_rep_measurements(&peer_index);
                 if !measurements.is_empty() {
                     // Make sure that the reported measurements were submitted to the application
                     // state.
@@ -384,8 +382,6 @@ async fn test_reputation_calculation_and_query() {
 
     let (committee, mut keystore) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
-    let chain_id = genesis.chain_id;
-
     genesis.node_info = committee;
 
     let node_public_key1 = node_secret_key1.to_pk();
@@ -544,10 +540,10 @@ async fn test_reputation_calculation_and_query() {
     // note(dalton): Refactored to not include measurements for non white listed nodes so have to
     // switch Alice and bob to the keys we added to the committee
     let alice = query_runner
-        .pubkey_to_index(&keystore[0].node_secret_key.to_pk())
+        .pubkey_to_index(keystore[0].node_secret_key.to_pk())
         .unwrap();
     let bob = query_runner
-        .pubkey_to_index(&keystore[1].node_secret_key.to_pk())
+        .pubkey_to_index(keystore[1].node_secret_key.to_pk())
         .unwrap();
     rep_reporter1.report_sat(alice, Weight::Strong);
     rep_reporter1.report_ping(alice, Some(Duration::from_millis(100)));
@@ -573,10 +569,8 @@ async fn test_reputation_calculation_and_query() {
     loop {
         tokio::select! {
             _ = interval.tick() => {
-                let measure_alice =
-                    query_runner.get_reputation_measurements(&alice).unwrap_or(Vec::new());
-                let measure_bob =
-                    query_runner.get_reputation_measurements(&bob).unwrap_or(Vec::new());
+                let measure_alice = query_runner.get_rep_measurements(&alice);
+                let measure_bob = query_runner.get_rep_measurements(&bob);
                 if measure_alice.len() == 2 && measure_bob.len() == 2 {
                     // Wait until all measurements were submitted to the application.
                     break;
@@ -602,7 +596,6 @@ async fn test_reputation_calculation_and_query() {
             sender: node.node_secret_key.to_pk().into(),
             nonce,
             method,
-            chain_id,
         };
         let digest = payload.to_digest();
         let signature = node.node_secret_key.sign(&digest);
@@ -627,10 +620,10 @@ async fn test_reputation_calculation_and_query() {
     // Also test that alice received a higher reputation, because the reported measurements were
     // better.
     let alice_rep = query_runner
-        .get_reputation_score(&alice)
+        .get_reputation(&alice)
         .expect("Reputation score for alice is missing");
     let bob_rep = query_runner
-        .get_reputation_score(&bob)
+        .get_reputation(&bob)
         .expect("Reputation score for bob is missing");
     assert!(alice_rep > bob_rep);
 }

@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
-lightning-utils = { path = "../utils" }
 anyhow.workspace = true
 async-trait.workspace = true
 tracing.workspace = true
@@ -19,7 +18,7 @@ resolved-pathbuf.workspace = true
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }
-lightning-application = { path= "../application", features = ["test"] }
+lightning-application = {path="../application", features = ["test"]}
 infusion.workspace = true
 hp-fixed.workspace = true
 futures.workspace = true

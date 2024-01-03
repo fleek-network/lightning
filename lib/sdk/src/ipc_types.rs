@@ -61,17 +61,9 @@ pub enum IpcMessage {
 }
 
 ReqRes! {
-    /// Query a client's bandwidth balance.
-    QueryClientBandwidth {
+    /// Query a client's balance.
+    QueryClientBalance {
         /// The public key of the user that we want their balance.
-        pk: ClientPublicKeyBytes,
-        =>
-        /// The balance of the user.
-        balance: u128,
-    },
-    /// Query a client's FLK balance.
-    QueryClientFLK {
-        /// The public key of the user .
         pk: ClientPublicKeyBytes,
         =>
         /// The balance of the user.

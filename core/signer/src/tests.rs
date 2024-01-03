@@ -116,12 +116,10 @@ async fn test_send_two_txs_in_a_row() {
     // Each transaction will take at most 2 seconds to get ordered.
     // Therefore, after 5 seconds, the nonce should be 2.
     tokio::time::sleep(Duration::from_secs(5)).await;
-    let node_idx = query_runner
-        .pubkey_to_index(&signer.get_ed25519_pk())
-        .unwrap();
     let new_nonce = query_runner
-        .get_node_info::<u64>(&node_idx, |n| n.nonce)
-        .unwrap();
+        .get_node_info(&signer.get_ed25519_pk())
+        .unwrap()
+        .nonce;
     assert_eq!(new_nonce, 2);
 }
 
@@ -213,12 +211,10 @@ async fn test_retry_send() {
     // transaction, and then it will resend all following transactions.
     // Hence, the application nonce should be 3 after some time.
     tokio::time::sleep(Duration::from_secs(15)).await;
-    let node_idx = query_runner
-        .pubkey_to_index(&signer.get_ed25519_pk())
-        .unwrap();
     let new_nonce = query_runner
-        .get_node_info::<u64>(&node_idx, |n| n.nonce)
-        .unwrap();
+        .get_node_info(&signer.get_ed25519_pk())
+        .unwrap()
+        .nonce;
     assert_eq!(new_nonce, 3);
 }
 

@@ -14,12 +14,10 @@ use ethers::types::{
 };
 use ethers::utils::rlp;
 use fleek_crypto::EthAddress;
-use hp_fixed::unsigned::HpUfixed;
 use jsonrpsee::core::RpcResult;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{ArchiveRequest, ArchiveResponse};
 use lightning_interfaces::SyncQueryRunnerInterface;
-use lightning_utils::application::QueryRunnerExt;
 use tracing::trace;
 
 use crate::api::EthApiServer;
@@ -30,8 +28,6 @@ use crate::Data;
 const FLEEK_CONTRACT: EthAddress = EthAddress([6; 20]);
 
 const FLEEK_CONTRACT_BYTES: &[u8; 172] = b"73000000000000000000000000000000000000000030146080604052600080fdfea264697066735822122012d3570051ca11eb882745693b7b2af91a10ad5074b3486da80280731d9af73164736f6c63430008120033";
-
-use lightning_interfaces::types::{Metadata, Value};
 
 pub struct EthApi<C: Collection> {
     data: Arc<Data<C>>,
@@ -48,12 +44,7 @@ impl<C: Collection> EthApiServer for EthApi<C> {
     async fn block_number(&self) -> RpcResult<U256> {
         trace!(target: "rpc::eth", "Serving eth_blockNumber");
 
-        let block_number = match self.data.query_runner.get_metadata(&Metadata::BlockNumber) {
-            Some(Value::BlockNumber(num)) => num,
-            _ => 0,
-        };
-
-        Ok(U256::from(block_number))
+        Ok(U256::from(self.data.query_runner.get_block_number()))
     }
 
     /// todo this function always returns the current nonce
@@ -65,11 +56,7 @@ impl<C: Collection> EthApiServer for EthApi<C> {
         trace!(target: "rpc::eth", ?address, "Serving eth_getTransactionCount");
 
         Ok(U256::from(
-            self.data
-                .query_runner
-                .get_account_info::<u64>(&address, |a| a.nonce)
-                .unwrap_or(0)
-                + 1,
+            self.data.query_runner.get_account_nonce(&address) + 1,
         ))
     }
 
@@ -83,8 +70,7 @@ impl<C: Collection> EthApiServer for EthApi<C> {
         Ok(self
             .data
             .query_runner
-            .get_account_info::<HpUfixed<18>>(&address, |a| a.flk_balance)
-            .unwrap_or(HpUfixed::<18>::zero())
+            .get_flk_balance(&address)
             .try_into()
             .unwrap_or(U256::zero()))
     }
@@ -96,6 +82,7 @@ impl<C: Collection> EthApiServer for EthApi<C> {
 
     async fn chain_id(&self) -> RpcResult<Option<U64>> {
         trace!(target: "rpc::eth", "Serving eth_chainId");
+
         Ok(Some(U64::from(self.data.query_runner.get_chain_id())))
     }
 

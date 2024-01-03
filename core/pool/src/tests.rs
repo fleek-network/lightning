@@ -225,7 +225,7 @@ fn create_peer(
 
     let node_public_key = signer.get_ed25519_pk();
     let node_index = if in_state {
-        query_runner.pubkey_to_index(&node_public_key).unwrap()
+        query_runner.pubkey_to_index(node_public_key).unwrap()
     } else {
         u32::MAX
     };
@@ -246,10 +246,10 @@ async fn test_send_to_one() {
     let query_runner = app.sync_query();
 
     let node_index1 = query_runner
-        .pubkey_to_index(&peers[0].node_public_key)
+        .pubkey_to_index(peers[0].node_public_key)
         .unwrap();
     let node_index2 = query_runner
-        .pubkey_to_index(&peers[1].node_public_key)
+        .pubkey_to_index(peers[1].node_public_key)
         .unwrap();
 
     let event_handler1 = peers[0].pool.open_event(ServiceScope::Broadcast);
@@ -294,7 +294,7 @@ async fn test_send_to_all() {
 
     // Given: we start known nodes.
     let node_index1 = query_runner
-        .pubkey_to_index(&peers[0].node_public_key)
+        .pubkey_to_index(peers[0].node_public_key)
         .unwrap();
     let mut event_handlers: Vec<_> = peers
         .iter()
@@ -348,10 +348,10 @@ async fn test_open_req_res() {
     let query_runner = app.sync_query();
 
     let node_index1 = query_runner
-        .pubkey_to_index(&peers[0].node_public_key)
+        .pubkey_to_index(peers[0].node_public_key)
         .unwrap();
     let node_index2 = query_runner
-        .pubkey_to_index(&peers[1].node_public_key)
+        .pubkey_to_index(peers[1].node_public_key)
         .unwrap();
     let (_requester1, mut responder1) = peers[0].pool.open_req_res(ServiceScope::BlockstoreServer);
     let (requester2, _responder2) = peers[1].pool.open_req_res(ServiceScope::BlockstoreServer);
@@ -801,10 +801,10 @@ async fn test_start_shutdown() {
     let query_runner = app.sync_query();
 
     let node_index1 = query_runner
-        .pubkey_to_index(&peers[0].node_public_key)
+        .pubkey_to_index(peers[0].node_public_key)
         .unwrap();
     let node_index2 = query_runner
-        .pubkey_to_index(&peers[1].node_public_key)
+        .pubkey_to_index(peers[1].node_public_key)
         .unwrap();
 
     let event_handler1 = peers[0].pool.open_event(ServiceScope::Broadcast);

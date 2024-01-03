@@ -19,7 +19,6 @@ use lightning_node::config::TomlConfigProvider;
 use lightning_rpc::{utils, Rpc};
 use lightning_signer::Signer;
 use lightning_types::{
-    ChainId,
     EpochInfo,
     NodeInfo,
     Participation,
@@ -83,14 +82,7 @@ async fn opt_in<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>
         return Ok(());
     }
 
-    let chain_id = get_chain_id().context("Failed to load Chain ID from genesis.")?;
-
-    let tx = create_update_request(
-        UpdateMethod::OptIn {},
-        secret_key,
-        node_info.nonce + 1,
-        chain_id,
-    );
+    let tx = create_update_request(UpdateMethod::OptIn {}, secret_key, node_info.nonce + 1);
 
     genesis_committee_rpc::<()>(&genesis_committee, send_transaction(tx))
         .await
@@ -132,15 +124,7 @@ async fn opt_out<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C
         );
         return Ok(());
     }
-
-    let chain_id = get_chain_id().context("Failed to load Chain ID from genesis.")?;
-
-    let tx = create_update_request(
-        UpdateMethod::OptOut {},
-        secret_key,
-        node_info.nonce + 1,
-        chain_id,
-    );
+    let tx = create_update_request(UpdateMethod::OptOut {}, secret_key, node_info.nonce + 1);
 
     genesis_committee_rpc::<()>(&genesis_committee, send_transaction(tx))
         .await
@@ -229,13 +213,11 @@ fn create_update_request(
     method: UpdateMethod,
     secret_key: NodeSecretKey,
     nonce: u64,
-    chain_id: ChainId,
 ) -> UpdateRequest {
     let payload = UpdatePayload {
         sender: TransactionSender::NodeMain(secret_key.to_pk()),
         nonce,
         method,
-        chain_id,
     };
     let digest = payload.to_digest();
     let signature = secret_key.sign(&digest);
@@ -276,11 +258,6 @@ fn get_epoch_info() -> String {
         "id":1,
     })
     .to_string()
-}
-
-fn get_chain_id() -> Result<ChainId> {
-    let genesis = Genesis::load()?;
-    Ok(genesis.chain_id)
 }
 
 fn get_genesis_committee() -> Result<Vec<NodeInfo>> {

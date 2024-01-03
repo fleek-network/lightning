@@ -30,8 +30,6 @@ use super::{
 use crate::content_registry::ContentUpdate;
 use crate::{NodeIndex, NodePorts, TransactionDestination};
 
-pub type ChainId = u32;
-
 pub type TxHash = [u8; 32];
 
 // TODO: Change this to capital and non-abrv version.
@@ -154,16 +152,6 @@ impl TransactionRequest {
             },
         }
     }
-
-    pub fn chain_id(&self) -> ChainId {
-        match self {
-            Self::UpdateRequest(payload) => payload.payload.chain_id,
-            Self::EthereumRequest(payload) => payload
-                .chain_id
-                .expect("Chain ID should be included in Ethereum Transaction")
-                .as_u32(),
-        }
-    }
 }
 
 impl TryFrom<&TransactionRequest> for Vec<u8> {
@@ -263,8 +251,6 @@ pub struct UpdatePayload {
     pub nonce: u64,
     /// The transition function (and parameters) for this update request.
     pub method: UpdateMethod,
-    /// The chain ID.
-    pub chain_id: ChainId,
 }
 
 /// All of the update functions in our logic, along their parameters.
@@ -395,9 +381,8 @@ impl ToDigest for UpdatePayload {
     /// nonce, the name of all of the update method names along with the value
     /// for all of the parameters.
     fn transcript(&self) -> TranscriptBuilder {
-        let mut transcript_builder = TranscriptBuilder::empty(FN_TXN_PAYLOAD_DOMAIN)
-            .with("nonce", &self.nonce)
-            .with("chain_id", &self.chain_id);
+        let mut transcript_builder =
+            TranscriptBuilder::empty(FN_TXN_PAYLOAD_DOMAIN).with("nonce", &self.nonce);
 
         match &self.sender {
             TransactionSender::NodeMain(public_key) => {
@@ -636,11 +621,8 @@ impl<const P: usize> TranscriptBuilderInput for HpUfixedWrapper<P> {
 mod tests {
     use ethers::types::U256;
     use fleek_crypto::{AccountOwnerSignature, NodeSecretKey, SecretKey};
-    use lightning_interfaces::ToDigest;
 
     use super::*;
-
-    const CHAIN_ID: ChainId = 1337;
 
     fn get_block(num_txns: usize) -> Block {
         let transactions: Vec<TransactionRequest> = (0..num_txns)
@@ -654,7 +636,6 @@ mod tests {
                         sender,
                         nonce: 0,
                         method,
-                        chain_id: CHAIN_ID,
                     };
                     let digest = payload.to_digest();
                     TransactionRequest::UpdateRequest(UpdateRequest {
@@ -681,14 +662,8 @@ mod tests {
 
     #[test]
     fn test_transaction_request_eth() {
-        let tx = EthersTransaction {
-            chain_id: Some(U256::from(CHAIN_ID)),
-            ..Default::default()
-        };
+        let tx = EthersTransaction::default();
         let tx_req = TransactionRequest::EthereumRequest(tx.into());
-
-        assert_eq!(tx_req.chain_id(), CHAIN_ID);
-
         let bytes: Vec<u8> = (&tx_req).try_into().unwrap();
         let tx_req_r = TransactionRequest::try_from(bytes.as_ref()).unwrap();
 
@@ -707,7 +682,6 @@ mod tests {
             sender: TransactionSender::AccountOwner(EthAddress([0; 20])),
             nonce: 0,
             method: update_method,
-            chain_id: CHAIN_ID,
         };
         let update_req = UpdateRequest {
             signature: TransactionSignature::AccountOwner(AccountOwnerSignature([0; 65])),
@@ -726,41 +700,5 @@ mod tests {
         let bytes: Vec<u8> = (&block).try_into().unwrap();
         let block_r = Block::try_from(bytes).unwrap();
         assert_eq!(block, block_r);
-    }
-
-    #[test]
-    fn test_update_payload_hash_includes_chain_id() {
-        let chain_id_1 = CHAIN_ID;
-        let chain_id_2 = chain_id_1 + 1;
-
-        let update_method = UpdateMethod::ChangeProtocolParam {
-            param: ProtocolParams::CommitteeSize,
-            value: 4,
-        };
-        let payload_1 = UpdatePayload {
-            sender: TransactionSender::AccountOwner(EthAddress([0; 20])),
-            nonce: 0,
-            method: update_method,
-            chain_id: chain_id_1,
-        };
-
-        let mut payload_2 = payload_1.clone();
-        payload_2.chain_id = chain_id_2;
-
-        assert_ne!(payload_1.to_digest(), payload_2.to_digest());
-
-        let update_1 = UpdateRequest {
-            signature: TransactionSignature::AccountOwner(AccountOwnerSignature([0; 65])),
-            payload: payload_1,
-        };
-        let tx_1 = TransactionRequest::UpdateRequest(update_1);
-        assert_eq!(tx_1.chain_id(), chain_id_1);
-
-        let update_2 = UpdateRequest {
-            signature: TransactionSignature::AccountOwner(AccountOwnerSignature([0; 65])),
-            payload: payload_2,
-        };
-        let tx_2 = TransactionRequest::UpdateRequest(update_2);
-        assert_eq!(tx_2.chain_id(), chain_id_2)
     }
 }

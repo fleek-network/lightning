@@ -20,6 +20,3 @@ thiserror = "1.0"
 bincode.workspace = true
 schemars.workspace = true
 ethers.workspace = true
-
-[dev-dependencies]
-lightning-interfaces = { path = "../interfaces" }

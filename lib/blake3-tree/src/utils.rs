@@ -5,7 +5,6 @@ pub fn tree_index(block_counter: usize) -> usize {
 }
 
 /// A simple static vector of 32-byte hashes, used internally by [`HashTree`].
-#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct HashVec {
     inner: Box<[u8]>,
 }
@@ -45,33 +44,6 @@ impl From<&[[u8; 32]]> for HashVec {
         }
 
         Self { inner: buf }
-    }
-}
-
-// TODO(qti3e): Check the safety of this code.
-//impl From<Vec<[u8; 32]>> for HashVec {
-//    #[inline]
-//    fn from(value: Vec<[u8; 32]>) -> Self {
-//        let len = value.len() * 32;
-//        let ptr = Box::into_raw(value.into_boxed_slice());
-//        let buf = unsafe {
-//            let slice = std::slice::from_raw_parts_mut(ptr as *mut u8, len);
-//            Box::from_raw(slice)
-//        };
-//        Self { inner: buf }
-//    }
-//}
-
-impl TryFrom<Vec<u8>> for HashVec {
-    type Error = ();
-
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        if value.len() % 32 != 0 {
-            return Err(());
-        }
-        Ok(Self {
-            inner: value.into_boxed_slice(),
-        })
     }
 }
 
@@ -124,7 +96,6 @@ impl HashVec {
 /// let block_hash_a = tree[0];
 /// let block_hash_b = tree[1];
 /// ```
-#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct HashTree {
     inner: HashVec,
 }

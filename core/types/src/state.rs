@@ -124,13 +124,13 @@ pub enum Participation {
 /// Adjustable parameters that are stored in the blockchain
 #[rustfmt::skip]
 #[derive(
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    Debug,
+    Clone, 
+    PartialEq, 
+    Eq, 
+    Hash, 
+    Serialize, 
+    Deserialize, 
+    Debug, 
     schemars::JsonSchema
 )]
 #[repr(u8)]
@@ -161,15 +161,15 @@ pub enum ProtocolParams {
 
 #[rustfmt::skip]
 #[derive(
-    Debug,
-    Hash,
-    PartialEq,
-    PartialOrd,
-    Ord,
-    Eq,
-    Serialize,
-    Deserialize,
-    Clone,
+    Debug, 
+    Hash, 
+    PartialEq, 
+    PartialOrd, 
+    Ord, 
+    Eq, 
+    Serialize, 
+    Deserialize, 
+    Clone, 
     schemars::JsonSchema,
 )]
 pub struct NodeInfo {

@@ -110,7 +110,6 @@ pub enum ExecutionData {
 #[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize)]
 pub enum ExecutionError {
     InsufficientBalance,
-    InvalidChainId,
     InvalidSignature,
     InvalidNonce,
     InvalidProof,

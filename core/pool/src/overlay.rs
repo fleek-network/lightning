@@ -17,7 +17,6 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
 };
 use lightning_metrics::histogram;
-use lightning_utils::application::QueryRunnerExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
@@ -234,7 +233,7 @@ where
     pub fn get_index(&self) -> NodeIndex {
         if let Some(index) = self.index.get() {
             *index
-        } else if let Some(index) = self.sync_query.pubkey_to_index(&self.pk) {
+        } else if let Some(index) = self.sync_query.pubkey_to_index(self.pk) {
             self.index.set(index).expect("Failed to set index");
             index
         } else {
@@ -243,13 +242,13 @@ where
     }
 
     pub fn node_info_from_state(&self, peer: &NodeIndex) -> Option<NodeInfo> {
-        let info = self
-            .sync_query
-            .get_node_info::<lightning_interfaces::types::NodeInfo>(peer, |n| n)?;
+        let pk = self.sync_query.index_to_pubkey(*peer)?;
+
+        let info = self.sync_query.get_node_info(&pk)?;
 
         Some(NodeInfo {
             index: *peer,
-            pk: info.public_key,
+            pk,
             socket_address: SocketAddr::from((info.domain, info.ports.pool)),
         })
     }
@@ -289,16 +288,7 @@ where
     /// to be a valid node in the network, and false otherwise.
     #[inline]
     pub fn validate_stake(&self, peer: NodePublicKey) -> bool {
-        match self.sync_query.pubkey_to_index(&peer) {
-            None => false,
-            Some(ref node_idx) => {
-                HpUfixed::from(self.sync_query.get_staking_amount())
-                    <= self
-                        .sync_query
-                        .get_node_info::<HpUfixed<18>>(node_idx, |n| n.stake.staked)
-                        .unwrap_or(HpUfixed::<18>::zero())
-            },
-        }
+        HpUfixed::from(self.sync_query.get_staking_amount()) <= self.sync_query.get_staked(&peer)
     }
 
     pub fn _index_from_connection<M: MuxerInterface>(
@@ -306,15 +296,15 @@ where
         connection: &M::Connection,
     ) -> Option<NodeIndex> {
         let pk = connection.peer_identity()?;
-        self.sync_query.pubkey_to_index(&pk)
+        self.sync_query.pubkey_to_index(pk)
     }
 
     pub fn pubkey_to_index(&self, peer: NodePublicKey) -> Option<NodeIndex> {
-        self.sync_query.pubkey_to_index(&peer)
+        self.sync_query.pubkey_to_index(peer)
     }
 
     pub fn _index_to_pubkey(&self, peer: NodeIndex) -> Option<NodePublicKey> {
-        self.sync_query.index_to_pubkey(&peer)
+        self.sync_query.index_to_pubkey(peer)
     }
 
     #[inline]
