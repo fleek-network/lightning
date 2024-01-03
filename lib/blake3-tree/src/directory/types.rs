@@ -1,7 +1,8 @@
 use smol_str::SmolStr;
 
-use super::hash_directory;
+use super::{hash_directory, FindEntryOutput};
 use crate::utils::HashTree;
+use crate::ProofBuf;
 
 pub type Digest = [u8; 32];
 
@@ -48,6 +49,49 @@ impl Directory {
     #[inline]
     pub fn find_index(&self, name: &str) -> Result<usize, usize> {
         self.entries.binary_search_by(|e| e.name.as_str().cmp(name))
+    }
+
+    /// Find an entry with the given name and return the link to it along with an existence proof,
+    /// or if the entry is not found returns a non-existence proof.
+    #[inline]
+    pub fn find_entry(&self, name: &str) -> FindEntryOutput {
+        self.generate_find_entry_output(self.find_index(name))
+    }
+
+    /// Generate a proof for the existence or non-existence of a given entry search.
+    #[doc(hidden)]
+    pub fn generate_find_entry_output(&self, index: Result<usize, usize>) -> FindEntryOutput {
+        if self.entries.is_empty() {
+            return FindEntryOutput::EmptyDirectory;
+        }
+
+        match index {
+            Ok(idx) => {
+                let proof = ProofBuf::new(self.tree.as_ref(), idx);
+                let link = self.entries[idx].link().clone();
+                FindEntryOutput::Found(proof, link)
+            },
+            Err(0) => {
+                let proof = ProofBuf::new(self.tree.as_ref(), 0);
+                let entry = self.entries[0].clone();
+                FindEntryOutput::NotFoundLeft(proof, entry)
+            },
+            Err(i) if i >= self.entries.len() => {
+                let idx = self.entries.len() - 1;
+                let proof = ProofBuf::new(self.tree.as_ref(), idx);
+                let entry = self.entries[idx].clone();
+                FindEntryOutput::NotFoundRight(proof, entry)
+            },
+            Err(mid) => {
+                let left_idx = mid - 1;
+                let left_proof = ProofBuf::new(self.tree.as_ref(), left_idx);
+                let left_entry = self.entries[left_idx].clone();
+                let right_idx = mid + 1;
+                let right_proof = ProofBuf::resume(self.tree.as_ref(), right_idx);
+                let right_entry = self.entries[right_idx].clone();
+                FindEntryOutput::NotFound(mid, left_proof, left_entry, right_proof, right_entry)
+            },
+        }
     }
 }
 
