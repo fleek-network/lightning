@@ -39,6 +39,10 @@ pub enum IncrementalVerifierError {
     HashMismatch,
     #[error("Verifier has already finished its job.")]
     VerifierTerminated,
+    #[error("Invalid counter value")]
+    InvalidCounter,
+    #[error("Invalid range provided for requested key.")]
+    InvalidRange,
 }
 
 #[derive(Default)]

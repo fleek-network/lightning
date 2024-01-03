@@ -86,7 +86,7 @@ impl Directory {
                 let idx = self.entries.len() - 1;
                 let proof = ProofBuf::new(self.tree.as_ref(), idx);
                 let entry = self.entries[idx].clone();
-                FindEntryOutput::NotFoundRight(proof, entry)
+                FindEntryOutput::NotFoundRight(idx, proof, entry)
             },
             Err(mid) => {
                 let left_idx = mid - 1;
