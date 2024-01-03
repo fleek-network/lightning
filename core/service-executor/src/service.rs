@@ -349,7 +349,11 @@ async fn run_command(
         let last_start = Instant::now();
         tracing::trace!("Running command for '{name}'");
 
-        let mut child = command.spawn().expect("Command failed to start.");
+        let mut child = command
+            // Unique group id for the subprocess to isolate signals from the parent process
+            .process_group(0)
+            .spawn()
+            .expect("Command failed to start.");
 
         select! {
             biased;
