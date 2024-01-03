@@ -5,6 +5,7 @@ pub fn tree_index(block_counter: usize) -> usize {
 }
 
 /// A simple static vector of 32-byte hashes, used internally by [`HashTree`].
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct HashVec {
     inner: Box<[u8]>,
 }
@@ -123,6 +124,7 @@ impl HashVec {
 /// let block_hash_a = tree[0];
 /// let block_hash_b = tree[1];
 /// ```
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct HashTree {
     inner: HashVec,
 }

@@ -5,6 +5,7 @@ use crate::utils::HashTree;
 
 pub type Digest = [u8; 32];
 
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Directory {
     pub entries: Vec<DirectoryEntry>,
     pub tree: HashTree,
@@ -29,14 +30,24 @@ pub enum LinkRep {
 impl Directory {
     /// Create a new directory from a list of entries. The `sorted` parameters must be set to false
     /// if the provided list of entries is not already sorted.
-    pub fn new(mut entries: Vec<DirectoryEntry>, sorted: bool) -> Self {
-        if !sorted {
+    ///
+    /// 1. The correct ordering for entries is ascending order based on the name of each entry.
+    /// 2. The names *MUST* be unique.
+    pub fn new(mut entries: Vec<DirectoryEntry>, skip_sorting: bool) -> Self {
+        if !skip_sorting {
             entries.sort_unstable_by(|a, b| a.name.cmp(&b.name))
         }
 
         let tree = hash_directory(true, &entries).tree.unwrap();
 
         Self { entries, tree }
+    }
+
+    /// Search the entries for the given file and return the index if found. Otherwise an `Err(idx)`
+    // is returned contaning where the element should have been.
+    #[inline]
+    pub fn find_index(&self, name: &str) -> Result<usize, usize> {
+        self.entries.binary_search_by(|e| e.name.as_str().cmp(name))
     }
 }
 
@@ -140,5 +151,41 @@ impl DirectoryEntry {
                 out.extend_from_slice(digest);
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn ascii(i: usize) -> char {
+        std::char::from_u32(65 + (i as u32)).unwrap()
+    }
+
+    fn d(i: usize) -> DirectoryEntry {
+        let mut s = [0; 32];
+        s[0..8].copy_from_slice(&(i as u64).to_le_bytes());
+        DirectoryEntry::new(format!("{}", ascii(i)).into(), Link::file(s))
+    }
+
+    #[test]
+    fn directory_constructor_ordering() {
+        let expected = Directory::new(vec![d(0), d(1), d(2)], true);
+        let actual = Directory::new(vec![d(1), d(2), d(0)], false);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn directory_find_index() {
+        let test_dir = Directory::new((1..7).map(d).collect(), true);
+        for i in 1..7 {
+            assert_eq!(Ok(i - 1), test_dir.find_index(&format!("{}", ascii(i))));
+        }
+        assert_eq!(Err(0), test_dir.find_index(&format!("{}", ascii(0))));
+        assert_eq!(Err(6), test_dir.find_index(&format!("{}", ascii(7))));
+        assert_eq!(Err(6), test_dir.find_index(&format!("{}", ascii(8))));
+
+        let test_dir = Directory::new((1..7).filter(|e| *e != 3).map(d).collect(), true);
+        assert_eq!(Err(2), test_dir.find_index("D"));
     }
 }
