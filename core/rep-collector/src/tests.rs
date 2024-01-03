@@ -611,8 +611,6 @@ async fn test_reputation_calculation_and_query() {
             payload,
         };
         let _res = update_socket
-            .lock()
-            .await
             .run(Block {
                 transactions: vec![req.into()],
                 digest: [0; 32],

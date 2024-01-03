@@ -160,8 +160,7 @@ impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
                         digest: [0;32]
                     };
 
-                    let guard = self.executor.lock().await;
-                    let _res = guard
+                    let _res = self.executor
                         .run(block)
                         .await
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))

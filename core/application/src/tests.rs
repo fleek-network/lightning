@@ -3,6 +3,7 @@ use std::net::IpAddr;
 use std::str::FromStr;
 use std::time::SystemTime;
 
+use affair::Socket;
 use anyhow::{anyhow, Result};
 use fleek_crypto::{
     AccountOwnerSecretKey,
@@ -1026,11 +1027,9 @@ fn prepare_content_registry_update(
 /// Returns `Result<BlockExecutionResponse>`.
 async fn run_transaction(
     requests: Vec<TransactionRequest>,
-    update_socket: &ExecutionEngineSocket,
+    update_socket: &Socket<Block, BlockExecutionResponse>,
 ) -> Result<BlockExecutionResponse> {
     let res = update_socket
-        .lock()
-        .await
         .run(Block {
             transactions: requests,
             digest: [0; 32],

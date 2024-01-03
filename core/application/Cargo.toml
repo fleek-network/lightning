@@ -13,7 +13,6 @@ bincode.workspace = true
 ethers.workspace = true
 lazy_static.workspace = true
 serde.workspace = true
-tokio.workspace = true
 toml = "0.7.4"
 multiaddr = "0.17.1"
 lightning-interfaces = { path = "../interfaces" }

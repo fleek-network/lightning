@@ -43,17 +43,10 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
     fn init(app: &c![C::ApplicationInterface]) -> Self {
         let notifier: Arc<Notify> = Default::default();
         let notify = Arc::downgrade(&notifier);
-
-        let executor = app.transaction_executor();
-        // We cannot use async lock in sync fn
-        // Also, we cannot use blocking lock within asynchronous execution context
-        // See here https://docs.rs/tokio/latest/tokio/sync/struct.Mutex.html#panics
-        tokio::task::spawn_blocking(move || {
-            executor.blocking_lock().inject(move |res| {
-                if res.change_epoch {
-                    notifier.notify_waiters();
-                }
-            });
+        app.transaction_executor().inject(move |res| {
+            if res.change_epoch {
+                notifier.notify_waiters();
+            }
         });
 
         Self {

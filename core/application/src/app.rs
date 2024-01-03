@@ -1,5 +1,4 @@
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use affair::{Executor, TokioSpawn};
 use anyhow::{anyhow, Result};
@@ -11,7 +10,6 @@ use lightning_interfaces::{
     ExecutionEngineSocket,
     WithStartAndShutdown,
 };
-use tokio::sync::Mutex;
 use tracing::{error, info};
 
 use crate::config::{Config, StorageConfig};
@@ -68,9 +66,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
 
         Ok(Self {
             query_runner: env.query_runner(),
-            update_socket: Arc::new(Mutex::new(TokioSpawn::spawn_async(UpdateWorker::<C>::new(
-                env, blockstore,
-            )))),
+            update_socket: TokioSpawn::spawn_async(UpdateWorker::<C>::new(env, blockstore)),
             collection: PhantomData,
         })
     }

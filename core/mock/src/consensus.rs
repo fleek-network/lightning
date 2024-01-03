@@ -221,8 +221,7 @@ async fn run_consensus(
                     digest: [0;32]
                 };
 
-                let guard = exec.lock().await;
-                let _ = guard.run(block).await;
+                let _ = exec.run(block).await;
 
                 block_notifier.notify_waiters();
             }
