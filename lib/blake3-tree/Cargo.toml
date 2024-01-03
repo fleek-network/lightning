@@ -11,6 +11,7 @@ fleek-blake3 = "1.5"
 thiserror = "1.0"
 arrayref = "0.3"
 arrayvec = "0.7"
+smol_str = "0.2"
 
 [features]
 all-tests = []

@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::types::{NodeIndex, Participation};
+use lightning_interfaces::types::{NodeIndex, NodeInfo, Participation};
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
@@ -20,6 +20,7 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
+use lightning_utils::application::QueryRunnerExt;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
@@ -140,7 +141,7 @@ impl<C: Collection> PingerInner<C> {
                         return;
                     }
                     _ = interval.tick() => {
-                        if let Some(index) = self.query_runner.pubkey_to_index(pk) {
+                        if let Some(index) = self.query_runner.pubkey_to_index(&pk) {
                             self.node_index.set(index).expect("Failed to set once cell");
                             break;
                         }
@@ -221,7 +222,8 @@ impl<C: Collection> PingerInner<C> {
                 _ = interval.tick() => {
                     let peer_index = node_registry[cursor];
                     cursor = (cursor + 1) % node_registry.len();
-                    if let Some(node) = self.query_runner.get_node_info_with_index(&peer_index) {
+                    if let Some(node) =
+                        self.query_runner.get_node_info::<NodeInfo>(&peer_index, |n| n) {
                         let id = rng.gen_range(0..u32::MAX);
                         let msg = Message::Request { sender: node_index, id };
                         let bytes: Vec<u8> = msg.into();
@@ -268,8 +270,8 @@ impl<C: Collection> PingerInner<C> {
             .query_runner
             .get_node_registry(None)
             .into_iter()
-            .filter(|node| node.participation == Participation::True)
-            .filter_map(|node| self.query_runner.pubkey_to_index(node.public_key))
+            .filter(|node| node.info.participation == Participation::True)
+            .map(|node| node.index)
             .collect();
         nodes.shuffle(rng);
         nodes

@@ -1,3 +1,4 @@
+pub mod directory;
 pub mod utils;
 
 use std::borrow::Borrow;

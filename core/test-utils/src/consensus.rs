@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use affair::{Socket, Task};
 use async_trait::async_trait;
-use lightning_interfaces::application::{ExecutionEngineSocket, SyncQueryRunnerInterface};
+use lightning_interfaces::application::ExecutionEngineSocket;
 use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
@@ -14,6 +14,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     IndexSocket,
+    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use rand::Rng;

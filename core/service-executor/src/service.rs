@@ -29,9 +29,30 @@ pub struct Context<C: Collection> {
 impl<C: Collection> Context<C> {
     pub async fn run(&self, request: ipc_types::Request) -> ipc_types::Response {
         match request {
-            ipc_types::Request::QueryClientBalance { pk } => {
-                let balance = self.query_runner.get_client_balance(&ClientPublicKey(pk));
-                ipc_types::Response::QueryClientBalance { balance }
+            ipc_types::Request::QueryClientBandwidth { pk } => {
+                let balance = self
+                    .query_runner
+                    .client_key_to_account_key(&ClientPublicKey(pk))
+                    .and_then(|address| {
+                        self.query_runner
+                            .get_account_info(&address, |a| a.bandwidth_balance)
+                    })
+                    .unwrap_or(0);
+                ipc_types::Response::QueryClientBandwidth { balance }
+            },
+            ipc_types::Request::QueryClientFLK { pk } => {
+                let balance = self
+                    .query_runner
+                    .client_key_to_account_key(&ClientPublicKey(pk))
+                    .and_then(|address| {
+                        self.query_runner
+                            .get_account_info(&address, |a| a.flk_balance)
+                    })
+                    .unwrap();
+                //.unwrap_or(0_u32.into());
+                ipc_types::Response::QueryClientFLK {
+                    balance: balance.try_into().unwrap(),
+                }
             },
             ipc_types::Request::FetchFromOrigin { origin, uri } => {
                 let hash = match self
