@@ -179,10 +179,23 @@ pub(crate) fn write_entry_transcript(
     }
 }
 
+#[inline]
+pub fn hash_entry(is_root: bool, counter: usize, name: &str, link: &Link) -> Digest {
+    let mut buffer = Vec::new();
+    write_entry_transcript(&mut buffer, is_root, counter, name, link);
+    let hash = fleek_blake3::keyed_hash(&KEY, &buffer);
+    *hash.as_bytes()
+}
+
+#[inline(always)]
+pub(crate) fn iv() -> fleek_blake3::tree::IV {
+    fleek_blake3::tree::IV::new_keyed(&KEY)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::directory::Link;
+    use crate::directory::test_utils::entry;
 
     #[test]
     fn constants() {
@@ -200,72 +213,60 @@ mod tests {
 
     #[test]
     fn test() {
-        let dirs = vec![
-            DirectoryEntry::new("A".into(), Link::file([0; 32])),
-            DirectoryEntry::new("B".into(), Link::file([1; 32])),
-            DirectoryEntry::new("C".into(), Link::file([2; 32])),
-            DirectoryEntry::new("D".into(), Link::file([3; 32])),
-            DirectoryEntry::new("E".into(), Link::file([4; 32])),
-            DirectoryEntry::new("F".into(), Link::file([5; 32])),
-            DirectoryEntry::new("G".into(), Link::file([6; 32])),
-            DirectoryEntry::new("H".into(), Link::file([7; 32])),
-            DirectoryEntry::new("I".into(), Link::file([8; 32])),
-            DirectoryEntry::new("J".into(), Link::file([9; 32])),
-        ];
-
+        let entries = (0..10).map(entry).collect::<Vec<_>>();
         let platform = Platform::detect();
 
-        let output = hash_directory(false, &dirs[0..1]);
+        let output = hash_directory(false, &entries[0..1]);
         let actual = *output.hash.as_bytes();
-        let expected = hash_entry(true, 0, &dirs[0]);
+        let expected = hash_entry(true, 0, &entries[0]);
         assert_eq!(actual, expected);
 
-        let output = hash_directory(false, &dirs[0..2]);
+        let output = hash_directory(false, &entries[0..2]);
         let actual = *output.hash.as_bytes();
         let expected = merge(
             platform,
-            &hash_entry(false, 0, &dirs[0]),
-            &hash_entry(false, 1, &dirs[1]),
+            &hash_entry(false, 0, &entries[0]),
+            &hash_entry(false, 1, &entries[1]),
             true,
         );
         assert_eq!(actual, expected);
 
-        let output = hash_directory(false, &dirs[0..3]);
-        let actual = *output.hash.as_bytes();
-        let expected = merge(
-            platform,
-            &merge(
-                platform,
-                &hash_entry(false, 0, &dirs[0]),
-                &hash_entry(false, 1, &dirs[1]),
-                false,
-            ),
-            &hash_entry(false, 2, &dirs[2]),
-            true,
-        );
-        assert_eq!(actual, expected);
-
-        let output = hash_directory(false, &dirs[0..4]);
+        let output = hash_directory(false, &entries[0..3]);
         let actual = *output.hash.as_bytes();
         let expected = merge(
             platform,
             &merge(
                 platform,
-                &hash_entry(false, 0, &dirs[0]),
-                &hash_entry(false, 1, &dirs[1]),
+                &hash_entry(false, 0, &entries[0]),
+                &hash_entry(false, 1, &entries[1]),
+                false,
+            ),
+            &hash_entry(false, 2, &entries[2]),
+            true,
+        );
+        assert_eq!(actual, expected);
+
+        let output = hash_directory(false, &entries[0..4]);
+        let actual = *output.hash.as_bytes();
+        let expected = merge(
+            platform,
+            &merge(
+                platform,
+                &hash_entry(false, 0, &entries[0]),
+                &hash_entry(false, 1, &entries[1]),
                 false,
             ),
             &merge(
                 platform,
-                &hash_entry(false, 2, &dirs[2]),
-                &hash_entry(false, 3, &dirs[3]),
+                &hash_entry(false, 2, &entries[2]),
+                &hash_entry(false, 3, &entries[3]),
                 false,
             ),
             true,
         );
         assert_eq!(actual, expected);
 
-        let output = hash_directory(false, &dirs[0..5]);
+        let output = hash_directory(false, &entries[0..5]);
         let actual = *output.hash.as_bytes();
         let expected = merge(
             platform,
@@ -273,19 +274,19 @@ mod tests {
                 platform,
                 &merge(
                     platform,
-                    &hash_entry(false, 0, &dirs[0]),
-                    &hash_entry(false, 1, &dirs[1]),
+                    &hash_entry(false, 0, &entries[0]),
+                    &hash_entry(false, 1, &entries[1]),
                     false,
                 ),
                 &merge(
                     platform,
-                    &hash_entry(false, 2, &dirs[2]),
-                    &hash_entry(false, 3, &dirs[3]),
+                    &hash_entry(false, 2, &entries[2]),
+                    &hash_entry(false, 3, &entries[3]),
                     false,
                 ),
                 false,
             ),
-            &hash_entry(false, 4, &dirs[4]),
+            &hash_entry(false, 4, &entries[4]),
             true,
         );
         assert_eq!(actual, expected);

@@ -66,11 +66,6 @@ impl IncrementalVerifier {
         }
     }
 
-    #[inline]
-    pub fn get_current_block_counter(&self) -> usize {
-        self.block_counter
-    }
-
     /// Enable preserving the full tree.
     ///
     /// # Panics
@@ -84,6 +79,17 @@ impl IncrementalVerifier {
         );
 
         self.keeper = Some(TreeKeeper::default());
+    }
+
+    /// Set a custom initialization vector for the hasher. This is used for subtree
+    /// merge operations.
+    pub fn set_iv(&mut self, iv: blake3::tree::IV) {
+        self.iv = iv;
+    }
+
+    #[inline]
+    pub fn get_current_block_counter(&self) -> usize {
+        self.block_counter
     }
 
     /// Returns the tree that we kept.
@@ -109,10 +115,7 @@ impl IncrementalVerifier {
     /// Verify the new block of data only by providing its hash, you should be aware of
     /// what mode you have finalized the block at.
     ///
-    /// Do not attempt to manually call this function, you can not figure out how to finalize.
-    ///
-    /// Only exposed for fuzz and test purposes.
-    #[doc(hidden)]
+    /// To decide if the `is_root` needs to be set you should make a call to [`Self::is_root`].
     pub fn verify_hash(&mut self, hash: &[u8; 32]) -> Result<(), IncrementalVerifierError> {
         if self.is_done() {
             return Err(IncrementalVerifierError::VerifierTerminated);
@@ -259,7 +262,7 @@ impl IncrementalVerifier {
 
     /// Returns true if the current cursor is pointing to the root of the tree.
     #[inline(always)]
-    fn is_root(&self) -> bool {
+    pub fn is_root(&self) -> bool {
         self.nodes.len() == 1 && self.nodes.last().unwrap() == &self.root_hash
     }
 

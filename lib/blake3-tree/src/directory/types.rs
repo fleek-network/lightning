@@ -44,6 +44,12 @@ impl Directory {
         Self { entries, tree }
     }
 
+    /// Returns the root hash of the directory.
+    #[inline]
+    pub fn root_hash(&self) -> &Digest {
+        self.tree.get_root()
+    }
+
     /// Search the entries for the given file and return the index if found. Otherwise an `Err(idx)`
     // is returned contaning where the element should have been.
     #[inline]
@@ -69,7 +75,7 @@ impl Directory {
             Ok(idx) => {
                 let proof = ProofBuf::new(self.tree.as_ref(), idx);
                 let link = self.entries[idx].link().clone();
-                FindEntryOutput::Found(proof, link)
+                FindEntryOutput::Found(idx, proof, link)
             },
             Err(0) => {
                 let proof = ProofBuf::new(self.tree.as_ref(), 0);
@@ -162,35 +168,28 @@ impl DirectoryEntry {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    fn ascii(i: usize) -> char {
-        std::char::from_u32(65 + (i as u32)).unwrap()
-    }
-
-    fn d(i: usize) -> DirectoryEntry {
-        let mut s = [0; 32];
-        s[0..8].copy_from_slice(&(i as u64).to_le_bytes());
-        DirectoryEntry::new(format!("{}", ascii(i)).into(), Link::file(s))
-    }
+    use crate::directory::test_utils::*;
 
     #[test]
     fn directory_constructor_ordering() {
-        let expected = Directory::new(vec![d(0), d(1), d(2)], true);
-        let actual = Directory::new(vec![d(1), d(2), d(0)], false);
+        let expected = Directory::new(vec![entry(0), entry(1), entry(2)], true);
+        let actual = Directory::new(vec![entry(1), entry(2), entry(0)], false);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn directory_find_index() {
-        let test_dir = Directory::new((1..7).map(d).collect(), true);
+        let test_dir = mkdir(1..7);
         for i in 1..7 {
-            assert_eq!(Ok(i - 1), test_dir.find_index(&format!("{}", ascii(i))));
+            // 0 3
+            // i = 1
+            assert_eq!(Ok(i - 1), test_dir.find_index(name(i)));
         }
-        assert_eq!(Err(0), test_dir.find_index(&format!("{}", ascii(0))));
-        assert_eq!(Err(6), test_dir.find_index(&format!("{}", ascii(7))));
-        assert_eq!(Err(6), test_dir.find_index(&format!("{}", ascii(8))));
+        assert_eq!(Err(0), test_dir.find_index(name(0)));
+        assert_eq!(Err(6), test_dir.find_index(name(7)));
+        assert_eq!(Err(6), test_dir.find_index(name(8)));
 
-        let test_dir = Directory::new((1..7).filter(|e| *e != 3).map(d).collect(), true);
+        let test_dir = mkdir((1..7).filter(|e| *e != 3));
         assert_eq!(Err(2), test_dir.find_index("D"));
     }
 }
