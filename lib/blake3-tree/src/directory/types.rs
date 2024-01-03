@@ -76,7 +76,7 @@ impl Link {
 
     pub fn symlink_target(&self) -> Option<&str> {
         match &self.0 {
-            LinkRep::Symlink(path) => Some(&path),
+            LinkRep::Symlink(path) => Some(path),
             _ => None,
         }
     }
