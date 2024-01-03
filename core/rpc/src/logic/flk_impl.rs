@@ -375,15 +375,4 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
 
         Ok(())
     }
-
-    async fn health(&self) -> RpcResult<String> {
-        Ok("OK".to_string())
-    }
-
-    async fn metrics(&self) -> RpcResult<String> {
-        match autometrics::prometheus_exporter::encode_to_string() {
-            Ok(metrics) => Ok(metrics),
-            Err(err) => Err(RPCError::custom(err.to_string()).into()),
-        }
-    }
 }

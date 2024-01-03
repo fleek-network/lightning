@@ -131,12 +131,6 @@ pub trait FleekApi {
     #[method(name = "put")]
     async fn put(&self, data: Vec<u8>) -> RpcResult<Blake3Hash>;
 
-    #[method(name = "health")]
-    async fn health(&self) -> RpcResult<String>;
-
-    #[method(name = "metrics")]
-    async fn metrics(&self) -> RpcResult<String>;
-
     #[subscription(name = "subscribe", item = Event)]
     async fn handle_subscription(&self, event_type: EventType) -> SubscriptionResult;
 }
