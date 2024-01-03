@@ -44,6 +44,7 @@ reqwest = { workspace = true, features = ["json"] }
 rand.workspace = true
 human-panic = "1.2.2"
 compile-time-run = "0.2.12"
+nix = { version = "0.27.1", features = [ "signal" ] }
 
 [[bin]]
 name = "lightning-node"

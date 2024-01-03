@@ -22,6 +22,14 @@ fn main() -> Result<()> {
         // instead run the code for that service. We avoid using a runtime so that a service can use
         // its own.
         cli.setup_logging(true);
+
+        // Ignore SIGINT signals by default to avoid conflicting on ctrlc shutdown
+        unsafe {
+            use nix::sys::signal::{signal, SigHandler, Signal};
+            signal(Signal::SIGINT, SigHandler::SigIgn).expect("failed to ignore SIGINT")
+        };
+
+        // Start the service
         ServiceExecutor::<FinalTypes>::run_service(
             service_id.parse().expect("SERVICE_ID to be a number"),
         );
