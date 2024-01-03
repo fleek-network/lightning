@@ -4,6 +4,8 @@
 mod builder;
 mod hash;
 mod proof;
+#[cfg(test)]
+mod test_utils;
 mod types;
 
 pub use builder::{DirectoryBuilder, DirectoryBuilderError};

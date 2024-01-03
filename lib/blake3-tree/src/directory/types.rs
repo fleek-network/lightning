@@ -19,10 +19,10 @@ pub struct DirectoryEntry {
 }
 
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct Link(LinkRep);
+pub struct Link(pub(crate) LinkRep);
 
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub enum LinkRep {
+pub(crate) enum LinkRep {
     Symlink(SmolStr),
     File(Digest),
     Directory(Digest),
@@ -42,6 +42,12 @@ impl Directory {
         let tree = hash_directory(true, &entries).tree.unwrap();
 
         Self { entries, tree }
+    }
+
+    /// Returns the root hash of the directory.
+    #[inline]
+    pub fn root_hash(&self) -> &Digest {
+        self.tree.get_root()
     }
 
     /// Search the entries for the given file and return the index if found. Otherwise an `Err(idx)`
@@ -69,7 +75,7 @@ impl Directory {
             Ok(idx) => {
                 let proof = ProofBuf::new(self.tree.as_ref(), idx);
                 let link = self.entries[idx].link().clone();
-                FindEntryOutput::Found(proof, link)
+                FindEntryOutput::Found(idx, proof, link)
             },
             Err(0) => {
                 let proof = ProofBuf::new(self.tree.as_ref(), 0);
@@ -157,79 +163,33 @@ impl DirectoryEntry {
     pub fn to_link(self) -> Link {
         self.link
     }
-
-    /// Returns a length-prefixed encoding of this directory entry which can be used
-    /// for hashing the entry.
-    #[inline(always)]
-    pub(crate) fn transcript(&self, out: &mut Vec<u8>, counter: usize, is_root: bool) {
-        let name_bytes = self.name.as_bytes();
-        let name_len: [u8; 4] = (name_bytes.len() as u32).to_le_bytes();
-        let counter: [u8; 4] = (counter as u32).to_le_bytes();
-
-        let mut size = 1 + 4 + 4 + name_bytes.len();
-        size += match &self.link.0 {
-            LinkRep::Symlink(path) => 5 + path.len(),
-            LinkRep::File(_) => 33,
-            LinkRep::Directory(_) => 33,
-        };
-
-        out.reserve(size);
-        out.push(if is_root { 1 } else { 0 });
-        out.extend_from_slice(counter.as_slice());
-        out.extend_from_slice(name_len.as_slice());
-        out.extend_from_slice(name_bytes);
-        match &self.link.0 {
-            LinkRep::Symlink(path) => {
-                let bytes = path.as_bytes();
-                let len: [u8; 4] = (bytes.len() as u32).to_le_bytes();
-                out.push(0);
-                out.extend_from_slice(len.as_slice());
-                out.extend_from_slice(bytes);
-            },
-            LinkRep::File(digest) => {
-                out.push(1);
-                out.extend_from_slice(digest);
-            },
-            LinkRep::Directory(digest) => {
-                out.push(2);
-                out.extend_from_slice(digest);
-            },
-        }
-    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-
-    fn ascii(i: usize) -> char {
-        std::char::from_u32(65 + (i as u32)).unwrap()
-    }
-
-    fn d(i: usize) -> DirectoryEntry {
-        let mut s = [0; 32];
-        s[0..8].copy_from_slice(&(i as u64).to_le_bytes());
-        DirectoryEntry::new(format!("{}", ascii(i)).into(), Link::file(s))
-    }
+    use crate::directory::test_utils::*;
 
     #[test]
     fn directory_constructor_ordering() {
-        let expected = Directory::new(vec![d(0), d(1), d(2)], true);
-        let actual = Directory::new(vec![d(1), d(2), d(0)], false);
+        let expected = Directory::new(vec![entry(0), entry(1), entry(2)], true);
+        let actual = Directory::new(vec![entry(1), entry(2), entry(0)], false);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn directory_find_index() {
-        let test_dir = Directory::new((1..7).map(d).collect(), true);
+        let test_dir = mkdir(1..7);
         for i in 1..7 {
-            assert_eq!(Ok(i - 1), test_dir.find_index(&format!("{}", ascii(i))));
+            // 0 3
+            // i = 1
+            assert_eq!(Ok(i - 1), test_dir.find_index(name(i)));
         }
-        assert_eq!(Err(0), test_dir.find_index(&format!("{}", ascii(0))));
-        assert_eq!(Err(6), test_dir.find_index(&format!("{}", ascii(7))));
-        assert_eq!(Err(6), test_dir.find_index(&format!("{}", ascii(8))));
+        assert_eq!(Err(0), test_dir.find_index(name(0)));
+        assert_eq!(Err(6), test_dir.find_index(name(7)));
+        assert_eq!(Err(6), test_dir.find_index(name(8)));
 
-        let test_dir = Directory::new((1..7).filter(|e| *e != 3).map(d).collect(), true);
+        let test_dir = mkdir((1..7).filter(|e| *e != 3));
         assert_eq!(Err(2), test_dir.find_index("D"));
     }
 }
