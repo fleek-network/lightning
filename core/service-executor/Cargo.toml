@@ -21,6 +21,7 @@ fxhash = "0.2"
 resolved-pathbuf.workspace = true
 affair.workspace = true
 futures.workspace = true
+which = "5.0.0"
 
 # io stress dependencies
 bytes.workspace = true
