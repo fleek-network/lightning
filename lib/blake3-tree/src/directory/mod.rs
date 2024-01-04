@@ -9,6 +9,6 @@ mod test_utils;
 mod types;
 
 pub use builder::{DirectoryBuilder, DirectoryBuilderError};
-pub use hash::hash_directory;
+pub use hash::{hash_directory, iv};
 pub use proof::FindEntryOutput;
 pub use types::*;

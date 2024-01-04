@@ -187,8 +187,12 @@ pub fn hash_entry(is_root: bool, counter: usize, name: &str, link: &Link) -> Dig
     *hash.as_bytes()
 }
 
+/// Returns an instance of [blake3 IV] that can be used with [set_iv].
+///
+/// [blake3 IV]: fleek_blake3::tree::IV
+/// [set_iv]: crate::IncrementalVerifier::set_iv
 #[inline(always)]
-pub(crate) fn iv() -> fleek_blake3::tree::IV {
+pub fn iv() -> fleek_blake3::tree::IV {
     fleek_blake3::tree::IV::new_keyed(&KEY)
 }
 
