@@ -35,6 +35,11 @@ rand.workspace = true
 human-panic = "1.2.2"
 compile-time-run = "0.2.12"
 
+[features]
+default = []
+# Opt-in for compiling services directly inside the node
+services = [ "lightning-node/services" ]
+
 [[bin]]
 name = "lightning-node"
 path = "src/main.rs"

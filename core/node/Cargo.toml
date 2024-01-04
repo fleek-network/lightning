@@ -33,3 +33,8 @@ infusion.workspace = true
 anyhow.workspace = true
 resolved-pathbuf.workspace = true
 tracing.workspace = true
+
+[features]
+default = []
+# Opt-in for compiling services directly inside the node
+services = [ "lightning-service-executor/services" ]
