@@ -8,25 +8,15 @@ default-run = "lightning-node"
 
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
-lightning-application = { path = "../application" }
-lightning-broadcast = { path = "../broadcast" }
-lightning-blockstore = { path = "../blockstore" }
-lightning-blockstore-server = { path = "../blockstore-server" }
-lightning-consensus = { path = "../consensus" }
-lightning-fetcher = { path = "../fetcher" }
-lightning-handshake = { path = "../handshake" }
-lightning-notifier = { path = "../notifier" }
-lightning-origin-ipfs = { path = "../origin-ipfs" }
-lightning-rep-collector = { path = "../rep-collector" }
-lightning-resolver = { path = "../resolver" }
-lightning-rpc = { path = "../rpc" }
-lightning-service-executor = { path = "../service-executor" }
-lightning-topology = { path = "../topology" }
-lightning-types = { path = "../types" }
-lightning-pool = { path = "../pool" }
-lightning-signer = { path = "../signer" }
-lightning-utils = { path = "../utils" }
 lightning-node = { path = "../node" }
+lightning-types = { path = "../types" }
+lightning-utils = { path = "../utils" }
+
+# TODO: cli ideally shouldn't depend on these directly
+lightning-application = { path = "../application" }
+lightning-rpc = { path = "../rpc" }
+lightning-signer = { path = "../signer" }
+
 mock = { path = "../mock" }
 fleek-crypto.workspace = true
 resolved-pathbuf.workspace = true
