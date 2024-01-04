@@ -1,5 +1,9 @@
 mod config;
 
+#[cfg(test)]
+mod tests;
+
+use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
@@ -14,18 +18,19 @@ use lightning_interfaces::{
 
 use crate::config::Config;
 
-pub struct Indexer {
+pub struct Indexer<C> {
     submit_tx: SubmitTxSocket,
     is_running: AtomicBool,
+    _marker: PhantomData<C>,
 }
 
-impl ConfigConsumer for Indexer {
+impl<C: Collection> ConfigConsumer for Indexer<C> {
     const KEY: &'static str = "indexer";
     type Config = Config;
 }
 
 #[async_trait]
-impl WithStartAndShutdown for Indexer {
+impl<C: Collection> WithStartAndShutdown for Indexer<C> {
     fn is_running(&self) -> bool {
         self.is_running.load(Ordering::Relaxed)
     }
@@ -39,11 +44,12 @@ impl WithStartAndShutdown for Indexer {
     }
 }
 
-impl<C: Collection> IndexerInterface<C> for Indexer {
+impl<C: Collection> IndexerInterface<C> for Indexer<C> {
     fn init(_: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
         Ok(Self {
             submit_tx,
             is_running: AtomicBool::new(false),
+            _marker: PhantomData,
         })
     }
 

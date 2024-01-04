@@ -12,7 +12,12 @@ serde.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
-lightning-application = { path="../application", features = ["test"] }
 lightning-interfaces = { path = "../interfaces" }
-lightning-signer = { path="../signer" }
 
+[dev-dependencies]
+fleek-crypto.workspace = true
+infusion.workspace = true
+lightning-test-utils = { path="../test-utils" }
+lightning-signer = { path="../signer" }
+lightning-application = { path="../application", features = ["test"] }
+lightning-rep-collector = { path="../rep-collector" }
