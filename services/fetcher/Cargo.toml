@@ -10,8 +10,13 @@ bytes.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 arrayref = "0.3.7"
+tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 
 [dev-dependencies]
 lightning-schema = { path = "../../core/schema" }
 cid = "0.11"
 hex = "0.4"
+
+[[bin]]
+name = "fn-service-0"
+path = "src/bin.rs"
