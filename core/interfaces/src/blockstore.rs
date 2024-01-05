@@ -85,9 +85,13 @@ pub struct ContentChunk {
 #[async_trait]
 #[infusion::service]
 pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsumer {
-    fn _init(config: ::ConfigProviderInterface, indexer: ::IndexerInterface) {
+    fn _init(config: ::ConfigProviderInterface) {
         let config = config.get::<Self>();
-        Self::init(config, indexer.clone())
+        Self::init(config)
+    }
+
+    fn _post(&mut self, c: ::IndexerInterface) {
+        self.provide_indexer(c.clone())
     }
 
     /// The block store has the ability to use a smart pointer to avoid duplicating
@@ -102,7 +106,9 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
     type DirPut: IncrementalDirInterface;
 
     /// Create a new block store from the given configuration values.
-    fn init(config: Self::Config, indexer: C::IndexerInterface) -> anyhow::Result<Self>;
+    fn init(config: Self::Config) -> anyhow::Result<Self>;
+
+    fn provide_indexer(&mut self, indexer: C::IndexerInterface);
 
     /// Returns the Blake3 tree associated with the given CID. Returns [`None`] if the content
     /// is not present in our block store.

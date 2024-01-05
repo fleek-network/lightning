@@ -3,7 +3,7 @@
 use std::io;
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
 use blake3_tree::blake3::tree::{BlockHasher, HashTreeBuilder};
@@ -22,6 +22,7 @@ use lightning_interfaces::{
     PutFinalizeError,
     PutWriteError,
 };
+use parking_lot::RwLock;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use tempdir::TempDir;
@@ -37,11 +38,20 @@ use crate::store::{Block, Store};
 
 pub const BLOCK_SIZE: usize = 256 << 10;
 
-#[derive(Clone)]
 pub struct Blockstore<C: Collection> {
     root: PathBuf,
-    indexer: C::IndexerInterface,
+    indexer: Arc<OnceLock<C::IndexerInterface>>,
     collection: PhantomData<C>,
+}
+
+impl<C: Collection> Clone for Blockstore<C> {
+    fn clone(&self) -> Self {
+        Self {
+            root: self.root.clone(),
+            indexer: self.indexer.clone(),
+            collection: PhantomData,
+        }
+    }
 }
 
 impl<C: Collection> ConfigConsumer for Blockstore<C> {
@@ -55,7 +65,7 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     type Put = Putter<Self, C>;
     type DirPut = infusion::Blank<()>;
 
-    fn init(config: Self::Config, indexer: C::IndexerInterface) -> anyhow::Result<Self> {
+    fn init(config: Self::Config) -> anyhow::Result<Self> {
         let root = config.root.to_path_buf();
         let internal_dir = root.join(INTERNAL_DIR);
         let block_dir = root.join(BLOCK_DIR);
@@ -68,9 +78,15 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
 
         Ok(Self {
             root,
-            indexer,
+            indexer: Arc::new(OnceLock::new()),
             collection: PhantomData,
         })
+    }
+
+    /// Provide the blockstore with the indexer after initialization, this function
+    /// should only be called once.
+    fn provide_indexer(&mut self, indexer: C::IndexerInterface) {
+        assert!(self.indexer.set(indexer).is_ok());
     }
 
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<HashTree>> {
@@ -102,8 +118,21 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
 
     fn put(&self, root: Option<Blake3Hash>) -> Self::Put {
         match root {
-            Some(root) => Putter::verifier(self.clone(), root, self.indexer.clone()),
-            None => Putter::trust(self.clone(), self.indexer.clone()),
+            Some(root) => Putter::verifier(
+                self.clone(),
+                root,
+                self.indexer
+                    .get()
+                    .cloned()
+                    .expect("Indexer to have been set"),
+            ),
+            None => Putter::trust(
+                self.clone(),
+                self.indexer
+                    .get()
+                    .cloned()
+                    .expect("Indexer to have been set"),
+            ),
         }
     }
 
