@@ -3,7 +3,7 @@
 use std::io;
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use blake3_tree::blake3::tree::{BlockHasher, HashTreeBuilder};
@@ -40,7 +40,7 @@ pub const BLOCK_SIZE: usize = 256 << 10;
 
 pub struct Blockstore<C: Collection> {
     root: PathBuf,
-    indexer: Arc<OnceLock<C::IndexerInterface>>,
+    indexer: Arc<RwLock<Option<C::IndexerInterface>>>,
     collection: PhantomData<C>,
 }
 
@@ -78,7 +78,7 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
 
         Ok(Self {
             root,
-            indexer: Arc::new(OnceLock::new()),
+            indexer: Arc::new(RwLock::new(None)),
             collection: PhantomData,
         })
     }
@@ -86,7 +86,7 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     /// Provide the blockstore with the indexer after initialization, this function
     /// should only be called once.
     fn provide_indexer(&mut self, indexer: C::IndexerInterface) {
-        assert!(self.indexer.set(indexer).is_ok());
+        assert!(self.indexer.write().replace(indexer).is_none());
     }
 
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<HashTree>> {
@@ -122,15 +122,15 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
                 self.clone(),
                 root,
                 self.indexer
-                    .get()
-                    .cloned()
+                    .read()
+                    .clone()
                     .expect("Indexer to have been set"),
             ),
             None => Putter::trust(
                 self.clone(),
                 self.indexer
-                    .get()
-                    .cloned()
+                    .read()
+                    .clone()
                     .expect("Indexer to have been set"),
             ),
         }
