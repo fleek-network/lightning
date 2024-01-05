@@ -29,6 +29,7 @@ collection!([
     FetcherInterface,
     PoolInterface,
     PingerInterface,
+    IndexerInterface,
 ]);
 
 /// The Fleek Network node.

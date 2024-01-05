@@ -52,6 +52,7 @@ impl<C: Collection> ConfigConsumer for Blockstore<C> {
 impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
     type Put = Putter<Self>;
+    type DirPut = infusion::Blank<()>;
 
     fn init(config: Self::Config) -> anyhow::Result<Self> {
         let root = config.root.to_path_buf();
@@ -102,6 +103,10 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
             Some(root) => Putter::verifier(self.clone(), root),
             None => Putter::trust(self.clone()),
         }
+    }
+
+    fn put_dir(&self, root: Option<Blake3Hash>) -> Self::DirPut {
+        todo!()
     }
 
     fn get_root_dir(&self) -> PathBuf {

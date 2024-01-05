@@ -14,6 +14,7 @@ lightning-broadcast = { path = "../broadcast" }
 lightning-consensus = { path = "../consensus" }
 lightning-fetcher = { path = "../fetcher" }
 lightning-handshake = { path = "../handshake" }
+lightning-indexer = { path = "../indexer" }
 lightning-interfaces = { path = "../interfaces" }
 lightning-notifier = { path = "../notifier" }
 lightning-origin-ipfs = { path = "../origin-ipfs" }
@@ -32,3 +33,8 @@ infusion.workspace = true
 anyhow.workspace = true
 resolved-pathbuf.workspace = true
 tracing.workspace = true
+
+[features]
+default = []
+# Opt-in for compiling services directly inside the node
+services = [ "lightning-service-executor/services" ]

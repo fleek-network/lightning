@@ -20,7 +20,7 @@ use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::net::UnixStream;
 use tokio::sync::Notify;
-use tracing::{error, info, trace};
+use tracing::{error, trace};
 use triomphe::Arc;
 
 use crate::service::{spawn_service, Context, ServiceCollection};
@@ -34,6 +34,7 @@ pub struct ServiceExecutor<C: Collection> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ServiceExecutorConfig {
     pub services: FxHashSet<ServiceId>,
     /// The IPC directory is used to contain the Unix domain sockets that we use to communicate
@@ -56,7 +57,7 @@ impl ServiceExecutorConfig {
     pub fn test_default() -> Self {
         Self {
             services: Default::default(),
-            ipc_path: "~/.lightning/ipc"
+            ipc_path: "~/.lightning-test/ipc"
                 .try_into()
                 .expect("Failed to resolve path"),
         }
@@ -105,9 +106,11 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
 
     fn run_service(id: u32) {
         match id {
+            #[cfg(feature = "services")]
             0 => {
                 fleek_service_fetcher::main();
             },
+            #[cfg(feature = "services")]
             1 => {
                 fleek_service_js_poc::main();
             },
@@ -129,7 +132,6 @@ impl<C: Collection> WithStartAndShutdown for ServiceExecutor<C> {
         self.is_running.store(true, Ordering::Relaxed);
 
         for &id in self.config.services.iter() {
-            info!("Enabling service {id}");
             let handle = spawn_service(id, self.ctx.clone()).await;
             self.collection.insert(id, handle);
         }

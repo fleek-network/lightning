@@ -115,8 +115,9 @@ pub struct ServiceHandle {}
 
 #[allow(unused)]
 pub async fn spawn_service<C: Collection>(id: u32, cx: Arc<Context<C>>) -> ServiceHandle {
+    tracing::info!("Initializing service {id}");
+
     let ipc_dir = cx.ipc_path.join(format!("service-{id}"));
-    tracing::trace!("Spawning service {id} [IPC={ipc_dir:?}.");
 
     // First try to remove the directory if it does exits. And then create it
     // again. Ignoring the errors that may occur while removing.
@@ -125,27 +126,34 @@ pub async fn spawn_service<C: Collection>(id: u32, cx: Arc<Context<C>>) -> Servi
         .await
         .expect("Failed to create IPC directory for service.");
 
-    let mut args = std::env::args_os();
-    let program = args.next().unwrap();
-    let command = {
-        let mut cmd = Command::new(program);
-        cmd.args(args)
-            .env("SERVICE_ID", format!("{id}"))
-            .env("BLOCKSTORE_PATH", &cx.blockstore_path)
-            .env("IPC_PATH", &ipc_dir);
-        cmd
+    let mut cmd = match which::which(format!("fn-service-{id}")) {
+        // Use the standalone service binary
+        Ok(path) => Command::new(path),
+        Err(_) => {
+            // Otherwise, relaunch the current binary for running statically linked services
+            let mut args = std::env::args_os();
+            let program = args.next().unwrap();
+            let mut cmd = Command::new(program);
+            cmd.args(args);
+            cmd
+        },
     };
+
+    cmd.env("SERVICE_ID", format!("{id}"))
+        .env("BLOCKSTORE_PATH", &cx.blockstore_path)
+        .env("IPC_PATH", &ipc_dir);
 
     let kill_notify = cx.kill.clone();
     let cmd_permit = Arc::new(Notify::new());
     let permit = cmd_permit.clone();
     let conn_path = ipc_dir.join("conn");
+
     #[cfg(not(test))]
     tokio::spawn(async move {
         // Wait until we have the UDS listener listening.
         permit.notified().await;
         tracing::trace!("Starting the child process for service '{id}'.");
-        run_command(format!("service-{id}"), command, kill_notify, conn_path).await;
+        run_command(format!("service-{id}"), cmd, kill_notify, conn_path).await;
         tracing::trace!("Exiting service '{id}' execution loop.");
     });
 
@@ -347,7 +355,7 @@ async fn run_command(
         let _ = tokio::fs::remove_file(&conn_uds_path).await;
 
         let last_start = Instant::now();
-        tracing::trace!("Running command for '{name}'");
+        tracing::debug!("Starting child process '{name}' with {command:?}");
 
         let mut child = command
             // Unique group id for the subprocess to isolate signals from the parent process

@@ -8,6 +8,7 @@ use lightning_broadcast::Broadcast;
 use lightning_consensus::consensus::Consensus;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_handshake::handshake::Handshake;
+use lightning_indexer::Indexer;
 use lightning_interfaces::infu_collection::{
     Collection,
     CollectionBase,
@@ -55,6 +56,7 @@ impl CollectionBase for FinalTypes {
     type FetcherInterface<C: Collection> = Fetcher<C>;
     type PoolInterface<C: Collection> = Pool<C>;
     type PingerInterface<C: Collection> = Pinger<C>;
+    type IndexerInterface<C: Collection> = Indexer<C>;
 }
 
 // Create the collection modifier that can inject the mock consensus

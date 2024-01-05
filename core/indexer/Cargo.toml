@@ -1,0 +1,23 @@
+[package]
+name = "lightning-indexer"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+lightning-interfaces = { path = "../interfaces" }
+
+[dev-dependencies]
+fleek-crypto.workspace = true
+infusion.workspace = true
+lightning-test-utils = { path="../test-utils" }
+lightning-signer = { path="../signer" }
+lightning-application = { path="../application", features = ["test"] }
+lightning-rep-collector = { path="../rep-collector" }

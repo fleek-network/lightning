@@ -7,9 +7,10 @@ use anyhow::Result;
 use clap::Parser;
 use cli::Cli;
 use compile_time_run::run_command_str;
+use infusion::c;
+use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::ServiceExecutorInterface;
 use lightning_node::FinalTypes;
-use lightning_service_executor::shim::ServiceExecutor;
 
 use crate::args::Args;
 
@@ -22,7 +23,7 @@ fn main() -> Result<()> {
         // instead run the code for that service. We avoid using a runtime so that a service can use
         // its own.
         cli.setup_logging(true);
-        ServiceExecutor::<FinalTypes>::run_service(
+        <c!(FinalTypes::ServiceExecutorInterface)>::run_service(
             service_id.parse().expect("SERVICE_ID to be a number"),
         );
         std::process::exit(0);

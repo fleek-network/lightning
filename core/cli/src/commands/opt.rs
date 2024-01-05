@@ -16,7 +16,6 @@ use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::ToDigest;
 use lightning_node::config::TomlConfigProvider;
-use lightning_rpc::{utils, Rpc};
 use lightning_signer::Signer;
 use lightning_types::{
     ChainId,
@@ -28,6 +27,7 @@ use lightning_types::{
     UpdatePayload,
     UpdateRequest,
 };
+use lightning_utils::rpc::rpc_request;
 use reqwest::Client;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::de::DeserializeOwned;
@@ -35,7 +35,7 @@ use serde_json::json;
 
 use crate::args::OptSubCmd;
 
-pub async fn exec<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>>>(
+pub async fn exec<C: Collection<SignerInterface = Signer<C>>>(
     cmd: OptSubCmd,
     config_path: ResolvedPathBuf,
 ) -> Result<()> {
@@ -46,7 +46,7 @@ pub async fn exec<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<
     }
 }
 
-async fn opt_in<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>>>(
+async fn opt_in<C: Collection<SignerInterface = Signer<C>>>(
     config_path: ResolvedPathBuf,
 ) -> Result<()> {
     println!(
@@ -106,7 +106,7 @@ async fn opt_in<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>
     Ok(())
 }
 
-async fn opt_out<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>>>(
+async fn opt_out<C: Collection<SignerInterface = Signer<C>>>(
     config_path: ResolvedPathBuf,
 ) -> Result<()> {
     println!(
@@ -156,7 +156,7 @@ async fn opt_out<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C
     Ok(())
 }
 
-async fn status<C: Collection<RpcInterface = Rpc<C>, SignerInterface = Signer<C>>>(
+async fn status<C: Collection<SignerInterface = Signer<C>>>(
     config_path: ResolvedPathBuf,
 ) -> Result<()> {
     let config = Arc::new(TomlConfigProvider::<C>::load_or_write_config(config_path).await?);
@@ -299,7 +299,7 @@ async fn genesis_committee_rpc<T: DeserializeOwned>(
 ) -> Result<T> {
     let client = Client::new();
     for node in genesis_committee {
-        if let Ok(res) = utils::rpc_request::<T>(
+        if let Ok(res) = rpc_request::<T>(
             &client,
             format!("http://{}:{}/rpc/v0", node.domain, node.ports.rpc),
             request.clone(),

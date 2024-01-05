@@ -58,12 +58,13 @@ use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_utils::application::QueryRunnerExt;
+use lightning_utils::rpc as utils;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::config::Config as RpcConfig;
-use crate::{utils, Rpc};
+use crate::Rpc;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RpcSuccessResponse<T> {

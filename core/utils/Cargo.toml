@@ -9,7 +9,11 @@ edition = "2021"
 autometrics.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 lightning-types.workspace = true
+anyhow.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 ethers.workspace = true
 fleek-crypto.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true

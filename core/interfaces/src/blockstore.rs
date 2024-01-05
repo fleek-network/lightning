@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use blake3_tree::directory::DirectoryEntry;
 use blake3_tree::utils::HashTree;
 use thiserror::Error;
 
@@ -97,6 +98,9 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
     /// The incremental putter which can be used to write a file to block store.
     type Put: IncrementalPutInterface;
 
+    /// The incremental putter which can be used to insert directory headers to block store.
+    type DirPut: IncrementalDirInterface;
+
     /// Create a new block store from the given configuration values.
     fn init(config: Self::Config) -> anyhow::Result<Self>;
 
@@ -122,6 +126,11 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
 
     /// Create a putter that can be used to write a content into the block store.
     fn put(&self, cid: Option<Blake3Hash>) -> Self::Put;
+
+    /// Create a directory putter which can be used to insert the layout of a directory to the
+    /// blockstore. Putting a directory does not mean the content is also inserted to the
+    /// blockstore.
+    fn put_dir(&self, cid: Option<Blake3Hash>) -> Self::DirPut;
 
     /// Returns the path to the root directory of the blockstore. The directory layout of
     /// the blockstore is simple.
@@ -178,6 +187,24 @@ pub trait IncrementalPutInterface: Send {
     async fn finalize(self) -> Result<Blake3Hash, PutFinalizeError>;
 }
 
+/// The interface for the directory writer to a [`BlockStoreInterface`].
+#[async_trait]
+#[infusion::blank]
+pub trait IncrementalDirInterface: Send {
+    /// Write the proof for the next entry. Should not be called in the trusted mode.
+    fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError>;
+
+    /// Insert the next directory entry. The calls to this method must be in alphabetic order,
+    /// based on the name of the entry.
+    fn insert(&mut self, entry: DirectoryEntry) -> Result<(), PutInsertError>;
+
+    /// Returns true if the writer is not expecting any more bytes.
+    fn is_finished(&self) -> bool;
+
+    /// Finalize the write, try to write the directory header to the file system.
+    async fn finalize(self) -> Result<Blake3Hash, PutFinalizeError>;
+}
+
 #[derive(Error, Debug)]
 pub enum PutFeedProofError {
     #[error("Putter was running without incremental verification.")]
@@ -192,6 +219,14 @@ pub enum PutWriteError {
     InvalidContent,
     #[error("The provided content could not be decompressed.")]
     DecompressionFailure,
+}
+
+#[derive(Error, Debug)]
+pub enum PutInsertError {
+    #[error("The provided entry does not meet the expected hash.")]
+    InvalidContent,
+    #[error("The provided entry violates the entry name ordering.")]
+    OrderingError,
 }
 
 #[derive(Error, Debug)]

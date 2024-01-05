@@ -32,7 +32,6 @@ pub mod config;
 pub mod error;
 pub mod event;
 pub mod logic;
-pub mod utils;
 
 #[cfg(test)]
 mod tests;
