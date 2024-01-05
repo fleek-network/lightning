@@ -14,7 +14,6 @@ lightning-utils = { path = "../utils" }
 
 # TODO: cli ideally shouldn't depend on these directly
 lightning-application = { path = "../application" }
-lightning-rpc = { path = "../rpc" }
 lightning-signer = { path = "../signer" }
 
 mock = { path = "../mock" }

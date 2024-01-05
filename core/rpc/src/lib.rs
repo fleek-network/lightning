@@ -29,7 +29,6 @@ mod api_types;
 pub mod config;
 mod error;
 mod logic;
-pub mod utils;
 
 #[cfg(test)]
 mod tests;

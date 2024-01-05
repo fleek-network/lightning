@@ -4617,7 +4617,6 @@ dependencies = [
  "lightning-application",
  "lightning-interfaces",
  "lightning-node",
- "lightning-rpc",
  "lightning-signer",
  "lightning-types",
  "lightning-utils",
@@ -5309,11 +5308,15 @@ dependencies = [
 name = "lightning-utils"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "autometrics",
  "ethers",
  "fleek-crypto",
  "lightning-interfaces",
  "lightning-types",
+ "reqwest",
+ "serde",
+ "serde_json",
  "tokio",
  "tracing",
 ]
