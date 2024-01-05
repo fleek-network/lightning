@@ -5,6 +5,7 @@ mod tests;
 
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use lightning_interfaces::infu_collection::Collection;
@@ -18,9 +19,10 @@ use lightning_interfaces::{
 
 use crate::config::Config;
 
+#[derive(Clone)]
 pub struct Indexer<C> {
     submit_tx: SubmitTxSocket,
-    is_running: AtomicBool,
+    is_running: Arc<AtomicBool>,
     _marker: PhantomData<C>,
 }
 
@@ -48,16 +50,13 @@ impl<C: Collection> IndexerInterface<C> for Indexer<C> {
     fn init(_: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
         Ok(Self {
             submit_tx,
-            is_running: AtomicBool::new(false),
+            is_running: Arc::new(AtomicBool::new(false)),
             _marker: PhantomData,
         })
     }
 
-    fn register(&self, cids: Vec<Blake3Hash>) {
-        let updates = cids
-            .into_iter()
-            .map(|cid| ContentUpdate { cid, remove: false })
-            .collect();
+    fn register(&self, cid: Blake3Hash) {
+        let updates = vec![ContentUpdate { cid, remove: false }];
         let submit_tx = self.submit_tx.clone();
         tokio::spawn(async move {
             if let Err(e) = submit_tx
@@ -69,11 +68,8 @@ impl<C: Collection> IndexerInterface<C> for Indexer<C> {
         });
     }
 
-    fn unregister(&self, cids: Vec<Blake3Hash>) {
-        let updates = cids
-            .into_iter()
-            .map(|cid| ContentUpdate { cid, remove: true })
-            .collect();
+    fn unregister(&self, cid: Blake3Hash) {
+        let updates = vec![ContentUpdate { cid, remove: true }];
         let submit_tx = self.submit_tx.clone();
         tokio::spawn(async move {
             if let Err(e) = submit_tx

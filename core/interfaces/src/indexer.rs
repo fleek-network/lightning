@@ -12,14 +12,16 @@ use crate::{
 
 #[async_trait]
 #[infusion::service]
-pub trait IndexerInterface<C: Collection>: ConfigConsumer + WithStartAndShutdown + Sized {
+pub trait IndexerInterface<C: Collection>:
+    ConfigConsumer + WithStartAndShutdown + Clone + Send + Sync + Sized
+{
     fn _init(config: ::ConfigProviderInterface, signer: ::SignerInterface) {
         Self::init(config.get::<Self>(), signer.get_socket())
     }
 
     fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self>;
 
-    fn register(&self, cid: Vec<Blake3Hash>);
+    fn register(&self, cid: Blake3Hash);
 
-    fn unregister(&self, cid: Vec<Blake3Hash>);
+    fn unregister(&self, cid: Blake3Hash);
 }

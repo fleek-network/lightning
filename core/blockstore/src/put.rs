@@ -3,9 +3,11 @@ use blake3_tree::blake3::tree::{BlockHasher, HashTreeBuilder};
 use blake3_tree::IncrementalVerifier;
 use bytes::{BufMut, BytesMut};
 use derive_more::IsVariant;
+use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
 use lightning_interfaces::{
     IncrementalPutInterface,
+    IndexerInterface,
     PutFeedProofError,
     PutFinalizeError,
     PutWriteError,
@@ -17,12 +19,13 @@ use crate::blockstore::BLOCK_SIZE;
 use crate::config::{BLOCK_DIR, INTERNAL_DIR};
 use crate::store::Store;
 
-pub struct Putter<S> {
+pub struct Putter<S, C: Collection> {
     invalidated: bool,
     buffer: BytesMut,
     mode: PutterMode,
     write_tasks: JoinSet<()>,
     store: S,
+    indexer: C::IndexerInterface,
 }
 
 #[derive(IsVariant)]
@@ -37,11 +40,12 @@ enum PutterMode {
     },
 }
 
-impl<S> Putter<S>
+impl<C, S> Putter<S, C>
 where
+    C: Collection,
     S: Store + 'static,
 {
-    pub fn verifier(store: S, root: [u8; 32]) -> Self {
+    pub fn verifier(store: S, root: [u8; 32], indexer: C::IndexerInterface) -> Self {
         let mut verifier = IncrementalVerifier::new(root, 0);
         verifier.preserve_tree();
         Self::new(
@@ -50,26 +54,29 @@ where
                 root_hash: root,
                 verifier: Box::new(verifier),
             },
+            indexer,
         )
     }
 
-    pub fn trust(store: S) -> Self {
+    pub fn trust(store: S, indexer: C::IndexerInterface) -> Self {
         Self::new(
             store,
             PutterMode::Trusted {
                 counter: 0,
                 hasher: Box::new(HashTreeBuilder::new()),
             },
+            indexer,
         )
     }
 
-    fn new(store: S, mode: PutterMode) -> Self {
+    fn new(store: S, mode: PutterMode, indexer: C::IndexerInterface) -> Self {
         Self {
             invalidated: false,
             buffer: BytesMut::new(),
             mode,
             write_tasks: JoinSet::new(),
             store,
+            indexer,
         }
     }
 
@@ -122,8 +129,9 @@ where
 }
 
 #[async_trait]
-impl<S> IncrementalPutInterface for Putter<S>
+impl<C, S> IncrementalPutInterface for Putter<S, C>
 where
+    C: Collection,
     S: Store + 'static,
 {
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError> {
@@ -246,6 +254,8 @@ where
                 error!("failed to write tree to store: {e:?}");
                 PutFinalizeError::WriteFailed
             })?;
+
+        self.indexer.register(hash);
 
         Ok(hash)
     }

@@ -40,6 +40,7 @@ pub const BLOCK_SIZE: usize = 256 << 10;
 #[derive(Clone)]
 pub struct Blockstore<C: Collection> {
     root: PathBuf,
+    indexer: C::IndexerInterface,
     collection: PhantomData<C>,
 }
 
@@ -51,10 +52,10 @@ impl<C: Collection> ConfigConsumer for Blockstore<C> {
 #[async_trait]
 impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
-    type Put = Putter<Self>;
+    type Put = Putter<Self, C>;
     type DirPut = infusion::Blank<()>;
 
-    fn init(config: Self::Config) -> anyhow::Result<Self> {
+    fn init(config: Self::Config, indexer: C::IndexerInterface) -> anyhow::Result<Self> {
         let root = config.root.to_path_buf();
         let internal_dir = root.join(INTERNAL_DIR);
         let block_dir = root.join(BLOCK_DIR);
@@ -67,6 +68,7 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
 
         Ok(Self {
             root,
+            indexer,
             collection: PhantomData,
         })
     }
@@ -100,8 +102,8 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
 
     fn put(&self, root: Option<Blake3Hash>) -> Self::Put {
         match root {
-            Some(root) => Putter::verifier(self.clone(), root),
-            None => Putter::trust(self.clone()),
+            Some(root) => Putter::verifier(self.clone(), root, self.indexer.clone()),
+            None => Putter::trust(self.clone(), self.indexer.clone()),
         }
     }
 
