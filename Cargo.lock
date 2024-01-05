@@ -5282,6 +5282,7 @@ dependencies = [
  "num-bigint",
  "num-derive",
  "num-traits",
+ "ruint",
  "schemars",
  "serde",
  "thiserror",
