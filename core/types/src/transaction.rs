@@ -13,7 +13,6 @@ use fleek_crypto::{
 };
 use hp_fixed::unsigned::HpUfixed;
 use ink_quill::{ToDigest, TranscriptBuilder, TranscriptBuilderInput};
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -610,7 +609,7 @@ struct HpUfixedWrapper<const T: usize>(HpUfixed<T>);
 
 impl<const T: usize> HpUfixedWrapper<T> {
     #[inline]
-    pub fn get_value(&self) -> &BigUint {
+    pub fn get_value(&self) -> &ruint::aliases::U256 {
         self.0.get_value()
     }
 }
@@ -625,7 +624,7 @@ impl<const P: usize> TranscriptBuilderInput for HpUfixedWrapper<P> {
         input.push(P as u8);
 
         // Append the BigUint data as bytes
-        let data_bytes = self.get_value().to_bytes_le();
+        let data_bytes: [u8; 256] = self.get_value().to_le_bytes();
         input.extend_from_slice(&data_bytes);
 
         input

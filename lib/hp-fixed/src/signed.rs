@@ -9,7 +9,7 @@ use num_traits::{FromPrimitive, Signed, ToPrimitive, Zero};
 use schemars::{schema_for_value, JsonSchema};
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::{format_hp_fixed, get_float_parts, HpFixedConversionError};
+use crate::{format_hp_fixed, get_float_parts_b, HpFixedConversionError};
 
 #[derive(Clone, Hash, PartialEq, PartialOrd, Ord, Eq, Default)]
 
@@ -377,7 +377,7 @@ impl<const P: usize> From<f64> for HpFixed<P> {
             Plus
         };
 
-        let (integer_part, fraction_part) = get_float_parts::<P>(&s);
+        let (integer_part, fraction_part) = get_float_parts_b::<P>(&s);
         let result = (integer_part * scale) + fraction_part;
         HpFixed(BigInt::from_biguint(sign, result))
     }
