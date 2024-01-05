@@ -11,12 +11,12 @@ lightning-interfaces = { path = "../interfaces" }
 lightning-node = { path = "../node" }
 lightning-types = { path = "../types" }
 lightning-utils = { path = "../utils" }
+mock = { path = "../mock" }
 
 # TODO: cli ideally shouldn't depend on these directly
 lightning-application = { path = "../application" }
 lightning-signer = { path = "../signer" }
 
-mock = { path = "../mock" }
 fleek-crypto.workspace = true
 resolved-pathbuf.workspace = true
 infusion.workspace = true
@@ -31,7 +31,8 @@ fleek-blake3 = "1.5"
 serde_json.workspace = true
 reqwest = { workspace = true, features = ["json"] }
 rand.workspace = true
-human-panic = "1.2.2"
+panic-report.workspace = true
+os_info = "3.7.0"
 compile-time-run = "0.2.12"
 
 [features]
