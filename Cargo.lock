@@ -6710,6 +6710,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "panic-report"
+version = "0.1.0"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "serde",
+ "toml 0.8.8",
+ "uuid 1.6.1",
+]
+
+[[package]]
 name = "parity-scale-codec"
 version = "3.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
