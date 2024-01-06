@@ -89,6 +89,10 @@ impl<C: Collection> TomlConfigProvider<C> {
 
         Ok(config)
     }
+
+    pub fn into_inner(&self) -> Table {
+        self.table.lock().unwrap().clone()
+    }
 }
 
 impl<C: Collection> ConfigProviderInterface<C> for TomlConfigProvider<C> {

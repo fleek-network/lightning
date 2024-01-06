@@ -5187,6 +5187,7 @@ dependencies = [
  "lightning-signer",
  "lightning-test-utils",
  "lightning-topology",
+ "panic-report",
  "resolved-pathbuf",
  "serde",
  "tokio",
