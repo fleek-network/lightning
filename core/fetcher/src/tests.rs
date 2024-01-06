@@ -11,6 +11,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::{BlockStoreServer, Config as BlockServerConfig};
 use lightning_broadcast::{Broadcast, Config as BroadcastConfig};
+use lightning_indexer::Indexer;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     FetcherRequest,
@@ -28,6 +29,7 @@ use lightning_interfaces::{
     BroadcastInterface,
     ConsensusInterface,
     FetcherInterface,
+    IndexerInterface,
     NotifierInterface,
     OriginProviderInterface,
     PoolInterface,
@@ -68,6 +70,7 @@ partial!(TestBinding {
     TopologyInterface = Topology<Self>;
     ConsensusInterface = MockConsensus<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
+    IndexerInterface = Indexer<Self>;
 });
 
 struct Peer<C: Collection> {
@@ -134,6 +137,8 @@ async fn get_fetchers(
             true,
         ));
     }
+
+    // Note: This blockstore lives without an indexer. We need a signer to create an indexer.
     let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig {
         root: path.join("dummy_blockstore").try_into().unwrap(),
     })
@@ -164,6 +169,9 @@ async fn get_fetchers(
         .unwrap();
 
         let notifier = Notifier::<TestBinding>::init(&app);
+
+        let indexer =
+            Indexer::<TestBinding>::init(Default::default(), signer.get_socket()).unwrap();
 
         let rep_coll_config = RepCollConfig {
             reporter_buffer_size: 1,
@@ -228,10 +236,12 @@ async fn get_fetchers(
         .unwrap();
         resolver.start().await;
 
-        let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig {
+        let mut blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig {
             root: path.join(format!("node{i}/blockstore")).try_into().unwrap(),
         })
         .unwrap();
+        blockstore.provide_indexer(indexer);
+
         let ipfs_origin_config = IPFSOriginConfig {
             gateways: vec![Gateway {
                 protocol: Protocol::Http,

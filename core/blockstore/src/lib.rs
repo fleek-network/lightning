@@ -26,6 +26,7 @@ mod tests {
         IncrementalPutInterface,
         IndexerInterface,
         SignerInterface,
+        SyncQueryRunnerInterface,
         WithStartAndShutdown,
     };
     use lightning_signer::{Config as SignerConfig, Signer};
@@ -35,14 +36,18 @@ mod tests {
     use crate::blockstore::{Blockstore, BLOCK_SIZE};
     use crate::config::Config;
 
-    struct TmpDirGuard {
-        inner: PathBuf,
+    struct AppState {
+        app: Application<TestBinding>,
+        signer: Signer<TestBinding>,
+        _consensus: MockConsensus<TestBinding>,
+        blockstore: Blockstore<TestBinding>,
+        temp_dir_path: PathBuf,
     }
 
-    impl Drop for TmpDirGuard {
+    impl Drop for AppState {
         fn drop(&mut self) {
-            if self.inner.exists() {
-                std::fs::remove_dir_all(self.inner.as_path()).unwrap();
+            if self.temp_dir_path.exists() {
+                std::fs::remove_dir_all(self.temp_dir_path.as_path()).unwrap();
             }
         }
     }
@@ -76,13 +81,7 @@ mod tests {
         }
     }
 
-    async fn create_blockstore(
-        test_name: String,
-    ) -> (
-        Application<TestBinding>,
-        Blockstore<TestBinding>,
-        TmpDirGuard,
-    ) {
+    async fn create_app_state(test_name: String) -> AppState {
         let signer_config = SignerConfig::test();
         let (consensus_secret_key, node_secret_key) = signer_config.load_test_keys();
         let node_public_key = node_secret_key.to_pk();
@@ -189,27 +188,33 @@ mod tests {
 
         signer.provide_mempool(consensus.mempool());
         signer.provide_new_block_notify(consensus.new_block_notifier());
-        signer.start().await;
-        consensus.start().await;
 
         let indexer =
             Indexer::<TestBinding>::init(Default::default(), signer.get_socket()).unwrap();
-
         blockstore.provide_indexer(indexer);
 
-        (app, blockstore, TmpDirGuard { inner: path })
+        signer.start().await;
+        consensus.start().await;
+
+        AppState {
+            app,
+            signer,
+            _consensus: consensus,
+            blockstore,
+            temp_dir_path: path,
+        }
     }
 
     #[test]
     async fn test_put_verify() {
         // Given: some content.
         let content = create_content();
-        // Given: a block store.
-        let (_app, blockstore, _tmpdir_guard) =
-            create_blockstore(format!("test-{}", std::thread::current().name().unwrap())).await;
+        // Given: app state with a blockstore.
+        let state =
+            create_app_state(format!("test-{}", std::thread::current().name().unwrap())).await;
 
         // Given: we put the content in the block store.
-        let mut putter = blockstore.put(None);
+        let mut putter = state.blockstore.put(None);
         putter
             .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
             .unwrap();
@@ -219,7 +224,7 @@ mod tests {
         let hash_tree = hash_tree(content.as_slice());
 
         // When: we put the content by block and feed the proof to verify it.
-        let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
+        let mut putter = state.blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
         for (i, block) in content.chunks(BLOCK_SIZE).enumerate() {
             let proof = new_proof(&hash_tree.tree, i);
             putter.feed_proof(proof.as_slice()).unwrap();
@@ -229,11 +234,7 @@ mod tests {
         }
 
         // Then: the putter returns the appropriate root hash and no errors.
-        let root = putter
-            .finalize()
-            .await
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
-            .unwrap();
+        let root = putter.finalize().await.unwrap();
         if root != Blake3Hash::from(hash_tree.hash) {
             panic!("invalid root hash");
         }
@@ -244,21 +245,16 @@ mod tests {
         // Given: some content.
         let mut content = create_content();
 
-        // Given: a block store.
-        let (_app, blockstore, _tmpdir_guard) =
-            create_blockstore(format!("test-{}", std::thread::current().name().unwrap())).await;
+        // Given: app state with a blockstore.
+        let state =
+            create_app_state(format!("test-{}", std::thread::current().name().unwrap())).await;
 
         // Given: we put the content in the block store and feed the proof to verify it.
-        let mut putter = blockstore.put(None);
+        let mut putter = state.blockstore.put(None);
         putter
             .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
             .unwrap();
-        putter
-            .finalize()
-            .await
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
-            .unwrap();
+        putter.finalize().await.unwrap();
 
         // Given: the full tree.
         let hash_tree = hash_tree(content.as_slice());
@@ -267,17 +263,15 @@ mod tests {
         content[10] = 69;
 
         // When: we put a block with modified content and feed the proof to verify it.
-        let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
+        let mut putter = state.blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
         let mut blocks = content.chunks(BLOCK_SIZE);
         let proof = ProofBuf::new(&hash_tree.tree, 0);
-        putter
-            .feed_proof(proof.as_slice())
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
-            .unwrap();
+        putter.feed_proof(proof.as_slice()).unwrap();
+
+        // Then: write fails because content is invalid.
         assert!(
             putter
                 .write(blocks.next().unwrap(), CompressionAlgorithm::Uncompressed)
-                .map_err(|e| anyhow::anyhow!("{e:?}"))
                 .is_err()
         );
     }
@@ -287,44 +281,30 @@ mod tests {
         // Given: some content.
         let content = [0; BLOCK_SIZE];
 
-        // Given: a block store.
-        let (_app, blockstore, _tmpdir_guard) =
-            create_blockstore(format!("test-{}", std::thread::current().name().unwrap())).await;
+        // Given: app state with a blockstore.
+        let state =
+            create_app_state(format!("test-{}", std::thread::current().name().unwrap())).await;
 
         // Given: we put the content in the block store.
-
-        let mut putter = blockstore.put(None);
+        let mut putter = state.blockstore.put(None);
         putter
             .write(&content, CompressionAlgorithm::Uncompressed)
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
             .unwrap();
-        putter
-            .finalize()
-            .await
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
-            .unwrap();
+        putter.finalize().await.unwrap();
 
         // Given: the full tree.
         let hash_tree = hash_tree(&content);
 
         // When: we put one block and feed the proof to verify it.
-        let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
+        let mut putter = state.blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
         let proof = new_proof(&hash_tree.tree, 0);
-        putter
-            .feed_proof(proof.as_slice())
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
-            .unwrap();
+        putter.feed_proof(proof.as_slice()).unwrap();
         putter
             .write(&content, CompressionAlgorithm::Uncompressed)
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
             .unwrap();
 
         // Then: the putter returns the appropriate root hash and no errors.
-        let root = putter
-            .finalize()
-            .await
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
-            .unwrap();
+        let root = putter.finalize().await.unwrap();
         if root != Blake3Hash::from(hash_tree.hash) {
             panic!("Invalid root")
         }
@@ -334,35 +314,26 @@ mod tests {
     async fn test_put_verify_one_chunk_small() {
         // Given: some content.
         let content = [0; 256];
-        // Given: a block store.
-        let (_app, blockstore, _tmpdir_guard) =
-            create_blockstore(format!("test-{}", std::thread::current().name().unwrap())).await;
+        // Given: app state with a blockstore.
+        let state =
+            create_app_state(format!("test-{}", std::thread::current().name().unwrap())).await;
 
         // Given: we put the content in the block store.
-        let mut putter = blockstore.put(None);
+        let mut putter = state.blockstore.put(None);
         putter
             .write(&content, CompressionAlgorithm::Uncompressed)
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
             .unwrap();
-        putter
-            .finalize()
-            .await
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
-            .unwrap();
+        putter.finalize().await.unwrap();
 
         // Given: the full tree.
         let hash_tree = hash_tree(&content);
 
         // When: we put one block and feed the proof to verify it.
-        let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
+        let mut putter = state.blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
         let proof = new_proof(&hash_tree.tree, 0);
-        putter
-            .feed_proof(proof.as_slice())
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
-            .unwrap();
+        putter.feed_proof(proof.as_slice()).unwrap();
         putter
             .write(&content, CompressionAlgorithm::Uncompressed)
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
             .unwrap();
 
         // Then: the putter returns the appropriate root hash and no errors.
@@ -380,27 +351,23 @@ mod tests {
             .flatten()
             .collect::<Vec<_>>();
 
-        // Given: a block store.
-        let (_app, blockstore, _tmpdir_guard) =
-            create_blockstore(format!("test-{}", std::thread::current().name().unwrap())).await;
+        // Given: app state with a blockstore.
+        let state =
+            create_app_state(format!("test-{}", std::thread::current().name().unwrap())).await;
 
         // Given: we put the content in the block store.
-        let mut putter = blockstore.put(None);
+        let mut putter = state.blockstore.put(None);
         putter
             .write(&content, CompressionAlgorithm::Uncompressed)
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
             .unwrap();
-        putter
-            .finalize()
-            .await
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
-            .unwrap();
+        putter.finalize().await.unwrap();
 
         // Given: the full tree.
         let hash_tree = hash_tree(&content);
 
         // When: we put the content by block and feed the proof to verify it.
-        let size = blockstore
+        let size = state
+            .blockstore
             .read_all_to_vec(hash_tree.hash.as_bytes())
             .await
             .unwrap()
@@ -408,22 +375,15 @@ mod tests {
         assert_eq!(size, 262400);
 
         // When: we verify the content.
-        let mut putter = blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
+        let mut putter = state.blockstore.put(Some(Blake3Hash::from(hash_tree.hash)));
         let proof = new_proof(&hash_tree.tree, 0);
-        putter
-            .feed_proof(proof.as_slice())
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
-            .unwrap();
+        putter.feed_proof(proof.as_slice()).unwrap();
         putter
             .write(&content, CompressionAlgorithm::Uncompressed)
             .unwrap();
 
         // Then: the putter returns the appropriate root hash and no errors.
-        let root = putter
-            .finalize()
-            .await
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
-            .unwrap();
+        let root = putter.finalize().await.unwrap();
 
         if root != Blake3Hash::from(hash_tree.hash) {
             panic!("Invalid root")
@@ -435,31 +395,53 @@ mod tests {
         // Given: some content.
         let content = create_content();
 
-        // Given: a block store.
-        let (_app, blockstore, _tmpdir_guard) =
-            create_blockstore(format!("test-{}", std::thread::current().name().unwrap())).await;
+        // Given: app state with a blockstore.
+        let state =
+            create_app_state(format!("test-{}", std::thread::current().name().unwrap())).await;
 
         // When: we create a putter and write some content.
-        let mut putter = blockstore.put(None);
+        let mut putter = state.blockstore.put(None);
         putter
             .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
             .unwrap();
 
         // Then: the putter returns the appropriate root hash.
-        let root = putter
-            .finalize()
-            .await
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
-            .unwrap();
+        let root = putter.finalize().await.unwrap();
         let tree = hash_tree(content.as_slice());
         if root != Blake3Hash::from(tree.hash) {
             panic!("invalid root hash");
         }
 
+        // Then: content registry was updated.
+        let (_, sk) = state.signer.get_sk();
+        let query_runner = state.app.sync_query();
+        let local_index = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
+
+        let mut interval = tokio::time::interval(Duration::from_secs(1));
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    if let Some(content_registry)
+                        = query_runner.get_content_registry(&local_index) {
+                        assert!(content_registry.contains(&root));
+                        assert_eq!(content_registry.len(), 1);
+
+                        let providers = query_runner
+                            .get_cid_providers(&root).unwrap();
+                        if !providers.is_empty() {
+                            assert!(providers.contains(&local_index));
+                            assert_eq!(providers.len(), 1);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         // Then: our tree is stored as expected.
         let tree = hash_tree(content.as_slice());
-        let shared = blockstore
+        let shared = state
+            .blockstore
             .get_tree(&Blake3Hash::from(tree.hash))
             .await
             .ok_or_else(|| anyhow::anyhow!("failed to get tree"))
@@ -470,8 +452,8 @@ mod tests {
 
     #[tokio::test]
     async fn hash_consistency() {
-        let (_app, blockstore, _tmpdir_guard) =
-            create_blockstore(format!("test-{}", std::thread::current().name().unwrap())).await;
+        let state =
+            create_app_state(format!("test-{}", std::thread::current().name().unwrap())).await;
 
         const SIZE: usize = 4321;
 
@@ -484,7 +466,7 @@ mod tests {
         let output = hasher.finalize();
         assert_eq!(output.hash, expected_hash);
 
-        let mut putter = blockstore.put(None);
+        let mut putter = state.blockstore.put(None);
         putter
             .write(&[0; SIZE], CompressionAlgorithm::Uncompressed)
             .expect("failed to write to putter");

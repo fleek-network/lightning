@@ -16,6 +16,7 @@ use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::{Blockstore, BLOCK_SIZE};
 use lightning_blockstore::config::Config as BlockstoreConfig;
+use lightning_indexer::Indexer;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     CompressionAlgoSet,
@@ -29,6 +30,7 @@ use lightning_interfaces::{
     BlockStoreInterface,
     BlockStoreServerInterface,
     IncrementalPutInterface,
+    IndexerInterface,
     NotifierInterface,
     PoolInterface,
     ReputationAggregatorInterface,
@@ -56,6 +58,7 @@ partial!(TestBinding {
     NotifierInterface = Notifier<Self>;
     TopologyInterface = Topology<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
+    IndexerInterface = Indexer<Self>;
 });
 
 fn create_content() -> Vec<u8> {
@@ -81,7 +84,7 @@ async fn get_peers(
     let mut signers_configs = Vec::new();
     let mut genesis = Genesis::load().unwrap();
     let path = std::env::temp_dir()
-        .join("lightning-pool-test")
+        .join("blockstore-server-test")
         .join(test_name);
     if path.exists() {
         std::fs::remove_dir_all(&path).unwrap();
@@ -161,6 +164,9 @@ async fn get_peers(
         )
         .unwrap();
 
+        let indexer =
+            Indexer::<TestBinding>::init(Default::default(), signer.get_socket()).unwrap();
+
         let config = PoolConfig {
             max_idle_timeout: Duration::from_secs(5),
             address: format!("0.0.0.0:{}", port_offset + i as u16)
@@ -181,7 +187,8 @@ async fn get_peers(
         let blockstore_config = BlockstoreConfig {
             root: path.join(format!("node{i}/blockstore")).try_into().unwrap(),
         };
-        let blockstore = Blockstore::init(blockstore_config).unwrap();
+        let mut blockstore = Blockstore::init(blockstore_config).unwrap();
+        blockstore.provide_indexer(indexer);
 
         let bs_config = Config {
             max_conc_req: 10,
@@ -210,23 +217,12 @@ async fn get_peers(
 /// Temporary sanity check on the flow
 #[tokio::test]
 async fn test_stream_verified_content() {
-    let path1 = std::env::temp_dir().join("lightning-blockstore-transfer-1");
-    let path2 = std::env::temp_dir().join("lightning-blockstore-transfer-2");
-
-    let blockstore1 = Blockstore::<TestBinding>::init(BlockstoreConfig {
-        root: path1.clone().try_into().unwrap(),
-    })
-    .unwrap();
-
-    let blockstore2 = Blockstore::<TestBinding>::init(BlockstoreConfig {
-        root: path2.clone().try_into().unwrap(),
-    })
-    .unwrap();
+    let (peers, _app, path) = get_peers("stream_verified_content", 49200, 2).await;
 
     let content = create_content();
 
     // Put some content into the sender's blockstore
-    let mut putter = blockstore1.put(None);
+    let mut putter = peers[0].blockstore.put(None);
     putter
         .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
         .unwrap();
@@ -235,10 +231,11 @@ async fn test_stream_verified_content() {
     let mut network_wire = VecDeque::new();
 
     // The sender sends the content with the proofs to the receiver
-    if let Some(tree) = blockstore1.get_tree(&root_hash).await {
+    if let Some(tree) = peers[0].blockstore.get_tree(&root_hash).await {
         for block in 0..tree.len() {
             let compr = CompressionAlgoSet::default(); // rustfmt
-            let chunk = blockstore1
+            let chunk = peers[0]
+                .blockstore
                 .get(block as u32, &tree[block], compr)
                 .await
                 .expect("failed to get block from store");
@@ -257,7 +254,7 @@ async fn test_stream_verified_content() {
     }
 
     // The receiver reads the frames and puts them into its blockstore
-    let mut putter = blockstore2.put(Some(root_hash));
+    let mut putter = peers[1].blockstore.put(Some(root_hash));
     while let Some(frame) = network_wire.pop_front() {
         match frame {
             Frame::Proof(proof) => putter.feed_proof(&proof).unwrap(),
@@ -273,16 +270,13 @@ async fn test_stream_verified_content() {
     }
 
     // Make sure the content matches
-    let content1 = blockstore1.read_all_to_vec(&root_hash).await;
-    let content2 = blockstore2.read_all_to_vec(&root_hash).await;
+    let content1 = peers[0].blockstore.read_all_to_vec(&root_hash).await;
+    let content2 = peers[1].blockstore.read_all_to_vec(&root_hash).await;
     assert_eq!(content1, content2);
 
     // Clean up test
-    if path1.exists() {
-        std::fs::remove_dir_all(path1).unwrap();
-    }
-    if path2.exists() {
-        std::fs::remove_dir_all(path2).unwrap();
+    if path.exists() {
+        std::fs::remove_dir_all(path).unwrap();
     }
 }
 

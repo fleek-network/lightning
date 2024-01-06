@@ -24,6 +24,12 @@ tokio-util = { version = "0.7.8", features = ["io"] }
 tracing.workspace = true
 
 [dev-dependencies]
-lightning-test-utils = { path = "../test-utils" }
+fleek-crypto.workspace = true
 infusion.workspace = true
+lightning-application = { path="../application", features = ["test"] }
 lightning-blockstore = { path = "../blockstore" }
+lightning-indexer = { path = "../indexer" }
+lightning-signer = { path="../signer" }
+lightning-test-utils = { path = "../test-utils" }
+
+
