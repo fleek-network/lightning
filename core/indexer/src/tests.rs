@@ -139,9 +139,6 @@ async fn test_submission() {
 
     // Given: an indexer.
     let indexer = Indexer::<TestBinding>::init(Default::default(), signer.get_socket()).unwrap();
-    indexer.start().await;
-
-    assert!(indexer.is_running());
 
     // When: we register a cid.
     let cid = [0u8; 32];
@@ -175,8 +172,4 @@ async fn test_submission() {
             }
         }
     }
-
-    indexer.shutdown().await;
-
-    assert!(!indexer.is_running());
 }

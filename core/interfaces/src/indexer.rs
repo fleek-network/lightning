@@ -2,19 +2,11 @@ use async_trait::async_trait;
 use lightning_types::Blake3Hash;
 
 use crate::infu_collection::Collection;
-use crate::{
-    ConfigConsumer,
-    ConfigProviderInterface,
-    SignerInterface,
-    SubmitTxSocket,
-    WithStartAndShutdown,
-};
+use crate::{ConfigConsumer, ConfigProviderInterface, SignerInterface, SubmitTxSocket};
 
 #[async_trait]
 #[infusion::service]
-pub trait IndexerInterface<C: Collection>:
-    ConfigConsumer + WithStartAndShutdown + Clone + Send + Sync + Sized
-{
+pub trait IndexerInterface<C: Collection>: ConfigConsumer + Clone + Send + Sync + Sized {
     fn _init(config: ::ConfigProviderInterface, signer: ::SignerInterface) {
         Self::init(config.get::<Self>(), signer.get_socket())
     }
