@@ -5,7 +5,11 @@ use syn::{parse_quote, Error, Result};
 
 use crate::{sig, utils};
 
-pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStream {
+pub fn process_trait(
+    mode: utils::Mode,
+    mut trait_: syn::ItemTrait,
+    name: Option<syn::Ident>,
+) -> TokenStream {
     // The diagnostics and compile errors that we gather.
     let mut report = quote!();
     // trait ... { %trait_body }
@@ -13,7 +17,7 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
     // impl ... { %blank_body }
     let mut blank_body = Vec::<syn::ImplItem>::new();
 
-    let name = trait_.ident.clone();
+    let name = name.unwrap_or(trait_.ident.clone());
     let names = utils::collect_generics_names(&trait_.generics);
 
     // The fist generic is meant to be the name for the collection.
