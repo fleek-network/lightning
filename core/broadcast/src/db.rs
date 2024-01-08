@@ -1,9 +1,7 @@
+use lightning_interfaces::schema::broadcast::{Message, MessageInternedId};
 use lightning_interfaces::types::Digest;
 use quick_cache::unsync::Cache;
 use tracing::error;
-
-use crate::frame::MessageInternedId;
-use crate::Message;
 
 // TODO: Make this persist.
 pub struct Database {

@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use derive_more::IsVariant;
 use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::schema::broadcast::Frame;
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::Topic;
 use lightning_interfaces::{
@@ -21,7 +22,6 @@ use crate::command::CommandSender;
 use crate::config::Config;
 use crate::db::Database;
 use crate::ev::Context;
-use crate::frame::Frame;
 use crate::pubsub::PubSubI;
 
 pub struct Broadcast<C: Collection> {

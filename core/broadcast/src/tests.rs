@@ -8,7 +8,10 @@ use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::schema::broadcast::{BroadcastFrame, BroadcastMessage};
+use lightning_interfaces::schema::broadcast::{
+    DeprecatedBroadcastFrame,
+    DeprecatedBroadcastMessage,
+};
 use lightning_interfaces::types::{NodeIndex, NodePorts, Topic};
 use lightning_interfaces::{
     partial,
@@ -213,16 +216,16 @@ async fn test_send() {
 
     let pub_sub1 = peers[0]
         .broadcast
-        .get_pubsub::<BroadcastFrame>(Topic::Debug);
+        .get_pubsub::<DeprecatedBroadcastFrame>(Topic::Debug);
     let mut pub_sub2 = peers[1]
         .broadcast
-        .get_pubsub::<BroadcastFrame>(Topic::Debug);
+        .get_pubsub::<DeprecatedBroadcastFrame>(Topic::Debug);
     let mut pub_sub3 = peers[2]
         .broadcast
-        .get_pubsub::<BroadcastFrame>(Topic::Debug);
+        .get_pubsub::<DeprecatedBroadcastFrame>(Topic::Debug);
 
     // Create a message from node1
-    let message = BroadcastMessage {
+    let message = DeprecatedBroadcastMessage {
         topic: Topic::Debug,
         originator: peers[0].node_secret_key.to_pk(),
         payload: String::from("hello").into_bytes(),
@@ -235,7 +238,7 @@ async fn test_send() {
     let target_message = message.clone();
     tokio::spawn(async move {
         match pub_sub2.recv().await.unwrap() {
-            BroadcastFrame::Message { message, signature } => {
+            DeprecatedBroadcastFrame::Message { message, signature } => {
                 assert_eq!(message, target_message);
                 assert_eq!(signature, target_signature);
                 tx.send(()).unwrap();
@@ -248,7 +251,7 @@ async fn test_send() {
     let (tx, rx3) = oneshot::channel();
     tokio::spawn(async move {
         match pub_sub3.recv().await.unwrap() {
-            BroadcastFrame::Message { message, signature } => {
+            DeprecatedBroadcastFrame::Message { message, signature } => {
                 assert_eq!(message, target_message);
                 assert_eq!(signature, target_signature);
                 tx.send(()).unwrap();
@@ -260,7 +263,7 @@ async fn test_send() {
     // node1 sends the message over the broadcast
     pub_sub1
         .send(
-            &BroadcastFrame::Message {
+            &DeprecatedBroadcastFrame::Message {
                 message,
                 signature: target_signature,
             },

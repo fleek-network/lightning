@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 use fxhash::{FxHashMap, FxHashSet};
+use lightning_interfaces::schema::broadcast::MessageInternedId;
 use lightning_interfaces::types::NodeIndex;
 use rand::distributions::WeightedIndex;
 use rand::prelude::Distribution;
@@ -10,7 +11,6 @@ use ta::indicators::ExponentialMovingAverage;
 use ta::Next;
 
 use crate::stats::FusedTa;
-use crate::MessageInternedId;
 
 const TICK_DURATION: Duration = Duration::from_millis(500);
 const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_millis(1000);
