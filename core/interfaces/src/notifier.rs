@@ -18,9 +18,22 @@ pub trait NotifierInterface<C: Collection>: Sync + Send + Clone {
         ok!(Self::init(app))
     }
 
+    type Emitters: NotifierEmitters;
+
     fn init(app: &c!(C::ApplicationInterface)) -> Self;
+
+    /// Returns a reference to the emitter end of this notifier. Should only be used if we are
+    /// interested (and responsible) for triggering a notification.
+    fn emitters(&self) -> &Self::Emitters;
 
     fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>);
 
     fn notify_before_epoch_change(&self, duration: Duration, tx: mpsc::Sender<Notification>);
+}
+
+
+#[infusion::blank]
+pub trait NotifierEmitters {
+    /// Notify the waiters about epoch change.
+    fn epoch_changed(&self);
 }
