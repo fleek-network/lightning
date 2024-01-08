@@ -132,10 +132,13 @@ impl<C: Collection> Context<C> {
     /// Handle a message sent from another node.
     fn handle_frame_payload(&mut self, sender: NodeIndex, payload: Bytes) {
         let Ok(frame) = Frame::decode(&payload) else {
-            self.stats.report(sender, ConnectionStats {
-                invalid_messages_received_from_peer: 1,
-                ..Default::default()
-            });
+            self.stats.report(
+                sender,
+                ConnectionStats {
+                    invalid_messages_received_from_peer: 1,
+                    ..Default::default()
+                },
+            );
             return;
         };
 
@@ -211,10 +214,13 @@ impl<C: Collection> Context<C> {
 
     fn handle_message(&mut self, sender: NodeIndex, msg: Message) {
         let Some(origin_pk) = self.get_node_pk(msg.origin) else {
-            self.stats.report(sender, ConnectionStats {
-                invalid_messages_received_from_peer: 1,
-                ..Default::default()
-            });
+            self.stats.report(
+                sender,
+                ConnectionStats {
+                    invalid_messages_received_from_peer: 1,
+                    ..Default::default()
+                },
+            );
             return;
         };
 
@@ -318,7 +324,7 @@ impl<C: Collection> Context<C> {
                 self.advertise(id, digest, cmd.filter);
             },
             Command::Propagate(cmd) => {
-                let Some(id) = self.db.get_id(&cmd.digest) else  {
+                let Some(id) = self.db.get_id(&cmd.digest) else {
                     debug_assert!(
                         false,
                         "We should not be trying to propagate a message we don't know the id of."

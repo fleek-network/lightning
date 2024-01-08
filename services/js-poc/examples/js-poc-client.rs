@@ -61,7 +61,10 @@ mod cli {
         let mut args = std::env::args();
         args.next();
 
-        let Some(uri) = args.next() else { help(); std::process::exit(1); };
+        let Some(uri) = args.next() else {
+            help();
+            std::process::exit(1);
+        };
 
         let origin = {
             let arg = args.next().unwrap_or("blake3".into());

@@ -211,7 +211,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
 
                 let Some(tx) = self.secondary_senders.get(&token_state.connection_id) else {
                     sender.terminate(TerminationReason::ServiceTerminated);
-                    return
+                    return;
                 };
 
                 tx.send((sender, receiver).into()).await.ok();

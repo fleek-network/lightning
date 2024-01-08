@@ -226,7 +226,10 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
 
 fn impl_init(base: &syn::Ident, item: syn::TraitItemFn) -> Result<Vec<syn::TraitItem>> {
     let Some(block) = &item.default else {
-        return Err(Error::new(item.span(), "Infu init requires default implementation."));
+        return Err(Error::new(
+            item.span(),
+            "Infu init requires default implementation.",
+        ));
     };
 
     let (deps, names) = sig::verify_fn_signature(sig::InfuFnKind::Init, &item.sig)?;
@@ -266,7 +269,10 @@ fn impl_init(base: &syn::Ident, item: syn::TraitItemFn) -> Result<Vec<syn::Trait
 
 fn impl_post(base: &syn::Ident, item: syn::TraitItemFn) -> Result<syn::TraitItem> {
     let Some(block) = &item.default else {
-        return Err(Error::new(item.span(), "Infu post requires default implementation."));
+        return Err(Error::new(
+            item.span(),
+            "Infu post requires default implementation.",
+        ));
     };
 
     let (deps, names) = sig::verify_fn_signature(sig::InfuFnKind::Post, &item.sig)?;

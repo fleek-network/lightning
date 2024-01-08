@@ -135,10 +135,7 @@ where
     S: Store + 'static,
 {
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError> {
-        let PutterMode::WithIncrementalVerification {
-            verifier,
-            ..
-        } = &mut self.mode else {
+        let PutterMode::WithIncrementalVerification { verifier, .. } = &mut self.mode else {
             return Err(PutFeedProofError::UnexpectedCall);
         };
 

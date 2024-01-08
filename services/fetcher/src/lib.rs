@@ -91,7 +91,7 @@ pub async fn connection_loop(conn: Connection) {
                 // Fetch the content from the origin
                 let Some(hash) = fn_sdk::api::fetch_from_origin(origin.into(), uri).await else {
                     error!("failed to fetch from origin");
-                    return
+                    return;
                 };
                 hash
             },
@@ -102,7 +102,7 @@ pub async fn connection_loop(conn: Connection) {
         // Get the content from the blockstore
         let Ok(content_handle) = fn_sdk::blockstore::ContentHandle::load(&hash).await else {
             error!("failed to load content handle from the blockstore");
-            return
+            return;
         };
 
         debug!("got content handle");
@@ -118,7 +118,7 @@ pub async fn connection_loop(conn: Connection) {
         for block in 0..content_handle.len() {
             let Ok(bytes) = content_handle.read(block).await else {
                 error!("failed to read content from the blockstore :(");
-                return
+                return;
             };
 
             debug!("sending block {block}");

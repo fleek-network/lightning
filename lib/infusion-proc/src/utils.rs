@@ -24,7 +24,10 @@ pub fn impl_trait_fn(item: &syn::TraitItemFn, block: syn::Block) -> syn::ImplIte
 /// does not have a default.
 pub fn impl_trait_const(item: &syn::TraitItemConst) -> Result<syn::ImplItemConst> {
     let Some((eq_token, expr)) = &item.default else {
-        return Err(Error::new(item.ident.span(), "Const must have a default for the Blank."));
+        return Err(Error::new(
+            item.ident.span(),
+            "Const must have a default for the Blank.",
+        ));
     };
 
     Ok(syn::ImplItemConst {

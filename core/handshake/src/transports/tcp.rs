@@ -113,7 +113,7 @@ fn spawn_handshake_task(
 
         // Parse the handshake frame
         let Ok(frame) = schema::HandshakeRequestFrame::decode(&buf) else {
-            return
+            return;
         };
 
         let (reader, writer) = stream.into_split();
