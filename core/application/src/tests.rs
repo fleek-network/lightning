@@ -1278,6 +1278,137 @@ async fn test_epoch_change() {
 }
 
 #[tokio::test]
+async fn test_change_epoch_reverts_account_key() {
+    let committee_size = 4;
+    let (committee, _keystore) = create_genesis_committee(committee_size);
+    let (update_socket, _query_runner) = test_init_app(committee);
+
+    // Account Secret Key
+    let secret_key = AccountOwnerSecretKey::generate();
+
+    let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
+
+    let update = prepare_update_request_account(change_epoch, &secret_key, 1);
+    expect_tx_revert!(update, &update_socket, ExecutionError::OnlyNode);
+}
+
+#[tokio::test]
+async fn test_change_epoch_reverts_node_does_not_exist() {
+    // Create a genesis committee and seed the application state with it.
+    let committee_size = 4;
+    let (committee, _keystore) = create_genesis_committee(committee_size);
+    let (update_socket, _query_runner) = test_init_app(committee);
+
+    // Unknown Node Key (without Stake)
+    let node_secret_key = NodeSecretKey::generate();
+    let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
+
+    let update = prepare_update_request_node(change_epoch, &node_secret_key, 1);
+    expect_tx_revert!(update, &update_socket, ExecutionError::NodeDoesNotExist);
+}
+
+#[tokio::test]
+async fn test_change_epoch_reverts_insufficient_stake() {
+    // Create a genesis committee and seed the application state with it.
+    let committee_size = 4;
+    let (committee, _keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    // New Node key
+    let node_secret_key = NodeSecretKey::generate();
+
+    // Stake less than the minimum required amount.
+    let minimum_stake_amount: HpUfixed<18> = query_runner.get_staking_amount().into();
+    let less_than_minimum_stake_amount: HpUfixed<18> =
+        minimum_stake_amount / HpUfixed::<18>::from(2u16);
+    deposit_and_stake!(
+        &update_socket,
+        &owner_secret_key,
+        1,
+        &less_than_minimum_stake_amount,
+        &node_secret_key.to_pk(),
+        [0; 96].into()
+    );
+
+    let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
+    let update = prepare_update_request_node(change_epoch, &node_secret_key, 1);
+    expect_tx_revert!(update, &update_socket, ExecutionError::InsufficientStake);
+}
+
+#[tokio::test]
+async fn test_epoch_change_reverts_epoch_already_changed() {
+    // Create a genesis committee and seed the application state with it.
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+
+    // call epoch change
+    simple_epoch_change!(&update_socket, &keystore, &query_runner, 0);
+    assert_eq!(query_runner.get_epoch_info().epoch, 1);
+
+    let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
+    let update = prepare_update_request_node(change_epoch, &keystore[0].node_secret_key, 2);
+    expect_tx_revert!(update, &update_socket, ExecutionError::EpochAlreadyChanged);
+}
+
+#[tokio::test]
+async fn test_epoch_change_reverts_epoch_has_not_started() {
+    // Create a genesis committee and seed the application state with it.
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, _query_runner) = test_init_app(committee);
+
+    let change_epoch = UpdateMethod::ChangeEpoch { epoch: 1 };
+    let update = prepare_update_request_node(change_epoch, &keystore[0].node_secret_key, 1);
+    expect_tx_revert!(update, &update_socket, ExecutionError::EpochHasNotStarted);
+}
+
+#[tokio::test]
+async fn test_epoch_change_reverts_not_committee_member() {
+    // Create a genesis committee and seed the application state with it.
+    let committee_size = 4;
+    let (committee, _keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    // New Node key
+    let node_secret_key = NodeSecretKey::generate();
+
+    // Stake less than the minimum required amount.
+    let minimum_stake_amount: HpUfixed<18> = query_runner.get_staking_amount().into();
+
+    deposit_and_stake!(
+        &update_socket,
+        &owner_secret_key,
+        1,
+        &minimum_stake_amount,
+        &node_secret_key.to_pk(),
+        [0; 96].into()
+    );
+
+    let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
+    let update = prepare_update_request_node(change_epoch, &node_secret_key, 1);
+    expect_tx_revert!(update, &update_socket, ExecutionError::NotCommitteeMember);
+}
+
+#[tokio::test]
+async fn test_epoch_change_reverts_already_signaled() {
+    // Create a genesis committee and seed the application state with it.
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, _query_runner) = test_init_app(committee);
+
+    let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
+    let update = prepare_update_request_node(change_epoch.clone(), &keystore[0].node_secret_key, 1);
+    expect_tx_success!(update, &update_socket);
+
+    // Second update
+    let update = prepare_update_request_node(change_epoch, &keystore[0].node_secret_key, 2);
+    expect_tx_revert!(update, &update_socket, ExecutionError::AlreadySignaled);
+}
+
+#[tokio::test]
 async fn test_submit_rep_measurements() {
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
@@ -1703,13 +1834,13 @@ async fn test_submit_pod_reverts_insufficient_stake() {
 
     // Stake less than the minimum required amount.
     let minimum_stake_amount: HpUfixed<18> = query_runner.get_staking_amount().into();
-    let less_than_minimum_skate_amount: HpUfixed<18> =
+    let less_than_minimum_stake_amount: HpUfixed<18> =
         minimum_stake_amount / HpUfixed::<18>::from(2u16);
     deposit_and_stake!(
         &update_socket,
         &owner_secret_key,
         1,
-        &less_than_minimum_skate_amount,
+        &less_than_minimum_stake_amount,
         &node_secret_key.to_pk(),
         [0; 96].into()
     );
@@ -1762,12 +1893,12 @@ async fn test_is_valid_node() {
     let node_pub_key = NodeSecretKey::generate().to_pk();
 
     // Stake less than the minimum required amount.
-    let less_than_minimum_skate_amount = minimum_stake_amount / HpUfixed::<18>::from(2u16);
+    let less_than_minimum_stake_amount = minimum_stake_amount / HpUfixed::<18>::from(2u16);
     deposit_and_stake!(
         &update_socket,
         &owner_secret_key,
         1,
-        &less_than_minimum_skate_amount,
+        &less_than_minimum_stake_amount,
         &node_pub_key,
         [1; 96].into()
     );
@@ -2061,12 +2192,12 @@ async fn test_get_node_registry() {
     let node_secret_key2 = NodeSecretKey::generate();
 
     // Stake less than the minimum required amount.
-    let less_than_minimum_skate_amount = minimum_stake_amount.clone() / HpUfixed::<18>::from(2u16);
+    let less_than_minimum_stake_amount = minimum_stake_amount.clone() / HpUfixed::<18>::from(2u16);
     deposit_and_stake!(
         &update_socket,
         &owner_secret_key2,
         1,
-        &less_than_minimum_skate_amount,
+        &less_than_minimum_stake_amount,
         &node_secret_key2.to_pk(),
         [1; 96].into()
     );
@@ -2493,13 +2624,13 @@ async fn test_opt_in_reverts_insufficient_stake() {
 
     // Stake less than the minimum required amount.
     let minimum_stake_amount: HpUfixed<18> = query_runner.get_staking_amount().into();
-    let less_than_minimum_skate_amount: HpUfixed<18> =
+    let less_than_minimum_stake_amount: HpUfixed<18> =
         minimum_stake_amount / HpUfixed::<18>::from(2u16);
     deposit_and_stake!(
         &update_socket,
         &owner_secret_key,
         1,
-        &less_than_minimum_skate_amount,
+        &less_than_minimum_stake_amount,
         &node_secret_key.to_pk(),
         [0; 96].into()
     );
@@ -2592,13 +2723,13 @@ async fn test_opt_out_reverts_insufficient_stake() {
 
     // Stake less than the minimum required amount.
     let minimum_stake_amount: HpUfixed<18> = query_runner.get_staking_amount().into();
-    let less_than_minimum_skate_amount: HpUfixed<18> =
+    let less_than_minimum_stake_amount: HpUfixed<18> =
         minimum_stake_amount / HpUfixed::<18>::from(2u16);
     deposit_and_stake!(
         &update_socket,
         &owner_secret_key,
         1,
-        &less_than_minimum_skate_amount,
+        &less_than_minimum_stake_amount,
         &node_secret_key.to_pk(),
         [0; 96].into()
     );
@@ -3256,13 +3387,13 @@ async fn test_submit_reputation_measurements_reverts_insufficient_stake() {
 
     // Stake less than the minimum required amount.
     let minimum_stake_amount: HpUfixed<18> = query_runner.get_staking_amount().into();
-    let less_than_minimum_skate_amount: HpUfixed<18> =
+    let less_than_minimum_stake_amount: HpUfixed<18> =
         minimum_stake_amount / HpUfixed::<18>::from(2u16);
     deposit_and_stake!(
         &update_socket,
         &owner_secret_key,
         1,
-        &less_than_minimum_skate_amount,
+        &less_than_minimum_stake_amount,
         &node_secret_key.to_pk(),
         [0; 96].into()
     );
