@@ -183,7 +183,7 @@ where
 #[allow(dead_code)]
 pub fn constrained_fasterpam<M, L>(
     mat: &M,
-    med: &mut Vec<usize>,
+    med: &mut [usize],
     maxiter: usize,
     min: usize,
     max: usize,
@@ -481,7 +481,7 @@ where
 #[inline]
 pub(crate) fn do_swap<M, N, L>(
     mat: &M,
-    med: &mut Vec<usize>,
+    med: &mut [usize],
     data: &mut [Rec<N>],
     idx: usize,
     new: usize,

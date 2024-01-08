@@ -115,7 +115,7 @@ impl<S: TransportSender, R: TransportReceiver, P: ExecutorProviderInterface> Pro
                 },
                 // Handle outgoing socket bytes from the service
                 res = self.socket.read_buf(&mut self.socket_buffer) => match res {
-                    Ok(n) if n == 0 => break Ok(()),
+                    Ok(0) => break Ok(()),
                     Ok(_) => {
                         handle_socket_bytes(
                             &mut self.socket_buffer,
@@ -279,7 +279,7 @@ impl<
                 },
                 // Handle outgoing socket bytes from the service to the secondary
                 res = self.inner.socket.read_buf(&mut self.inner.socket_buffer) => match res {
-                    Ok(n) if n == 0 => break Ok(()),
+                    Ok(0) => break Ok(()),
                     Ok(_) => {
                         handle_socket_bytes(
                             &mut self.inner.socket_buffer,

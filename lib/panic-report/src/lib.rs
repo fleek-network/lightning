@@ -222,10 +222,8 @@ impl Report {
     /// Serialize as toml and save to a random temporary file.
     #[inline(always)]
     pub fn save(&self) -> PathBuf {
-        let report_path = std::env::temp_dir().join(format!(
-            "report-{}.toml",
-            Uuid::new_v4().hyphenated().to_string()
-        ));
+        let report_path =
+            std::env::temp_dir().join(format!("report-{}.toml", Uuid::new_v4().hyphenated()));
 
         match toml::to_string_pretty(&self) {
             Ok(toml) => {

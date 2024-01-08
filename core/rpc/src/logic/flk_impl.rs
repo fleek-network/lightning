@@ -285,7 +285,7 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
                     .query_runner
                     .get_reputation_measurements(&node_idx)
             })
-            .unwrap_or(Vec::new());
+            .unwrap_or_default();
         Ok(rep_measurements)
     }
 

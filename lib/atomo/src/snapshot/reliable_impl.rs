@@ -75,7 +75,11 @@ impl<T, U> SnapshotList<T, U> {
     pub fn get_metadata_mut(&mut self) -> &mut U {
         let current = self.current();
         let metadata_mut_ref = ((&current.0.metadata) as *const U) as *mut U;
-        unsafe { &mut *metadata_mut_ref }
+        // TODO: (parsa) ensure this can be safely ignored
+        #[allow(invalid_reference_casting)]
+        unsafe {
+            &mut *metadata_mut_ref
+        }
     }
 }
 

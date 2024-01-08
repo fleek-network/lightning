@@ -86,7 +86,7 @@ fn spawn_handshake_task(
         // Read until we have enough for the length delimiter
         while buf.len() < 4 {
             match stream.read_buf(&mut buf).await {
-                Ok(len) if len == 0 => return,
+                Ok(0) => return,
                 Err(_) => return,
                 Ok(_) => {},
             }
@@ -105,7 +105,7 @@ fn spawn_handshake_task(
         // Read until we have enough for the handshake frame
         while buf.len() < len {
             match stream.read_buf(&mut buf).await {
-                Ok(len) if len == 0 => return,
+                Ok(0) => return,
                 Err(_) => return,
                 Ok(_) => {},
             }

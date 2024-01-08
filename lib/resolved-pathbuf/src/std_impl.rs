@@ -39,7 +39,7 @@ impl Ord for ResolvedPathBuf {
 
 impl PartialOrd for ResolvedPathBuf {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.resolved.partial_cmp(&other.resolved)
+        Some(self.cmp(other))
     }
 }
 

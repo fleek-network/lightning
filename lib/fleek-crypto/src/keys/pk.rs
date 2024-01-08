@@ -217,7 +217,7 @@ impl schemars::JsonSchema for AccountOwnerSignature {
     }
 
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        let sig = Self::try_from([0u8; 65]).expect("valid account owner signature for example");
+        let sig = Self::from([0u8; 65]);
 
         schemars::schema_for_value!(sig).schema.into()
     }
@@ -233,7 +233,7 @@ impl schemars::JsonSchema for NodeSignature {
     }
 
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        let sig = Self::try_from([0u8; 64]).expect("valid node signature for example");
+        let sig = Self::from([0u8; 64]);
 
         schemars::schema_for_value!(sig).schema.into()
     }
@@ -249,7 +249,7 @@ impl schemars::JsonSchema for ConsensusSignature {
     }
 
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        let sig = Self::try_from([0u8; 48]).expect("valid consensus signature for example");
+        let sig = Self::from([0u8; 48]);
 
         schemars::schema_for_value!(sig).schema.into()
     }
