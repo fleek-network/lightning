@@ -5,6 +5,7 @@ on:
     # TODO: enable for main only after testnet
     branches:
       - testnet-*
+      - chore/tias-20240109
     paths:
       - core/**
       - etc/**
