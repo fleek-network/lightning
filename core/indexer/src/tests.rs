@@ -138,7 +138,8 @@ async fn test_submission() {
     let us = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
 
     // Given: an indexer.
-    let indexer = Indexer::<TestBinding>::init(Default::default(), signer.get_socket()).unwrap();
+    let indexer =
+        Indexer::<TestBinding>::init(Default::default(), query_runner.clone(), &signer).unwrap();
 
     // When: we register a cid.
     let cid = [0u8; 32];

@@ -4,17 +4,41 @@ mod config;
 mod tests;
 
 use std::marker::PhantomData;
+use std::sync::{Arc, OnceLock};
 
+use fleek_crypto::{NodePublicKey, SecretKey};
+use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::{Blake3Hash, ContentUpdate, UpdateMethod};
-use lightning_interfaces::{ConfigConsumer, IndexerInterface, SubmitTxSocket};
+use lightning_interfaces::types::{Blake3Hash, ContentUpdate, NodeIndex, UpdateMethod};
+use lightning_interfaces::{
+    ApplicationInterface,
+    ConfigConsumer,
+    IndexerInterface,
+    SignerInterface,
+    SubmitTxSocket,
+    SyncQueryRunnerInterface,
+};
 
 use crate::config::Config;
 
-#[derive(Clone)]
-pub struct Indexer<C> {
+pub struct Indexer<C: Collection> {
+    pk: NodePublicKey,
+    local_index: Arc<OnceLock<NodeIndex>>,
     submit_tx: SubmitTxSocket,
+    query_runner: c![C::ApplicationInterface::SyncExecutor],
     _marker: PhantomData<C>,
+}
+
+impl<C: Collection> Clone for Indexer<C> {
+    fn clone(&self) -> Self {
+        Self {
+            pk: self.pk,
+            local_index: self.local_index.clone(),
+            submit_tx: self.submit_tx.clone(),
+            query_runner: self.query_runner.clone(),
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<C: Collection> ConfigConsumer for Indexer<C> {
@@ -22,37 +46,88 @@ impl<C: Collection> ConfigConsumer for Indexer<C> {
     type Config = Config;
 }
 
+impl<C: Collection> Indexer<C> {
+    fn get_index(&self) -> Option<NodeIndex> {
+        match self.local_index.get() {
+            None => {
+                if let Some(index) = self.query_runner.pubkey_to_index(&self.pk) {
+                    let _ = self.local_index.set(index);
+                    Some(index)
+                } else {
+                    None
+                }
+            },
+            Some(index) => Some(*index),
+        }
+    }
+}
+
 impl<C: Collection> IndexerInterface<C> for Indexer<C> {
-    fn init(_: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
+    fn init(
+        _: Self::Config,
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        signer: &c!(C::SignerInterface),
+    ) -> anyhow::Result<Self> {
+        let submit_tx = signer.get_socket();
+
+        let (_, sk) = signer.get_sk();
+        let local_index = OnceLock::new();
+        if let Some(index) = query_runner.pubkey_to_index(&sk.to_pk()) {
+            local_index.set(index).expect("Cell to be empty");
+        }
+
         Ok(Self {
+            pk: sk.to_pk(),
+            local_index: Arc::new(local_index),
             submit_tx,
+            query_runner,
             _marker: PhantomData,
         })
     }
 
     fn register(&self, cid: Blake3Hash) {
-        let updates = vec![ContentUpdate { cid, remove: false }];
-        let submit_tx = self.submit_tx.clone();
-        tokio::spawn(async move {
-            if let Err(e) = submit_tx
-                .run(UpdateMethod::UpdateContentRegistry { updates })
-                .await
+        if let Some(index) = self.get_index() {
+            if self
+                .query_runner
+                .get_content_registry(&index)
+                .map(|registry| !registry.contains(&cid))
+                .unwrap_or(true)
             {
-                tracing::error!("Submitting content registry update failed: {e:?}");
+                let updates = vec![ContentUpdate { cid, remove: false }];
+                let submit_tx = self.submit_tx.clone();
+
+                tokio::spawn(async move {
+                    if let Err(e) = submit_tx
+                        .run(UpdateMethod::UpdateContentRegistry { updates })
+                        .await
+                    {
+                        tracing::error!("Submitting content registry update failed: {e:?}");
+                    }
+                });
             }
-        });
+        }
     }
 
     fn unregister(&self, cid: Blake3Hash) {
-        let updates = vec![ContentUpdate { cid, remove: true }];
-        let submit_tx = self.submit_tx.clone();
-        tokio::spawn(async move {
-            if let Err(e) = submit_tx
-                .run(UpdateMethod::UpdateContentRegistry { updates })
-                .await
+        if let Some(index) = self.get_index() {
+            if self
+                .query_runner
+                .get_content_registry(&index)
+                .map(|registry| registry.contains(&cid))
+                .unwrap_or(false)
             {
-                tracing::error!("Submitting content registry removal update failed: {e:?}");
+                let updates = vec![ContentUpdate { cid, remove: true }];
+                let submit_tx = self.submit_tx.clone();
+
+                tokio::spawn(async move {
+                    if let Err(e) = submit_tx
+                        .run(UpdateMethod::UpdateContentRegistry { updates })
+                        .await
+                    {
+                        tracing::error!("Submitting content registry update failed: {e:?}");
+                    }
+                });
             }
-        });
+        }
     }
 }

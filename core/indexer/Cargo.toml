@@ -7,6 +7,8 @@ edition = "2021"
 
 [dependencies]
 anyhow.workspace = true
+fleek-crypto = { path = "../../lib/fleek-crypto" }
+infusion.workspace = true
 serde.workspace = true
 tokio.workspace = true
 tracing.workspace = true
@@ -14,8 +16,6 @@ tracing.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 
 [dev-dependencies]
-fleek-crypto.workspace = true
-infusion.workspace = true
 lightning-test-utils = { path="../test-utils" }
 lightning-signer = { path="../signer" }
 lightning-application = { path="../application", features = ["test"] }
