@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::{arg, ArgAction, Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(about, version)]
+#[command(about, version = crate::VERSION)]
 pub struct Args {
     /// Path to the toml configuration file
     #[arg(short, long, global = true, default_value_t = String::from("~/.lightning/config.toml") )]

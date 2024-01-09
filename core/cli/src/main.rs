@@ -1,19 +1,13 @@
-mod args;
-pub mod cli;
-mod commands;
-mod utils;
-
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 use clap::Parser;
-use cli::Cli;
 use infusion::c;
+use lightning_cli::args::Args;
+use lightning_cli::cli::Cli;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::ServiceExecutorInterface;
 use lightning_node::FinalTypes;
-
-use crate::args::Args;
 
 fn main() -> Result<()> {
     let args = Args::parse();
@@ -32,12 +26,7 @@ fn main() -> Result<()> {
 
     panic_report::setup! {
         name: "lightning-node".into(),
-        version: concat!(
-            env!("CARGO_PKG_VERSION"),
-            "-",
-            compile_time_run::run_command_str!("git", "rev-parse", "HEAD")
-        )
-        .into(),
+        version: lightning_cli::VERSION.into(),
         homepage: "https://github.com/fleek-network/lightning",
         contacts: ["Fleek Network Team <reports@fleek.network>".to_string()]
     };
