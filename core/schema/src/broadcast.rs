@@ -1,40 +1,11 @@
-use fleek_crypto::{NodePublicKey, NodeSignature};
+use fleek_crypto::NodeSignature;
 use ink_quill::{ToDigest, TranscriptBuilder};
 use lightning_types::{Digest, ImmutablePointer, NodeIndex, Topic};
 use serde::{Deserialize, Serialize};
 
 use crate::AutoImplSerde;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct DeprecatedBroadcastMessage {
-    pub topic: Topic,
-    pub originator: NodePublicKey,
-    pub payload: Vec<u8>,
-}
-
-impl ToDigest for DeprecatedBroadcastMessage {
-    fn transcript(&self) -> TranscriptBuilder {
-        TranscriptBuilder::empty("lightning-broadcast")
-            .with("TOPIC", &self.topic)
-            .with("PUBKEY", &self.originator.0)
-            .with("PAYLOAD", &self.payload)
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum DeprecatedBroadcastFrame {
-    Advertise {
-        digest: [u8; 32],
-    },
-    Want {
-        digest: [u8; 32],
-    },
-    Message {
-        message: DeprecatedBroadcastMessage,
-        signature: NodeSignature,
-    },
-}
-impl AutoImplSerde for DeprecatedBroadcastFrame {}
+pub type MessageInternedId = u16;
 
 /// Once a content is put on the network (i.e a node fetches the content from the origin), the
 /// node that fetched the content computes the blake3 hash of the content and signs a record
@@ -63,20 +34,18 @@ impl ToDigest for ResolvedImmutablePointerRecord {
 
 impl AutoImplSerde for ResolvedImmutablePointerRecord {}
 
-pub type MessageInternedId = u16;
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Want {
     pub interned_id: MessageInternedId,
 }
 
-#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Advr {
     pub interned_id: MessageInternedId,
     pub digest: Digest,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Message {
     pub origin: NodeIndex,
     pub signature: NodeSignature,
@@ -85,7 +54,7 @@ pub struct Message {
     pub payload: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Frame {
     /// Sent by a single node to advertise a message that they have.
     Advr(Advr),
