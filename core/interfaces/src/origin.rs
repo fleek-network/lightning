@@ -19,8 +19,6 @@ pub trait OriginProviderInterface<C: Collection>:
         Self::init(config.get::<Self>(), blockstore.clone())
     }
 
-    type Stream: UntrustedStream = BlankUntrustedStream;
-
     /// Initialize the origin service.
     fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self>;
 
