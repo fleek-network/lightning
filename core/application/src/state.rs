@@ -1203,13 +1203,8 @@ impl<B: Backend> State<B> {
                     return TransactionResponse::Revert(ExecutionError::InvalidContentRemoval);
                 }
             } else {
-                if !providers.insert(node_index) {
-                    return TransactionResponse::Revert(ExecutionError::ContentAlreadyRegistered);
-                }
-                if !staged_cids_provided.insert(update.cid) {
-                    // Unreachable.
-                    return TransactionResponse::Revert(ExecutionError::ContentAlreadyRegistered);
-                }
+                providers.insert(node_index);
+                staged_cids_provided.insert(update.cid);
             }
 
             staged_cid_to_node.insert(update.cid, providers);
