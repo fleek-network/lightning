@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/build/target \
     rustup toolchain install stable && \
     rustup default stable && \
-    cargo +stable install --locked --path core/cli && \
+    cargo +stable install --locked --path core/cli --features services && \
     cargo strip && \
     cp /usr/local/cargo/bin/lightning-node /build
 
