@@ -56,7 +56,7 @@ async fn wait_loop(
             let delta = Duration::from_millis(delta);
 
             print!(
-                "\rWaiting for new epoch to start. Joining the network in {}... (hit ENTER to exit)",
+                "\rWaiting for new epoch to start. Joining the network in {}...",
                 get_timer(delta)
             );
             stdout.flush().unwrap();
