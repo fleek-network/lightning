@@ -171,7 +171,8 @@ async fn get_fetchers(
         let notifier = Notifier::<TestBinding>::init(&app);
 
         let indexer =
-            Indexer::<TestBinding>::init(Default::default(), signer.get_socket()).unwrap();
+            Indexer::<TestBinding>::init(Default::default(), query_runner.clone(), &signer)
+                .unwrap();
 
         let rep_coll_config = RepCollConfig {
             reporter_buffer_size: 1,

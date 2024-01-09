@@ -190,7 +190,7 @@ mod tests {
         signer.provide_new_block_notify(consensus.new_block_notifier());
 
         let indexer =
-            Indexer::<TestBinding>::init(Default::default(), signer.get_socket()).unwrap();
+            Indexer::<TestBinding>::init(Default::default(), query_runner, &signer).unwrap();
         blockstore.provide_indexer(indexer);
 
         signer.start().await;

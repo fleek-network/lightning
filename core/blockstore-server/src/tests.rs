@@ -165,7 +165,8 @@ async fn get_peers(
         .unwrap();
 
         let indexer =
-            Indexer::<TestBinding>::init(Default::default(), signer.get_socket()).unwrap();
+            Indexer::<TestBinding>::init(Default::default(), query_runner.clone(), &signer)
+                .unwrap();
 
         let config = PoolConfig {
             max_idle_timeout: Duration::from_secs(5),

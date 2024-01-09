@@ -162,7 +162,7 @@ async fn create_app_state(test_name: String) -> AppState {
     signer.provide_mempool(consensus.mempool());
     signer.provide_new_block_notify(consensus.new_block_notifier());
 
-    let indexer = Indexer::<TestBinding>::init(Default::default(), signer.get_socket()).unwrap();
+    let indexer = Indexer::<TestBinding>::init(Default::default(), query_runner, &signer).unwrap();
     blockstore.provide_indexer(indexer);
 
     signer.start().await;
