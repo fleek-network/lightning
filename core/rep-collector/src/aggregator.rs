@@ -3,7 +3,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use async_trait::async_trait;
 use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::notifier::{Notification, NotifierInterface};
@@ -40,7 +39,6 @@ pub struct ReputationAggregator<C: Collection> {
     shutdown_notify: Arc<Notify>,
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for ReputationAggregator<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
@@ -67,7 +65,6 @@ impl<C: Collection> WithStartAndShutdown for ReputationAggregator<C> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> ReputationAggregatorInterface<C> for ReputationAggregator<C> {
     /// The reputation reporter can be used by our system to report the reputation of other
     type ReputationReporter = MyReputationReporter;

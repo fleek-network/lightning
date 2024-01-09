@@ -1,6 +1,5 @@
 use affair::Socket;
 use anyhow::Result;
-use async_trait::async_trait;
 use infusion::c;
 use lightning_types::{PeerRequestError, ServerRequest};
 use tokio::sync::broadcast;
@@ -18,7 +17,6 @@ use crate::{
 pub type BlockStoreServerSocket =
     Socket<ServerRequest, broadcast::Receiver<Result<(), PeerRequestError>>>;
 
-#[async_trait]
 #[infusion::service]
 pub trait BlockStoreServerInterface<C: Collection>:
     Sized + Send + Sync + ConfigConsumer + WithStartAndShutdown

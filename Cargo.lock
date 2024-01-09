@@ -4456,7 +4456,6 @@ version = "0.0.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
- "async-trait",
  "atomo",
  "atomo-rocks",
  "autometrics",
@@ -4487,7 +4486,6 @@ version = "0.0.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
- "async-trait",
  "bincode",
  "ethers",
  "infusion",
@@ -4507,7 +4505,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "arrayref",
- "async-trait",
  "bincode",
  "blake3-tree",
  "bytes",
@@ -4528,6 +4525,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "trait-variant",
 ]
 
 [[package]]
@@ -4536,7 +4534,6 @@ version = "0.0.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
- "async-trait",
  "blake3-tree",
  "bytes",
  "fleek-crypto",
@@ -4564,7 +4561,6 @@ dependencies = [
  "affair 0.1.2",
  "anyhow",
  "arrayref",
- "async-trait",
  "bytes",
  "dashmap",
  "derive_more",
@@ -4717,7 +4713,6 @@ version = "0.0.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
- "async-trait",
  "blake3-tree",
  "bytes",
  "cid 0.10.1",
@@ -4800,7 +4795,6 @@ name = "lightning-indexer"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "fleek-crypto",
  "infusion",
  "lightning-application",
@@ -4819,7 +4813,6 @@ version = "0.1.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
- "async-trait",
  "atomo",
  "blake3-tree",
  "bytes",
@@ -4837,6 +4830,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
+ "trait-variant",
  "zeroize",
 ]
 
@@ -4893,7 +4887,6 @@ dependencies = [
 name = "lightning-notifier"
 version = "0.0.0"
 dependencies = [
- "async-trait",
  "infusion",
  "lightning-application",
  "lightning-interfaces",
@@ -4948,7 +4941,6 @@ version = "0.0.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
- "async-trait",
  "bytes",
  "cid 0.10.1",
  "fleek-crypto",
@@ -4976,7 +4968,6 @@ name = "lightning-pinger"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "fleek-crypto",
  "infusion",
  "lightning-application",
@@ -5007,7 +4998,6 @@ version = "0.0.0"
 dependencies = [
  "affair 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "anyhow",
- "async-trait",
  "axum",
  "bincode",
  "bytes",
@@ -5037,6 +5027,7 @@ dependencies = [
  "tokio-stream",
  "tokio-util 0.7.10",
  "tracing",
+ "trait-variant",
  "webpki",
  "x509-parser 0.15.1",
 ]
@@ -5046,7 +5037,6 @@ name = "lightning-rep-collector"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "fleek-crypto",
  "hp-fixed",
  "infusion",
@@ -5161,7 +5151,6 @@ dependencies = [
  "affair 0.1.2",
  "anyhow",
  "arrayref",
- "async-trait",
  "bincode",
  "bytes",
  "dashmap",
@@ -5202,7 +5191,6 @@ version = "0.0.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
- "async-trait",
  "fleek-crypto",
  "futures",
  "hp-fixed",
@@ -5222,7 +5210,6 @@ name = "lightning-syncronizer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "fleek-crypto",
  "lightning-interfaces",
  "lightning-utils",
@@ -5240,7 +5227,6 @@ version = "0.0.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
- "async-trait",
  "axum",
  "ethers",
  "fleek-crypto",
@@ -5257,7 +5243,6 @@ name = "lightning-topology"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "base64 0.21.5",
  "criterion",
  "csv",
@@ -5590,7 +5575,6 @@ version = "0.1.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
- "async-trait",
  "axum",
  "dashmap",
  "fleek-crypto",
@@ -10152,6 +10136,17 @@ checksum = "ebeb235c5847e2f82cfe0f07eb971d1e5f6804b18dac2ae16349cc604380f82f"
 dependencies = [
  "quote 1.0.35",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "trait-variant"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45e1a477061e97925d81a2f89fb73b2b8038e6baa5a0023bad380ac23b5f4fa6"
+dependencies = [
+ "proc-macro2 1.0.74",
+ "quote 1.0.35",
+ "syn 2.0.46",
 ]
 
 [[package]]

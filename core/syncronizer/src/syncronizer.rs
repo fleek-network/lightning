@@ -2,7 +2,6 @@ use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, bail, Result};
-use async_trait::async_trait;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{
@@ -54,7 +53,6 @@ pub struct SyncronizerInner<C: Collection> {
     epoch_change_delta: Duration,
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for Syncronizer<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {

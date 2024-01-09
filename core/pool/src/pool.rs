@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 use std::task::Poll;
 
 use anyhow::{Context, Result};
-use async_trait::async_trait;
 use bytes::Bytes;
 use fleek_crypto::SecretKey;
 use futures::{SinkExt, Stream};
@@ -105,7 +104,6 @@ where
     }
 }
 
-#[async_trait]
 impl<C> WithStartAndShutdown for Pool<C, QuinnMuxer>
 where
     C: Collection,
@@ -259,7 +257,6 @@ pub struct EventHandler {
     service_scope: ServiceScope,
 }
 
-#[async_trait]
 impl EventHandlerInterface for EventHandler {
     fn send_to_all<F: Fn(NodeIndex) -> bool + Send + Sync + 'static>(
         &self,
@@ -321,7 +318,6 @@ impl Clone for Requester {
     }
 }
 
-#[async_trait]
 impl RequesterInterface for Requester {
     type Response = Response;
 
@@ -355,7 +351,6 @@ impl Response {
     }
 }
 
-#[async_trait]
 impl ResponseInterface for Response {
     type Body = Body;
     fn status_code(&self) -> Result<(), RejectReason> {
@@ -393,7 +388,6 @@ pub struct Responder {
     inner: Receiver<(RequestHeader, Request)>,
 }
 
-#[async_trait]
 impl ResponderInterface for Responder {
     type Request = Request;
 
@@ -422,7 +416,6 @@ impl Request {
     }
 }
 
-#[async_trait]
 impl RequestInterface for Request {
     fn reject(self, reason: RejectReason) {
         let mut us = self;

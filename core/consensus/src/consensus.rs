@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use affair::{Executor, TokioSpawn};
-use async_trait::async_trait;
 use derive_more::{From, IsVariant, TryInto};
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
 use lightning_interfaces::application::ExecutionEngineSocket;
@@ -315,7 +314,6 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, 
     }
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for Consensus<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
@@ -375,7 +373,6 @@ impl<C: Collection> ConfigConsumer for Consensus<C> {
     type Config = Config;
 }
 
-#[async_trait]
 impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
     type Certificate = PubSubMsg;
 

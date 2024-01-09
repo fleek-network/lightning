@@ -8,7 +8,6 @@ use std::time::{Duration, Instant};
 
 use affair::{Socket, Task};
 use anyhow::{anyhow, Result};
-use async_trait::async_trait;
 use blake3_tree::ProofBuf;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use infusion::c;
@@ -93,7 +92,6 @@ impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for BlockStoreServer<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {

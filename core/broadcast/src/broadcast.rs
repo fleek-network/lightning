@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use derive_more::IsVariant;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::schema::broadcast::Frame;
@@ -46,7 +45,6 @@ impl<C: Collection> ConfigConsumer for Broadcast<C> {
     type Config = Config;
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
     fn is_running(&self) -> bool {
         let guard = self.status.blocking_lock();

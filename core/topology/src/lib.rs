@@ -10,7 +10,6 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use async_trait::async_trait;
 pub use config::Config;
 use divisive::DivisiveHierarchy;
 use fleek_crypto::NodePublicKey;
@@ -141,7 +140,6 @@ impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> TopologyInterface<C> for Topology<C> {
     fn init(
         config: Self::Config,

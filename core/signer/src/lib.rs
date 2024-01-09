@@ -13,7 +13,6 @@ use std::time::{Duration, SystemTime};
 
 use affair::{Socket, Task};
 use anyhow::anyhow;
-use async_trait::async_trait;
 pub use config::Config;
 use fleek_crypto::{
     ConsensusPublicKey,
@@ -61,7 +60,6 @@ pub struct Signer<C: Collection> {
     shutdown_notify: Arc<Notify>,
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for Signer<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
@@ -101,7 +99,6 @@ impl<C: Collection> WithStartAndShutdown for Signer<C> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> SignerInterface<C> for Signer<C> {
     /// Initialize the signature service.
     fn init(

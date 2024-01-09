@@ -30,7 +30,6 @@
 use std::fmt::Display;
 use std::sync::{Arc, Weak};
 
-use async_trait::async_trait;
 use crossbeam::sync::ShardedLock;
 use futures::Future;
 use tokio::sync::{mpsc, oneshot};
@@ -52,7 +51,6 @@ pub trait Worker: Send + 'static {
 }
 
 /// An awaiting worker that processes requests and returns a response.
-#[async_trait]
 pub trait AsyncWorker: Send + 'static {
     /// The payload of the request that can be sent to the worker.
     type Request: Send + 'static;
@@ -61,7 +59,7 @@ pub trait AsyncWorker: Send + 'static {
     type Response: Send + 'static;
 
     /// Implement your custom handler for this async worker and enjoy using `await`.
-    async fn handle(&mut self, req: Self::Request) -> Self::Response;
+    fn handle(&mut self, req: Self::Request) -> impl Future<Output = Self::Response> + Send;
 }
 
 /// A socket that can be used to communicate with a worker, you can use a socket to send
@@ -392,7 +390,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl AsyncWorker for CounterWorker {
         type Request = u64;
         type Response = u64;

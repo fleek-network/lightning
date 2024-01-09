@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 
 use affair::{Socket, Task};
 use anyhow::anyhow;
-use async_trait::async_trait;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     Blake3Hash,
@@ -39,7 +38,6 @@ pub struct Fetcher<C: Collection> {
     shutdown_tx: mpsc::Sender<()>,
 }
 
-#[async_trait]
 impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
     /// Initialize the fetcher.
     fn init(
@@ -74,7 +72,6 @@ impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for Fetcher<C> {
     fn is_running(&self) -> bool {
         self.is_running.load(Ordering::Relaxed)

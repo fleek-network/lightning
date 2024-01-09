@@ -9,7 +9,6 @@ edition = "2021"
 lightning-interfaces = {path="../interfaces"}
 lightning-utils = { path = "../utils" }
 tokio.workspace = true
-async-trait.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 rand.workspace = true

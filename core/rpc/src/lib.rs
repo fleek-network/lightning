@@ -92,7 +92,6 @@ impl<C: Collection> Rpc<C> {
     }
 }
 
-#[async_trait::async_trait]
 impl<C: Collection> WithStartAndShutdown for Rpc<C> {
     async fn start(&self) {
         let (stop, server_handle) = stop_channel();

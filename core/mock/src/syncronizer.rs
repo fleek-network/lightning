@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 use std::sync::Mutex;
 
 use anyhow::Result;
-use async_trait::async_trait;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::Blake3Hash;
 use lightning_interfaces::{
@@ -22,7 +21,6 @@ pub struct MockSyncronizer<C: Collection> {
     _marker: PhantomData<C>,
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for MockSyncronizer<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {

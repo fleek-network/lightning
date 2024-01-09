@@ -4,7 +4,6 @@ use std::sync::{Arc, Mutex};
 
 use affair::{Socket, Task};
 use anyhow::{Context, Result};
-use async_trait::async_trait;
 use ethers::types::BlockNumber;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{
@@ -106,7 +105,6 @@ impl<C: Collection> ArchiveInterface<C> for Archive<C> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for Archive<C> {
     fn is_running(&self) -> bool {
         self.is_running.load(Ordering::Relaxed)

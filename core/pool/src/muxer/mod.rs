@@ -6,7 +6,6 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use async_trait::async_trait;
 use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
 use futures::{Sink, Stream};
@@ -22,8 +21,8 @@ pub type BoxedChannel =
 // Todo: It might be more convenient to move this interface
 // in `/interfaces` so we can pass it to `PoolInterface::init`.
 /// Multiplexed-transport interface.
-#[async_trait]
-pub trait MuxerInterface: Clone + Send + Sync + 'static {
+#[trait_variant::make(MuxerInterface: Send)]
+pub trait _MuxerInterface: Clone + Send + Sync + 'static {
     type Connecting: Future<Output = io::Result<Self::Connection>> + Send;
     type Connection: ConnectionInterface;
     type Config: Clone + Send;
@@ -37,8 +36,8 @@ pub trait MuxerInterface: Clone + Send + Sync + 'static {
 }
 
 /// Connection over a multiplexed transport.
-#[async_trait]
-pub trait ConnectionInterface: Clone + Send + 'static {
+#[trait_variant::make(ConnectionInterface: Send)]
+pub trait _ConnectionInterface: Clone + Send + 'static {
     type SendStream: AsyncWrite + Send + Sync + Unpin;
     type RecvStream: AsyncRead + Send + Sync + Unpin;
 

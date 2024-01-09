@@ -1,8 +1,8 @@
+use std::future::Future;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use blake3_tree::directory::DirectoryEntry;
 use blake3_tree::utils::HashTree;
 use thiserror::Error;
@@ -82,7 +82,6 @@ pub struct ContentChunk {
 /// Each chunk is it's own independent *content*, so for example if we use a compression algorithm
 /// we use it at the chunk level, we don't compress the entire file and then perform the chunking,
 /// we chunk first, and compress each chunk later for obvious technical reasons.
-#[async_trait]
 #[infusion::service]
 pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsumer {
     fn _init(config: ::ConfigProviderInterface) {
@@ -112,7 +111,13 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
 
     /// Returns the Blake3 tree associated with the given CID. Returns [`None`] if the content
     /// is not present in our block store.
-    async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<HashTree>>;
+    fn get_tree(
+        &self,
+        _cid: &Blake3Hash,
+    ) -> impl Future<Output = Option<Self::SharedPointer<HashTree>>> + Send {
+        // TODO: improve infusion so this autoimpl is not needed
+        async { None }
+    }
 
     /// Returns the content associated with the given hash and block number, the compression
     /// set determines which compression modes we care about.
@@ -123,12 +128,15 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
     ///
     /// If the content is requested with an empty compression set, the decompressed content is
     /// returned.
-    async fn get(
+    fn get(
         &self,
-        block_counter: u32,
-        block_hash: &Blake3Hash,
-        compression: CompressionAlgoSet,
-    ) -> Option<Self::SharedPointer<ContentChunk>>;
+        _block_counter: u32,
+        _block_hash: &Blake3Hash,
+        _compression: CompressionAlgoSet,
+    ) -> impl Future<Output = Option<Self::SharedPointer<ContentChunk>>> + Send {
+        // TODO: improve infusion so this autoimpl is not needed
+        async { None }
+    }
 
     /// Create a putter that can be used to write a content into the block store.
     fn put(&self, cid: Option<Blake3Hash>) -> Self::Put;
@@ -153,27 +161,29 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
     fn get_root_dir(&self) -> PathBuf;
 
     /// Utility function to read an entire file to a vec.
-    async fn read_all_to_vec(&self, hash: &Blake3Hash) -> Option<Vec<u8>> {
-        let tree = self.get_tree(hash).await?;
-        let mut result = Vec::new();
+    fn read_all_to_vec(&self, hash: &Blake3Hash) -> impl Future<Output = Option<Vec<u8>>> + Send {
+        async {
+            let tree = self.get_tree(hash).await?;
+            let mut result = Vec::new();
 
-        for i in 0usize..tree.len() {
-            let block = &self
-                .get(i as u32, &tree[i], CompressionAlgoSet::new())
-                .await?
-                .content;
+            for i in 0usize..tree.len() {
+                let block = &self
+                    .get(i as u32, &tree[i], CompressionAlgoSet::new())
+                    .await?
+                    .content;
 
-            result.extend_from_slice(block);
+                result.extend_from_slice(block);
+            }
+
+            Some(result)
         }
-
-        Some(result)
     }
 }
 
 /// The interface for the writer to a [`BlockStoreInterface`].
-#[async_trait]
-#[infusion::blank]
-pub trait IncrementalPutInterface: Send {
+#[infusion::blank(IncrementalPutInterface)]
+#[trait_variant::make(IncrementalPutInterface: Send)]
+pub trait _IncrementalPutInterface: Send {
     /// Write the proof for the buffer.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError>;
 
@@ -194,9 +204,9 @@ pub trait IncrementalPutInterface: Send {
 }
 
 /// The interface for the directory writer to a [`BlockStoreInterface`].
-#[async_trait]
-#[infusion::blank]
-pub trait IncrementalDirInterface: Send {
+#[infusion::blank(IncrementalDirInterface)]
+#[trait_variant::make(IncrementalDirInterface: Send)]
+pub trait _IncrementalDirInterface: Send {
     /// Write the proof for the next entry. Should not be called in the trusted mode.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError>;
 

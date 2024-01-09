@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::marker::PhantomData;
 
 use anyhow::{anyhow, Result};
-use async_trait::async_trait;
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{Digest, NodeIndex, Topic};
 use lightning_interfaces::{BroadcastEventInterface, PubSub};
@@ -50,7 +49,6 @@ impl<T: LightningMessage + Clone> Clone for PubSubI<T> {
     }
 }
 
-#[async_trait]
 impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
     type Event = Event<T>;
 

@@ -4,7 +4,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::anyhow;
 use async_channel::{bounded, Sender};
-use async_trait::async_trait;
 use axum::Router;
 use dashmap::DashMap;
 use infusion::c;
@@ -66,7 +65,6 @@ impl<C: Collection> ConfigConsumer for Handshake<C> {
     type Config = HandshakeConfig;
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for Handshake<C> {
     fn is_running(&self) -> bool {
         self.status.blocking_lock().is_some()

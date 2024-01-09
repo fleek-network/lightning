@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use blake3_tree::blake3::tree::{BlockHasher, HashTreeBuilder};
 use blake3_tree::IncrementalVerifier;
 use bytes::{BufMut, BytesMut};
@@ -128,7 +127,6 @@ where
     }
 }
 
-#[async_trait]
 impl<C, S> IncrementalPutInterface for Putter<S, C>
 where
     C: Collection,

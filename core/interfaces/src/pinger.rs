@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use infusion::c;
 
 use crate::infu_collection::Collection;
@@ -12,7 +11,6 @@ use crate::{
     WithStartAndShutdown,
 };
 
-#[async_trait]
 #[infusion::service]
 pub trait PingerInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync

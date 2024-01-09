@@ -4,7 +4,6 @@ use std::time::{Duration, SystemTime};
 
 use affair::AsyncWorker as WorkerTrait;
 use anyhow::{Context, Result};
-use async_trait::async_trait;
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
@@ -462,7 +461,6 @@ impl<C: Collection> UpdateWorker<C> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> WorkerTrait for UpdateWorker<C> {
     type Request = Block;
     type Response = BlockExecutionResponse;

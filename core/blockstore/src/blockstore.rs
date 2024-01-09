@@ -5,7 +5,6 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
-use async_trait::async_trait;
 use blake3_tree::blake3::tree::{BlockHasher, HashTreeBuilder};
 use blake3_tree::blake3::Hash;
 use blake3_tree::utils::{HashTree, HashVec};
@@ -59,7 +58,6 @@ impl<C: Collection> ConfigConsumer for Blockstore<C> {
     type Config = Config;
 }
 
-#[async_trait]
 impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
     type Put = Putter<Self, C>;
@@ -145,7 +143,6 @@ impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
     }
 }
 
-#[async_trait]
 impl<C> Store for Blockstore<C>
 where
     C: Collection,

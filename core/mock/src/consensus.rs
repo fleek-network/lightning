@@ -5,7 +5,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use affair::{AsyncWorker, Executor, TokioSpawn};
-use async_trait::async_trait;
 use axum::extract::State;
 use axum::routing::post;
 use axum::{Json, Router};
@@ -57,7 +56,6 @@ struct MempoolSocketWorker {
     rng: ChaCha20Rng,
 }
 
-#[async_trait]
 impl AsyncWorker for MempoolSocketWorker {
     type Request = TransactionRequest;
     type Response = ();
@@ -96,7 +94,6 @@ impl Default for Config {
     }
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for MockConsensus<C> {
     fn is_running(&self) -> bool {
         self.is_running.load(Ordering::Relaxed)
@@ -149,7 +146,6 @@ impl<C: Collection> WithStartAndShutdown for MockConsensus<C> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
     type Certificate = ();
 

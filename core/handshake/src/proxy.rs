@@ -351,7 +351,6 @@ mod tests {
     use std::time::Duration;
 
     use anyhow::Result;
-    use async_trait::async_trait;
     use fleek_crypto::{ClientPublicKey, ClientSignature};
     use futures::{SinkExt, StreamExt};
     use lightning_interfaces::types::ServiceId;
@@ -392,7 +391,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl ExecutorProviderInterface for MockServiceProvider {
         async fn connect(&self, service_id: ServiceId) -> Option<UnixStream> {
             match service_id {

@@ -9,7 +9,6 @@ use std::collections::HashMap;
 
 use affair::AsyncWorker;
 use anyhow::{bail, Result};
-use async_trait::async_trait;
 use fastcrypto::bls12381::min_sig::BLS12381PublicKey;
 use fleek_crypto::ConsensusPublicKey;
 use lightning_interfaces::types::{Epoch, EpochInfo, NodeInfo, TransactionRequest};
@@ -171,7 +170,6 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
     }
 }
 
-#[async_trait]
 impl<Q: SyncQueryRunnerInterface + 'static> AsyncWorker for Forwarder<Q> {
     type Request = TransactionRequest;
     type Response = ();

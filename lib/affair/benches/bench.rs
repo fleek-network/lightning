@@ -1,5 +1,4 @@
 use affair::{AsyncWorker, DedicatedThread, Executor, Socket, TokioSpawn, Worker};
-use async_trait::async_trait;
 use criterion::measurement::Measurement;
 use criterion::*;
 
@@ -82,7 +81,6 @@ impl Worker for CounterWorker {
     }
 }
 
-#[async_trait]
 impl AsyncWorker for CounterWorker {
     type Request = u64;
     type Response = u64;

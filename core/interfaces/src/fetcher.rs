@@ -1,5 +1,4 @@
 use affair::Socket;
-use async_trait::async_trait;
 use lightning_types::{FetcherRequest, FetcherResponse};
 
 use crate::infu_collection::Collection;
@@ -15,9 +14,9 @@ use crate::{
 
 pub type FetcherSocket = Socket<FetcherRequest, FetcherResponse>;
 
-#[async_trait]
-#[infusion::service]
-pub trait FetcherInterface<C: Collection>:
+#[infusion::service(FetcherInterface)]
+#[trait_variant::make(FetcherInterface: Send)]
+pub trait _FetcherInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
     fn _init(

@@ -1,10 +1,8 @@
-use async_trait::async_trait;
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer};
 use lightning_interfaces::OriginFinderAsyncIter;
 
 pub struct OriginFinder {}
 
-#[async_trait]
 impl OriginFinderAsyncIter for OriginFinder {
     /// Returns the hash of requested content.
     fn hash(&self) -> &Blake3Hash {
