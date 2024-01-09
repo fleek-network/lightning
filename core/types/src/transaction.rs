@@ -624,7 +624,7 @@ impl<const P: usize> TranscriptBuilderInput for HpUfixedWrapper<P> {
         input.push(P as u8);
 
         // Append the BigUint data as bytes
-        let data_bytes: [u8; 256] = self.get_value().to_le_bytes();
+        let data_bytes: [u8; 32] = self.get_value().to_le_bytes();
         input.extend_from_slice(&data_bytes);
 
         input
