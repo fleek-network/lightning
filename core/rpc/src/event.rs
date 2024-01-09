@@ -52,7 +52,7 @@ impl EventDistributor {
                 start_broadcasting.notified().await;
 
                 tokio::select! {
-                    _ = Self::forward(&mut event_rx, broadcast_tx.clone()) => {
+                    _ = Self::forward(&mut event_rx, &broadcast_tx) => {
                         // if this returns it means the event socket senders have been dropeed
                         break;
                     },
@@ -77,7 +77,7 @@ impl EventDistributor {
         this
     }
 
-    async fn forward(rx: &mut mpsc::Receiver<Vec<Event>>, tx: broadcast::Sender<Event>) {
+    async fn forward(rx: &mut mpsc::Receiver<Vec<Event>>, tx: &broadcast::Sender<Event>) {
         while let Some(events) = rx.recv().await {
             for event in events {
                 match tx.send(event) {
