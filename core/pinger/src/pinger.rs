@@ -4,7 +4,6 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
-use async_trait::async_trait;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{NodeIndex, NodeInfo, Participation};
@@ -68,7 +67,6 @@ impl<C: Collection> PingerInterface<C> for Pinger<C> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for Pinger<C> {
     fn is_running(&self) -> bool {
         self.is_running.load(Ordering::Relaxed)

@@ -2,7 +2,6 @@ use std::path::Path;
 use std::sync::Arc;
 
 use affair::{Executor, TokioSpawn, Worker};
-use async_trait::async_trait;
 use fleek_crypto::{
     ConsensusPublicKey,
     ConsensusSecretKey,
@@ -87,7 +86,6 @@ impl<C: Collection> SignerInterface<C> for KeyOnlySigner {
     }
 }
 
-#[async_trait]
 impl WithStartAndShutdown for KeyOnlySigner {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {

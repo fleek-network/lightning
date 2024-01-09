@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 
 use anyhow::Result;
-use async_trait::async_trait;
 use infusion::c;
 use lightning_schema::LightningMessage;
 use lightning_types::{Digest, NodeIndex};
@@ -59,7 +58,6 @@ pub trait BroadcastInterface<C: Collection>:
     fn get_pubsub<T: LightningMessage + Clone>(&self, topic: Topic) -> Self::PubSub<T>;
 }
 
-#[async_trait]
 #[infusion::blank]
 pub trait PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
     type Event: BroadcastEventInterface<T> = infusion::Blank<T>;

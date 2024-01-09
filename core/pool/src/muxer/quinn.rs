@@ -6,7 +6,6 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-use async_trait::async_trait;
 use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use quinn::{ClientConfig, Endpoint, RecvStream, SendStream, ServerConfig, TransportConfig};
 use rustls::Certificate;
@@ -30,7 +29,6 @@ pub struct QuinnMuxer {
     max_idle_timeout: Duration,
 }
 
-#[async_trait]
 impl MuxerInterface for QuinnMuxer {
     type Connecting = Connecting;
     type Connection = Connection;
@@ -93,7 +91,6 @@ impl Future for Connecting {
 #[derive(Clone)]
 pub struct Connection(quinn::Connection);
 
-#[async_trait]
 impl ConnectionInterface for Connection {
     type SendStream = SendStream;
     type RecvStream = RecvStream;

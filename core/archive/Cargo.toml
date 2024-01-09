@@ -10,7 +10,6 @@ edition = "2021"
 lightning-interfaces = { path = "../interfaces" }
 affair.workspace = true
 anyhow.workspace = true
-async-trait.workspace = true
 resolved-pathbuf.workspace = true
 serde.workspace = true
 tokio.workspace = true

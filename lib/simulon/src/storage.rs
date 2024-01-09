@@ -4,11 +4,11 @@ use fxhash::FxHashMap;
 
 #[derive(Default)]
 pub struct TypedStorage {
-    data: FxHashMap<TypeId, Box<dyn Any>>,
+    data: FxHashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 impl TypedStorage {
-    pub fn insert<T: Any>(&mut self, value: T) {
+    pub fn insert<T: Any + Send + Sync>(&mut self, value: T) {
         let tid = TypeId::of::<T>();
         let item = Box::new(value);
         if self.data.insert(tid, item).is_some() {

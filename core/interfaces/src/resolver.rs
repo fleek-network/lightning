@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use infusion::c;
 use lightning_schema::broadcast::ResolvedImmutablePointerRecord;
 
@@ -15,7 +14,6 @@ use crate::{
 
 /// The resolver is responsible to resolve an FNIP (Fleek Network Immutable Pointer),
 /// into a Blake3 hash of the content.
-#[async_trait]
 #[infusion::service]
 pub trait ResolverInterface<C: Collection>:
     Sized + Send + Sync + Clone + ConfigConsumer + WithStartAndShutdown
@@ -58,7 +56,6 @@ pub trait ResolverInterface<C: Collection>:
 }
 
 /// An `async-iterator`-like interface that tries to find the immutable pointers of
-#[async_trait]
 #[infusion::blank]
 pub trait OriginFinderAsyncIter: Sized + Send + Sync {
     /// Returns the hash of requested content.

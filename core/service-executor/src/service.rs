@@ -143,6 +143,8 @@ pub async fn spawn_service<C: Collection>(id: u32, cx: Arc<Context<C>>) -> Servi
         .env("BLOCKSTORE_PATH", &cx.blockstore_path)
         .env("IPC_PATH", &ipc_dir);
 
+    panic_report::add_context(format!("service_{id}"), format!("{cmd:?}"));
+
     let kill_notify = cx.kill.clone();
     let cmd_permit = Arc::new(Notify::new());
     let permit = cmd_permit.clone();

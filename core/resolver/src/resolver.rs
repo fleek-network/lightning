@@ -1,7 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use fleek_crypto::{NodeSecretKey, PublicKey, SecretKey};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::schema::broadcast::ResolvedImmutablePointerRecord;
@@ -40,7 +39,6 @@ impl<C: Collection> ConfigConsumer for Resolver<C> {
     type Config = Config;
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for Resolver<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
@@ -69,7 +67,6 @@ impl<C: Collection> WithStartAndShutdown for Resolver<C> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> ResolverInterface<C> for Resolver<C> {
     type OriginFinder = OriginFinder;
 

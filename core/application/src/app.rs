@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 
 use affair::{Executor, TokioSpawn};
 use anyhow::{anyhow, Result};
-use async_trait::async_trait;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
     ApplicationInterface,
@@ -21,7 +20,6 @@ pub struct Application<C: Collection> {
     collection: PhantomData<C>,
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for Application<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
@@ -44,7 +42,6 @@ impl<C: Collection> ConfigConsumer for Application<C> {
     type Config = Config;
 }
 
-#[async_trait]
 impl<C: Collection> ApplicationInterface<C> for Application<C> {
     /// The type for the sync query executor.
     type SyncExecutor = QueryRunner;

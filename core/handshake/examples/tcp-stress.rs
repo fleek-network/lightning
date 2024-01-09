@@ -228,7 +228,13 @@ async fn run_request(
     data!(line, "handshake_sent", timer);
 
     // Read hello frame from the io_stress service
-    let ResponseFrame::ServicePayload { bytes } = client.recv().await.ok_or(anyhow!("failed to get first byte"))? else { unreachable!() };
+    let ResponseFrame::ServicePayload { bytes } = client
+        .recv()
+        .await
+        .ok_or(anyhow!("failed to get first byte"))?
+    else {
+        unreachable!()
+    };
     assert_eq!(bytes.len(), 32);
     data!(line, "handshake_recv", timer);
 
@@ -236,7 +242,13 @@ async fn run_request(
     data!(line, "request_sent", timer);
 
     let mut received = {
-        let ResponseFrame::ServicePayload { bytes } = client.recv().await.ok_or(anyhow!("failed to get first byte"))? else { unreachable!() };
+        let ResponseFrame::ServicePayload { bytes } = client
+            .recv()
+            .await
+            .ok_or(anyhow!("failed to get first byte"))?
+        else {
+            unreachable!()
+        };
         bytes.len()
     };
     data!(line, "first_byte_recv", timer);
@@ -244,7 +256,13 @@ async fn run_request(
     let total_bytes = chunks * chunk_len;
     while received < total_bytes {
         received += {
-            let ResponseFrame::ServicePayload { bytes } = client.recv().await.ok_or(anyhow!("failed to get first byte"))? else { unreachable!() };
+            let ResponseFrame::ServicePayload { bytes } = client
+                .recv()
+                .await
+                .ok_or(anyhow!("failed to get first byte"))?
+            else {
+                unreachable!()
+            };
             bytes.len()
         };
     }

@@ -79,7 +79,10 @@ mod cli {
         let mut args = std::env::args();
         args.next();
 
-        let Some(uid) = args.next() else { help(); std::process::exit(1); };
+        let Some(uid) = args.next() else {
+            help();
+            std::process::exit(1);
+        };
 
         let origin = {
             let arg = args.next().unwrap_or("ipfs".into());

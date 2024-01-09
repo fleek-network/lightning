@@ -214,7 +214,7 @@ impl Connection {
             // Message has been received
             Event::ChannelData(msg) => self.handle_message(msg).await?,
             // Connection has disconnected
-            Event::IceConnectionStateChange(state) if state == IceConnectionState::Disconnected => {
+            Event::IceConnectionStateChange(IceConnectionState::Disconnected) => {
                 trace!("Client disconnected");
                 self.state = ConnectionState::Disconnected;
             },

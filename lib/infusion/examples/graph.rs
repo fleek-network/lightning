@@ -10,8 +10,10 @@ use infusion::{collection, ok, tag};
 #[infusion::service]
 pub trait A<C: Collection>: Sized {
     fn _init(_b: ::B) {
-        ok!(todo!())
+        ok!(Self::init())
     }
+
+    fn init() -> Self;
 
     fn hello(&self) {
         println!("Hello from A");
@@ -33,7 +35,14 @@ forward!(fn start(this, _x: u8) {
 
 struct I<C: Collection>(PhantomData<C>);
 
-impl<C> A<C> for I<C> where C: Collection<A = Self> {}
+impl<C> A<C> for I<C>
+where
+    C: Collection<A = Self>,
+{
+    fn init() -> Self {
+        I(PhantomData)
+    }
+}
 
 impl<C> B<C> for I<C> where C: Collection<B = Self> {}
 

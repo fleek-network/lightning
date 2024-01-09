@@ -37,6 +37,8 @@ where
         .map_err(|e| anyhow::anyhow!("Node Initialization failed: {e:?}"))
         .context("Could not start the node.")?;
 
+    panic_report::add_context("config", config.into_inner());
+
     if let Some(cb) = &custom_start_shutdown {
         ((cb)(&node, true)).await;
     } else {

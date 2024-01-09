@@ -1,9 +1,7 @@
+use lightning_interfaces::schema::broadcast::{Message, MessageInternedId};
 use lightning_interfaces::types::Digest;
 use quick_cache::unsync::Cache;
 use tracing::error;
-
-use crate::frame::MessageInternedId;
-use crate::Message;
 
 // TODO: Make this persist.
 pub struct Database {
@@ -78,7 +76,10 @@ impl Database {
     /// Mark the message known with the given digest as propagated.
     pub fn mark_propagated(&mut self, digest: &Digest) {
         let Some(mut e) = self.data.get_mut(digest) else {
-            debug_assert!(false, "We should not mark a message we haven't seen as propagated.");
+            debug_assert!(
+                false,
+                "We should not mark a message we haven't seen as propagated."
+            );
             return;
         };
         e.propagated = true;
@@ -88,7 +89,10 @@ impl Database {
     pub fn insert_message(&mut self, digest: &Digest, message: Message) {
         let Some(mut e) = self.data.get_mut(digest) else {
             error!("This should never happen...call Dalton");
-            debug_assert!(false, "We should not be inserting payload of what we have not seen.");
+            debug_assert!(
+                false,
+                "We should not be inserting payload of what we have not seen."
+            );
             return;
         };
         e.message = Some(message);

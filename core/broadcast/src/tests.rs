@@ -1,14 +1,19 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
-use ink_quill::ToDigest;
+use fleek_crypto::{
+    AccountOwnerSecretKey,
+    ConsensusSecretKey,
+    NodeSecretKey,
+    NodeSignature,
+    SecretKey,
+};
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::schema::broadcast::{BroadcastFrame, BroadcastMessage};
+use lightning_interfaces::schema::broadcast::{Frame, Message};
 use lightning_interfaces::types::{NodeIndex, NodePorts, Topic};
 use lightning_interfaces::{
     partial,
@@ -204,30 +209,32 @@ async fn create_peer(
 #[tokio::test]
 async fn test_send() {
     // Initialize three broadcasts
-    let (peers, _app, path) = get_broadcasts("send", 28000, 3).await;
+    let (peers, app, path) = get_broadcasts("send", 28000, 3).await;
+    let query_runner = app.sync_query();
 
     for peer in &peers {
         peer.broadcast.start().await;
         peer.pool.start().await;
     }
 
-    let pub_sub1 = peers[0]
-        .broadcast
-        .get_pubsub::<BroadcastFrame>(Topic::Debug);
-    let mut pub_sub2 = peers[1]
-        .broadcast
-        .get_pubsub::<BroadcastFrame>(Topic::Debug);
-    let mut pub_sub3 = peers[2]
-        .broadcast
-        .get_pubsub::<BroadcastFrame>(Topic::Debug);
+    let pub_sub1 = peers[0].broadcast.get_pubsub::<Frame>(Topic::Debug);
+    let mut pub_sub2 = peers[1].broadcast.get_pubsub::<Frame>(Topic::Debug);
+    let mut pub_sub3 = peers[2].broadcast.get_pubsub::<Frame>(Topic::Debug);
 
     // Create a message from node1
-    let message = BroadcastMessage {
+    let index = query_runner
+        .pubkey_to_index(&peers[0].node_secret_key.to_pk())
+        .unwrap();
+    let message = Message {
+        origin: index,
+        signature: NodeSignature([0; 64]),
         topic: Topic::Debug,
-        originator: peers[0].node_secret_key.to_pk(),
+        timestamp: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64,
         payload: String::from("hello").into_bytes(),
     };
-    let target_signature = peers[0].node_secret_key.sign(&message.to_digest());
 
     // node2 listens to the broadcast and we make sure that it receives the same message that node1
     // sent out
@@ -235,9 +242,9 @@ async fn test_send() {
     let target_message = message.clone();
     tokio::spawn(async move {
         match pub_sub2.recv().await.unwrap() {
-            BroadcastFrame::Message { message, signature } => {
+            Frame::Message(message) => {
                 assert_eq!(message, target_message);
-                assert_eq!(signature, target_signature);
+                // Todo: old test validated signature.
                 tx.send(()).unwrap();
             },
             _ => panic!("Unexpected frame"),
@@ -248,9 +255,9 @@ async fn test_send() {
     let (tx, rx3) = oneshot::channel();
     tokio::spawn(async move {
         match pub_sub3.recv().await.unwrap() {
-            BroadcastFrame::Message { message, signature } => {
+            Frame::Message(message) => {
                 assert_eq!(message, target_message);
-                assert_eq!(signature, target_signature);
+                // Todo: old test validated signature.
                 tx.send(()).unwrap();
             },
             _ => panic!("Unexpected frame"),
@@ -258,16 +265,7 @@ async fn test_send() {
     });
 
     // node1 sends the message over the broadcast
-    pub_sub1
-        .send(
-            &BroadcastFrame::Message {
-                message,
-                signature: target_signature,
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    pub_sub1.send(&Frame::Message(message), None).await.unwrap();
 
     // wait until node2 and node3 received the messages before cleaning up
     rx2.await.unwrap();

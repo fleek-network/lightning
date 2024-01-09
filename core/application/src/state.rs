@@ -51,6 +51,7 @@ use lightning_interfaces::types::{
     Value,
     MAX_MEASUREMENTS_PER_TX,
     MAX_MEASUREMENTS_SUBMIT,
+    MAX_UPDATES_CONTENT_REGISTRY,
 };
 use lightning_interfaces::ToDigest;
 use lightning_reputation::statistics;
@@ -97,9 +98,6 @@ const MINIMUM_UPTIME: u8 = 40;
 /// otherwise, if there is a value and a different address they are trying to transfer the native
 /// token FLK
 const FLEEK_CONTRACT: H160 = H160([6; 20]);
-
-/// Max number of updates allowed in a content registry update transaction.
-const MAX_UPDATES_CONTENT_REGISTRY: usize = 100;
 
 lazy_static! {
     static ref BIG_HUNDRED: HpUfixed<18> = HpUfixed::<18>::from(100_u64);

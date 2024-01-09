@@ -1,7 +1,5 @@
-//! TODO: fix crash when running 2 consecutive requests
-
 use arrayref::array_ref;
-use deno_core::{serde_v8, v8};
+use deno_core::{serde_v8, v8, JsRuntime};
 use runtime::Runtime;
 use serde::{Deserialize, Serialize};
 use stream::Origin;
@@ -30,6 +28,9 @@ pub async fn main() {
     // TODO: create a snapshot runtime with the extensions loaded and initialized
 
     let listener = fn_sdk::ipc::conn_bind().await;
+
+    JsRuntime::init_platform(None);
+
     while let Ok(conn) = listener.accept().await {
         let stream = ServiceStream::new(conn);
 

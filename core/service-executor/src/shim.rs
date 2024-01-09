@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use async_trait::async_trait;
 use fxhash::FxHashSet;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
@@ -70,7 +69,6 @@ pub struct Provider {
     collection: ServiceCollection,
 }
 
-#[async_trait]
 impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     type Provider = Provider;
 
@@ -122,7 +120,6 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for ServiceExecutor<C> {
     fn is_running(&self) -> bool {
         self.is_running.load(Ordering::Relaxed)
@@ -148,7 +145,6 @@ impl<C: Collection> ConfigConsumer for ServiceExecutor<C> {
     type Config = ServiceExecutorConfig;
 }
 
-#[async_trait]
 impl ExecutorProviderInterface for Provider {
     /// Make a connection to the provided service.
     async fn connect(&self, service_id: ServiceId) -> Option<UnixStream> {

@@ -9,6 +9,7 @@ use lightning_interfaces::types::{
     UpdateMethod,
     UpdateRequest,
     MAX_MEASUREMENTS_PER_TX,
+    MAX_UPDATES_CONTENT_REGISTRY,
 };
 use lightning_interfaces::ToDigest;
 use lightning_utils::eth;
@@ -81,11 +82,15 @@ impl Validator {
                     }
                 }
 
-                #[allow(clippy::single_match)]
                 match payload.method {
                     UpdateMethod::SubmitReputationMeasurements { measurements } => {
                         if measurements.len() > MAX_MEASUREMENTS_PER_TX {
                             return Err(anyhow!("Too many reputation measurements"));
+                        }
+                    },
+                    UpdateMethod::UpdateContentRegistry { updates } => {
+                        if updates.len() > MAX_UPDATES_CONTENT_REGISTRY {
+                            return Err(anyhow!("Too many updates"));
                         }
                     },
                     _ => (),

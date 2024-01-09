@@ -46,15 +46,18 @@ impl EventDistributor {
         };
 
         let fut = async move {
+            let mut event_rx = event_rx;
+
             loop {
                 start_broadcasting.notified().await;
 
                 tokio::select! {
-                    _ = Self::forward(event_rx, broadcast_tx) => {
+                    _ = Self::forward(&mut event_rx, broadcast_tx.clone()) => {
+                        // if this returns it means the event socket senders have been dropeed
                         break;
                     },
                     _ = stop_broadcasting.notified() => {
-                        break;
+                        continue;
                     }
                 }
             }
@@ -74,7 +77,7 @@ impl EventDistributor {
         this
     }
 
-    async fn forward(mut rx: mpsc::Receiver<Vec<Event>>, tx: broadcast::Sender<Event>) {
+    async fn forward(rx: &mut mpsc::Receiver<Vec<Event>>, tx: broadcast::Sender<Event>) {
         while let Some(events) = rx.recv().await {
             for event in events {
                 match tx.send(event) {

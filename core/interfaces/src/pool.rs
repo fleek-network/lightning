@@ -1,7 +1,6 @@
 use std::io;
 
 use anyhow::{bail, Error};
-use async_trait::async_trait;
 use bytes::Bytes;
 use lightning_types::NodeIndex;
 pub use lightning_types::RejectReason;
@@ -86,7 +85,6 @@ pub trait PoolInterface<C: Collection>:
     fn open_req_res(&self, scope: ServiceScope) -> (Self::Requester, Self::Responder);
 }
 
-#[async_trait]
 #[infusion::blank]
 pub trait EventHandlerInterface: Send + Sync {
     fn send_to_all<F: Fn(NodeIndex) -> bool + Send + Sync + 'static>(
@@ -98,7 +96,6 @@ pub trait EventHandlerInterface: Send + Sync {
     async fn receive(&mut self) -> Option<(NodeIndex, Bytes)>;
 }
 
-#[async_trait]
 #[infusion::blank]
 pub trait RequesterInterface: Clone + Send + Sync {
     type Response: ResponseInterface;
@@ -113,14 +110,12 @@ pub trait ResponseInterface: Send + Sync {
     fn body(self) -> Self::Body;
 }
 
-#[async_trait]
 #[infusion::blank]
 pub trait ResponderInterface: Send {
     type Request: RequestInterface;
     async fn get_next_request(&mut self) -> io::Result<(RequestHeader, Self::Request)>;
 }
 
-#[async_trait]
 #[infusion::blank]
 pub trait RequestInterface: Send + Sync {
     fn reject(self, reason: RejectReason);

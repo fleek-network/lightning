@@ -11,7 +11,7 @@ bincode.workspace = true
 resolved-pathbuf.workspace = true
 blake3-tree = { path = "../../lib/blake3-tree"}
 anyhow.workspace = true
-async-trait.workspace = true
+trait-variant = "0.1"
 bytes.workspace = true
 tracing.workspace = true
 parking_lot.workspace = true
@@ -25,3 +25,9 @@ arrayref = "0.3"
 infusion.workspace = true
 
 [dev-dependencies]
+fleek-crypto.workspace = true
+lightning-test-utils = { path="../test-utils" }
+lightning-signer = { path="../signer" }
+lightning-application = { path="../application", features = ["test"] }
+lightning-rep-collector = { path="../rep-collector" }
+lightning-indexer = { path = "../indexer" }

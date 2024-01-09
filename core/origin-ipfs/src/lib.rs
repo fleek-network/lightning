@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use affair::{Socket, Task};
 use anyhow::{anyhow, Context};
-use async_trait::async_trait;
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use hyper::client::{self, HttpConnector};
@@ -43,7 +42,6 @@ pub struct IPFSOrigin<C: Collection> {
     shutdown_notify: Arc<Notify>,
 }
 
-#[async_trait]
 impl<C: Collection> OriginProviderInterface<C> for IPFSOrigin<C> {
     type Stream = IPFSStream;
     fn init(config: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
@@ -67,7 +65,6 @@ impl<C: Collection> OriginProviderInterface<C> for IPFSOrigin<C> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for IPFSOrigin<C> {
     fn is_running(&self) -> bool {
         *self.is_running.lock().unwrap()

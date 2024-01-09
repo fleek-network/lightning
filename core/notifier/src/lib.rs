@@ -1,7 +1,6 @@
 use std::sync::{Arc, Weak};
 use std::time::{Duration, SystemTime};
 
-use async_trait::async_trait;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::notifier::{Notification, NotifierInterface};
 use lightning_interfaces::ApplicationInterface;
@@ -38,7 +37,6 @@ impl<C: Collection> Notifier<C> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> NotifierInterface<C> for Notifier<C> {
     fn init(app: &c![C::ApplicationInterface]) -> Self {
         let notifier: Arc<Notify> = Default::default();

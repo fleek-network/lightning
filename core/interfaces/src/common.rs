@@ -1,16 +1,15 @@
-use async_trait::async_trait;
+use std::future::Future;
 
-#[async_trait]
 pub trait WithStartAndShutdown {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool;
 
     /// Start the system, should not do anything if the system is already
     /// started.
-    async fn start(&self);
+    fn start(&self) -> impl Future<Output = ()> + Send;
 
     /// Send the shutdown signal to the system.
-    async fn shutdown(&self);
+    fn shutdown(&self) -> impl Future<Output = ()> + Send;
 }
 
 /// Any object that implements the cryptographic digest function, this should
@@ -19,7 +18,6 @@ pub trait WithStartAndShutdown {
 pub use ink_quill::ToDigest;
 pub use ink_quill::TranscriptBuilder;
 
-#[async_trait]
 impl<T> WithStartAndShutdown for infusion::Blank<T> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {

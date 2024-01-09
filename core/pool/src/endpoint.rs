@@ -277,7 +277,9 @@ where
                 // so we can just send our message.
                 for index in connected {
                     let Some(handle) = self.pool.get(&index) else {
-                        tracing::error!("we were told that we had a connection already to peer {index:?}");
+                        tracing::error!(
+                            "we were told that we had a connection already to peer {index:?}"
+                        );
                         continue;
                     };
 

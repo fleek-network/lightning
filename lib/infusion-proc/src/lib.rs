@@ -25,7 +25,7 @@ pub fn service(
 ) -> proc_macro::TokenStream {
     let item = parse_macro_input!(input as Item);
     let token = match item {
-        Item::Trait(item) => on_trait::process_trait(utils::Mode::WithCollection, item),
+        Item::Trait(trait_) => on_trait::process_trait(utils::Mode::WithCollection, trait_),
         Item::Impl(item) => syn::Error::new_spanned(item, "Infusion over impl not supported yet.")
             .to_compile_error(),
     };

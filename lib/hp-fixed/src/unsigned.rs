@@ -675,9 +675,11 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unnecessary_fallible_conversions)]
     fn test_ethers_u256_try_from_ufixed() {
         let fixed: HpUfixed<18> = HpUfixed::from(999393993_u32);
         let uint = U256::try_from(fixed.clone()).unwrap();
+
         let fixed_r = HpUfixed::<18>::try_from(uint).unwrap();
         assert_eq!(fixed, fixed_r);
 

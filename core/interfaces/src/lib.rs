@@ -22,7 +22,11 @@ pub mod service;
 pub mod signer;
 pub mod syncronizer;
 pub mod topology;
-pub mod types;
+
+pub mod types {
+    /// Re-export all lightning types
+    pub use lightning_types::*;
+}
 
 pub use application::*;
 pub use archive::*;

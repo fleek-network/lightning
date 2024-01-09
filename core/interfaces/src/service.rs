@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use infusion::c;
 use tokio::net::UnixStream;
 
@@ -19,7 +18,6 @@ use crate::{
 ///
 /// Currently, we are hard coding some services and there is no API on this interface to
 /// load services.
-#[async_trait]
 #[infusion::service]
 pub trait ServiceExecutorInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
@@ -63,7 +61,6 @@ pub trait ServiceExecutorInterface<C: Collection>:
     fn run_service(id: u32);
 }
 
-#[async_trait]
 #[infusion::blank]
 pub trait ExecutorProviderInterface: Clone + Send + Sync + 'static {
     /// Make a connection to the provided service.

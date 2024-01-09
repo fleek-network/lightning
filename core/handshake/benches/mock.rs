@@ -1,4 +1,3 @@
-#![feature(result_option_inspect)]
 use std::time::Duration;
 
 use async_channel::{Receiver, Sender};

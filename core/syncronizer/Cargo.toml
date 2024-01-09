@@ -9,7 +9,6 @@ edition.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 lightning-utils = { path = "../utils" }
 anyhow.workspace = true
-async-trait.workspace = true
 tracing.workspace = true
 reqwest.workspace = true
 serde_json.workspace = true

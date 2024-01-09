@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use affair::{Socket, Task};
-use async_trait::async_trait;
 use lightning_interfaces::application::ExecutionEngineSocket;
 use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
@@ -40,7 +39,6 @@ struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static> {
     new_block_notify: Arc<Notify>,
 }
 
-#[async_trait]
 impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
     type Certificate = ();
 
@@ -84,7 +82,6 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
     }
 }
 
-#[async_trait]
 impl<C: Collection> WithStartAndShutdown for MockConsensus<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
