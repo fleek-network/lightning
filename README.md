@@ -82,11 +82,11 @@ between everyone and also we get to use some of the nightly options when it come
 
 But this does not mean we're going to use this for building and releasing the binary, building the binary
 for any actual use cases should use the `cargo +stable build` command and the coming scripts and CI config
-will ease this process.
+will ease this process. Our MSRV (Minimum Supported Rust Version) is 1.75.
 
 So in summary: We use the default that is set in the `rust-toolchain` to have consistent formatting of
 the code. And does not necessarily indicate that it is the version of the compiler we are going to use
-for builds.
+for builds, which should be rust stable and at a minimum version 1.75.
 
 # Development
 
