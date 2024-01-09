@@ -85,8 +85,7 @@ impl<C: Collection> EthApiServer for EthApi<C> {
             .query_runner
             .get_account_info::<HpUfixed<18>>(&address, |a| a.flk_balance)
             .unwrap_or(HpUfixed::<18>::zero())
-            .try_into()
-            .unwrap_or(U256::zero()))
+            .into())
     }
 
     async fn protocol_version(&self) -> RpcResult<U64> {
