@@ -430,242 +430,240 @@ impl<const P: usize> From<HpUfixed<P>> for U256 {
 }
 
 impl<const P: usize> From<HpUfixed<P>> for EthersU256 {
-    fn from(_value: HpUfixed<P>) -> Self {
-        todo!()
+    fn from(value: HpUfixed<P>) -> Self {
+        EthersU256::from(value.0)
     }
 }
 
 impl<const P: usize> From<EthersU256> for HpUfixed<P> {
-    fn from(_value: EthersU256) -> Self {
-        todo!()
+    fn from(value: EthersU256) -> Self {
+        Self::new(value.into())
     }
 }
 
-// #[cfg(test)]
-// mod tests {
+#[cfg(test)]
+mod tests {
 
-//     use primitive_types::U256;
+    use ruint::aliases::U256;
 
-//     use super::*;
+    use super::*;
 
-//     #[test]
-//     fn test_floor() {
-//         let num = HpUfixed::<6>::from(1.3);
-//         assert_eq!(num.floor(), HpUfixed::<6>::from(1.0));
-//         let num = HpUfixed::<6>::from(12.9);
-//         assert_eq!(num.floor(), HpUfixed::<6>::from(12.0));
-//         let num = HpUfixed::<6>::from(1223.91323);
-//         assert_eq!(num.floor(), HpUfixed::<6>::from(1223.0));
-//     }
+    #[test]
+    fn test_floor() {
+        let num = HpUfixed::<6>::from(1.3);
+        assert_eq!(num.floor(), HpUfixed::<6>::from(1.0));
+        let num = HpUfixed::<6>::from(12.9);
+        assert_eq!(num.floor(), HpUfixed::<6>::from(12.0));
+        let num = HpUfixed::<6>::from(1223.91323);
+        assert_eq!(num.floor(), HpUfixed::<6>::from(1223.0));
+    }
 
-//     #[test]
-//     fn test_try_into() {
-//         let large = HpUfixed::<20>::from(BigUint::from(std::u64::MAX as u128 + 1_u128));
-//         let medium = HpUfixed::<19>::from(BigUint::from(std::u32::MAX as u64 + 1_u64));
-//         let small = HpUfixed::<18>::from(BigUint::from(std::u16::MAX as u32 + 1_u32));
+    #[test]
+    fn test_try_into() {
+        let large = HpUfixed::<20>::from(std::u64::MAX as u128 + 1_u128);
+        let medium = HpUfixed::<19>::from(std::u32::MAX as u64 + 1_u64);
+        let small = HpUfixed::<18>::from(std::u16::MAX as u32 + 1_u32);
 
-//         assert_eq!(
-//             std::u64::MAX as u128 + 1_u128,
-//             large.clone().try_into().unwrap()
-//         );
-//         assert!(matches!(
-//             TryInto::<usize>::try_into(large.clone()),
-//             Err(HpFixedConversionError::Overflow)
-//         ));
-//         assert!(matches!(
-//             TryInto::<u64>::try_into(large.clone()),
-//             Err(HpFixedConversionError::Overflow)
-//         ));
-//         assert!(matches!(
-//             TryInto::<u32>::try_into(large),
-//             Err(HpFixedConversionError::Overflow)
-//         ));
+        assert_eq!(
+            std::u64::MAX as u128 + 1_u128,
+            large.clone().try_into().unwrap()
+        );
+        assert!(matches!(
+            TryInto::<usize>::try_into(large.clone()),
+            Err(HpFixedConversionError::Overflow)
+        ));
+        assert!(matches!(
+            TryInto::<u64>::try_into(large.clone()),
+            Err(HpFixedConversionError::Overflow)
+        ));
+        assert!(matches!(
+            TryInto::<u32>::try_into(large),
+            Err(HpFixedConversionError::Overflow)
+        ));
 
-//         assert_eq!(
-//             TryInto::<u128>::try_into(medium.clone()).unwrap(),
-//             std::u32::MAX as u128 + 1
-//         );
-//         assert_eq!(
-//             TryInto::<u64>::try_into(medium.clone()).unwrap(),
-//             std::u32::MAX as u64 + 1
-//         );
-//         assert_eq!(
-//             TryInto::<usize>::try_into(medium.clone()).unwrap(),
-//             std::u32::MAX as usize + 1
-//         );
-//         assert!(matches!(
-//             TryInto::<u32>::try_into(medium),
-//             Err(HpFixedConversionError::Overflow)
-//         ));
+        assert_eq!(
+            TryInto::<u128>::try_into(medium.clone()).unwrap(),
+            std::u32::MAX as u128 + 1
+        );
+        assert_eq!(
+            TryInto::<u64>::try_into(medium.clone()).unwrap(),
+            std::u32::MAX as u64 + 1
+        );
+        assert_eq!(
+            TryInto::<usize>::try_into(medium.clone()).unwrap(),
+            std::u32::MAX as usize + 1
+        );
+        assert!(matches!(
+            TryInto::<u32>::try_into(medium),
+            Err(HpFixedConversionError::Overflow)
+        ));
 
-//         assert_eq!(
-//             TryInto::<u128>::try_into(small.clone()).unwrap(),
-//             std::u16::MAX as u128 + 1
-//         );
-//         assert_eq!(
-//             TryInto::<usize>::try_into(small.clone()).unwrap(),
-//             std::u16::MAX as usize + 1
-//         );
-//         assert_eq!(
-//             TryInto::<u64>::try_into(small.clone()).unwrap(),
-//             std::u16::MAX as u64 + 1
-//         );
-//         assert_eq!(
-//             TryInto::<u32>::try_into(small.clone()).unwrap(),
-//             std::u16::MAX as u32 + 1
-//         );
+        assert_eq!(
+            TryInto::<u128>::try_into(small.clone()).unwrap(),
+            std::u16::MAX as u128 + 1
+        );
+        assert_eq!(
+            TryInto::<usize>::try_into(small.clone()).unwrap(),
+            std::u16::MAX as usize + 1
+        );
+        assert_eq!(
+            TryInto::<u64>::try_into(small.clone()).unwrap(),
+            std::u16::MAX as u64 + 1
+        );
+        assert_eq!(
+            TryInto::<u32>::try_into(small.clone()).unwrap(),
+            std::u16::MAX as u32 + 1
+        );
 
-//         let small_by_2 = &small / &200_u64.into();
-//         let small_float: f64 = small_by_2.try_into().unwrap();
-//         // small_float = 65536(small) / 200   = 327.68
-//         assert_eq!(327.68, small_float);
-//         // Todo: more tests to test overflow and bigger gloats
-//     }
+        let small_by_2 = &small / &200_u64.into();
+        let small_float: f64 = small_by_2.try_into().unwrap();
+        // small_float = 65536(small) / 200   = 327.68
+        assert_eq!(327.68, small_float);
+        // Todo: more tests to test overflow and bigger gloats
+    }
 
-//     #[test]
-//     fn test_hp_fixed_add() {
-//         let decimal1: HpUfixed<18> = 1_000_000_000_000_000_000u64.into();
-//         let decimal2: HpUfixed<18> = 2_000_000_000_000_000_000u64.into();
-//         let res = BigUint::from(3_000_000_000_000_000_000_000_000_000_000_000_000u128);
+    #[test]
+    fn test_hp_fixed_add() {
+        let decimal1: HpUfixed<18> = 1_000_000_000_000_000_000u64.into();
+        let decimal2: HpUfixed<18> = 2_000_000_000_000_000_000u64.into();
+        let res = U256::from(3_000_000_000_000_000_000_000_000_000_000_000_000u128);
 
-//         let both_ref = &decimal1 + &decimal2;
-//         assert_eq!(both_ref.0, res);
-//         let second_ref = decimal1.clone() + &decimal2;
-//         assert_eq!(second_ref.0, res);
-//         let first_ref = &decimal1 + decimal2.clone();
-//         assert_eq!(first_ref.0, res);
-//         let both_owned = decimal1 + decimal2;
-//         assert_eq!(both_owned.0, res);
-//     }
+        let both_ref = &decimal1 + &decimal2;
+        assert_eq!(both_ref.0, res);
+        let second_ref = decimal1.clone() + &decimal2;
+        assert_eq!(second_ref.0, res);
+        let first_ref = &decimal1 + decimal2.clone();
+        assert_eq!(first_ref.0, res);
+        let both_owned = decimal1 + decimal2;
+        assert_eq!(both_owned.0, res);
+    }
 
-//     #[test]
-//     fn test_hp_fixed_sub() {
-//         let decimal1: HpUfixed<18> = 5_000_000_000_000_000_000u64.into();
-//         let decimal2: HpUfixed<18> = 2_000_000_000_000_000_000u64.into();
-//         let res = BigUint::from(3_000_000_000_000_000_000_000_000_000_000_000_000u128);
+    #[test]
+    fn test_hp_fixed_sub() {
+        let decimal1: HpUfixed<18> = 5_000_000_000_000_000_000u64.into();
+        let decimal2: HpUfixed<18> = 2_000_000_000_000_000_000u64.into();
+        let res = U256::from(3_000_000_000_000_000_000_000_000_000_000_000_000u128);
 
-//         let both_ref = &decimal1 - &decimal2;
-//         assert_eq!(both_ref.0, res);
-//         let second_ref = decimal1.clone() - &decimal2;
-//         assert_eq!(second_ref.0, res);
-//         let first_ref = &decimal1 - decimal2.clone();
-//         assert_eq!(first_ref.0, res);
-//         let both_owned = decimal1 - decimal2;
-//         assert_eq!(both_owned.0, res);
-//     }
+        let both_ref = &decimal1 - &decimal2;
+        assert_eq!(both_ref.0, res);
+        let second_ref = decimal1.clone() - &decimal2;
+        assert_eq!(second_ref.0, res);
+        let first_ref = &decimal1 - decimal2.clone();
+        assert_eq!(first_ref.0, res);
+        let both_owned = decimal1 - decimal2;
+        assert_eq!(both_owned.0, res);
+    }
 
-//     #[test]
-//     fn test_hp_fixed_mul() {
-//         let decimal1: HpUfixed<18> = 5_000_000u64.into();
-//         let decimal2: HpUfixed<18> = 2_000_000u64.into();
-//         let res = BigUint::from(10_000_000_000_000_000_000_000_000_000_000u128);
+    #[test]
+    fn test_hp_fixed_mul() {
+        let decimal1: HpUfixed<18> = 5_000_000u64.into();
+        let decimal2: HpUfixed<18> = 2_000_000u64.into();
+        let res = U256::from(10_000_000_000_000_000_000_000_000_000_000u128);
 
-//         let both_ref = &decimal1 * &decimal2;
-//         assert_eq!(both_ref.0, res);
-//         let second_ref = decimal1.clone() * &decimal2;
-//         assert_eq!(second_ref.0, res);
-//         let first_ref = &decimal1 * decimal2.clone();
-//         assert_eq!(first_ref.0, res);
-//         let both_owned = decimal1 * decimal2;
-//         assert_eq!(both_owned.0, res);
-//     }
+        let both_ref = &decimal1 * &decimal2;
+        assert_eq!(both_ref.0, res);
+        let second_ref = decimal1.clone() * &decimal2;
+        assert_eq!(second_ref.0, res);
+        let first_ref = &decimal1 * decimal2.clone();
+        assert_eq!(first_ref.0, res);
+        let both_owned = decimal1 * decimal2;
+        assert_eq!(both_owned.0, res);
+    }
 
-//     #[test]
-//     fn test_hp_fixed_div() {
-//         let decimal1: HpUfixed<18> = 1u64.into();
-//         let decimal2: HpUfixed<18> = 50u64.into();
-//         let res = BigUint::from(20_000_000_000_000_000u128);
+    #[test]
+    fn test_hp_fixed_div() {
+        let decimal1: HpUfixed<18> = 1u64.into();
+        let decimal2: HpUfixed<18> = 50u64.into();
+        let res = U256::from(20_000_000_000_000_000u128);
 
-//         let both_ref = &decimal1 / &decimal2;
-//         assert_eq!(both_ref.0, res);
-//         let second_ref = decimal1.clone() / &decimal2;
-//         assert_eq!(second_ref.0, res);
-//         let first_ref = &decimal1 / decimal2.clone();
-//         assert_eq!(first_ref.0, res);
-//         let both_owned = decimal1 / decimal2;
-//         assert_eq!(both_owned.0, res);
-//     }
+        let both_ref = &decimal1 / &decimal2;
+        assert_eq!(both_ref.0, res);
+        let second_ref = decimal1.clone() / &decimal2;
+        assert_eq!(second_ref.0, res);
+        let first_ref = &decimal1 / decimal2.clone();
+        assert_eq!(first_ref.0, res);
+        let both_owned = decimal1 / decimal2;
+        assert_eq!(both_owned.0, res);
+    }
 
-//     #[test]
-//     fn test_hp_fixed_from_f64() {
-//         let decimal: f64 = 1234.567891234567;
-//         let result = HpUfixed::<18>::from(decimal);
-//         assert_eq!(result.0, BigUint::from(1_234_567_891_234_567_000_000u128));
-//     }
-//     #[test]
-//     fn test_hp_fixed_from_f64_truncation() {
-//         #[allow(clippy::excessive_precision)]
-//         let decimal: f64 = 1234.5678912345678909;
-//         let result = HpUfixed::<18>::from(decimal);
-//         assert_eq!(result.0, BigUint::from(1_234_567_891_234_568_000_000u128));
-//     }
+    #[test]
+    fn test_hp_fixed_from_f64() {
+        let decimal: f64 = 1234.567891234567;
+        let result = HpUfixed::<18>::from(decimal);
+        assert_eq!(result.0, U256::from(1_234_567_891_234_567_000_000u128));
+    }
 
-//     #[test]
-//     fn test_convert_precsion_up() {
-//         let decimal: f64 = 1_234.123456;
-//         let decimal1 = HpUfixed::<6>::from(decimal);
-//         let result = decimal1.convert_precision::<18>();
-//         assert_eq!(result.0, BigUint::from(1_234_123_456_000_000_000_000_u128));
-//     }
+    #[test]
+    fn test_hp_fixed_from_f64_truncation() {
+        #[allow(clippy::excessive_precision)]
+        let decimal: f64 = 1234.5678912345678909;
+        let result = HpUfixed::<18>::from(decimal);
+        assert_eq!(result.0, U256::from(1_234_567_891_234_568_000_000u128));
+    }
 
-//     #[test]
-//     fn test_convert_precsion_down() {
-//         let decimal: f64 = 1234.123456;
-//         let decimal1 = HpUfixed::<6>::from(decimal);
-//         let result = decimal1.convert_precision::<2>();
-//         assert_eq!(result.0, BigUint::from(123_412_u128));
-//     }
+    #[test]
+    fn test_convert_precsion_up() {
+        let decimal: f64 = 1_234.123456;
+        let decimal1 = HpUfixed::<6>::from(decimal);
+        let result = decimal1.convert_precision::<18>();
+        assert_eq!(result.0, U256::from(1_234_123_456_000_000_000_000_u128));
+    }
 
-//     #[test]
-//     fn test_serde() {
-//         let decimal: HpUfixed<18> = HpUfixed::from(10_f64);
-//         let ser = serde_json::to_string(&decimal).unwrap();
-//         let decimal2: HpUfixed<18> = serde_json::from_str(&ser).unwrap();
-//         assert_eq!(decimal, decimal2);
-//     }
+    #[test]
+    fn test_convert_precsion_down() {
+        let decimal: f64 = 1234.123456;
+        let decimal1 = HpUfixed::<6>::from(decimal);
+        let result = decimal1.convert_precision::<2>();
+        assert_eq!(result.0, U256::from(123_412_u128));
+    }
 
-//     #[test]
-//     fn bincode_serde_test() {
-//         let decimal: HpUfixed<18> = HpUfixed::from(10_f64);
-//         let serialized = bincode::serialize(&decimal).expect("Failed to serialize using
-// bincode");         let deserialized: HpUfixed<18> =
-//             bincode::deserialize(&serialized).expect("Failed to deserialize using bincode");
-//         assert_eq!(decimal, deserialized);
-//     }
+    #[test]
+    fn test_serde() {
+        let decimal: HpUfixed<18> = HpUfixed::from(10_f64);
+        let ser = serde_json::to_string(&decimal).unwrap();
+        let decimal2: HpUfixed<18> = serde_json::from_str(&ser).unwrap();
+        assert_eq!(decimal, decimal2);
+    }
 
-//     #[test]
-//     fn test_ethers_u256_try_from_ufixed() {
-//         let fixed: HpUfixed<18> = HpUfixed::from(999393993_u32);
-//         let uint = U256::try_from(fixed.clone()).unwrap();
-//         let fixed_r = HpUfixed::<18>::try_from(uint).unwrap();
-//         assert_eq!(fixed, fixed_r);
+    #[test]
+    fn bincode_serde_test() {
+        let decimal: HpUfixed<18> = HpUfixed::from(10_f64);
+        let serialized = bincode::serialize(&decimal).expect("Failed to serialize using bincode");
+        let deserialized: HpUfixed<18> =
+            bincode::deserialize(&serialized).expect("Failed to deserialize using bincode");
+        assert_eq!(decimal, deserialized);
+    }
 
-//         let fixed: HpUfixed<18> = HpUfixed::from(10123.323452_f64);
-//         let uint = U256::try_from(fixed.clone()).unwrap();
-//         let fixed_r = HpUfixed::<18>::try_from(uint).unwrap();
-//         assert_eq!(fixed, fixed_r);
+    #[test]
+    fn test_ufixed_from_ethers_u256() {
+        let uint = primitive_types::U256::from(329399399321_u64);
+        let fixed: HpUfixed<18> = HpUfixed::from(uint);
+        let target = U256::from(329399399321_u64);
+        assert_eq!(fixed.0, target);
 
-//         let fixed: HpUfixed<18> = HpUfixed::from(0_u32);
-//         let uint = U256::try_from(fixed.clone()).unwrap();
-//         let fixed_r = HpUfixed::<18>::try_from(uint).unwrap();
-//         assert_eq!(fixed, fixed_r);
-//     }
+        let uint = primitive_types::U256::from(0_u64);
+        let fixed: HpUfixed<18> = HpUfixed::from(uint);
+        let target = U256::from(0_u64);
+        assert_eq!(fixed.0, target);
 
-//     #[test]
-//     fn test_ufixed_from_ethers_u256() {
-//         let uint = U256::from(329399399321_u64);
-//         let fixed: HpUfixed<18> = HpUfixed::from(uint);
-//         let uint_r = U256::try_from(fixed).unwrap();
-//         assert_eq!(uint, uint_r);
+        let uint = primitive_types::U256::from(938563839392332232455_u128);
+        let fixed: HpUfixed<18> = HpUfixed::from(uint);
+        let target = U256::from(938563839392332232455_u128);
+        assert_eq!(fixed.0, target);
+    }
 
-//         let uint = U256::from(0_u64);
-//         let fixed: HpUfixed<18> = HpUfixed::from(uint);
-//         let uint_r = U256::try_from(fixed).unwrap();
-//         assert_eq!(uint, uint_r);
+    #[test]
+    fn test_ethers_256_from_ufixed() {
+        let fixed: HpUfixed<0> = HpUfixed::from(329399399321_u64);
+        let target = primitive_types::U256::from(329399399321_u64);
+        assert_eq!(target, fixed.into());
 
-//         let uint = U256::from(938563839392332232455_u128);
-//         let fixed: HpUfixed<18> = HpUfixed::from(uint);
-//         let uint_r = U256::try_from(fixed).unwrap();
-//         assert_eq!(uint, uint_r);
-// //     }
-// }
+        let fixed: HpUfixed<0> = HpUfixed::from(0_u64);
+        let target = primitive_types::U256::from(0_u64);
+        assert_eq!(target, fixed.into());
+
+        let fixed: HpUfixed<0> = HpUfixed::from(938563839392332232455_u128);
+        let target = primitive_types::U256::from(938563839392332232455_u128);
+        assert_eq!(target, fixed.into());
+    }
+}
