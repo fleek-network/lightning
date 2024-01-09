@@ -58,9 +58,8 @@ pub trait BroadcastInterface<C: Collection>:
     fn get_pubsub<T: LightningMessage + Clone>(&self, topic: Topic) -> Self::PubSub<T>;
 }
 
-#[infusion::blank(PubSub)]
-#[trait_variant::make(PubSub: Send)]
-pub trait _PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
+#[infusion::blank]
+pub trait PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
     type Event: BroadcastEventInterface<T> = infusion::Blank<T>;
 
     /// Publish a message. If `filter` is `Some(set)`, then the message

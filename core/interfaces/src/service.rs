@@ -18,9 +18,8 @@ use crate::{
 ///
 /// Currently, we are hard coding some services and there is no API on this interface to
 /// load services.
-#[infusion::service(ServiceExecutorInterface)]
-#[trait_variant::make(ServiceExecutorInterface: Send)]
-pub trait _ServiceExecutorInterface<C: Collection>:
+#[infusion::service]
+pub trait ServiceExecutorInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
     fn _init(
@@ -62,9 +61,8 @@ pub trait _ServiceExecutorInterface<C: Collection>:
     fn run_service(id: u32);
 }
 
-#[infusion::blank(ExecutorProviderInterface)]
-#[trait_variant::make(ExecutorProviderInterface: Send)]
-pub trait _ExecutorProviderInterface: Clone + Send + Sync + 'static {
+#[infusion::blank]
+pub trait ExecutorProviderInterface: Clone + Send + Sync + 'static {
     /// Make a connection to the provided service.
     async fn connect(&self, service_id: ServiceId) -> Option<UnixStream>;
 }

@@ -181,9 +181,8 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
 }
 
 /// The interface for the writer to a [`BlockStoreInterface`].
-#[infusion::blank(IncrementalPutInterface)]
-#[trait_variant::make(IncrementalPutInterface: Send)]
-pub trait _IncrementalPutInterface: Send {
+#[infusion::blank]
+pub trait IncrementalPutInterface: Send {
     /// Write the proof for the buffer.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError>;
 
@@ -204,9 +203,8 @@ pub trait _IncrementalPutInterface: Send {
 }
 
 /// The interface for the directory writer to a [`BlockStoreInterface`].
-#[infusion::blank(IncrementalDirInterface)]
-#[trait_variant::make(IncrementalDirInterface: Send)]
-pub trait _IncrementalDirInterface: Send {
+#[infusion::blank]
+pub trait IncrementalDirInterface: Send {
     /// Write the proof for the next entry. Should not be called in the trusted mode.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError>;
 

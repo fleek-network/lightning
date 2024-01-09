@@ -14,9 +14,8 @@ use crate::{
 
 /// The resolver is responsible to resolve an FNIP (Fleek Network Immutable Pointer),
 /// into a Blake3 hash of the content.
-#[infusion::service(ResolverInterface)]
-#[trait_variant::make(ResolverInterface: Send)]
-pub trait LocalResolverInterface<C: Collection>:
+#[infusion::service]
+pub trait ResolverInterface<C: Collection>:
     Sized + Send + Sync + Clone + ConfigConsumer + WithStartAndShutdown
 {
     fn _init(
@@ -57,9 +56,8 @@ pub trait LocalResolverInterface<C: Collection>:
 }
 
 /// An `async-iterator`-like interface that tries to find the immutable pointers of
-#[infusion::blank(OriginFinderAsyncIter)]
-#[trait_variant::make(OriginFinderAsyncIter: Send)]
-pub trait LocalOriginFinderAsyncIter: Sized + Send + Sync {
+#[infusion::blank]
+pub trait OriginFinderAsyncIter: Sized + Send + Sync {
     /// Returns the hash of requested content.
     fn hash(&self) -> &Blake3Hash;
 

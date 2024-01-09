@@ -45,9 +45,8 @@ pub struct RequestHeader {
 }
 
 /// Defines the connection pool.
-#[infusion::service(PoolInterface)]
-#[trait_variant::make(PoolInterface: Send)]
-pub trait _PoolInterface<C: Collection>:
+#[infusion::service]
+pub trait PoolInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Send + Sync + Sized
 {
     fn _init(
@@ -86,9 +85,8 @@ pub trait _PoolInterface<C: Collection>:
     fn open_req_res(&self, scope: ServiceScope) -> (Self::Requester, Self::Responder);
 }
 
-#[infusion::blank(EventHandlerInterface)]
-#[trait_variant::make(EventHandlerInterface: Send)]
-pub trait _EventHandlerInterface: Send + Sync {
+#[infusion::blank]
+pub trait EventHandlerInterface: Send + Sync {
     fn send_to_all<F: Fn(NodeIndex) -> bool + Send + Sync + 'static>(
         &self,
         payload: Bytes,
@@ -98,9 +96,8 @@ pub trait _EventHandlerInterface: Send + Sync {
     async fn receive(&mut self) -> Option<(NodeIndex, Bytes)>;
 }
 
-#[infusion::blank(RequesterInterface)]
-#[trait_variant::make(RequesterInterface: Send)]
-pub trait _RequesterInterface: Clone + Send + Sync {
+#[infusion::blank]
+pub trait RequesterInterface: Clone + Send + Sync {
     type Response: ResponseInterface;
     async fn request(&self, destination: NodeIndex, request: Bytes) -> io::Result<Self::Response>;
 }
@@ -113,16 +110,14 @@ pub trait ResponseInterface: Send + Sync {
     fn body(self) -> Self::Body;
 }
 
-#[infusion::blank(ResponderInterface)]
-#[trait_variant::make(ResponderInterface: Send)]
-pub trait _ResponderInterface: Send {
+#[infusion::blank]
+pub trait ResponderInterface: Send {
     type Request: RequestInterface;
     async fn get_next_request(&mut self) -> io::Result<(RequestHeader, Self::Request)>;
 }
 
-#[infusion::blank(RequestInterface)]
-#[trait_variant::make(RequestInterface: Send)]
-pub trait _RequestInterface: Send + Sync {
+#[infusion::blank]
+pub trait RequestInterface: Send + Sync {
     fn reject(self, reason: RejectReason);
     async fn send(&mut self, frame: Bytes) -> io::Result<()>;
 }

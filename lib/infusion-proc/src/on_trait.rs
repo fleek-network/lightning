@@ -5,11 +5,7 @@ use syn::{parse_quote, Error, Result};
 
 use crate::{sig, utils};
 
-pub fn process_trait(
-    mode: utils::Mode,
-    mut trait_: syn::ItemTrait,
-    name: Option<syn::Ident>,
-) -> TokenStream {
+pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStream {
     // The diagnostics and compile errors that we gather.
     let mut report = quote!();
     // trait ... { %trait_body }
@@ -17,7 +13,7 @@ pub fn process_trait(
     // impl ... { %blank_body }
     let mut blank_body = Vec::<syn::ImplItem>::new();
 
-    let name = name.unwrap_or(trait_.ident.clone());
+    let name = trait_.ident.clone();
     let names = utils::collect_generics_names(&trait_.generics);
 
     // The fist generic is meant to be the name for the collection.
@@ -34,6 +30,7 @@ pub fn process_trait(
 
     let mut has_init = false;
     let mut has_post = false;
+    let mut has_async = false;
 
     for item in std::mem::take(&mut trait_.items) {
         match item {
@@ -50,6 +47,9 @@ pub fn process_trait(
 
             syn::TraitItem::Fn(item) if mode == utils::Mode::BlankOnly => {
                 let (item, expr) = extract_default_attribute(item);
+                if item.sig.asyncness.is_some() {
+                    has_async = true;
+                }
                 if item.default.is_none() || expr.is_some() {
                     let impl_ = implement_blank_method(&trait_.ident, &item, expr);
                     blank_body.push(syn::ImplItem::Fn(impl_));
@@ -59,6 +59,10 @@ pub fn process_trait(
 
             syn::TraitItem::Fn(item) => {
                 let name = item.sig.ident.to_string();
+
+                if item.sig.asyncness.is_some() {
+                    has_async = true;
+                }
 
                 match name.as_str() {
                     "_init" => match impl_init(&base_name, item) {
@@ -219,9 +223,20 @@ pub fn process_trait(
         }
     };
 
+    let async_mod = if has_async {
+        // Proxy identity to add trait_variant onto
+        trait_.ident = syn::Ident::new(&format!("_{}", trait_.ident), trait_.ident.span());
+        quote! {
+            #[trait_variant::make(#name: Send)]
+        }
+    } else {
+        quote! {}
+    };
+
     quote! {
         #report
 
+        #async_mod
         #trait_
 
         #blank

@@ -14,9 +14,8 @@ use crate::{
 
 pub type FetcherSocket = Socket<FetcherRequest, FetcherResponse>;
 
-#[infusion::service(FetcherInterface)]
-#[trait_variant::make(FetcherInterface: Send)]
-pub trait _FetcherInterface<C: Collection>:
+#[infusion::service]
+pub trait FetcherInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
     fn _init(
