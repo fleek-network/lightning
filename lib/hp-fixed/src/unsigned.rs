@@ -45,23 +45,7 @@ use crate::{get_float_parts, HpFixedConversionError};
 #[derive(Clone, Hash, PartialEq, PartialOrd, Ord, Eq, Default)]
 pub struct HpUfixed<const P: usize>(U256);
 
-impl JsonSchema for HpUfixed<6> {
-    fn schema_name() -> String {
-        "HpUfixed".to_string()
-    }
-
-    fn schema_id() -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Borrowed(concat!(module_path!(), "::HpUfixed"))
-    }
-
-    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        let ui = U256::from(13_u32);
-
-        schema_for_value!(Self(ui)).schema.into()
-    }
-}
-
-impl JsonSchema for HpUfixed<18> {
+impl<const P: usize> JsonSchema for HpUfixed<P> {
     fn schema_name() -> String {
         "HpUfixed".to_string()
     }
@@ -683,5 +667,5 @@ impl<const P: usize> From<EthersU256> for HpUfixed<P> {
 //         let fixed: HpUfixed<18> = HpUfixed::from(uint);
 //         let uint_r = U256::try_from(fixed).unwrap();
 //         assert_eq!(uint, uint_r);
-//     }
+// //     }
 // }
