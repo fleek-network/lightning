@@ -1,5 +1,5 @@
 chain_id = 59330
-epoch_start = 1704835658090
+epoch_start = 1704838021901
 epoch_time = 1800000
 committee_size = 6
 min_stake = 1000
@@ -177,3 +177,5 @@ price = 0.2
 [total_served]
 
 [current_epoch_served]
+
+[client]
