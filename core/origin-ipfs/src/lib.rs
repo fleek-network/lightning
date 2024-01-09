@@ -43,7 +43,6 @@ pub struct IPFSOrigin<C: Collection> {
 }
 
 impl<C: Collection> OriginProviderInterface<C> for IPFSOrigin<C> {
-    type Stream = IPFSStream;
     fn init(config: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
         let inner = IPFSOriginInner {
