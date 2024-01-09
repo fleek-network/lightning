@@ -3792,12 +3792,8 @@ async fn test_submit_content_registry_update_multiple_updates_for_cid_in_diff_tr
     let updates = vec![ContentUpdate { cid, remove: false }];
     let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 2);
 
-    // Then: the transaction is reverted.
-    expect_tx_revert!(
-        update,
-        &update_socket,
-        ExecutionError::ContentAlreadyRegistered
-    );
+    // Then: the transaction is successful.
+    expect_tx_success!(update, &update_socket);
 }
 
 #[tokio::test]
