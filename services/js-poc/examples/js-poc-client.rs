@@ -1,6 +1,7 @@
 use fleek_service_js_poc::stream::Request;
 use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
 use tcp_client::TcpClient;
+use tokio::time::Instant;
 
 const ADDRESS: &str = "127.0.0.1:4221";
 const SERVICE_ID: u32 = 1;
@@ -8,8 +9,6 @@ const SERVICE_ID: u32 = 1;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let (origin, uri, param) = cli::args();
-
-    println!("Sending handshake");
 
     // Connect and handshake with the node
     let mut client = TcpClient::connect(ADDRESS).await?;
@@ -23,6 +22,8 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     println!("Sending request for running {uri}");
+
+    let time = Instant::now();
 
     // Send the request
     client
@@ -39,7 +40,9 @@ async fn main() -> anyhow::Result<()> {
     };
     let string = String::from_utf8_lossy(&bytes);
 
-    println!("Response: {string}");
+    let duration = time.elapsed();
+
+    println!("Completed in {duration:?}:\n\n{string}");
 
     Ok(())
 }
