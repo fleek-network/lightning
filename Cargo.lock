@@ -4664,6 +4664,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-dack-aggregator"
+version = "0.0.0"
+dependencies = [
+ "affair 0.1.2",
+ "anyhow",
+ "fleek-crypto",
+ "infusion",
+ "lightning-application",
+ "lightning-interfaces",
+ "lightning-signer",
+ "lightning-test-utils",
+ "resolved-pathbuf",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "lightning-e2e"
 version = "0.0.0"
 dependencies = [
@@ -4982,15 +5000,6 @@ dependencies = [
  "serde",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "lightning-pod"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "lightning-interfaces",
- "serde",
 ]
 
 [[package]]

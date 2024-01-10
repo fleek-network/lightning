@@ -1,0 +1,22 @@
+[package]
+name = "lightning-dack-aggregator"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lightning-interfaces = {path="../interfaces"}
+anyhow.workspace = true
+serde.workspace = true
+tokio.workspace = true
+affair.workspace = true
+tracing.workspace = true
+resolved-pathbuf.workspace = true
+
+[dev-dependencies]
+lightning-test-utils = {path="../test-utils"}
+lightning-signer = {path="../signer"}
+lightning-application = {path="../application", features = ["test"]}
+infusion.workspace = true
+fleek-crypto.workspace = true
