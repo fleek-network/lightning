@@ -1,6 +1,7 @@
 mod config;
 mod muxer;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use affair::Socket;
@@ -12,6 +13,7 @@ use lightning_interfaces::{
     OriginProviderInterface,
     OriginProviderSocket,
     WithStartAndShutdown,
+    _IncrementalDirInterface,
 };
 use lightning_origin_http::HttpOriginFetcher;
 use muxer::Muxer;
@@ -19,12 +21,7 @@ use tokio::sync::{Mutex, Notify};
 use tokio::task::JoinHandle;
 
 use crate::config::Config;
-
-#[derive(Eq, PartialEq, Hash)]
-pub enum OriginType {
-    Http,
-    Ipfs,
-}
+use crate::muxer::HTTP_ORIGIN;
 
 #[derive(IsVariant)]
 enum Status<C: Collection> {
@@ -87,15 +84,15 @@ impl<C: Collection> OriginProviderInterface<C> for OriginMuxer<C> {
     fn init(_: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
 
-        let http_origin = HttpOriginFetcher::<C>::init(
+        let mut muxer = Muxer::new(rx);
+
+        muxer.http_origin(HttpOriginFetcher::<C>::init(
             Default::default(),
             blockstore.clone(),
-        )?;
+        )?);
 
         Ok(Self {
-            status: Mutex::new(Some(Status::NotRunning {
-                muxer: Muxer::new(http_origin),
-            })),
+            status: Mutex::new(Some(Status::NotRunning { muxer })),
             socket,
         })
     }
