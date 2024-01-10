@@ -4975,6 +4975,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-origin-http"
+version = "0.0.0"
+dependencies = [
+ "affair 0.1.2",
+ "anyhow",
+ "lightning-interfaces",
+ "reqwest",
+ "serde",
+]
+
+[[package]]
 name = "lightning-origin-ipfs"
 version = "0.0.0"
 dependencies = [
@@ -5008,9 +5019,12 @@ version = "0.0.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
+ "derive_more",
  "lightning-interfaces",
+ "lightning-origin-http",
  "multiaddr",
  "serde",
+ "tokio",
 ]
 
 [[package]]
