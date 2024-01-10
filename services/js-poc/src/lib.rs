@@ -1,23 +1,14 @@
+use anyhow::{anyhow, Context};
 use arrayref::array_ref;
+use cid::Cid;
 use deno_core::{serde_v8, v8, JsRuntime};
-use runtime::Runtime;
-use serde::{Deserialize, Serialize};
-use stream::Origin;
-use tracing::info;
+use tracing::{error, info};
 
-use crate::stream::ServiceStream;
+use crate::runtime::Runtime;
+use crate::stream::{Origin, Request, ServiceStream};
 
-pub(crate) mod extensions;
-pub(crate) mod runtime;
+mod runtime;
 pub mod stream;
-
-// TODO: Use this
-#[derive(Serialize, Deserialize)]
-pub struct Request {
-    origin: u8,
-    uri: Vec<u8>,
-    entrypoint: serde_json::Value,
-}
 
 #[tokio::main(flavor = "current_thread")]
 pub async fn main() {
