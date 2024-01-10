@@ -12,6 +12,7 @@ anyhow.workspace = true
 tracing.workspace = true
 fleek-crypto.workspace = true
 arrayref = "0.3"
+triomphe = "0.1"
 serde.workspace = true
 serde_json.workspace = true
 deno_core = "0.232"

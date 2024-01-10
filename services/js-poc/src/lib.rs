@@ -1,8 +1,11 @@
+use std::ops::Deref;
+
 use anyhow::{anyhow, Context};
 use arrayref::array_ref;
 use cid::Cid;
-use deno_core::{serde_v8, v8, JsRuntime};
+use deno_core::{serde_v8, v8};
 use tracing::{error, info};
+use triomphe::Arc;
 
 use crate::runtime::Runtime;
 use crate::stream::{Origin, Request, ServiceStream};
@@ -16,12 +19,16 @@ pub async fn main() {
 
     info!("Initialized POC JS service!");
 
-    // TODO: create a snapshot runtime with the extensions loaded and initialized
-
     let listener = fn_sdk::ipc::conn_bind().await;
 
-    // Explicitly initialize the v8 platform on the main thread
-    JsRuntime::init_platform(None);
+    // Create the runtime snapshot all connections will use.
+    // This has the side effect of initializing the v8 platform on the main thread,
+    // so we don't need to explicitly do so ourselves.
+    let snapshot = Arc::new(
+        Runtime::snapshot()
+            .await
+            .expect("failed to create runtime startup snapshot"),
+    );
 
     while let Ok(conn) = listener.accept().await {
         let stream = ServiceStream::new(conn);
@@ -29,13 +36,14 @@ pub async fn main() {
         // spawn a new thread and tokio runtime to handle the connection
         // TODO: This is very hacky and not very scalable
         // Research using deno's JsRealms to provide the script sandboxing in a single or a
-        // few shared multithreaded runtimes.
+        // few shared multithreaded runtimes, or use a custom work scheduler.
+        let snapshot = snapshot.clone();
         std::thread::spawn(move || {
             if let Err(e) = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
                 .expect("failed to create connection async runtime")
-                .block_on(connection_loop(stream))
+                .block_on(connection_loop(snapshot, stream))
             {
                 error!("session failed: {e:?}");
             }
@@ -43,7 +51,10 @@ pub async fn main() {
     }
 }
 
-async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
+async fn connection_loop(
+    snapshot: Arc<Box<[u8]>>,
+    mut stream: ServiceStream,
+) -> anyhow::Result<()> {
     while let Some(Request { origin, uri, param }) = stream.read_request().await {
         // Fetch content from origin
         let hash = match origin {
@@ -86,7 +97,7 @@ async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
         }
 
         // Create runtime and execute the source
-        let mut runtime = Runtime::new();
+        let mut runtime = Runtime::new(Some(snapshot.deref().clone()));
         let res = runtime.exec(source).context("failed to run javascript")?;
 
         // Resolve async if applicable
