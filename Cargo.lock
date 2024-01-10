@@ -5003,6 +5003,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-origin-muxer"
+version = "0.0.0"
+dependencies = [
+ "affair 0.1.2",
+ "anyhow",
+ "lightning-interfaces",
+ "multiaddr",
+ "serde",
+]
+
+[[package]]
 name = "lightning-pinger"
 version = "0.0.0"
 dependencies = [
