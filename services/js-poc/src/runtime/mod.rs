@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use anyhow::{Context, Result};
 use deno_core::v8::{Global, Value};
 use deno_core::{JsRuntime, JsRuntimeForSnapshot, PollEventLoopOptions, RuntimeOptions, Snapshot};
@@ -26,6 +28,15 @@ impl Runtime {
 
     /// Execute javascript source on the runtime
     pub fn exec(&mut self, source: String) -> anyhow::Result<Global<Value>> {
+        // Initialize environment
+        let time = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+        self.deno
+            .execute_script(
+                "<anon>",
+                format!("globalThis.Date.now = () => {time};").into(),
+            )
+            .context("failed to execute environment initialization")?;
+
         self.deno
             .execute_script("<anon>", source.into())
             .context("failed to execute javascript")
