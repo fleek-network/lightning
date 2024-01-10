@@ -1,9 +1,10 @@
 //! Javascript runtime bindings for the SDK APIs
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 use arrayref::array_ref;
 use blake3_tree::utils::{tree_index, HashVec};
 use deno_core::{extension, op2};
+use fleek_crypto::ClientPublicKey;
 use fn_sdk::blockstore::get_internal_path;
 use tracing::info;
 
@@ -13,7 +14,7 @@ pub fn log(#[string] message: String) {
 }
 
 #[op2(async)]
-pub async fn fetch_blake3(#[buffer(copy)] hash: Vec<u8>) -> anyhow::Result<bool> {
+pub async fn fetch_blake3(#[buffer(copy)] hash: Vec<u8>) -> Result<bool> {
     if hash.len() != 32 {
         return Err(anyhow!("blake3 hash must be 32 bytes"));
     }
@@ -23,7 +24,7 @@ pub async fn fetch_blake3(#[buffer(copy)] hash: Vec<u8>) -> anyhow::Result<bool>
 
 #[op2(async)]
 #[buffer]
-pub async fn load_content(#[buffer(copy)] hash: Vec<u8>) -> anyhow::Result<Box<[u8]>> {
+pub async fn load_content(#[buffer(copy)] hash: Vec<u8>) -> Result<Box<[u8]>> {
     let path = get_internal_path(array_ref![hash, 0, 32]);
 
     // TODO: store proof on rust side, and only give javascript an id to reference the handle
@@ -49,9 +50,33 @@ pub async fn read_block(
     Ok(block)
 }
 
+#[op2(async)]
+pub async fn query_client_flk_balance(#[buffer(copy)] address: Vec<u8>) -> Result<f64> {
+    if address.len() != 96 {
+        return Err(anyhow!("address must be 32 bytes"));
+    }
+    Ok(
+        fn_sdk::api::query_client_flk_balance(ClientPublicKey(*array_ref![address, 0, 96])).await
+            as f64
+            / 10f64.powi(18),
+    )
+}
+
+#[op2(async)]
+pub async fn query_client_bandwidth_balance(#[buffer(copy)] address: Vec<u8>) -> Result<f64> {
+    if address.len() != 96 {
+        return Err(anyhow!("address must be 32 bytes"));
+    }
+    Ok(
+        fn_sdk::api::query_client_bandwidth_balance(ClientPublicKey(*array_ref![address, 0, 96]))
+            .await as f64
+            / 10f64.powi(18),
+    )
+}
+
 extension!(
     fleek,
     ops = [log, fetch_blake3, load_content, read_block],
     esm_entry_point = "ext:fleek/entrypoint.js",
-    esm = [ dir "src/extensions", "entrypoint.js" ]
+    esm = [ dir "src/runtime", "entrypoint.js" ]
 );
