@@ -47,7 +47,7 @@ impl CollectionBase for FinalTypes {
     type HandshakeInterface<C: Collection> = Handshake<C>;
     type NotifierInterface<C: Collection> = Notifier<C>;
     type OriginProviderInterface<C: Collection> = IPFSOrigin<C>;
-    type OriginFetcherInterface<C: Collection> =infusion::Blank<C>;
+    type OriginFetcherInterface<C: Collection> = infusion::Blank<C>;
     type DeliveryAcknowledgmentAggregatorInterface<C: Collection> = infusion::Blank<C>;
     type ReputationAggregatorInterface<C: Collection> = ReputationAggregator<C>;
     type ResolverInterface<C: Collection> = Resolver<C>;
