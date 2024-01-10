@@ -103,12 +103,19 @@ async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
         if local.is_uint8_array() {
             // If the return type is a u8 array, send the raw data directly to the client
             let bytes = serde_v8::from_v8::<Vec<u8>>(scope, local)
-                .context("failed to deserialize response")?
-                .clone();
+                .context("failed to deserialize response")?;
             stream
                 .send_payload(&bytes)
                 .await
-                .context("failed to send response")?;
+                .context("failed to send byte response")?;
+        } else if local.is_string() {
+            // Likewise for string types
+            let string = serde_v8::from_v8::<String>(scope, local)
+                .context("failed to deserialize response string")?;
+            stream
+                .send_payload(string.as_bytes())
+                .await
+                .context("failed to send string response")?;
         } else {
             // Otherwise, send the data as json
             let value = serde_v8::from_v8::<serde_json::Value>(scope, local)
@@ -118,7 +125,7 @@ async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
             stream
                 .send_payload(res.as_bytes())
                 .await
-                .context("failed to send response")?;
+                .context("failed to send json response")?;
         }
     }
 
