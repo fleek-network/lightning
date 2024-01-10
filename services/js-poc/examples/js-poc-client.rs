@@ -1,6 +1,4 @@
-use bytes::{BufMut, BytesMut};
-use cid::Cid;
-use fleek_service_js_poc::stream::Origin;
+use fleek_service_js_poc::stream::Request;
 use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
 use tcp_client::TcpClient;
 
@@ -9,7 +7,7 @@ const SERVICE_ID: u32 = 1;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let (origin, uid) = cli::args();
+    let (origin, uri, param) = cli::args();
 
     println!("Sending handshake");
 
@@ -24,22 +22,14 @@ async fn main() -> anyhow::Result<()> {
         })
         .await?;
 
-    println!("Sending request for running {uid}");
+    println!("Sending request for running {uri}");
 
-    // Parse the hash from the cli into a uri
-    let hash = match origin {
-        Origin::Ipfs => Cid::try_from(uid).expect("valid ipfs cid").to_bytes(),
-        Origin::Blake3 => hex::decode(uid.as_bytes()).expect("valid hex string"),
-        _ => unreachable!(),
-    };
-
-    // Send the request for the origin and uid
-    let mut buffer = BytesMut::with_capacity(1 + hash.len());
-    buffer.put_u8(origin as u8);
-    buffer.put_slice(&hash);
+    // Send the request
     client
         .send(RequestFrame::ServicePayload {
-            bytes: buffer.into(),
+            bytes: serde_json::to_string(&Request { origin, uri, param })
+                .expect("failed to encode request")
+                .into(),
         })
         .await?;
 
@@ -57,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
 mod cli {
     use fleek_service_js_poc::stream::Origin;
 
-    pub fn args() -> (Origin, String) {
+    pub fn args() -> (Origin, String, Option<serde_json::Value>) {
         let mut args = std::env::args();
         args.next();
 
@@ -67,7 +57,10 @@ mod cli {
         };
 
         let origin = {
-            let arg = args.next().unwrap_or("blake3".into());
+            let Some(arg) = args.next() else {
+                help();
+                std::process::exit(1);
+            };
             match arg.to_lowercase().as_str() {
                 "ipfs" => Origin::Ipfs,
                 "blake3" => Origin::Blake3,
@@ -78,11 +71,15 @@ mod cli {
             }
         };
 
-        (origin, uri)
+        let param = args
+            .next()
+            .map(|v| serde_json::from_str(&v).expect("invalid json parameter"));
+
+        (origin, uri, param)
     }
 
     fn help() {
-        println!("Usage: ./js-poc-client <URI> [blake3|ipfs, default: blake3]")
+        println!("Usage: ./js-poc-client <URI> <blake3|ipfs> [json entrypoint parameter]")
     }
 }
 

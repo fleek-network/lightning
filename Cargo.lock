@@ -3147,6 +3147,7 @@ dependencies = [
  "bytes",
  "cid 0.11.0",
  "deno_core",
+ "fleek-crypto",
  "fn-sdk",
  "hex",
  "lightning-schema",

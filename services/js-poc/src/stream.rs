@@ -1,27 +1,31 @@
 use anyhow::Result;
 use arrayref::array_ref;
-use bytes::{Buf, Bytes, BytesMut};
+use bytes::BytesMut;
 use fn_sdk::api::Origin as ApiOrigin;
 use fn_sdk::connection::Connection;
+use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-#[derive(Debug)]
-#[repr(u8)]
-pub enum Origin {
-    Blake3 = 0x00,
-    Ipfs = 0x01,
-    Unknown = 0xFF,
+/// Request to execute some javascript from an origin
+#[derive(Serialize, Deserialize)]
+pub struct Request {
+    /// Origin to use
+    pub origin: Origin,
+    /// URI For the origin
+    /// - for blake3 should be hex encoded bytes
+    /// - for ipfs should be cid string
+    pub uri: String,
+    /// Parameter to pass to the script's main function
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub param: Option<serde_json::Value>,
 }
 
-impl From<u8> for Origin {
-    #[inline(always)]
-    fn from(val: u8) -> Self {
-        match val {
-            0 => Self::Blake3,
-            1 => Self::Ipfs,
-            _ => Self::Unknown,
-        }
-    }
+#[derive(Debug, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum Origin {
+    Blake3,
+    Ipfs,
+    Unknown,
 }
 
 impl From<Origin> for ApiOrigin {
@@ -47,7 +51,7 @@ impl ServiceStream {
         }
     }
 
-    pub async fn read_request(&mut self) -> Option<(Origin, Bytes)> {
+    pub async fn read_request(&mut self) -> Option<Request> {
         // Read the payload length delimiter
         while self.buffer.len() < 5 {
             if self.conn.stream.read_buf(&mut self.buffer).await.ok()? == 0 {
@@ -64,20 +68,10 @@ impl ServiceStream {
             return None;
         }
 
-        // We reserve an additional byte for the next request
+        // We reserve an additional 4 bytes for the next request
         self.buffer.reserve(len + 4);
 
-        while self.buffer.is_empty() {
-            if self.conn.stream.read_buf(&mut self.buffer).await.ok()? == 0 {
-                // Socket was closed
-                return None;
-            }
-        }
-
-        // Read the origin type
-        let origin = Origin::from(self.buffer[0]);
-
-        // Read the request URI
+        // Read the request
         while self.buffer.len() < len {
             if self.conn.stream.read_buf(&mut self.buffer).await.ok()? == 0 {
                 // Socket was closed
@@ -85,9 +79,8 @@ impl ServiceStream {
             }
         }
 
-        // Split and return the URI
-        self.buffer.advance(1);
-        Some((origin, self.buffer.split_to(len - 1).into()))
+        let bytes = self.buffer.split_to(len);
+        serde_json::from_slice(&bytes).ok()
     }
 
     pub async fn send_payload(&mut self, bytes: &[u8]) -> Result<()> {
