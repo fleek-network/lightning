@@ -1,20 +1,45 @@
 mod config;
+mod muxer;
 
-use std::collections::HashMap;
-use std::marker::PhantomData;
 use std::sync::Arc;
+
+use affair::Socket;
+use derive_more::IsVariant;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::{ConfigConsumer, OriginProviderInterface, OriginProviderSocket, WithStartAndShutdown};
+use lightning_interfaces::{
+    ConfigConsumer,
+    OriginFetcherInterface,
+    OriginProviderInterface,
+    OriginProviderSocket,
+    WithStartAndShutdown,
+};
+use lightning_origin_http::HttpOriginFetcher;
+use muxer::Muxer;
+use tokio::sync::{Mutex, Notify};
+use tokio::task::JoinHandle;
+
 use crate::config::Config;
 
+#[derive(Eq, PartialEq, Hash)]
 pub enum OriginType {
     Http,
     Ipfs,
 }
 
+#[derive(IsVariant)]
+enum Status<C: Collection> {
+    Running {
+        handle: JoinHandle<Muxer<C>>,
+        shutdown: Arc<Notify>,
+    },
+    NotRunning {
+        muxer: Muxer<C>,
+    },
+}
+
 pub struct OriginMuxer<C: Collection> {
-    origins: HashMap<OriginType, Arc<C::OriginFetcherInterface>>,
-    _marker: PhantomData<C>,
+    status: Mutex<Option<Status<C>>>,
+    socket: OriginProviderSocket,
 }
 
 impl<C: Collection> ConfigConsumer for OriginMuxer<C> {
@@ -24,24 +49,58 @@ impl<C: Collection> ConfigConsumer for OriginMuxer<C> {
 
 impl<C: Collection> WithStartAndShutdown for OriginMuxer<C> {
     fn is_running(&self) -> bool {
-        todo!()
+        self.status.blocking_lock().as_ref().unwrap().is_running()
     }
 
     async fn start(&self) {
-        todo!()
+        let mut guard = self.status.lock().await;
+        let status = guard.take().unwrap();
+        let next_status = if let Status::NotRunning { muxer } = status {
+            let (handle, shutdown) = muxer.spawn();
+            Status::Running { handle, shutdown }
+        } else {
+            status
+        };
+        *guard = Some(next_status);
     }
 
     async fn shutdown(&self) {
-        todo!()
+        let mut guard = self.status.lock().await;
+        let status = guard.take().unwrap();
+        let next_status = if let Status::Running { handle, shutdown } = status {
+            shutdown.notify_one();
+            let muxer = match handle.await {
+                Ok(muxer) => muxer,
+                Err(e) => {
+                    std::panic::resume_unwind(e.into_panic());
+                },
+            };
+            Status::NotRunning { muxer }
+        } else {
+            status
+        };
+        *guard = Some(next_status);
     }
 }
 
 impl<C: Collection> OriginProviderInterface<C> for OriginMuxer<C> {
-    fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
-        todo!()
+    fn init(_: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
+        let (socket, rx) = Socket::raw_bounded(2048);
+
+        let http_origin = HttpOriginFetcher::<C>::init(
+            Default::default(),
+            blockstore.clone(),
+        )?;
+
+        Ok(Self {
+            status: Mutex::new(Some(Status::NotRunning {
+                muxer: Muxer::new(http_origin),
+            })),
+            socket,
+        })
     }
 
     fn get_socket(&self) -> OriginProviderSocket {
-        todo!()
+        self.socket.clone()
     }
 }
