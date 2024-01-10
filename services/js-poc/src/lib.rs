@@ -90,11 +90,16 @@ async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
         let res = runtime.exec(source).context("failed to run javascript")?;
 
         // Resolve async if applicable
-        let res = runtime
-            .deno
-            .resolve_value(res)
-            .await
-            .context("failed to resolve output")?;
+        let res = match runtime.deno.resolve_value(res).await {
+            Ok(res) => res,
+            Err(e) => {
+                stream
+                    .send_payload(e.to_string().as_bytes())
+                    .await
+                    .context("failed to send error message")?;
+                return Err(e).context("failed to resolve output");
+            },
+        };
 
         // Handle the return data
         let scope = &mut runtime.deno.handle_scope();
