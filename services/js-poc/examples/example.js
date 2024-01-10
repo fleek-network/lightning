@@ -1,3 +1,6 @@
+// Example script for fetching some content with the sdk 
+// cargo run --example js-poc-client $(lgtn-old dev store services/js-poc/examples/example.js | awk '{print $1}') blake3
+
 const bbb_hash = new Uint8Array([
   16,
   101,
@@ -54,5 +57,3 @@ const main = async () => {
     return { success: false };
   }
 };
-
-main()
