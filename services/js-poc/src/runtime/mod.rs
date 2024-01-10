@@ -1,8 +1,9 @@
 use anyhow::Context;
 use deno_core::v8::{Global, Value};
 use deno_core::{JsRuntime, RuntimeOptions};
+use extensions::fleek;
 
-use crate::extensions::fleek;
+mod extensions;
 
 pub struct Runtime {
     pub deno: JsRuntime,
