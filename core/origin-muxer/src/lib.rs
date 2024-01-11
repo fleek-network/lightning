@@ -1,5 +1,7 @@
 mod config;
 mod muxer;
+#[cfg(test)]
+mod tests;
 
 use std::sync::Arc;
 
