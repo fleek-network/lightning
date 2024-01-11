@@ -47,10 +47,16 @@ impl<C: Collection> OriginFetcherInterface<C> for HttpOriginFetcher<C> {
         })
     }
 
-    async fn fetch(&self, address: Vec<u8>) -> anyhow::Result<Blake3Hash> {
+    async fn fetch(&self, identifier: Vec<u8>) -> anyhow::Result<Blake3Hash> {
+        let identifier = String::from_utf8(identifier)?;
+        let (url, _hash) = identifier.split_once("#integrity=").ok_or(anyhow::anyhow!("invalid identifier"))?;
+        if url.is_empty() {
+            anyhow::bail!("invalid url");
+        }
+
         let resp = self
             .client
-            .get(String::from_utf8(address)?)
+            .get(url)
             .timeout(Duration::from_millis(500))
             .send()
             .await?;

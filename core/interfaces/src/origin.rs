@@ -36,7 +36,7 @@ pub trait OriginFetcherInterface<C: Collection>:
 
     fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self>;
 
-    async fn fetch(&self, address: Vec<u8>) -> anyhow::Result<Blake3Hash>;
+    async fn fetch(&self, identifier: Vec<u8>) -> anyhow::Result<Blake3Hash>;
 }
 
 /// An untrusted stream to an origin, this allows the origin provider to start the
