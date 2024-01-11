@@ -23,7 +23,7 @@ use lightning_interfaces::{
 };
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
-use lightning_test_utils::ipfs_gateway::spawn_gateway;
+use lightning_test_utils::server;
 
 use crate::HttpOriginFetcher;
 
@@ -180,16 +180,11 @@ async fn create_app_state(test_name: String) -> AppState {
 async fn test_http_origin() {
     // Todo: let's use a different type of content.
     // Given: Some content that will be returned by gateway.
-    let file: Vec<u8> = std::fs::read(
-        "../test-utils/files/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
-    )
-    .unwrap();
+    let file: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
     // Given: an identifier for some resource.
-    let url =
-        "http://127.0.0.1:30233/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
-            .to_string();
+    let url = "http://127.0.0.1:30233/bar/index.ts".to_string();
     // Given: an origin.
-    let state = create_app_state("test_http_origin_v2".to_string()).await;
+    let state = create_app_state("test_http_origin".to_string()).await;
     let origin =
         HttpOriginFetcher::<TestBinding>::init(Default::default(), state.blockstore.clone())
             .unwrap();
@@ -204,7 +199,40 @@ async fn test_http_origin() {
 
     tokio::select! {
         biased;
-        _ = spawn_gateway(30233) => {}
+        _ = server::spawn_server(30233) => {}
         _ = test_fut => {}
     }
+}
+
+#[tokio::test]
+async fn test_http_origin_with_integrity_check() {
+    // Todo: let's use a different type of content.
+    // Given: Some content that will be returned by gateway.
+    let file: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
+    // Given: an identifier for some resource.
+    let url = "http://127.0.0.1:30234/bar/index.ts#integrity=somehash".to_string();
+    // Given: an origin.
+    let state = create_app_state("test_http_origin_with_integrity_check".to_string()).await;
+    let origin =
+        HttpOriginFetcher::<TestBinding>::init(Default::default(), state.blockstore.clone())
+            .unwrap();
+
+    // When: we fetch some content using the origin.
+    let test_fut = async move {
+        let hash = origin.fetch(url.as_bytes().to_vec()).await.unwrap();
+        let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
+        // Then: we get the expected content.
+        assert_eq!(file, bytes);
+    };
+
+    tokio::select! {
+        biased;
+        _ = server::spawn_server(30234) => {}
+        _ = test_fut => {}
+    }
+}
+
+#[tokio::test]
+async fn test_http_origin_with_integrity_check_invalid_hash() {
+    // Todo: need to implement.
 }
