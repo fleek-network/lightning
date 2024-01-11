@@ -7,6 +7,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::TransactionReceipt;
 
+/// Max number of updates allowed in a content registry update transaction.
+pub const MAX_UPDATES_CONTENT_REGISTRY: usize = 100;
+
+/// Max number of delivery acknowledgements allowed per transaction.
+pub const MAX_DELIVERY_ACKNOWLEDGMENTS: usize = 1000;
+
 /// The response generated from executing an entire batch of transactions (aka a block).
 #[derive(Debug, Hash, Clone)]
 pub struct BlockExecutionResponse {

@@ -9,10 +9,12 @@ edition = "2021"
 lightning-interfaces = {path="../interfaces"}
 anyhow.workspace = true
 serde.workspace = true
+bincode.workspace = true
 tokio.workspace = true
 affair.workspace = true
 tracing.workspace = true
 resolved-pathbuf.workspace = true
+queue-file = "1.4.10"
 
 [dev-dependencies]
 lightning-test-utils = {path="../test-utils"}

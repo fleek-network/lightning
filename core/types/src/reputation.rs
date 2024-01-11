@@ -13,9 +13,6 @@ pub const MAX_MEASUREMENTS_SUBMIT: u8 = 2;
 
 pub const PRECISION: usize = 18;
 
-/// Max number of updates allowed in a content registry update transaction.
-pub const MAX_UPDATES_CONTENT_REGISTRY: usize = 100;
-
 /// Contains the peer measurements that node A has about node B, that
 /// will be taken into account when computing B's reputation score.
 #[derive(

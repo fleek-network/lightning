@@ -132,7 +132,7 @@ async fn test_shutdown_and_start_again() {
     let path = std::env::temp_dir().join("lightning-test-dack-aggregator-shutdown");
 
     if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
     }
     let node = init_aggregator(path.clone()).await;
 
@@ -152,6 +152,6 @@ async fn test_shutdown_and_start_again() {
     assert!(!node.aggregator.is_running());
 
     if path.exists() {
-        std::fs::remove_dir_all(path).unwrap();
+        std::fs::remove_file(path).unwrap();
     }
 }

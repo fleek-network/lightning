@@ -2386,6 +2386,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "doc-comment"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
+
+[[package]]
 name = "downcast"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4670,12 +4676,14 @@ version = "0.0.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
+ "bincode",
  "fleek-crypto",
  "infusion",
  "lightning-application",
  "lightning-interfaces",
  "lightning-signer",
  "lightning-test-utils",
+ "queue-file",
  "resolved-pathbuf",
  "serde",
  "tokio",
@@ -7499,6 +7507,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "queue-file"
+version = "1.4.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69ed7dc66e03d45ddd9894a51fa309436cbfbff1bfbaae5b23353dd599568a80"
+dependencies = [
+ "bytes",
+ "snafu",
+]
+
+[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9015,6 +9033,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74212e6bbe9a4352329b2f68ba3130c15a3f26fe88ff22dbdc6cdd58fa85e99c"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "snafu"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4de37ad025c587a29e8f3f5605c00f70b98715ef90b9061a815b9e59e9042d6"
+dependencies = [
+ "doc-comment",
+ "snafu-derive",
+]
+
+[[package]]
+name = "snafu-derive"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "990079665f075b699031e9c08fd3ab99be5029b96f3b78dc0709e8f77e4efebf"
+dependencies = [
+ "heck",
+ "proc-macro2 1.0.74",
+ "quote 1.0.35",
+ "syn 1.0.109",
 ]
 
 [[package]]
