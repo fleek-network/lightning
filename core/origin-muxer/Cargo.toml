@@ -10,6 +10,7 @@ affair.workspace = true
 anyhow.workspace = true
 derive_more = "0.99"
 lightning-interfaces = { path = "../interfaces" }
+lightning-origin-ipfs = { path = "../origin-ipfs" }
 lightning-origin-http = { path = "../origin-http" }
 serde.workspace = true
 tokio.workspace = true

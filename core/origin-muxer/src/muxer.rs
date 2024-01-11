@@ -6,11 +6,13 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::Blake3Hash;
 use lightning_interfaces::OriginFetcherInterface;
 use lightning_origin_http::HttpOriginFetcher;
+use lightning_origin_ipfs::IPFSOrigin;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
 pub const HTTP_ORIGIN: &str = "http";
+pub const IPFS_ORIGIN: &str = "ipfs";
 
 pub struct Muxer<C: Collection> {
     origins: HashMap<&'static str, Origin<C>>,
@@ -27,6 +29,10 @@ impl<C: Collection> Muxer<C> {
 
     pub fn http_origin(&mut self, origin: HttpOriginFetcher<C>) {
         self.origins.insert(HTTP_ORIGIN, Origin::Http(origin));
+    }
+
+    pub fn ipfs_origin(&mut self, origin: IPFSOrigin<C>) {
+        self.origins.insert(IPFS_ORIGIN, Origin::Ipfs(origin));
     }
 
     pub fn spawn(mut self) -> (JoinHandle<Self>, Arc<Notify>) {
@@ -49,15 +55,19 @@ impl<C: Collection> Muxer<C> {
                 },
                 Some(Origin::Http(origin)) => {
                     let fetcher = origin.clone();
-                    // Todo: update fetch to take slice of bytes.
                     let id = id.as_bytes().to_vec();
                     tokio::spawn(async move {
                         let hash = fetcher.fetch(id).await;
                         task.respond(hash);
                     });
                 },
-                Some(Origin::Ipfs(_)) => {
-                    todo!()
+                Some(Origin::Ipfs(origin)) => {
+                    let fetcher = origin.clone();
+                    let id = id.as_bytes().to_vec();
+                    tokio::spawn(async move {
+                        let hash = fetcher.fetch(id).await;
+                        task.respond(hash);
+                    });
                 },
             }
         } else {
@@ -83,9 +93,7 @@ impl<C: Collection> Muxer<C> {
     }
 }
 
-// Todo: try using enum_dispatch.
-#[allow(dead_code)]
 enum Origin<C: Collection> {
     Http(HttpOriginFetcher<C>),
-    Ipfs(()),
+    Ipfs(IPFSOrigin<C>),
 }
