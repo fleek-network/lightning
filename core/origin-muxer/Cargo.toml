@@ -11,7 +11,6 @@ anyhow.workspace = true
 derive_more = "0.99"
 lightning-interfaces = { path = "../interfaces" }
 lightning-origin-http = { path = "../origin-http" }
-multiaddr = "0.17.1"
 serde.workspace = true
 tokio.workspace = true
 

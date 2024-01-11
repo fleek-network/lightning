@@ -5022,7 +5022,6 @@ dependencies = [
  "derive_more",
  "lightning-interfaces",
  "lightning-origin-http",
- "multiaddr",
  "serde",
  "tokio",
 ]
