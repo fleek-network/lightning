@@ -49,7 +49,7 @@ use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
 use lightning_signer::{utils, Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
-use lightning_test_utils::ipfs_gateway::spawn_gateway;
+use lightning_test_utils::server::spawn_server;
 use lightning_topology::{Config as TopologyConfig, Topology};
 use tokio::sync::oneshot;
 
@@ -328,7 +328,7 @@ async fn test_simple_origin_fetch() {
     };
 
     tokio::select! {
-        _ = spawn_gateway(40101) => {
+        _ = spawn_server(40101) => {
 
         }
         _ = req_fut => {
@@ -369,7 +369,7 @@ async fn test_fetch_from_peer() {
         let _ = tx.send((hash, peer1));
     };
     tokio::select! {
-        _ = spawn_gateway(40302) => {
+        _ = spawn_server(40302) => {
 
         }
         _ = put_fut => {

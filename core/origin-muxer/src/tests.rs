@@ -11,11 +11,21 @@ use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodePorts;
-use lightning_interfaces::{partial, ApplicationInterface, BlockStoreInterface, ConsensusInterface, IndexerInterface, SignerInterface, WithStartAndShutdown, OriginProviderInterface};
+use lightning_interfaces::{
+    partial,
+    ApplicationInterface,
+    BlockStoreInterface,
+    ConsensusInterface,
+    IndexerInterface,
+    OriginProviderInterface,
+    SignerInterface,
+    WithStartAndShutdown,
+};
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
-use crate::OriginMuxer;
+use lightning_test_utils::server;
 
+use crate::OriginMuxer;
 
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
@@ -168,12 +178,30 @@ async fn create_app_state(test_name: String) -> AppState {
 }
 
 #[tokio::test]
-async fn test_shutdown() {
-    let state = create_app_state("test_shutdown_origin_muxer".to_string()).await;
-    let origin = OriginMuxer::<TestBinding>::init(Default::default(), state.blockstore.clone()).unwrap();
-    assert!(!origin.is_running());
-    origin.start().await;
-    assert!(origin.is_running());
-    origin.shutdown().await;
-    assert!(!origin.is_running());
+async fn test_origin_muxer() {
+    // Given: Some content that will be returned by gateway.
+    let file: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
+    // Given: an identifier for some resource.
+    let id = "http=http://127.0.0.1:30235/bar/index.ts".to_string();
+    // Given: some state.
+    let state = create_app_state("test_origin_muxer".to_string()).await;
+
+    let test_fut = async move {
+        let origin =
+            OriginMuxer::<TestBinding>::init(Default::default(), state.blockstore.clone()).unwrap();
+        origin.start().await;
+
+        let socket = origin.get_socket();
+        let hash = socket.run(id.into_bytes()).await.unwrap().unwrap();
+
+        let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
+        // Then: we get the expected content.
+        assert_eq!(file, bytes);
+    };
+
+    tokio::select! {
+        biased;
+        _ = server::spawn_server(30235) => {}
+        _ = test_fut => {}
+    }
 }
