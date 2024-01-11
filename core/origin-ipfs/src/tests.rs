@@ -25,7 +25,7 @@ use lightning_interfaces::{
 };
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
-use lightning_test_utils::ipfs_gateway::spawn_gateway;
+use lightning_test_utils::server::spawn_server;
 
 use crate::config::{Config, Gateway, Protocol};
 use crate::IPFSOrigin;
@@ -207,7 +207,7 @@ async fn test_origin() {
     };
 
     tokio::select! {
-        _ = spawn_gateway(30100) => {
+        _ = spawn_server(30100) => {
 
         }
         _ = req_fut => {

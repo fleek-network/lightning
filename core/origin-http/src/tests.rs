@@ -206,7 +206,6 @@ async fn test_http_origin() {
 
 #[tokio::test]
 async fn test_http_origin_with_integrity_check() {
-    // Todo: let's use a different type of content.
     // Given: Some content that will be returned by gateway.
     let file: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
     // Given: an identifier for some resource.
