@@ -44,7 +44,9 @@ impl<C: Collection> Muxer<C> {
         let address = std::str::from_utf8(task.request.as_slice()).unwrap();
         if let Some((ty, id)) = address.split_once('=') {
             match self.origins.get(ty) {
-                None => {},
+                None => {
+                    task.respond(Err(anyhow::anyhow!("unknown origin type")));
+                },
                 Some(Origin::Http(origin)) => {
                     let fetcher = origin.clone();
                     // Todo: update fetch to take slice of bytes.

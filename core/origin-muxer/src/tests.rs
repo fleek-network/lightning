@@ -191,12 +191,16 @@ async fn test_origin_muxer() {
             OriginMuxer::<TestBinding>::init(Default::default(), state.blockstore.clone()).unwrap();
         origin.start().await;
 
+        // When: we request content given its identify.
         let socket = origin.get_socket();
         let hash = socket.run(id.into_bytes()).await.unwrap().unwrap();
 
         let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
         // Then: we get the expected content.
         assert_eq!(file, bytes);
+
+        // Clean up.
+        origin.shutdown().await;
     };
 
     tokio::select! {
@@ -204,4 +208,24 @@ async fn test_origin_muxer() {
         _ = server::spawn_server(30235) => {}
         _ = test_fut => {}
     }
+}
+
+#[tokio::test]
+async fn test_origin_muxer_invalid_id() {
+    // Given: an invalid identifier.
+    let id = "zoo=http://127.0.0.1:30235/bar/index.ts".to_string();
+    // Given: some state.
+    let state = create_app_state("test_origin_muxer_invalid_id".to_string()).await;
+
+    // When: we request content given.
+    let origin =
+        OriginMuxer::<TestBinding>::init(Default::default(), state.blockstore.clone()).unwrap();
+    origin.start().await;
+    let socket = origin.get_socket();
+
+    // Then: request fails because id is invalid.
+    assert!(socket.run(id.into_bytes()).await.unwrap().is_err());
+
+    // Clean up.
+    origin.shutdown().await;
 }
