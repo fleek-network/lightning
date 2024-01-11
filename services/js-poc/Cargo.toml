@@ -15,13 +15,16 @@ arrayref = "0.3"
 triomphe = "0.1"
 serde.workspace = true
 serde_json.workspace = true
-deno_core = "0.232"
+deno_core = "0.245"
 hex = "0.4"
 cid = "0.11"
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 
 [dev-dependencies]
 lightning-schema = { path = "../../core/schema" }
+
+[build-dependencies]
+deno_core = "0.245"
 
 [[bin]]
 name = "fn-service-1"
