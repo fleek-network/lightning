@@ -16,6 +16,7 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use lightning_origin_http::HttpOriginFetcher;
+use lightning_origin_ipfs::IPFSOrigin;
 use muxer::Muxer;
 use tokio::sync::{Mutex, Notify};
 use tokio::task::JoinHandle;
@@ -80,15 +81,17 @@ impl<C: Collection> WithStartAndShutdown for OriginMuxer<C> {
 }
 
 impl<C: Collection> OriginProviderInterface<C> for OriginMuxer<C> {
-    fn init(_: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
+    fn init(config: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
 
         let mut muxer = Muxer::new(rx);
 
         muxer.http_origin(HttpOriginFetcher::<C>::init(
-            Default::default(),
+            config.http,
             blockstore.clone(),
         )?);
+
+        muxer.ipfs_origin(IPFSOrigin::<C>::init(config.ipfs, blockstore.clone())?);
 
         Ok(Self {
             status: Mutex::new(Some(Status::NotRunning { muxer })),

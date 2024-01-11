@@ -13,7 +13,16 @@ use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodePorts;
-use lightning_interfaces::{partial, ApplicationInterface, BlockStoreInterface, ConsensusInterface, IndexerInterface, SignerInterface, WithStartAndShutdown, OriginFetcherInterface};
+use lightning_interfaces::{
+    partial,
+    ApplicationInterface,
+    BlockStoreInterface,
+    ConsensusInterface,
+    IndexerInterface,
+    OriginFetcherInterface,
+    SignerInterface,
+    WithStartAndShutdown,
+};
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use lightning_test_utils::server::spawn_server;

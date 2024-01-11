@@ -15,7 +15,7 @@ use lightning_interfaces::{
 };
 use reqwest::Client;
 
-use crate::config::Config;
+pub use crate::config::Config;
 
 pub struct HttpOriginFetcher<C: Collection> {
     client: Client,

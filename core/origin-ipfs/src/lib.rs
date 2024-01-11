@@ -1,10 +1,7 @@
-use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
-use affair::{Socket, Task};
 use anyhow::{anyhow, Context};
-use bytes::Bytes;
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use hyper::client::{self, HttpConnector};
@@ -17,14 +14,10 @@ use lightning_interfaces::{
     ConfigConsumer,
     IncrementalPutInterface,
     OriginFetcherInterface,
-    OriginProviderInterface,
-    OriginProviderSocket,
-    WithStartAndShutdown,
 };
 use tokio::io::AsyncReadExt;
-use tokio::sync::{mpsc, Notify};
 use tokio::time::timeout;
-use tracing::{error, info};
+use tracing::info;
 pub mod config;
 pub use config::Config;
 use config::Gateway;
@@ -36,7 +29,7 @@ mod tests;
 
 const GATEWAY_TIMEOUT: Duration = Duration::from_millis(500);
 
-struct IPFSOrigin<C: Collection> {
+pub struct IPFSOrigin<C: Collection> {
     client: Arc<Client<HttpsConnector<HttpConnector>, Body>>,
     gateways: Vec<Gateway>,
     blockstore: C::BlockStoreInterface,
