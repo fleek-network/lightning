@@ -63,6 +63,8 @@ impl<C: Collection> OriginFetcherInterface<C> for HttpOriginFetcher<C> {
             anyhow::bail!("invalid url");
         }
 
+        // Todo: check that it's a valid URL.
+
         let resp = self
             .client
             .get(url)
