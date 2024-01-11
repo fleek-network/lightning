@@ -1,6 +1,7 @@
 mod config;
+#[cfg(test)]
+mod tests;
 
-use std::future::Future;
 use std::marker::PhantomData;
 use std::time::Duration;
 
@@ -49,7 +50,15 @@ impl<C: Collection> OriginFetcherInterface<C> for HttpOriginFetcher<C> {
 
     async fn fetch(&self, identifier: Vec<u8>) -> anyhow::Result<Blake3Hash> {
         let identifier = String::from_utf8(identifier)?;
-        let (url, _hash) = identifier.split_once("#integrity=").ok_or(anyhow::anyhow!("invalid identifier"))?;
+        let (url, _hash) = if identifier.contains("#integrity=") {
+            identifier
+                .split_once("#integrity=")
+                .map(|(url, hash)| (url, Some(hash)))
+                .ok_or(anyhow::anyhow!("invalid identifier"))?
+        } else {
+            (identifier.as_str(), None)
+        };
+
         if url.is_empty() {
             anyhow::bail!("invalid url");
         }

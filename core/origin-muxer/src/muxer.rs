@@ -1,9 +1,8 @@
 use std::collections::HashMap;
-use std::future::Future;
 use std::sync::Arc;
 
 use affair::Task;
-use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::Blake3Hash;
 use lightning_interfaces::OriginFetcherInterface;
 use lightning_origin_http::HttpOriginFetcher;
@@ -83,7 +82,8 @@ impl<C: Collection> Muxer<C> {
 }
 
 // Todo: try using enum_dispatch.
-pub enum Origin<C: Collection> {
+#[allow(dead_code)]
+enum Origin<C: Collection> {
     Http(HttpOriginFetcher<C>),
     Ipfs(()),
 }
