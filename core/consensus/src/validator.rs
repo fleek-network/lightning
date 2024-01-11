@@ -8,6 +8,7 @@ use lightning_interfaces::types::{
     TransactionRequest,
     UpdateMethod,
     UpdateRequest,
+    MAX_DELIVERY_ACKNOWLEDGMENTS,
     MAX_MEASUREMENTS_PER_TX,
     MAX_UPDATES_CONTENT_REGISTRY,
 };
@@ -91,6 +92,16 @@ impl Validator {
                     UpdateMethod::UpdateContentRegistry { updates } => {
                         if updates.len() > MAX_UPDATES_CONTENT_REGISTRY {
                             return Err(anyhow!("Too many updates"));
+                        }
+                    },
+                    UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+                        commodity: _,
+                        service_id: _,
+                        proofs,
+                        metadata: _,
+                    } => {
+                        if proofs.len() > MAX_DELIVERY_ACKNOWLEDGMENTS {
+                            return Err(anyhow!("Too many delivery acknowledgments"));
                         }
                     },
                     _ => (),
