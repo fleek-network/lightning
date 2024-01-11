@@ -1,8 +1,10 @@
+use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use affair::{Socket, Task};
 use anyhow::{anyhow, Context};
+use bytes::Bytes;
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use hyper::client::{self, HttpConnector};
@@ -14,6 +16,7 @@ use lightning_interfaces::{
     BlockStoreInterface,
     ConfigConsumer,
     IncrementalPutInterface,
+    OriginFetcherInterface,
     OriginProviderInterface,
     OriginProviderSocket,
     WithStartAndShutdown,
@@ -33,69 +36,26 @@ mod tests;
 
 const GATEWAY_TIMEOUT: Duration = Duration::from_millis(500);
 
-#[allow(clippy::type_complexity)]
-pub struct IPFSOrigin<C: Collection> {
-    inner: Arc<IPFSOriginInner<C>>,
-    socket: OriginProviderSocket,
-    rx: Arc<Mutex<Option<mpsc::Receiver<Task<Vec<u8>, anyhow::Result<Blake3Hash>>>>>>,
-    is_running: Arc<Mutex<bool>>,
-    shutdown_notify: Arc<Notify>,
-}
-
-impl<C: Collection> OriginProviderInterface<C> for IPFSOrigin<C> {
-    fn init(config: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
-        let (socket, rx) = Socket::raw_bounded(2048);
-        let inner = IPFSOriginInner {
-            gateways: config.gateways,
-            blockstore,
-        };
-
-        Ok(IPFSOrigin {
-            inner: Arc::new(inner),
-            socket,
-            rx: Arc::new(Mutex::new(Some(rx))),
-            is_running: Arc::new(Mutex::new(false)),
-            shutdown_notify: Arc::new(Notify::new()),
-        })
-    }
-
-    fn get_socket(&self) -> OriginProviderSocket {
-        self.socket.clone()
-    }
-}
-
-impl<C: Collection> WithStartAndShutdown for IPFSOrigin<C> {
-    fn is_running(&self) -> bool {
-        *self.is_running.lock().unwrap()
-    }
-
-    async fn start(&self) {
-        if !*self.is_running.lock().unwrap() {
-            let inner = self.inner.clone();
-            let rx = self.rx.lock().unwrap().take().unwrap();
-            let shutdown_notify = self.shutdown_notify.clone();
-            tokio::spawn(async move { inner.handle(rx, shutdown_notify).await });
-            *self.is_running.lock().unwrap() = true;
-        }
-    }
-
-    async fn shutdown(&self) {
-        self.shutdown_notify.notify_one();
-        *self.is_running.lock().unwrap() = false;
-    }
-}
-
-struct IPFSOriginInner<C: Collection> {
+struct IPFSOrigin<C: Collection> {
+    client: Arc<Client<HttpsConnector<HttpConnector>, Body>>,
     gateways: Vec<Gateway>,
     blockstore: C::BlockStoreInterface,
 }
 
-impl<C: Collection> IPFSOriginInner<C> {
-    async fn handle(
-        self: Arc<Self>,
-        mut rx: mpsc::Receiver<Task<Vec<u8>, anyhow::Result<Blake3Hash>>>,
-        shutdown_notify: Arc<Notify>,
-    ) {
+impl<C: Collection> ConfigConsumer for IPFSOrigin<C> {
+    const KEY: &'static str = "origin-ipfs";
+
+    type Config = Config;
+}
+
+impl<C: Collection> Clone for IPFSOrigin<C> {
+    fn clone(&self) -> Self {
+        todo!()
+    }
+}
+
+impl<C: Collection> OriginFetcherInterface<C> for IPFSOrigin<C> {
+    fn init(config: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
         // Prepare the TLS client config
         let tls = rustls::ClientConfig::builder()
             .with_safe_defaults()
@@ -110,63 +70,55 @@ impl<C: Collection> IPFSOriginInner<C> {
             .build();
 
         // Build the hyper client from the HTTPS connector.
-        let client: client::Client<_, hyper::Body> = client::Client::builder().build(https);
+        let client: Client<_, hyper::Body> = client::Client::builder().build(https);
 
-        'outer: loop {
-            tokio::select! {
-                task = rx.recv() => {
-                    let Some(task) = task else {
-                        error!("Failed to receive task");
-                        continue;
-                    };
-                    match self.fetch(&client, &task.request).await {
-                        Ok(stream) => {
-                            let mut blockstore_putter = self.blockstore.put(None);
-                            let mut read = StreamReader::new(stream);
-                            let mut buf = [0; 1024];
-                            let mut bytes: Vec<u8> = Vec::new();
-                            let comp = CompressionAlgorithm::Uncompressed; // clippy
-                            loop {
-                                let len = read.read(&mut buf).await.unwrap();
-                                if let Err(e) = blockstore_putter.write(&buf[..len], comp){
-                                    task.respond(Err(anyhow!("Failed to write to the blockstore: {e}")));
-                                    continue 'outer;
-                                }
-                                bytes.extend(&buf[..len]);
-                                if len == 0 {
-                                    break;
-                                }
-                            }
-                            let Ok(requested_cid) = Cid::try_from(task.request.clone()) else {
-                                error!("Failed to parse uri into cid");
-                                continue;
-                            };
-                            let valid = match Code::try_from(requested_cid.hash().code()) {
-                                Ok(hasher) => &hasher.digest(&bytes) == requested_cid.hash(),
-                                _ => false,
-                            };
-                            if valid {
-                                let hash = blockstore_putter.finalize().await.map_err(|e| anyhow!("failed to finalize in blockstore: {e}"));
-                                task.respond(hash);
-                            } else {
-                                task.respond(Err(anyhow!("Data verification failed")));
-                            }
-                        },
-                        Err(e) => task.respond(Err(e)),
-                    }
-                }
-                _ = shutdown_notify.notified() => break,
-            }
-        }
+        Ok(IPFSOrigin {
+            client: Arc::new(client),
+            gateways: config.gateways,
+            blockstore,
+        })
     }
 
-    async fn fetch(
-        &self,
-        client: &Client<HttpsConnector<HttpConnector>, hyper::Body>,
-        uri: &[u8],
-    ) -> anyhow::Result<IPFSStream> {
-        let requested_cid = Cid::try_from(uri).with_context(|| "Failed to parse uri into cid")?;
+    async fn fetch(&self, identifier: Vec<u8>) -> anyhow::Result<Blake3Hash> {
+        let requested_cid =
+            Cid::try_from(identifier).with_context(|| "Failed to parse uri into cid")?;
 
+        let stream = self.fetch_from_gateway(&requested_cid).await?;
+
+        let mut blockstore_putter = self.blockstore.put(None);
+        let mut read = StreamReader::new(stream);
+        let mut buf = [0; 1024];
+        let mut bytes: Vec<u8> = Vec::new();
+        let comp = CompressionAlgorithm::Uncompressed; // clippy
+
+        loop {
+            let len = read.read(&mut buf).await.unwrap();
+            if let Err(e) = blockstore_putter.write(&buf[..len], comp) {
+                anyhow::bail!("Failed to write to the blockstore: {e}");
+            }
+            bytes.extend(&buf[..len]);
+            if len == 0 {
+                break;
+            }
+        }
+
+        let valid = match Code::try_from(requested_cid.hash().code()) {
+            Ok(hasher) => &hasher.digest(&bytes) == requested_cid.hash(),
+            _ => false,
+        };
+        if valid {
+            blockstore_putter
+                .finalize()
+                .await
+                .map_err(|e| anyhow!("failed to finalize in blockstore: {e}"))
+        } else {
+            Err(anyhow!("Data verification failed"))
+        }
+    }
+}
+
+impl<C: Collection> IPFSOrigin<C> {
+    async fn fetch_from_gateway(&self, requested_cid: &Cid) -> anyhow::Result<IPFSStream> {
         for gateway in self.gateways.iter() {
             let url = Uri::builder()
                 .scheme(gateway.protocol.as_str())
@@ -180,10 +132,10 @@ impl<C: Collection> IPFSOriginInner<C> {
                 .header("Connection", "keep-alive")
                 .body(Body::default())?;
 
-            match timeout(GATEWAY_TIMEOUT, client.request(req)).await {
+            match timeout(GATEWAY_TIMEOUT, self.client.request(req)).await {
                 Ok(Ok(res)) => {
                     let body = res.into_body();
-                    return Ok(IPFSStream::new(requested_cid, body));
+                    return Ok(IPFSStream::new(*requested_cid, body));
                 },
                 Ok(Err(e)) => {
                     info!(
@@ -201,10 +153,4 @@ impl<C: Collection> IPFSOriginInner<C> {
         }
         Err(anyhow::anyhow!("No response from gateways."))
     }
-}
-
-impl<C: Collection> ConfigConsumer for IPFSOrigin<C> {
-    const KEY: &'static str = "origin-ipfs";
-
-    type Config = Config;
 }

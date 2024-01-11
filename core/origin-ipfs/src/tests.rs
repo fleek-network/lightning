@@ -13,16 +13,7 @@ use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodePorts;
-use lightning_interfaces::{
-    partial,
-    ApplicationInterface,
-    BlockStoreInterface,
-    ConsensusInterface,
-    IndexerInterface,
-    OriginProviderInterface,
-    SignerInterface,
-    WithStartAndShutdown,
-};
+use lightning_interfaces::{partial, ApplicationInterface, BlockStoreInterface, ConsensusInterface, IndexerInterface, SignerInterface, WithStartAndShutdown, OriginFetcherInterface};
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use lightning_test_utils::server::spawn_server;
@@ -36,7 +27,7 @@ partial!(TestBinding {
     BlockStoreInterface = Blockstore<Self>;
     IndexerInterface = Indexer<Self>;
     SignerInterface = Signer<Self>;
-    OriginProviderInterface = IPFSOrigin<Self>;
+    OriginFetcherInterface = IPFSOrigin<Self>;
 });
 
 struct AppState {
@@ -192,10 +183,8 @@ async fn test_origin() {
         });
         let ipfs_origin =
             IPFSOrigin::<TestBinding>::init(config, state.blockstore.clone()).unwrap();
-        ipfs_origin.start().await;
 
-        let socket = ipfs_origin.get_socket();
-        let hash = socket.run(req_cid.to_bytes()).await.unwrap().unwrap();
+        let hash = ipfs_origin.fetch(req_cid.to_bytes()).await.unwrap();
 
         let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
         assert!(
@@ -215,15 +204,4 @@ async fn test_origin() {
         }
 
     }
-}
-
-#[tokio::test]
-async fn test_shutdown() {
-    let blockstore = Blockstore::<TestBinding>::init(Default::default()).unwrap();
-    let ipfs_origin = IPFSOrigin::<TestBinding>::init(Config::default(), blockstore).unwrap();
-    assert!(!ipfs_origin.is_running());
-    ipfs_origin.start().await;
-    assert!(ipfs_origin.is_running());
-    ipfs_origin.shutdown().await;
-    assert!(!ipfs_origin.is_running());
 }
