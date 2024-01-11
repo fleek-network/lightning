@@ -108,36 +108,22 @@ impl AggregatorInner {
                 }
                 _ = interval.tick() => {
                     let mut dacks = Vec::new();
-                    loop {
+                    let mut num_dacks_taken = 0;
+                    for dack_bytes in queue.iter() {
                         if dacks.len() == MAX_DELIVERY_ACKNOWLEDGMENTS {
                             break;
                         }
-                        match queue.peek() {
-                            Ok(Some(dack_bytes)) => {
-                                match bincode::deserialize::<DeliveryAcknowledgment>(&dack_bytes) {
-                                    Ok(dack) => {
-                                        dacks.push(dack);
-                                    }
-                                    Err(e) => {
-                                        error!("Failed to deserialize DACK: {e:?}");
-                                    }
-                                }
+                        match bincode::deserialize::<DeliveryAcknowledgment>(&dack_bytes) {
+                            Ok(dack) => {
+                                dacks.push(dack);
                             }
-                            Ok(None) => break, // queue is empty
                             Err(e) => {
-                                // TODO(matthias): should we panic here?
-                                error!("Failed to read DACK from disk: {e:?}");
+                                error!("Failed to deserialize DACK: {e:?}");
                             }
                         }
-
-                        // TODO(matthias): instead of removing the DACKs directly,
-                        // we should only remove them once the transaction was submitted.
-                        // Or we only remove them after we verified that the transaction was
-                        // ordered.
-                        if let Err(e) = queue.remove() {
-                            error!("Failed to remove DACK from queue: {e:?}");
-                        }
+                        num_dacks_taken += 1;
                     }
+
                     let submit_tx = self.submit_tx.clone();
                     // TODO(matthias): fill this information in. This information has
                     // has to be sent through the aggregator socket, along with the DACK.
@@ -153,6 +139,14 @@ impl AggregatorInner {
                             .await
                         {
                             error!("Failed to submit DACK to signer: {e:?}");
+                        }
+                    });
+                    // After sending the transaction, we remove the DACKs we sent from the queue.
+                    (0..num_dacks_taken).for_each(|_| {
+                        // TODO(matthias): should we only remove them after we verified that the transaction was
+                        // ordered?
+                        if let Err(e) = queue.remove() {
+                            error!("Failed to remove DACK from queue: {e:?}");
                         }
                     });
                 }
