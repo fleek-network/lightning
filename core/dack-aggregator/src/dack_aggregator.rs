@@ -4,7 +4,11 @@ use std::sync::{Arc, Mutex};
 
 use affair::{Socket, Task};
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::DeliveryAcknowledgment;
+use lightning_interfaces::types::{
+    DeliveryAcknowledgment,
+    UpdateMethod,
+    MAX_DELIVERY_ACKNOWLEDGMENTS,
+};
 use lightning_interfaces::{
     ConfigConsumer,
     DeliveryAcknowledgmentAggregatorInterface,
@@ -12,6 +16,7 @@ use lightning_interfaces::{
     SubmitTxSocket,
     WithStartAndShutdown,
 };
+use queue_file::QueueFile;
 use tokio::sync::{mpsc, Notify};
 use tracing::error;
 
@@ -31,6 +36,7 @@ struct AggregatorInner {
     submit_tx: SubmitTxSocket,
     #[allow(clippy::type_complexity)]
     socket_rx: Arc<Mutex<Option<mpsc::Receiver<Task<DeliveryAcknowledgment, ()>>>>>,
+    queue: Arc<Mutex<Option<QueueFile>>>,
     shutdown_notify: Arc<Notify>,
 }
 
@@ -40,7 +46,7 @@ impl<C: Collection> DeliveryAcknowledgmentAggregatorInterface<C>
     fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
         let (socket, socket_rx) = Socket::raw_bounded(2048);
         let shutdown_notify = Arc::new(Notify::new());
-        let inner = AggregatorInner::new(config, submit_tx, socket_rx, shutdown_notify.clone());
+        let inner = AggregatorInner::new(config, submit_tx, socket_rx, shutdown_notify.clone())?;
 
         Ok(Self {
             inner: Arc::new(inner),
@@ -62,17 +68,20 @@ impl AggregatorInner {
         submit_tx: SubmitTxSocket,
         socket_rx: mpsc::Receiver<Task<DeliveryAcknowledgment, ()>>,
         shutdown_notify: Arc<Notify>,
-    ) -> Self {
-        Self {
+    ) -> anyhow::Result<Self> {
+        let queue = QueueFile::open(&config.db_path)?;
+        Ok(Self {
             config,
             submit_tx,
             socket_rx: Arc::new(Mutex::new(Some(socket_rx))),
+            queue: Arc::new(Mutex::new(Some(queue))),
             shutdown_notify,
-        }
+        })
     }
 
     async fn start(&self) {
         let mut socket_rx = self.socket_rx.lock().unwrap().take().unwrap();
+        let mut queue = self.queue.lock().unwrap().take().unwrap();
         let mut interval = tokio::time::interval(self.config.submit_interval);
         loop {
             tokio::select! {
@@ -80,15 +89,77 @@ impl AggregatorInner {
                     break;
                 }
                 task = socket_rx.recv() => {
-                    if let Some(_task) = task {
+                    if let Some(task) = task {
+                        match bincode::serialize(&task.request) {
+                            Ok(dack_bytes) => {
+                                task.respond(());
+                                if let Err(e) = queue.add(&dack_bytes) {
+                                    // TODO(matthias): this should be a telemetry event log
+                                    error!("Failed to write DACK to disk: {e:?}");
+                                }
+                            }
+                            Err(e) => {
+                                task.respond(());
+                                error!("Failed to serialize DACK: {e:?}");
+                            }
+                        }
+
                     }
                 }
                 _ = interval.tick() => {
+                    let mut dacks = Vec::new();
+                    loop {
+                        if dacks.len() == MAX_DELIVERY_ACKNOWLEDGMENTS {
+                            break;
+                        }
+                        match queue.peek() {
+                            Ok(Some(dack_bytes)) => {
+                                match bincode::deserialize::<DeliveryAcknowledgment>(&dack_bytes) {
+                                    Ok(dack) => {
+                                        dacks.push(dack);
+                                    }
+                                    Err(e) => {
+                                        error!("Failed to deserialize DACK: {e:?}");
+                                    }
+                                }
+                            }
+                            Ok(None) => break, // queue is empty
+                            Err(e) => {
+                                // TODO(matthias): should we panic here?
+                                error!("Failed to read DACK from disk: {e:?}");
+                            }
+                        }
 
+                        // TODO(matthias): instead of removing the DACKs directly,
+                        // we should only remove them once the transaction was submitted.
+                        // Or we only remove them after we verified that the transaction was
+                        // ordered.
+                        if let Err(e) = queue.remove() {
+                            error!("Failed to remove DACK from queue: {e:?}");
+                        }
+                    }
+                    let submit_tx = self.submit_tx.clone();
+                    // TODO(matthias): fill this information in. This information has
+                    // has to be sent through the aggregator socket, along with the DACK.
+                    let update = UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+                        commodity: 1, // dummy
+                        service_id: 0, // dummy
+                        proofs: dacks,
+                        metadata: None // dummy
+                    };
+                    tokio::spawn(async move {
+                        if let Err(e) = submit_tx
+                            .run(update)
+                            .await
+                        {
+                            error!("Failed to submit DACK to signer: {e:?}");
+                        }
+                    });
                 }
             }
         }
         *self.socket_rx.lock().unwrap() = Some(socket_rx);
+        *self.queue.lock().unwrap() = Some(queue);
     }
 }
 

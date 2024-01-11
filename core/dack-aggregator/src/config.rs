@@ -5,8 +5,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
+    /// Interval for submitting the aggregated DACKs to the mempool
     pub submit_interval: Duration,
-    /// Path to the database where the dacks are stored.
+    /// Path to the database where the DACKs are stored
     pub db_path: ResolvedPathBuf,
 }
 
