@@ -74,9 +74,4 @@ pub async fn query_client_bandwidth_balance(#[buffer(copy)] address: Vec<u8>) ->
     )
 }
 
-extension!(
-    fleek,
-    ops = [log, fetch_blake3, load_content, read_block],
-    esm_entry_point = "ext:fleek/entrypoint.js",
-    esm = [ dir "src/runtime", "entrypoint.js" ]
-);
+extension!(fleek, ops = [log, fetch_blake3, load_content, read_block]);
