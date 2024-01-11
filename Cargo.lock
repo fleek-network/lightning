@@ -4980,9 +4980,18 @@ version = "0.0.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
+ "cid 0.10.1",
+ "fleek-crypto",
+ "infusion",
+ "lightning-application",
+ "lightning-blockstore",
+ "lightning-indexer",
  "lightning-interfaces",
+ "lightning-signer",
+ "lightning-test-utils",
  "reqwest",
  "serde",
+ "tokio",
 ]
 
 [[package]]

@@ -1,7 +1,6 @@
 mod config;
 mod muxer;
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use affair::Socket;
@@ -13,7 +12,6 @@ use lightning_interfaces::{
     OriginProviderInterface,
     OriginProviderSocket,
     WithStartAndShutdown,
-    _IncrementalDirInterface,
 };
 use lightning_origin_http::HttpOriginFetcher;
 use muxer::Muxer;
@@ -21,7 +19,6 @@ use tokio::sync::{Mutex, Notify};
 use tokio::task::JoinHandle;
 
 use crate::config::Config;
-use crate::muxer::HTTP_ORIGIN;
 
 #[derive(IsVariant)]
 enum Status<C: Collection> {
