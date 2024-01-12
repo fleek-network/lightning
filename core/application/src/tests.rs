@@ -25,7 +25,7 @@ use lightning_interfaces::types::{
     ChainId,
     CommodityTypes,
     ContentUpdate,
-    DeliveryAcknowledgment,
+    DeliveryAcknowledgmentProof,
     Epoch,
     ExecutionData,
     ExecutionError,
@@ -933,7 +933,7 @@ fn prepare_pod_request(
         UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
             commodity,  // units of data served
             service_id, // service 0 serving bandwidth
-            proofs: vec![DeliveryAcknowledgment],
+            proofs: vec![DeliveryAcknowledgmentProof],
             metadata: None,
         },
         secret_key,
@@ -1795,7 +1795,7 @@ async fn test_submit_pod_reverts_account_key() {
     let submit_pod = UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
         commodity: 2000,
         service_id: 1,
-        proofs: vec![DeliveryAcknowledgment],
+        proofs: vec![DeliveryAcknowledgmentProof],
         metadata: None,
     };
     let update = prepare_update_request_account(submit_pod, &secret_key, 1);
@@ -1814,7 +1814,7 @@ async fn test_submit_pod_reverts_node_does_not_exist() {
     let submit_pod = UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
         commodity: 2000,
         service_id: 1,
-        proofs: vec![DeliveryAcknowledgment],
+        proofs: vec![DeliveryAcknowledgmentProof],
         metadata: None,
     };
     let update = prepare_update_request_node(submit_pod, &node_secret_key, 1);
@@ -1848,7 +1848,7 @@ async fn test_submit_pod_reverts_insufficient_stake() {
     let submit_pod = UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
         commodity: 2000,
         service_id: 1,
-        proofs: vec![DeliveryAcknowledgment],
+        proofs: vec![DeliveryAcknowledgmentProof],
         metadata: None,
     };
     let update = prepare_update_request_node(submit_pod, &node_secret_key, 1);

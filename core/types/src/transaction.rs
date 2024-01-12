@@ -16,7 +16,6 @@ use ink_quill::{ToDigest, TranscriptBuilder, TranscriptBuilderInput};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    DeliveryAcknowledgment,
     Epoch,
     ProofOfConsensus,
     ProofOfMisbehavior,
@@ -27,7 +26,7 @@ use super::{
     Tokens,
 };
 use crate::content_registry::ContentUpdate;
-use crate::{NodeIndex, NodePorts, TransactionDestination};
+use crate::{DeliveryAcknowledgmentProof, NodeIndex, NodePorts, TransactionDestination};
 
 pub type ChainId = u32;
 
@@ -278,7 +277,7 @@ pub enum UpdateMethod {
         /// The service id of the service this was provided through(CDN, compute, ect.)
         service_id: u32,
         /// The PoD of delivery in bytes
-        proofs: Vec<DeliveryAcknowledgment>,
+        proofs: Vec<DeliveryAcknowledgmentProof>,
         /// Optional metadata to provide information additional information about this batch
         metadata: Option<Vec<u8>>,
     },

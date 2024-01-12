@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -6,6 +7,7 @@ use affair::{Socket, Task};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     DeliveryAcknowledgment,
+    DeliveryAcknowledgmentProof,
     UpdateMethod,
     MAX_DELIVERY_ACKNOWLEDGMENTS,
 };
@@ -107,15 +109,25 @@ impl AggregatorInner {
                     }
                 }
                 _ = interval.tick() => {
-                    let mut dacks = Vec::new();
+                    let mut proofs: HashMap<u32, Vec<DeliveryAcknowledgmentProof>> = HashMap::new();
+                    let mut metadata = HashMap::new();
+                    let mut commodity = HashMap::new();
                     let mut num_dacks_taken = 0;
                     for dack_bytes in queue.iter() {
-                        if dacks.len() == MAX_DELIVERY_ACKNOWLEDGMENTS {
-                            break;
-                        }
                         match bincode::deserialize::<DeliveryAcknowledgment>(&dack_bytes) {
                             Ok(dack) => {
-                                dacks.push(dack);
+                                let num_dacks = proofs.get(&dack.service_id).map_or(0, |p| p.len());
+                                if num_dacks >= MAX_DELIVERY_ACKNOWLEDGMENTS {
+                                    break;
+                                }
+                                proofs.entry(dack.service_id).or_default().push(dack.proof);
+                                *commodity.entry(dack.service_id).or_insert(0) += dack.commodity;
+                                if let Some(data) = &dack.metadata {
+                                    metadata
+                                        .entry(dack.service_id)
+                                        .or_insert(Vec::new())
+                                        .extend(data);
+                                }
                             }
                             Err(e) => {
                                 error!("Failed to deserialize DACK: {e:?}");
@@ -124,23 +136,25 @@ impl AggregatorInner {
                         num_dacks_taken += 1;
                     }
 
-                    let submit_tx = self.submit_tx.clone();
-                    // TODO(matthias): fill this information in. This information has
-                    // has to be sent through the aggregator socket, along with the DACK.
-                    let update = UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
-                        commodity: 1, // dummy
-                        service_id: 0, // dummy
-                        proofs: dacks,
-                        metadata: None // dummy
-                    };
-                    tokio::spawn(async move {
-                        if let Err(e) = submit_tx
-                            .run(update)
-                            .await
-                        {
-                            error!("Failed to submit DACK to signer: {e:?}");
-                        }
-                    });
+                    for (service_id, service_proofs) in proofs {
+                        // This unwrap is safe because commodity and proofs are inserted together
+                        let service_commodity = commodity.get(&service_id).unwrap();
+                        let update = UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+                            commodity: *service_commodity,
+                            service_id,
+                            proofs: service_proofs,
+                            metadata: metadata.remove(&service_id),
+                        };
+                        let submit_tx = self.submit_tx.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = submit_tx
+                                .run(update)
+                                .await
+                            {
+                                error!("Failed to submit DACK to signer: {e:?}");
+                            }
+                        });
+                    }
                     // After sending the transaction, we remove the DACKs we sent from the queue.
                     (0..num_dacks_taken).for_each(|_| {
                         // TODO(matthias): should we only remove them after we verified that the transaction was
