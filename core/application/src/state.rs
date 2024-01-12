@@ -22,7 +22,7 @@ use lightning_interfaces::types::{
     Committee,
     CommodityTypes,
     ContentUpdate,
-    DeliveryAcknowledgment,
+    DeliveryAcknowledgmentProof,
     Epoch,
     ExecutionData,
     ExecutionError,
@@ -373,7 +373,7 @@ impl<B: Backend> State<B> {
         sender: TransactionSender,
         commodity: u128,
         service_id: u32,
-        _acknowledgments: Vec<DeliveryAcknowledgment>,
+        _acknowledgments: Vec<DeliveryAcknowledgmentProof>,
     ) -> TransactionResponse {
         // Todo: function not done
         let sender: NodeIndex = match self.only_node(sender) {
