@@ -11,9 +11,6 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
-pub const HTTP_ORIGIN: &str = "http";
-pub const IPFS_ORIGIN: &str = "ipfs";
-
 pub struct Muxer<C: Collection> {
     origins: HashMap<OriginProvider, Origin<C>>,
     task_rx: Receiver<Task<ImmutablePointer, anyhow::Result<Blake3Hash>>>,

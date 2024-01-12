@@ -103,7 +103,7 @@ impl<C: Collection> OriginFetcher<C> {
         let origin_socket = self.origin_socket.clone();
         self.tasks.spawn(async move {
             match &pointer.origin {
-                OriginProvider::IPFS => match origin_socket.run(pointer.uri.clone()).await {
+                OriginProvider::IPFS => match origin_socket.run(pointer.clone()).await {
                     Ok(Ok(hash)) => Ok(SuccessResponse { pointer, hash }),
                     Ok(Err(_)) => Err(ErrorResponse::OriginFetchError(pointer.uri)),
                     Err(_) => Err(ErrorResponse::OriginSocketError),

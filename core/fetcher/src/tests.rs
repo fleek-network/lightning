@@ -41,7 +41,8 @@ use lightning_interfaces::{
 };
 use lightning_notifier::Notifier;
 use lightning_origin_ipfs::config::{Gateway, Protocol};
-use lightning_origin_ipfs::{Config as IPFSOriginConfig, IPFSOrigin};
+use lightning_origin_ipfs::Config as IPFSOriginConfig;
+use lightning_origin_muxer::{Config as MuxerOriginConfig, OriginMuxer};
 use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_rep_collector::aggregator::ReputationAggregator;
 use lightning_rep_collector::config::Config as RepCollConfig;
@@ -58,7 +59,7 @@ use crate::fetcher::Fetcher;
 
 partial!(TestBinding {
     FetcherInterface = Fetcher<Self>;
-    OriginProviderInterface = IPFSOrigin<Self>;
+    OriginProviderInterface = OriginMuxer<Self>;
     BroadcastInterface = Broadcast<Self>;
     BlockStoreInterface = Blockstore<Self>;
     BlockStoreServerInterface = BlockStoreServer<Self>;
@@ -249,8 +250,15 @@ async fn get_fetchers(
                 authority: format!("127.0.0.1:{}", gateway_port_offset + i as u16),
             }],
         };
-        let ipfs_origin =
-            IPFSOrigin::<TestBinding>::init(ipfs_origin_config, blockstore.clone()).unwrap();
+
+        let ipfs_origin = OriginMuxer::<TestBinding>::init(
+            MuxerOriginConfig {
+                ipfs: ipfs_origin_config,
+                ..Default::default()
+            },
+            blockstore.clone(),
+        )
+        .unwrap();
 
         let blockstore_server = BlockStoreServer::<TestBinding>::init(
             BlockServerConfig::default(),
@@ -328,6 +336,7 @@ async fn test_simple_origin_fetch() {
     };
 
     tokio::select! {
+        biased;
         _ = spawn_server(40101) => {
 
         }
@@ -369,6 +378,7 @@ async fn test_fetch_from_peer() {
         let _ = tx.send((hash, peer1));
     };
     tokio::select! {
+        biased;
         _ = spawn_server(40302) => {
 
         }
