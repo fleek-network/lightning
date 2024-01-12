@@ -103,15 +103,15 @@ pub enum Value {
 /// Indicates the participation status of a node.
 #[rustfmt::skip]
 #[derive(
-    Debug, 
-    Hash, 
-    PartialEq, 
-    PartialOrd, 
+    Debug,
+    Hash,
+    PartialEq,
+    PartialOrd,
     Ord,
-    Eq, 
-    Serialize, 
-    Deserialize, 
-    Clone, 
+    Eq,
+    Serialize,
+    Deserialize,
+    Clone,
     schemars::JsonSchema,
 )]
 pub enum Participation {
