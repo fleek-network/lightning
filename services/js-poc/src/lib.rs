@@ -88,7 +88,9 @@ async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
         let res = runtime.exec(source).context("failed to run javascript")?;
 
         // Resolve async if applicable
-        let res = match runtime.deno.resolve(res).await {
+        // TODO: figure out why `deno.resolve` doesn't drive async functions
+        #[allow(deprecated)]
+        let res = match runtime.deno.resolve_value(res).await {
             Ok(res) => res,
             Err(e) => {
                 stream
