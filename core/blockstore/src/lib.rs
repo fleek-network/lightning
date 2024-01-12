@@ -179,7 +179,7 @@ mod tests {
         let consensus = MockConsensus::<TestBinding>::init(
             consensus_config,
             &signer,
-            update_socket,
+            update_socket.unwrap(),
             query_runner.clone(),
             infusion::Blank::default(),
             None,

@@ -570,7 +570,7 @@ fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
 fn do_init_app(config: Config) -> (ExecutionEngineSocket, QueryRunner) {
     let app = Application::<TestBinding>::init(config, Default::default()).unwrap();
 
-    (app.transaction_executor(), app.sync_query())
+    (app.transaction_executor().unwrap(), app.sync_query())
 }
 
 /// Initialize application with provided committee.

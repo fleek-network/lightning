@@ -150,7 +150,7 @@ async fn create_app_state(test_name: String) -> AppState {
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
-        update_socket,
+        update_socket.unwrap(),
         query_runner.clone(),
         infusion::Blank::default(),
         None,

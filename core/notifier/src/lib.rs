@@ -1,4 +1,4 @@
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use lightning_interfaces::infu_collection::{c, Collection};
@@ -10,7 +10,7 @@ use tokio::time::sleep;
 
 pub struct Notifier<C: Collection> {
     query_runner: c![C::ApplicationInterface::SyncExecutor],
-    notify: Weak<Notify>,
+    notify: Arc<Notify>,
 }
 
 impl<C: Collection> Clone for Notifier<C> {
@@ -38,14 +38,12 @@ impl<C: Collection> Notifier<C> {
 }
 
 impl<C: Collection> NotifierInterface<C> for Notifier<C> {
+    fn emitters(&self) -> Arc<Notify> {
+        self.notify.clone()
+    }
+
     fn init(app: &c![C::ApplicationInterface]) -> Self {
-        let notifier: Arc<Notify> = Default::default();
-        let notify = Arc::downgrade(&notifier);
-        app.transaction_executor().inject(move |res| {
-            if res.change_epoch {
-                notifier.notify_waiters();
-            }
-        });
+        let notify: Arc<Notify> = Default::default();
 
         Self {
             query_runner: app.sync_query(),
@@ -54,17 +52,11 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
     }
 
     fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>) {
-        let weak_notify = self.notify.clone();
+        let notify = self.notify.clone();
 
         tokio::spawn(async move {
             loop {
-                if let Some(notify) = weak_notify.upgrade() {
-                    notify.notified().await;
-                } else {
-                    // The transaction executor sockets have dropped. There
-                    // is nothing coming anymore.
-                    return;
-                }
+                notify.notified().await;
 
                 if tx.send(Notification::NewEpoch).await.is_err() {
                     // There is no receiver anymore.
@@ -122,7 +114,7 @@ mod tests {
 
         let app = Application::<TestBinding>::init(config, Default::default()).unwrap();
 
-        (app.transaction_executor(), app)
+        (app.transaction_executor().unwrap(), app)
     }
 
     // This take currently is broken since the application doesn't automatically move the epoch
