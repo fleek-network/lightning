@@ -16,7 +16,7 @@ use lightning_interfaces::infu_collection::{
     ConsensusInterfaceModifier,
 };
 use lightning_notifier::Notifier;
-use lightning_origin_ipfs::IPFSOrigin;
+use lightning_origin_muxer::OriginMuxer;
 use lightning_pinger::Pinger;
 use lightning_pool::Pool;
 use lightning_rep_collector::ReputationAggregator;
@@ -46,7 +46,7 @@ impl CollectionBase for FinalTypes {
     type ConsensusInterface<C: Collection> = Consensus<C>;
     type HandshakeInterface<C: Collection> = Handshake<C>;
     type NotifierInterface<C: Collection> = Notifier<C>;
-    type OriginProviderInterface<C: Collection> = IPFSOrigin<C>;
+    type OriginProviderInterface<C: Collection> = OriginMuxer<C>;
     type OriginFetcherInterface<C: Collection> = infusion::Blank<C>;
     type DeliveryAcknowledgmentAggregatorInterface<C: Collection> = infusion::Blank<C>;
     type ReputationAggregatorInterface<C: Collection> = ReputationAggregator<C>;

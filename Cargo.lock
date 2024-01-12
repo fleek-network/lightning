@@ -4907,7 +4907,7 @@ dependencies = [
  "lightning-indexer",
  "lightning-interfaces",
  "lightning-notifier",
- "lightning-origin-ipfs",
+ "lightning-origin-muxer",
  "lightning-pinger",
  "lightning-pool",
  "lightning-rep-collector",
