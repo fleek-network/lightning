@@ -39,7 +39,8 @@ use lightning_interfaces::{
 };
 use lightning_notifier::Notifier;
 use lightning_origin_ipfs::config::{Gateway, Protocol};
-use lightning_origin_ipfs::{Config as IPFSOriginConfig, IPFSOrigin};
+use lightning_origin_ipfs::Config as IPFSOriginConfig;
+use lightning_origin_muxer::{Config as DemuxerOriginConfig, OriginMuxer};
 use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_rep_collector::aggregator::ReputationAggregator;
 use lightning_rep_collector::config::Config as RepCollConfig;
@@ -54,7 +55,7 @@ use crate::shim::{ServiceExecutor, ServiceExecutorConfig};
 partial!(TestBinding {
     ServiceExecutorInterface = ServiceExecutor<Self>;
     FetcherInterface = Fetcher<Self>;
-    OriginProviderInterface = IPFSOrigin<Self>;
+    OriginProviderInterface = OriginMuxer<Self>;
     BroadcastInterface = Broadcast<Self>;
     BlockStoreInterface = Blockstore<Self>;
     BlockStoreServerInterface = BlockStoreServer<Self>;
@@ -75,7 +76,7 @@ struct Peer<C: Collection> {
     _blockstore_server: C::BlockStoreServerInterface,
     _rep_aggregator: C::ReputationAggregatorInterface,
     _signer: C::SignerInterface,
-    _ipfs_origin: C::OriginProviderInterface,
+    _origin_provider: C::OriginProviderInterface,
     _blockstore: C::BlockStoreInterface,
 }
 
@@ -182,14 +183,18 @@ async fn init_service_executor(
         root: path.join("blockstore").try_into().unwrap(),
     })
     .unwrap();
-    let ipfs_origin_config = IPFSOriginConfig {
-        gateways: vec![Gateway {
-            protocol: Protocol::Http,
-            authority: format!("127.0.0.1:{}", gateway_port),
-        }],
+
+    let demuxer_config = DemuxerOriginConfig {
+        ipfs: IPFSOriginConfig {
+            gateways: vec![Gateway {
+                protocol: Protocol::Http,
+                authority: format!("127.0.0.1:{}", gateway_port),
+            }],
+        },
+        ..Default::default()
     };
-    let ipfs_origin =
-        IPFSOrigin::<TestBinding>::init(ipfs_origin_config, blockstore.clone()).unwrap();
+    let origin_provider =
+        OriginMuxer::<TestBinding>::init(demuxer_config, blockstore.clone()).unwrap();
 
     let blockstore_server = BlockStoreServer::<TestBinding>::init(
         BlockServerConfig::default(),
@@ -206,7 +211,7 @@ async fn init_service_executor(
         blockstore.clone(),
         &blockstore_server,
         resolver,
-        &ipfs_origin,
+        &origin_provider,
     )
     .unwrap();
 
@@ -229,7 +234,7 @@ async fn init_service_executor(
     .unwrap();
 
     broadcast.start().await;
-    ipfs_origin.start().await;
+    origin_provider.start().await;
     signer.start().await;
     fetcher.start().await;
     pool.start().await;
@@ -244,7 +249,7 @@ async fn init_service_executor(
         _blockstore_server: blockstore_server,
         _rep_aggregator: rep_aggregator,
         _signer: signer,
-        _ipfs_origin: ipfs_origin,
+        _origin_provider: origin_provider,
         _blockstore: blockstore,
     };
 

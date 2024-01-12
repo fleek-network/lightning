@@ -193,7 +193,10 @@ async fn test_origin() {
         let ipfs_origin =
             IPFSOrigin::<TestBinding>::init(config, state.blockstore.clone()).unwrap();
 
-        let hash = ipfs_origin.fetch(req_cid.to_bytes()).await.unwrap();
+        let hash = ipfs_origin
+            .fetch(req_cid.to_bytes().as_slice())
+            .await
+            .unwrap();
 
         let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
         assert!(
