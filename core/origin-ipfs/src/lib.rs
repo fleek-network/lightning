@@ -31,7 +31,7 @@ const GATEWAY_TIMEOUT: Duration = Duration::from_millis(500);
 
 pub struct IPFSOrigin<C: Collection> {
     client: Arc<Client<HttpsConnector<HttpConnector>, Body>>,
-    gateways: Vec<Gateway>,
+    gateways: Arc<Vec<Gateway>>,
     blockstore: C::BlockStoreInterface,
 }
 
@@ -43,7 +43,11 @@ impl<C: Collection> ConfigConsumer for IPFSOrigin<C> {
 
 impl<C: Collection> Clone for IPFSOrigin<C> {
     fn clone(&self) -> Self {
-        todo!()
+        Self {
+            client: self.client.clone(),
+            gateways: self.gateways.clone(),
+            blockstore: self.blockstore.clone(),
+        }
     }
 }
 
@@ -67,14 +71,13 @@ impl<C: Collection> OriginFetcherInterface<C> for IPFSOrigin<C> {
 
         Ok(IPFSOrigin {
             client: Arc::new(client),
-            gateways: config.gateways,
+            gateways: Arc::new(config.gateways),
             blockstore,
         })
     }
 
     async fn fetch(&self, uri: &[u8]) -> anyhow::Result<Blake3Hash> {
-        let requested_cid =
-            Cid::try_from(uri).with_context(|| "Failed to parse uri into cid")?;
+        let requested_cid = Cid::try_from(uri).with_context(|| "Failed to parse uri into cid")?;
 
         let stream = self.fetch_from_gateway(&requested_cid).await?;
 
