@@ -11,13 +11,10 @@ use derive_more::IsVariant;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
     ConfigConsumer,
-    OriginFetcherInterface,
     OriginProviderInterface,
     OriginProviderSocket,
     WithStartAndShutdown,
 };
-use lightning_origin_http::HttpOriginFetcher;
-use lightning_origin_ipfs::IPFSOrigin;
 use tokio::sync::{Mutex, Notify};
 use tokio::task::JoinHandle;
 
@@ -83,18 +80,10 @@ impl<C: Collection> WithStartAndShutdown for OriginDemuxer<C> {
 impl<C: Collection> OriginProviderInterface<C> for OriginDemuxer<C> {
     fn init(config: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
-
-        let mut demuxer = Demuxer::new(rx);
-
-        demuxer.http_origin(HttpOriginFetcher::<C>::init(
-            config.http,
-            blockstore.clone(),
-        )?);
-
-        demuxer.ipfs_origin(IPFSOrigin::<C>::init(config.ipfs, blockstore.clone())?);
-
         Ok(Self {
-            status: Mutex::new(Some(Status::NotRunning { demuxer })),
+            status: Mutex::new(Some(Status::NotRunning {
+                demuxer: Demuxer::new(config, blockstore, rx)?,
+            })),
             socket,
         })
     }

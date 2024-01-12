@@ -9,12 +9,7 @@ use hyper::{Body, Client, Request, Uri};
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
-use lightning_interfaces::{
-    BlockStoreInterface,
-    ConfigConsumer,
-    IncrementalPutInterface,
-    OriginFetcherInterface,
-};
+use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
 use tokio::io::AsyncReadExt;
 use tokio::time::timeout;
 use tracing::info;
@@ -35,12 +30,6 @@ pub struct IPFSOrigin<C: Collection> {
     blockstore: C::BlockStoreInterface,
 }
 
-impl<C: Collection> ConfigConsumer for IPFSOrigin<C> {
-    const KEY: &'static str = "origin-ipfs";
-
-    type Config = Config;
-}
-
 impl<C: Collection> Clone for IPFSOrigin<C> {
     fn clone(&self) -> Self {
         Self {
@@ -51,8 +40,8 @@ impl<C: Collection> Clone for IPFSOrigin<C> {
     }
 }
 
-impl<C: Collection> OriginFetcherInterface<C> for IPFSOrigin<C> {
-    fn init(config: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
+impl<C: Collection> IPFSOrigin<C> {
+    pub fn new(config: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
         // Prepare the TLS client config
         let tls = rustls::ClientConfig::builder()
             .with_safe_defaults()
@@ -76,7 +65,7 @@ impl<C: Collection> OriginFetcherInterface<C> for IPFSOrigin<C> {
         })
     }
 
-    async fn fetch(&self, uri: &[u8]) -> anyhow::Result<Blake3Hash> {
+    pub async fn fetch(&self, uri: &[u8]) -> anyhow::Result<Blake3Hash> {
         let requested_cid = Cid::try_from(uri).with_context(|| "Failed to parse uri into cid")?;
 
         let stream = self.fetch_from_gateway(&requested_cid).await?;
@@ -111,9 +100,7 @@ impl<C: Collection> OriginFetcherInterface<C> for IPFSOrigin<C> {
             Err(anyhow!("Data verification failed"))
         }
     }
-}
 
-impl<C: Collection> IPFSOrigin<C> {
     async fn fetch_from_gateway(&self, requested_cid: &Cid) -> anyhow::Result<IPFSStream> {
         for gateway in self.gateways.iter() {
             let url = Uri::builder()

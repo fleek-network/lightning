@@ -20,7 +20,6 @@ collection!([
     HandshakeInterface,
     NotifierInterface,
     OriginProviderInterface,
-    OriginFetcherInterface,
     DeliveryAcknowledgmentAggregatorInterface,
     ReputationAggregatorInterface,
     ResolverInterface,

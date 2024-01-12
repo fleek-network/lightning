@@ -6,12 +6,7 @@ use std::time::Duration;
 
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
-use lightning_interfaces::{
-    BlockStoreInterface,
-    ConfigConsumer,
-    IncrementalPutInterface,
-    OriginFetcherInterface,
-};
+use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
 use reqwest::{Client, Url};
 
 pub use crate::config::Config;
@@ -30,18 +25,13 @@ impl<C: Collection> Clone for HttpOriginFetcher<C> {
     }
 }
 
-impl<C: Collection> ConfigConsumer for HttpOriginFetcher<C> {
-    const KEY: &'static str = "http-origin-fetcher";
-    type Config = Config;
-}
-
-impl<C: Collection> OriginFetcherInterface<C> for HttpOriginFetcher<C> {
-    fn init(_: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
+impl<C: Collection> HttpOriginFetcher<C> {
+    pub fn new(_: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
         let client = Client::new();
         Ok(Self { client, blockstore })
     }
 
-    async fn fetch(&self, uri: &[u8]) -> anyhow::Result<Blake3Hash> {
+    pub async fn fetch(&self, uri: &[u8]) -> anyhow::Result<Blake3Hash> {
         let (url, _hash) = get_url_and_sri(uri)?;
         let resp = self
             .client

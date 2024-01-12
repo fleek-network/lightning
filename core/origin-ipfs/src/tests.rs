@@ -19,7 +19,6 @@ use lightning_interfaces::{
     BlockStoreInterface,
     ConsensusInterface,
     IndexerInterface,
-    OriginFetcherInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
@@ -36,7 +35,6 @@ partial!(TestBinding {
     BlockStoreInterface = Blockstore<Self>;
     IndexerInterface = Indexer<Self>;
     SignerInterface = Signer<Self>;
-    OriginFetcherInterface = IPFSOrigin<Self>;
 });
 
 struct AppState {
@@ -190,8 +188,7 @@ async fn test_origin() {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30100".to_string(),
         });
-        let ipfs_origin =
-            IPFSOrigin::<TestBinding>::init(config, state.blockstore.clone()).unwrap();
+        let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore.clone()).unwrap();
 
         let hash = ipfs_origin
             .fetch(req_cid.to_bytes().as_slice())
