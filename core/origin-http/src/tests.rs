@@ -25,7 +25,7 @@ use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use lightning_test_utils::server;
 
-use crate::HttpOriginFetcher;
+use crate::{get_url_and_sri, HttpOriginFetcher};
 
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
@@ -234,4 +234,22 @@ async fn test_http_origin_with_integrity_check() {
 #[tokio::test]
 async fn test_http_origin_with_integrity_check_invalid_hash() {
     // Todo: need to implement.
+}
+
+#[test]
+fn test_url_and_integrity_hash() {
+    let (_, hash) = get_url_and_sri(String::from("https://lightning.com/").as_bytes()).unwrap();
+    assert!(hash.is_none());
+
+    let (_, hash) =
+        get_url_and_sri(String::from("https://lightning.com/#integrity=foo").as_bytes()).unwrap();
+    assert_eq!(hash, Some("foo".to_string()));
+
+    let (_, hash) = get_url_and_sri(
+        String::from("https://lightning.com/path?bar=1&other=2#integrity=foo").as_bytes(),
+    )
+    .unwrap();
+    assert_eq!(hash, Some("foo".to_string()));
+
+    assert!(get_url_and_sri(String::from("https://lightning.com/#integrity=").as_bytes()).is_err());
 }
