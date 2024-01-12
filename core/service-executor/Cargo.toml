@@ -38,7 +38,7 @@ services = [ "dep:fleek-service-fetcher", "dep:fleek-service-js-poc"]
 
 [dev-dependencies]
 lightning-fetcher = { path = "../fetcher" }
-lightning-origin-muxer = { path = "../origin-muxer" }
+lightning-origin-demuxer = { path = "../origin-demuxer" }
 lightning-origin-ipfs = { path = "../origin-ipfs" }
 lightning-broadcast = { path="../broadcast" }
 lightning-blockstore = { path = "../blockstore" }

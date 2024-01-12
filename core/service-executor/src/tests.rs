@@ -38,9 +38,9 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
+use lightning_origin_demuxer::{Config as DemuxerOriginConfig, OriginDemuxer};
 use lightning_origin_ipfs::config::{Gateway, Protocol};
 use lightning_origin_ipfs::Config as IPFSOriginConfig;
-use lightning_origin_muxer::{Config as DemuxerOriginConfig, OriginMuxer};
 use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_rep_collector::aggregator::ReputationAggregator;
 use lightning_rep_collector::config::Config as RepCollConfig;
@@ -55,7 +55,7 @@ use crate::shim::{ServiceExecutor, ServiceExecutorConfig};
 partial!(TestBinding {
     ServiceExecutorInterface = ServiceExecutor<Self>;
     FetcherInterface = Fetcher<Self>;
-    OriginProviderInterface = OriginMuxer<Self>;
+    OriginProviderInterface = OriginDemuxer<Self>;
     BroadcastInterface = Broadcast<Self>;
     BlockStoreInterface = Blockstore<Self>;
     BlockStoreServerInterface = BlockStoreServer<Self>;
@@ -194,7 +194,7 @@ async fn init_service_executor(
         ..Default::default()
     };
     let origin_provider =
-        OriginMuxer::<TestBinding>::init(demuxer_config, blockstore.clone()).unwrap();
+        OriginDemuxer::<TestBinding>::init(demuxer_config, blockstore.clone()).unwrap();
 
     let blockstore_server = BlockStoreServer::<TestBinding>::init(
         BlockServerConfig::default(),

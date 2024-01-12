@@ -21,7 +21,7 @@ thiserror = "1.0"
 [dev-dependencies]
 lightning-blockstore = { path = "../blockstore" }
 lightning-indexer = { path = "../indexer" }
-lightning-origin-muxer = { path = "../origin-muxer" }
+lightning-origin-demuxer = { path = "../origin-demuxer" }
 lightning-origin-ipfs = { path = "../origin-ipfs" }
 lightning-resolver = { path = "../resolver" }
 lightning-blockstore-server = { path = "../blockstore-server" }

@@ -40,9 +40,9 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
+use lightning_origin_demuxer::{Config as DemuxerOriginConfig, OriginDemuxer};
 use lightning_origin_ipfs::config::{Gateway, Protocol};
 use lightning_origin_ipfs::Config as IPFSOriginConfig;
-use lightning_origin_muxer::{Config as MuxerOriginConfig, OriginMuxer};
 use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_rep_collector::aggregator::ReputationAggregator;
 use lightning_rep_collector::config::Config as RepCollConfig;
@@ -59,7 +59,7 @@ use crate::fetcher::Fetcher;
 
 partial!(TestBinding {
     FetcherInterface = Fetcher<Self>;
-    OriginProviderInterface = OriginMuxer<Self>;
+    OriginProviderInterface = OriginDemuxer<Self>;
     BroadcastInterface = Broadcast<Self>;
     BlockStoreInterface = Blockstore<Self>;
     BlockStoreServerInterface = BlockStoreServer<Self>;
@@ -251,8 +251,8 @@ async fn get_fetchers(
             }],
         };
 
-        let ipfs_origin = OriginMuxer::<TestBinding>::init(
-            MuxerOriginConfig {
+        let ipfs_origin = OriginDemuxer::<TestBinding>::init(
+            DemuxerOriginConfig {
                 ipfs: ipfs_origin_config,
                 ..Default::default()
             },

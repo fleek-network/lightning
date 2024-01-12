@@ -53,7 +53,7 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
-use lightning_origin_muxer::OriginMuxer;
+use lightning_origin_demuxer::OriginDemuxer;
 use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{Config as SignerConfig, Signer};
@@ -96,7 +96,7 @@ partial!(TestBinding {
     RpcInterface = Rpc<Self>;
     BlockStoreInterface = Blockstore<Self>;
     BlockStoreServerInterface = BlockStoreServer<Self>;
-    OriginProviderInterface = OriginMuxer<Self>;
+    OriginProviderInterface = OriginDemuxer<Self>;
     SignerInterface = Signer<Self>;
     NotifierInterface = Notifier<Self>;
     PoolInterface = Pool<Self>;
@@ -107,7 +107,7 @@ fn init_rpc(app: Application<TestBinding>, port: u16) -> Result<Rpc<TestBinding>
     let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
 
     let ipfs_origin =
-        OriginMuxer::<TestBinding>::init(Default::default(), blockstore.clone()).unwrap();
+        OriginDemuxer::<TestBinding>::init(Default::default(), blockstore.clone()).unwrap();
 
     let signer = Signer::<TestBinding>::init(SignerConfig::test(), app.sync_query()).unwrap();
 
