@@ -53,7 +53,7 @@ if [[ ! -d /home/$USERNAME/.lightning/keystore ]]; then
   lgtn keys generate
 fi
 
-if ! lgtn opt ${OPT:-in}; then
+if ! yes | lgtn opt ${OPT:-in}; then
   echo "Oops! Failed to set network participation"
 fi
 
