@@ -7,13 +7,14 @@ use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::NodePorts;
+use lightning_interfaces::types::{DeliveryAcknowledgment, DeliveryAcknowledgmentProof, NodePorts};
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
     ConsensusInterface,
     DeliveryAcknowledgmentAggregatorInterface,
     SignerInterface,
+    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use lightning_signer::{Config as SignerConfig, Signer};
@@ -150,6 +151,40 @@ async fn test_shutdown_and_start_again() {
     node.aggregator.shutdown().await;
     tokio::time::sleep(Duration::from_millis(1)).await;
     assert!(!node.aggregator.is_running());
+
+    if path.exists() {
+        std::fs::remove_file(path).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn test_submit_dack() {
+    let path = std::env::temp_dir().join("lightning-test-dack-aggregator-submit");
+
+    if path.exists() {
+        std::fs::remove_file(&path).unwrap();
+    }
+    let node = init_aggregator(path.clone()).await;
+
+    let query_runner = node._app.sync_query();
+
+    let socket = node.aggregator.socket();
+    node.aggregator.start().await;
+
+    let service_id = 0;
+    let commodity = 10;
+    let dack = DeliveryAcknowledgment {
+        service_id,
+        commodity,
+        proof: DeliveryAcknowledgmentProof,
+        metadata: None,
+    };
+    socket.run(dack).await.unwrap();
+    // Wait for aggregator to submit txn.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    let total_served = query_runner.get_total_served(&0);
+    assert_eq!(total_served.unwrap().served[service_id as usize], commodity);
 
     if path.exists() {
         std::fs::remove_file(path).unwrap();
