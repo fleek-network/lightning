@@ -5346,6 +5346,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bincode",
+ "cid 0.10.1",
  "derive_more",
  "ethers",
  "fleek-crypto",
@@ -5360,6 +5361,7 @@ dependencies = [
  "schemars",
  "serde",
  "thiserror",
+ "url",
 ]
 
 [[package]]

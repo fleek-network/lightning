@@ -1,5 +1,11 @@
+use std::str::FromStr;
+
+use cid::Cid;
 use derive_more::IsVariant;
 use serde::{Deserialize, Serialize};
+
+const HTTP_ORIGIN: &str = "http";
+const IPFS_ORIGIN: &str = "ipfs";
 
 /// An immutable pointer is used as a general address to a content living off Fleek Network.
 ///
@@ -13,6 +19,32 @@ pub struct ImmutablePointer {
     pub origin: OriginProvider,
     /// The serialized path for the content within the respective origin.
     pub uri: Vec<u8>,
+}
+
+impl FromStr for ImmutablePointer {
+    type Err = std::io::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (origin_ty, uri) = s.split_once('=').ok_or(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "invalid immutable pointer syntax",
+        ))?;
+        let (origin, uri) = match origin_ty {
+            HTTP_ORIGIN => (OriginProvider::HTTP, uri.to_string().into_bytes()),
+            IPFS_ORIGIN => {
+                let cid = Cid::try_from(uri)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                (OriginProvider::IPFS, cid.to_bytes())
+            },
+            ty => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("invalid origin type: {ty}"),
+                ));
+            },
+        };
+        Ok(ImmutablePointer { origin, uri })
+    }
 }
 
 /// This enum represents the origins which we support in the protocol. More can be added as we
@@ -32,5 +64,50 @@ impl ToString for OriginProvider {
             OriginProvider::IPFS => String::from("ipfs"),
             OriginProvider::HTTP => String::from("http"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use cid::Cid;
+
+    use crate::{ImmutablePointer, OriginProvider};
+
+    #[test]
+    fn test_parse_immutable_pointer() {
+        let expected_pointer_http = ImmutablePointer {
+            origin: OriginProvider::HTTP,
+            uri: b"https://lightning.com".to_vec(),
+        };
+        let parsed_pointer_http: ImmutablePointer = "http=https://lightning.com".parse().unwrap();
+        assert_eq!(expected_pointer_http, parsed_pointer_http);
+
+        let cid =
+            Cid::try_from("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi").unwrap();
+        let expected_pointer_ipfs = ImmutablePointer {
+            origin: OriginProvider::IPFS,
+            uri: cid.to_bytes(),
+        };
+        let parsed_pointer_ipfs: ImmutablePointer =
+            "ipfs=bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+                .parse()
+                .unwrap();
+        assert_eq!(expected_pointer_ipfs, parsed_pointer_ipfs);
+
+        assert_eq!(
+            "https://lightning.com"
+                .parse::<ImmutablePointer>()
+                .unwrap_err()
+                .to_string(),
+            "invalid immutable pointer syntax".to_string()
+        );
+        assert_eq!(
+            "foo=bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+                .parse::<ImmutablePointer>()
+                .unwrap_err()
+                .to_string(),
+            "invalid origin type: foo".to_string()
+        );
+        assert!("ipfs=bar".parse::<ImmutablePointer>().is_err());
     }
 }
