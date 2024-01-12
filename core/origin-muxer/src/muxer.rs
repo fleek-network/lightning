@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use affair::Task;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::Blake3Hash;
+use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, OriginProvider};
 use lightning_interfaces::OriginFetcherInterface;
 use lightning_origin_http::HttpOriginFetcher;
 use lightning_origin_ipfs::IPFSOrigin;
@@ -15,12 +15,12 @@ pub const HTTP_ORIGIN: &str = "http";
 pub const IPFS_ORIGIN: &str = "ipfs";
 
 pub struct Muxer<C: Collection> {
-    origins: HashMap<&'static str, Origin<C>>,
-    task_rx: Receiver<Task<Vec<u8>, anyhow::Result<Blake3Hash>>>,
+    origins: HashMap<OriginProvider, Origin<C>>,
+    task_rx: Receiver<Task<ImmutablePointer, anyhow::Result<Blake3Hash>>>,
 }
 
 impl<C: Collection> Muxer<C> {
-    pub fn new(task_rx: Receiver<Task<Vec<u8>, anyhow::Result<Blake3Hash>>>) -> Self {
+    pub fn new(task_rx: Receiver<Task<ImmutablePointer, anyhow::Result<Blake3Hash>>>) -> Self {
         Self {
             origins: HashMap::new(),
             task_rx,
@@ -28,11 +28,13 @@ impl<C: Collection> Muxer<C> {
     }
 
     pub fn http_origin(&mut self, origin: HttpOriginFetcher<C>) {
-        self.origins.insert(HTTP_ORIGIN, Origin::Http(origin));
+        self.origins
+            .insert(OriginProvider::HTTP, Origin::Http(origin));
     }
 
     pub fn ipfs_origin(&mut self, origin: IPFSOrigin<C>) {
-        self.origins.insert(IPFS_ORIGIN, Origin::Ipfs(origin));
+        self.origins
+            .insert(OriginProvider::IPFS, Origin::Ipfs(origin));
     }
 
     pub fn spawn(mut self) -> (JoinHandle<Self>, Arc<Notify>) {
@@ -45,33 +47,25 @@ impl<C: Collection> Muxer<C> {
         (handle, shutdown)
     }
 
-    fn handle(&mut self, task: Task<Vec<u8>, anyhow::Result<Blake3Hash>>) {
-        // Todo: Let's add some validation because this string slice is allocated on the stack.
-        let address = std::str::from_utf8(task.request.as_slice()).unwrap();
-        if let Some((ty, id)) = address.split_once('=') {
-            match self.origins.get(ty) {
-                None => {
-                    task.respond(Err(anyhow::anyhow!("unknown origin type")));
-                },
-                Some(Origin::Http(origin)) => {
-                    let fetcher = origin.clone();
-                    let id = id.as_bytes().to_vec();
-                    tokio::spawn(async move {
-                        let hash = fetcher.fetch(id).await;
-                        task.respond(hash);
-                    });
-                },
-                Some(Origin::Ipfs(origin)) => {
-                    let fetcher = origin.clone();
-                    let id = id.as_bytes().to_vec();
-                    tokio::spawn(async move {
-                        let hash = fetcher.fetch(id).await;
-                        task.respond(hash);
-                    });
-                },
-            }
-        } else {
-            task.respond(Err(anyhow::anyhow!("invalid identifier")));
+    fn handle(&mut self, task: Task<ImmutablePointer, anyhow::Result<Blake3Hash>>) {
+        match self.origins.get(&task.request.origin) {
+            None => {
+                task.respond(Err(anyhow::anyhow!("unknown origin type")));
+            },
+            Some(Origin::Http(origin)) => {
+                let fetcher = origin.clone();
+                tokio::spawn(async move {
+                    let hash = fetcher.fetch(&task.request.uri).await;
+                    task.respond(hash);
+                });
+            },
+            Some(Origin::Ipfs(origin)) => {
+                let fetcher = origin.clone();
+                tokio::spawn(async move {
+                    let hash = fetcher.fetch(&task.request.uri).await;
+                    task.respond(hash);
+                });
+            },
         }
     }
 

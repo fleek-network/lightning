@@ -10,7 +10,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::NodePorts;
+use lightning_interfaces::types::{ImmutablePointer, NodePorts, OriginProvider};
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
@@ -181,8 +181,11 @@ async fn create_app_state(test_name: String) -> AppState {
 async fn test_origin_muxer() {
     // Given: Some content that will be returned by gateway.
     let file: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
-    // Given: an identifier for some resource.
-    let id = "http=http://127.0.0.1:30235/bar/index.ts".to_string();
+    // Given: a pointer for some content.
+    let pointer = ImmutablePointer {
+        origin: OriginProvider::HTTP,
+        uri: "http://127.0.0.1:30235/bar/index.ts".as_bytes().to_vec(),
+    };
     // Given: some state.
     let state = create_app_state("test_origin_muxer".to_string()).await;
 
@@ -193,7 +196,7 @@ async fn test_origin_muxer() {
 
         // When: we request content given its identify.
         let socket = origin.get_socket();
-        let hash = socket.run(id.into_bytes()).await.unwrap().unwrap();
+        let hash = socket.run(pointer).await.unwrap().unwrap();
 
         let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
         // Then: we get the expected content.
@@ -208,24 +211,4 @@ async fn test_origin_muxer() {
         _ = server::spawn_server(30235) => {}
         _ = test_fut => {}
     }
-}
-
-#[tokio::test]
-async fn test_origin_muxer_invalid_id() {
-    // Given: an invalid identifier.
-    let id = "zoo=http://127.0.0.1:30235/bar/index.ts".to_string();
-    // Given: some state.
-    let state = create_app_state("test_origin_muxer_invalid_id".to_string()).await;
-
-    // When: we request content given.
-    let origin =
-        OriginMuxer::<TestBinding>::init(Default::default(), state.blockstore.clone()).unwrap();
-    origin.start().await;
-    let socket = origin.get_socket();
-
-    // Then: request fails because id is invalid.
-    assert!(socket.run(id.into_bytes()).await.unwrap().is_err());
-
-    // Clean up.
-    origin.shutdown().await;
 }

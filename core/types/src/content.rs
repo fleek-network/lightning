@@ -23,12 +23,14 @@ pub struct ImmutablePointer {
 #[non_exhaustive]
 pub enum OriginProvider {
     IPFS,
+    HTTP,
 }
 
 impl ToString for OriginProvider {
     fn to_string(&self) -> String {
         match self {
             OriginProvider::IPFS => String::from("ipfs"),
+            OriginProvider::HTTP => String::from("http"),
         }
     }
 }

@@ -48,8 +48,9 @@ impl<C: Collection> OriginFetcherInterface<C> for HttpOriginFetcher<C> {
         })
     }
 
-    async fn fetch(&self, identifier: Vec<u8>) -> anyhow::Result<Blake3Hash> {
-        let identifier = String::from_utf8(identifier)?;
+    async fn fetch(&self, uri: &[u8]) -> anyhow::Result<Blake3Hash> {
+        // Todo: work with slice instead of allocating a vec.
+        let identifier = String::from_utf8(uri.to_vec())?;
         let (url, _hash) = if identifier.contains("#integrity=") {
             identifier
                 .split_once("#integrity=")
