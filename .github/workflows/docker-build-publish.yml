@@ -5,6 +5,7 @@ on:
     # TODO: enable for main only after testnet
     branches:
       - testnet-*
+      - chore/docker-network-participation-user-ctrl
     paths:
       - core/**
       - etc/**
