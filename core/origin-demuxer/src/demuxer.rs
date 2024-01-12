@@ -1,37 +1,33 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use affair::Task;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, OriginProvider};
-use lightning_interfaces::OriginFetcherInterface;
 use lightning_origin_http::HttpOriginFetcher;
 use lightning_origin_ipfs::IPFSOrigin;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
+use crate::Config;
+
 pub struct Demuxer<C: Collection> {
-    origins: HashMap<OriginProvider, Origin<C>>,
+    http: HttpOriginFetcher<C>,
+    ipfs: IPFSOrigin<C>,
     task_rx: Receiver<Task<ImmutablePointer, anyhow::Result<Blake3Hash>>>,
 }
 
 impl<C: Collection> Demuxer<C> {
-    pub fn new(task_rx: Receiver<Task<ImmutablePointer, anyhow::Result<Blake3Hash>>>) -> Self {
-        Self {
-            origins: HashMap::new(),
+    pub fn new(
+        config: Config,
+        blockstore: C::BlockStoreInterface,
+        task_rx: Receiver<Task<ImmutablePointer, anyhow::Result<Blake3Hash>>>,
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
+            http: HttpOriginFetcher::<C>::new(config.http, blockstore.clone())?,
+            ipfs: IPFSOrigin::<C>::new(config.ipfs, blockstore)?,
             task_rx,
-        }
-    }
-
-    pub fn http_origin(&mut self, origin: HttpOriginFetcher<C>) {
-        self.origins
-            .insert(OriginProvider::HTTP, Origin::Http(origin));
-    }
-
-    pub fn ipfs_origin(&mut self, origin: IPFSOrigin<C>) {
-        self.origins
-            .insert(OriginProvider::IPFS, Origin::Ipfs(origin));
+        })
     }
 
     pub fn spawn(mut self) -> (JoinHandle<Self>, Arc<Notify>) {
@@ -45,23 +41,23 @@ impl<C: Collection> Demuxer<C> {
     }
 
     fn handle(&mut self, task: Task<ImmutablePointer, anyhow::Result<Blake3Hash>>) {
-        match self.origins.get(&task.request.origin) {
-            None => {
+        match &task.request.origin {
+            OriginProvider::HTTP => {
+                let fetcher = self.http.clone();
+                tokio::spawn(async move {
+                    let hash = fetcher.fetch(&task.request.uri).await;
+                    task.respond(hash);
+                });
+            },
+            OriginProvider::IPFS => {
+                let fetcher = self.ipfs.clone();
+                tokio::spawn(async move {
+                    let hash = fetcher.fetch(&task.request.uri).await;
+                    task.respond(hash);
+                });
+            },
+            _ => {
                 task.respond(Err(anyhow::anyhow!("unknown origin type")));
-            },
-            Some(Origin::Http(origin)) => {
-                let fetcher = origin.clone();
-                tokio::spawn(async move {
-                    let hash = fetcher.fetch(&task.request.uri).await;
-                    task.respond(hash);
-                });
-            },
-            Some(Origin::Ipfs(origin)) => {
-                let fetcher = origin.clone();
-                tokio::spawn(async move {
-                    let hash = fetcher.fetch(&task.request.uri).await;
-                    task.respond(hash);
-                });
             },
         }
     }
@@ -82,9 +78,4 @@ impl<C: Collection> Demuxer<C> {
             }
         }
     }
-}
-
-enum Origin<C: Collection> {
-    Http(HttpOriginFetcher<C>),
-    Ipfs(IPFSOrigin<C>),
 }

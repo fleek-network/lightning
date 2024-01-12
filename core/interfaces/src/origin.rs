@@ -27,19 +27,6 @@ pub trait OriginProviderInterface<C: Collection>:
     fn get_socket(&self) -> OriginProviderSocket;
 }
 
-#[infusion::service]
-pub trait OriginFetcherInterface<C: Collection>:
-    ConfigConsumer + Clone + Sized + Send + Sync
-{
-    fn _init(config: ::ConfigProviderInterface, blockstore: ::BlockStoreInterface) {
-        Self::init(config.get::<Self>(), blockstore.clone())
-    }
-
-    fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self>;
-
-    async fn fetch(&self, uri: &[u8]) -> anyhow::Result<Blake3Hash>;
-}
-
 /// An untrusted stream to an origin, this allows the origin provider to start the
 /// streaming of the content it receives before it is sure of the integrity of the
 /// content.
