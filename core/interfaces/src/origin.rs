@@ -1,12 +1,13 @@
 use affair::Socket;
 use anyhow;
+use lightning_types::ImmutablePointer;
 
 use crate::infu_collection::Collection;
 use crate::types::Blake3Hash;
 use crate::{BlockStoreInterface, ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown};
 
 /// A socket for submitting a fetch request to an origin.
-pub type OriginProviderSocket = Socket<Vec<u8>, anyhow::Result<Blake3Hash>>;
+pub type OriginProviderSocket = Socket<ImmutablePointer, anyhow::Result<Blake3Hash>>;
 
 /// The abstraction layer for different origins and how we handle them in the codebase in
 /// a modular way, and [`OriginProvider`] can be something like a provider for resolving
@@ -36,7 +37,7 @@ pub trait OriginFetcherInterface<C: Collection>:
 
     fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self>;
 
-    async fn fetch(&self, identifier: Vec<u8>) -> anyhow::Result<Blake3Hash>;
+    async fn fetch(&self, uri: &[u8]) -> anyhow::Result<Blake3Hash>;
 }
 
 /// An untrusted stream to an origin, this allows the origin provider to start the

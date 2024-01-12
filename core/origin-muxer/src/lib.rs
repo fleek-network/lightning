@@ -21,7 +21,7 @@ use muxer::Muxer;
 use tokio::sync::{Mutex, Notify};
 use tokio::task::JoinHandle;
 
-use crate::config::Config;
+pub use crate::config::Config;
 
 #[derive(IsVariant)]
 enum Status<C: Collection> {

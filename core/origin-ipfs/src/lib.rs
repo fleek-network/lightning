@@ -72,9 +72,9 @@ impl<C: Collection> OriginFetcherInterface<C> for IPFSOrigin<C> {
         })
     }
 
-    async fn fetch(&self, identifier: Vec<u8>) -> anyhow::Result<Blake3Hash> {
+    async fn fetch(&self, uri: &[u8]) -> anyhow::Result<Blake3Hash> {
         let requested_cid =
-            Cid::try_from(identifier).with_context(|| "Failed to parse uri into cid")?;
+            Cid::try_from(uri).with_context(|| "Failed to parse uri into cid")?;
 
         let stream = self.fetch_from_gateway(&requested_cid).await?;
 
