@@ -191,7 +191,7 @@ async fn test_http_origin() {
 
     // When: we fetch some content using the origin.
     let test_fut = async move {
-        let hash = origin.fetch(url.as_bytes().to_vec()).await.unwrap();
+        let hash = origin.fetch(url.as_bytes()).await.unwrap();
         let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
         // Then: we get the expected content.
         assert_eq!(file, bytes);
@@ -218,7 +218,7 @@ async fn test_http_origin_with_integrity_check() {
 
     // When: we fetch some content using the origin.
     let test_fut = async move {
-        let hash = origin.fetch(url.as_bytes().to_vec()).await.unwrap();
+        let hash = origin.fetch(url.as_bytes()).await.unwrap();
         let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
         // Then: we get the expected content.
         assert_eq!(file, bytes);
