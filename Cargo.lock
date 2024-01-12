@@ -4764,8 +4764,8 @@ dependencies = [
  "lightning-indexer",
  "lightning-interfaces",
  "lightning-notifier",
+ "lightning-origin-demuxer",
  "lightning-origin-ipfs",
- "lightning-origin-muxer",
  "lightning-pool",
  "lightning-rep-collector",
  "lightning-resolver",
@@ -4907,7 +4907,7 @@ dependencies = [
  "lightning-indexer",
  "lightning-interfaces",
  "lightning-notifier",
- "lightning-origin-muxer",
+ "lightning-origin-demuxer",
  "lightning-pinger",
  "lightning-pool",
  "lightning-rep-collector",
@@ -4967,6 +4967,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-origin-demuxer"
+version = "0.0.0"
+dependencies = [
+ "affair 0.1.2",
+ "anyhow",
+ "cid 0.10.1",
+ "derive_more",
+ "fleek-crypto",
+ "infusion",
+ "lightning-application",
+ "lightning-blockstore",
+ "lightning-indexer",
+ "lightning-interfaces",
+ "lightning-origin-http",
+ "lightning-origin-ipfs",
+ "lightning-signer",
+ "lightning-test-utils",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "lightning-origin-filecoin"
 version = "0.0.0"
 dependencies = [
@@ -5020,28 +5042,6 @@ dependencies = [
  "tokio-stream",
  "tokio-util 0.7.10",
  "tracing",
-]
-
-[[package]]
-name = "lightning-origin-muxer"
-version = "0.0.0"
-dependencies = [
- "affair 0.1.2",
- "anyhow",
- "cid 0.10.1",
- "derive_more",
- "fleek-crypto",
- "infusion",
- "lightning-application",
- "lightning-blockstore",
- "lightning-indexer",
- "lightning-interfaces",
- "lightning-origin-http",
- "lightning-origin-ipfs",
- "lightning-signer",
- "lightning-test-utils",
- "serde",
- "tokio",
 ]
 
 [[package]]
@@ -5186,7 +5186,7 @@ dependencies = [
  "lightning-notifier",
  "lightning-openrpc",
  "lightning-openrpc-macros",
- "lightning-origin-muxer",
+ "lightning-origin-demuxer",
  "lightning-pool",
  "lightning-rep-collector",
  "lightning-signer",
@@ -5241,8 +5241,8 @@ dependencies = [
  "lightning-fetcher",
  "lightning-interfaces",
  "lightning-notifier",
+ "lightning-origin-demuxer",
  "lightning-origin-ipfs",
- "lightning-origin-muxer",
  "lightning-pool",
  "lightning-rep-collector",
  "lightning-resolver",

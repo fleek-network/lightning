@@ -11,12 +11,12 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
-pub struct Muxer<C: Collection> {
+pub struct Demuxer<C: Collection> {
     origins: HashMap<OriginProvider, Origin<C>>,
     task_rx: Receiver<Task<ImmutablePointer, anyhow::Result<Blake3Hash>>>,
 }
 
-impl<C: Collection> Muxer<C> {
+impl<C: Collection> Demuxer<C> {
     pub fn new(task_rx: Receiver<Task<ImmutablePointer, anyhow::Result<Blake3Hash>>>) -> Self {
         Self {
             origins: HashMap::new(),

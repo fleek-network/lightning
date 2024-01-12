@@ -25,7 +25,7 @@ use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use lightning_test_utils::server;
 
-use crate::OriginMuxer;
+use crate::OriginDemuxer;
 
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
@@ -33,7 +33,7 @@ partial!(TestBinding {
     SignerInterface = Signer<Self>;
     ConsensusInterface = MockConsensus<Self>;
     IndexerInterface = Indexer<Self>;
-    OriginProviderInterface = OriginMuxer<Self>;
+    OriginProviderInterface = OriginDemuxer<Self>;
 });
 
 struct AppState {
@@ -191,7 +191,8 @@ async fn test_origin_muxer() {
 
     let test_fut = async move {
         let origin =
-            OriginMuxer::<TestBinding>::init(Default::default(), state.blockstore.clone()).unwrap();
+            OriginDemuxer::<TestBinding>::init(Default::default(), state.blockstore.clone())
+                .unwrap();
         origin.start().await;
 
         // When: we request content given its identify.

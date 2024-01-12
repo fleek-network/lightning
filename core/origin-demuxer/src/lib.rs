@@ -1,11 +1,12 @@
 mod config;
-mod muxer;
+mod demuxer;
 #[cfg(test)]
 mod tests;
 
 use std::sync::Arc;
 
 use affair::Socket;
+use demuxer::Demuxer;
 use derive_more::IsVariant;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
@@ -17,7 +18,6 @@ use lightning_interfaces::{
 };
 use lightning_origin_http::HttpOriginFetcher;
 use lightning_origin_ipfs::IPFSOrigin;
-use muxer::Muxer;
 use tokio::sync::{Mutex, Notify};
 use tokio::task::JoinHandle;
 
@@ -26,25 +26,25 @@ pub use crate::config::Config;
 #[derive(IsVariant)]
 enum Status<C: Collection> {
     Running {
-        handle: JoinHandle<Muxer<C>>,
+        handle: JoinHandle<Demuxer<C>>,
         shutdown: Arc<Notify>,
     },
     NotRunning {
-        muxer: Muxer<C>,
+        demuxer: Demuxer<C>,
     },
 }
 
-pub struct OriginMuxer<C: Collection> {
+pub struct OriginDemuxer<C: Collection> {
     status: Mutex<Option<Status<C>>>,
     socket: OriginProviderSocket,
 }
 
-impl<C: Collection> ConfigConsumer for OriginMuxer<C> {
-    const KEY: &'static str = "origin-muxer";
+impl<C: Collection> ConfigConsumer for OriginDemuxer<C> {
+    const KEY: &'static str = "origin-demuxer";
     type Config = Config;
 }
 
-impl<C: Collection> WithStartAndShutdown for OriginMuxer<C> {
+impl<C: Collection> WithStartAndShutdown for OriginDemuxer<C> {
     fn is_running(&self) -> bool {
         self.status.blocking_lock().as_ref().unwrap().is_running()
     }
@@ -52,8 +52,8 @@ impl<C: Collection> WithStartAndShutdown for OriginMuxer<C> {
     async fn start(&self) {
         let mut guard = self.status.lock().await;
         let status = guard.take().unwrap();
-        let next_status = if let Status::NotRunning { muxer } = status {
-            let (handle, shutdown) = muxer.spawn();
+        let next_status = if let Status::NotRunning { demuxer } = status {
+            let (handle, shutdown) = demuxer.spawn();
             Status::Running { handle, shutdown }
         } else {
             status
@@ -66,13 +66,13 @@ impl<C: Collection> WithStartAndShutdown for OriginMuxer<C> {
         let status = guard.take().unwrap();
         let next_status = if let Status::Running { handle, shutdown } = status {
             shutdown.notify_one();
-            let muxer = match handle.await {
-                Ok(muxer) => muxer,
+            let demuxer = match handle.await {
+                Ok(demuxer) => demuxer,
                 Err(e) => {
                     std::panic::resume_unwind(e.into_panic());
                 },
             };
-            Status::NotRunning { muxer }
+            Status::NotRunning { demuxer }
         } else {
             status
         };
@@ -80,21 +80,21 @@ impl<C: Collection> WithStartAndShutdown for OriginMuxer<C> {
     }
 }
 
-impl<C: Collection> OriginProviderInterface<C> for OriginMuxer<C> {
+impl<C: Collection> OriginProviderInterface<C> for OriginDemuxer<C> {
     fn init(config: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
 
-        let mut muxer = Muxer::new(rx);
+        let mut demuxer = Demuxer::new(rx);
 
-        muxer.http_origin(HttpOriginFetcher::<C>::init(
+        demuxer.http_origin(HttpOriginFetcher::<C>::init(
             config.http,
             blockstore.clone(),
         )?);
 
-        muxer.ipfs_origin(IPFSOrigin::<C>::init(config.ipfs, blockstore.clone())?);
+        demuxer.ipfs_origin(IPFSOrigin::<C>::init(config.ipfs, blockstore.clone())?);
 
         Ok(Self {
-            status: Mutex::new(Some(Status::NotRunning { muxer })),
+            status: Mutex::new(Some(Status::NotRunning { demuxer })),
             socket,
         })
     }
