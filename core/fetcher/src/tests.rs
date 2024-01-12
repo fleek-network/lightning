@@ -158,9 +158,10 @@ async fn get_fetchers(
     .unwrap();
     app.start().await;
 
+    let update_socket = app.transaction_executor().unwrap();
     let mut peers = Vec::new();
     for (i, signer_config) in signers_configs.into_iter().enumerate() {
-        let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+        let query_runner = app.sync_query();
         let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
         let topology = Topology::<TestBinding>::init(
             TopologyConfig::default(),

@@ -114,7 +114,7 @@ async fn test_start_shutdown() {
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
-        update_socket.clone(),
+        update_socket.unwrap(),
         query_runner,
         broadcast.get_pubsub(Topic::Consensus),
         None,

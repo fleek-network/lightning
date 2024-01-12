@@ -66,7 +66,7 @@ pub trait ApplicationInterface<C: Collection>:
     /// # Safety
     ///
     /// See the safety document for the [`ExecutionEngineSocket`].
-    fn transaction_executor(&self) -> ExecutionEngineSocket;
+    fn transaction_executor(&self) -> Option<ExecutionEngineSocket>;
 
     /// Returns the instance of a sync query runner which can be used to run queries without
     /// blocking or awaiting. A naive (& blocking) implementation can achieve this by simply
@@ -111,7 +111,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Query Pub Key to Node Index Table
     fn pubkey_to_index(&self, pub_key: &NodePublicKey) -> Option<NodeIndex>;
 
-    /// Query Committe Table
+    /// Query Committee Table
     fn get_committe_info<V>(
         &self,
         epoch: &Epoch,
