@@ -44,7 +44,7 @@ use crate::narwhal::{NarwhalArgs, NarwhalService};
 
 pub struct Consensus<C: Collection> {
     /// Inner state of the consensus
-    /// todo(dalton): We can probably get a little more effecient then a mutex here
+    /// todo(dalton): We can probably get a little more efficient then a mutex here
     /// maybe a once box
     #[allow(clippy::type_complexity)]
     epoch_state: Mutex<
@@ -55,13 +55,13 @@ pub struct Consensus<C: Collection> {
             >,
         >,
     >,
-    /// This socket recieves signed transactions and forwards them to an active committee member to
+    /// This socket receives signed transactions and forwards them to an active committee member to
     /// be ordered
     mempool_socket: MempoolSocket,
     /// Timestamp of the narwhal certificate that caused an epoch change
     /// is sent through this channel to notify that epoch chould change.
     reconfigure_notify: Arc<Notify>,
-    /// A notifier that is notified everytime a new block is proccessed
+    /// A notifier that is notified every time a new block is processed
     new_block_notify: Arc<Notify>,
     /// Called from the shutdown function to notify the start event loop to
     /// exit.
@@ -93,7 +93,7 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     txn_socket: SubmitTxSocket,
     /// Interface for sending messages through the gossip layer
     pub_sub: P,
-    /// Narhwal sends payloads ready for broadcast to this reciever
+    /// Narhwal sends payloads ready for broadcast to this receiver
     rx_narwhal_batches: Option<mpsc::Receiver<(AuthenticStampedParcel, bool)>>,
     /// To notify when consensus is shutting down
     shutdown_notify: Arc<Notify>,

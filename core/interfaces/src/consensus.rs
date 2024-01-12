@@ -17,6 +17,7 @@ use crate::{
     BroadcastInterface,
     ConfigProviderInterface,
     IndexSocket,
+    NotifierInterface,
 };
 
 /// A socket that gives services and other sub-systems the required functionality to
@@ -39,8 +40,17 @@ pub trait ConsensusInterface<C: Collection>:
         app: ::ApplicationInterface,
         broadcast: ::BroadcastInterface,
         archive: ::ArchiveInterface,
+        notifier: ::NotifierInterface,
     ) {
-        let executor = app.transaction_executor();
+        let executor = app
+            .transaction_executor()
+            .expect("ConsensusInferface::_init - Update Socket should be available");
+        let epoch_change_notifier = notifier.emitters();
+        executor.inject(move |res| {
+            if res.change_epoch {
+                epoch_change_notifier.notify_waiters();
+            }
+        });
         let sqr = app.sync_query();
         let pubsub = broadcast.get_pubsub(crate::types::Topic::Consensus);
         Self::init(
@@ -71,7 +81,7 @@ pub trait ConsensusInterface<C: Collection>:
     #[blank = Socket::raw_bounded(64).0]
     fn mempool(&self) -> MempoolSocket;
 
-    /// Returns a tokio Notifier that notifies everytime a new block is finished being processed
+    /// Returns a tokio Notifier that notifies every time a new block is finished being processed
     #[blank = Default::default()]
     fn new_block_notifier(&self) -> Arc<Notify>;
 }

@@ -149,7 +149,7 @@ async fn test_query() {
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
-        update_socket.clone(),
+        update_socket.unwrap(),
         query_runner.clone(),
         infusion::Blank::default(),
         None,
@@ -302,7 +302,7 @@ async fn test_submit_measurements() {
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
-        update_socket.clone(),
+        update_socket.unwrap(),
         query_runner.clone(),
         infusion::Blank::default(),
         None,
@@ -483,6 +483,8 @@ async fn test_reputation_calculation_and_query() {
         transactions_to_lose: HashSet::new(),
         new_block_interval: Duration::from_secs(5),
     };
+    // Need to Clone later while we have 2 different MockConsensus
+    let update_socket = update_socket.unwrap();
     let consensus1 = MockConsensus::<TestBinding>::init(
         consensus_config.clone(),
         &signer1,

@@ -125,7 +125,7 @@ async fn init_pinger() -> Pinger<TestBinding> {
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
-        update_socket.clone(),
+        update_socket.unwrap(),
         query_runner.clone(),
         infusion::Blank::default(),
         None,

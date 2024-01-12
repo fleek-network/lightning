@@ -91,7 +91,7 @@ async fn test_send_two_txs_in_a_row() {
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
-        update_socket.clone(),
+        update_socket.unwrap(),
         query_runner.clone(),
         infusion::Blank::default(),
         None,
@@ -186,7 +186,7 @@ async fn test_retry_send() {
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
-        update_socket.clone(),
+        update_socket.unwrap(),
         query_runner.clone(),
         infusion::Blank::default(),
         None,
@@ -230,7 +230,7 @@ async fn test_shutdown() {
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
-        update_socket.clone(),
+        update_socket.unwrap(),
         query_runner.clone(),
         infusion::Blank::default(),
         None,
@@ -257,7 +257,7 @@ async fn test_shutdown_and_start_again() {
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
-        update_socket.clone(),
+        update_socket.unwrap(),
         query_runner.clone(),
         infusion::Blank::default(),
         None,
@@ -290,7 +290,7 @@ async fn test_sign_raw_digest() {
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
-        update_socket.clone(),
+        update_socket.unwrap(),
         query_runner.clone(),
         infusion::Blank::default(),
         None,
@@ -380,7 +380,7 @@ async fn test_no_keys_exist() {
     let path = ResolvedPathBuf::try_from("~/.lightning-signer-test-3/keys")
         .expect("Failed to resolve path");
 
-    // Make sure this directoy doesn't exist.
+    // Make sure this directory doesn't exist.
     if path.is_dir() {
         fs::remove_dir_all(&path).expect("Failed to clean up signer test directory.");
     }
@@ -409,7 +409,7 @@ async fn test_generate_node_key() {
     let path = ResolvedPathBuf::try_from("~/.lightning-signer-test-4/keys")
         .expect("Failed to resolve path");
 
-    // Make sure this directoy doesn't exist.
+    // Make sure this directory doesn't exist.
     if path.is_dir() {
         fs::remove_dir_all(&path).expect("Failed to clean up signer test directory.");
     }
@@ -429,7 +429,7 @@ async fn test_generate_consensus_key() {
     let path = ResolvedPathBuf::try_from("~/.lightning-signer-test-5/keys")
         .expect("Failed to resolve path");
 
-    // Make sure this directoy doesn't exist.
+    // Make sure this directory doesn't exist.
     if path.is_dir() {
         fs::remove_dir_all(&path).expect("Failed to clean up signer test directory.");
     }
