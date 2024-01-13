@@ -1,0 +1,9 @@
+[package]
+name = "fast-sri"
+version = "0.0.0"
+edition = "2021"
+authors = [ "M. Meier <miguel@fleek.xyz>" ]
+homepage = "https://github.com/fleek-network/lightning"
+
+[dependencies]
+fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1" }
