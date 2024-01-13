@@ -2968,6 +2968,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "fast-sri"
+version = "0.0.0"
+dependencies = [
+ "fastcrypto",
+]
+
+[[package]]
 name = "fastcrypto"
 version = "0.1.5"
 source = "git+https://github.com/MystenLabs/fastcrypto?rev=c961a01596a87e76f590c7e43aca9d57106dbbb1#c961a01596a87e76f590c7e43aca9d57106dbbb1"
