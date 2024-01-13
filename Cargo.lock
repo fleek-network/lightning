@@ -2971,6 +2971,7 @@ dependencies = [
 name = "fast-sri"
 version = "0.0.0"
 dependencies = [
+ "base64 0.21.5",
  "fastcrypto",
 ]
 

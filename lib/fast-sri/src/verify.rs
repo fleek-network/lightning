@@ -8,7 +8,10 @@ pub struct Verifier<H: HashFunction<DIGEST_LEN>, const DIGEST_LEN: usize> {
 }
 
 impl<H: HashFunction<DIGEST_LEN>, const DIGEST_LEN: usize> Verifier<H, DIGEST_LEN> {
-    pub fn new(builder: IncrementalBuilder<H, DIGEST_LEN>, digest: Digest<DIGEST_LEN>) -> Self {
+    pub(crate) fn new(
+        builder: IncrementalBuilder<H, DIGEST_LEN>,
+        digest: Digest<DIGEST_LEN>,
+    ) -> Self {
         Self { builder, digest }
     }
 
