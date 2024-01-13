@@ -1,40 +1,8 @@
 use std::marker::PhantomData;
 
-use fastcrypto::hash::HashFunction;
+use fastcrypto::hash::{Digest, HashFunction};
 
 use crate::verify::Verifier;
-
-pub struct Sha256(PhantomData<()>);
-pub struct Sha512(PhantomData<()>);
-pub struct Blake3(PhantomData<()>);
-pub struct Integrity<T>(T);
-
-impl Integrity<Blake3> {
-    pub fn verifier(self) -> Verifier<fastcrypto::hash::Blake3, 32> {
-        Verifier::new(
-            IncrementalBuilder::new(fastcrypto::hash::Blake3::new()),
-            Vec::new(),
-        )
-    }
-}
-
-impl Integrity<Sha256> {
-    pub fn verifier(self) -> Verifier<fastcrypto::hash::Sha256, 32> {
-        Verifier::new(
-            IncrementalBuilder::new(fastcrypto::hash::Sha256::new()),
-            Vec::new(),
-        )
-    }
-}
-
-impl Integrity<Sha512> {
-    pub fn verifier(self) -> Verifier<fastcrypto::hash::Sha512, 64> {
-        Verifier::new(
-            IncrementalBuilder::new(fastcrypto::hash::Sha512::new()),
-            Vec::new(),
-        )
-    }
-}
 
 #[non_exhaustive]
 pub enum IntegrityMetadata {
@@ -43,6 +11,33 @@ pub enum IntegrityMetadata {
     Blake3(Integrity<Blake3>),
 }
 
+pub struct Integrity<T> {
+    digest: T,
+}
+
+pub struct Sha256(Digest<32>);
+pub struct Sha512(Digest<64>);
+pub struct Blake3(Digest<32>);
+
+impl Integrity<Blake3> {
+    pub fn verifier(self) -> Verifier<fastcrypto::hash::Blake3, 32> {
+        Verifier::new(IncrementalBuilder::default(), self.digest.0.to_vec())
+    }
+}
+
+impl Integrity<Sha256> {
+    pub fn verifier(self) -> Verifier<fastcrypto::hash::Sha256, 32> {
+        Verifier::new(IncrementalBuilder::default(), self.digest.0.to_vec())
+    }
+}
+
+impl Integrity<Sha512> {
+    pub fn verifier(self) -> Verifier<fastcrypto::hash::Sha512, 64> {
+        Verifier::new(IncrementalBuilder::default(), self.digest.0.to_vec())
+    }
+}
+
+#[derive(Default)]
 pub struct IncrementalBuilder<H: HashFunction<DIGEST_LEN>, const DIGEST_LEN: usize> {
     hash: H,
 }
@@ -51,9 +46,37 @@ impl<H, const DIGEST_LEN: usize> IncrementalBuilder<H, DIGEST_LEN>
 where
     H: HashFunction<DIGEST_LEN>,
 {
-    pub fn new(hash: H) -> Self {
-        Self { hash }
+    pub fn update<T: AsRef<[u8]>>(&mut self, data: T) {
+        self.hash.update(data);
+    }
+}
+
+impl IncrementalBuilder<fastcrypto::hash::Sha256, 32> {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    pub fn update(&mut self) {}
+    pub fn finalize(self) -> Sha256 {
+        Sha256(self.hash.finalize())
+    }
+}
+
+impl IncrementalBuilder<fastcrypto::hash::Sha512, 64> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn finalize(self) -> Sha512 {
+        Sha512(self.hash.finalize())
+    }
+}
+
+impl IncrementalBuilder<fastcrypto::hash::Blake3, 32> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn finalize(self) -> Blake3 {
+        Blake3(self.hash.finalize())
+    }
 }
