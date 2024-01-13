@@ -21,19 +21,19 @@ pub struct Blake3(Digest<32>);
 
 impl Integrity<Blake3> {
     pub fn verifier(self) -> Verifier<fastcrypto::hash::Blake3, 32> {
-        Verifier::new(IncrementalBuilder::default(), self.digest.0.to_vec())
+        Verifier::new(IncrementalBuilder::default(), self.digest.0)
     }
 }
 
 impl Integrity<Sha256> {
     pub fn verifier(self) -> Verifier<fastcrypto::hash::Sha256, 32> {
-        Verifier::new(IncrementalBuilder::default(), self.digest.0.to_vec())
+        Verifier::new(IncrementalBuilder::default(), self.digest.0)
     }
 }
 
 impl Integrity<Sha512> {
     pub fn verifier(self) -> Verifier<fastcrypto::hash::Sha512, 64> {
-        Verifier::new(IncrementalBuilder::default(), self.digest.0.to_vec())
+        Verifier::new(IncrementalBuilder::default(), self.digest.0)
     }
 }
 
@@ -48,6 +48,10 @@ where
 {
     pub fn update<T: AsRef<[u8]>>(&mut self, data: T) {
         self.hash.update(data);
+    }
+
+    pub(crate) fn inner_finalize(self) -> Digest<DIGEST_LEN> {
+        self.hash.finalize()
     }
 }
 
