@@ -184,7 +184,7 @@ async fn test_origin_muxer() {
     // Given: a pointer for some content.
     let pointer = ImmutablePointer {
         origin: OriginProvider::HTTP,
-        uri: "http://127.0.0.1:30235/bar/index.ts".as_bytes().to_vec(),
+        uri: "http://127.0.0.1:31000/bar/index.ts".as_bytes().to_vec(),
     };
     // Given: some state.
     let state = create_app_state("test_origin_muxer".to_string()).await;
@@ -209,7 +209,7 @@ async fn test_origin_muxer() {
 
     tokio::select! {
         biased;
-        _ = server::spawn_server(30235) => {}
+        _ = server::spawn_server(31000) => {}
         _ = test_fut => {}
     }
 }

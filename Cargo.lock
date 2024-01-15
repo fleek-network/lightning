@@ -5011,6 +5011,7 @@ version = "0.0.0"
 dependencies = [
  "affair 0.1.2",
  "anyhow",
+ "fast-sri",
  "fleek-crypto",
  "infusion",
  "lightning-application",

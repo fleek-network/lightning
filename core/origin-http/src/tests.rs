@@ -208,7 +208,7 @@ async fn test_http_origin_with_integrity_check() {
     // Given: Some content that will be returned by gateway.
     let file: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
     // Given: an identifier for some resource.
-    let url = "http://127.0.0.1:30234/bar/index.ts#integrity=somehash".to_string();
+    let url = "http://127.0.0.1:30400/bar/index.ts#integrity=sha256-61z/GbpXJljbPypnYd2389IVCTbzU/taXTCVOUR67is=".to_string();
     // Given: an origin.
     let state = create_app_state("test_http_origin_with_integrity_check".to_string()).await;
     let origin =
@@ -225,30 +225,69 @@ async fn test_http_origin_with_integrity_check() {
 
     tokio::select! {
         biased;
-        _ = server::spawn_server(30234) => {}
+        _ = server::spawn_server(30400) => {}
         _ = test_fut => {}
     }
 }
 
 #[tokio::test]
 async fn test_http_origin_with_integrity_check_invalid_hash() {
-    // Todo: need to implement.
+    // Given: an identifier for some resource with an invalid digest.
+    let url = "http://127.0.0.1:30401/bar/index.ts#integrity=sha256-23lFzBrGtqXuPufwrMw+G3hWOwdtehDz/izclz/3gVw=".to_string();
+    // Given: an origin.
+    let state =
+        create_app_state("test_http_origin_with_integrity_check_invalid_hash".to_string()).await;
+    let origin =
+        HttpOriginFetcher::<TestBinding>::new(Default::default(), state.blockstore.clone())
+            .unwrap();
+
+    // When: we fetch some content using the origin.
+    let test_fut = async move {
+        // Then: sri verification fails.
+        assert_eq!(
+            origin
+                .fetch(url.as_bytes())
+                .await
+                .unwrap_err()
+                .to_string()
+                .as_str(),
+            "sri failed: invalid digest"
+        );
+    };
+
+    tokio::select! {
+        biased;
+        _ = server::spawn_server(30401) => {}
+        _ = test_fut => {}
+    }
 }
 
 #[test]
 fn test_url_and_integrity_hash() {
-    let (_, hash) = get_url_and_sri(String::from("https://lightning.com/").as_bytes()).unwrap();
-    assert!(hash.is_none());
+    let (_, integrity) =
+        get_url_and_sri(String::from("https://lightning.com/").as_bytes()).unwrap();
+    assert!(integrity.is_none());
 
-    let (_, hash) =
-        get_url_and_sri(String::from("https://lightning.com/#integrity=foo").as_bytes()).unwrap();
-    assert_eq!(hash, Some("foo".to_string()));
-
-    let (_, hash) = get_url_and_sri(
-        String::from("https://lightning.com/path?bar=1&other=2#integrity=foo").as_bytes(),
+    let (_, integrity) = get_url_and_sri(
+        String::from(
+            "https://lightning.com/#integrity=blake3-7eXAsQ8uxJecabUvYeQv9bQTUZzgm+DxTQmNz+X2+Y0=",
+        )
+        .as_bytes(),
     )
     .unwrap();
-    assert_eq!(hash, Some("foo".to_string()));
+    assert_eq!(
+        integrity.unwrap().to_string(),
+        "blake3-7eXAsQ8uxJecabUvYeQv9bQTUZzgm+DxTQmNz+X2+Y0=".to_string()
+    );
+
+    let (_, integrity) = get_url_and_sri(
+        String::from("https://lightning.com/path?bar=1&other=2#integrity=blake3-7eXAsQ8uxJecabUvYeQv9bQTUZzgm+DxTQmNz+X2+Y0=").as_bytes(),
+    )
+    .unwrap();
+    assert_eq!(
+        integrity.unwrap().to_string(),
+        "blake3-7eXAsQ8uxJecabUvYeQv9bQTUZzgm+DxTQmNz+X2+Y0=".to_string()
+    );
 
     assert!(get_url_and_sri(String::from("https://lightning.com/#integrity=").as_bytes()).is_err());
 }
