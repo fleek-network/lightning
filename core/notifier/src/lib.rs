@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::notifier::{Notification, NotifierInterface};
+use lightning_interfaces::notifier::{EpochNotifierEmitter, Notification, NotifierInterface};
 use lightning_interfaces::ApplicationInterface;
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::{mpsc, Notify};
@@ -10,14 +10,14 @@ use tokio::time::sleep;
 
 pub struct Notifier<C: Collection> {
     query_runner: c![C::ApplicationInterface::SyncExecutor],
-    notify: Arc<Notify>,
+    epoch_notify: EpochChangeNotificationsEmitter,
 }
 
 impl<C: Collection> Clone for Notifier<C> {
     fn clone(&self) -> Self {
         Self {
             query_runner: self.query_runner.clone(),
-            notify: self.notify.clone(),
+            epoch_notify: self.epoch_notify.clone(),
         }
     }
 }
@@ -38,25 +38,25 @@ impl<C: Collection> Notifier<C> {
 }
 
 impl<C: Collection> NotifierInterface<C> for Notifier<C> {
-    fn emitters(&self) -> Arc<Notify> {
-        self.notify.clone()
+    type EpochEmitter = EpochChangeNotificationsEmitter;
+
+    fn epoch_emitter(&self) -> Self::EpochEmitter {
+        self.epoch_notify.clone()
     }
 
     fn init(app: &c![C::ApplicationInterface]) -> Self {
-        let notify: Arc<Notify> = Default::default();
-
         Self {
             query_runner: app.sync_query(),
-            notify,
+            epoch_notify: Default::default(),
         }
     }
 
     fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>) {
-        let notify = self.notify.clone();
+        let notify = self.epoch_notify.clone();
 
         tokio::spawn(async move {
             loop {
-                notify.notified().await;
+                notify.emitter.notified().await;
 
                 if tx.send(Notification::NewEpoch).await.is_err() {
                     // There is no receiver anymore.
@@ -74,6 +74,17 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
                 tx.send(Notification::BeforeEpochChange).await.unwrap();
             });
         }
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct EpochChangeNotificationsEmitter {
+    emitter: Arc<Notify>,
+}
+
+impl EpochNotifierEmitter for EpochChangeNotificationsEmitter {
+    fn epoch_changed(&self) {
+        self.emitter.notify_waiters()
     }
 }
 
