@@ -12,12 +12,12 @@ use reqwest::{Client, Url};
 
 pub use crate::config::Config;
 
-pub struct HttpOriginFetcher<C: Collection> {
+pub struct HttpOrigin<C: Collection> {
     client: Client,
     blockstore: C::BlockStoreInterface,
 }
 
-impl<C: Collection> Clone for HttpOriginFetcher<C> {
+impl<C: Collection> Clone for HttpOrigin<C> {
     fn clone(&self) -> Self {
         Self {
             client: self.client.clone(),
@@ -26,7 +26,7 @@ impl<C: Collection> Clone for HttpOriginFetcher<C> {
     }
 }
 
-impl<C: Collection> HttpOriginFetcher<C> {
+impl<C: Collection> HttpOrigin<C> {
     pub fn new(_: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
         let client = Client::new();
         Ok(Self { client, blockstore })

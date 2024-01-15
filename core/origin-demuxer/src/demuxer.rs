@@ -3,7 +3,7 @@ use std::sync::Arc;
 use affair::Task;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, OriginProvider};
-use lightning_origin_http::HttpOriginFetcher;
+use lightning_origin_http::HttpOrigin;
 use lightning_origin_ipfs::IPFSOrigin;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::Notify;
@@ -12,7 +12,7 @@ use tokio::task::JoinHandle;
 use crate::Config;
 
 pub struct Demuxer<C: Collection> {
-    http: HttpOriginFetcher<C>,
+    http: HttpOrigin<C>,
     ipfs: IPFSOrigin<C>,
     task_rx: Receiver<Task<ImmutablePointer, anyhow::Result<Blake3Hash>>>,
 }
@@ -24,7 +24,7 @@ impl<C: Collection> Demuxer<C> {
         task_rx: Receiver<Task<ImmutablePointer, anyhow::Result<Blake3Hash>>>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
-            http: HttpOriginFetcher::<C>::new(config.http, blockstore.clone())?,
+            http: HttpOrigin::<C>::new(config.http, blockstore.clone())?,
             ipfs: IPFSOrigin::<C>::new(config.ipfs, blockstore)?,
             task_rx,
         })

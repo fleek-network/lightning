@@ -179,13 +179,25 @@ async fn create_app_state(test_name: String) -> AppState {
 
 #[tokio::test]
 async fn test_origin_muxer() {
-    // Given: Some content that will be returned by gateway.
-    let file: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
-    // Given: a pointer for some content.
-    let pointer = ImmutablePointer {
+    // Given: s ts file that will be returned by the server.
+    let ts_file: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
+    // Given: a pointer for that content.
+    let pointer_ts_file = ImmutablePointer {
         origin: OriginProvider::HTTP,
         uri: "http://127.0.0.1:31000/bar/index.ts".as_bytes().to_vec(),
     };
+
+    // Given: an IPFS-encoded file that will be returned by the server.
+    let ipfs_file: Vec<u8> = std::fs::read(
+        "../test-utils/files/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+    )
+    .unwrap();
+    // Given: a pointer for that content.
+    let pointer_ipfs_file = ImmutablePointer {
+        origin: OriginProvider::HTTP,
+        uri: "http://127.0.0.1:31000/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi".as_bytes().to_vec(),
+    };
+
     // Given: some state.
     let state = create_app_state("test_origin_muxer".to_string()).await;
 
@@ -194,14 +206,19 @@ async fn test_origin_muxer() {
             OriginDemuxer::<TestBinding>::init(Default::default(), state.blockstore.clone())
                 .unwrap();
         origin.start().await;
-
-        // When: we request content given its identify.
         let socket = origin.get_socket();
-        let hash = socket.run(pointer).await.unwrap().unwrap();
 
+        // When: we request content from an HTTP origin.
+        let hash = socket.run(pointer_ts_file).await.unwrap().unwrap();
         let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
         // Then: we get the expected content.
-        assert_eq!(file, bytes);
+        assert_eq!(ts_file, bytes);
+
+        // When: we request content given from an IPFS origin.
+        let hash = socket.run(pointer_ipfs_file).await.unwrap().unwrap();
+        let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
+        // Then: we get the expected content.
+        assert_eq!(ipfs_file, bytes);
 
         // Clean up.
         origin.shutdown().await;
