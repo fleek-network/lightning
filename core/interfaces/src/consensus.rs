@@ -16,6 +16,7 @@ use crate::{
     ArchiveInterface,
     BroadcastInterface,
     ConfigProviderInterface,
+    EpochNotifierEmitter,
     IndexSocket,
     NotifierInterface,
 };
@@ -45,10 +46,11 @@ pub trait ConsensusInterface<C: Collection>:
         let executor = app
             .transaction_executor()
             .expect("ConsensusInferface::_init - Update Socket should be available");
-        let epoch_change_notifier = notifier.emitters();
+
+        let epoch_change_notifier = notifier.epoch_emitter();
         executor.inject(move |res| {
             if res.change_epoch {
-                epoch_change_notifier.notify_waiters();
+                epoch_change_notifier.epoch_changed();
             }
         });
         let sqr = app.sync_query();
