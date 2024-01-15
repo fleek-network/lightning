@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 affair.workspace = true
 anyhow.workspace = true
+fast-sri = { path = "../../lib/fast-sri" }
 lightning-interfaces = { path = "../interfaces" }
 reqwest = "0.11"
 serde.workspace = true

@@ -69,6 +69,16 @@ impl FromStr for IntegrityMetadata {
     }
 }
 
+impl std::fmt::Display for IntegrityMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            IntegrityMetadata::Sha256(integrity) => integrity.fmt(f),
+            IntegrityMetadata::Sha512(integrity) => integrity.fmt(f),
+            IntegrityMetadata::Blake3(integrity) => integrity.fmt(f),
+        }
+    }
+}
+
 pub struct Integrity<T> {
     digest: T,
 }
