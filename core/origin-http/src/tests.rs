@@ -24,7 +24,7 @@ use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use lightning_test_utils::server;
 
-use crate::{get_url_and_sri, HttpOriginFetcher};
+use crate::{get_url_and_sri, HttpOrigin};
 
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
@@ -185,8 +185,7 @@ async fn test_http_origin() {
     // Given: an origin.
     let state = create_app_state("test_http_origin".to_string()).await;
     let origin =
-        HttpOriginFetcher::<TestBinding>::new(Default::default(), state.blockstore.clone())
-            .unwrap();
+        HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore.clone()).unwrap();
 
     // When: we fetch some content using the origin.
     let test_fut = async move {
@@ -212,8 +211,7 @@ async fn test_http_origin_with_integrity_check() {
     // Given: an origin.
     let state = create_app_state("test_http_origin_with_integrity_check".to_string()).await;
     let origin =
-        HttpOriginFetcher::<TestBinding>::new(Default::default(), state.blockstore.clone())
-            .unwrap();
+        HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore.clone()).unwrap();
 
     // When: we fetch some content using the origin.
     let test_fut = async move {
@@ -238,8 +236,7 @@ async fn test_http_origin_with_integrity_check_invalid_hash() {
     let state =
         create_app_state("test_http_origin_with_integrity_check_invalid_hash".to_string()).await;
     let origin =
-        HttpOriginFetcher::<TestBinding>::new(Default::default(), state.blockstore.clone())
-            .unwrap();
+        HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore.clone()).unwrap();
 
     // When: we fetch some content using the origin.
     let test_fut = async move {
