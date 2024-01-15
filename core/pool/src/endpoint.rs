@@ -789,8 +789,8 @@ where
                                 tracing::error!("failed to handle broadcast task after an update: {e:?}");
                             }
                         }
-                        Some(Notification::BeforeEpochChange) => {
-                            unreachable!("we're only registered for new epoch events")
+                        Some(_) => {
+                            unreachable!("we're only registered for new epoch events");
                         }
                         None => {
                             tracing::info!("notifier was dropped");
