@@ -8,6 +8,7 @@ use crate::ApplicationInterface;
 
 #[derive(Debug)]
 pub enum Notification {
+    NewBlock,
     NewEpoch,
     BeforeEpochChange,
 }
@@ -15,7 +16,7 @@ pub enum Notification {
 #[infusion::service]
 pub trait NotifierInterface<C: Collection>: Sync + Send + Clone {
     type EpochEmitter: EpochNotifierEmitter;
-    // type BlockEmitter: BlockNotifierEmitter;
+    type BlockEmitter: BlockNotifierEmitter;
 
     fn _init(app: ::ApplicationInterface) {
         ok!(Self::init(app))
@@ -27,7 +28,7 @@ pub trait NotifierInterface<C: Collection>: Sync + Send + Clone {
     /// interested (and responsible) for triggering a notification around new epoch.
     fn epoch_emitter(&self) -> Self::EpochEmitter;
 
-    // fn notify_on_new_block(&self, tx: Sender<Notification>);
+    fn notify_on_new_block(&self, tx: mpsc::Sender<Notification>);
 
     fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>);
 
@@ -38,4 +39,10 @@ pub trait NotifierInterface<C: Collection>: Sync + Send + Clone {
 pub trait EpochNotifierEmitter: Clone + Send + Sync + 'static {
     /// Notify the waiters about epoch change.
     fn epoch_changed(&self);
+}
+
+#[infusion::blank]
+pub trait BlockNotifierEmitter: Clone + Send + Sync + 'static {
+    /// Notify the waiters about new block.
+    fn new_block(&self);
 }

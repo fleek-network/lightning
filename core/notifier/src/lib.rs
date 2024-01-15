@@ -2,7 +2,12 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::notifier::{EpochNotifierEmitter, Notification, NotifierInterface};
+use lightning_interfaces::notifier::{
+    BlockNotifierEmitter,
+    EpochNotifierEmitter,
+    Notification,
+    NotifierInterface,
+};
 use lightning_interfaces::ApplicationInterface;
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::{mpsc, Notify};
@@ -11,6 +16,7 @@ use tokio::time::sleep;
 pub struct Notifier<C: Collection> {
     query_runner: c![C::ApplicationInterface::SyncExecutor],
     epoch_notify: EpochChangeNotificationsEmitter,
+    block_notify: NewBlockNotificationsEmitter,
 }
 
 impl<C: Collection> Clone for Notifier<C> {
@@ -18,6 +24,7 @@ impl<C: Collection> Clone for Notifier<C> {
         Self {
             query_runner: self.query_runner.clone(),
             epoch_notify: self.epoch_notify.clone(),
+            block_notify: self.block_notify.clone(),
         }
     }
 }
@@ -39,6 +46,7 @@ impl<C: Collection> Notifier<C> {
 
 impl<C: Collection> NotifierInterface<C> for Notifier<C> {
     type EpochEmitter = EpochChangeNotificationsEmitter;
+    type BlockEmitter = NewBlockNotificationsEmitter;
 
     fn epoch_emitter(&self) -> Self::EpochEmitter {
         self.epoch_notify.clone()
@@ -48,7 +56,23 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
         Self {
             query_runner: app.sync_query(),
             epoch_notify: Default::default(),
+            block_notify: Default::default(),
         }
+    }
+
+    fn notify_on_new_block(&self, tx: mpsc::Sender<Notification>) {
+        let notify = self.block_notify.clone();
+
+        tokio::spawn(async move {
+            loop {
+                notify.emitter.notified().await;
+
+                if tx.send(Notification::NewBlock).await.is_err() {
+                    // There is no receiver anymore.
+                    return;
+                }
+            }
+        });
     }
 
     fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>) {
@@ -71,7 +95,9 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
         if until_epoch_end > duration {
             tokio::spawn(async move {
                 sleep(until_epoch_end - duration).await;
-                tx.send(Notification::BeforeEpochChange).await.unwrap();
+                tx.send(Notification::BeforeEpochChange)
+                    .await
+                    .expect("Failed to send notification before epoch change.")
             });
         }
     }
@@ -84,6 +110,17 @@ pub struct EpochChangeNotificationsEmitter {
 
 impl EpochNotifierEmitter for EpochChangeNotificationsEmitter {
     fn epoch_changed(&self) {
+        self.emitter.notify_waiters()
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct NewBlockNotificationsEmitter {
+    emitter: Arc<Notify>,
+}
+
+impl BlockNotifierEmitter for NewBlockNotificationsEmitter {
+    fn new_block(&self) {
         self.emitter.notify_waiters()
     }
 }
