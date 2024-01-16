@@ -139,6 +139,8 @@ async fn test_query() {
 
     let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
 
+    let notifier = Notifier::<TestBinding>::init(&app);
+
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 1,
@@ -153,6 +155,7 @@ async fn test_query() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        &notifier,
     )
     .unwrap();
 
@@ -292,6 +295,8 @@ async fn test_submit_measurements() {
 
     let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
 
+    let notifier = Notifier::<TestBinding>::init(&app);
+
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 1,
@@ -306,6 +311,7 @@ async fn test_submit_measurements() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        &notifier,
     )
     .unwrap();
 
@@ -476,6 +482,9 @@ async fn test_reputation_calculation_and_query() {
     let mut signer1 = Signer::<TestBinding>::init(signer_config1, query_runner.clone()).unwrap();
     let mut signer2 = Signer::<TestBinding>::init(signer_config2, query_runner.clone()).unwrap();
 
+    let notifier1 = Notifier::<TestBinding>::init(&app);
+    let notifier2 = Notifier::<TestBinding>::init(&app);
+
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 1,
@@ -492,6 +501,7 @@ async fn test_reputation_calculation_and_query() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        &notifier1,
     )
     .unwrap();
     let consensus2 = MockConsensus::<TestBinding>::init(
@@ -501,6 +511,7 @@ async fn test_reputation_calculation_and_query() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        &notifier2,
     )
     .unwrap();
 

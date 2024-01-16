@@ -13,10 +13,12 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConsensusInterface,
     DeliveryAcknowledgmentAggregatorInterface,
+    NotifierInterface,
     SignerInterface,
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
+use lightning_notifier::Notifier;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 
@@ -27,6 +29,7 @@ partial!(TestBinding {
     ConsensusInterface = MockConsensus<Self>;
     SignerInterface = Signer<Self>;
     DeliveryAcknowledgmentAggregatorInterface = DeliveryAcknowledgmentAggregator<Self>;
+    NotifierInterface = Notifier<Self>;
 });
 
 struct Node<C: Collection> {
@@ -90,6 +93,7 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
     let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+    let notifier = Notifier::<TestBinding>::init(&app);
 
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
@@ -105,6 +109,7 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        &notifier,
     )
     .unwrap();
 

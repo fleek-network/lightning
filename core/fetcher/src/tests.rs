@@ -198,7 +198,7 @@ async fn get_fetchers(
             config,
             &signer,
             query_runner.clone(),
-            notifier,
+            notifier.clone(),
             topology,
             rep_aggregator.get_reporter(),
         )
@@ -220,6 +220,7 @@ async fn get_fetchers(
             query_runner,
             broadcast.get_pubsub(Topic::Consensus),
             None,
+            &notifier,
         )
         .unwrap();
 

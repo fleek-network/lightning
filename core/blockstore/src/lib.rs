@@ -25,10 +25,12 @@ mod tests {
         ConsensusInterface,
         IncrementalPutInterface,
         IndexerInterface,
+        NotifierInterface,
         SignerInterface,
         SyncQueryRunnerInterface,
         WithStartAndShutdown,
     };
+    use lightning_notifier::Notifier;
     use lightning_signer::{Config as SignerConfig, Signer};
     use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
     use tokio::test;
@@ -58,6 +60,7 @@ mod tests {
         SignerInterface = Signer<Self>;
         ConsensusInterface = MockConsensus<Self>;
         IndexerInterface = Indexer<Self>;
+        NotifierInterface = Notifier<Self>;
     });
 
     fn create_content() -> Vec<u8> {
@@ -169,6 +172,8 @@ mod tests {
 
         let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
 
+        let notifier = Notifier::<TestBinding>::init(&app);
+
         let consensus_config = ConsensusConfig {
             min_ordering_time: 0,
             max_ordering_time: 1,
@@ -183,6 +188,7 @@ mod tests {
             query_runner.clone(),
             infusion::Blank::default(),
             None,
+            &notifier,
         )
         .unwrap();
 

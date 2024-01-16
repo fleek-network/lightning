@@ -18,11 +18,12 @@ tokio.workspace = true
 rocksdb = "0.21"
 
 [dev-dependencies]
-lightning-test-utils = {path="../test-utils"}
-lightning-signer = {path="../signer"}
-lightning-broadcast = {path="../broadcast"}
-lightning-rep-collector = {path="../rep-collector"}
-lightning-application = {path="../application", features = ["test"]}
+lightning-test-utils = { path = "../test-utils" }
+lightning-signer = { path = "../signer" }
+lightning-broadcast = { path = "../broadcast" }
+lightning-rep-collector = { path="../rep-collector" }
+lightning-application = { path = "../application", features = ["test"] }
 lightning-pool = { path = "../pool" }
+lightning-notifier = { path = "../notifier" }
 fleek-crypto.workspace = true
 infusion.workspace = true

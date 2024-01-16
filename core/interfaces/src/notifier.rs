@@ -14,7 +14,7 @@ pub enum Notification {
 
 #[infusion::service]
 pub trait NotifierInterface<C: Collection>: Sync + Send + Clone {
-    type EpochEmitter: EpochNotifierEmitter + Send + Sync + Clone;
+    type EpochEmitter: EpochNotifierEmitter;
     // type BlockEmitter: BlockNotifierEmitter;
 
     fn _init(app: ::ApplicationInterface) {
@@ -35,7 +35,7 @@ pub trait NotifierInterface<C: Collection>: Sync + Send + Clone {
 }
 
 #[infusion::blank]
-pub trait EpochNotifierEmitter {
+pub trait EpochNotifierEmitter: Clone + Send + Sync + 'static {
     /// Notify the waiters about epoch change.
     fn epoch_changed(&self);
 }

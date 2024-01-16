@@ -17,10 +17,12 @@ use lightning_interfaces::{
     BlockStoreInterface,
     ConsensusInterface,
     IndexerInterface,
+    NotifierInterface,
     OriginProviderInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
+use lightning_notifier::Notifier;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use lightning_test_utils::server;
@@ -34,6 +36,7 @@ partial!(TestBinding {
     ConsensusInterface = MockConsensus<Self>;
     IndexerInterface = Indexer<Self>;
     OriginProviderInterface = OriginDemuxer<Self>;
+    NotifierInterface = Notifier<Self>;
 });
 
 struct AppState {
@@ -141,6 +144,7 @@ async fn create_app_state(test_name: String) -> AppState {
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
     let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+    let notifier = Notifier::<TestBinding>::init(&app);
 
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
@@ -156,6 +160,7 @@ async fn create_app_state(test_name: String) -> AppState {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        &notifier,
     )
     .unwrap();
 

@@ -16,7 +16,8 @@ tracing.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 
 [dev-dependencies]
-lightning-test-utils = { path="../test-utils" }
-lightning-signer = { path="../signer" }
-lightning-application = { path="../application", features = ["test"] }
-lightning-rep-collector = { path="../rep-collector" }
+lightning-test-utils = { path = "../test-utils" }
+lightning-signer = { path = "../signer" }
+lightning-application = { path = "../application", features = ["test"] }
+lightning-rep-collector = { path = "../rep-collector" }
+lightning-notifier = { path = "../notifier" }

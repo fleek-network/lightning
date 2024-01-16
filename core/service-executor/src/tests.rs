@@ -138,7 +138,7 @@ async fn init_service_executor(
         config,
         &signer,
         query_runner.clone(),
-        notifier,
+        notifier.clone(),
         topology,
         rep_aggregator.get_reporter(),
     )
@@ -160,6 +160,7 @@ async fn init_service_executor(
         query_runner.clone(),
         broadcast.get_pubsub(Topic::Consensus),
         None,
+        &notifier,
     )
     .unwrap();
 

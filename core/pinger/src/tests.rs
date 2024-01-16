@@ -115,6 +115,8 @@ async fn init_pinger() -> Pinger<TestBinding> {
 
     let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
 
+    let notifier = Notifier::<TestBinding>::init(&app);
+
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 1,
@@ -129,6 +131,7 @@ async fn init_pinger() -> Pinger<TestBinding> {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        &notifier,
     )
     .unwrap();
 

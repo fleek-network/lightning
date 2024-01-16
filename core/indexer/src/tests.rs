@@ -12,10 +12,12 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConsensusInterface,
     IndexerInterface,
+    NotifierInterface,
     SignerInterface,
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
+use lightning_notifier::Notifier;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 
@@ -26,6 +28,7 @@ partial!(TestBinding {
     SignerInterface = Signer<Self>;
     ConsensusInterface = MockConsensus<Self>;
     IndexerInterface = Indexer<Self>;
+    NotifierInterface = Notifier<Self>;
 });
 
 #[tokio::test]
@@ -111,6 +114,8 @@ async fn test_submission() {
 
     let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
 
+    let notifier = Notifier::<TestBinding>::init(&app);
+
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 1,
@@ -125,6 +130,7 @@ async fn test_submission() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        &notifier,
     )
     .unwrap();
 

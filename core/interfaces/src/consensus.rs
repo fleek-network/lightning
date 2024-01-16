@@ -16,7 +16,6 @@ use crate::{
     ArchiveInterface,
     BroadcastInterface,
     ConfigProviderInterface,
-    EpochNotifierEmitter,
     IndexSocket,
     NotifierInterface,
 };
@@ -45,13 +44,6 @@ pub trait ConsensusInterface<C: Collection>:
     ) {
         let executor = app.transaction_executor();
 
-        let epoch_change_notifier = notifier.epoch_emitter();
-        executor.inject(move |res| {
-            if res.change_epoch {
-                epoch_change_notifier.epoch_changed();
-            }
-        });
-
         let sqr = app.sync_query();
         let pubsub = broadcast.get_pubsub(crate::types::Topic::Consensus);
         Self::init(
@@ -61,6 +53,7 @@ pub trait ConsensusInterface<C: Collection>:
             sqr,
             pubsub,
             archive.index_socket(),
+            notifier,
         )
     }
 
@@ -74,6 +67,7 @@ pub trait ConsensusInterface<C: Collection>:
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
         indexer_socket: Option<IndexSocket>,
+        notifier: &c!(C::NotifierInterface),
     ) -> anyhow::Result<Self>;
 
     /// Returns a socket that can be used to submit transactions to the consensus,
