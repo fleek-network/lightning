@@ -57,6 +57,7 @@ pub enum RPCModules {
     Net,
     Eth,
     Flk,
+    Admin,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
