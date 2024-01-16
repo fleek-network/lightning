@@ -18,7 +18,8 @@ use lightning_interfaces::consensus::ConsensusInterface;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::signer::SignerInterface;
 use lightning_interfaces::types::{NodePorts, UpdateMethod};
-use lightning_interfaces::{partial, SyncQueryRunnerInterface};
+use lightning_interfaces::{partial, NotifierInterface, SyncQueryRunnerInterface};
+use lightning_notifier::Notifier;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use resolved_pathbuf::ResolvedPathBuf;
 
@@ -29,6 +30,7 @@ partial!(TestBinding {
     SignerInterface = Signer<Self>;
     ApplicationInterface = Application<Self>;
     ConsensusInterface = MockConsensus<Self>;
+    NotifierInterface = Notifier<Self>;
 });
 
 #[tokio::test]
@@ -81,6 +83,8 @@ async fn test_send_two_txs_in_a_row() {
     let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
     let signer_socket = signer.get_socket();
 
+    let notifier = Notifier::<TestBinding>::init(&app);
+
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 2,
@@ -95,6 +99,7 @@ async fn test_send_two_txs_in_a_row() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        &notifier,
     )
     .unwrap();
 
@@ -176,6 +181,8 @@ async fn test_retry_send() {
 
     let signer_socket = signer.get_socket();
 
+    let notifier = Notifier::<TestBinding>::init(&app);
+
     let consensus_config = ConsensusConfig {
         min_ordering_time: 0,
         max_ordering_time: 2,
@@ -190,6 +197,7 @@ async fn test_retry_send() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        &notifier,
     )
     .unwrap();
 
@@ -227,6 +235,7 @@ async fn test_shutdown() {
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
     let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
+    let notifier = Notifier::<TestBinding>::init(&app);
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
@@ -234,6 +243,7 @@ async fn test_shutdown() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        &notifier,
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());
@@ -254,6 +264,7 @@ async fn test_shutdown_and_start_again() {
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
     let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
+    let notifier = Notifier::<TestBinding>::init(&app);
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
@@ -261,6 +272,7 @@ async fn test_shutdown_and_start_again() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        &notifier,
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());
@@ -287,6 +299,7 @@ async fn test_sign_raw_digest() {
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
     let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
+    let notifier = Notifier::<TestBinding>::init(&app);
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
@@ -294,6 +307,7 @@ async fn test_sign_raw_digest() {
         query_runner.clone(),
         infusion::Blank::default(),
         None,
+        &notifier,
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());

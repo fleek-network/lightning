@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lightning-interfaces = {path="../interfaces"}
+lightning-interfaces = { path="../interfaces" }
 anyhow.workspace = true
 serde.workspace = true
 bincode.workspace = true
@@ -17,8 +17,9 @@ resolved-pathbuf.workspace = true
 queue-file = "1.4.10"
 
 [dev-dependencies]
-lightning-test-utils = {path="../test-utils"}
-lightning-signer = {path="../signer"}
-lightning-application = {path="../application", features = ["test"]}
+lightning-test-utils = { path="../test-utils" }
+lightning-signer = { path = "../signer" }
+lightning-application = { path = "../application", features = ["test"] }
+lightning-notifier = { path = "../notifier" }
 infusion.workspace = true
 fleek-crypto.workspace = true

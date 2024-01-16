@@ -31,3 +31,4 @@ lightning-signer = { path="../signer" }
 lightning-application = { path="../application", features = ["test"] }
 lightning-rep-collector = { path="../rep-collector" }
 lightning-indexer = { path = "../indexer" }
+lightning-notifier = { path="../notifier" }
