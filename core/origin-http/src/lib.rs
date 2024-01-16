@@ -40,16 +40,15 @@ impl<C: Collection> HttpOrigin<C> {
             .timeout(Duration::from_millis(500))
             .send()
             .await?;
-        let data = resp.bytes().await?;
+        let mut data: Vec<u8> = resp.bytes().await?.into();
 
         // We verify before inserting any blocks
         if let Some(integrity_metadata) = sri {
-            let mut verifier = integrity_metadata.into_verifier();
-            verifier.update(data.as_ref());
-            let (is_valid, _) = verifier.verify();
+            let (is_valid, verified_data) = integrity_metadata.verify(data);
             if !is_valid {
                 anyhow::bail!("sri failed: invalid digest");
             }
+            data = verified_data;
         }
 
         let mut putter = self.blockstore.put(None);

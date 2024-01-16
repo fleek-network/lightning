@@ -21,6 +21,11 @@ impl IntegrityMetadata {
     pub fn into_verifier(self) -> BufferedVerifier {
         BufferedVerifier::new(self)
     }
+
+    /// Verifies data against this integrity metadata.
+    pub fn verify(self, data: Vec<u8>) -> (bool, Vec<u8>) {
+        BufferedVerifier::new_with_data(self, data).verify()
+    }
 }
 
 impl FromStr for IntegrityMetadata {
@@ -269,5 +274,35 @@ mod tests {
                 .parse::<IntegrityMetadata>()
                 .is_err()
         );
+    }
+
+    #[test]
+    fn test_verify_sha256() {
+        // Given: an integrity metadata.
+        let integrity_metadata: IntegrityMetadata =
+            "sha256-MV9b23bQeMQ7isAGTkoBZGErH853yGk0W/yUx1iU7dM="
+                .parse()
+                .unwrap();
+
+        // When: we verify all of our content.
+        let (is_valid, data) = integrity_metadata.verify(b"Hello, world!".to_vec());
+
+        // Then: digest is valid for the data.
+        assert!(is_valid);
+        assert_eq!(data, b"Hello, world!".to_vec());
+
+        // Given: an integrity metadata.
+        let integrity_metadata: IntegrityMetadata =
+            "sha256-MV9b23bQeMQ7isAGTkoBZGErH853yGk0W/yUx1iU7dM="
+                .parse()
+                .unwrap();
+
+        // When: we try to verify data that doesn't correspond to the digest in the integrity
+        // metadata.
+        let (is_valid, data) = integrity_metadata.verify(b"foo bar".to_vec());
+
+        // Then: digest is invalid for the data.
+        assert!(!is_valid);
+        assert_eq!(data, b"foo bar".to_vec());
     }
 }

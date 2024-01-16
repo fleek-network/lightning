@@ -9,4 +9,3 @@ description = "A thin wrapper over fastcrypto for handling Subresource Integrity
 [dependencies]
 fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1" }
 base64 = "0.21"
-bytes = "1.4"
