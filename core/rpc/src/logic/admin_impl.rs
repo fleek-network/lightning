@@ -15,7 +15,7 @@ pub struct AdminApi<C: Collection> {
 
 impl<C: Collection> AdminApi<C> {
     pub(crate) fn new(data: Arc<Data<C>>) -> Self {
-        Self { data: data }
+        Self { data }
     }
 }
 

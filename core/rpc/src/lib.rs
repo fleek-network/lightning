@@ -2,6 +2,7 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
+use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
 use jsonrpsee::server::{stop_channel, Server as JSONRPCServer, ServerHandle};
 use jsonrpsee::{Methods, RpcModule};
@@ -21,9 +22,12 @@ use reqwest::StatusCode;
 use tokio::sync::Mutex;
 use tower::Service;
 
+use crate::api::AdminApiServer;
 pub use crate::api::{EthApiServer, FleekApiServer, NetApiServer};
 pub use crate::config::Config;
+use crate::logic::AdminApi;
 pub use crate::logic::{EthApi, FleekApi, NetApi};
+
 pub mod api;
 mod api_types;
 pub mod config;
@@ -49,6 +53,9 @@ pub struct Rpc<C: Collection> {
 
     /// The final RPCModule containting selected methods
     module: RpcModule<()>,
+
+    /// RPC module for admin methods.
+    admin_module: RpcModule<()>,
 
     // need interior mutability to support restarts
     handle: Mutex<Option<ServerHandle>>,
@@ -85,9 +92,26 @@ impl<C: Collection> Rpc<C> {
                 config::RPCModules::Flk => {
                     final_module.merge(FleekApi::new(data.clone()).into_rpc())?;
                 },
+                config::RPCModules::Admin => {
+                    // Admin RPC is private and it's set up separately than the public RPCs.
+                },
             }
         }
 
+        Ok(final_module)
+    }
+
+    fn create_admin_module_from_config(
+        config: &Config,
+        data: Arc<Data<C>>,
+    ) -> anyhow::Result<RpcModule<()>> {
+        let mut final_module = RpcModule::new(());
+        if config
+            .rpc_selection()
+            .any(|module| matches!(module, config::RPCModules::Admin))
+        {
+            final_module.merge(AdminApi::new(data.clone()).into_rpc())?;
+        }
         Ok(final_module)
     }
 }
@@ -99,12 +123,20 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
             .to_service_builder()
             .build(Methods::from(self.module.clone()), stop.clone());
 
-        let make_service = make_service_fn(move |_| {
+        let admin_json_rpc_service = JSONRPCServer::builder()
+            .to_service_builder()
+            .build(Methods::from(self.admin_module.clone()), stop.clone());
+
+        let make_service = make_service_fn(move |addr_stream: &AddrStream| {
             let json_rpc_service = json_rpc_service.clone();
+            let admin_json_rpc_service = admin_json_rpc_service.clone();
+
+            let is_local = addr_stream.remote_addr().ip().is_loopback();
 
             async move {
                 Ok::<_, hyper::Error>(service_fn(move |req: hyper::Request<hyper::Body>| {
                     let mut json_rpc_service = json_rpc_service.clone();
+                    let mut admin_json_rpc_service = admin_json_rpc_service.clone();
 
                     async move {
                         let path = req.uri().path().to_string().to_ascii_lowercase();
@@ -124,6 +156,20 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
                                 hyper::Response::builder()
                                     .status(status)
                                     .body(hyper::Body::from(res))
+                            },
+                            "/admin" => {
+                                if is_local && method == hyper::Method::POST {
+                                    match admin_json_rpc_service.call(req).await {
+                                        Ok(res) => Ok(res),
+                                        Err(err) => hyper::Response::builder()
+                                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                            .body(hyper::Body::from(err.to_string())),
+                                    }
+                                } else {
+                                    hyper::Response::builder()
+                                        .status(StatusCode::NOT_FOUND)
+                                        .body(hyper::Body::empty())
+                                }
                             },
                             _ => {
                                 if method == hyper::Method::POST {
@@ -199,9 +245,12 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
 
         let module = Self::create_modules_from_config(&config, data.clone())?;
 
+        let admin_module = Self::create_admin_module_from_config(&config, data.clone())?;
+
         Ok(Self {
             config,
             module,
+            admin_module,
             handle: Mutex::new(None),
             _data: data,
         })
