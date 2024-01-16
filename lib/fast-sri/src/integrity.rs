@@ -4,6 +4,7 @@ use base64::Engine;
 use fastcrypto::hash::{Digest, HashFunction};
 
 use crate::verify::Verifier;
+use crate::BufferedVerifier;
 
 const SHA256_ALGO: &str = "sha256";
 const SHA512_ALGO: &str = "sha512";
@@ -14,6 +15,12 @@ pub enum IntegrityMetadata {
     Sha256(Integrity<Sha256>),
     Sha512(Integrity<Sha512>),
     Blake3(Integrity<Blake3>),
+}
+
+impl IntegrityMetadata {
+    pub fn into_verifier(self) -> BufferedVerifier {
+        BufferedVerifier::new(self)
+    }
 }
 
 impl FromStr for IntegrityMetadata {
