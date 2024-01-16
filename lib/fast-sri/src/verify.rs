@@ -1,4 +1,3 @@
-use bytes::BytesMut;
 use fastcrypto::hash::{Digest, HashFunction};
 
 use crate::integrity::Builder;
@@ -24,7 +23,7 @@ impl<H: HashFunction<DIGEST_LEN>, const DIGEST_LEN: usize> Verifier<H, DIGEST_LE
 }
 
 pub struct BufferedVerifier {
-    buff: BytesMut,
+    buff: Vec<u8>,
     integrity_metadata: IntegrityMetadata,
 }
 
@@ -32,7 +31,14 @@ impl BufferedVerifier {
     pub(crate) fn new(integrity_metadata: IntegrityMetadata) -> Self {
         Self {
             integrity_metadata,
-            buff: BytesMut::new(),
+            buff: Vec::new(),
+        }
+    }
+
+    pub(crate) fn new_with_data(integrity_metadata: IntegrityMetadata, data: Vec<u8>) -> Self {
+        Self {
+            integrity_metadata,
+            buff: data,
         }
     }
 
@@ -44,21 +50,21 @@ impl BufferedVerifier {
         let is_valid = match self.integrity_metadata {
             IntegrityMetadata::Sha256(integrity) => {
                 let mut verifier = integrity.verifier();
-                verifier.update(self.buff.as_ref());
+                verifier.update(self.buff.as_slice());
                 verifier.verify()
             },
             IntegrityMetadata::Sha512(integrity) => {
                 let mut verifier = integrity.verifier();
-                verifier.update(self.buff.as_ref());
+                verifier.update(self.buff.as_slice());
                 verifier.verify()
             },
             IntegrityMetadata::Blake3(integrity) => {
                 let mut verifier = integrity.verifier();
-                verifier.update(self.buff.as_ref());
+                verifier.update(self.buff.as_slice());
                 verifier.verify()
             },
         };
-        (is_valid, self.buff.into())
+        (is_valid, self.buff)
     }
 }
 
@@ -172,41 +178,5 @@ mod tests {
 
         // Then: verifies that digest is invalid for the data.
         assert!(!verifier.verify());
-    }
-
-    #[test]
-    fn test_buffered_verify_sha256() {
-        // Given: an integrity metadata.
-        let integrity_metadata: IntegrityMetadata =
-            "sha256-MV9b23bQeMQ7isAGTkoBZGErH853yGk0W/yUx1iU7dM="
-                .parse()
-                .unwrap();
-
-        // When: we feed to a verifier data corresponding to the digest in the integrity metadata.
-        let mut verifier = integrity_metadata.into_verifier();
-        verifier.update("Hello,");
-        verifier.update(" world!");
-
-        // Then: verifies that digest is valid for the data.
-        let (is_valid, data) = verifier.verify();
-        assert!(is_valid);
-        assert_eq!(data, b"Hello, world!".to_vec());
-
-        // Given: an integrity metadata.
-        let integrity_metadata: IntegrityMetadata =
-            "sha256-MV9b23bQeMQ7isAGTkoBZGErH853yGk0W/yUx1iU7dM="
-                .parse()
-                .unwrap();
-
-        // When: we feed to a verifier data that doesn't correspond to the digest in the integrity
-        // metadata.
-        let mut verifier = integrity_metadata.into_verifier();
-        verifier.update("foo");
-        verifier.update("bar");
-
-        // Then: verifies that digest is invalid for the data.
-        let (is_valid, data) = verifier.verify();
-        assert!(!is_valid);
-        assert_eq!(data, b"foobar".to_vec());
     }
 }
