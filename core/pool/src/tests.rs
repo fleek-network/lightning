@@ -188,7 +188,7 @@ fn create_peer(
     in_state: bool,
     state_server_address_port: Option<u16>,
 ) -> Peer<TestBinding> {
-    let (_, query_runner) = (app.transaction_executor(), app.sync_query());
+    let query_runner = app.sync_query();
     let signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
     let notifier = Notifier::<TestBinding>::init(app);
     let topology = Topology::<TestBinding>::init(

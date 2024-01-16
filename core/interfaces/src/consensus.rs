@@ -43,9 +43,7 @@ pub trait ConsensusInterface<C: Collection>:
         archive: ::ArchiveInterface,
         notifier: ::NotifierInterface,
     ) {
-        let executor = app
-            .transaction_executor()
-            .expect("ConsensusInferface::_init - Update Socket should be available");
+        let executor = app.transaction_executor();
 
         let epoch_change_notifier = notifier.epoch_emitter();
         executor.inject(move |res| {
@@ -53,6 +51,7 @@ pub trait ConsensusInterface<C: Collection>:
                 epoch_change_notifier.epoch_changed();
             }
         });
+
         let sqr = app.sync_query();
         let pubsub = broadcast.get_pubsub(crate::types::Topic::Consensus);
         Self::init(

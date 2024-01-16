@@ -158,7 +158,7 @@ async fn get_fetchers(
     .unwrap();
     app.start().await;
 
-    let update_socket = app.transaction_executor().unwrap();
+    let update_socket = app.transaction_executor();
     let mut peers = Vec::new();
     for (i, signer_config) in signers_configs.into_iter().enumerate() {
         let query_runner = app.sync_query();
