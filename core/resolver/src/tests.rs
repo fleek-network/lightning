@@ -12,12 +12,14 @@ use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     ConsensusInterface,
+    NotifierInterface,
     PoolInterface,
     ReputationAggregatorInterface,
     ResolverInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
+use lightning_notifier::Notifier;
 use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{Config as SignerConfig, Signer};
@@ -33,6 +35,7 @@ partial!(TestBinding {
     BroadcastInterface = Broadcast<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
     PoolInterface = Pool<Self>;
+    NotifierInterface = Notifier<Self>;
 });
 
 #[tokio::test]
@@ -84,10 +87,12 @@ async fn test_start_shutdown() {
 
     let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
 
+    let notifier = Notifier::<TestBinding>::init(&app);
+
     let rep_aggregator = ReputationAggregator::<TestBinding>::init(
         lightning_rep_collector::config::Config::default(),
         signer.get_socket(),
-        Default::default(),
+        notifier.clone(),
         query_runner.clone(),
     )
     .unwrap();
@@ -96,7 +101,7 @@ async fn test_start_shutdown() {
         PoolConfig::default(),
         &signer,
         app.sync_query(),
-        Default::default(),
+        notifier.clone(),
         Default::default(),
         rep_aggregator.get_reporter(),
     )
@@ -118,6 +123,7 @@ async fn test_start_shutdown() {
         query_runner,
         broadcast.get_pubsub(Topic::Consensus),
         None,
+        &notifier,
     )
     .unwrap();
 

@@ -25,10 +25,12 @@ tracing.workspace = true
 [dev-dependencies]
 fleek-crypto.workspace = true
 infusion.workspace = true
-lightning-application = { path="../application", features = ["test"] }
+lightning-application = { path= "../application", features = ["test"] }
 lightning-blockstore = { path = "../blockstore" }
 lightning-indexer = { path = "../indexer" }
-lightning-signer = { path="../signer" }
+lightning-signer = { path = "../signer" }
 lightning-test-utils = { path = "../test-utils" }
+lightning-notifier = { path = "../notifier" }
+
 
 

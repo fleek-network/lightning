@@ -16,7 +16,9 @@ use lightning_interfaces::types::{Epoch, EpochInfo, UpdateMethod};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
+    EpochNotifierEmitter,
     IndexSocket,
+    NotifierInterface,
     PubSub,
     SyncQueryRunnerInterface,
 };
@@ -52,6 +54,7 @@ pub struct Consensus<C: Collection> {
             EpochState<
                 c![C::ApplicationInterface::SyncExecutor],
                 c![C::BroadcastInterface::PubSub<PubSubMsg>],
+                c![C::NotifierInterface::EpochEmitter],
             >,
         >,
     >,
@@ -71,7 +74,11 @@ pub struct Consensus<C: Collection> {
 }
 
 /// This struct contains mutable state only for the current epoch.
-struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
+struct EpochState<
+    Q: SyncQueryRunnerInterface,
+    P: PubSub<PubSubMsg> + 'static,
+    EN: EpochNotifierEmitter,
+> {
     /// The node public key of the node.
     node_public_key: NodePublicKey,
     /// The consensus public key of the node.
@@ -85,7 +92,7 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
     /// Path to the database used by the narwhal implementation
     pub store_path: ResolvedPathBuf,
     /// Narwhal execution state.
-    execution_state: Arc<Execution<Q>>,
+    execution_state: Arc<Execution<Q, EN>>,
     /// Used to send transactions to consensus
     /// We still use this socket on consensus struct because a node is not always on the committee,
     /// so its not always sending     a transaction to its own mempool. The signer interface
@@ -100,14 +107,16 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> {
 }
 
 #[allow(clippy::too_many_arguments)]
-impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static> EpochState<Q, P> {
+impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, EN: EpochNotifierEmitter>
+    EpochState<Q, P, EN>
+{
     fn new(
         node_public_key: NodePublicKey,
         consensus_public_key: ConsensusPublicKey,
         query_runner: Q,
         narwhal_args: NarwhalArgs,
         store_path: ResolvedPathBuf,
-        execution_state: Arc<Execution<Q>>,
+        execution_state: Arc<Execution<Q, EN>>,
         txn_socket: SubmitTxSocket,
         pub_sub: P,
         rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
@@ -384,6 +393,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
         indexer_socket: Option<IndexSocket>,
+        notifier: &c!(C::NotifierInterface),
     ) -> anyhow::Result<Self> {
         // Spawn the registry for narwhal
         let registry = Registry::new();
@@ -413,6 +423,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             tx_narwhal_batches,
             query_runner.clone(),
             indexer_socket,
+            notifier.epoch_emitter(),
         ));
 
         let shutdown_notify = Arc::new(Notify::new());
