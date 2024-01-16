@@ -87,14 +87,14 @@ impl DirectoryHasher {
     /// # Panics
     ///
     /// If the hasher is not capturing the tree.
-    pub fn finalize_flush_tree<W>(self, writer: &mut W) -> std::io::Result<()>
+    pub fn finalize_flush_tree<W>(self, writer: &mut W) -> std::io::Result<[u8; 32]>
     where
         W: Write,
     {
         let output = self.finalize();
         let tree = output.tree.unwrap();
         let flat_tree = flatten(&tree);
-        writer.write_all(flat_tree)
+        writer.write_all(flat_tree).map(|_| output.hash)
     }
 
     /// Insert the given entry into the hasher and returns `Ok(())` if the entry passes all the

@@ -1,14 +1,17 @@
 use arrayvec::ArrayVec;
 use thiserror::Error;
 
-use crate::{utils::is_valid_proof_len, proof::iter::ProofBufIter};
+use super::keeper::TreeKeeper;
+use crate::proof::iter::ProofBufIter;
+use crate::utils::is_valid_proof_len;
 
 /// The incremental verifier that can be feed a stream of proofs and content and verifiy their
 /// authenticity along the way.
 pub struct IncrementalVerifier {
     iv: fleek_blake3::tree::IV,
     stack: ArrayVec<[u8; 32], 64>,
-    could_be_root: bool
+    could_be_root: bool,
+    keeper: Option<TreeKeeper>,
 }
 
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -19,19 +22,58 @@ pub enum IncrementalVerifierError {
     HashMismatch,
     #[error("Verifier has already finished its job.")]
     VerifierTerminated,
-    #[error("Invalid counter value")]
-    InvalidCounter,
-    #[error("Invalid range provided for requested key.")]
-    InvalidRange,
+    #[error("Invalid proof hash position.")]
+    InvalidStackWalk,
 }
 
 impl IncrementalVerifier {
-    pub fn new() -> Self {
+    fn new_internal(iv: fleek_blake3::tree::IV, root_hash: [u8; 32]) -> Self {
         Self {
-            iv: fleek_blake3::tree::IV::new(),
-            stack: ArrayVec::new(),
-            could_be_root: true
+            iv,
+            stack: {
+                let mut s = ArrayVec::new();
+                s.push(root_hash);
+                s
+            },
+            could_be_root: true,
+            keeper: None,
         }
+    }
+
+    /// Create an incremental verifier that can verify normal content.
+    pub fn new(hash: [u8; 32]) -> Self {
+        Self::new_internal(fleek_blake3::tree::IV::new(), hash)
+    }
+
+    /// Create an incremental verifier that can verify directories.
+    pub fn dir(hash: [u8; 32]) -> Self {
+        Self::new_internal(crate::directory::merge::iv(), hash)
+    }
+
+    /// Enable the tree keeper part of the verifier which will collect all of the proofs together to
+    /// recreate the full tree (once all of the content has been received)
+    ///
+    /// Once this is enabled `feed_proof` is not going to accept any proof that is not indicating a
+    /// movement from counter 0 up.
+    ///
+    /// # Panics
+    ///
+    /// If called after initialization.
+    pub fn enable_keeper(&mut self) {
+        assert!(self.could_be_root);
+        self.keeper = Some(TreeKeeper::default());
+    }
+
+    /// Return the tree that was captured.
+    ///
+    /// # Panics
+    ///
+    /// 1. If called without a prior call to `enable_keeper`.
+    /// 2. If the tree has already been taken.
+    /// 3. If there are still pending nodes in the content (pending verification)
+    pub fn take_tree(&mut self) -> Vec<[u8; 32]> {
+        assert!(self.stack.is_empty(), "The proof is not complete.");
+        self.keeper.take().expect("Keeper not present.").take()
     }
 
     /// Feed a new proof to this verifier. The content chunk targeted for this proof must come
@@ -52,6 +94,7 @@ impl IncrementalVerifier {
         let is_root = self.is_root();
         let expected_subtree_root = self.stack.pop().unwrap();
         let prev_stack_len = self.stack.len();
+        let mut keeper_counter = 0;
 
         let mut stack = ArrayVec::<[u8; 32], 2>::new();
         for (is_on_left, hash) in ProofBufIter::new(proof) {
@@ -60,6 +103,16 @@ impl IncrementalVerifier {
                 let left = stack.pop().unwrap();
                 let parent = self.iv.merge(&left, &right, false);
                 stack.push(parent);
+
+                if let Some(keeper) = &mut self.keeper {
+                    if is_on_left {
+                        return Err(IncrementalVerifierError::InvalidStackWalk);
+                    }
+                    keeper.push(left);
+                    keeper.push(right);
+                    keeper.push(parent);
+                    keeper_counter += 3;
+                }
             }
 
             stack.push(*hash);
@@ -85,6 +138,11 @@ impl IncrementalVerifier {
         let right = stack.pop().unwrap();
         let left = stack.pop().unwrap();
         let subtree_root = self.iv.merge(&left, &right, is_root);
+        if let Some(keeper) = &mut self.keeper {
+            keeper.push(left);
+            keeper.push(right);
+            keeper_counter += 2;
+        }
 
         if subtree_root == expected_subtree_root {
             // everything is fine!
@@ -98,6 +156,12 @@ impl IncrementalVerifier {
             // invalid proof: we have to revert.
             while self.stack.len() > prev_stack_len {
                 self.stack.pop();
+            }
+            // revert the changes to the keeper.
+            if let Some(keeper) = &mut self.keeper {
+                for _ in 0..keeper_counter {
+                    keeper.pop();
+                }
             }
             self.stack.push(expected_subtree_root);
             Err(IncrementalVerifierError::HashMismatch)
@@ -115,6 +179,8 @@ impl IncrementalVerifier {
 
         let expected_hash = self.stack.pop().unwrap();
         if hash == expected_hash {
+            // Move the keeper forward.
+            self.keeper.as_mut().map(|keeper| keeper.advance());
             Ok(())
         } else {
             // revert:

@@ -1,5 +1,5 @@
-use super::DirectoryReader;
 use crate::collections::HashTree;
+use crate::persistance::dir_reader::DirectoryReader;
 
 /// The deserializer of an on-disk header file which can be either a directory or a file.
 pub struct Reader<'b> {

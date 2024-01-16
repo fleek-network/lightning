@@ -38,20 +38,20 @@ impl<'b> DirectoryReader<'b> {
             return None;
         }
 
-        let offset = self.after_tree_pos();
-        let slice = &self.buffer[offset..];
+        let offsets = &self.buffer[self.after_tree_pos()..];
+        let payloads = &offsets[(len * 4)..];
 
         let mut hi = len - 1;
         let mut lo = 0;
 
         while lo <= hi {
             let mid = (hi + lo) / 2;
-            let offset = read_u32(slice, mid << 2) as usize;
+            let offset = read_u32(offsets, mid << 2) as usize;
 
             // +1 because the first byte of the entry bytes is the tag.
-            match cmp(name, &slice[offset + 1..]) {
+            match cmp(name, &payloads[offset + 1..]) {
                 Ordering::Equal => {
-                    return Some((mid, read_entry(&slice[offset..])));
+                    return Some((mid, read_entry(&payloads[offset..])));
                 },
                 Ordering::Less => {
                     hi = mid - 1;
@@ -67,7 +67,7 @@ impl<'b> DirectoryReader<'b> {
 
     #[inline(always)]
     pub fn after_tree_pos(&self) -> usize {
-        4 + ((2 * self.len()).max(1) - 1) << 5
+        4 + ((2 * self.len()).max(2) - 1) << 5
     }
 }
 

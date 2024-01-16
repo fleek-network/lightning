@@ -12,13 +12,11 @@ pub mod walker;
 
 pub mod collections;
 
-pub mod reader;
-
-pub mod writer;
-
 pub mod directory;
 
 pub mod verifier;
+
+pub mod persistance;
 
 #[cfg(test)]
 pub mod test_utils;
