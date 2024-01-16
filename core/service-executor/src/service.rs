@@ -48,8 +48,7 @@ impl<C: Collection> Context<C> {
                         self.query_runner
                             .get_account_info(&address, |a| a.flk_balance)
                     })
-                    .unwrap();
-                //.unwrap_or(0_u32.into());
+                    .unwrap_or(0_u32.into());
                 ipc_types::Response::QueryClientFLK {
                     balance: balance.try_into().unwrap(),
                 }
