@@ -297,3 +297,36 @@ async fn test_query_client_info() {
         std::fs::remove_dir_all(&path).unwrap();
     }
 }
+
+#[tokio::test]
+async fn test_query_missing_client_info() {
+    let path = std::env::temp_dir().join("lightning-service-ex-test-2");
+    if path.exists() {
+        std::fs::remove_dir_all(&path).unwrap();
+    }
+    std::fs::create_dir_all(&path).unwrap();
+
+    let secret_key = ConsensusSecretKey::generate();
+    let client_pk = ClientPublicKey(secret_key.to_pk().0);
+
+    let genesis = Genesis::load().unwrap();
+
+    let (node, _app) = init_service_executor(genesis, path.clone(), 30310, 40310, 1070).await;
+    node.service_exec.start().await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // Start the service
+    fn_sdk::ipc::init_from_env();
+
+    // Get the client bandwidth balance
+    let balance = fn_sdk::api::query_client_bandwidth_balance(client_pk).await;
+    assert_eq!(balance, 0);
+
+    // Get the client FLK balance
+    let balance = fn_sdk::api::query_client_flk_balance(client_pk).await;
+    assert_eq!(balance, 0);
+
+    if path.exists() {
+        std::fs::remove_dir_all(&path).unwrap();
+    }
+}
