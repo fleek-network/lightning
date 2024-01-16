@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use affair::{Executor, TokioSpawn};
 use anyhow::{anyhow, Result};
@@ -16,7 +16,7 @@ use crate::config::{Config, StorageConfig};
 use crate::env::{Env, UpdateWorker};
 use crate::query_runner::QueryRunner;
 pub struct Application<C: Collection> {
-    update_socket: Arc<Mutex<Option<ExecutionEngineSocket>>>,
+    update_socket: Mutex<Option<ExecutionEngineSocket>>,
     query_runner: QueryRunner,
     collection: PhantomData<C>,
 }
@@ -64,8 +64,8 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
 
         Ok(Self {
             query_runner: env.query_runner(),
-            update_socket: Arc::new(Mutex::new(Some(TokioSpawn::spawn_async(
-                UpdateWorker::<C>::new(env, blockstore),
+            update_socket: Mutex::new(Some(TokioSpawn::spawn_async(UpdateWorker::<C>::new(
+                env, blockstore,
             )))),
             collection: PhantomData,
         })
@@ -77,8 +77,12 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
     /// # Safety
     ///
     /// See the safety document for the [`ExecutionEngineSocket`].
-    fn transaction_executor(&self) -> Option<ExecutionEngineSocket> {
-        self.update_socket.lock().unwrap().take()
+    fn transaction_executor(&self) -> ExecutionEngineSocket {
+        self.update_socket
+            .lock()
+            .unwrap()
+            .take()
+            .expect("Execution Engine Socket has already been taken")
     }
 
     /// Returns the instance of a sync query runner which can be used to run queries without

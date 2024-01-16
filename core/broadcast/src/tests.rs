@@ -144,7 +144,7 @@ async fn create_peer(
     address: SocketAddr,
     in_state: bool,
 ) -> Peer<TestBinding> {
-    let (_, query_runner) = (app.transaction_executor(), app.sync_query());
+    let query_runner = app.sync_query();
     let signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
     let notifier = Notifier::<TestBinding>::init(app);
     let topology = Topology::<TestBinding>::init(

@@ -66,7 +66,7 @@ pub trait ApplicationInterface<C: Collection>:
     /// # Safety
     ///
     /// See the safety document for the [`ExecutionEngineSocket`].
-    fn transaction_executor(&self) -> Option<ExecutionEngineSocket>;
+    fn transaction_executor(&self) -> ExecutionEngineSocket;
 
     /// Returns the instance of a sync query runner which can be used to run queries without
     /// blocking or awaiting. A naive (& blocking) implementation can achieve this by simply

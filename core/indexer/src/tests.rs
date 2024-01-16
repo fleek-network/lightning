@@ -121,7 +121,7 @@ async fn test_submission() {
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
-        update_socket.unwrap(),
+        update_socket,
         query_runner.clone(),
         infusion::Blank::default(),
         None,
