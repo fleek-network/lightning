@@ -125,7 +125,7 @@ mod tests {
 
         let app = Application::<TestBinding>::init(config, Default::default()).unwrap();
 
-        (app.transaction_executor().unwrap(), app)
+        (app.transaction_executor(), app)
     }
 
     // This take currently is broken since the application doesn't automatically move the epoch

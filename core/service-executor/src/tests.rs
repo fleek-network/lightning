@@ -156,7 +156,7 @@ async fn init_service_executor(
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
-        update_socket.unwrap(),
+        update_socket,
         query_runner.clone(),
         broadcast.get_pubsub(Topic::Consensus),
         None,

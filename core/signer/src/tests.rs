@@ -91,7 +91,7 @@ async fn test_send_two_txs_in_a_row() {
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
-        update_socket.unwrap(),
+        update_socket,
         query_runner.clone(),
         infusion::Blank::default(),
         None,
@@ -186,7 +186,7 @@ async fn test_retry_send() {
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
-        update_socket.unwrap(),
+        update_socket,
         query_runner.clone(),
         infusion::Blank::default(),
         None,
@@ -230,7 +230,7 @@ async fn test_shutdown() {
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
-        update_socket.unwrap(),
+        update_socket,
         query_runner.clone(),
         infusion::Blank::default(),
         None,
@@ -257,7 +257,7 @@ async fn test_shutdown_and_start_again() {
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
-        update_socket.unwrap(),
+        update_socket,
         query_runner.clone(),
         infusion::Blank::default(),
         None,
@@ -290,7 +290,7 @@ async fn test_sign_raw_digest() {
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
-        update_socket.unwrap(),
+        update_socket,
         query_runner.clone(),
         infusion::Blank::default(),
         None,

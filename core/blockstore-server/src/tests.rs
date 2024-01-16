@@ -147,7 +147,7 @@ async fn get_peers(
 
     let mut peers = Vec::new();
     for (i, signer_config) in signers_configs.into_iter().enumerate() {
-        let (_, query_runner) = (app.transaction_executor(), app.sync_query());
+        let query_runner = app.sync_query();
         let signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
         let notifier = Notifier::<TestBinding>::init(&app);
         let topology = Topology::<TestBinding>::init(
