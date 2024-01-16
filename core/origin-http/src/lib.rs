@@ -44,30 +44,9 @@ impl<C: Collection> HttpOrigin<C> {
 
         // We verify before inserting any blocks
         if let Some(integrity_metadata) = sri {
-            let is_valid = match integrity_metadata {
-                IntegrityMetadata::Sha256(integrity) => {
-                    let mut verifier = integrity.verifier();
-                    verifier.update(data.clone());
-                    verifier.verify()
-                },
-                IntegrityMetadata::Sha512(integrity) => {
-                    let mut verifier = integrity.verifier();
-                    verifier.update(data.clone());
-                    verifier.verify()
-                },
-                IntegrityMetadata::Blake3(integrity) => {
-                    // Todo: in this case we could incrementally verify
-                    // a stream. `fastcrypto` does not currently expose an API
-                    // to do this with Blake3.
-                    // Another option is using the putter to verify the input
-                    // but it might insert blocks for invalid files.
-                    let mut verifier = integrity.verifier();
-                    verifier.update(data.clone());
-                    verifier.verify()
-                },
-                _ => anyhow::bail!("sri failed: unsupported algorithm"),
-            };
-
+            let mut verifier = integrity_metadata.into_verifier();
+            verifier.update(data.as_ref());
+            let (is_valid, _) = verifier.verify();
             if !is_valid {
                 anyhow::bail!("sri failed: invalid digest");
             }
