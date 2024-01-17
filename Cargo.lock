@@ -5192,6 +5192,7 @@ dependencies = [
  "lightning-blockstore",
  "lightning-blockstore-server",
  "lightning-fetcher",
+ "lightning-indexer",
  "lightning-interfaces",
  "lightning-notifier",
  "lightning-openrpc",

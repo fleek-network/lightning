@@ -22,8 +22,10 @@ use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::{BlockStoreServer, Config as BlockServerConfig};
 use lightning_fetcher::config::Config as FetcherConfig;
 use lightning_fetcher::fetcher::Fetcher;
+use lightning_indexer::Indexer;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
+    Blake3Hash,
     EpochInfo,
     Metadata,
     NodeInfo,
@@ -41,6 +43,7 @@ use lightning_interfaces::{
     BlockStoreInterface,
     BlockStoreServerInterface,
     FetcherInterface,
+    IndexerInterface,
     MempoolSocket,
     NotifierInterface,
     OriginProviderInterface,
@@ -101,15 +104,25 @@ partial!(TestBinding {
     NotifierInterface = Notifier<Self>;
     PoolInterface = Pool<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
+    IndexerInterface = Indexer<Self>;
 });
 
-fn init_rpc(app: Application<TestBinding>, port: u16) -> Result<Rpc<TestBinding>> {
-    let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
+struct AppState {
+    blockstore: Blockstore<TestBinding>,
+}
+
+fn init_rpc(app: Application<TestBinding>, port: u16) -> Result<(Rpc<TestBinding>, AppState)> {
+    let mut blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
 
     let ipfs_origin =
         OriginDemuxer::<TestBinding>::init(Default::default(), blockstore.clone()).unwrap();
 
     let signer = Signer::<TestBinding>::init(SignerConfig::test(), app.sync_query()).unwrap();
+
+    let indexer =
+        Indexer::<TestBinding>::init(Default::default(), app.sync_query(), &signer).unwrap();
+
+    blockstore.provide_indexer(indexer);
 
     let notifier = Notifier::<TestBinding>::init(&app);
     let rep_aggregator = ReputationAggregator::<TestBinding>::init(
@@ -151,12 +164,13 @@ fn init_rpc(app: Application<TestBinding>, port: u16) -> Result<Rpc<TestBinding>
         RpcConfig::default_with_port(port),
         MockWorker::mempool_socket(),
         app.sync_query(),
-        blockstore,
+        blockstore.clone(),
         &fetcher,
         &signer,
         None,
     )?;
-    Ok(rpc)
+
+    Ok((rpc, AppState { blockstore }))
 }
 
 async fn init_rpc_without_consensus(
@@ -183,7 +197,7 @@ async fn init_rpc_without_consensus(
     let query_runner = app.sync_query();
     app.start().await;
 
-    let rpc = init_rpc(app, port).unwrap();
+    let (rpc, _) = init_rpc(app, port).unwrap();
     Ok((rpc, query_runner))
 }
 
@@ -194,9 +208,17 @@ async fn init_rpc_app_test(port: u16) -> Result<(Rpc<TestBinding>, QueryRunner)>
     app.start().await;
 
     // Init rpc service
-    let rpc = init_rpc(app, port).unwrap();
+    let (rpc, _) = init_rpc(app, port).unwrap();
 
     Ok((rpc, query_runner))
+}
+
+async fn init_admin_rpc_app_test(port: u16) -> Result<(Rpc<TestBinding>, AppState)> {
+    let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
+    let app = Application::<TestBinding>::init(AppConfig::test(), blockstore).unwrap();
+    app.start().await;
+
+    init_rpc(app, port)
 }
 
 async fn wait_for_server_start(port: u16) -> Result<()> {
@@ -1299,6 +1321,40 @@ async fn test_rpc_get_node_registry() -> Result<()> {
     )
     .await?;
     assert!(response.result.contains(&NodeInfo::from(&node_info)));
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_admin_rpc_store() -> Result<()> {
+    let port = 30022;
+    let (rpc, app) = init_admin_rpc_app_test(port).await.unwrap();
+
+    rpc.start().await;
+    wait_for_server_start(port).await?;
+
+    let req = json!({
+        "jsonrpc": "2.0",
+        "method": "admin_store",
+        "params": { "path": "../test-utils/files/index.ts" },
+        "id": 1,
+    });
+
+    let client = Client::new();
+    let response = utils::rpc_request::<Blake3Hash>(
+        &client,
+        format!("http://127.0.0.1:{port}/admin"),
+        req.to_string(),
+    )
+    .await?;
+
+    let expected_content: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
+    let stored_content = app
+        .blockstore
+        .read_all_to_vec(&response.result)
+        .await
+        .unwrap();
+    assert_eq!(expected_content, stored_content);
 
     Ok(())
 }
