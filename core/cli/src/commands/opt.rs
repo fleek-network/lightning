@@ -175,12 +175,10 @@ async fn status<C: Collection<SignerInterface = Signer<C>>>(
     match node_info.participation {
         Participation::True => {
             println!("Your node is participating in the network.");
-
             std::process::exit(0)
         },
         Participation::False => {
             println!("Your node is not participating in the network.");
-
             std::process::exit(210)
         },
         Participation::OptedIn => {
@@ -191,7 +189,6 @@ async fn status<C: Collection<SignerInterface = Signer<C>>>(
                 "Your node is opted in. Your node will be participating once the next epoch starts in {}",
                 get_timestamp(delta)
             );
-
             std::process::exit(211)
         },
         Participation::OptedOut => {
@@ -202,7 +199,6 @@ async fn status<C: Collection<SignerInterface = Signer<C>>>(
                 "Your node is opted out. You can shutdown your node once the current epoch ends in {}",
                 get_timestamp(delta)
             );
-
             std::process::exit(212)
         },
     }
