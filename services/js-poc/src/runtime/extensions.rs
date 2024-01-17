@@ -51,27 +51,41 @@ pub async fn read_block(
 }
 
 #[op2(async)]
-pub async fn query_client_flk_balance(#[buffer(copy)] address: Vec<u8>) -> Result<f64> {
+#[string]
+pub async fn query_client_flk_balance(#[buffer(copy)] address: Vec<u8>) -> Result<String> {
     if address.len() != 96 {
         return Err(anyhow!("address must be 32 bytes"));
     }
+    let bytes = *array_ref![address, 0, 96];
     Ok(
-        fn_sdk::api::query_client_flk_balance(ClientPublicKey(*array_ref![address, 0, 96])).await
-            as f64
-            / 10f64.powi(18),
+        fn_sdk::api::query_client_flk_balance(ClientPublicKey(bytes))
+            .await
+            .to_string(),
     )
 }
 
 #[op2(async)]
-pub async fn query_client_bandwidth_balance(#[buffer(copy)] address: Vec<u8>) -> Result<f64> {
+#[string]
+pub async fn query_client_bandwidth_balance(#[buffer(copy)] address: Vec<u8>) -> Result<String> {
     if address.len() != 96 {
         return Err(anyhow!("address must be 32 bytes"));
     }
+    let bytes = *array_ref![address, 0, 96];
     Ok(
-        fn_sdk::api::query_client_bandwidth_balance(ClientPublicKey(*array_ref![address, 0, 96]))
-            .await as f64
-            / 10f64.powi(18),
+        fn_sdk::api::query_client_bandwidth_balance(ClientPublicKey(bytes))
+            .await
+            .to_string(),
     )
 }
 
-extension!(fleek, ops = [log, fetch_blake3, load_content, read_block]);
+extension!(
+    fleek,
+    ops = [
+        log,
+        fetch_blake3,
+        load_content,
+        read_block,
+        query_client_flk_balance,
+        query_client_bandwidth_balance
+    ]
+);
