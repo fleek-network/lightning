@@ -18,9 +18,26 @@ const load_content = async (hash) => {
   return new ContentHandle(proof);
 }
 
+/** Fetch a clients FLK balance.
+ * @param {Uint8Array} account - The balance to check
+ * @returns {Promise<BigInt>} BigInt of the balance
+ */
+const query_client_flk_balance = async (account) => {
+  const balance = await Deno.core.ops.query_client_flk_balance(account);
+  return BigInt(balance, 10);
+}
+
+/** Fetch a clients FLK balance.
+ * @param {Uint8Array} account - The balance to check
+ * @returns {Promise<BigInt>} BigInt of the balance
+ */
+const query_client_bandwidth_balance = async (account) => {
+  const balance = await Deno.core.ops.query_client_bandwidth_balance(account);
+  return BigInt(balance, 10);
+}
+
 /**Handle to blockstore content.
- * Traverses the proof and reads blocks from the blockstore.
- * @class
+ * Utility for traversing the proof and reading blocks from the blockstore.
  * @property {Uint8Array} proof - Blake3 proof of the content
  * @property {number} length - Number of blocks in the content
  */
@@ -48,4 +65,6 @@ globalThis.Fleek = {
   log,
   fetch_blake3,
   load_content,
+  query_client_flk_balance,
+  query_client_bandwidth_balance
 };
