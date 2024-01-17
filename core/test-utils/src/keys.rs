@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::sync::Arc;
 
 use affair::{Executor, TokioSpawn, Worker};
 use fleek_crypto::{
@@ -16,12 +15,12 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
     MempoolSocket,
+    Notification,
     SignerInterface,
     SubmitTxSocket,
     WithStartAndShutdown,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::Notify;
 
 pub struct KeyOnlySigner {
     node_sk: NodeSecretKey,
@@ -43,7 +42,11 @@ impl<C: Collection> SignerInterface<C> for KeyOnlySigner {
     }
 
     fn provide_mempool(&mut self, _mempool: MempoolSocket) {}
-    fn provide_new_block_notify(&mut self, _block_notify: Arc<Notify>) {}
+    fn provide_new_block_notify(
+        &mut self,
+        _new_block_rx: tokio::sync::mpsc::Receiver<Notification>,
+    ) {
+    }
 
     fn get_bls_pk(&self) -> ConsensusPublicKey {
         self.consensus_sk.to_pk()

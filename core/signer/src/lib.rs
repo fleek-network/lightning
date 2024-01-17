@@ -33,7 +33,12 @@ use lightning_interfaces::types::{
     UpdatePayload,
     UpdateRequest,
 };
-use lightning_interfaces::{ApplicationInterface, MempoolSocket, SyncQueryRunnerInterface};
+use lightning_interfaces::{
+    ApplicationInterface,
+    MempoolSocket,
+    Notification,
+    SyncQueryRunnerInterface,
+};
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::{mpsc, Notify};
 use tracing::error;
@@ -56,7 +61,7 @@ pub struct Signer<C: Collection> {
     is_running: Arc<AtomicBool>,
     mempool_socket: Option<MempoolSocket>,
     query_runner: c![C::ApplicationInterface::SyncExecutor],
-    new_block_notify: Option<Arc<Notify>>,
+    new_block_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
     shutdown_notify: Arc<Notify>,
 }
 
@@ -74,18 +79,12 @@ impl<C: Collection> WithStartAndShutdown for Signer<C> {
             //let rx = self.rx.lock().unwrap().take().unwrap();
             let mempool_socket = self.mempool_socket.clone().unwrap();
             let query_runner = self.query_runner.clone();
-            let new_block_notify = self.new_block_notify.clone().unwrap();
             let shutdown_notify = self.shutdown_notify.clone();
 
             let is_running = self.is_running.clone();
             tokio::spawn(async move {
                 inner
-                    .handle(
-                        shutdown_notify,
-                        mempool_socket,
-                        query_runner,
-                        new_block_notify,
-                    )
+                    .handle(shutdown_notify, mempool_socket, query_runner)
                     .await;
                 is_running.store(false, Ordering::Relaxed);
             });
@@ -106,14 +105,15 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
         query_runner: c![C::ApplicationInterface::SyncExecutor],
     ) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
-        let inner = SignerInner::init(config, rx)?;
+        let new_block_rx = Arc::new(Mutex::new(None));
+        let inner = SignerInner::init(config, rx, new_block_rx.clone())?;
         Ok(Self {
             inner: Arc::new(inner),
             socket,
             is_running: Arc::new(AtomicBool::new(false)),
             mempool_socket: None,
             query_runner,
-            new_block_notify: None,
+            new_block_rx,
             shutdown_notify: Arc::new(Notify::new()),
         })
     }
@@ -125,10 +125,11 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
         self.mempool_socket = Some(mempool);
     }
 
-    // Provide the signer service with a block notifier to get notified when a block of
-    // transactions has been processed at the application.
-    fn provide_new_block_notify(&mut self, new_block_notify: Arc<Notify>) {
-        self.new_block_notify = Some(new_block_notify);
+    // Provide the signer service with a new block notifications channel's receiver to get notified
+    // when a block of transactions has been processed at the application.
+    fn provide_new_block_notify(&mut self, new_block_rx: mpsc::Receiver<Notification>) {
+        let mut notifier = self.new_block_rx.lock().unwrap();
+        *notifier = Some(new_block_rx)
     }
 
     /// Returns the `BLS` public key of the current node.
@@ -214,10 +215,15 @@ struct SignerInner {
     consensus_secret_key: ConsensusSecretKey,
     consensus_public_key: ConsensusPublicKey,
     rx: Arc<Mutex<Option<mpsc::Receiver<Task<UpdateMethod, u64>>>>>,
+    new_block_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
 }
 
 impl SignerInner {
-    fn init(config: Config, rx: mpsc::Receiver<Task<UpdateMethod, u64>>) -> anyhow::Result<Self> {
+    fn init(
+        config: Config,
+        rx: mpsc::Receiver<Task<UpdateMethod, u64>>,
+        new_block_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
+    ) -> anyhow::Result<Self> {
         let node_secret_key = if config.node_key_path.exists() {
             // read pem file, if we cant read the pem file we should panic
             let encoded =
@@ -254,6 +260,7 @@ impl SignerInner {
             consensus_secret_key,
             consensus_public_key,
             rx: Arc::new(Mutex::new(Some(rx))),
+            new_block_rx,
         })
     }
 
@@ -262,7 +269,6 @@ impl SignerInner {
         shutdown_notify: Arc<Notify>,
         mempool_socket: MempoolSocket,
         query_runner: Q,
-        new_block_notify: Arc<Notify>,
     ) {
         let mut pending_transactions = VecDeque::new();
         let mut base_timestamp = None;
@@ -275,6 +281,12 @@ impl SignerInner {
         let mut next_nonce = application_nonce + 1;
 
         let mut rx = self.rx.lock().unwrap().take().unwrap();
+        let mut new_block_rx = self
+            .new_block_rx
+            .lock()
+            .unwrap()
+            .take()
+            .expect("New block notification channel must be opened");
         loop {
             tokio::select! {
                 task = rx.recv() => {
@@ -316,17 +328,21 @@ impl SignerInner {
                         base_timestamp = Some(timestamp);
                     }
                 }
-                _ = new_block_notify.notified() => {
-                    SignerInner::sync_with_application(
-                        &self.node_public_key,
-                        &self.node_secret_key,
-                        &query_runner,
-                        &mempool_socket,
-                        &mut base_nonce,
-                        &mut next_nonce,
-                        &mut base_timestamp,
-                        &mut pending_transactions
-                    ).await;
+                notification = new_block_rx.recv() => {
+                    if let Some(Notification::NewBlock) = notification {
+                        SignerInner::sync_with_application(
+                            &self.node_public_key,
+                            &self.node_secret_key,
+                            &query_runner,
+                            &mempool_socket,
+                            &mut base_nonce,
+                            &mut next_nonce,
+                            &mut base_timestamp,
+                            &mut pending_transactions
+                        ).await
+                    } else {
+                        panic!("Got unexpected notification from Notifier: {:?}", notification)
+                    }
                 }
                 _ = shutdown_notify.notified() => break,
             }

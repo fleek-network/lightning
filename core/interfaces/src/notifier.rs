@@ -25,8 +25,12 @@ pub trait NotifierInterface<C: Collection>: Sync + Send + Clone {
     fn init(app: &c!(C::ApplicationInterface)) -> Self;
 
     /// Returns a reference to the emitter end of this notifier. Should only be used if we are
+    /// interested (and responsible) for triggering a notification around new block.
+    fn new_block_emitter(&self) -> Self::BlockEmitter;
+
+    /// Returns a reference to the emitter end of this notifier. Should only be used if we are
     /// interested (and responsible) for triggering a notification around new epoch.
-    fn epoch_emitter(&self) -> Self::EpochEmitter;
+    fn new_epoch_emitter(&self) -> Self::EpochEmitter;
 
     fn notify_on_new_block(&self, tx: mpsc::Sender<Notification>);
 

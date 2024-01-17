@@ -5,6 +5,7 @@ use std::time::Duration;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::Epoch;
 use lightning_interfaces::{
+    BlockNotifierEmitter,
     BroadcastEventInterface,
     EpochNotifierEmitter,
     PubSub,
@@ -34,9 +35,10 @@ impl EdgeConsensus {
         P: PubSub<PubSubMsg> + 'static,
         Q: SyncQueryRunnerInterface,
         EN: EpochNotifierEmitter,
+        BN: BlockNotifierEmitter,
     >(
         pub_sub: P,
-        execution: Arc<Execution<Q, EN>>,
+        execution: Arc<Execution<Q, EN, BN>>,
         query_runner: Q,
         node_public_key: NodePublicKey,
         rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
@@ -76,10 +78,11 @@ async fn message_receiver_worker<
     P: PubSub<PubSubMsg>,
     Q: SyncQueryRunnerInterface,
     EN: EpochNotifierEmitter,
+    BN: BlockNotifierEmitter,
 >(
     mut pub_sub: P,
     shutdown_notify: Arc<Notify>,
-    execution: Arc<Execution<Q, EN>>,
+    execution: Arc<Execution<Q, EN, BN>>,
     query_runner: Q,
     node_public_key: NodePublicKey,
     mut rx_narwhal_batch: mpsc::Receiver<(AuthenticStampedParcel, bool)>,

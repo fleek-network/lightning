@@ -1,9 +1,6 @@
-use std::sync::Arc;
-
 use affair::Socket;
 use infusion::c;
 use lightning_schema::LightningMessage;
-use tokio::sync::Notify;
 
 use crate::application::ExecutionEngineSocket;
 use crate::common::WithStartAndShutdown;
@@ -75,8 +72,4 @@ pub trait ConsensusInterface<C: Collection>:
     /// transaction to the consensus.
     #[blank = Socket::raw_bounded(64).0]
     fn mempool(&self) -> MempoolSocket;
-
-    /// Returns a tokio Notifier that notifies every time a new block is finished being processed
-    #[blank = Default::default()]
-    fn new_block_notifier(&self) -> Arc<Notify>;
 }

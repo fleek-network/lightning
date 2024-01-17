@@ -27,6 +27,7 @@ use lightning_notifier::Notifier;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use lightning_utils::application::QueryRunnerExt;
+use tokio::sync::mpsc;
 
 use crate::aggregator::ReputationAggregator;
 use crate::config::Config;
@@ -160,7 +161,12 @@ async fn test_query() {
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
-    signer.provide_new_block_notify(consensus.new_block_notifier());
+
+    let (new_block_tx, new_block_rx) = mpsc::channel(10);
+
+    signer.provide_new_block_notify(new_block_rx);
+    notifier.notify_on_new_block(new_block_tx);
+
     signer.start().await;
     consensus.start().await;
 
@@ -316,7 +322,12 @@ async fn test_submit_measurements() {
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
-    signer.provide_new_block_notify(consensus.new_block_notifier());
+
+    let (new_block_tx, new_block_rx) = mpsc::channel(10);
+
+    signer.provide_new_block_notify(new_block_rx);
+    notifier.notify_on_new_block(new_block_tx);
+
     signer.start().await;
     consensus.start().await;
 
@@ -517,8 +528,14 @@ async fn test_reputation_calculation_and_query() {
 
     signer1.provide_mempool(consensus1.mempool());
     signer2.provide_mempool(consensus2.mempool());
-    signer1.provide_new_block_notify(consensus1.new_block_notifier());
-    signer2.provide_new_block_notify(consensus2.new_block_notifier());
+
+    let (new_block_tx_1, new_block_rx_1) = mpsc::channel(10);
+    signer1.provide_new_block_notify(new_block_rx_1);
+    notifier1.notify_on_new_block(new_block_tx_1);
+
+    let (new_block_tx_2, new_block_rx_2) = mpsc::channel(10);
+    signer2.provide_new_block_notify(new_block_rx_2);
+    notifier2.notify_on_new_block(new_block_tx_2);
 
     signer1.start().await;
 
