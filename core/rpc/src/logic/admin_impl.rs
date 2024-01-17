@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use jsonrpsee::core::RpcResult;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::CompressionAlgorithm;
+use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
 use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
 
 use crate::api::AdminApiServer;
@@ -21,7 +21,7 @@ impl<C: Collection> AdminApi<C> {
 
 #[async_trait::async_trait]
 impl<C: Collection> AdminApiServer for AdminApi<C> {
-    async fn store(&self, path: String) -> RpcResult<()> {
+    async fn store(&self, path: String) -> RpcResult<Blake3Hash> {
         let file = tokio::fs::read(path)
             .await
             .map_err(|e| RPCError::custom(e.to_string()))?;
@@ -30,10 +30,11 @@ impl<C: Collection> AdminApiServer for AdminApi<C> {
         putter
             .write(file.as_ref(), CompressionAlgorithm::Uncompressed)
             .map_err(|e| RPCError::custom(format!("failed to write content: {e}")))?;
-        putter
+        let hash = putter
             .finalize()
             .await
             .map_err(|e| RPCError::custom(format!("failed to finalize put: {e}")))?;
-        Ok(())
+
+        Ok(hash)
     }
 }

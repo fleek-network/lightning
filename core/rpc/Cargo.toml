@@ -45,6 +45,7 @@ lightning-application = { path = "../application" }
 lightning-fetcher = { path = "../fetcher" }
 lightning-blockstore = { path = "../blockstore" }
 lightning-blockstore-server = { path = "../blockstore-server" }
+lightning-indexer = { path = "../indexer" }
 lightning-origin-demuxer = { path = "../origin-demuxer" }
 lightning-signer = { path = "../signer" }
 lightning-notifier = { path = "../notifier" }

@@ -72,9 +72,13 @@ impl RPCSelection {
     pub fn iter(self) -> impl Iterator<Item = RPCModules> {
         match self {
             RPCSelection::None => vec![].into_iter(),
-            RPCSelection::All => {
-                vec![RPCModules::Net, RPCModules::Eth, RPCModules::Flk].into_iter()
-            },
+            RPCSelection::All => vec![
+                RPCModules::Net,
+                RPCModules::Eth,
+                RPCModules::Flk,
+                RPCModules::Admin,
+            ]
+            .into_iter(),
             RPCSelection::Some(v) => v.into_iter(),
         }
     }
