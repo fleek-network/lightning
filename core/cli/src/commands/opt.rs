@@ -173,8 +173,16 @@ async fn status<C: Collection<SignerInterface = Signer<C>>>(
     let node_info = node_info.context("Node not found on state.")?;
 
     match node_info.participation {
-        Participation::True => println!("Your node is participating in the network."),
-        Participation::False => println!("Your node is not participating in the network."),
+        Participation::True => {
+            println!("Your node is participating in the network.");
+
+            std::process::exit(0)
+        },
+        Participation::False => {
+            println!("Your node is not participating in the network.");
+
+            std::process::exit(210)
+        },
         Participation::OptedIn => {
             let delta = get_epoch_end_delta(&genesis_committee)
                 .await
@@ -182,7 +190,9 @@ async fn status<C: Collection<SignerInterface = Signer<C>>>(
             println!(
                 "Your node is opted in. Your node will be participating once the next epoch starts in {}",
                 get_timestamp(delta)
-            )
+            );
+
+            std::process::exit(211)
         },
         Participation::OptedOut => {
             let delta = get_epoch_end_delta(&genesis_committee)
@@ -191,11 +201,11 @@ async fn status<C: Collection<SignerInterface = Signer<C>>>(
             println!(
                 "Your node is opted out. You can shutdown your node once the current epoch ends in {}",
                 get_timestamp(delta)
-            )
+            );
+
+            std::process::exit(212)
         },
     }
-
-    Ok(())
 }
 
 async fn get_epoch_end_delta(genesis_committee: &Vec<NodeInfo>) -> Result<Duration> {
