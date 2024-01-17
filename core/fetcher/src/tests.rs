@@ -52,7 +52,7 @@ use lightning_signer::{utils, Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use lightning_test_utils::server::spawn_server;
 use lightning_topology::{Config as TopologyConfig, Topology};
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::config::Config;
 use crate::fetcher::Fetcher;
@@ -225,7 +225,11 @@ async fn get_fetchers(
         .unwrap();
 
         signer.provide_mempool(consensus.mempool());
-        signer.provide_new_block_notify(consensus.new_block_notifier());
+
+        let (new_block_tx, new_block_rx) = mpsc::channel(10);
+
+        signer.provide_new_block_notify(new_block_rx);
+        notifier.notify_on_new_block(new_block_tx);
 
         let resolver_path = path.join(format!("node{i}/resolver"));
         let config = ResolverConfig {

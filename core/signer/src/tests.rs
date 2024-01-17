@@ -22,6 +22,7 @@ use lightning_interfaces::{partial, NotifierInterface, SyncQueryRunnerInterface}
 use lightning_notifier::Notifier;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use resolved_pathbuf::ResolvedPathBuf;
+use tokio::sync::mpsc;
 
 use crate::config::Config;
 use crate::{utils, Signer};
@@ -104,7 +105,12 @@ async fn test_send_two_txs_in_a_row() {
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
-    signer.provide_new_block_notify(consensus.new_block_notifier());
+
+    let (new_block_tx, new_block_rx) = mpsc::channel(10);
+
+    signer.provide_new_block_notify(new_block_rx);
+    notifier.notify_on_new_block(new_block_tx);
+
     signer.start().await;
     consensus.start().await;
 
@@ -202,7 +208,12 @@ async fn test_retry_send() {
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
-    signer.provide_new_block_notify(consensus.new_block_notifier());
+
+    let (new_block_tx, new_block_rx) = mpsc::channel(10);
+
+    signer.provide_new_block_notify(new_block_rx);
+    notifier.notify_on_new_block(new_block_tx);
+
     signer.start().await;
     consensus.start().await;
 
@@ -247,7 +258,11 @@ async fn test_shutdown() {
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());
-    signer.provide_new_block_notify(consensus.new_block_notifier());
+
+    let (new_block_tx, new_block_rx) = mpsc::channel(10);
+
+    signer.provide_new_block_notify(new_block_rx);
+    notifier.notify_on_new_block(new_block_tx);
 
     assert!(!signer.is_running());
     signer.start().await;
@@ -276,9 +291,18 @@ async fn test_shutdown_and_start_again() {
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());
-    signer.provide_new_block_notify(consensus.new_block_notifier());
+
+    let (new_block_tx, new_block_rx) = mpsc::channel(10);
+
+    signer.provide_new_block_notify(new_block_rx);
+    notifier.notify_on_new_block(new_block_tx);
 
     assert!(!signer.is_running());
+    let (new_block_tx, new_block_rx) = mpsc::channel(10);
+
+    signer.provide_new_block_notify(new_block_rx);
+    notifier.notify_on_new_block(new_block_tx);
+
     signer.start().await;
     assert!(signer.is_running());
     signer.shutdown().await;
@@ -286,6 +310,11 @@ async fn test_shutdown_and_start_again() {
     // finish shutting down
     tokio::time::sleep(Duration::from_millis(1)).await;
     assert!(!signer.is_running());
+
+    let (new_block_tx, new_block_rx) = mpsc::channel(10);
+
+    signer.provide_new_block_notify(new_block_rx);
+    notifier.notify_on_new_block(new_block_tx);
 
     signer.start().await;
     assert!(signer.is_running());
@@ -311,7 +340,12 @@ async fn test_sign_raw_digest() {
     )
     .unwrap();
     signer.provide_mempool(consensus.mempool());
-    signer.provide_new_block_notify(consensus.new_block_notifier());
+
+    let (new_block_tx, new_block_rx) = mpsc::channel(10);
+
+    signer.provide_new_block_notify(new_block_rx);
+    notifier.notify_on_new_block(new_block_tx);
+
     signer.start().await;
 
     let digest = [0; 32];

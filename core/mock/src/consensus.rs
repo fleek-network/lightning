@@ -12,12 +12,14 @@ use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{Block, TransactionRequest};
 use lightning_interfaces::{
     ApplicationInterface,
+    BlockNotifierEmitter,
     BroadcastInterface,
     ConfigConsumer,
     ConsensusInterface,
     ExecutionEngineSocket,
     IndexSocket,
     MempoolSocket,
+    NotifierInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
@@ -37,7 +39,6 @@ pub struct MockConsensus<C: Collection> {
     socket: mpsc::Sender<TransactionRequest>,
     is_running: Arc<AtomicBool>,
     shutdown_notifier: Arc<Notify>,
-    block_notifier: Arc<Notify>,
     mempool: MempoolSocket,
     collection: PhantomData<C>,
 }
@@ -156,11 +157,14 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
         _pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
         _indexer_socket: Option<IndexSocket>,
-        _notifier: &c!(C::NotifierInterface),
+        notifier: &c!(C::NotifierInterface),
     ) -> anyhow::Result<Self> {
         let (tx, rx) = mpsc::channel(128);
-        let block_notifier = Arc::new(Notify::new());
-        tokio::spawn(run_consensus(rx, executor, block_notifier.clone()));
+        tokio::spawn(run_consensus::<C>(
+            rx,
+            executor,
+            notifier.new_block_emitter(),
+        ));
 
         let mempool = TokioSpawn::spawn_async(MempoolSocketWorker {
             sender: tx.clone(),
@@ -176,7 +180,6 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
             socket: tx,
             is_running: Arc::new(AtomicBool::new(false)),
             shutdown_notifier: Arc::new(Notify::new()),
-            block_notifier,
             mempool,
             collection: PhantomData,
         })
@@ -184,10 +187,6 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
 
     fn mempool(&self) -> MempoolSocket {
         self.mempool.clone()
-    }
-
-    fn new_block_notifier(&self) -> Arc<Notify> {
-        self.block_notifier.clone()
     }
 }
 
@@ -197,10 +196,10 @@ impl<C: Collection> ConfigConsumer for MockConsensus<C> {
     type Config = Config;
 }
 
-async fn run_consensus(
+async fn run_consensus<C: Collection>(
     mut rx: mpsc::Receiver<TransactionRequest>,
     exec: ExecutionEngineSocket,
-    block_notifier: Arc<Notify>,
+    new_block_notifier: c!(C::NotifierInterface::BlockEmitter),
 ) {
     let mut ticker = tokio::time::interval(Duration::from_millis(1));
     let mut buffer = Vec::<TransactionRequest>::with_capacity(32);
@@ -220,7 +219,7 @@ async fn run_consensus(
 
                 let _ = exec.run(block).await;
 
-                block_notifier.notify_waiters();
+                new_block_notifier.new_block();
             }
             tmp = rx.recv() => {
                 if let Some(tx) = tmp {

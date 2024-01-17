@@ -24,6 +24,7 @@ use lightning_pool::{muxer, Config as PoolConfig, Pool};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+use tokio::sync::mpsc;
 
 use crate::config::Config;
 use crate::resolver::Resolver;
@@ -128,7 +129,12 @@ async fn test_start_shutdown() {
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
-    signer.provide_new_block_notify(consensus.new_block_notifier());
+
+    let (new_block_tx, new_block_rx) = mpsc::channel(10);
+
+    signer.provide_new_block_notify(new_block_rx);
+    notifier.notify_on_new_block(new_block_tx);
+
     signer.start().await;
     consensus.start().await;
 
