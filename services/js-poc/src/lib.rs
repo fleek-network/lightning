@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context};
 use arrayref::array_ref;
 use cid::Cid;
 use deno_core::{serde_v8, v8, JsRuntime};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use crate::runtime::Runtime;
 use crate::stream::{Origin, Request, ServiceStream};
@@ -84,7 +84,7 @@ async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
         }
 
         // Create runtime and execute the source
-        let mut runtime = Runtime::new();
+        let mut runtime = Runtime::new(hash);
         let res = runtime.exec(source).context("failed to run javascript")?;
 
         // Resolve async if applicable
@@ -101,37 +101,43 @@ async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
             },
         };
 
-        // Handle the return data
-        let scope = &mut runtime.deno.handle_scope();
-        let local = v8::Local::new(scope, res);
+        {
+            // Handle the return data
+            let scope = &mut runtime.deno.handle_scope();
+            let local = v8::Local::new(scope, res);
 
-        if local.is_uint8_array() {
-            // If the return type is a u8 array, send the raw data directly to the client
-            let bytes = serde_v8::from_v8::<Vec<u8>>(scope, local)
-                .context("failed to deserialize response")?;
-            stream
-                .send_payload(&bytes)
-                .await
-                .context("failed to send byte response")?;
-        } else if local.is_string() {
-            // Likewise for string types
-            let string = serde_v8::from_v8::<String>(scope, local)
-                .context("failed to deserialize response string")?;
-            stream
-                .send_payload(string.as_bytes())
-                .await
-                .context("failed to send string response")?;
-        } else {
-            // Otherwise, send the data as json
-            let value = serde_v8::from_v8::<serde_json::Value>(scope, local)
-                .context("failed to deserialize response")?
-                .clone();
-            let res = serde_json::to_string(&value).context("failed to encode json response")?;
-            stream
-                .send_payload(res.as_bytes())
-                .await
-                .context("failed to send json response")?;
+            if local.is_uint8_array() {
+                // If the return type is a u8 array, send the raw data directly to the client
+                let bytes = serde_v8::from_v8::<Vec<u8>>(scope, local)
+                    .context("failed to deserialize response")?;
+                stream
+                    .send_payload(&bytes)
+                    .await
+                    .context("failed to send byte response")?;
+            } else if local.is_string() {
+                // Likewise for string types
+                let string = serde_v8::from_v8::<String>(scope, local)
+                    .context("failed to deserialize response string")?;
+                stream
+                    .send_payload(string.as_bytes())
+                    .await
+                    .context("failed to send string response")?;
+            } else {
+                // Otherwise, send the data as json
+                let value = serde_v8::from_v8::<serde_json::Value>(scope, local)
+                    .context("failed to deserialize response")?
+                    .clone();
+                let res =
+                    serde_json::to_string(&value).context("failed to encode json response")?;
+                stream
+                    .send_payload(res.as_bytes())
+                    .await
+                    .context("failed to send json response")?;
+            }
         }
+
+        let feed = runtime.end();
+        debug!("{feed:?}");
     }
 
     Ok(())
