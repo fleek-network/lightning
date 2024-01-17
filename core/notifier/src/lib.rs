@@ -169,28 +169,6 @@ mod tests {
         (app.transaction_executor(), app)
     }
 
-    // This take currently is broken since the application doesn't automatically move the epoch
-    // forward. It needs a transaction to do it.
-    //
-    // #[tokio::test]
-    // async fn test_on_new_epoch() {
-    //     let (_, app) = init_app(2000);
-
-    //     let notifier = Notifier::<TestBinding>::init(&app);
-
-    //     // Request to be notified when the epoch ends.
-    //     let (tx, mut rx) = mpsc::channel(2048);
-    //     let now = SystemTime::now();
-    //     notifier.notify_on_new_epoch(tx);
-
-    //     // The epoch time is 2 secs, the notification will be send when the epoch ends,
-    //     // hence, the notification should arrive approx. 2 secs after the request was made.
-    //     if let Notification::NewEpoch = rx.recv().await.unwrap() {
-    //         let elapsed_time = now.elapsed().unwrap();
-    //         assert!((elapsed_time.as_secs_f64() - 2.0).abs() < EPSILON);
-    //     }
-    // }
-
     #[tokio::test]
     async fn test_before_epoch_change() {
         let (_, app) = init_app(3000);
@@ -208,5 +186,43 @@ mod tests {
             let elapsed_time = now.elapsed().unwrap();
             assert!((elapsed_time.as_secs_f64() - 2.0).abs() < EPSILON);
         }
+    }
+
+    #[tokio::test]
+    async fn test_notify_on_epoch_change() {
+        let (_, app) = init_app(3000);
+
+        let notifier = Notifier::<TestBinding>::init(&app);
+
+        // Request to be notified about new epoch.
+        let (tx, mut rx) = mpsc::channel(10);
+        notifier.notify_on_new_epoch(tx);
+
+        // Trigger new epoch Notification
+        tokio::spawn(async move {
+            sleep(Duration::from_secs(1)).await;
+            notifier.new_epoch_emitter().epoch_changed();
+        });
+
+        assert_eq!(Notification::NewEpoch, rx.recv().await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_notify_on_new_block() {
+        let (_, app) = init_app(3000);
+
+        let notifier = Notifier::<TestBinding>::init(&app);
+
+        // Request to be notified about new block.
+        let (tx, mut rx) = mpsc::channel(10);
+        notifier.notify_on_new_block(tx);
+
+        // Trigger new block Notification
+        tokio::spawn(async move {
+            sleep(Duration::from_secs(1)).await;
+            notifier.new_block_emitter().new_block();
+        });
+
+        assert_eq!(Notification::NewBlock, rx.recv().await.unwrap());
     }
 }
