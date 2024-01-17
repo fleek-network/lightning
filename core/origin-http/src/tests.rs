@@ -25,6 +25,7 @@ use lightning_notifier::Notifier;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use lightning_test_utils::server;
+use tokio::sync::mpsc;
 
 use crate::{get_url_and_sri, HttpOrigin};
 
@@ -163,7 +164,11 @@ async fn create_app_state(test_name: String) -> AppState {
     .unwrap();
 
     signer.provide_mempool(consensus.mempool());
-    signer.provide_new_block_notify(consensus.new_block_notifier());
+
+    let (new_block_tx, new_block_rx) = mpsc::channel(10);
+
+    signer.provide_new_block_notify(new_block_rx);
+    notifier.notify_on_new_block(new_block_tx);
 
     let indexer = Indexer::<TestBinding>::init(Default::default(), query_runner, &signer).unwrap();
     blockstore.provide_indexer(indexer);

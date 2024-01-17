@@ -15,6 +15,7 @@ use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
 use lightning_interfaces::types::{Epoch, EpochInfo, UpdateMethod};
 use lightning_interfaces::{
     ApplicationInterface,
+    BlockNotifierEmitter,
     BroadcastInterface,
     EpochNotifierEmitter,
     IndexSocket,
@@ -55,6 +56,7 @@ pub struct Consensus<C: Collection> {
                 c![C::ApplicationInterface::SyncExecutor],
                 c![C::BroadcastInterface::PubSub<PubSubMsg>],
                 c![C::NotifierInterface::EpochEmitter],
+                c![C::NotifierInterface::BlockEmitter],
             >,
         >,
     >,
@@ -64,8 +66,6 @@ pub struct Consensus<C: Collection> {
     /// Timestamp of the narwhal certificate that caused an epoch change
     /// is sent through this channel to notify that epoch chould change.
     reconfigure_notify: Arc<Notify>,
-    /// A notifier that is notified every time a new block is processed
-    new_block_notify: Arc<Notify>,
     /// Called from the shutdown function to notify the start event loop to
     /// exit.
     shutdown_notify: Arc<Notify>,
@@ -78,6 +78,7 @@ struct EpochState<
     Q: SyncQueryRunnerInterface,
     P: PubSub<PubSubMsg> + 'static,
     EN: EpochNotifierEmitter,
+    BN: BlockNotifierEmitter,
 > {
     /// The node public key of the node.
     node_public_key: NodePublicKey,
@@ -92,7 +93,7 @@ struct EpochState<
     /// Path to the database used by the narwhal implementation
     pub store_path: ResolvedPathBuf,
     /// Narwhal execution state.
-    execution_state: Arc<Execution<Q, EN>>,
+    execution_state: Arc<Execution<Q, EN, BN>>,
     /// Used to send transactions to consensus
     /// We still use this socket on consensus struct because a node is not always on the committee,
     /// so its not always sending     a transaction to its own mempool. The signer interface
@@ -107,8 +108,12 @@ struct EpochState<
 }
 
 #[allow(clippy::too_many_arguments)]
-impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, EN: EpochNotifierEmitter>
-    EpochState<Q, P, EN>
+impl<
+    Q: SyncQueryRunnerInterface,
+    P: PubSub<PubSubMsg> + 'static,
+    EN: EpochNotifierEmitter,
+    BN: BlockNotifierEmitter,
+> EpochState<Q, P, EN, BN>
 {
     fn new(
         node_public_key: NodePublicKey,
@@ -116,7 +121,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, EN: EpochNotif
         query_runner: Q,
         narwhal_args: NarwhalArgs,
         store_path: ResolvedPathBuf,
-        execution_state: Arc<Execution<Q, EN>>,
+        execution_state: Arc<Execution<Q, EN, BN>>,
         txn_socket: SubmitTxSocket,
         pub_sub: P,
         rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
@@ -402,7 +407,6 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
 
         let (consensus_sk, primary_sk) = signer.get_sk();
         let reconfigure_notify = Arc::new(Notify::new());
-        let new_block_notify = Arc::new(Notify::new());
         let networking_keypair = NetworkKeyPair::from(primary_sk);
         let primary_keypair = KeyPair::from(consensus_sk);
         let forwarder = Forwarder::new(query_runner.clone(), primary_keypair.public().clone());
@@ -419,11 +423,11 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         let execution_state = Arc::new(Execution::new(
             executor,
             reconfigure_notify.clone(),
-            new_block_notify.clone(),
             tx_narwhal_batches,
             query_runner.clone(),
             indexer_socket,
-            notifier.epoch_emitter(),
+            notifier.new_epoch_emitter(),
+            notifier.new_block_emitter(),
         ));
 
         let shutdown_notify = Arc::new(Notify::new());
@@ -445,7 +449,6 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             epoch_state: Mutex::new(Some(epoch_state)),
             mempool_socket: TokioSpawn::spawn_async(forwarder),
             reconfigure_notify,
-            new_block_notify,
             shutdown_notify,
             is_running: AtomicBool::new(false),
         })
@@ -456,10 +459,6 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
     /// transaction to the consensus.
     fn mempool(&self) -> MempoolSocket {
         self.mempool_socket.clone()
-    }
-
-    fn new_block_notifier(&self) -> Arc<Notify> {
-        self.new_block_notify.clone()
     }
 }
 

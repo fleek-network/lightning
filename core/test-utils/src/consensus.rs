@@ -11,32 +11,38 @@ use lightning_interfaces::signer::SignerInterface;
 use lightning_interfaces::types::{Block, TransactionRequest};
 use lightning_interfaces::{
     ApplicationInterface,
+    BlockNotifierEmitter,
     BroadcastInterface,
     IndexSocket,
+    NotifierInterface,
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::mpsc;
 use tokio::time::{interval, sleep};
 
 // TODO(qti3e): Should we deprecate this?
 #[allow(clippy::type_complexity)]
 pub struct MockConsensus<C: Collection> {
-    inner: Arc<MockConsensusInner<c![C::ApplicationInterface::SyncExecutor]>>,
+    inner: Arc<
+        MockConsensusInner<
+            c![C::ApplicationInterface::SyncExecutor],
+            c![C::NotifierInterface::BlockEmitter],
+        >,
+    >,
     socket: Socket<TransactionRequest, ()>,
     is_running: Arc<Mutex<bool>>,
     shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
     rx: Arc<Mutex<Option<mpsc::Receiver<Task<TransactionRequest, ()>>>>>,
-    new_block_notify: Arc<Notify>,
 }
 
-struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static> {
+struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static, BN: BlockNotifierEmitter> {
     _query_runner: Q,
     executor: ExecutionEngineSocket,
     config: Config,
-    new_block_notify: Arc<Notify>,
+    new_block_notifier: BN,
 }
 
 impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
@@ -50,15 +56,14 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         _pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
         _indexer_socket: Option<IndexSocket>,
-        _notifier: &c!(C::NotifierInterface),
+        notifier: &c!(C::NotifierInterface),
     ) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
-        let new_block_notify = Arc::new(Notify::new());
         let inner = MockConsensusInner {
             _query_runner: query_runner,
             executor,
             config,
-            new_block_notify: new_block_notify.clone(),
+            new_block_notifier: notifier.new_block_emitter(),
         };
         Ok(Self {
             inner: Arc::new(inner),
@@ -66,7 +71,6 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
             is_running: Arc::new(Mutex::new(false)),
             shutdown_tx: Arc::new(Mutex::new(None)),
             rx: Arc::new(Mutex::new(Some(rx))),
-            new_block_notify,
         })
     }
 
@@ -75,10 +79,6 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
     /// transaction to the consensus.
     fn mempool(&self) -> MempoolSocket {
         self.socket.clone()
-    }
-
-    fn new_block_notifier(&self) -> Arc<Notify> {
-        self.new_block_notify.clone()
     }
 }
 
@@ -123,7 +123,7 @@ impl<C: Collection> ConfigConsumer for MockConsensus<C> {
     type Config = Config;
 }
 
-impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
+impl<Q: SyncQueryRunnerInterface, BN: BlockNotifierEmitter> MockConsensusInner<Q, BN> {
     async fn handle(
         self: Arc<Self>,
         mut rx: mpsc::Receiver<Task<TransactionRequest, ()>>,
@@ -164,11 +164,11 @@ impl<Q: SyncQueryRunnerInterface> MockConsensusInner<Q> {
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                         .unwrap();
 
-                    self.new_block_notify.notify_waiters();
+                    self.new_block_notifier.new_block();
                 }
                 _ = interval.tick() => {
                     // Lets pretend that a new block arrived.
-                    self.new_block_notify.notify_waiters();
+                    self.new_block_notifier.new_block();
                 }
                 _ = shutdown_rx.recv() => break,
             }

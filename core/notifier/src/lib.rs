@@ -48,7 +48,11 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
     type EpochEmitter = EpochChangeNotificationsEmitter;
     type BlockEmitter = NewBlockNotificationsEmitter;
 
-    fn epoch_emitter(&self) -> Self::EpochEmitter {
+    fn new_block_emitter(&self) -> Self::BlockEmitter {
+        self.block_notify.clone()
+    }
+
+    fn new_epoch_emitter(&self) -> Self::EpochEmitter {
         self.epoch_notify.clone()
     }
 

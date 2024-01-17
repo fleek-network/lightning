@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::sync::Arc;
 
 use affair::Socket;
 use fleek_crypto::{
@@ -10,7 +9,7 @@ use fleek_crypto::{
     NodeSignature,
 };
 use infusion::c;
-use tokio::sync::Notify;
+use tokio::sync::mpsc;
 
 use crate::config::ConfigConsumer;
 use crate::consensus::MempoolSocket;
@@ -20,6 +19,8 @@ use crate::{
     ApplicationInterface,
     ConfigProviderInterface,
     ConsensusInterface,
+    Notification,
+    NotifierInterface,
     WithStartAndShutdown,
 };
 
@@ -38,9 +39,14 @@ pub trait SignerInterface<C: Collection>:
         Self::init(config.get::<Self>(), app.sync_query())
     }
 
-    fn _post(&mut self, c: ::ConsensusInterface) {
+    fn _post(&mut self, c: ::ConsensusInterface, n: ::NotifierInterface) {
         self.provide_mempool(c.mempool());
-        self.provide_new_block_notify(c.new_block_notifier());
+
+        let (new_block_tx, new_block_rx) = mpsc::channel(10);
+
+        self.provide_new_block_notify(new_block_rx);
+
+        n.notify_on_new_block(new_block_tx);
     }
 
     /// Initialize the signature service.
@@ -53,9 +59,9 @@ pub trait SignerInterface<C: Collection>:
     /// should only be called once.
     fn provide_mempool(&mut self, mempool: MempoolSocket);
 
-    // Provide the signer service with a block notifier to get notified when a block of
-    // transactions has been processed at the application.
-    fn provide_new_block_notify(&mut self, block_notify: Arc<Notify>);
+    // Provide the signer service with a new block notifications channel's receiver to get notified
+    // when a block of transactions has been processed at the application.
+    fn provide_new_block_notify(&mut self, block_notify_rx: mpsc::Receiver<Notification>);
 
     /// Returns the `BLS` public key of the current node.
     fn get_bls_pk(&self) -> ConsensusPublicKey;
