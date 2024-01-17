@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 use crate::infu_collection::Collection;
 use crate::ApplicationInterface;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Notification {
     NewBlock,
     NewEpoch,
