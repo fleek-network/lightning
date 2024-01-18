@@ -5,9 +5,8 @@ use std::time::Duration;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::Epoch;
 use lightning_interfaces::{
-    BlockNotifierEmitter,
     BroadcastEventInterface,
-    EpochNotifierEmitter,
+    Emitter,
     PubSub,
     SyncQueryRunnerInterface,
     ToDigest,
@@ -31,14 +30,9 @@ pub struct EdgeConsensus {
 }
 
 impl EdgeConsensus {
-    pub fn spawn<
-        P: PubSub<PubSubMsg> + 'static,
-        Q: SyncQueryRunnerInterface,
-        EN: EpochNotifierEmitter,
-        BN: BlockNotifierEmitter,
-    >(
+    pub fn spawn<P: PubSub<PubSubMsg> + 'static, Q: SyncQueryRunnerInterface, NE: Emitter>(
         pub_sub: P,
-        execution: Arc<Execution<Q, EN, BN>>,
+        execution: Arc<Execution<Q, NE>>,
         query_runner: Q,
         node_public_key: NodePublicKey,
         rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
@@ -74,15 +68,10 @@ impl EdgeConsensus {
 
 /// Creates and event loop which consumes messages from pubsub and sends them to the
 /// right destination.
-async fn message_receiver_worker<
-    P: PubSub<PubSubMsg>,
-    Q: SyncQueryRunnerInterface,
-    EN: EpochNotifierEmitter,
-    BN: BlockNotifierEmitter,
->(
+async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     mut pub_sub: P,
     shutdown_notify: Arc<Notify>,
-    execution: Arc<Execution<Q, EN, BN>>,
+    execution: Arc<Execution<Q, NE>>,
     query_runner: Q,
     node_public_key: NodePublicKey,
     mut rx_narwhal_batch: mpsc::Receiver<(AuthenticStampedParcel, bool)>,

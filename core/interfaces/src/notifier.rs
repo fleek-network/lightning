@@ -15,22 +15,15 @@ pub enum Notification {
 
 #[infusion::service]
 pub trait NotifierInterface<C: Collection>: Sync + Send + Clone {
-    type EpochEmitter: EpochNotifierEmitter;
-    type BlockEmitter: BlockNotifierEmitter;
+    type Emitter: Emitter;
 
     fn _init(app: ::ApplicationInterface) {
         ok!(Self::init(app))
     }
-
     fn init(app: &c!(C::ApplicationInterface)) -> Self;
-
-    /// Returns a reference to the emitter end of this notifier. Should only be used if we are
-    /// interested (and responsible) for triggering a notification around new block.
-    fn new_block_emitter(&self) -> Self::BlockEmitter;
-
     /// Returns a reference to the emitter end of this notifier. Should only be used if we are
     /// interested (and responsible) for triggering a notification around new epoch.
-    fn new_epoch_emitter(&self) -> Self::EpochEmitter;
+    fn get_emitter(&self) -> Self::Emitter;
 
     fn notify_on_new_block(&self, tx: mpsc::Sender<Notification>);
 
@@ -38,15 +31,11 @@ pub trait NotifierInterface<C: Collection>: Sync + Send + Clone {
 
     fn notify_before_epoch_change(&self, duration: Duration, tx: mpsc::Sender<Notification>);
 }
-
 #[infusion::blank]
-pub trait EpochNotifierEmitter: Clone + Send + Sync + 'static {
+pub trait Emitter: Clone + Send + Sync + 'static {
     /// Notify the waiters about epoch change.
     fn epoch_changed(&self);
-}
 
-#[infusion::blank]
-pub trait BlockNotifierEmitter: Clone + Send + Sync + 'static {
     /// Notify the waiters about new block.
     fn new_block(&self);
 }
