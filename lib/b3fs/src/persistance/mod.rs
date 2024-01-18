@@ -4,3 +4,7 @@ pub mod dir_reader;
 pub mod error;
 pub mod reader;
 pub mod writer;
+
+pub use dir_reader::{DirectoryReader, EntriesIter};
+pub use error::PersistanceError;
+pub use reader::Reader;

@@ -8,6 +8,11 @@ pub struct DirectoryReader<'b> {
     buffer: &'b [u8],
 }
 
+pub struct EntriesIter<'b> {
+    len: usize,
+    buffer: &'b [u8],
+}
+
 impl<'b> DirectoryReader<'b> {
     /// Creates a new directory from the provided buffer. You should know that this method does
     /// not perform any checks on the validity of the provided buffer and this can cause errors
@@ -65,9 +70,60 @@ impl<'b> DirectoryReader<'b> {
         None
     }
 
+    /// Returns
+    pub fn iter(&self) -> EntriesIter {
+        let len = self.len();
+        let offset = self.after_tree_pos() + 4 * len;
+        EntriesIter {
+            len,
+            buffer: &self.buffer[offset..],
+        }
+    }
+
     #[inline(always)]
     pub fn after_tree_pos(&self) -> usize {
         4 + ((2 * self.len()).max(2) - 1) << 5
+    }
+}
+
+impl<'b> Iterator for EntriesIter<'b> {
+    type Item = BorrowedEntry<'b>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.len == 0 || self.buffer.is_empty() {
+            return None;
+        }
+
+        self.len -= 1;
+        let tag = self.buffer[0];
+        let name = read_null_terminated(&self.buffer[1..]);
+
+        self.buffer = &self.buffer[(2 + name.len())..];
+        let buffer = self.buffer;
+
+        let link = match tag {
+            0 => {
+                self.buffer = &self.buffer[32..];
+                BorrowedLink::File(arrayref::array_ref![buffer, 0, 32])
+            },
+            1 => {
+                self.buffer = &self.buffer[32..];
+                BorrowedLink::Directory(arrayref::array_ref![buffer, 0, 32])
+            },
+            2 => {
+                let link = read_null_terminated(&buffer);
+                self.buffer = &self.buffer[(1 + link.len())..];
+                BorrowedLink::Link(link)
+            },
+            _ => unreachable!(),
+        };
+
+        Some(BorrowedEntry { name, link })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
     }
 }
 

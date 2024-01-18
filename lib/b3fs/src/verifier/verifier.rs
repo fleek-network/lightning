@@ -59,7 +59,7 @@ impl IncrementalVerifier {
     /// # Panics
     ///
     /// If called after initialization.
-    pub fn enable_keeper(&mut self) {
+    pub fn preserve_tree(&mut self) {
         assert!(self.could_be_root);
         self.keeper = Some(TreeKeeper::default());
     }
@@ -68,7 +68,7 @@ impl IncrementalVerifier {
     ///
     /// # Panics
     ///
-    /// 1. If called without a prior call to `enable_keeper`.
+    /// 1. If called without a prior call to `preserve_tree`.
     /// 2. If the tree has already been taken.
     /// 3. If there are still pending nodes in the content (pending verification)
     pub fn take_tree(&mut self) -> Vec<[u8; 32]> {

@@ -57,3 +57,8 @@ pub mod encoder;
 pub mod iter;
 /// A pretty printer for a proof buffer slice that displays each hex value properly.
 pub mod pretty;
+
+pub use buffer::ProofBuf;
+pub use encoder::ProofEncoder;
+pub use iter::{ProofBufIter, ShouldFlip};
+pub use pretty::ProofBufPrettyPrinter;

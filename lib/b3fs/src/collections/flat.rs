@@ -12,6 +12,8 @@
 use std::fmt::Debug;
 use std::ops::Index;
 
+use fmmap::tokio::AsyncMmapFileExt;
+
 use super::error::CollectionTryFromError;
 use crate::utils::{flatten, Digest};
 
@@ -19,9 +21,23 @@ const BYTES_POW_2: usize = 5; // 2 ** 5 == 32
 
 /// A flat slice of hashes. This wrapper guarantees that the size of the underlying slice is a
 /// multiple of 32.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy)]
 pub struct FlatHashSlice<'s> {
-    slice: &'s [u8],
+    repr: FlatHashSliceRepr<'s>,
+}
+
+/// The backing representation
+#[derive(Clone, Copy)]
+enum FlatHashSliceRepr<'s> {
+    Slice(&'s [u8]),
+    /// This allows us to use a memory mapping as the backend of a hash slice. There are no public
+    /// APIs on the struct to generate this backend, and it is only created by the `store` APIs to
+    /// generally returning an hashtree
+    TokioMmap {
+        start: usize,
+        end: usize,
+        file: &'s fmmap::tokio::AsyncMmapFile,
+    },
 }
 
 /// An iterator over a [`FlatHashSlice`] obtained by calling the [iter] method on the slice.
@@ -37,7 +53,9 @@ impl<'s> TryFrom<&'s [u8]> for FlatHashSlice<'s> {
     #[inline]
     fn try_from(value: &'s [u8]) -> Result<Self, Self::Error> {
         if value.len() & 31 == 0 {
-            Ok(FlatHashSlice { slice: value })
+            Ok(FlatHashSlice {
+                repr: FlatHashSliceRepr::Slice(value),
+            })
         } else {
             Err(CollectionTryFromError::InvalidNumberOfBytes)
         }
@@ -48,7 +66,7 @@ impl<'s> From<&'s [[u8; 32]]> for FlatHashSlice<'s> {
     #[inline(always)]
     fn from(value: &'s [[u8; 32]]) -> Self {
         Self {
-            slice: flatten(value),
+            repr: FlatHashSliceRepr::Slice(flatten(value)),
         }
     }
 }
@@ -58,10 +76,7 @@ impl<'s> Index<usize> for FlatHashSlice<'s> {
 
     #[inline]
     fn index(&self, index: usize) -> &Self::Output {
-        if index >= self.len() {
-            panic!("Out of bound.")
-        }
-        arrayref::array_ref![self.slice, index << BYTES_POW_2, 32]
+        self.get(index)
     }
 }
 
@@ -78,35 +93,79 @@ impl<'s> IntoIterator for FlatHashSlice<'s> {
 impl<'s> AsRef<[u8]> for FlatHashSlice<'s> {
     #[inline]
     fn as_ref(&self) -> &[u8] {
-        &self.slice
+        self.as_slice()
     }
 }
 
 impl<'s> FlatHashSlice<'s> {
+    /// Create a new flat hash slice backed by a memory mapping.
+    pub(crate) fn from_tokio_mmap(
+        start: usize,
+        end: usize,
+        file: &'s fmmap::tokio::AsyncMmapFile,
+    ) -> Self {
+        let len = end - start;
+        if len & 31 != 0 {
+            panic!("File size not a multiple of 32")
+        }
+
+        Self {
+            repr: FlatHashSliceRepr::TokioMmap { start, end, file },
+        }
+    }
+
+    /// If the hash slice is backed by a memory mapping or anything else, this loads the content
+    /// into memory.
+    pub fn load(&self) -> Self {
+        Self {
+            repr: match self.repr {
+                FlatHashSliceRepr::Slice(slice) => FlatHashSliceRepr::Slice(slice),
+                FlatHashSliceRepr::TokioMmap { start, end, file } => {
+                    FlatHashSliceRepr::Slice(file.bytes(start, end - start).unwrap())
+                },
+            },
+        }
+    }
+
     #[inline]
     pub fn get(&self, index: usize) -> &'s [u8; 32] {
         if index >= self.len() {
             panic!("Out of bound.")
         }
-        arrayref::array_ref![self.slice, index << BYTES_POW_2, 32]
+        let n = index << BYTES_POW_2;
+        let bytes = match self.repr {
+            FlatHashSliceRepr::Slice(s) => &s[n..],
+            FlatHashSliceRepr::TokioMmap { start, file, .. } => {
+                file.bytes(start + n, 32).expect("Could not read bytes.")
+            },
+        };
+        arrayref::array_ref![bytes, 0, 32]
     }
 
     /// Returns the number of hashes in this slice.
     #[inline]
     pub fn len(&self) -> usize {
-        self.slice.len() >> BYTES_POW_2
+        match self.repr {
+            FlatHashSliceRepr::Slice(s) => s.len() >> BYTES_POW_2,
+            FlatHashSliceRepr::TokioMmap { start, end, .. } => (end - start) >> BYTES_POW_2,
+        }
     }
 
     /// Returns true if there are no hashes in this slice.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.slice.is_empty()
+        self.len() == 0
     }
 
     /// Returns a reference to the raw slice.
     #[inline]
     pub fn as_slice(&self) -> &[u8] {
-        &self.slice
+        match self.repr {
+            FlatHashSliceRepr::Slice(s) => s,
+            FlatHashSliceRepr::TokioMmap { start, end, file } => &file
+                .bytes(start, end - start)
+                .expect("Could not read bytes."),
+        }
     }
 
     /// Skip the first `n` items from the current slice.
@@ -116,28 +175,47 @@ impl<'s> FlatHashSlice<'s> {
             panic!("Out of bound.");
         }
 
-        Self {
-            slice: &self.slice[(n << BYTES_POW_2)..],
-        }
+        let n = n << BYTES_POW_2;
+        let repr = match self.repr {
+            FlatHashSliceRepr::Slice(s) => FlatHashSliceRepr::Slice(&s[n..]),
+            FlatHashSliceRepr::TokioMmap { start, end, file } => FlatHashSliceRepr::TokioMmap {
+                start: start + n,
+                end,
+                file,
+            },
+        };
+
+        Self { repr }
     }
 
     /// Skip the last `n` items from the current slice.
     #[inline]
     pub fn skip_end(&self, n: usize) -> Self {
-        if n > self.len() {
+        let len = self.len();
+
+        if n > len {
             panic!("Out of bound.");
         }
 
-        let n = self.len() - n;
-        Self {
-            slice: &self.slice[..(n << BYTES_POW_2)],
-        }
+        let size = len - n;
+        let repr = match self.repr {
+            FlatHashSliceRepr::Slice(s) => FlatHashSliceRepr::Slice(&s[..size]),
+            FlatHashSliceRepr::TokioMmap { start, end, file } => FlatHashSliceRepr::TokioMmap {
+                start,
+                end: end - (n << BYTES_POW_2),
+                file,
+            },
+        };
+
+        Self { repr }
     }
 
     /// Returns an iterator over the current hash slice.
     #[inline]
     pub fn iter(&self) -> FlatHashSliceIter<'_> {
-        FlatHashSliceIter { inner: *self }
+        FlatHashSliceIter {
+            inner: self.clone(),
+        }
     }
 }
 

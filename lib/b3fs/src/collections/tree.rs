@@ -10,7 +10,7 @@ use crate::utils::{is_valid_tree_len, tree_index};
 use crate::walker::Mode;
 
 /// A wrapper around a list of hashes that provides access only to the leaf nodes in the tree.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy)]
 pub struct HashTree<'s> {
     inner: FlatHashSlice<'s>,
 }
@@ -76,6 +76,14 @@ impl<'s> IntoIterator for HashTree<'s> {
 }
 
 impl<'s> HashTree<'s> {
+    /// See [`FlatHashSlice::load`].
+    #[inline]
+    pub fn load(&self) -> Self {
+        Self {
+            inner: self.inner.load(),
+        }
+    }
+
     /// Returns the number of items in this hash tree.
     #[inline]
     pub fn len(&self) -> usize {

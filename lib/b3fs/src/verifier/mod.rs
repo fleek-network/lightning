@@ -3,3 +3,6 @@
 
 pub mod keeper;
 pub mod verifier;
+
+pub use keeper::TreeKeeper;
+pub use verifier::{IncrementalVerifier, IncrementalVerifierError};

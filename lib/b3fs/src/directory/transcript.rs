@@ -41,3 +41,13 @@ pub fn write_entry_transcript(
 pub fn hash_transcript(buffer: &[u8]) -> [u8; 32] {
     *fleek_blake3::keyed_hash(&KEY, &buffer).as_bytes()
 }
+
+/// Hash an entry.
+pub fn hash_entry<'a, E>(entry: &'a E, counter: usize, is_root: bool) -> [u8; 32]
+where
+    BorrowedEntry<'a>: From<&'a E>,
+{
+    let mut buffer = Vec::with_capacity(320);
+    write_entry_transcript(&mut buffer, entry.into(), counter as u16, is_root);
+    hash_transcript(&buffer)
+}
