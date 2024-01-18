@@ -1,4 +1,5 @@
 pub mod tcp;
+#[cfg(not(feature = "cloudflare"))]
 pub mod webtransport;
 
 use anyhow::Result;

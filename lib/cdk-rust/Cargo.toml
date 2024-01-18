@@ -20,6 +20,9 @@ tokio = { version = "1.32", features = ["rt-multi-thread", "time", "sync", "io-u
 tokio-util = { version = "0.7", features = ["codec"] }
 wtransport = { version = "0.1", features = ["dangerous-configuration"] }
 lightning-schema = { path = "../../core/schema" }
-
 arrayref = "0.3"
 fleek-crypto = { path = "../fleek-crypto"}
+worker = { version = "0.0.18", optional = true}
+
+[features]
+cloudflare = ["dep:worker"]
