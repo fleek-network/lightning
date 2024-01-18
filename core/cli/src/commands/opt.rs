@@ -186,8 +186,7 @@ async fn status<C: Collection<SignerInterface = Signer<C>>>(
                 .await
                 .context("Failed to get epoch info from genesis committee")?;
             // Warning: The following text has a timestamp in the format HH:MM:SS that might be
-            // parsed. If you require to change or remove it, make sure to inform the maintainers of
-            // get.fleek.network
+            // parsed e.g. get.fleek.network. If you require to change, report it pls
             println!(
                 "Your node is opted in. Your node will be participating once the next epoch starts in {}",
                 get_timestamp(delta)
@@ -198,6 +197,8 @@ async fn status<C: Collection<SignerInterface = Signer<C>>>(
             let delta = get_epoch_end_delta(&genesis_committee)
                 .await
                 .context("Failed to get epoch info from genesis committee")?;
+            // Warning: The following text has a timestamp in the format HH:MM:SS that might be
+            // parsed e.g. get.fleek.network. If you require to change, report it pls
             println!(
                 "Your node is opted out. You can shutdown your node once the current epoch ends in {}",
                 get_timestamp(delta)
