@@ -2,29 +2,22 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::notifier::{
-    BlockNotifierEmitter,
-    EpochNotifierEmitter,
-    Notification,
-    NotifierInterface,
-};
-use lightning_interfaces::ApplicationInterface;
+use lightning_interfaces::notifier::{Notification, NotifierInterface};
+use lightning_interfaces::{ApplicationInterface, Emitter};
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::{mpsc, Notify};
 use tokio::time::sleep;
 
 pub struct Notifier<C: Collection> {
     query_runner: c![C::ApplicationInterface::SyncExecutor],
-    epoch_notify: EpochChangeNotificationsEmitter,
-    block_notify: NewBlockNotificationsEmitter,
+    notify: NotificationsEmitter,
 }
 
 impl<C: Collection> Clone for Notifier<C> {
     fn clone(&self) -> Self {
         Self {
             query_runner: self.query_runner.clone(),
-            epoch_notify: self.epoch_notify.clone(),
-            block_notify: self.block_notify.clone(),
+            notify: self.notify.clone(),
         }
     }
 }
@@ -45,31 +38,25 @@ impl<C: Collection> Notifier<C> {
 }
 
 impl<C: Collection> NotifierInterface<C> for Notifier<C> {
-    type EpochEmitter = EpochChangeNotificationsEmitter;
-    type BlockEmitter = NewBlockNotificationsEmitter;
+    type Emitter = NotificationsEmitter;
 
-    fn new_block_emitter(&self) -> Self::BlockEmitter {
-        self.block_notify.clone()
-    }
-
-    fn new_epoch_emitter(&self) -> Self::EpochEmitter {
-        self.epoch_notify.clone()
+    fn get_emitter(&self) -> Self::Emitter {
+        self.notify.clone()
     }
 
     fn init(app: &c![C::ApplicationInterface]) -> Self {
         Self {
             query_runner: app.sync_query(),
-            epoch_notify: Default::default(),
-            block_notify: Default::default(),
+            notify: Default::default(),
         }
     }
 
     fn notify_on_new_block(&self, tx: mpsc::Sender<Notification>) {
-        let notify = self.block_notify.clone();
+        let notify = self.notify.clone();
 
         tokio::spawn(async move {
             loop {
-                notify.emitter.notified().await;
+                notify.new_block_notify.notified().await;
 
                 if tx.send(Notification::NewBlock).await.is_err() {
                     // There is no receiver anymore.
@@ -80,11 +67,11 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
     }
 
     fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>) {
-        let notify = self.epoch_notify.clone();
+        let notify = self.notify.clone();
 
         tokio::spawn(async move {
             loop {
-                notify.emitter.notified().await;
+                notify.new_epoch_notify.notified().await;
 
                 if tx.send(Notification::NewEpoch).await.is_err() {
                     // There is no receiver anymore.
@@ -108,24 +95,18 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
 }
 
 #[derive(Default, Clone)]
-pub struct EpochChangeNotificationsEmitter {
-    emitter: Arc<Notify>,
+pub struct NotificationsEmitter {
+    new_block_notify: Arc<Notify>,
+    new_epoch_notify: Arc<Notify>,
 }
 
-impl EpochNotifierEmitter for EpochChangeNotificationsEmitter {
-    fn epoch_changed(&self) {
-        self.emitter.notify_waiters()
-    }
-}
-
-#[derive(Default, Clone)]
-pub struct NewBlockNotificationsEmitter {
-    emitter: Arc<Notify>,
-}
-
-impl BlockNotifierEmitter for NewBlockNotificationsEmitter {
+impl Emitter for NotificationsEmitter {
     fn new_block(&self) {
-        self.emitter.notify_waiters()
+        self.new_block_notify.notify_waiters()
+    }
+
+    fn epoch_changed(&self) {
+        self.new_epoch_notify.notify_waiters()
     }
 }
 
@@ -201,7 +182,7 @@ mod tests {
         // Trigger new epoch Notification
         tokio::spawn(async move {
             sleep(Duration::from_secs(1)).await;
-            notifier.new_epoch_emitter().epoch_changed();
+            notifier.get_emitter().epoch_changed();
         });
 
         assert_eq!(Notification::NewEpoch, rx.recv().await.unwrap());
@@ -220,7 +201,7 @@ mod tests {
         // Trigger new block Notification
         tokio::spawn(async move {
             sleep(Duration::from_secs(1)).await;
-            notifier.new_block_emitter().new_block();
+            notifier.get_emitter().new_block();
         });
 
         assert_eq!(Notification::NewBlock, rx.recv().await.unwrap());
