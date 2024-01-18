@@ -11,14 +11,20 @@ use rustls::{ClientConfig, SupportedCipherSuite, SupportedProtocolVersion};
 
 use crate::tls::verifier::CertificateVerifier;
 
+#[allow(dead_code)]
 static PROTOCOL_VERSIONS: &[&SupportedProtocolVersion] = &[&rustls::version::TLS13];
+
+#[allow(dead_code)]
 static CIPHERSUITES: &[SupportedCipherSuite] = &[
     TLS13_CHACHA20_POLY1305_SHA256,
     TLS13_AES_256_GCM_SHA384,
     TLS13_AES_128_GCM_SHA256,
 ];
+
+#[allow(dead_code)]
 const DEFAULT_ALPN: &[u8] = b"h3";
 
+#[allow(dead_code)]
 pub fn tls_config(hashes: Vec<Vec<u8>>) -> ClientConfig {
     let mut crypto = rustls::ClientConfig::builder()
         .with_cipher_suites(CIPHERSUITES)
