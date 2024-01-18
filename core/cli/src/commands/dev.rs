@@ -1,19 +1,14 @@
-use std::fs::File;
-use std::io::Read;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
 use lightning_interfaces::infu_collection::{Collection, Node};
-use lightning_interfaces::types::CompressionAlgorithm;
-use lightning_interfaces::{
-    BlockStoreInterface,
-    BlockStoreServerInterface,
-    ConfigProviderInterface,
-    IncrementalPutInterface,
-};
+use lightning_interfaces::BlockStoreServerInterface;
 use lightning_node::config::TomlConfigProvider;
+use lightning_types::{Blake3Hash, NodePorts};
+use lightning_utils::rpc::rpc_request;
+use reqwest::Client;
 use resolved_pathbuf::ResolvedPathBuf;
-use tracing::error;
+use serde_json::json;
 
 use crate::args::DevSubCmd;
 
@@ -25,7 +20,7 @@ where
         DevSubCmd::InitOnly => init::<C>(config_path).await,
         DevSubCmd::ShowOrder => show_order::<C>().await,
         DevSubCmd::DepGraph => dep_graph::<C>().await,
-        DevSubCmd::Store { input } => store::<C>(input, config_path).await,
+        DevSubCmd::Store { input } => store(input).await,
         DevSubCmd::Fetch { remote, hash } => fetch::<C>(config_path, hash, remote).await,
     }
 }
@@ -64,49 +59,29 @@ async fn dep_graph<C: Collection>() -> Result<()> {
     Ok(())
 }
 
-async fn store<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
-    input: Vec<PathBuf>,
-    config_path: ResolvedPathBuf,
-) -> Result<()> {
-    let config = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
-    let store = <C::BlockStoreInterface as BlockStoreInterface<C>>::init(
-        config.get::<C::BlockStoreInterface>(),
-    )
-    .context("Could not init blockstore")?;
+async fn store(input: Vec<PathBuf>) -> Result<()> {
+    // Todo: is there a way to find the port for the locally running node?
+    let ports = NodePorts::default();
 
-    let mut block = vec![0u8; 256 * 1025];
-
-    'outer: for path in &input {
-        let Ok(mut file) = File::open(path) else {
-            error!("Could not open the file {path:?}");
-            continue;
+    for path in &input {
+        if let Some(path) = path.to_str() {
+            let request = json!({
+                "jsonrpc": "2.0",
+                "method": "admin_store",
+                "params": { "path": path },
+                "id":1,
+            })
+            .to_string();
+            let client = Client::new();
+            let _ = rpc_request::<Blake3Hash>(
+                &client,
+                format!("http://127.0.0.1:{}/admin", ports.rpc),
+                request,
+            )
+            .await?;
+        } else {
+            println!("invalid unicode in {path:?}")
         };
-
-        let mut putter = store.put(None);
-
-        loop {
-            let Ok(size) = file.read(&mut block) else {
-                error!("read error");
-                break 'outer;
-            };
-
-            if size == 0 {
-                break;
-            }
-
-            putter
-                .write(&block[0..size], CompressionAlgorithm::Uncompressed)
-                .unwrap();
-        }
-
-        match putter.finalize().await {
-            Ok(hash) => {
-                println!("{:x}\t{path:?}", ByteBuf(&hash));
-            },
-            Err(e) => {
-                error!("Failed: {e}");
-            },
-        }
     }
     Ok(())
 }

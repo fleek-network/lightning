@@ -131,6 +131,11 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
             let json_rpc_service = json_rpc_service.clone();
             let admin_json_rpc_service = admin_json_rpc_service.clone();
 
+            // Although it is kind of odd to set up a server in this manner,
+            // this is safe from spoofing attacks as long as we're using TCP.
+            // It would be better to add auth to these endpoints or add
+            // another server on loopback for internal services.
+            // Todo: improve admin service.
             let is_local = addr_stream.remote_addr().ip().is_loopback();
 
             async move {
