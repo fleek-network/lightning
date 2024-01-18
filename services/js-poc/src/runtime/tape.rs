@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use deno_core::{OpMetricsEvent, OpMetricsFactoryFn, OpMetricsFn};
-use tracing::debug;
 
 #[derive(Clone)]
 pub struct Tape {
@@ -17,41 +16,32 @@ impl Tape {
     }
 
     /// Returns a [`OpMetricsFn`] for this tracker.
-    pub fn op_metrics_fn(self) -> OpMetricsFn {
+    pub fn op_metrics_fn(&self) -> OpMetricsFn {
+        let feed = self.feed.clone();
         Rc::new(move |ctx, event, _source| {
             let decl = ctx.decl();
             let name = decl.name.to_string();
-            debug!("{name}");
+            let mut feed = feed.borrow_mut();
+
             match event {
-                OpMetricsEvent::Dispatched => {
-                    let mut feed = self.feed.borrow_mut();
-                    if decl.is_async {
-                        feed.push(Punch::OpDispatchedAsync(name));
-                    } else {
-                        feed.push(Punch::OpDispatched(name))
-                    }
-                },
-                OpMetricsEvent::Completed => {
-                    let mut feed = self.feed.borrow_mut();
-                    if decl.is_async {
-                        feed.push(Punch::OpCompletedAsync(name));
-                    } else {
-                        feed.push(Punch::OpCompleted(name));
-                    }
-                },
-                OpMetricsEvent::CompletedAsync => {
-                    self.feed.borrow_mut().push(Punch::OpCompletedAsync(name))
-                },
-                OpMetricsEvent::Error => self.feed.borrow_mut().push(Punch::OpError(name)),
-                OpMetricsEvent::ErrorAsync => {
-                    self.feed.borrow_mut().push(Punch::OpErrorAsync(name))
-                },
+                OpMetricsEvent::Dispatched => feed.push(match decl.is_async {
+                    true => Punch::OpDispatchedAsync(name),
+                    false => Punch::OpDispatched(name),
+                }),
+                OpMetricsEvent::Completed => feed.push(match decl.is_async {
+                    true => Punch::OpCompletedAsync(name),
+                    false => Punch::OpCompleted(name),
+                }),
+                OpMetricsEvent::Error => feed.push(Punch::OpError(name)),
+                OpMetricsEvent::CompletedAsync => feed.push(Punch::OpCompletedAsync(name)),
+                OpMetricsEvent::ErrorAsync => feed.push(Punch::OpErrorAsync(name)),
             }
         })
     }
 
-    pub fn op_metrics_factory_fn(self) -> OpMetricsFactoryFn {
-        Box::new(move |_, _, _| Some(self.clone().op_metrics_fn()))
+    pub fn op_metrics_factory_fn(&self) -> OpMetricsFactoryFn {
+        let s = self.clone();
+        Box::new(move |_, _, _| Some(s.op_metrics_fn()))
     }
 
     /// Consumes the inner refcell and returns the feed
