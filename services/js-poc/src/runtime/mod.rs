@@ -26,7 +26,7 @@ impl Runtime {
             deno: JsRuntime::new(RuntimeOptions {
                 extensions: vec![fleek::init_ops()],
                 startup_snapshot: Some(Snapshot::Static(SNAPSHOT)),
-                op_metrics_factory_fn: Some(tape.clone().op_metrics_factory_fn()),
+                op_metrics_factory_fn: Some(tape.op_metrics_factory_fn()),
                 ..Default::default()
             }),
             tape,
