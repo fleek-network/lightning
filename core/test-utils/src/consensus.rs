@@ -11,8 +11,8 @@ use lightning_interfaces::signer::SignerInterface;
 use lightning_interfaces::types::{Block, TransactionRequest};
 use lightning_interfaces::{
     ApplicationInterface,
-    BlockNotifierEmitter,
     BroadcastInterface,
+    Emitter,
     IndexSocket,
     NotifierInterface,
     SyncQueryRunnerInterface,
@@ -29,7 +29,7 @@ pub struct MockConsensus<C: Collection> {
     inner: Arc<
         MockConsensusInner<
             c![C::ApplicationInterface::SyncExecutor],
-            c![C::NotifierInterface::BlockEmitter],
+            c![C::NotifierInterface::Emitter],
         >,
     >,
     socket: Socket<TransactionRequest, ()>,
@@ -38,11 +38,11 @@ pub struct MockConsensus<C: Collection> {
     rx: Arc<Mutex<Option<mpsc::Receiver<Task<TransactionRequest, ()>>>>>,
 }
 
-struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static, BN: BlockNotifierEmitter> {
+struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static, NE: Emitter> {
     _query_runner: Q,
     executor: ExecutionEngineSocket,
     config: Config,
-    new_block_notifier: BN,
+    notifier: NE,
 }
 
 impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
@@ -63,7 +63,7 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
             _query_runner: query_runner,
             executor,
             config,
-            new_block_notifier: notifier.new_block_emitter(),
+            notifier: notifier.get_emitter(),
         };
         Ok(Self {
             inner: Arc::new(inner),
@@ -123,7 +123,7 @@ impl<C: Collection> ConfigConsumer for MockConsensus<C> {
     type Config = Config;
 }
 
-impl<Q: SyncQueryRunnerInterface, BN: BlockNotifierEmitter> MockConsensusInner<Q, BN> {
+impl<Q: SyncQueryRunnerInterface, NE: Emitter> MockConsensusInner<Q, NE> {
     async fn handle(
         self: Arc<Self>,
         mut rx: mpsc::Receiver<Task<TransactionRequest, ()>>,
@@ -164,11 +164,11 @@ impl<Q: SyncQueryRunnerInterface, BN: BlockNotifierEmitter> MockConsensusInner<Q
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                         .unwrap();
 
-                    self.new_block_notifier.new_block();
+                    self.notifier.new_block();
                 }
                 _ = interval.tick() => {
                     // Lets pretend that a new block arrived.
-                    self.new_block_notifier.new_block();
+                    self.notifier.new_block();
                 }
                 _ = shutdown_rx.recv() => break,
             }

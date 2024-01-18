@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
-use lightning_interfaces::{BlockNotifierEmitter, EpochNotifierEmitter, SyncQueryRunnerInterface};
+use lightning_interfaces::{Emitter, SyncQueryRunnerInterface};
 use lightning_utils::application::QueryRunnerExt;
 
 use super::ring_buffer::RingBuffer;
@@ -107,16 +107,12 @@ impl TransactionStore {
 
     // Threshold should be 2f + 1 of the committee
     // Returns true if the epoch has changed
-    pub async fn try_execute<
-        Q: SyncQueryRunnerInterface,
-        EN: EpochNotifierEmitter,
-        BN: BlockNotifierEmitter,
-    >(
+    pub async fn try_execute<Q: SyncQueryRunnerInterface, NE: Emitter>(
         &mut self,
         digest: Digest,
         threshold: usize,
         query_runner: &Q,
-        execution: &Arc<Execution<Q, EN, BN>>,
+        execution: &Arc<Execution<Q, NE>>,
     ) -> Result<bool, NotExecuted> {
         // get the current chain head
         let head = query_runner.get_last_block();
@@ -145,15 +141,11 @@ impl TransactionStore {
         Ok(epoch_changed)
     }
 
-    async fn try_execute_internal<
-        Q: SyncQueryRunnerInterface,
-        EN: EpochNotifierEmitter,
-        BN: BlockNotifierEmitter,
-    >(
+    async fn try_execute_internal<Q: SyncQueryRunnerInterface, NE: Emitter>(
         &mut self,
         digest: Digest,
         threshold: usize,
-        execution: &Arc<Execution<Q, EN, BN>>,
+        execution: &Arc<Execution<Q, NE>>,
         head: Digest,
     ) -> Result<bool, NotExecuted> {
         if self.executed.contains(&digest) {
@@ -170,14 +162,10 @@ impl TransactionStore {
         Err(NotExecuted::MissingAttestations(digest))
     }
 
-    async fn try_execute_chain<
-        Q: SyncQueryRunnerInterface,
-        EN: EpochNotifierEmitter,
-        BN: BlockNotifierEmitter,
-    >(
+    async fn try_execute_chain<Q: SyncQueryRunnerInterface, NE: Emitter>(
         &mut self,
         digest: Digest,
-        execution: &Arc<Execution<Q, EN, BN>>,
+        execution: &Arc<Execution<Q, NE>>,
         head: Digest,
     ) -> Result<bool, NotExecuted> {
         let mut txn_chain = VecDeque::new();

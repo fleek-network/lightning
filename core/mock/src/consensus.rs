@@ -12,10 +12,10 @@ use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{Block, TransactionRequest};
 use lightning_interfaces::{
     ApplicationInterface,
-    BlockNotifierEmitter,
     BroadcastInterface,
     ConfigConsumer,
     ConsensusInterface,
+    Emitter,
     ExecutionEngineSocket,
     IndexSocket,
     MempoolSocket,
@@ -160,11 +160,7 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
         notifier: &c!(C::NotifierInterface),
     ) -> anyhow::Result<Self> {
         let (tx, rx) = mpsc::channel(128);
-        tokio::spawn(run_consensus::<C>(
-            rx,
-            executor,
-            notifier.new_block_emitter(),
-        ));
+        tokio::spawn(run_consensus::<C>(rx, executor, notifier.get_emitter()));
 
         let mempool = TokioSpawn::spawn_async(MempoolSocketWorker {
             sender: tx.clone(),
@@ -199,7 +195,7 @@ impl<C: Collection> ConfigConsumer for MockConsensus<C> {
 async fn run_consensus<C: Collection>(
     mut rx: mpsc::Receiver<TransactionRequest>,
     exec: ExecutionEngineSocket,
-    new_block_notifier: c!(C::NotifierInterface::BlockEmitter),
+    notifier: c!(C::NotifierInterface::Emitter),
 ) {
     let mut ticker = tokio::time::interval(Duration::from_millis(1));
     let mut buffer = Vec::<TransactionRequest>::with_capacity(32);
@@ -219,7 +215,7 @@ async fn run_consensus<C: Collection>(
 
                 let _ = exec.run(block).await;
 
-                new_block_notifier.new_block();
+                notifier.new_block();
             }
             tmp = rx.recv() => {
                 if let Some(tx) = tmp {
