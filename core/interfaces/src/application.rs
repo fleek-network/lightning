@@ -77,7 +77,7 @@ pub trait ApplicationInterface<C: Collection>:
     fn sync_query(&self) -> Self::SyncExecutor;
 
     /// Will seed its underlying database with the checkpoint provided
-    fn load_from_checkpoint(
+    async fn load_from_checkpoint(
         config: &Self::Config,
         checkpoint: Vec<u8>,
         checkpoint_hash: [u8; 32],

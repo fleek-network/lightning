@@ -26,5 +26,5 @@ pub trait ConfigConsumer {
     const KEY: &'static str = "BLANK";
 
     /// The type which is expected for this configuration object.
-    type Config: Serialize + DeserializeOwned + Default = HashMap<String, String>;
+    type Config: Send + Sync + Serialize + DeserializeOwned + Default = HashMap<String, String>;
 }
