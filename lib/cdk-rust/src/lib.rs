@@ -55,6 +55,7 @@ mod connection;
 mod context;
 mod frame;
 mod mode;
+#[cfg(not(feature = "cloudflare"))]
 mod tls;
 
 pub mod transport;
