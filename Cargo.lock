@@ -640,6 +640,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "atomo",
+ "fcntl",
  "fleek-blake3",
  "fxhash",
  "rand 0.8.5",
@@ -3079,6 +3080,15 @@ dependencies = [
  "arrayvec",
  "auto_impl",
  "bytes",
+]
+
+[[package]]
+name = "fcntl"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "886f6e92eeda007d866edc0c2ffae6670315810b232b9305fce66b2646fd3686"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

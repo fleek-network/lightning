@@ -1,8 +1,11 @@
 use std::marker::PhantomData;
+use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use affair::{Executor, TokioSpawn};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
+use atomo_rocks::is_db_locked;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
     ApplicationInterface,
@@ -94,11 +97,32 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
         self.query_runner.clone()
     }
 
-    fn load_from_checkpoint(
+    async fn load_from_checkpoint(
         config: &Self::Config,
         checkpoint: Vec<u8>,
         checkpoint_hash: [u8; 32],
     ) -> Result<()> {
+        // Do to a raise condition on shutdowns when a node checkpoints, we should sleep and try
+        // again if there is a lock on the DB at this stage of the process
+        let mut counter = 0;
+
+        let db_path: &PathBuf = config
+            .db_path
+            .as_ref()
+            .context("db_path must be specified for RocksDb backend")?;
+
+        loop {
+            if is_db_locked(db_path.clone()) {
+                if counter >= 10 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_secs(3)).await;
+                counter += 1;
+            } else {
+                break;
+            }
+        }
+
         match Env::new(config, Some((checkpoint_hash, checkpoint))) {
             Ok(mut env) => {
                 info!("Successfully built database from checkpoint with hash {checkpoint_hash:?}");
@@ -110,7 +134,6 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
             },
             Err(e) => {
                 error!("Failed to build app db from checkpoint");
-
                 Err(anyhow!("Failed to build app db from checkpoint: {}", e))
             },
         }
