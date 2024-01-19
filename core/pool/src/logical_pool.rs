@@ -71,6 +71,14 @@ where
         }
     }
 
+    pub fn handle_new_connection(&mut self, peer: NodeIndex) {
+        if !self.contains(&peer) {
+            if let Some(info) = self.node_info_from_state(&peer) {
+                self.pin_connection(peer, info);
+            }
+        }
+    }
+
     pub fn process_received_message(&self, src: &NodeIndex) -> bool {
         self.pool.contains_key(src)
     }
