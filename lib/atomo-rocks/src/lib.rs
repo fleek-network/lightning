@@ -1,12 +1,13 @@
 //! A [`rocksdb`] storage backend implementation for [`atomo`].
 
 mod serialization;
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::path::PathBuf;
 
 use anyhow::Result;
 use atomo::batch::Operation;
 use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackend, StorageBackendConstructor};
+use fcntl::is_file_locked;
 use fxhash::FxHashMap;
 /// Re-export of [`rocksdb::Options`].
 pub use rocksdb::Options;
@@ -215,6 +216,24 @@ impl StorageBackend for RocksBackend {
         } else {
             false
         }
+    }
+}
+
+/// Helper method to determine if there is currently a lock on your RocksDB
+/// Will return true if there is any fs problems trying to access the the lock file(Like user
+/// permission errors) but if the directory or lock file does not exist it will return false
+/// indicating you are safe to open a db here.
+pub fn is_db_locked(mut path: PathBuf) -> bool {
+    path.push("LOCK");
+
+    if !path.exists() {
+        return false;
+    }
+
+    if let Ok(file) = OpenOptions::new().read(true).open(path) {
+        is_file_locked(&file, None).unwrap_or(true)
+    } else {
+        true
     }
 }
 
