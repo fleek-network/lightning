@@ -10,6 +10,7 @@ pub struct Directory {
     header: Header,
 }
 
+/// a
 pub struct EntriesIterator<'d> {
     dir: &'d Directory,
 }
@@ -47,12 +48,19 @@ impl Directory {
         let len = self.len() as usize;
         let after_hashtree = (len.max(1) * 2 - 1) * 32 + 8;
         let offsets = self.header.content.bytes(after_hashtree, len * 4).unwrap();
+        let file_len = self.header.content.len();
 
         let mut hi = len - 1;
         let mut lo = 0;
 
         while hi >= lo {
             let mid = (hi + lo) / 2;
+            let offset = read_u32(offsets, mid * 4);
+            let next_offset = if mid + 1 >= len {
+                ((file_len - after_hashtree) as u32) - offset
+            } else {
+                read_u32(offsets, (mid + 1) * 4)
+            };
         }
 
         todo!()
