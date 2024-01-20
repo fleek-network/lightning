@@ -15,6 +15,19 @@ use crate::overlay::{BroadcastRequest, ConnectionInfo, Message, SendRequest};
 use crate::pool::{Request, Response};
 use crate::state::{NodeInfo, Stats};
 
+/// Events.
+pub enum Event {
+    NewConnection {
+        remote: NodeIndex,
+        service_request_sent: bool,
+    },
+    ConnectionEnded(NodeIndex),
+    Broadcast(BroadcastRequest),
+    SendRequest(SendRequest),
+    MessageReceived(MessageReceived),
+    RequestReceived(RequestReceived),
+}
+
 /// Event receiver.
 pub struct EventReceiver<C: Collection> {
     /// Queue of events.
@@ -37,8 +50,10 @@ where
     C: Collection,
 {
     #[inline]
-    fn handle_new_epoch(&mut self) {
-        self.handler.update_connections();
+    fn handle_new_epoch(&mut self) -> anyhow::Result<()> {
+        let pool_task = self.handler.update_connections();
+        self.pool_queue.try_send(pool_task)?;
+        Ok(())
     }
 
     #[inline]
@@ -56,8 +71,11 @@ where
             Event::RequestReceived(request) => {
                 let _ = self.handle_incoming_request(request);
             },
-            Event::NewConnection(index) => {
-                self.handle_new_connection(index);
+            Event::NewConnection {
+                remote: index,
+                service_request_sent,
+            } => {
+                self.handle_new_connection(index, service_request_sent);
             },
             Event::ConnectionEnded(index) => {
                 self.handle_closed_connection(index);
@@ -68,8 +86,9 @@ where
     }
 
     #[inline]
-    fn handle_new_connection(&mut self, peer: NodeIndex) {
-        self.handler.handle_new_connection(peer);
+    fn handle_new_connection(&mut self, peer: NodeIndex, service_request_sent: bool) {
+        self.handler
+            .handle_new_connection(peer, service_request_sent);
     }
 
     #[inline]
@@ -158,23 +177,14 @@ where
 }
 
 pub struct MessageReceived {
-    peer: NodeIndex,
-    message: Message,
+    pub peer: NodeIndex,
+    pub message: Message,
 }
 
 pub struct RequestReceived {
-    peer: NodeIndex,
-    service_scope: ServiceScope,
-    request: (RequestHeader, Request),
-}
-
-pub enum Event {
-    NewConnection(NodeIndex),
-    ConnectionEnded(NodeIndex),
-    Broadcast(BroadcastRequest),
-    SendRequest(SendRequest),
-    MessageReceived(MessageReceived),
-    RequestReceived(RequestReceived),
+    pub peer: NodeIndex,
+    pub service_scope: ServiceScope,
+    pub request: (RequestHeader, Request),
 }
 
 /// Requests that will be performed on a connection.
@@ -188,6 +198,11 @@ pub enum PoolTask {
         service: ServiceScope,
         request: Bytes,
         respond: oneshot::Sender<io::Result<Response>>,
+    },
+    Update {
+        // Nodes that are in our overlay.
+        keep: HashMap<NodeIndex, ConnectionInfo>,
+        drop: Vec<NodeIndex>,
     },
     Stats {
         respond: oneshot::Sender<Stats>,

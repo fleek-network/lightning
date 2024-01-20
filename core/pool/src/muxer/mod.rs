@@ -23,15 +23,14 @@ pub type BoxedChannel =
 /// Multiplexed-transport interface.
 #[trait_variant::make(MuxerInterface: Send)]
 pub trait _MuxerInterface: Clone + Send + Sync + 'static {
-    type Connecting: Future<Output = io::Result<Self::Connection>> + Send;
     type Connection: ConnectionInterface;
     type Config: Clone + Send;
 
     fn init(config: Self::Config) -> io::Result<Self>;
-    async fn connect(&self, peer: NodeInfo, server_name: &str) -> io::Result<Self::Connecting>;
+    async fn connect(&self, peer: NodeInfo, server_name: &str) -> io::Result<Self::Connection>;
 
     // The implementation must be cancel-safe.
-    async fn accept(&self) -> Option<Self::Connecting>;
+    async fn accept(&self) -> Option<io::Result<Self::Connection>>;
     async fn close(&self);
 }
 

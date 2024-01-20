@@ -71,7 +71,7 @@ where
         }
     }
 
-    pub fn handle_new_connection(&mut self, peer: NodeIndex) {
+    pub fn handle_new_connection(&mut self, peer: NodeIndex, _: bool) {
         if !self.contains(&peer) {
             if let Some(info) = self.node_info_from_state(&peer) {
                 self.pin_connection(peer, info);
@@ -98,7 +98,7 @@ where
     }
 
     #[inline]
-    pub fn update_connections(&mut self) -> BroadcastTask {
+    pub fn update_connections(&mut self) -> PoolTask {
         let peers = self
             .topology
             .suggest_connections()
@@ -178,7 +178,7 @@ where
         self.stats.cluster_hit_count = 0;
 
         // We tell the pool who to connect to.
-        BroadcastTask::Update {
+        PoolTask::Update {
             keep: self.pool.clone(),
             drop: peers_to_drop,
         }
