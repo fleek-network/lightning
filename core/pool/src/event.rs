@@ -1,18 +1,29 @@
+use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::io;
 
 use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
+use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{Notification, RequestHeader, ServiceScope};
+use lightning_interfaces::{
+    ApplicationInterface,
+    Notification,
+    NotifierInterface,
+    RequestHeader,
+    ServiceScope,
+};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
+use crate::actual_pool::Endpoint;
 use crate::logical_pool::LogicalPool;
+use crate::muxer::MuxerInterface;
 use crate::overlay::{BroadcastRequest, ConnectionInfo, Message, SendRequest};
-use crate::pool::{Request, Response};
+use crate::provider::{Request, Response};
 use crate::state::{NodeInfo, Stats};
 
 /// Events.
@@ -49,6 +60,49 @@ impl<C> EventReceiver<C>
 where
     C: Collection,
 {
+    pub fn new(
+        sync_query: c!(C::ApplicationInterface::SyncExecutor),
+        topology: c!(C::TopologyInterface),
+        notifier: c!(C::NotifierInterface),
+        event_queue: Receiver<Event>,
+        pool_queue: Sender<PoolTask>,
+        public_key: NodePublicKey,
+        shutdown: CancellationToken,
+    ) -> Self {
+        let (notifier_tx, notifier_rx) = mpsc::channel(16);
+        notifier.notify_on_new_epoch(notifier_tx);
+
+        let logical_pool = LogicalPool::<C>::new(sync_query, topology, public_key);
+
+        Self {
+            event_queue,
+            handler: logical_pool,
+            notifier: notifier_rx,
+            pool_queue,
+            broadcast_service_handles: HashMap::new(),
+            send_request_service_handles: HashMap::new(),
+            shutdown,
+        }
+    }
+
+    pub fn register_broadcast_service(
+        &mut self,
+        service: ServiceScope,
+    ) -> Receiver<(NodeIndex, Bytes)> {
+        let (tx, rx) = mpsc::channel(96);
+        self.broadcast_service_handles.insert(service, tx);
+        rx
+    }
+
+    pub fn register_requester_service(
+        &mut self,
+        service: ServiceScope,
+    ) -> Receiver<(RequestHeader, Request)> {
+        let (tx, rx) = mpsc::channel(96);
+        self.send_request_service_handles.insert(service, tx);
+        rx
+    }
+
     #[inline]
     fn handle_new_epoch(&mut self) -> anyhow::Result<()> {
         let pool_task = self.handler.update_connections();
@@ -154,6 +208,17 @@ where
     #[inline]
     fn enqueue_pool_task(&self, task: PoolTask) -> anyhow::Result<()> {
         self.pool_queue.try_send(task).map_err(Into::into)
+    }
+
+    pub fn clear_state(&mut self) {
+        todo!()
+    }
+
+    pub fn spawn(mut self) -> JoinHandle<Self> {
+        tokio::spawn(async move {
+            self.run().await;
+            self
+        })
     }
 
     pub async fn run(&mut self) {

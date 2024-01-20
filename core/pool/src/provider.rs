@@ -1,4 +1,3 @@
-use std::cell::OnceCell;
 use std::io;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
@@ -16,7 +15,6 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
     EventHandlerInterface,
-    NotifierInterface,
     ReputationAggregatorInterface,
     RequestHeader,
     RequestInterface,
@@ -32,79 +30,79 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
+use crate::actual_pool::Endpoint;
 use crate::config::Config;
-use crate::endpoint::Endpoint;
+use crate::event::{Event, EventReceiver};
 use crate::muxer::quinn::QuinnMuxer;
 use crate::muxer::{BoxedChannel, MuxerInterface};
 use crate::overlay::{BroadcastRequest, Param, SendRequest};
-use crate::state::QuerySender;
-use crate::{http, muxer, tls};
+use crate::{muxer, tls};
 
-pub struct Pool<C, M = QuinnMuxer>
+pub struct PoolProvider<C, M = QuinnMuxer>
 where
     C: Collection,
     M: MuxerInterface,
 {
     state: Mutex<Option<State<C, M>>>,
+    event_queue: Sender<Event>,
     config: Config,
-    state_request: QuerySender,
     shutdown: CancellationToken,
 }
 
-impl<C, M> Pool<C, M>
+impl<C, M> PoolProvider<C, M>
 where
     C: Collection,
     M: MuxerInterface,
 {
-    fn new(endpoint: Endpoint<C, M>, config: Config, state_request: QuerySender) -> Result<Self> {
+    fn new(
+        endpoint: Endpoint<C, M>,
+        receiver: EventReceiver<C>,
+        event_queue: Sender<Event>,
+        config: Config,
+        shutdown: CancellationToken,
+    ) -> Result<Self> {
         Ok(Self {
-            state: Mutex::new(Some(State::NotRunning {
-                endpoint: Some(endpoint),
-            })),
+            state: Mutex::new(Some(State::NotRunning { endpoint, receiver })),
             config,
-            state_request,
-            shutdown: CancellationToken::new(),
+            event_queue,
+            shutdown,
         })
     }
 
     fn register_broadcast_service(
         &self,
         service: ServiceScope,
-    ) -> (Sender<BroadcastRequest>, Receiver<(NodeIndex, Bytes)>) {
+    ) -> (Sender<Event>, Receiver<(NodeIndex, Bytes)>) {
         let mut guard = self.state.lock().unwrap();
         match guard.as_mut().expect("Pool to have a state") {
             State::Running { .. } => {
                 panic!("failed to start: endpoint is already running");
             },
-            State::NotRunning { endpoint } => {
-                let endpoint = endpoint
-                    .as_mut()
-                    .expect("Endpoint to exist before registering");
-                endpoint.register_broadcast_service(service)
-            },
+            State::NotRunning { receiver, .. } => (
+                self.event_queue.clone(),
+                receiver.register_broadcast_service(service),
+            ),
         }
     }
 
     fn register_requester_service(
         &self,
         service: ServiceScope,
-    ) -> (Sender<SendRequest>, Receiver<(RequestHeader, Request)>) {
+    ) -> (Sender<Event>, Receiver<(RequestHeader, Request)>) {
         let mut guard = self.state.lock().unwrap();
         match guard.as_mut().expect("Pool to have a state") {
             State::Running { .. } => {
                 panic!("failed to start: endpoint is already running");
             },
-            State::NotRunning { endpoint } => {
-                let endpoint = endpoint
-                    .as_mut()
-                    .expect("Endpoint to exist before registering");
-                endpoint.register_requester_service(service)
-            },
+            State::NotRunning { receiver, .. } => (
+                self.event_queue.clone(),
+                receiver.register_requester_service(service),
+            ),
         }
     }
 }
 
-impl<C> WithStartAndShutdown for Pool<C, QuinnMuxer>
+impl<C> WithStartAndShutdown for PoolProvider<C, QuinnMuxer>
 where
     C: Collection,
 {
@@ -116,33 +114,26 @@ where
     }
 
     async fn start(&self) {
-        let mut guard = self.state.lock().unwrap();
-        let state = guard.take().expect("There to be a state");
-        let handle = match state {
-            State::Running { .. } => {
-                panic!("failed to start: endpoint is already running");
-            },
-            State::NotRunning { mut endpoint } => {
-                let endpoint = endpoint.take().expect("There to be an Endpoint");
-                let shutdown = self.shutdown.clone();
-
-                if let Some(http_server_address) = self.config.http {
-                    let shutdown_http_server = shutdown.clone();
-                    let state_request = self.state_request.clone();
-                    tokio::spawn(async move {
-                        http::spawn_http_server(
-                            http_server_address,
-                            shutdown_http_server,
-                            state_request,
-                        )
-                        .await
-                    });
-                }
-
-                endpoint.spawn(shutdown)
-            },
+        let state = {
+            let mut guard = self.state.lock().unwrap();
+            guard.take().expect("There to be a state")
         };
-        *guard = Some(State::Running { handle });
+
+        let next_state = if let State::NotRunning {
+            mut endpoint,
+            receiver,
+        } = state
+        {
+            State::Running {
+                receiver_handle: receiver.spawn(),
+                endpoint_handle: endpoint.spawn(),
+            }
+        } else {
+            state
+        };
+
+        let mut guard = self.state.lock().unwrap();
+        *guard = Some(next_state);
     }
 
     async fn shutdown(&self) {
@@ -151,26 +142,34 @@ where
             guard.take().expect("There to be a state")
         };
 
-        let mut endpoint = match state {
-            State::Running { handle } => {
-                self.shutdown.cancel();
-                handle.await.context("endpoint tasked failed").unwrap()
-            },
-            State::NotRunning { .. } => {
-                panic!("failed to shutdown: endpoint is not running");
-            },
+        let next_state = if let State::Running {
+            endpoint_handle,
+            receiver_handle,
+        } = state
+        {
+            self.shutdown.cancel();
+            let mut receiver = receiver_handle
+                .await
+                .context("event receiver tasked failed")
+                .unwrap();
+            receiver.clear_state();
+            let mut endpoint = endpoint_handle
+                .await
+                .context("endpoint tasked failed")
+                .unwrap();
+            endpoint.shutdown().await;
+
+            State::NotRunning { endpoint, receiver }
+        } else {
+            state
         };
 
-        endpoint.shutdown().await;
-
         let mut guard = self.state.lock().unwrap();
-        *guard = Some(State::NotRunning {
-            endpoint: Some(endpoint),
-        });
+        *guard = Some(next_state);
     }
 }
 
-impl<C> ConfigConsumer for Pool<C, QuinnMuxer>
+impl<C> ConfigConsumer for PoolProvider<C, QuinnMuxer>
 where
     C: Collection,
 {
@@ -180,7 +179,7 @@ where
 
 // Todo: An improvement would be to pass a `Muxer` in `init`.
 // See comments in `MuxerInterface`.
-impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
+impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
     type EventHandler = EventHandler;
     type Requester = Requester;
     type Responder = Responder;
@@ -191,8 +190,8 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         notifier: c!(C::NotifierInterface),
         topology: c!(C::TopologyInterface),
-        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
-    ) -> Result<Pool<C, QuinnMuxer>> {
+        _: c!(C::ReputationAggregatorInterface::ReputationReporter),
+    ) -> Result<PoolProvider<C, QuinnMuxer>> {
         let (_, sk) = signer.get_sk();
         let public_key = sk.to_pk();
 
@@ -201,7 +200,6 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
         let tls_config = tls::make_server_config(&sk).expect("Secret key to be valid");
         let mut server_config = quinn::ServerConfig::with_crypto(Arc::new(tls_config));
         server_config.transport_config(Arc::new(transport_config));
-
         let muxer_config = muxer::quinn::Config {
             server_config,
             address: config.address,
@@ -209,25 +207,27 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
             max_idle_timeout: config.max_idle_timeout,
         };
 
-        let (notifier_tx, notifier_rx) = mpsc::channel(32);
-        notifier.notify_on_new_epoch(notifier_tx);
+        let shutdown = CancellationToken::new();
+        let (pool_task_tx, pool_task_rx) = mpsc::channel(1024);
+        let (event_tx, event_rx) = mpsc::channel(1024);
+        let (receiver) = EventReceiver::<C>::new(
+            sync_query.clone(),
+            topology,
+            notifier,
+            event_rx,
+            pool_task_tx,
+            public_key,
+            shutdown.clone(),
+        );
+        let endpoint = Endpoint::<C, QuinnMuxer>::new(
+            sync_query,
+            pool_task_rx,
+            event_tx.clone(),
+            muxer_config,
+            shutdown.clone(),
+        );
 
-        let (state_request_tx, state_request_rx) = mpsc::channel(2);
-
-        Pool::new(
-            Endpoint::<C, QuinnMuxer>::new(
-                topology,
-                sync_query,
-                notifier_rx,
-                rep_reporter,
-                muxer_config,
-                public_key,
-                OnceCell::new(),
-                state_request_rx,
-            ),
-            config,
-            state_request_tx,
-        )
+        PoolProvider::new(endpoint, receiver, event_tx, config, shutdown)
     }
 
     fn open_event(&self, service: ServiceScope) -> Self::EventHandler {
@@ -252,7 +252,7 @@ impl<C: Collection> PoolInterface<C> for Pool<C, QuinnMuxer> {
 }
 
 pub struct EventHandler {
-    request_tx: Sender<BroadcastRequest>,
+    request_tx: Sender<Event>,
     event_rx: Receiver<(NodeIndex, Bytes)>,
     service_scope: ServiceScope,
 }
@@ -267,11 +267,11 @@ impl EventHandlerInterface for EventHandler {
         let service_scope = self.service_scope;
         tokio::spawn(async move {
             if request_tx
-                .send(BroadcastRequest {
+                .send(Event::Broadcast(BroadcastRequest {
                     service_scope,
                     message,
                     param: Param::Filter(Box::new(filter)),
-                })
+                }))
                 .await
                 .is_err()
             {
@@ -285,11 +285,11 @@ impl EventHandlerInterface for EventHandler {
         let service_scope = self.service_scope;
         tokio::spawn(async move {
             if request_tx
-                .send(BroadcastRequest {
+                .send(Event::Broadcast(BroadcastRequest {
                     service_scope,
                     message,
                     param: Param::Index(index),
-                })
+                }))
                 .await
                 .is_err()
             {
@@ -305,7 +305,7 @@ impl EventHandlerInterface for EventHandler {
 }
 
 pub struct Requester {
-    request_tx: Sender<SendRequest>,
+    request_tx: Sender<Event>,
     service_scope: ServiceScope,
 }
 
@@ -325,12 +325,12 @@ impl RequesterInterface for Requester {
         let (respond_tx, respond_rx) = oneshot::channel();
         // Request a stream.
         self.request_tx
-            .send(SendRequest {
+            .send(Event::SendRequest(SendRequest {
                 peer,
                 service_scope: self.service_scope,
                 request,
                 respond: respond_tx,
-            })
+            }))
             .await
             .map_err(|_| io::ErrorKind::BrokenPipe)?;
 
@@ -463,6 +463,12 @@ where
     C: Collection,
     M: MuxerInterface,
 {
-    NotRunning { endpoint: Option<Endpoint<C, M>> },
-    Running { handle: JoinHandle<Endpoint<C, M>> },
+    NotRunning {
+        receiver: EventReceiver<C>,
+        endpoint: Endpoint<C, M>,
+    },
+    Running {
+        receiver_handle: JoinHandle<EventReceiver<C>>,
+        endpoint_handle: JoinHandle<Endpoint<C, M>>,
+    },
 }

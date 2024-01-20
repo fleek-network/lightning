@@ -1,5 +1,5 @@
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io;
 use std::time::Duration;
 
@@ -13,7 +13,7 @@ use lightning_interfaces::{ApplicationInterface, ServiceScope, SyncQueryRunnerIn
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
-use tokio::task::JoinSet;
+use tokio::task::{JoinHandle, JoinSet};
 use tokio_util::sync::CancellationToken;
 
 use crate::connection;
@@ -22,7 +22,7 @@ use crate::endpoint::OngoingConnectionHandle;
 use crate::event::{Event, PoolTask};
 use crate::muxer::{ConnectionInterface, MuxerInterface};
 use crate::overlay::{ConnectionInfo, Message};
-use crate::pool::Response;
+use crate::provider::Response;
 use crate::state::{NodeInfo, Stats};
 
 type ConnectionId = usize;
@@ -72,6 +72,29 @@ where
     C: Collection,
     M: MuxerInterface,
 {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        task_queue: Receiver<PoolTask>,
+        event_queue: Sender<Event>,
+        config: M::Config,
+        shutdown: CancellationToken,
+    ) -> Self {
+        Self {
+            pool: HashMap::new(),
+            task_queue,
+            pending_task: HashMap::new(),
+            ongoing_connection_tasks: JoinSet::new(),
+            redundant_pool: HashMap::new(),
+            connection_buffer: Vec::new(),
+            event_queue,
+            query_runner,
+            muxer: None,
+            config,
+            shutdown,
+        }
+    }
+
     fn enqueue_dial_task(&mut self, info: NodeInfo, muxer: M) -> anyhow::Result<()> {
         todo!()
     }
@@ -419,6 +442,13 @@ where
             .expect("start method to have been called")
             .close()
             .await;
+    }
+
+    pub fn spawn(mut self) -> JoinHandle<Self> {
+        tokio::spawn(async move {
+            let _ = self.run().await;
+            self
+        })
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {

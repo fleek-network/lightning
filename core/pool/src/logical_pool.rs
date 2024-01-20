@@ -15,27 +15,12 @@ use lightning_utils::application::QueryRunnerExt;
 
 use crate::event::PoolTask;
 use crate::muxer::{ConnectionInterface, MuxerInterface};
-use crate::overlay::{
-    BroadcastRequest,
-    BroadcastTask,
-    ConnectionInfo,
-    Message,
-    Param,
-    SendRequest,
-};
+use crate::overlay::{BroadcastRequest, ConnectionInfo, Message, Param, SendRequest};
 use crate::state::NodeInfo;
 
 pub type BoxedFilterCallback = Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>;
 
-// Manager (BRAIN)
-// Event::NewConnection -> update brain.
-// Event::ConnectionEnded -> update brain.
-// Event::EpochChanged -> update brain.
-// Event::MessageReceived -> validated by Brain and sent to client.
-// Event::RequestReceived -> validated by Brain and sent to client.
-// Event::BroadcastRequest -> talk to pool (pool will start a connection if needed and send in your
-// behalf). Event::SendRequest -> talk to pool (pool will start a connection if needed and send in
-// your behalf).
+/// Pool that handles logical connections.
 pub struct LogicalPool<C: Collection> {
     /// Peers that we are currently connected to.
     pub(crate) pool: HashMap<NodeIndex, ConnectionInfo>,
@@ -59,12 +44,11 @@ where
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         topology: c!(C::TopologyInterface),
         pk: NodePublicKey,
-        index: OnceCell<NodeIndex>,
     ) -> Self {
         Self {
             pool: HashMap::new(),
             sync_query,
-            index,
+            index: OnceCell::new(),
             stats: Stats::default(),
             pk,
             topology,

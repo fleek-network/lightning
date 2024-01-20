@@ -12,10 +12,10 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-use crate::endpoint::ConnectionEvent;
+use crate::event::{Event, MessageReceived, RequestReceived};
 use crate::muxer::{ConnectionInterface, NetChannel};
 use crate::overlay::Message;
-use crate::pool::{Request, Response, Status};
+use crate::provider::{Request, Response, Status};
 use crate::state::Stats;
 
 /// Context for driving the connection.
@@ -27,7 +27,7 @@ pub struct Context<C> {
     /// Receive requests to perform on connection.
     service_request_rx: Receiver<ServiceRequest>,
     /// Send events from this connection.
-    connection_event_tx: Sender<ConnectionEvent>,
+    connection_event_tx: Sender<Event>,
 }
 
 impl<C: ConnectionInterface> Context<C> {
@@ -35,7 +35,7 @@ impl<C: ConnectionInterface> Context<C> {
         connection: C,
         peer: NodeIndex,
         service_request_rx: Receiver<ServiceRequest>,
-        connection_event_tx: Sender<ConnectionEvent>,
+        connection_event_tx: Sender<Event>,
     ) -> Self {
         Self {
             connection,
@@ -151,13 +151,13 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
 async fn handle_incoming_uni_stream<C: ConnectionInterface>(
     peer: NodeIndex,
     stream_rx: C::RecvStream,
-    connection_event_tx: Sender<ConnectionEvent>,
+    connection_event_tx: Sender<Event>,
 ) -> Result<()> {
     let mut stream = FramedRead::new(stream_rx, LengthDelimitedCodec::new());
     while let Some(message) = stream.next().await {
         let message = Message::try_from(message?)?;
         connection_event_tx
-            .send(ConnectionEvent::Broadcast { peer, message })
+            .send(Event::MessageReceived(MessageReceived { peer, message }))
             .await
             .map_err(|_| anyhow::anyhow!("failed to send incoming network event"))?;
     }
@@ -167,7 +167,7 @@ async fn handle_incoming_uni_stream<C: ConnectionInterface>(
 async fn handle_incoming_bi_stream<C: ConnectionInterface>(
     peer: NodeIndex,
     (stream_tx, mut stream_rx): (C::SendStream, C::RecvStream),
-    connection_event_tx: Sender<ConnectionEvent>,
+    connection_event_tx: Sender<Event>,
 ) -> Result<()> {
     // The peer opened a stream.
     // The first byte identifies the service.
@@ -188,11 +188,11 @@ async fn handle_incoming_bi_stream<C: ConnectionInterface>(
     let request = Request::new(channel);
 
     connection_event_tx
-        .send(ConnectionEvent::IncomingRequest {
+        .send(Event::RequestReceived(RequestReceived {
             peer,
             service_scope,
             request: (header, request),
-        })
+        }))
         .await
         .map_err(|_| anyhow::anyhow!("failed to send incoming network event"))
 }

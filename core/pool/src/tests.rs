@@ -50,7 +50,7 @@ use crate::overlay::{
     PoolTask,
     SendRequest,
 };
-use crate::{muxer, pool, Config, Pool};
+use crate::{muxer, provider, Config, Pool};
 
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
@@ -426,7 +426,7 @@ async fn test_open_req_res_unknown_peer() {
         .await;
 
     // Then: our request fails.
-    let _expected_err: Result<pool::Response, io::Error> =
+    let _expected_err: Result<provider::Response, io::Error> =
         Err(io::Error::from(io::ErrorKind::AddrNotAvailable));
     assert!(matches!(response, _expected_err));
 
