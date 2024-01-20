@@ -5,20 +5,14 @@ use std::io;
 use std::net::SocketAddr;
 
 use fleek_crypto::NodePublicKey;
-use hp_fixed::unsigned::HpUfixed;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{ApplicationInterface, SyncQueryRunnerInterface, TopologyInterface};
 use lightning_metrics::histogram;
-use lightning_utils::application::QueryRunnerExt;
 
-use crate::event::PoolTask;
-use crate::muxer::{ConnectionInterface, MuxerInterface};
-use crate::overlay::{BroadcastRequest, ConnectionInfo, Message, Param, SendRequest};
+use crate::event::{BroadcastRequest, ConnectionInfo, Message, Param, PoolTask, SendRequest};
 use crate::state::NodeInfo;
-
-pub type BoxedFilterCallback = Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>;
 
 /// Pool that handles logical connections.
 pub struct LogicalPool<C: Collection> {
@@ -55,6 +49,12 @@ where
         }
     }
 
+    #[inline]
+    pub fn clear_state(&mut self) {
+        self.pool.clear();
+    }
+
+    #[inline]
     pub fn handle_new_connection(&mut self, peer: NodeIndex, _: bool) {
         if !self.contains(&peer) {
             if let Some(info) = self.node_info_from_state(&peer) {
@@ -63,10 +63,12 @@ where
         }
     }
 
+    #[inline]
     pub fn process_received_message(&self, src: &NodeIndex) -> bool {
         self.pool.contains_key(src)
     }
 
+    #[inline]
     pub fn process_received_request(&mut self, src: NodeIndex) -> bool {
         if let Some(info) = self.node_info_from_state(&src) {
             self.pin_connection(src, info);
@@ -81,7 +83,6 @@ where
         self.pool.contains_key(peer)
     }
 
-    #[inline]
     pub fn update_connections(&mut self) -> PoolTask {
         let peers = self
             .topology
@@ -168,6 +169,7 @@ where
         }
     }
 
+    #[inline]
     pub fn get_index(&self) -> NodeIndex {
         if let Some(index) = self.index.get() {
             *index
@@ -179,6 +181,7 @@ where
         }
     }
 
+    #[inline]
     pub fn node_info_from_state(&self, peer: &NodeIndex) -> Option<NodeInfo> {
         let info = self
             .sync_query
@@ -191,6 +194,7 @@ where
         })
     }
 
+    #[inline]
     pub fn pin_connection(&mut self, peer: NodeIndex, info: NodeInfo) {
         let our_index = self.get_index();
         self.pool
@@ -222,36 +226,9 @@ where
         }
     }
 
-    /// Returns true if the peer has staked the required amount
-    /// to be a valid node in the network, and false otherwise.
     #[inline]
-    pub fn validate_stake(&self, peer: NodePublicKey) -> bool {
-        match self.sync_query.pubkey_to_index(&peer) {
-            None => false,
-            Some(ref node_idx) => {
-                HpUfixed::from(self.sync_query.get_staking_amount())
-                    <= self
-                        .sync_query
-                        .get_node_info::<HpUfixed<18>>(node_idx, |n| n.stake.staked)
-                        .unwrap_or(HpUfixed::<18>::zero())
-            },
-        }
-    }
-
-    pub fn _index_from_connection<M: MuxerInterface>(
-        &self,
-        connection: &M::Connection,
-    ) -> Option<NodeIndex> {
-        let pk = connection.peer_identity()?;
-        self.sync_query.pubkey_to_index(&pk)
-    }
-
     pub fn pubkey_to_index(&self, peer: NodePublicKey) -> Option<NodeIndex> {
         self.sync_query.pubkey_to_index(&peer)
-    }
-
-    pub fn _index_to_pubkey(&self, peer: NodeIndex) -> Option<NodePublicKey> {
-        self.sync_query.index_to_pubkey(&peer)
     }
 
     #[inline]
@@ -267,12 +244,12 @@ where
     }
 
     #[inline]
-    pub fn connections(&self) -> HashMap<NodeIndex, ConnectionInfo> {
+    pub fn _connections(&self) -> HashMap<NodeIndex, ConnectionInfo> {
         self.pool.clone()
     }
 
     #[inline]
-    pub fn get_connection_info(&self, peer: &NodeIndex) -> Option<&ConnectionInfo> {
+    pub fn _get_connection_info(&self, peer: &NodeIndex) -> Option<&ConnectionInfo> {
         self.pool.get(peer)
     }
 

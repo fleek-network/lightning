@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
+#[allow(dead_code)]
 pub type QuerySender = Sender<Query>;
 
+#[allow(dead_code)]
 pub enum Query {
     /// Request for the entire state of the pool.
     State { respond: oneshot::Sender<State> },

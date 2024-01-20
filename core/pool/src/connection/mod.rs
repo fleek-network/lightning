@@ -12,9 +12,8 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-use crate::event::{Event, MessageReceived, RequestReceived};
+use crate::event::{Event, Message, MessageReceived, RequestReceived};
 use crate::muxer::{ConnectionInterface, NetChannel};
-use crate::overlay::Message;
 use crate::provider::{Request, Response, Status};
 use crate::state::Stats;
 
@@ -250,6 +249,7 @@ async fn send_request<C: ConnectionInterface>(
 }
 
 /// Requests that will be performed on a connection.
+#[allow(dead_code)]
 pub enum ServiceRequest {
     SendMessage(Message),
     SendRequest {

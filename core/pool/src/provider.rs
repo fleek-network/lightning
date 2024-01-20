@@ -32,10 +32,9 @@ use tokio_util::sync::CancellationToken;
 
 use crate::actual_pool::Endpoint;
 use crate::config::Config;
-use crate::event::{Event, EventReceiver};
+use crate::event::{BroadcastRequest, Event, EventReceiver, Param, SendRequest};
 use crate::muxer::quinn::QuinnMuxer;
 use crate::muxer::{BoxedChannel, MuxerInterface};
-use crate::overlay::{BroadcastRequest, Param, SendRequest};
 use crate::{muxer, tls};
 
 pub struct PoolProvider<C, M = QuinnMuxer>
@@ -45,7 +44,6 @@ where
 {
     state: Mutex<Option<State<C, M>>>,
     event_queue: Sender<Event>,
-    config: Config,
     shutdown: CancellationToken,
 }
 
@@ -58,12 +56,10 @@ where
         endpoint: Endpoint<C, M>,
         receiver: EventReceiver<C>,
         event_queue: Sender<Event>,
-        config: Config,
         shutdown: CancellationToken,
     ) -> Result<Self> {
         Ok(Self {
             state: Mutex::new(Some(State::NotRunning { endpoint, receiver })),
-            config,
             event_queue,
             shutdown,
         })
@@ -119,11 +115,7 @@ where
             guard.take().expect("There to be a state")
         };
 
-        let next_state = if let State::NotRunning {
-            mut endpoint,
-            receiver,
-        } = state
-        {
+        let next_state = if let State::NotRunning { endpoint, receiver } = state {
             State::Running {
                 receiver_handle: receiver.spawn(),
                 endpoint_handle: endpoint.spawn(),
@@ -210,7 +202,7 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
         let shutdown = CancellationToken::new();
         let (pool_task_tx, pool_task_rx) = mpsc::channel(1024);
         let (event_tx, event_rx) = mpsc::channel(1024);
-        let (receiver) = EventReceiver::<C>::new(
+        let receiver = EventReceiver::<C>::new(
             sync_query.clone(),
             topology,
             notifier,
@@ -227,7 +219,7 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
             shutdown.clone(),
         );
 
-        PoolProvider::new(endpoint, receiver, event_tx, config, shutdown)
+        PoolProvider::new(endpoint, receiver, event_tx, shutdown)
     }
 
     fn open_event(&self, service: ServiceScope) -> Self::EventHandler {

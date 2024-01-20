@@ -3,7 +3,6 @@ mod config;
 mod connection;
 mod endpoint;
 mod event;
-mod http;
 mod logical_pool;
 pub mod muxer;
 mod overlay;

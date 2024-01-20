@@ -1,31 +1,4 @@
-use std::cell::OnceCell;
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
-use std::time::Duration;
-
-use anyhow::Result;
-use bytes::Bytes;
-use fleek_crypto::NodePublicKey;
-use infusion::c;
-use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{
-    ApplicationInterface,
-    Notification,
-    ReputationAggregatorInterface,
-    RequestHeader,
-    ServiceScope,
-    TopologyInterface,
-};
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{mpsc, oneshot, Notify};
-use tokio::task::{JoinHandle, JoinSet};
-use tokio_util::sync::CancellationToken;
-
-//
-// use crate::connection::connector::{ConnectionResult, Connector};
-use crate::connection::{self, Context, ServiceRequest};
+// use lightning_interfaces::infu_collection::Collection;
 // use crate::muxer::{ConnectionInterface, MuxerInterface};
 // use crate::overlay::{
 //     BroadcastRequest,
@@ -827,8 +800,3 @@ use crate::connection::{self, Context, ServiceRequest};
 //         Ok(())
 //     }
 // }
-
-pub struct OngoingConnectionHandle {
-    pub(crate) service_request_tx: Sender<ServiceRequest>,
-    pub(crate) connection_id: usize,
-}

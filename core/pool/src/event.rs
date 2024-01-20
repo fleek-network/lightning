@@ -1,8 +1,7 @@
-use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::io;
 
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use fleek_crypto::NodePublicKey;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
@@ -14,15 +13,14 @@ use lightning_interfaces::{
     RequestHeader,
     ServiceScope,
 };
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
+use x509_parser::nom::AsBytes;
 
-use crate::actual_pool::Endpoint;
 use crate::logical_pool::LogicalPool;
-use crate::muxer::MuxerInterface;
-use crate::overlay::{BroadcastRequest, ConnectionInfo, Message, SendRequest};
 use crate::provider::{Request, Response};
 use crate::state::{NodeInfo, Stats};
 
@@ -211,7 +209,7 @@ where
     }
 
     pub fn clear_state(&mut self) {
-        todo!()
+        self.handler.clear_state();
     }
 
     pub fn spawn(mut self) -> JoinHandle<Self> {
@@ -253,6 +251,7 @@ pub struct RequestReceived {
 }
 
 /// Requests that will be performed on a connection.
+#[allow(dead_code)]
 pub enum PoolTask {
     SendMessage {
         peers: Vec<ConnectionInfo>,
@@ -273,3 +272,74 @@ pub enum PoolTask {
         respond: oneshot::Sender<Stats>,
     },
 }
+
+pub struct BroadcastRequest<F = BoxedFilterCallback>
+where
+    F: Fn(NodeIndex) -> bool,
+{
+    pub service_scope: ServiceScope,
+    pub message: Bytes,
+    pub param: Param<F>,
+}
+
+pub enum Param<F>
+where
+    F: Fn(NodeIndex) -> bool,
+{
+    Filter(F),
+    Index(NodeIndex),
+}
+
+pub struct SendRequest {
+    pub peer: NodeIndex,
+    pub service_scope: ServiceScope,
+    pub request: Bytes,
+    pub respond: oneshot::Sender<io::Result<Response>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ConnectionInfo {
+    /// Pinned connections should not be dropped
+    /// on topology changes.
+    pub pinned: bool,
+    /// This connection was initiated on a topology event.
+    pub from_topology: bool,
+    /// The info of the peer.
+    pub node_info: NodeInfo,
+    /// This field is used during topology updates.
+    /// It tells the pool whether it should connect
+    /// to the peer or wait for the peer to connect.
+    pub connect: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct Message {
+    pub service: ServiceScope,
+    pub payload: Vec<u8>,
+}
+
+impl TryFrom<BytesMut> for Message {
+    type Error = anyhow::Error;
+
+    fn try_from(value: BytesMut) -> anyhow::Result<Self> {
+        let bytes = value.as_bytes();
+        if bytes.is_empty() {
+            return Err(anyhow::anyhow!("Cannot convert empty bytes into a message"));
+        }
+        let service = ServiceScope::try_from(bytes[0])?;
+        let payload = bytes[1..bytes.len()].to_vec();
+        Ok(Self { service, payload })
+    }
+}
+
+impl From<Message> for Bytes {
+    fn from(value: Message) -> Self {
+        let mut buf = BytesMut::with_capacity(value.payload.len() + 1);
+        buf.put_u8(value.service as u8);
+        buf.put_slice(&value.payload);
+        buf.into()
+    }
+}
+
+//
+pub type BoxedFilterCallback = Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>;

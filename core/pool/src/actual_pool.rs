@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
+use futures::stream::FuturesUnordered;
 use hp_fixed::unsigned::HpUfixed;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
@@ -13,15 +14,14 @@ use lightning_interfaces::{ApplicationInterface, ServiceScope, SyncQueryRunnerIn
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
-use tokio::task::{JoinHandle, JoinSet};
+use tokio::task::JoinHandle;
+use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 
 use crate::connection;
 use crate::connection::{Context, ServiceRequest};
-use crate::endpoint::OngoingConnectionHandle;
-use crate::event::{Event, PoolTask};
+use crate::event::{ConnectionInfo, Event, Message, PoolTask};
 use crate::muxer::{ConnectionInterface, MuxerInterface};
-use crate::overlay::{ConnectionInfo, Message};
 use crate::provider::Response;
 use crate::state::{NodeInfo, Stats};
 
@@ -38,10 +38,12 @@ where
     pool: HashMap<NodeIndex, OngoingConnectionHandle>,
     /// Queue of incoming tasks.
     task_queue: Receiver<PoolTask>,
+    /// Queue of dial tasks.
+    pending_dial: HashMap<NodeIndex, CancellationToken>,
     /// Pending outgoing requests.
     pending_task: HashMap<NodeIndex, Vec<ServiceRequest>>,
-    /// Ongoing connection tasks.
-    ongoing_connection_tasks: JoinSet<(NodeIndex, ConnectionId)>,
+    /// Pool for asynchronous tasks.
+    task_pool: FuturesUnordered<JoinHandle<AsyncTaskResult<M::Connection>>>,
     /// Connections that are redundant.
     // There may be edge cases when two peers connect
     // to each other at the same time. During resolution,
@@ -72,7 +74,6 @@ where
     C: Collection,
     M: MuxerInterface,
 {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         task_queue: Receiver<PoolTask>,
@@ -84,9 +85,10 @@ where
             pool: HashMap::new(),
             task_queue,
             pending_task: HashMap::new(),
-            ongoing_connection_tasks: JoinSet::new(),
+            pending_dial: HashMap::new(),
             redundant_pool: HashMap::new(),
             connection_buffer: Vec::new(),
+            task_pool: FuturesUnordered::new(),
             event_queue,
             query_runner,
             muxer: None,
@@ -96,7 +98,41 @@ where
     }
 
     fn enqueue_dial_task(&mut self, info: NodeInfo, muxer: M) -> anyhow::Result<()> {
-        todo!()
+        if let Entry::Vacant(entry) = self.pending_dial.entry(info.index) {
+            let cancel = CancellationToken::new();
+            entry.insert(cancel.clone());
+
+            let handle = tokio::spawn(async move {
+                let index = info.index;
+                let connection = tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => return AsyncTaskResult::ConnectionFailed {
+                        remote: Some(index),
+                        error: anyhow::anyhow!("dial was cancelled")
+                    },
+                    connection = muxer.connect(info, "lightning-node") => connection,
+                };
+                match connection {
+                    Ok(conn) => AsyncTaskResult::ConnectionSuccess {
+                        incoming: false,
+                        conn,
+                    },
+                    Err(e) => AsyncTaskResult::ConnectionFailed {
+                        remote: Some(index),
+                        error: e.into(),
+                    },
+                }
+            });
+
+            self.task_pool.push(handle);
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    pub fn remove_pending_dial(&mut self, peer: &NodeIndex) {
+        self.pending_dial.remove(peer);
     }
 
     /// Enqueues requests that will be sent after a connection is established with the peer.
@@ -205,6 +241,14 @@ where
         Ok(())
     }
 
+    #[inline]
+    pub fn schedule_timeout(&mut self) {
+        self.task_pool.push(tokio::spawn(async move {
+            tokio::time::sleep(CONN_GRACE_PERIOD).await;
+            AsyncTaskResult::Timeout
+        }));
+    }
+
     fn handle_update(
         &mut self,
         keep: HashMap<NodeIndex, ConnectionInfo>,
@@ -221,13 +265,8 @@ where
             }
         });
 
-        // Todo: implement this.
-        // Schedule the internal notification to drop the buffered connections.
-        // let event_notifier_tx = self.cleanup_notify.clone();
-        // tokio::spawn(async move {
-        //     tokio::time::sleep(CONN_GRACE_PERIOD).await;
-        //     event_notifier_tx.notify_one();
-        // });
+        // Schedule a timeout to drop connections in buffer.
+        self.schedule_timeout();
 
         for info in keep.into_values() {
             tracing::debug!(
@@ -268,11 +307,36 @@ where
         }
     }
 
-    fn cancel_dial(&mut self, dst: &NodeIndex) {
-        todo!()
+    #[inline]
+    pub fn cancel_dial(&mut self, dst: &NodeIndex) {
+        if let Some(cancel) = self.pending_dial.remove(dst) {
+            cancel.cancel();
+        }
     }
 
-    fn handle_incoming_connection(&mut self, connection: M::Connection) {
+    #[inline]
+    fn spawn_connection_task(
+        &mut self,
+        connection: M::Connection,
+        remote: NodeIndex,
+    ) -> Sender<ServiceRequest> {
+        let (request_tx, request_rx) = mpsc::channel(1024);
+        let connection_id = connection.connection_id();
+        let ctx = Context::new(connection, remote, request_rx, self.event_queue.clone());
+        self.task_pool.push(tokio::spawn(async move {
+            if let Err(e) = connection::connection_loop(ctx).await {
+                tracing::info!("task for connection with {remote:?} exited with error: {e:?}");
+            }
+            AsyncTaskResult::ConnectionFinished {
+                remote,
+                connection_id,
+            }
+        }));
+
+        request_tx
+    }
+
+    fn handle_new_connection(&mut self, connection: M::Connection) {
         let Some(pk) = connection.peer_identity() else {
             tracing::error!("failed to get peer identity from connection");
             return;
@@ -302,17 +366,7 @@ where
             let connection_id = connection.connection_id();
 
             // Start worker to drive the connection.
-            let (request_tx, request_rx) = mpsc::channel(1024);
-            let connection_event_tx = self.event_queue.clone();
-            let ctx = Context::new(connection, peer_index, request_rx, connection_event_tx);
-            self.ongoing_connection_tasks.spawn(async move {
-                if let Err(e) = connection::connection_loop(ctx).await {
-                    tracing::info!(
-                        "task for connection with {peer_index:?} exited with error: {e:?}"
-                    );
-                }
-                (peer_index, connection_id)
-            });
+            let conn_request_sender = self.spawn_connection_task(connection, peer_index);
 
             // We need to pin the connection if used by requester service.
             let mut service_request_sent = false;
@@ -329,7 +383,7 @@ where
                         service_request_sent = true;
                     }
 
-                    let request_tx_clone = request_tx.clone();
+                    let request_tx_clone = conn_request_sender.clone();
                     if request_tx_clone.try_send(req).is_err() {
                         tracing::error!("failed to send pending request to connection task");
                     }
@@ -338,7 +392,7 @@ where
 
             // Save a handle to the connection task to send requests.
             let handle = OngoingConnectionHandle {
-                service_request_tx: request_tx,
+                service_request_tx: conn_request_sender,
                 connection_id,
             };
 
@@ -368,7 +422,7 @@ where
         }
     }
 
-    fn handle_stats_request(&mut self, respond: oneshot::Sender<Stats>) -> anyhow::Result<()> {
+    fn handle_stats_request(&mut self, _: oneshot::Sender<Stats>) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -426,6 +480,34 @@ where
         }
     }
 
+    fn handle_finished_async_task(&mut self, task_result: AsyncTaskResult<M::Connection>) {
+        match task_result {
+            AsyncTaskResult::ConnectionSuccess { conn, .. } => {
+                self.handle_new_connection(conn);
+            },
+            AsyncTaskResult::ConnectionFailed { remote, error } => {
+                if remote.is_none() {
+                    tracing::warn!("failed to connect to peer: {error:?}");
+                } else {
+                    let peer = remote.unwrap();
+                    tracing::warn!("failed to dial peer {:?}: {error:?}", peer);
+                    self.remove_pending_dial(&peer);
+                }
+            },
+            AsyncTaskResult::ConnectionFinished {
+                remote,
+                connection_id,
+            } => {
+                tracing::trace!("task for connection={connection_id:?} with node={remote:?} ended");
+                self.garbage_collect_closed_connections(remote, connection_id);
+            },
+            AsyncTaskResult::Timeout => {
+                // Drop connections from last epoch.
+                self.connection_buffer.clear();
+            },
+        }
+    }
+
     /// Shutdowns workers and clears state.
     pub async fn shutdown(&mut self) {
         self.pool.clear();
@@ -434,7 +516,7 @@ where
 
         // All connection tasks should finished since we dropped all
         // Senders above.
-        while self.ongoing_connection_tasks.join_next().await.is_some() {}
+        while self.task_pool.next().await.is_some() {}
 
         // We drop the muxer to unbind the address.
         self.muxer
@@ -442,6 +524,48 @@ where
             .expect("start method to have been called")
             .close()
             .await;
+    }
+
+    async fn poll(&mut self, muxer: &mut M) {
+        tokio::select! {
+            next = muxer.accept() => {
+                if let Some(connection) = next {
+                    match connection {
+                        Ok(connection) => {
+                            let _ = self.handle_new_connection(connection);
+                        }
+                        Err(e) => {
+                            tracing::info!("failed to connect: {e:?}");
+                        }
+                    }
+                }
+            }
+            next = self.task_queue.recv() => {
+                if let Some(task) = next {
+                   let _ = self.handle_task(task);
+                }
+            }
+            next = self.task_pool.next() => {
+                if let Some(handle_result) = next {
+                    match handle_result {
+                        Ok(task_result) => {
+                           let _ = self.handle_finished_async_task(task_result);
+                        }
+                        Err(e) => {
+                            if e.is_panic() {
+                                tracing::warn!("task panicked: {e:?}")
+                            } else {
+                                // Todo: when task IDs are stable in Tokio
+                                // we could use them to track info
+                                // about the task that failed
+                                // for retries, clean-ups, etc.
+                                tracing::warn!("task exited unexpectedly: {e:?}")
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     pub fn spawn(mut self) -> JoinHandle<Self> {
@@ -452,35 +576,48 @@ where
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
-        let muxer = M::init(self.config.clone())?;
+        let mut muxer = M::init(self.config.clone())?;
         self.muxer = Some(muxer.clone());
+        let shutdown = self.shutdown.clone();
 
         loop {
             tokio::select! {
                 biased;
-                _ = self.shutdown.cancelled() => {
+                _ = shutdown.cancelled() => {
                     break;
                 }
-                next = muxer.accept() => {
-                    if let Some(connection) = next {
-                        match connection {
-                            Ok(connection) => {
-                                let _ = self.handle_incoming_connection(connection);
-                            }
-                            Err(e) => {
-                                tracing::info!("failed to connect: {e:?}");
-                            }
-                        }
-                    }
-                }
-                next = self.task_queue.recv() => {
-                    if let Some(task) = next {
-                       let _ = self.handle_task(task);
-                    }
-                }
+                // Poll() is used so that branches can be polled randomly
+                // but shutdown can still be polled first.
+                _ = self.poll(&mut muxer) => {}
             }
         }
 
         Ok(())
     }
+}
+
+pub enum AsyncTaskResult<C: ConnectionInterface> {
+    /// Connection attempt succeeded.
+    ConnectionSuccess {
+        incoming: bool,
+        conn: C,
+    },
+    /// Connection attempt failed.
+    ConnectionFailed {
+        // Always Some when connection attempt
+        // was outgoing and None otherwise.
+        remote: Option<NodeIndex>,
+        error: anyhow::Error,
+    },
+    /// Ongoing connection finished.
+    ConnectionFinished {
+        remote: NodeIndex,
+        connection_id: ConnectionId,
+    },
+    Timeout,
+}
+
+pub struct OngoingConnectionHandle {
+    pub(crate) service_request_tx: Sender<ServiceRequest>,
+    pub(crate) connection_id: usize,
 }
