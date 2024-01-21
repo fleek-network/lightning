@@ -104,13 +104,14 @@ where
 
             let handle = tokio::spawn(async move {
                 let index = info.index;
+                let connect = || async { muxer.connect(info, "lightning-node").await?.await };
                 let connection = tokio::select! {
                     biased;
                     _ = cancel.cancelled() => return AsyncTaskResult::ConnectionFailed {
                         remote: Some(index),
                         error: anyhow::anyhow!("dial was cancelled")
                     },
-                    connection = muxer.connect(info, "lightning-node") => connection,
+                    connection = connect() => connection,
                 };
                 match connection {
                     Ok(conn) => AsyncTaskResult::ConnectionSuccess {
@@ -253,7 +254,10 @@ where
         &mut self,
         keep: HashMap<NodeIndex, ConnectionInfo>,
         drop: Vec<NodeIndex>,
+        respond: Option<oneshot::Sender<()>>,
     ) -> anyhow::Result<()> {
+        let empty_drop_set = drop.is_empty();
+
         // Move the connections to be dropped into a buffer.
         drop.into_iter().for_each(|index| {
             if let Some(conn_handle) = self.pool.remove(&index) {
@@ -266,7 +270,9 @@ where
         });
 
         // Schedule a timeout to drop connections in buffer.
-        self.schedule_timeout();
+        if !empty_drop_set {
+            self.schedule_timeout();
+        }
 
         for info in keep.into_values() {
             tracing::debug!(
@@ -286,6 +292,10 @@ where
             if let Err(e) = self.enqueue_dial_task(info.node_info, self.muxer.clone().unwrap()) {
                 tracing::error!("failed to enqueue the dial task: {e:?}");
             }
+        }
+
+        if let Some(tx) = respond {
+            let _ = tx.send(());
         }
 
         Ok(())
@@ -422,6 +432,21 @@ where
         }
     }
 
+    fn handle_accept(&mut self, connecting: M::Connecting) {
+        self.task_pool.push(tokio::spawn(async move {
+            match connecting.await {
+                Ok(conn) => AsyncTaskResult::ConnectionSuccess {
+                    incoming: true,
+                    conn,
+                },
+                Err(e) => AsyncTaskResult::ConnectionFailed {
+                    remote: None,
+                    error: e.into(),
+                },
+            }
+        }));
+    }
+
     fn handle_stats_request(&mut self, _: oneshot::Sender<Stats>) -> anyhow::Result<()> {
         todo!()
     }
@@ -439,8 +464,12 @@ where
             } => {
                 let _ = self.handle_outgoing_request(dst, service, request, respond);
             },
-            PoolTask::Update { keep, drop } => {
-                let _ = self.handle_update(keep, drop);
+            PoolTask::Update {
+                keep,
+                drop,
+                respond,
+            } => {
+                let _ = self.handle_update(keep, drop, respond);
             },
             PoolTask::Stats { respond } => {
                 let _ = self.handle_stats_request(respond);
@@ -510,13 +539,34 @@ where
 
     /// Shutdowns workers and clears state.
     pub async fn shutdown(&mut self) {
-        self.pool.clear();
-        self.redundant_pool.clear();
+        for (_, handle) in self.pool.iter() {
+            let _ = handle
+                .service_request_tx
+                .clone()
+                .send(ServiceRequest::Close)
+                .await
+                .unwrap();
+        }
+
+        for (_, handle) in self.redundant_pool.iter() {
+            let _ = handle
+                .service_request_tx
+                .clone()
+                .send(ServiceRequest::Close)
+                .await
+                .unwrap();
+        }
         self.pending_task.clear();
 
-        // All connection tasks should finished since we dropped all
-        // Senders above.
-        while self.task_pool.next().await.is_some() {}
+        // Todo: maybe pass a cancel token to connection loop to make this shutdown faster.
+        // Let's wait for connections to drop.
+        while let Ok(Some(_)) =
+            tokio::time::timeout(Duration::from_secs(5), self.task_pool.next()).await
+        {}
+
+        for task in self.task_pool.iter() {
+            task.abort();
+        }
 
         // We drop the muxer to unbind the address.
         self.muxer
@@ -529,15 +579,8 @@ where
     async fn poll(&mut self, muxer: &mut M) {
         tokio::select! {
             next = muxer.accept() => {
-                if let Some(connection) = next {
-                    match connection {
-                        Ok(connection) => {
-                            let _ = self.handle_new_connection(connection);
-                        }
-                        Err(e) => {
-                            tracing::info!("failed to connect: {e:?}");
-                        }
-                    }
+                if let Some(connecting) = next {
+                    let _ = self.handle_accept(connecting);
                 }
             }
             next = self.task_queue.recv() => {
@@ -545,22 +588,20 @@ where
                    let _ = self.handle_task(task);
                 }
             }
-            next = self.task_pool.next() => {
-                if let Some(handle_result) = next {
-                    match handle_result {
-                        Ok(task_result) => {
-                           let _ = self.handle_finished_async_task(task_result);
-                        }
-                        Err(e) => {
-                            if e.is_panic() {
-                                tracing::warn!("task panicked: {e:?}")
-                            } else {
-                                // Todo: when task IDs are stable in Tokio
-                                // we could use them to track info
-                                // about the task that failed
-                                // for retries, clean-ups, etc.
-                                tracing::warn!("task exited unexpectedly: {e:?}")
-                            }
+            Some(next) = self.task_pool.next() => {
+                match next {
+                    Ok(task_result) => {
+                       let _ = self.handle_finished_async_task(task_result);
+                    }
+                    Err(e) => {
+                        if e.is_panic() {
+                            tracing::warn!("task panicked: {e:?}")
+                        } else {
+                            // Todo: when task IDs are stable in Tokio
+                            // we could use them to track info
+                            // about the task that failed
+                            // for retries, clean-ups, etc.
+                            tracing::warn!("task exited unexpectedly: {e:?}")
                         }
                     }
                 }

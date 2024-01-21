@@ -101,10 +101,24 @@ where
         rx
     }
 
+    async fn setup_state(&mut self) -> anyhow::Result<()> {
+        let (tx, rx) = oneshot::channel();
+        let pool_task = self.handler.update_connections(Some(tx));
+        self.pool_queue.send(pool_task).await?;
+        rx.await.map_err(Into::into)
+    }
+
     #[inline]
-    fn handle_new_epoch(&mut self) -> anyhow::Result<()> {
-        let pool_task = self.handler.update_connections();
-        self.pool_queue.try_send(pool_task)?;
+    fn handle_new_epoch(&mut self, epoch_event: Notification) -> anyhow::Result<()> {
+        match epoch_event {
+            Notification::NewEpoch => {
+                let pool_task = self.handler.update_connections(None);
+                self.pool_queue.try_send(pool_task)?;
+            },
+            Notification::BeforeEpochChange => {
+                unreachable!("we're only registered for new epoch events")
+            },
+        }
         Ok(())
     }
 
@@ -124,10 +138,10 @@ where
                 let _ = self.handle_incoming_request(request);
             },
             Event::NewConnection {
-                remote: index,
+                remote,
                 service_request_sent,
             } => {
-                self.handle_new_connection(index, service_request_sent);
+                self.handle_new_connection(remote, service_request_sent);
             },
             Event::ConnectionEnded(index) => {
                 self.handle_closed_connection(index);
@@ -175,7 +189,7 @@ where
 
         if self.handler.process_received_message(&peer) {
             if let Some(sender) = self.broadcast_service_handles.get(&service).cloned() {
-                sender.try_send((peer, Bytes::from(payload)))?;
+                sender.try_send((peer, Bytes::from(payload))).unwrap();
             }
         }
 
@@ -220,14 +234,23 @@ where
     }
 
     pub async fn run(&mut self) {
+        // If there is an error while setting up the state,
+        // there is nothing else to do and
+        // we should not allow start to proceed.
+        let _ = self.setup_state().await.unwrap();
+
         loop {
             tokio::select! {
                 biased;
                 _ = self.shutdown.cancelled() => {
                     break;
                 }
-                _ = self.notifier.recv() => {
-                    let _ = self.handle_new_epoch();
+                next = self.notifier.recv() => {
+                    if let Some(event) = next {
+                        let _ = self.handle_new_epoch(event);
+                    }  else {
+                        tracing::info!("notifier was dropped");
+                    }
                 }
                 next = self.event_queue.recv() => {
                     if let Some(event) = next {
@@ -267,6 +290,7 @@ pub enum PoolTask {
         // Nodes that are in our overlay.
         keep: HashMap<NodeIndex, ConnectionInfo>,
         drop: Vec<NodeIndex>,
+        respond: Option<oneshot::Sender<()>>,
     },
     Stats {
         respond: oneshot::Sender<Stats>,

@@ -1,6 +1,9 @@
+use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 use fleek_crypto::{NodePublicKey, NodeSecretKey};
@@ -27,6 +30,7 @@ pub struct QuinnMuxer {
 }
 
 impl MuxerInterface for QuinnMuxer {
+    type Connecting = Connecting;
     type Connection = Connection;
     type Config = Config;
 
@@ -43,7 +47,7 @@ impl MuxerInterface for QuinnMuxer {
         })
     }
 
-    async fn connect(&self, peer: NodeInfo, server_name: &str) -> io::Result<Self::Connection> {
+    async fn connect(&self, peer: NodeInfo, server_name: &str) -> io::Result<Self::Connecting> {
         let tls_config = tls::make_client_config(&self.sk, Some(peer.pk))
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         let mut client_config = ClientConfig::new(Arc::new(tls_config));
@@ -53,29 +57,34 @@ impl MuxerInterface for QuinnMuxer {
             io::ErrorKind::Other
         })?));
         client_config.transport_config(Arc::new(transport_config));
-        self.endpoint
+        let connecting = self
+            .endpoint
             .connect_with(client_config, peer.socket_address, server_name)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
-            .await
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
-            .map(Connection)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        Ok(Connecting(connecting))
     }
 
-    async fn accept(&self) -> Option<io::Result<Self::Connection>> {
-        Some(
-            self.endpoint
-                .accept()
-                .await?
-                .await
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
-                .map(Connection),
-        )
+    async fn accept(&self) -> Option<Self::Connecting> {
+        self.endpoint.accept().await.map(Connecting)
     }
 
     async fn close(&self) {
         self.endpoint.close(0u8.into(), b"server shutted down");
         // Wait for all connections to cleanly shut down.
         self.endpoint.wait_idle().await;
+    }
+}
+
+pub struct Connecting(quinn::Connecting);
+
+impl Future for Connecting {
+    type Output = io::Result<Connection>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.0)
+            .poll(cx)
+            .map(|result| result.map(Connection))
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
 }
 

@@ -10,6 +10,7 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{ApplicationInterface, SyncQueryRunnerInterface, TopologyInterface};
 use lightning_metrics::histogram;
+use tokio::sync::oneshot;
 
 use crate::event::{BroadcastRequest, ConnectionInfo, Message, Param, PoolTask, SendRequest};
 use crate::state::NodeInfo;
@@ -83,7 +84,7 @@ where
         self.pool.contains_key(peer)
     }
 
-    pub fn update_connections(&mut self) -> PoolTask {
+    pub fn update_connections(&mut self, respond: Option<oneshot::Sender<()>>) -> PoolTask {
         let peers = self
             .topology
             .suggest_connections()
@@ -166,6 +167,7 @@ where
         PoolTask::Update {
             keep: self.pool.clone(),
             drop: peers_to_drop,
+            respond,
         }
     }
 

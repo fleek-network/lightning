@@ -132,9 +132,9 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                         tracing::debug!("handling new stats request");
                         let _ = respond.send(ctx.connection.stats());
                     }
-                    None => {
+                    Some(ServiceRequest::Close) | None => {
                         tracing::trace!(
-                            "channel was dropped: closing the connection with peer {}",
+                            "closing the connection with peer {}",
                             ctx.peer
                         );
                         ctx.connection.close(0u8, b"close from disconnect");
@@ -257,6 +257,7 @@ pub enum ServiceRequest {
         request: Bytes,
         respond: oneshot::Sender<io::Result<Response>>,
     },
+    Close,
     Stats {
         respond: oneshot::Sender<Stats>,
     },

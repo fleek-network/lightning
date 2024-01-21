@@ -1,5 +1,6 @@
 pub mod quinn;
 
+use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
 use std::pin::Pin;
@@ -22,14 +23,18 @@ pub type BoxedChannel =
 /// Multiplexed-transport interface.
 #[trait_variant::make(MuxerInterface: Send)]
 pub trait _MuxerInterface: Clone + Send + Sync + 'static {
+    // Todo: Remove this when we switch to s2n.
+    // We have to keep it for now to let to
+    // maintain cancel safety in `accept`.
+    type Connecting: Future<Output = io::Result<Self::Connection>> + Send;
     type Connection: ConnectionInterface;
     type Config: Clone + Send;
 
     fn init(config: Self::Config) -> io::Result<Self>;
-    async fn connect(&self, peer: NodeInfo, server_name: &str) -> io::Result<Self::Connection>;
+    async fn connect(&self, peer: NodeInfo, server_name: &str) -> io::Result<Self::Connecting>;
 
     // The implementation must be cancel-safe.
-    async fn accept(&self) -> Option<io::Result<Self::Connection>>;
+    async fn accept(&self) -> Option<Self::Connecting>;
     async fn close(&self);
 }
 
