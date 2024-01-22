@@ -4,15 +4,24 @@ use std::collections::{HashMap, HashSet};
 use std::io;
 use std::net::SocketAddr;
 
+use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{ApplicationInterface, SyncQueryRunnerInterface, TopologyInterface};
+use lightning_interfaces::{
+    ApplicationInterface,
+    ServiceScope,
+    SyncQueryRunnerInterface,
+    TopologyInterface,
+};
 use lightning_metrics::histogram;
+use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
-use crate::event::{BroadcastRequest, ConnectionInfo, Message, Param, PoolTask, SendRequest};
+use crate::endpoint::EndpointTask;
+use crate::event::{Message, Param};
+use crate::provider::Response;
 use crate::state::NodeInfo;
 
 /// Pool that handles logical connections.
@@ -84,27 +93,19 @@ where
         self.pool.contains_key(peer)
     }
 
-    pub fn update_connections(&mut self, respond: Option<oneshot::Sender<()>>) -> PoolTask {
-        let peers = self
-            .topology
-            .suggest_connections()
-            .iter()
-            .flatten()
-            .filter_map(|pk| self.pubkey_to_index(*pk))
-            .filter(|index| *index != self.get_index())
-            .collect::<HashSet<_>>();
-
+    // This is for unit tests.
+    pub(crate) fn _update_connections(&mut self, peers: HashSet<NodeIndex>) -> EndpointTask {
         // We keep pinned connections.
         let mut peers_to_drop = Vec::new();
         self.pool.retain(|index, info| {
-            let is_in_overlay = peers.contains(index);
-            if is_in_overlay {
+            let is_in_new_cluster = peers.contains(index);
+            if is_in_new_cluster {
                 // We want to update the flag in case it wasn't initially created by a
                 // topology update.
                 info.from_topology = true
             }
 
-            if is_in_overlay || info.pinned {
+            if is_in_new_cluster || info.pinned {
                 true
             } else {
                 peers_to_drop.push(*index);
@@ -164,11 +165,23 @@ where
         self.stats.cluster_hit_count = 0;
 
         // We tell the pool who to connect to.
-        PoolTask::Update {
+        EndpointTask::Update {
             keep: self.pool.clone(),
             drop: peers_to_drop,
-            respond,
         }
+    }
+
+    pub fn update_connections(&mut self) -> EndpointTask {
+        let peers = self
+            .topology
+            .suggest_connections()
+            .iter()
+            .flatten()
+            .filter_map(|pk| self.pubkey_to_index(*pk))
+            .filter(|index| *index != self.get_index())
+            .collect::<HashSet<_>>();
+
+        self._update_connections(peers)
     }
 
     #[inline]
@@ -257,9 +270,11 @@ where
 
     pub fn process_outgoing_broadcast(
         &self,
-        broadcast_request: BroadcastRequest,
-    ) -> Option<PoolTask> {
-        let peers: Vec<ConnectionInfo> = match broadcast_request.param {
+        service_scope: ServiceScope,
+        message: Bytes,
+        param: Param,
+    ) -> Option<EndpointTask> {
+        let peers: Vec<ConnectionInfo> = match param {
             Param::Filter(filter) => self
                 .pool
                 .iter()
@@ -275,12 +290,12 @@ where
         };
 
         let message = Message {
-            service: broadcast_request.service_scope,
-            payload: broadcast_request.message.to_vec(),
+            service: service_scope,
+            payload: message.to_vec(),
         };
 
         if !peers.is_empty() {
-            Some(PoolTask::SendMessage { message, peers })
+            Some(EndpointTask::SendMessage { message, peers })
         } else {
             tracing::warn!(
                 "no peers to send the message to: no peers in state or filter was too restrictive"
@@ -289,21 +304,26 @@ where
         }
     }
 
-    pub fn process_outgoing_request(&mut self, request: SendRequest) -> Option<PoolTask> {
-        match self.node_info_from_state(&request.peer) {
+    pub fn process_outgoing_request(
+        &mut self,
+        dst: NodeIndex,
+        service_scope: ServiceScope,
+        request: Bytes,
+        respond: oneshot::Sender<io::Result<Response>>,
+    ) -> Option<EndpointTask> {
+        match self.node_info_from_state(&dst) {
             Some(info) => {
-                self.record_req_res_request(&request.peer);
-                self.pin_connection(request.peer, info.clone());
-                Some(PoolTask::SendRequest {
+                self.record_req_res_request(&dst);
+                self.pin_connection(dst, info.clone());
+                Some(EndpointTask::SendRequest {
                     dst: info,
-                    service: request.service_scope,
-                    request: request.request,
-                    respond: request.respond,
+                    service: service_scope,
+                    request,
+                    respond,
                 })
             },
             None => {
-                if request
-                    .respond
+                if respond
                     .send(Err(io::ErrorKind::AddrNotAvailable.into()))
                     .is_err()
                 {
@@ -315,11 +335,26 @@ where
     }
 }
 
-/// Overlay stats.
+/// Logical pool stats.
 #[derive(Default)]
 pub struct Stats {
     total_req_res_requests: usize,
     /// Number of times that we are using request-response
     /// service with peers in our cluster.
     cluster_hit_count: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ConnectionInfo {
+    /// Pinned connections should not be dropped
+    /// on topology changes.
+    pub pinned: bool,
+    /// This connection was initiated on a topology event.
+    pub from_topology: bool,
+    /// The info of the peer.
+    pub node_info: NodeInfo,
+    /// This field is used during topology updates.
+    /// It tells the pool whether it should connect
+    /// to the peer or wait for the peer to connect.
+    pub connect: bool,
 }

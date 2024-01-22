@@ -20,7 +20,7 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
-use lightning_pool::{muxer, Config as PoolConfig, Pool};
+use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
@@ -35,8 +35,8 @@ partial!(TestBinding {
     SignerInterface = Signer<Self>;
     BroadcastInterface = Broadcast<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
-    PoolInterface = Pool<Self>;
     NotifierInterface = Notifier<Self>;
+    PoolInterface = PoolProvider<Self>;
 });
 
 #[tokio::test]
@@ -98,7 +98,7 @@ async fn test_start_shutdown() {
     )
     .unwrap();
 
-    let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
+    let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         PoolConfig::default(),
         &signer,
         app.sync_query(),

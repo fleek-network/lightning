@@ -29,7 +29,7 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
-use lightning_pool::{muxer, Config as PoolConfig, Pool};
+use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{utils, Config as SignerConfig, Signer};
 use lightning_topology::{Config as TopologyConfig, Topology};
@@ -39,7 +39,7 @@ use crate::{Broadcast, Config};
 
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
-    PoolInterface = Pool<Self>;
+    PoolInterface = PoolProvider<Self>;
     SignerInterface = Signer<Self>;
     NotifierInterface = Notifier<Self>;
     TopologyInterface = Topology<Self>;
@@ -166,7 +166,7 @@ async fn create_peer(
         address,
         ..Default::default()
     };
-    let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
+    let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         config,
         &signer,
         query_runner.clone(),

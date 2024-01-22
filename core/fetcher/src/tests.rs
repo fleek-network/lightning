@@ -43,7 +43,7 @@ use lightning_notifier::Notifier;
 use lightning_origin_demuxer::{Config as DemuxerOriginConfig, OriginDemuxer};
 use lightning_origin_ipfs::config::{Gateway, Protocol};
 use lightning_origin_ipfs::Config as IPFSOriginConfig;
-use lightning_pool::{muxer, Config as PoolConfig, Pool};
+use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::aggregator::ReputationAggregator;
 use lightning_rep_collector::config::Config as RepCollConfig;
 use lightning_resolver::config::Config as ResolverConfig;
@@ -66,7 +66,7 @@ partial!(TestBinding {
     SignerInterface = Signer<Self>;
     ResolverInterface = Resolver<Self>;
     ApplicationInterface = Application<Self>;
-    PoolInterface = Pool<Self>;
+    PoolInterface = PoolProvider<Self>;
     NotifierInterface = Notifier<Self>;
     TopologyInterface = Topology<Self>;
     ConsensusInterface = MockConsensus<Self>;
@@ -194,7 +194,7 @@ async fn get_fetchers(
                 .unwrap(),
             ..Default::default()
         };
-        let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
+        let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
             config,
             &signer,
             query_runner.clone(),

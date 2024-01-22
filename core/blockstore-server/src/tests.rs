@@ -40,7 +40,7 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
-use lightning_pool::{muxer, Config as PoolConfig, Pool};
+use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{utils, Config as SignerConfig, Signer};
 use lightning_topology::{Config as TopologyConfig, Topology};
@@ -53,7 +53,7 @@ partial!(TestBinding {
     BlockStoreInterface = Blockstore<Self>;
     BlockStoreServerInterface = BlockStoreServer<Self>;
     ApplicationInterface = Application<Self>;
-    PoolInterface = Pool<Self>;
+    PoolInterface = PoolProvider<Self>;
     SignerInterface = Signer<Self>;
     NotifierInterface = Notifier<Self>;
     TopologyInterface = Topology<Self>;
@@ -175,7 +175,7 @@ async fn get_peers(
                 .unwrap(),
             ..Default::default()
         };
-        let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
+        let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
             config,
             &signer,
             query_runner,

@@ -1,5 +1,3 @@
-pub mod connector;
-
 use std::io;
 
 use anyhow::Result;
@@ -12,9 +10,10 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-use crate::event::{Event, Message, MessageReceived, RequestReceived};
+use crate::event::{Event, Message};
 use crate::muxer::{ConnectionInterface, NetChannel};
-use crate::provider::{Request, Response, Status};
+use crate::provider;
+use crate::provider::{Response, Status};
 use crate::state::Stats;
 
 /// Context for driving the connection.
@@ -24,7 +23,7 @@ pub struct Context<C> {
     /// The peer's index.
     peer: NodeIndex,
     /// Receive requests to perform on connection.
-    service_request_rx: Receiver<ServiceRequest>,
+    service_request_rx: Receiver<Request>,
     /// Send events from this connection.
     connection_event_tx: Sender<Event>,
 }
@@ -33,7 +32,7 @@ impl<C: ConnectionInterface> Context<C> {
     pub fn new(
         connection: C,
         peer: NodeIndex,
-        service_request_rx: Receiver<ServiceRequest>,
+        service_request_rx: Receiver<Request>,
         connection_event_tx: Sender<Event>,
     ) -> Self {
         Self {
@@ -97,7 +96,7 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
             }
             request = ctx.service_request_rx.recv() => {
                 match request {
-                    Some(ServiceRequest::SendMessage(message)) => {
+                    Some(Request::SendMessage(message)) => {
                         tracing::trace!("handling a broadcast message request");
                         // We need to create a new stream on the connection.
                         let connection = ctx.connection.clone();
@@ -110,7 +109,7 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                             }
                         });
                     },
-                    Some(ServiceRequest::SendRequest { service, request, respond }) => {
+                    Some(Request::SendReqResp { service, request, respond }) => {
                         tracing::trace!("handling new outgoing request");
                         // We need to create a new stream on the connection for the channel.
                         let connection = ctx.connection.clone();
@@ -128,11 +127,11 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                             }
                         });
                     }
-                    Some(ServiceRequest::Stats { respond }) => {
+                    Some(Request::Stats { respond }) => {
                         tracing::debug!("handling new stats request");
                         let _ = respond.send(ctx.connection.stats());
                     }
-                    Some(ServiceRequest::Close) | None => {
+                    Some(Request::Close) | None => {
                         tracing::trace!(
                             "closing the connection with peer {}",
                             ctx.peer
@@ -156,7 +155,10 @@ async fn handle_incoming_uni_stream<C: ConnectionInterface>(
     while let Some(message) = stream.next().await {
         let message = Message::try_from(message?)?;
         connection_event_tx
-            .send(Event::MessageReceived(MessageReceived { peer, message }))
+            .send(Event::MessageReceived {
+                remote: peer,
+                message,
+            })
             .await
             .map_err(|_| anyhow::anyhow!("failed to send incoming network event"))?;
     }
@@ -184,14 +186,14 @@ async fn handle_incoming_bi_stream<C: ConnectionInterface>(
         peer,
         bytes: bytes_header,
     };
-    let request = Request::new(channel);
+    let request = provider::Request::new(channel);
 
     connection_event_tx
-        .send(Event::RequestReceived(RequestReceived {
-            peer,
+        .send(Event::RequestReceived {
+            remote: peer,
             service_scope,
             request: (header, request),
-        }))
+        })
         .await
         .map_err(|_| anyhow::anyhow!("failed to send incoming network event"))
 }
@@ -250,9 +252,9 @@ async fn send_request<C: ConnectionInterface>(
 
 /// Requests that will be performed on a connection.
 #[allow(dead_code)]
-pub enum ServiceRequest {
+pub enum Request {
     SendMessage(Message),
-    SendRequest {
+    SendReqResp {
         service: ServiceScope,
         request: Bytes,
         respond: oneshot::Sender<io::Result<Response>>,

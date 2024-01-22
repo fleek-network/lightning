@@ -33,7 +33,7 @@ use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
 use lightning_pinger::{Config as PingerConfig, Pinger};
-use lightning_pool::{Config as PoolConfig, Pool};
+use lightning_pool::{Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::config::Config as RepAggConfig;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_resolver::config::Config as ResolverConfig;
@@ -405,7 +405,7 @@ fn build_config(
         reporter_buffer_size: 1,
     });
 
-    config.inject::<Pool<FinalTypes>>(PoolConfig {
+    config.inject::<PoolProvider<FinalTypes>>(PoolConfig {
         address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
         ..Default::default()
     });

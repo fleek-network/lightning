@@ -30,9 +30,9 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::actual_pool::Endpoint;
 use crate::config::Config;
-use crate::event::{BroadcastRequest, Event, EventReceiver, Param, SendRequest};
+use crate::endpoint::Endpoint;
+use crate::event::{Event, EventReceiver, Param};
 use crate::muxer::quinn::QuinnMuxer;
 use crate::muxer::{BoxedChannel, MuxerInterface};
 use crate::{muxer, tls};
@@ -200,20 +200,20 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
         };
 
         let shutdown = CancellationToken::new();
-        let (pool_task_tx, pool_task_rx) = mpsc::channel(1024);
+        let (endpoint_task_tx, endpoint_task_rx) = mpsc::channel(1024);
         let (event_tx, event_rx) = mpsc::channel(1024);
         let receiver = EventReceiver::<C>::new(
             sync_query.clone(),
             topology,
             notifier,
             event_rx,
-            pool_task_tx,
+            endpoint_task_tx,
             public_key,
             shutdown.clone(),
         );
         let endpoint = Endpoint::<C, QuinnMuxer>::new(
             sync_query,
-            pool_task_rx,
+            endpoint_task_rx,
             event_tx.clone(),
             muxer_config,
             shutdown.clone(),
@@ -259,11 +259,11 @@ impl EventHandlerInterface for EventHandler {
         let service_scope = self.service_scope;
         tokio::spawn(async move {
             if request_tx
-                .send(Event::Broadcast(BroadcastRequest {
+                .send(Event::Broadcast {
                     service_scope,
                     message,
                     param: Param::Filter(Box::new(filter)),
-                }))
+                })
                 .await
                 .is_err()
             {
@@ -277,11 +277,11 @@ impl EventHandlerInterface for EventHandler {
         let service_scope = self.service_scope;
         tokio::spawn(async move {
             if request_tx
-                .send(Event::Broadcast(BroadcastRequest {
+                .send(Event::Broadcast {
                     service_scope,
                     message,
                     param: Param::Index(index),
-                }))
+                })
                 .await
                 .is_err()
             {
@@ -317,12 +317,12 @@ impl RequesterInterface for Requester {
         let (respond_tx, respond_rx) = oneshot::channel();
         // Request a stream.
         self.request_tx
-            .send(Event::SendRequest(SendRequest {
-                peer,
+            .send(Event::SendRequest {
+                dst: peer,
                 service_scope: self.service_scope,
                 request,
                 respond: respond_tx,
-            }))
+            })
             .await
             .map_err(|_| io::ErrorKind::BrokenPipe)?;
 

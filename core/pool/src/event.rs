@@ -13,16 +13,15 @@ use lightning_interfaces::{
     RequestHeader,
     ServiceScope,
 };
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use x509_parser::nom::AsBytes;
 
+use crate::endpoint::EndpointTask;
 use crate::logical_pool::LogicalPool;
 use crate::provider::{Request, Response};
-use crate::state::{NodeInfo, Stats};
 
 /// Events.
 pub enum Event {
@@ -30,11 +29,29 @@ pub enum Event {
         remote: NodeIndex,
         service_request_sent: bool,
     },
-    ConnectionEnded(NodeIndex),
-    Broadcast(BroadcastRequest),
-    SendRequest(SendRequest),
-    MessageReceived(MessageReceived),
-    RequestReceived(RequestReceived),
+    ConnectionEnded {
+        remote: NodeIndex,
+    },
+    Broadcast {
+        service_scope: ServiceScope,
+        message: Bytes,
+        param: Param,
+    },
+    SendRequest {
+        dst: NodeIndex,
+        service_scope: ServiceScope,
+        request: Bytes,
+        respond: oneshot::Sender<io::Result<Response>>,
+    },
+    MessageReceived {
+        remote: NodeIndex,
+        message: Message,
+    },
+    RequestReceived {
+        remote: NodeIndex,
+        service_scope: ServiceScope,
+        request: (RequestHeader, Request),
+    },
 }
 
 /// Event receiver.
@@ -42,11 +59,11 @@ pub struct EventReceiver<C: Collection> {
     /// Queue of events.
     event_queue: Receiver<Event>,
     /// Main handler of events.
-    handler: LogicalPool<C>,
+    pub(crate) handler: LogicalPool<C>,
     /// Epoch event receiver.
     notifier: Receiver<Notification>,
     /// Writer side of queue for actual pool tasks.
-    pool_queue: Sender<PoolTask>,
+    pool_queue: Sender<EndpointTask>,
     /// Service handles.
     broadcast_service_handles: HashMap<ServiceScope, Sender<(NodeIndex, Bytes)>>,
     /// Service handles.
@@ -63,7 +80,7 @@ where
         topology: c!(C::TopologyInterface),
         notifier: c!(C::NotifierInterface),
         event_queue: Receiver<Event>,
-        pool_queue: Sender<PoolTask>,
+        pool_queue: Sender<EndpointTask>,
         public_key: NodePublicKey,
         shutdown: CancellationToken,
     ) -> Self {
@@ -101,19 +118,17 @@ where
         rx
     }
 
-    async fn setup_state(&mut self) -> anyhow::Result<()> {
-        let (tx, rx) = oneshot::channel();
-        let pool_task = self.handler.update_connections(Some(tx));
-        self.pool_queue.send(pool_task).await?;
-        rx.await.map_err(Into::into)
+    fn setup_state(&mut self) -> anyhow::Result<()> {
+        let endpoint_task = self.handler.update_connections();
+        self.pool_queue.try_send(endpoint_task).map_err(Into::into)
     }
 
     #[inline]
     fn handle_new_epoch(&mut self, epoch_event: Notification) -> anyhow::Result<()> {
         match epoch_event {
             Notification::NewEpoch => {
-                let pool_task = self.handler.update_connections(None);
-                self.pool_queue.try_send(pool_task)?;
+                let endpoint_task = self.handler.update_connections();
+                self.pool_queue.try_send(endpoint_task)?;
             },
             Notification::BeforeEpochChange => {
                 unreachable!("we're only registered for new epoch events")
@@ -123,19 +138,32 @@ where
     }
 
     #[inline]
-    fn handle_event(&mut self, event: Event) -> anyhow::Result<()> {
+    pub(crate) fn handle_event(&mut self, event: Event) -> anyhow::Result<()> {
         match event {
-            Event::Broadcast(request) => {
-                let _ = self.handle_outgoing_broadcast(request);
+            Event::Broadcast {
+                service_scope,
+                message,
+                param,
+            } => {
+                let _ = self.handle_outgoing_broadcast(service_scope, message, param);
             },
-            Event::SendRequest(request) => {
-                let _ = self.handle_outgoing_request(request);
+            Event::SendRequest {
+                dst,
+                service_scope,
+                request,
+                respond,
+            } => {
+                let _ = self.handle_outgoing_request(dst, service_scope, request, respond);
             },
-            Event::MessageReceived(message) => {
-                let _ = self.handle_incoming_broadcast(message);
+            Event::MessageReceived { remote, message } => {
+                let _ = self.handle_incoming_broadcast(remote, message);
             },
-            Event::RequestReceived(request) => {
-                let _ = self.handle_incoming_request(request);
+            Event::RequestReceived {
+                remote,
+                service_scope,
+                request,
+            } => {
+                let _ = self.handle_incoming_request(remote, service_scope, request);
             },
             Event::NewConnection {
                 remote,
@@ -143,8 +171,8 @@ where
             } => {
                 self.handle_new_connection(remote, service_request_sent);
             },
-            Event::ConnectionEnded(index) => {
-                self.handle_closed_connection(index);
+            Event::ConnectionEnded { remote } => {
+                self.handle_closed_connection(remote);
             },
         }
 
@@ -163,33 +191,51 @@ where
     }
 
     #[inline]
-    fn handle_outgoing_broadcast(&self, request: BroadcastRequest) -> anyhow::Result<()> {
-        if let Some(task) = self.handler.process_outgoing_broadcast(request) {
-            self.enqueue_pool_task(task)?;
+    fn handle_outgoing_broadcast(
+        &self,
+        service_scope: ServiceScope,
+        message: Bytes,
+        param: Param,
+    ) -> anyhow::Result<()> {
+        if let Some(task) = self
+            .handler
+            .process_outgoing_broadcast(service_scope, message, param)
+        {
+            self.enqueue_task(task)?;
         }
 
         Ok(())
     }
 
     #[inline]
-    fn handle_outgoing_request(&mut self, request: SendRequest) -> anyhow::Result<()> {
-        if let Some(task) = self.handler.process_outgoing_request(request) {
-            self.enqueue_pool_task(task)?;
+    fn handle_outgoing_request(
+        &mut self,
+        dst: NodeIndex,
+        service_scope: ServiceScope,
+        request: Bytes,
+        respond: oneshot::Sender<io::Result<Response>>,
+    ) -> anyhow::Result<()> {
+        if let Some(task) =
+            self.handler
+                .process_outgoing_request(dst, service_scope, request, respond)
+        {
+            self.enqueue_task(task)?;
         }
 
         Ok(())
     }
 
     #[inline]
-    fn handle_incoming_broadcast(&self, message: MessageReceived) -> anyhow::Result<()> {
-        let MessageReceived {
-            peer,
-            message: Message { service, payload },
-        } = message;
-
-        if self.handler.process_received_message(&peer) {
-            if let Some(sender) = self.broadcast_service_handles.get(&service).cloned() {
-                sender.try_send((peer, Bytes::from(payload))).unwrap();
+    fn handle_incoming_broadcast(&self, remote: NodeIndex, message: Message) -> anyhow::Result<()> {
+        if self.handler.process_received_message(&remote) {
+            if let Some(sender) = self
+                .broadcast_service_handles
+                .get(&message.service)
+                .cloned()
+            {
+                sender
+                    .try_send((remote, Bytes::from(message.payload)))
+                    .unwrap();
             }
         }
 
@@ -197,14 +243,13 @@ where
     }
 
     #[inline]
-    fn handle_incoming_request(&mut self, request: RequestReceived) -> anyhow::Result<()> {
-        let RequestReceived {
-            peer,
-            service_scope,
-            request,
-        } = request;
-
-        if self.handler.process_received_request(peer) {
+    fn handle_incoming_request(
+        &mut self,
+        remote: NodeIndex,
+        service_scope: ServiceScope,
+        request: (RequestHeader, Request),
+    ) -> anyhow::Result<()> {
+        if self.handler.process_received_request(remote) {
             if let Some(sender) = self
                 .send_request_service_handles
                 .get(&service_scope)
@@ -218,7 +263,7 @@ where
     }
 
     #[inline]
-    fn enqueue_pool_task(&self, task: PoolTask) -> anyhow::Result<()> {
+    fn enqueue_task(&self, task: EndpointTask) -> anyhow::Result<()> {
         self.pool_queue.try_send(task).map_err(Into::into)
     }
 
@@ -237,7 +282,7 @@ where
         // If there is an error while setting up the state,
         // there is nothing else to do and
         // we should not allow start to proceed.
-        let _ = self.setup_state().await.unwrap();
+        self.setup_state().unwrap();
 
         loop {
             tokio::select! {
@@ -246,94 +291,29 @@ where
                     break;
                 }
                 next = self.notifier.recv() => {
-                    if let Some(event) = next {
-                        let _ = self.handle_new_epoch(event);
-                    }  else {
+                    let Some(event) = next else {
                         tracing::info!("notifier was dropped");
-                    }
+                        break;
+                    };
+                    let _ = self.handle_new_epoch(event);
                 }
                 next = self.event_queue.recv() => {
-                    if let Some(event) = next {
-                        let _ = self.handle_event(event);
-                    }
+                    let Some(event) = next else {
+                        break;
+                    };
+                    let _ = self.handle_event(event);
                 }
             }
         }
     }
 }
 
-pub struct MessageReceived {
-    pub peer: NodeIndex,
-    pub message: Message,
-}
-
-pub struct RequestReceived {
-    pub peer: NodeIndex,
-    pub service_scope: ServiceScope,
-    pub request: (RequestHeader, Request),
-}
-
-/// Requests that will be performed on a connection.
-#[allow(dead_code)]
-pub enum PoolTask {
-    SendMessage {
-        peers: Vec<ConnectionInfo>,
-        message: Message,
-    },
-    SendRequest {
-        dst: NodeInfo,
-        service: ServiceScope,
-        request: Bytes,
-        respond: oneshot::Sender<io::Result<Response>>,
-    },
-    Update {
-        // Nodes that are in our overlay.
-        keep: HashMap<NodeIndex, ConnectionInfo>,
-        drop: Vec<NodeIndex>,
-        respond: Option<oneshot::Sender<()>>,
-    },
-    Stats {
-        respond: oneshot::Sender<Stats>,
-    },
-}
-
-pub struct BroadcastRequest<F = BoxedFilterCallback>
-where
-    F: Fn(NodeIndex) -> bool,
-{
-    pub service_scope: ServiceScope,
-    pub message: Bytes,
-    pub param: Param<F>,
-}
-
-pub enum Param<F>
+pub enum Param<F = BoxedFilterCallback>
 where
     F: Fn(NodeIndex) -> bool,
 {
     Filter(F),
     Index(NodeIndex),
-}
-
-pub struct SendRequest {
-    pub peer: NodeIndex,
-    pub service_scope: ServiceScope,
-    pub request: Bytes,
-    pub respond: oneshot::Sender<io::Result<Response>>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ConnectionInfo {
-    /// Pinned connections should not be dropped
-    /// on topology changes.
-    pub pinned: bool,
-    /// This connection was initiated on a topology event.
-    pub from_topology: bool,
-    /// The info of the peer.
-    pub node_info: NodeInfo,
-    /// This field is used during topology updates.
-    /// It tells the pool whether it should connect
-    /// to the peer or wait for the peer to connect.
-    pub connect: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -365,5 +345,4 @@ impl From<Message> for Bytes {
     }
 }
 
-//
 pub type BoxedFilterCallback = Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>;
