@@ -31,11 +31,11 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::config::Config;
-use crate::endpoint::Endpoint;
+use crate::endpoint::{Endpoint, EndpointTask};
 use crate::event::{Event, EventReceiver, Param};
 use crate::muxer::quinn::QuinnMuxer;
 use crate::muxer::{BoxedChannel, MuxerInterface};
-use crate::{muxer, tls};
+use crate::{http, muxer, tls};
 
 pub struct PoolProvider<C, M = QuinnMuxer>
 where
@@ -44,6 +44,8 @@ where
 {
     state: Mutex<Option<State<C, M>>>,
     event_queue: Sender<Event>,
+    endpoint_task_queue: Sender<EndpointTask>,
+    config: Config,
     shutdown: CancellationToken,
 }
 
@@ -56,11 +58,15 @@ where
         endpoint: Endpoint<C, M>,
         receiver: EventReceiver<C>,
         event_queue: Sender<Event>,
+        endpoint_task_queue: Sender<EndpointTask>,
+        config: Config,
         shutdown: CancellationToken,
     ) -> Result<Self> {
         Ok(Self {
             state: Mutex::new(Some(State::NotRunning { endpoint, receiver })),
             event_queue,
+            endpoint_task_queue,
+            config,
             shutdown,
         })
     }
@@ -116,6 +122,22 @@ where
         };
 
         let next_state = if let State::NotRunning { endpoint, receiver } = state {
+            if let Some(http_server_address) = self.config.http {
+                let shutdown_http_server = self.shutdown.clone();
+                let event_tx = self.event_queue.clone();
+                let endpoint_task_tx = self.endpoint_task_queue.clone();
+
+                tokio::spawn(async move {
+                    http::spawn_http_server(
+                        http_server_address,
+                        shutdown_http_server,
+                        event_tx,
+                        endpoint_task_tx,
+                    )
+                    .await
+                });
+            }
+
             State::Running {
                 receiver_handle: receiver.spawn(),
                 endpoint_handle: endpoint.spawn(),
@@ -207,7 +229,7 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
             topology,
             notifier,
             event_rx,
-            endpoint_task_tx,
+            endpoint_task_tx.clone(),
             public_key,
             shutdown.clone(),
         );
@@ -219,7 +241,14 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
             shutdown.clone(),
         );
 
-        PoolProvider::new(endpoint, receiver, event_tx, shutdown)
+        PoolProvider::new(
+            endpoint,
+            receiver,
+            event_tx,
+            endpoint_task_tx,
+            config,
+            shutdown,
+        )
     }
 
     fn open_event(&self, service: ServiceScope) -> Self::EventHandler {

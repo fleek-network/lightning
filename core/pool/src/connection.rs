@@ -251,7 +251,6 @@ async fn send_request<C: ConnectionInterface>(
 }
 
 /// Requests that will be performed on a connection.
-#[allow(dead_code)]
 pub enum Request {
     SendMessage(Message),
     SendReqResp {

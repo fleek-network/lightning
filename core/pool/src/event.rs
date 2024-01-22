@@ -3,6 +3,7 @@ use std::io;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use fleek_crypto::NodePublicKey;
+use futures::stream::FuturesUnordered;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
@@ -22,6 +23,7 @@ use x509_parser::nom::AsBytes;
 use crate::endpoint::EndpointTask;
 use crate::logical_pool::LogicalPool;
 use crate::provider::{Request, Response};
+use crate::state::{ConnectionInfo, EventReceiverInfo};
 
 /// Events.
 pub enum Event {
@@ -52,6 +54,9 @@ pub enum Event {
         service_scope: ServiceScope,
         request: (RequestHeader, Request),
     },
+    GetStats {
+        respond: oneshot::Sender<anyhow::Result<EventReceiverInfo>>,
+    },
 }
 
 /// Event receiver.
@@ -63,11 +68,13 @@ pub struct EventReceiver<C: Collection> {
     /// Epoch event receiver.
     notifier: Receiver<Notification>,
     /// Writer side of queue for actual pool tasks.
-    pool_queue: Sender<EndpointTask>,
+    endpoint_queue: Sender<EndpointTask>,
     /// Service handles.
     broadcast_service_handles: HashMap<ServiceScope, Sender<(NodeIndex, Bytes)>>,
     /// Service handles.
     send_request_service_handles: HashMap<ServiceScope, Sender<(RequestHeader, Request)>>,
+    /// Ongoing asynchronous tasks.
+    ongoing_asynchronous_tasks: FuturesUnordered<JoinHandle<anyhow::Result<()>>>,
     shutdown: CancellationToken,
 }
 
@@ -93,9 +100,10 @@ where
             event_queue,
             handler: logical_pool,
             notifier: notifier_rx,
-            pool_queue,
+            endpoint_queue: pool_queue,
             broadcast_service_handles: HashMap::new(),
             send_request_service_handles: HashMap::new(),
+            ongoing_asynchronous_tasks: FuturesUnordered::new(),
             shutdown,
         }
     }
@@ -120,7 +128,9 @@ where
 
     fn setup_state(&mut self) -> anyhow::Result<()> {
         let endpoint_task = self.handler.update_connections();
-        self.pool_queue.try_send(endpoint_task).map_err(Into::into)
+        self.endpoint_queue
+            .try_send(endpoint_task)
+            .map_err(Into::into)
     }
 
     #[inline]
@@ -128,9 +138,9 @@ where
         match epoch_event {
             Notification::NewEpoch => {
                 let endpoint_task = self.handler.update_connections();
-                self.pool_queue.try_send(endpoint_task)?;
+                self.endpoint_queue.try_send(endpoint_task)?;
             },
-            Notification::BeforeEpochChange => {
+            _ => {
                 unreachable!("we're only registered for new epoch events")
             },
         }
@@ -174,9 +184,57 @@ where
             Event::ConnectionEnded { remote } => {
                 self.handle_closed_connection(remote);
             },
+            Event::GetStats { respond } => {
+                self.get_stats(respond);
+            },
         }
 
         Ok(())
+    }
+
+    fn get_stats(&self, respond: oneshot::Sender<anyhow::Result<EventReceiverInfo>>) {
+        let endpoint_queue_cap = self.endpoint_queue.capacity();
+        let endpoint_queue_max_cap = self.endpoint_queue.max_capacity();
+        let endpoint_queue = self.endpoint_queue.clone();
+        let mut connection_info = self.handler.connections();
+        self.ongoing_asynchronous_tasks
+            .push(tokio::spawn(async move {
+                let mut connections = HashMap::new();
+
+                let (tx, rx) = oneshot::channel();
+                if endpoint_queue
+                    .send(EndpointTask::Stats { respond: tx })
+                    .await
+                    .is_ok()
+                {
+                    let (mut actual_connections, ongoing_async_tasks) = rx
+                        .await
+                        .map(|info| (info.connections, info.ongoing_async_tasks))
+                        .unwrap_or_default();
+                    for (index, info) in connection_info.iter_mut() {
+                        let connection_info = ConnectionInfo {
+                            from_topology: info.from_topology,
+                            pinned: info.pinned,
+                            peer: Some(info.node_info.clone()),
+                            actual_connections: actual_connections
+                                .remove(index)
+                                .unwrap_or_default(),
+                        };
+                        connections.insert(*index, connection_info);
+                    }
+
+                    let _ = respond.send(Ok(EventReceiverInfo {
+                        connections,
+                        endpoint_queue_cap,
+                        endpoint_queue_max_cap,
+                        ongoing_endpoint_async_tasks: ongoing_async_tasks,
+                    }));
+                } else {
+                    let _ = respond.send(Err(anyhow::anyhow!("failed to get stats")));
+                }
+
+                Ok(())
+            }));
     }
 
     #[inline]
@@ -264,7 +322,7 @@ where
 
     #[inline]
     fn enqueue_task(&self, task: EndpointTask) -> anyhow::Result<()> {
-        self.pool_queue.try_send(task).map_err(Into::into)
+        self.endpoint_queue.try_send(task).map_err(Into::into)
     }
 
     pub fn clear_state(&mut self) {
@@ -292,7 +350,7 @@ where
                 }
                 next = self.notifier.recv() => {
                     let Some(event) = next else {
-                        tracing::info!("notifier was dropped");
+                        println!("notifier was dropped");
                         break;
                     };
                     let _ = self.handle_new_epoch(event);

@@ -25,7 +25,7 @@ use crate::event::{Event, Message};
 use crate::logical_pool::ConnectionInfo;
 use crate::muxer::{ConnectionInterface, MuxerInterface};
 use crate::provider::Response;
-use crate::state::{NodeInfo, Stats};
+use crate::state::{EndpointInfo, NodeInfo, TransportConnectionInfo};
 
 const CONN_GRACE_PERIOD: Duration = Duration::from_secs(30);
 
@@ -36,14 +36,6 @@ where
 {
     /// Pool of connections.
     pool: HashMap<NodeIndex, OngoingConnectionHandle>,
-    /// Queue of incoming tasks.
-    task_queue: Receiver<EndpointTask>,
-    /// Queue of dial tasks.
-    pending_dial: HashMap<NodeIndex, CancellationToken>,
-    /// Pending outgoing requests.
-    pending_task: HashMap<NodeIndex, Vec<connection::Request>>,
-    /// Pool for asynchronous tasks.
-    task_pool: FuturesUnordered<JoinHandle<AsyncTaskResult<M::Connection>>>,
     /// Connections that are redundant.
     // There may be edge cases when two peers connect
     // to each other at the same time. During resolution,
@@ -55,6 +47,14 @@ where
     // These will need to be garbage collected.
     // Todo: Look into avoiding to maintain two tables.
     redundant_pool: HashMap<NodeIndex, OngoingConnectionHandle>,
+    /// Queue of incoming tasks.
+    task_queue: Receiver<EndpointTask>,
+    /// Queue of dial tasks.
+    pending_dial: HashMap<NodeIndex, CancellationToken>,
+    /// Pending outgoing requests.
+    pending_task: HashMap<NodeIndex, Vec<connection::Request>>,
+    /// Ongoing asynchronous tasks.
+    ongoing_async_tasks: FuturesUnordered<JoinHandle<AsyncTaskResult<M::Connection>>>,
     // Before connections are dropped, they will be put in this buffer.
     // After a grace period, the connections will be dropped.
     connection_buffer: Vec<OngoingConnectionHandle>,
@@ -88,7 +88,7 @@ where
             pending_dial: HashMap::new(),
             redundant_pool: HashMap::new(),
             connection_buffer: Vec::new(),
-            task_pool: FuturesUnordered::new(),
+            ongoing_async_tasks: FuturesUnordered::new(),
             event_queue,
             query_runner,
             muxer: None,
@@ -125,7 +125,7 @@ where
                 }
             });
 
-            self.task_pool.push(handle);
+            self.ongoing_async_tasks.push(handle);
         }
 
         Ok(())
@@ -247,7 +247,7 @@ where
 
     #[inline]
     pub fn schedule_timeout(&mut self) {
-        self.task_pool.push(tokio::spawn(async move {
+        self.ongoing_async_tasks.push(tokio::spawn(async move {
             tokio::time::sleep(CONN_GRACE_PERIOD).await;
             AsyncTaskResult::Timeout
         }));
@@ -331,7 +331,7 @@ where
         let (request_tx, request_rx) = mpsc::channel(1024);
         let connection_id = connection.connection_id();
         let ctx = Context::new(connection, remote, request_rx, self.event_queue.clone());
-        self.task_pool.push(tokio::spawn(async move {
+        self.ongoing_async_tasks.push(tokio::spawn(async move {
             if let Err(e) = connection::connection_loop(ctx).await {
                 tracing::info!("task for connection with {remote:?} exited with error: {e:?}");
             }
@@ -431,7 +431,7 @@ where
     }
 
     fn handle_accept(&mut self, connecting: M::Connecting) {
-        self.task_pool.push(tokio::spawn(async move {
+        self.ongoing_async_tasks.push(tokio::spawn(async move {
             match connecting.await {
                 Ok(conn) => AsyncTaskResult::ConnectionSuccess {
                     incoming: true,
@@ -445,8 +445,76 @@ where
         }));
     }
 
-    fn handle_stats_request(&mut self, _: oneshot::Sender<Stats>) -> anyhow::Result<()> {
-        todo!()
+    fn handle_stats_request(&mut self, respond: oneshot::Sender<EndpointInfo>) {
+        let connections = self
+            .pool
+            .iter()
+            .map(|(peer, info)| (*peer, info.service_request_tx.clone()))
+            .collect::<Vec<_>>();
+        let redundant_connections = self
+            .redundant_pool
+            .iter()
+            .map(|(peer, info)| (*peer, info.service_request_tx.clone()))
+            .collect::<Vec<_>>();
+
+        let ongoing_async_tasks = self.ongoing_async_tasks.len();
+
+        self.ongoing_async_tasks.push(tokio::spawn(async move {
+            let mut result = HashMap::new();
+            for (peer, handle) in connections {
+                let request_queue_cap = handle.capacity();
+                let request_queue_max_cap = handle.max_capacity();
+                let (tx, rx) = oneshot::channel();
+                if handle
+                    .send(connection::Request::Stats { respond: tx })
+                    .await
+                    .is_err()
+                {
+                    continue;
+                }
+                if let Ok(stats) = rx.await {
+                    result.insert(
+                        peer,
+                        vec![TransportConnectionInfo {
+                            request_queue_cap,
+                            request_queue_max_cap,
+                            redundant: false,
+                            stats,
+                        }],
+                    );
+                }
+            }
+
+            for (peer, handle) in redundant_connections {
+                let request_queue_cap = handle.capacity();
+                let request_queue_max_cap = handle.max_capacity();
+                let (tx, rx) = oneshot::channel();
+                if handle
+                    .send(connection::Request::Stats { respond: tx })
+                    .await
+                    .is_err()
+                {
+                    continue;
+                }
+                if let Ok(stats) = rx.await {
+                    result
+                        .entry(peer)
+                        .or_default()
+                        .push(TransportConnectionInfo {
+                            request_queue_cap,
+                            request_queue_max_cap,
+                            redundant: true,
+                            stats,
+                        })
+                }
+            }
+
+            let _ = respond.send(EndpointInfo {
+                ongoing_async_tasks,
+                connections: result,
+            });
+            AsyncTaskResult::GenericTaskEnded
+        }));
     }
 
     fn handle_task(&mut self, task: EndpointTask) -> anyhow::Result<()> {
@@ -466,7 +534,7 @@ where
                 let _ = self.handle_update(keep, drop);
             },
             EndpointTask::Stats { respond } => {
-                let _ = self.handle_stats_request(respond);
+                self.handle_stats_request(respond);
             },
         }
 
@@ -530,6 +598,9 @@ where
                 // Drop connections from last epoch.
                 self.connection_buffer.clear();
             },
+            _ => {
+                // Ignore the rest.
+            },
         }
     }
 
@@ -558,10 +629,11 @@ where
         // Todo: maybe pass a cancel token to connection loop to make this shutdown faster.
         // Let's wait for connections to drop.
         while let Ok(Some(_)) =
-            tokio::time::timeout(Duration::from_secs(5), self.task_pool.next()).await
-        {}
+            tokio::time::timeout(Duration::from_secs(5), self.ongoing_async_tasks.next()).await
+        {
+        }
 
-        for task in self.task_pool.iter() {
+        for task in self.ongoing_async_tasks.iter() {
             task.abort();
         }
 
@@ -585,7 +657,7 @@ where
                    let _ = self.handle_task(task);
                 }
             }
-            Some(next) = self.task_pool.next() => {
+            Some(next) = self.ongoing_async_tasks.next() => {
                 match next {
                     Ok(task_result) => {
                        self.handle_finished_async_task(task_result);
@@ -653,6 +725,7 @@ pub enum AsyncTaskResult<C: ConnectionInterface> {
         connection_id: usize,
     },
     Timeout,
+    GenericTaskEnded,
 }
 
 pub struct OngoingConnectionHandle {
@@ -661,7 +734,6 @@ pub struct OngoingConnectionHandle {
 }
 
 /// Requests that will be performed on a connection.
-#[allow(dead_code)]
 pub enum EndpointTask {
     SendMessage {
         peers: Vec<ConnectionInfo>,
@@ -679,6 +751,6 @@ pub enum EndpointTask {
         drop: Vec<NodeIndex>,
     },
     Stats {
-        respond: oneshot::Sender<Stats>,
+        respond: oneshot::Sender<EndpointInfo>,
     },
 }

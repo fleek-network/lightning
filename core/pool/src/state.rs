@@ -5,30 +5,22 @@ use std::time::Duration;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::NodeIndex;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::Sender;
-use tokio::sync::oneshot;
-
-#[allow(dead_code)]
-pub type QuerySender = Sender<Query>;
-
-#[allow(dead_code)]
-pub enum Query {
-    /// Request for the entire state of the pool.
-    State { respond: oneshot::Sender<State> },
-    /// Request for information and stats from a specific peer.
-    Peer {
-        index: NodeIndex,
-        respond: oneshot::Sender<Option<ConnectionInfo>>,
-    },
-}
 
 #[derive(Deserialize, Serialize)]
 pub struct State {
     pub connections: HashMap<NodeIndex, ConnectionInfo>,
-    pub broadcast_queue_cap: usize,
-    pub broadcast_queue_max_cap: usize,
-    pub send_req_queue_cap: usize,
-    pub send_req_queue_max_cap: usize,
+    pub event_queue_cap: usize,
+    pub event_queue_max_cap: usize,
+    pub endpoint_task_queue_cap: usize,
+    pub endpoint_task_queue_max_cap: usize,
+    pub ongoing_endpoint_async_tasks: usize,
+}
+
+pub struct EventReceiverInfo {
+    pub connections: HashMap<NodeIndex, ConnectionInfo>,
+    pub endpoint_queue_cap: usize,
+    pub endpoint_queue_max_cap: usize,
+    pub ongoing_endpoint_async_tasks: usize,
 }
 
 #[derive(Default, Deserialize, Serialize)]
@@ -36,15 +28,20 @@ pub struct ConnectionInfo {
     pub from_topology: bool,
     pub pinned: bool,
     pub peer: Option<NodeInfo>,
-    pub work_queue_cap: usize,
-    pub work_queue_max_cap: usize,
     pub actual_connections: Vec<TransportConnectionInfo>,
+}
+
+pub struct EndpointInfo {
+    pub ongoing_async_tasks: usize,
+    pub connections: HashMap<NodeIndex, Vec<TransportConnectionInfo>>,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct TransportConnectionInfo {
     pub redundant: bool,
-    pub stats: Option<Stats>,
+    pub request_queue_cap: usize,
+    pub request_queue_max_cap: usize,
+    pub stats: Stats,
 }
 
 #[derive(Deserialize, Serialize)]

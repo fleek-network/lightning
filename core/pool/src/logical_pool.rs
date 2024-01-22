@@ -259,7 +259,7 @@ where
     }
 
     #[inline]
-    pub fn _connections(&self) -> HashMap<NodeIndex, ConnectionInfo> {
+    pub fn connections(&self) -> HashMap<NodeIndex, ConnectionInfo> {
         self.pool.clone()
     }
 

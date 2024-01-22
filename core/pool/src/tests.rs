@@ -22,7 +22,6 @@ use lightning_interfaces::{
     partial,
     ApplicationInterface,
     EventHandlerInterface,
-    ExecutionEngineSocket,
     NotifierInterface,
     PoolInterface,
     ReputationAggregatorInterface,
@@ -60,7 +59,6 @@ pub struct Peer<C: Collection> {
     // We hold on to the rep aggregator and notifier so
     // that they do not get dropped and cause a
     // race condition which causes the pool to stop.
-    _engine_socket: ExecutionEngineSocket,
     _rep_aggregator: C::ReputationAggregatorInterface,
     _notifier: C::NotifierInterface,
     pool: C::PoolInterface,
@@ -200,7 +198,7 @@ fn create_peer(
     in_state: bool,
     state_server_address_port: Option<u16>,
 ) -> Peer<TestBinding> {
-    let (_engine_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let query_runner = app.sync_query();
     let signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
     let notifier = Notifier::<TestBinding>::init(app);
     let topology = Topology::<TestBinding>::init(
@@ -245,7 +243,6 @@ fn create_peer(
     Peer::<TestBinding> {
         _rep_aggregator: rep_aggregator,
         _notifier: notifier,
-        _engine_socket,
         signer,
         topology,
         pool,
