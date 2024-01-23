@@ -73,12 +73,14 @@ async fn store(input: Vec<PathBuf>) -> Result<()> {
             })
             .to_string();
             let client = Client::new();
-            let _ = rpc_request::<Blake3Hash>(
+            let response = rpc_request::<Blake3Hash>(
                 &client,
                 format!("http://127.0.0.1:{}/admin", ports.rpc),
                 request,
             )
             .await?;
+
+            println!("{:x}\t{path:?}", ByteBuf(&response.result));
         } else {
             println!("invalid unicode in {path:?}")
         };
