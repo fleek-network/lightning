@@ -1,13 +1,12 @@
 //! A [`rocksdb`] storage backend implementation for [`atomo`].
 
 mod serialization;
-use std::fs::{self, OpenOptions};
+use std::fs::{self};
 use std::path::PathBuf;
 
 use anyhow::Result;
 use atomo::batch::Operation;
 use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackend, StorageBackendConstructor};
-use fcntl::is_file_locked;
 use fxhash::FxHashMap;
 /// Re-export of [`rocksdb::Options`].
 pub use rocksdb::Options;
@@ -231,14 +230,14 @@ pub fn is_db_locked(mut path: PathBuf) -> bool {
         return false;
     }
 
-    if let Ok(file) = OpenOptions::new().read(true).open(path) {
-        is_file_locked(&file, None).unwrap_or(true)
+    if let Ok(file) = std::fs::OpenOptions::new().read(true).open(path) {
+        fcntl::is_file_locked(&file, None).unwrap_or(true)
     } else {
         true
     }
 }
 #[cfg(target_os = "macos")]
-pub fn is_db_locked(mut path: PathBuf) -> bool {
+pub fn is_db_locked(_path: PathBuf) -> bool {
     false
 }
 
