@@ -102,7 +102,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
         checkpoint: Vec<u8>,
         checkpoint_hash: [u8; 32],
     ) -> Result<()> {
-        // Do to a raise condition on shutdowns when a node checkpoints, we should sleep and try
+        // Due to a race condition on shutdowns when a node checkpoints, we should sleep and try
         // again if there is a lock on the DB at this stage of the process
         let mut counter = 0;
 
@@ -111,11 +111,8 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
             .as_ref()
             .context("db_path must be specified for RocksDb backend")?;
 
-        loop {
+        while counter < 10 {
             if is_db_locked(db_path.clone()) {
-                if counter >= 10 {
-                    break;
-                }
                 tokio::time::sleep(Duration::from_secs(3)).await;
                 counter += 1;
             } else {

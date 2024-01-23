@@ -223,6 +223,7 @@ impl StorageBackend for RocksBackend {
 /// Will return true if there is any fs problems trying to access the the lock file(Like user
 /// permission errors) but if the directory or lock file does not exist it will return false
 /// indicating you are safe to open a db here.
+#[cfg(not(target_os = "macos"))]
 pub fn is_db_locked(mut path: PathBuf) -> bool {
     path.push("LOCK");
 
@@ -235,6 +236,10 @@ pub fn is_db_locked(mut path: PathBuf) -> bool {
     } else {
         true
     }
+}
+#[cfg(target_os = "macos")]
+pub fn is_db_locked(mut path: PathBuf) -> bool {
+    false
 }
 
 #[cfg(test)]
