@@ -1,5 +1,6 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::future::Future;
 use std::io;
 use std::time::Duration;
 
@@ -168,11 +169,14 @@ where
             },
             Some(handle) => {
                 let ongoing_conn_tx = handle.service_request_tx.clone();
-                ongoing_conn_tx.try_send(connection::Request::SendReqResp {
-                    service,
-                    request,
-                    respond,
-                })?;
+                self.enqueue_request_for_connection(
+                    ongoing_conn_tx,
+                    connection::Request::SendReqResp {
+                        service,
+                        request,
+                        respond,
+                    },
+                );
             },
         }
         Ok(())
@@ -232,14 +236,10 @@ where
             };
 
             let ongoing_conn_tx = handle.service_request_tx.clone();
-            if ongoing_conn_tx
-                .try_send(connection::Request::SendMessage(message.clone()))
-                .is_err()
-            {
-                tracing::error!(
-                    "failed to send broadcast request to connection task for node with index: {index:?}"
-                );
-            }
+            self.enqueue_request_for_connection(
+                ongoing_conn_tx,
+                connection::Request::SendMessage(message.clone()),
+            );
         }
 
         Ok(())
@@ -392,9 +392,7 @@ where
                     }
 
                     let request_tx_clone = conn_request_sender.clone();
-                    if request_tx_clone.try_send(req).is_err() {
-                        tracing::error!("failed to send pending request to connection task");
-                    }
+                    self.enqueue_request_for_connection(request_tx_clone, req);
                 }
             }
 
@@ -417,17 +415,40 @@ where
                 },
             }
 
-            if self
-                .event_queue
-                .try_send(Event::NewConnection {
-                    remote: peer_index,
-                    service_request_sent,
-                })
-                .is_err()
-            {
-                tracing::error!("failed to send new connection event");
-            }
+            self.enqueue_event(Event::NewConnection {
+                remote: peer_index,
+                service_request_sent,
+            });
         }
+    }
+
+    #[inline]
+    fn enqueue_event(&self, event: Event) {
+        let sender = self.event_queue.clone();
+        self.spawn_task(async move {
+            let _ = sender.send(event).await;
+            AsyncTaskResult::GenericTaskEnded
+        });
+    }
+
+    #[inline]
+    fn enqueue_request_for_connection(
+        &self,
+        sender: Sender<connection::Request>,
+        request: connection::Request,
+    ) {
+        self.spawn_task(async move {
+            let _ = sender.send(request).await;
+            AsyncTaskResult::GenericTaskEnded
+        });
+    }
+
+    #[inline]
+    fn spawn_task<F>(&self, fut: F)
+    where
+        F: Future<Output = AsyncTaskResult<M::Connection>> + Send + 'static,
+    {
+        self.ongoing_async_tasks.push(tokio::spawn(fut));
     }
 
     fn handle_accept(&mut self, connecting: M::Connecting) {
@@ -567,9 +588,7 @@ where
         // we must make sure that we don't have any active
         // transport connection.
         if !self.redundant_pool.contains_key(&peer) && !self.pool.contains_key(&peer) {
-            let _ = self
-                .event_queue
-                .try_send(Event::ConnectionEnded { remote: peer });
+            self.enqueue_event(Event::ConnectionEnded { remote: peer });
         }
     }
 

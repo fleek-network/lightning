@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::future::Future;
 use std::io;
 
 use bytes::{BufMut, Bytes, BytesMut};
@@ -126,11 +127,51 @@ where
         rx
     }
 
-    fn setup_state(&mut self) -> anyhow::Result<()> {
+    fn setup_state(&mut self) {
         let endpoint_task = self.handler.update_connections();
-        self.endpoint_queue
-            .try_send(endpoint_task)
-            .map_err(Into::into)
+        self.enqueue_endpoint_task(endpoint_task);
+    }
+
+    #[inline]
+    fn enqueue_received_message(
+        &self,
+        sender: Sender<(NodeIndex, Bytes)>,
+        message: (NodeIndex, Bytes),
+    ) {
+        self.spawn_task(async move {
+            let _ = sender.send(message).await;
+            Ok(())
+        });
+    }
+
+    #[inline]
+    fn enqueue_received_request(
+        &self,
+        sender: Sender<(RequestHeader, Request)>,
+        request: (RequestHeader, Request),
+    ) {
+        self.spawn_task(async move {
+            let _ = sender.send(request).await;
+            Ok(())
+        });
+    }
+
+    #[inline]
+    fn enqueue_endpoint_task(&self, task: EndpointTask) {
+        let sender = self.endpoint_queue.clone();
+        self.spawn_task(async move {
+            let _ = sender.send(task).await;
+            Ok(())
+        });
+    }
+
+    #[inline]
+    fn spawn_task<F>(&self, fut: F)
+    where
+        F: Future<Output = anyhow::Result<()>> + Send + 'static,
+    {
+        // Todo: add a limit.
+        self.ongoing_asynchronous_tasks.push(tokio::spawn(fut));
     }
 
     #[inline]
@@ -138,7 +179,7 @@ where
         match epoch_event {
             Notification::NewEpoch => {
                 let endpoint_task = self.handler.update_connections();
-                self.endpoint_queue.try_send(endpoint_task)?;
+                self.enqueue_endpoint_task(endpoint_task);
             },
             _ => {
                 unreachable!("we're only registered for new epoch events")
@@ -166,14 +207,14 @@ where
                 let _ = self.handle_outgoing_request(dst, service_scope, request, respond);
             },
             Event::MessageReceived { remote, message } => {
-                let _ = self.handle_incoming_broadcast(remote, message);
+                self.handle_incoming_broadcast(remote, message);
             },
             Event::RequestReceived {
                 remote,
                 service_scope,
                 request,
             } => {
-                let _ = self.handle_incoming_request(remote, service_scope, request);
+                self.handle_incoming_request(remote, service_scope, request);
             },
             Event::NewConnection {
                 remote,
@@ -259,7 +300,7 @@ where
             .handler
             .process_outgoing_broadcast(service_scope, message, param)
         {
-            self.enqueue_task(task)?;
+            self.enqueue_endpoint_task(task);
         }
 
         Ok(())
@@ -277,27 +318,23 @@ where
             self.handler
                 .process_outgoing_request(dst, service_scope, request, respond)
         {
-            self.enqueue_task(task)?;
+            self.enqueue_endpoint_task(task);
         }
 
         Ok(())
     }
 
     #[inline]
-    fn handle_incoming_broadcast(&self, remote: NodeIndex, message: Message) -> anyhow::Result<()> {
+    fn handle_incoming_broadcast(&self, remote: NodeIndex, message: Message) {
         if self.handler.process_received_message(&remote) {
             if let Some(sender) = self
                 .broadcast_service_handles
                 .get(&message.service)
                 .cloned()
             {
-                sender
-                    .try_send((remote, Bytes::from(message.payload)))
-                    .unwrap();
+                self.enqueue_received_message(sender, (remote, Bytes::from(message.payload)));
             }
         }
-
-        Ok(())
     }
 
     #[inline]
@@ -306,23 +343,16 @@ where
         remote: NodeIndex,
         service_scope: ServiceScope,
         request: (RequestHeader, Request),
-    ) -> anyhow::Result<()> {
+    ) {
         if self.handler.process_received_request(remote) {
             if let Some(sender) = self
                 .send_request_service_handles
                 .get(&service_scope)
                 .cloned()
             {
-                sender.try_send(request)?;
+                self.enqueue_received_request(sender, request);
             }
         }
-
-        Ok(())
-    }
-
-    #[inline]
-    fn enqueue_task(&self, task: EndpointTask) -> anyhow::Result<()> {
-        self.endpoint_queue.try_send(task).map_err(Into::into)
     }
 
     pub fn clear_state(&mut self) {
@@ -340,7 +370,7 @@ where
         // If there is an error while setting up the state,
         // there is nothing else to do and
         // we should not allow start to proceed.
-        self.setup_state().unwrap();
+        self.setup_state();
 
         loop {
             tokio::select! {
