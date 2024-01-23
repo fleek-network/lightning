@@ -162,16 +162,20 @@ where
         } = state
         {
             self.shutdown.cancel();
-            let mut receiver = receiver_handle
-                .await
-                .context("event receiver tasked failed")
-                .unwrap();
-            receiver.clear_state();
+            // We shutdown the endpoint first because it will close
+            // the ongoing connection loops that receive input from
+            // the network which in turn may enqueue events in the receiver
+            // queue, preventing it from shutting down.
             let mut endpoint = endpoint_handle
                 .await
                 .context("endpoint tasked failed")
                 .unwrap();
             endpoint.shutdown().await;
+            let mut receiver = receiver_handle
+                .await
+                .context("event receiver tasked failed")
+                .unwrap();
+            receiver.shutdown().await;
 
             State::NotRunning { endpoint, receiver }
         } else {

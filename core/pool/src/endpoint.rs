@@ -641,6 +641,7 @@ where
                 .await;
         }
         self.pending_task.clear();
+        self.connection_buffer.clear();
 
         // Clean out the queue.
         while !matches!(self.task_queue.try_recv(), Err(TryRecvError::Empty)) {}
@@ -655,6 +656,7 @@ where
         for task in self.ongoing_async_tasks.iter() {
             task.abort();
         }
+        self.ongoing_async_tasks.clear();
 
         // We drop the muxer to unbind the address.
         self.muxer

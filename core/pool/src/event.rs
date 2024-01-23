@@ -15,6 +15,7 @@ use lightning_interfaces::{
     RequestHeader,
     ServiceScope,
 };
+use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
@@ -75,7 +76,7 @@ pub struct EventReceiver<C: Collection> {
     /// Service handles.
     send_request_service_handles: HashMap<ServiceScope, Sender<(RequestHeader, Request)>>,
     /// Ongoing asynchronous tasks.
-    ongoing_asynchronous_tasks: FuturesUnordered<JoinHandle<anyhow::Result<()>>>,
+    ongoing_async_tasks: FuturesUnordered<JoinHandle<anyhow::Result<()>>>,
     shutdown: CancellationToken,
 }
 
@@ -104,7 +105,7 @@ where
             endpoint_queue: pool_queue,
             broadcast_service_handles: HashMap::new(),
             send_request_service_handles: HashMap::new(),
-            ongoing_asynchronous_tasks: FuturesUnordered::new(),
+            ongoing_async_tasks: FuturesUnordered::new(),
             shutdown,
         }
     }
@@ -171,7 +172,7 @@ where
         F: Future<Output = anyhow::Result<()>> + Send + 'static,
     {
         // Todo: add a limit.
-        self.ongoing_asynchronous_tasks.push(tokio::spawn(fut));
+        self.ongoing_async_tasks.push(tokio::spawn(fut));
     }
 
     #[inline]
@@ -238,44 +239,41 @@ where
         let endpoint_queue_max_cap = self.endpoint_queue.max_capacity();
         let endpoint_queue = self.endpoint_queue.clone();
         let mut connection_info = self.handler.connections();
-        self.ongoing_asynchronous_tasks
-            .push(tokio::spawn(async move {
-                let mut connections = HashMap::new();
+        self.ongoing_async_tasks.push(tokio::spawn(async move {
+            let mut connections = HashMap::new();
 
-                let (tx, rx) = oneshot::channel();
-                if endpoint_queue
-                    .send(EndpointTask::Stats { respond: tx })
+            let (tx, rx) = oneshot::channel();
+            if endpoint_queue
+                .send(EndpointTask::Stats { respond: tx })
+                .await
+                .is_ok()
+            {
+                let (mut actual_connections, ongoing_async_tasks) = rx
                     .await
-                    .is_ok()
-                {
-                    let (mut actual_connections, ongoing_async_tasks) = rx
-                        .await
-                        .map(|info| (info.connections, info.ongoing_async_tasks))
-                        .unwrap_or_default();
-                    for (index, info) in connection_info.iter_mut() {
-                        let connection_info = ConnectionInfo {
-                            from_topology: info.from_topology,
-                            pinned: info.pinned,
-                            peer: Some(info.node_info.clone()),
-                            actual_connections: actual_connections
-                                .remove(index)
-                                .unwrap_or_default(),
-                        };
-                        connections.insert(*index, connection_info);
-                    }
-
-                    let _ = respond.send(Ok(EventReceiverInfo {
-                        connections,
-                        endpoint_queue_cap,
-                        endpoint_queue_max_cap,
-                        ongoing_endpoint_async_tasks: ongoing_async_tasks,
-                    }));
-                } else {
-                    let _ = respond.send(Err(anyhow::anyhow!("failed to get stats")));
+                    .map(|info| (info.connections, info.ongoing_async_tasks))
+                    .unwrap_or_default();
+                for (index, info) in connection_info.iter_mut() {
+                    let connection_info = ConnectionInfo {
+                        from_topology: info.from_topology,
+                        pinned: info.pinned,
+                        peer: Some(info.node_info.clone()),
+                        actual_connections: actual_connections.remove(index).unwrap_or_default(),
+                    };
+                    connections.insert(*index, connection_info);
                 }
 
-                Ok(())
-            }));
+                let _ = respond.send(Ok(EventReceiverInfo {
+                    connections,
+                    endpoint_queue_cap,
+                    endpoint_queue_max_cap,
+                    ongoing_endpoint_async_tasks: ongoing_async_tasks,
+                }));
+            } else {
+                let _ = respond.send(Err(anyhow::anyhow!("failed to get stats")));
+            }
+
+            Ok(())
+        }));
     }
 
     #[inline]
@@ -355,8 +353,16 @@ where
         }
     }
 
-    pub fn clear_state(&mut self) {
+    pub async fn shutdown(&mut self) {
         self.handler.clear_state();
+
+        for task in self.ongoing_async_tasks.iter() {
+            task.abort();
+        }
+        self.ongoing_async_tasks.clear();
+
+        while !matches!(self.event_queue.try_recv(), Err(TryRecvError::Empty)) {}
+        while !matches!(self.notifier.try_recv(), Err(TryRecvError::Empty)) {}
     }
 
     pub fn spawn(mut self) -> JoinHandle<Self> {
