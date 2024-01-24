@@ -73,7 +73,7 @@ impl<C: Collection> IPFSOrigin<C> {
 
         let body = self.fetch_from_gateway(&requested_cid).await?;
         let reader = StreamReader::new(body.map_err(hyper_error));
-        let mut reader = CarReader::new(reader);
+        let mut car_reader = CarReader::new(reader).await?;
 
         //let mut blockstore_putter = self.blockstore.put(None);
         //let mut buf = [0; 1024];
@@ -81,7 +81,7 @@ impl<C: Collection> IPFSOrigin<C> {
         //let comp = CompressionAlgorithm::Uncompressed; // clippy
 
         loop {
-            match reader.next_block().await {
+            match car_reader.next_block().await {
                 Ok(Some((_cid, _data))) => {
                     // TODO(matthias): validation and further decoding
                     todo!()

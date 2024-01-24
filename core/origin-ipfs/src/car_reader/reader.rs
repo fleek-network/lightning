@@ -10,6 +10,12 @@ const MAX_ALLOC: usize = 4 * 1024 * 1024;
 
 pub struct CarReader<R: AsyncRead + Unpin> {
     reader: R,
+    version: u64,
+    bytes_read: u64,
+    data_read: u64,
+    data_size: u64,
+    buffer: Vec<u8>,
+    roots: Vec<Cid>,
 }
 
 // Taken from: https://github.com/n0-computer/iroh-car
@@ -36,12 +42,83 @@ pub struct CarV2Header {
 }
 
 impl<R: AsyncRead + Unpin> CarReader<R> {
-    pub fn new(reader: R) -> Self {
-        todo!()
+    pub async fn new(mut reader: R) -> Result<Self> {
+        match header_v1(&mut reader).await {
+            Ok((header, bytes_read)) => {
+                // This is a car v1
+                Ok(Self {
+                    reader,
+                    version: 1,
+                    bytes_read: bytes_read as u64,
+                    data_read: 0,
+                    data_size: 0, // not available in car v1
+                    buffer: vec![0; 1024],
+                    roots: header.roots,
+                })
+            },
+            Err(e) => {
+                if let Some(Buffer {
+                    data,
+                    mut bytes_read,
+                }) = e.downcast_ref()
+                {
+                    match pragma_v2(data).await {
+                        Ok(_pragma) => {
+                            // This is a car v2
+                            let header_v2 = header_v2(&mut reader).await?;
+                            bytes_read += 40;
+
+                            if header_v2.data_offset > bytes_read as u64 {
+                                // For car v2, we potentially need to skip the optional padding
+                                let padding_size = header_v2.data_offset as usize - bytes_read;
+                                if padding_size > MAX_ALLOC {
+                                    // The spec for car v2 does not mention any constrains on the
+                                    // size of the
+                                    // optional padding, but for safety reasons, we have to bound
+                                    // it.
+                                    return Err(anyhow!("Padding too large"));
+                                }
+                                let mut buf = vec![0; padding_size];
+                                reader.read_exact(&mut buf).await?;
+                            }
+                            // After the optional padding, the wrapped car v1 starts
+                            let (header_v1, bytes_read) = header_v1(&mut reader).await?;
+                            Ok(Self {
+                                reader,
+                                version: 2,
+                                bytes_read: bytes_read as u64,
+                                data_read: bytes_read as u64,
+                                data_size: header_v2.data_size,
+                                buffer: vec![0; 1024],
+                                roots: header_v1.roots,
+                            })
+                        },
+                        Err(e) => Err(e),
+                    }
+                } else {
+                    Err(e)
+                }
+            },
+        }
     }
 
     pub async fn next_block(&mut self) -> Result<Option<(Cid, Vec<u8>)>> {
-        todo!()
+        if self.version == 2 && self.data_read == self.data_size {
+            // For car v2, we have to stop reading content before the index section starts
+            return Ok(None);
+        }
+        match read_block(&mut self.reader, &mut self.buffer).await {
+            Ok(Some((cid, data, bytes_read))) => {
+                if self.version == 2 {
+                    // for car v2, we need to keep track of some state
+                    self.bytes_read += bytes_read as u64;
+                    self.data_read += bytes_read as u64;
+                }
+                Ok(Some((cid, data)))
+            },
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 }
 
