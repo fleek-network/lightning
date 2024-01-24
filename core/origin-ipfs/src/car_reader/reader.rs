@@ -35,10 +35,10 @@ pub struct CarV2Pragma {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CarV2Header {
-    characteristics: u128,
-    data_offset: u64,
-    data_size: u64,
-    index_offset: u64,
+    pub characteristics: u128,
+    pub data_offset: u64,
+    pub data_size: u64,
+    pub index_offset: u64,
 }
 
 impl<R: AsyncRead + Unpin> CarReader<R> {
@@ -126,7 +126,7 @@ impl<R: AsyncRead + Unpin> CarReader<R> {
 /// Returns the car v1 header, as well as the number of bytes read.
 /// If parsing the car v1 header fails, we return the read bytes in a buffer.
 /// In case this is a car v2 file, these bytes make up the pragma.
-async fn header_v1<R: AsyncRead + Unpin>(reader: &mut R) -> Result<(CarV1Header, usize)> {
+pub async fn header_v1<R: AsyncRead + Unpin>(reader: &mut R) -> Result<(CarV1Header, usize)> {
     let Some((header_size, bytes_read)) = read_varint_usize(reader).await? else {
         return Err(anyhow!("Failed to read var int from header"));
     };
@@ -155,7 +155,7 @@ async fn header_v1<R: AsyncRead + Unpin>(reader: &mut R) -> Result<(CarV1Header,
 }
 
 /// Returns the car v2 pragma.
-async fn pragma_v2(bytes: &[u8]) -> Result<CarV2Pragma> {
+pub async fn pragma_v2(bytes: &[u8]) -> Result<CarV2Pragma> {
     let pragma: CarV2Pragma = DagCborCodec
         .decode(bytes)
         .map_err(|e| anyhow!("Failed to decode pragma: {e:?}"))?;
@@ -163,7 +163,7 @@ async fn pragma_v2(bytes: &[u8]) -> Result<CarV2Pragma> {
 }
 
 /// Returns the car v2 header. The number of bytes is always 40.
-async fn header_v2<R: AsyncRead + Unpin>(reader: &mut R) -> Result<CarV2Header> {
+pub async fn header_v2<R: AsyncRead + Unpin>(reader: &mut R) -> Result<CarV2Header> {
     let mut buf = vec![0; 16];
     reader.read_exact(&mut buf).await?;
     // These unwraps are all safe because the size of the vecs is static
