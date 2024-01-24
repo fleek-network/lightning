@@ -50,6 +50,7 @@ affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
 atomo-rocks = { path = "lib/atomo-rocks" }
 fleek-crypto = { path = "lib/fleek-crypto" }
+fleek-ipld = { path = "lib/fleek-ipld" }
 hp-fixed = { path = "lib/hp-fixed" }
 blake3-tree = { path = "lib/blake3-tree" }
 ink-quill = { path = "lib/ink-quill" }

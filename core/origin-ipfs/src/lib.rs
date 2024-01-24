@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -9,6 +10,7 @@ use futures::TryStreamExt;
 use hyper::client::{self, HttpConnector};
 use hyper::{Body, Client, Request, Uri};
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
+use libipld::pb::PbNode;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
 use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
@@ -22,6 +24,7 @@ pub use ipfs_stream::IPFSStream;
 use tokio_util::io::StreamReader;
 
 mod car_reader;
+mod decoder;
 #[cfg(test)]
 mod tests;
 
@@ -75,21 +78,47 @@ impl<C: Collection> IPFSOrigin<C> {
         let reader = StreamReader::new(body.map_err(hyper_error));
         let mut car_reader = CarReader::new(reader).await?;
 
-        //let mut blockstore_putter = self.blockstore.put(None);
-        //let mut buf = [0; 1024];
-        //let mut bytes: Vec<u8> = Vec::new();
-        //let comp = CompressionAlgorithm::Uncompressed; // clippy
+        let mut blockstore_putter = self.blockstore.put(None);
+        let mut buf = [0; 1024];
+        let mut bytes: Vec<u8> = Vec::new();
+        let comp = CompressionAlgorithm::Uncompressed; // clippy
 
-        loop {
-            match car_reader.next_block().await {
-                Ok(Some((_cid, _data))) => {
-                    // TODO(matthias): validation and further decoding
-                    todo!()
-                },
-                Ok(None) => break,
-                Err(e) => return Err(e),
-            }
+        let root = car_reader
+            .next_block()
+            .await?
+            .ok_or(anyhow!("No block present"))?;
+
+        match car_reader.next_block().await {
+            Ok(Some((_cid, data))) => {
+                let node = PbNode::from_bytes(data.into())?;
+                // TODO(matthias): what to do with the data in the root?
+                //let data = decoder::decode_block(cid, data)?;
+
+                // TODO(matthias): we assume that the merkle dag is flat for now,
+                // but we have to support general merke dags in the future
+                let mut nodes = HashSet::new();
+                for links in &node.links {
+                    nodes.insert(links.cid);
+                }
+
+                // TODO(matthias): verify data
+                loop {
+                    match car_reader.next_block().await {
+                        Ok(Some((cid, data))) => {
+                            let data = decoder::decode_block(cid, data)?;
+                        },
+                        Ok(None) => break,
+                        Err(e) => return Err(e),
+                    }
+                }
+            },
+            Ok(None) => {
+                // TODO(matthias): what if there is no block?
+                return Err(anyhow!("The car file was empty"));
+            },
+            Err(e) => return Err(e),
         }
+
         todo!()
 
         //loop {
