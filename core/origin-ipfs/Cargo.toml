@@ -21,6 +21,8 @@ hyper-rustls = "0.24.1"
 affair.workspace = true
 tokio-util = { version = "0.7.8", features = ["io"] }
 tracing.workspace = true
+unsigned-varint = { version = "0.8", features = ["std"] }
+libipld = { version = "0.16", features = ["dag-cbor", "derive"] }
 
 [dev-dependencies]
 fleek-crypto.workspace = true
