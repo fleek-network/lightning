@@ -6,6 +6,10 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 
 use super::utils::Buffer;
 
+pub struct CarReader<R: AsyncRead + Unpin> {
+    reader: R,
+}
+
 // Taken from: https://github.com/n0-computer/iroh-car
 #[derive(Debug, Clone, Default, libipld::DagCbor, PartialEq, Eq)]
 pub struct CarV1Header {
@@ -15,8 +19,18 @@ pub struct CarV1Header {
     pub version: u64,
 }
 
-pub struct CarReader<R: AsyncRead + Unpin> {
-    reader: R,
+#[derive(Debug, Clone, Default, libipld::DagCbor, PartialEq, Eq)]
+pub struct CarV2Pragma {
+    #[ipld]
+    pub version: u64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CarV2Header {
+    characteristics: u128,
+    data_offset: u64,
+    data_size: u64,
+    index_offset: u64,
 }
 
 impl<R: AsyncRead + Unpin> CarReader<R> {
@@ -59,6 +73,44 @@ async fn header_v1<R: AsyncRead + Unpin>(reader: &mut R) -> Result<(CarV1Header,
     // TODO: check version
 
     Ok((header, bytes_read + header_size))
+}
+
+/// Returns the car v2 pragma.
+async fn pragma_v2(bytes: &[u8]) -> Result<CarV2Pragma> {
+    let pragma: CarV2Pragma = DagCborCodec
+        .decode(bytes)
+        .map_err(|e| anyhow!("Failed to decode pragma: {e:?}"))?;
+    Ok(pragma)
+}
+
+/// Returns the car v2 header. The number of bytes is always 40.
+async fn header_v2<R: AsyncRead + Unpin>(reader: &mut R) -> Result<CarV2Header> {
+    let mut buf = vec![0; 16];
+    reader.read_exact(&mut buf).await?;
+    // These unwraps are all safe because the size of the vecs is static
+    // TODO(matthias): make sure that big endian is correct here for a bit field
+    let characteristics = u128::from_be_bytes(buf.try_into().unwrap());
+
+    let mut buf = vec![0; 8];
+    reader.read_exact(&mut buf).await?;
+    let data_offset = u64::from_le_bytes(buf.try_into().unwrap());
+
+    let mut buf = vec![0; 8];
+    reader.read_exact(&mut buf).await?;
+    let data_size = u64::from_le_bytes(buf.try_into().unwrap());
+
+    let mut buf = vec![0; 8];
+    reader.read_exact(&mut buf).await?;
+    let index_offset = u64::from_le_bytes(buf.try_into().unwrap());
+
+    let header = CarV2Header {
+        characteristics,
+        data_offset,
+        data_size,
+        index_offset,
+    };
+
+    Ok(header)
 }
 
 /// Taken mostly from: https://github.com/n0-computer/iroh-car
