@@ -6,6 +6,8 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 
 use super::utils::Buffer;
 
+const MAX_ALLOC: usize = 4 * 1024 * 1024;
+
 pub struct CarReader<R: AsyncRead + Unpin> {
     reader: R,
 }
@@ -113,7 +115,53 @@ async fn header_v2<R: AsyncRead + Unpin>(reader: &mut R) -> Result<CarV2Header> 
     Ok(header)
 }
 
-/// Taken mostly from: https://github.com/n0-computer/iroh-car
+/// Mostly taken from: https://github.com/n0-computer/iroh-car
+async fn read_block<R>(
+    buf_reader: &mut R,
+    buf: &mut Vec<u8>,
+) -> Result<Option<(Cid, Vec<u8>, usize)>>
+where
+    R: AsyncRead + Unpin,
+{
+    if let Some((buf, bytes_read)) = read_block_bytes(buf_reader, buf).await? {
+        let mut cursor = std::io::Cursor::new(buf);
+        let c = Cid::read_bytes(&mut cursor)?;
+        let pos = cursor.position() as usize;
+
+        return Ok(Some((c, buf[pos..].to_vec(), bytes_read)));
+    }
+    Ok(None)
+}
+
+/// Adapted from: https://github.com/n0-computer/iroh-car
+async fn read_block_bytes<R>(mut reader: R, buf: &mut Vec<u8>) -> Result<Option<(&[u8], usize)>>
+where
+    R: AsyncRead + Unpin,
+{
+    let (length, mut bytes_read): (usize, usize) = match read_varint_usize(&mut reader).await {
+        Ok(Some((len, bytes_read))) => (len, bytes_read),
+        Ok(None) => return Ok(None),
+        Err(e) => {
+            return Err(anyhow!("Failed to parse data block: {e:?}"));
+        },
+    };
+    bytes_read += length;
+    if length > MAX_ALLOC {
+        return Err(anyhow!("Data block too large"));
+    }
+    if length > buf.len() {
+        buf.resize(length, 0);
+    }
+
+    reader
+        .read_exact(&mut buf[..length])
+        .await
+        .map_err(|e| anyhow!("Failed to parse data block: {e:?}"))?;
+
+    Ok(Some((&buf[..length], bytes_read)))
+}
+
+/// Mostly taken from: https://github.com/n0-computer/iroh-car
 /// Read a varint from the provided reader. Returns `Ok(None)` on unexpected `EOF`.
 async fn read_varint_usize<R: AsyncRead + Unpin>(
     reader: &mut R,
