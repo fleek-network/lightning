@@ -2,15 +2,16 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
+use car_reader::{hyper_error, CarReader};
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
+use futures::TryStreamExt;
 use hyper::client::{self, HttpConnector};
 use hyper::{Body, Client, Request, Uri};
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
 use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
-use tokio::io::AsyncReadExt;
 use tokio::time::timeout;
 use tracing::info;
 pub mod config;
@@ -19,6 +20,8 @@ use config::Gateway;
 mod ipfs_stream;
 pub use ipfs_stream::IPFSStream;
 use tokio_util::io::StreamReader;
+
+mod car_reader;
 #[cfg(test)]
 mod tests;
 
@@ -68,40 +71,53 @@ impl<C: Collection> IPFSOrigin<C> {
     pub async fn fetch(&self, uri: &[u8]) -> anyhow::Result<Blake3Hash> {
         let requested_cid = Cid::try_from(uri).with_context(|| "Failed to parse uri into cid")?;
 
-        let stream = self.fetch_from_gateway(&requested_cid).await?;
+        let body = self.fetch_from_gateway(&requested_cid).await?;
+        let reader = StreamReader::new(body.map_err(hyper_error));
+        let mut reader = CarReader::new(reader);
 
-        let mut blockstore_putter = self.blockstore.put(None);
-        let mut read = StreamReader::new(stream);
-        let mut buf = [0; 1024];
-        let mut bytes: Vec<u8> = Vec::new();
-        let comp = CompressionAlgorithm::Uncompressed; // clippy
+        //let mut blockstore_putter = self.blockstore.put(None);
+        //let mut buf = [0; 1024];
+        //let mut bytes: Vec<u8> = Vec::new();
+        //let comp = CompressionAlgorithm::Uncompressed; // clippy
 
         loop {
-            let len = read.read(&mut buf).await.unwrap();
-            if let Err(e) = blockstore_putter.write(&buf[..len], comp) {
-                anyhow::bail!("Failed to write to the blockstore: {e}");
-            }
-            bytes.extend(&buf[..len]);
-            if len == 0 {
-                break;
+            match reader.next_block().await {
+                Ok(Some((_cid, _data))) => {
+                    // TODO(matthias): validation and further decoding
+                    todo!()
+                },
+                Ok(None) => break,
+                Err(e) => return Err(e),
             }
         }
+        todo!()
 
-        let valid = match Code::try_from(requested_cid.hash().code()) {
-            Ok(hasher) => &hasher.digest(&bytes) == requested_cid.hash(),
-            _ => false,
-        };
-        if valid {
-            blockstore_putter
-                .finalize()
-                .await
-                .map_err(|e| anyhow!("failed to finalize in blockstore: {e}"))
-        } else {
-            Err(anyhow!("Data verification failed"))
-        }
+        //loop {
+        //    let len = read.read(&mut buf).await.unwrap();
+        //    if let Err(e) = blockstore_putter.write(&buf[..len], comp) {
+        //        anyhow::bail!("Failed to write to the blockstore: {e}");
+        //    }
+        //    bytes.extend(&buf[..len]);
+        //    if len == 0 {
+        //        break;
+        //    }
+        //}
+
+        //let valid = match Code::try_from(requested_cid.hash().code()) {
+        //    Ok(hasher) => &hasher.digest(&bytes) == requested_cid.hash(),
+        //    _ => false,
+        //};
+        //if valid {
+        //    blockstore_putter
+        //        .finalize()
+        //        .await
+        //        .map_err(|e| anyhow!("failed to finalize in blockstore: {e}"))
+        //} else {
+        //    Err(anyhow!("Data verification failed"))
+        //}
     }
 
-    async fn fetch_from_gateway(&self, requested_cid: &Cid) -> anyhow::Result<IPFSStream> {
+    async fn fetch_from_gateway(&self, requested_cid: &Cid) -> anyhow::Result<Body> {
         for gateway in self.gateways.iter() {
             let url = Uri::builder()
                 .scheme(gateway.protocol.as_str())
@@ -111,14 +127,15 @@ impl<C: Collection> IPFSOrigin<C> {
 
             let req = Request::builder()
                 .uri(url)
-                .header("Accept", "application/vnd.ipld.raw")
+                //.header("Accept", "application/vnd.ipld.raw")
+                //.header("Accept", "application/vnd.ipld.car")
+                .header("Accept", "application/vnd.ipld.car;version=1")
                 .header("Connection", "keep-alive")
                 .body(Body::default())?;
 
             match timeout(GATEWAY_TIMEOUT, self.client.request(req)).await {
                 Ok(Ok(res)) => {
-                    let body = res.into_body();
-                    return Ok(IPFSStream::new(*requested_cid, body));
+                    return Ok(res.into_body());
                 },
                 Ok(Err(e)) => {
                     info!(
