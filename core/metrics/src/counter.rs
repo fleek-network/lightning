@@ -54,6 +54,14 @@ impl Counter for Labels {
     }
 }
 
+/// Macro for creating metrics data.
+/// Responsible for incrementing a Counter of some event.
+///
+/// Arguments
+///  * `family: &str`
+///  * `description: Option<&str>`
+///  * `labels: Comma separated labels name => value`; each label set identifies specific Counter;
+///    Different labels identifies different Counter within the same `family`
 #[macro_export]
 macro_rules! increment_counter {
     ($family:expr, $description:expr $(, $($label:expr => $value:expr),*)?) => {

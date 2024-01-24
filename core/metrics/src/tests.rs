@@ -78,3 +78,29 @@ fn test_histogram_macro() {
         }
     }
 }
+
+#[test]
+fn test_labeled_event_counter() {
+    init();
+
+    let family = "synchronizer_usage";
+    let description = "Counting how often synchronizer has been used per epoch";
+    let events_count = 7;
+    let epoch = 10.to_string();
+
+    for _ in 0..events_count {
+        increment_counter!(family, Some(description), "epoch" => epoch.as_str());
+    }
+
+    let metrics = prometheus::gather();
+    // Only 1 Event Family
+    assert_eq!(metrics.len(), 1);
+
+    assert_eq!(metrics[0].get_name(), family);
+    assert_eq!(metrics[0].get_help(), description);
+
+    // Only 1 Counter for single Event labeled with `epoch`
+    let events = metrics[0].get_metric();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].get_counter().get_value(), events_count as f64);
+}
