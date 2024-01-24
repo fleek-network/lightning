@@ -6,6 +6,8 @@ use anyhow::anyhow;
 use async_channel::{bounded, Sender};
 use axum::Router;
 use dashmap::DashMap;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
@@ -74,17 +76,18 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
         let mut guard = self.status.lock().await;
         let run = guard.as_mut().expect("restart not implemented.");
 
-        // Spawn transport listeners to accept incoming handshakes
-        let mut routers = vec![];
-        for config in &self.config.transports {
-            if let Some(router) =
+        // Spawn transports in parallel for accepting incoming handshakes.
+        let routers = self
+            .config
+            .transports
+            .iter()
+            .map(|config| {
                 spawn_transport_by_config(run.shutdown.waiter(), run.ctx.clone(), config.clone())
-                    .await
-                    .expect("Failed to setup transport")
-            {
-                routers.push(router)
-            }
-        }
+            })
+            .collect::<FuturesUnordered<_>>()
+            .filter_map(|res| async move { res.expect("failed to bind transport") })
+            .collect::<Vec<_>>()
+            .await;
 
         // If we have routers to use, start the http server
         if !routers.is_empty() {
