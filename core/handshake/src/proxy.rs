@@ -404,11 +404,11 @@ mod tests {
         }
     }
 
-    async fn start_mock_node(id: u16) -> Result<ShutdownNotifier> {
+    async fn start_mock_node<P: ExecutorProviderInterface>(id: u16) -> Result<ShutdownNotifier> {
         let shutdown = ShutdownNotifier::default();
         let context = Context::new(MockServiceProvider, shutdown.waiter());
         let (transport, _) =
-            MockTransport::bind(shutdown.waiter(), MockTransportConfig { port: id }).await?;
+            MockTransport::bind::<P>(shutdown.waiter(), MockTransportConfig { port: id }).await?;
         transport.spawn_listener_task(context);
 
         Ok(shutdown)
@@ -417,7 +417,7 @@ mod tests {
     #[tokio::test]
     async fn primary_connection() -> Result<()> {
         // start and connect to the mock node
-        let shutdown = start_mock_node(0).await?;
+        let shutdown = start_mock_node::<MockServiceProvider>(0).await?;
         let (tx, rx) = dial_mock(0).await.expect("failed to dial");
 
         // send handshake req
@@ -455,7 +455,7 @@ mod tests {
     #[tokio::test]
     async fn join_secondary_connection() -> Result<()> {
         // start and connect to the mock node
-        let shutdown = start_mock_node(1).await?;
+        let shutdown = start_mock_node::<MockServiceProvider>(1).await?;
         let (primary_tx, primary_rx) = dial_mock(1)
             .await
             .expect("failed to dial primary connection");
@@ -516,7 +516,7 @@ mod tests {
     #[tokio::test]
     async fn reject_expired_token() -> Result<()> {
         // start and connect to the mock node
-        let shutdown = start_mock_node(2).await?;
+        let shutdown = start_mock_node::<MockServiceProvider>(2).await?;
         let (primary_tx, primary_rx) = dial_mock(2)
             .await
             .expect("failed to dial primary connection");
@@ -574,7 +574,7 @@ mod tests {
     #[tokio::test]
     async fn extend_token() -> Result<()> {
         // start and connect to the mock node
-        let shutdown = start_mock_node(3).await?;
+        let shutdown = start_mock_node::<MockServiceProvider>(3).await?;
         let (primary_tx, primary_rx) = dial_mock(3)
             .await
             .expect("failed to dial primary connection");

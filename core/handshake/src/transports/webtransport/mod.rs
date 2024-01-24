@@ -10,6 +10,7 @@ use bytes::{BufMut as _, Bytes};
 pub use config::WebTransportConfig;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::StreamExt;
+use lightning_interfaces::ExecutorProviderInterface;
 use tokio::sync::mpsc::{self, Receiver};
 use tracing::{error, info, warn};
 use wtransport::tls::Certificate;
@@ -37,7 +38,7 @@ impl Transport for WebTransport {
     type Sender = WebTransportSender;
     type Receiver = WebTransportReceiver;
 
-    async fn bind(
+    async fn bind<P: ExecutorProviderInterface>(
         shutdown: ShutdownWaiter,
         config: Self::Config,
     ) -> anyhow::Result<(Self, Option<Router>)> {

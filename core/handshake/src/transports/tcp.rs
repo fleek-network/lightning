@@ -5,6 +5,7 @@ use arrayref::array_ref;
 use async_trait::async_trait;
 use axum::Router;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use lightning_interfaces::ExecutorProviderInterface;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
@@ -40,7 +41,7 @@ impl Transport for TcpTransport {
     type Sender = TcpSender;
     type Receiver = TcpReceiver;
 
-    async fn bind(
+    async fn bind<P: ExecutorProviderInterface>(
         shutdown: ShutdownWaiter,
         config: Self::Config,
     ) -> Result<(Self, Option<Router>)> {
@@ -265,6 +266,7 @@ impl TransportReceiver for TcpReceiver {
 #[cfg(test)]
 mod tests {
     use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey, NodeSignature};
+    use lightning_service_executor::shim::Provider;
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpStream;
 
@@ -279,7 +281,9 @@ mod tests {
         let config = TcpConfig {
             address: ([127, 0, 0, 1], 20000).into(),
         };
-        let (mut transport, _) = TcpTransport::bind(notifier.waiter(), config.clone()).await?;
+        // Todo: use mock provider instead?
+        let (mut transport, _) =
+            TcpTransport::bind::<Provider>(notifier.waiter(), config.clone()).await?;
 
         // Connect a dummy client
         let mut client = TcpStream::connect(config.address)

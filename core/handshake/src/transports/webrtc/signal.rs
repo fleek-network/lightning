@@ -3,7 +3,8 @@ use std::net::{IpAddr, SocketAddr};
 use anyhow::Result;
 use axum::extract::{ConnectInfo, State};
 use axum::routing::post;
-use axum::{Json, Router};
+use axum::{Extension, Json, Router};
+use lightning_interfaces::ExecutorProviderInterface;
 use str0m::change::{SdpAnswer, SdpOffer};
 use str0m::{Candidate, Rtc};
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -11,6 +12,7 @@ use tower_http::cors::CorsLayer;
 use triomphe::Arc;
 
 use super::driver::{Connection, ConnectionMap};
+use crate::handshake::Context;
 use crate::schema::{HandshakeRequestFrame, RequestFrame};
 
 struct SignalState {
@@ -22,13 +24,13 @@ struct SignalState {
     host: Vec<Candidate>,
 }
 
-pub fn router(
+pub fn router<P: ExecutorProviderInterface>(
     udp_addrs: Vec<SocketAddr>,
     client_map: ConnectionMap,
     conn_tx: Sender<(HandshakeRequestFrame, IpAddr, Receiver<RequestFrame>)>,
 ) -> Result<Router> {
     Ok(Router::new()
-        .route("/sdp", post(handler))
+        .route("/sdp", post(handler::<P>))
         .layer(CorsLayer::permissive())
         .with_state(Arc::new(SignalState {
             client_map,
@@ -43,9 +45,10 @@ pub fn router(
         })))
 }
 
-async fn handler(
+async fn handler<P: ExecutorProviderInterface>(
     ConnectInfo(peer_addr): ConnectInfo<SocketAddr>,
     State(state): State<Arc<SignalState>>,
+    Extension(_provider): Extension<Context<P>>,
     Json(offer): Json<SdpOffer>,
 ) -> Result<Json<SdpAnswer>, String> {
     let mut rtc = Rtc::new();

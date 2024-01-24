@@ -61,7 +61,7 @@ pub trait Transport: Sized + Send + Sync + 'static {
     type Receiver: TransportReceiver;
 
     /// Bind the transport with the provided config.
-    async fn bind(
+    async fn bind<P: ExecutorProviderInterface>(
         shutdown: ShutdownWaiter,
         config: Self::Config,
     ) -> anyhow::Result<(Self, Option<Router>)>;
@@ -122,31 +122,33 @@ pub trait TransportReceiver: Send + Sync + 'static {
     async fn recv(&mut self) -> Option<schema::RequestFrame>;
 }
 
-pub async fn spawn_transport_by_config(
+pub async fn spawn_transport_by_config<P: ExecutorProviderInterface>(
     shutdown: ShutdownWaiter,
-    ctx: Context<impl ExecutorProviderInterface>,
+    ctx: Context<P>,
     config: TransportConfig,
 ) -> anyhow::Result<Option<Router>> {
     match config {
         TransportConfig::Mock(config) => {
-            let (transport, router) = mock::MockTransport::bind(shutdown.clone(), config).await?;
+            let (transport, router) =
+                mock::MockTransport::bind::<P>(shutdown.clone(), config).await?;
             transport.spawn_listener_task(ctx);
             Ok(router)
         },
         TransportConfig::Tcp(config) => {
-            let (transport, router) = tcp::TcpTransport::bind(shutdown.clone(), config).await?;
+            let (transport, router) =
+                tcp::TcpTransport::bind::<P>(shutdown.clone(), config).await?;
             transport.spawn_listener_task(ctx);
             Ok(router)
         },
         TransportConfig::WebRTC(config) => {
             let (transport, router) =
-                webrtc::WebRtcTransport::bind(shutdown.clone(), config).await?;
+                webrtc::WebRtcTransport::bind::<P>(shutdown.clone(), config).await?;
             transport.spawn_listener_task(ctx);
             Ok(router)
         },
         TransportConfig::WebTransport(config) => {
             let (transport, router) =
-                webtransport::WebTransport::bind(shutdown.clone(), config).await?;
+                webtransport::WebTransport::bind::<P>(shutdown.clone(), config).await?;
             transport.spawn_listener_task(ctx);
             Ok(router)
         },

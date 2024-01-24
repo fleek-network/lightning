@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use axum::Router;
 use bytes::Bytes;
 use dashmap::DashMap;
+use lightning_interfaces::ExecutorProviderInterface;
 use serde::{Deserialize, Serialize};
 use stunclient::StunClient;
 use tokio::sync::mpsc::{channel, Receiver};
@@ -56,7 +57,10 @@ impl Transport for WebRtcTransport {
     type Sender = WebRtcSender;
     type Receiver = WebRtcReceiver;
 
-    async fn bind(waiter: ShutdownWaiter, config: Self::Config) -> Result<(Self, Option<Router>)> {
+    async fn bind<P: ExecutorProviderInterface>(
+        waiter: ShutdownWaiter,
+        config: Self::Config,
+    ) -> Result<(Self, Option<Router>)> {
         info!("Binding WebRTC transport on {}", config.address);
         let conns = Arc::new(DashMap::new());
 
@@ -85,7 +89,7 @@ impl Transport for WebRtcTransport {
         // A bounded channel is used to provide some back pressure for incoming client handshakes.
         let (conn_tx, conn_rx) = channel(1024);
         // Construct our http router for negotiating via SDP.
-        let router = router(vec![public_addr, local_addr], conns.clone(), conn_tx)?;
+        let router = router::<P>(vec![public_addr, local_addr], conns.clone(), conn_tx)?;
 
         Ok((
             Self {

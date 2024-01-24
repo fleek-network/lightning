@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::anyhow;
 use async_channel::{bounded, Sender};
-use axum::Router;
+use axum::{Extension, Router};
 use dashmap::DashMap;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -91,7 +91,7 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
 
         // If we have routers to use, start the http server
         if !routers.is_empty() {
-            let mut router = Router::new();
+            let mut router = Router::new().layer(Extension(run.ctx.clone()));
             for child in routers {
                 router = router.nest("", child);
             }
