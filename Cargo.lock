@@ -3180,6 +3180,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "fleek-ipld"
+version = "0.0.0"
+dependencies = [
+ "quick-protobuf",
+]
+
+[[package]]
 name = "fleek-service-fetcher"
 version = "0.0.1"
 dependencies = [
@@ -7663,6 +7670,15 @@ name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
+
+[[package]]
+name = "quick-protobuf"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d6da84cc204722a989e01ba2f6e1e276e190f22263d0cb6ce8526fcdb0d2e1f"
+dependencies = [
+ "byteorder",
+]
 
 [[package]]
 name = "quick_cache"
