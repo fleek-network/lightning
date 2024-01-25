@@ -11,7 +11,7 @@ use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Extension, Router};
 use base64::Engine;
-use bytes::{BufMut, Bytes};
+use bytes::Bytes;
 pub use config::Config;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use lightning_interfaces::ExecutorProviderInterface;
@@ -21,7 +21,6 @@ use lightning_schema::handshake::{
     RequestFrame,
     ResponseFrame,
     TerminationReason,
-    RES_SERVICE_PAYLOAD_TAG,
 };
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
@@ -186,11 +185,6 @@ impl TransportSender for HttpSender {
             self.expected_body_len == 0,
             "data should be written completely before calling start_write again"
         );
-
-        let mut buffer = Vec::with_capacity(5);
-        buffer.put_u32(len as u32 + 1);
-        buffer.put_u8(RES_SERVICE_PAYLOAD_TAG);
-        self.inner_send(buffer.into());
     }
 
     fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
