@@ -15,6 +15,7 @@ pub struct CarReader<R: AsyncRead + Unpin> {
     data_read: u64,
     data_size: u64,
     buffer: Vec<u8>,
+    #[allow(unused)]
     roots: Vec<Cid>,
 }
 

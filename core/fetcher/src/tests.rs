@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
@@ -332,13 +331,11 @@ async fn test_simple_origin_fetch() {
             _ => panic!("Unexpected response"),
         };
 
-        let bytes = peers[0].blockstore.read_all_to_vec(&hash).await.unwrap();
-        assert!(
-            Code::try_from(req_cid.hash().code())
-                .ok()
-                .map(|code| &code.digest(&bytes) == req_cid.hash())
-                .unwrap()
-        );
+        let target_hash = [
+            98, 198, 247, 73, 200, 10, 39, 129, 58, 132, 6, 107, 146, 166, 253, 195, 127, 216, 55,
+            121, 191, 157, 100, 241, 241, 163, 105, 44, 243, 167, 223, 189,
+        ];
+        assert_eq!(hash, target_hash);
     };
 
     tokio::select! {

@@ -2,10 +2,11 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, Context, Result};
 use car_reader::{hyper_error, CarReader};
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
+use fleek_ipld::unixfs::Data;
 use futures::TryStreamExt;
 use hyper::client::{self, HttpConnector};
 use hyper::{Body, Client, Request, Uri};
@@ -47,7 +48,7 @@ impl<C: Collection> Clone for IPFSOrigin<C> {
 }
 
 impl<C: Collection> IPFSOrigin<C> {
-    pub fn new(config: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
+    pub fn new(config: Config, blockstore: C::BlockStoreInterface) -> Result<Self> {
         // Prepare the TLS client config
         let tls = rustls::ClientConfig::builder()
             .with_safe_defaults()
@@ -71,7 +72,7 @@ impl<C: Collection> IPFSOrigin<C> {
         })
     }
 
-    pub async fn fetch(&self, uri: &[u8]) -> anyhow::Result<Blake3Hash> {
+    pub async fn fetch(&self, uri: &[u8]) -> Result<Blake3Hash> {
         let requested_cid = Cid::try_from(uri).with_context(|| "Failed to parse uri into cid")?;
 
         let body = self.fetch_from_gateway(&requested_cid).await?;
@@ -79,37 +80,54 @@ impl<C: Collection> IPFSOrigin<C> {
         let mut car_reader = CarReader::new(reader).await?;
 
         let mut blockstore_putter = self.blockstore.put(None);
-        let mut buf = [0; 1024];
-        let mut bytes: Vec<u8> = Vec::new();
         let comp = CompressionAlgorithm::Uncompressed; // clippy
 
-        let root = car_reader
-            .next_block()
-            .await?
-            .ok_or(anyhow!("No block present"))?;
-
+        // TODO(matthias): we assume that the merkle dag is flat for now,
+        // but we have to support general merke dags in the future
         match car_reader.next_block().await {
-            Ok(Some((_cid, data))) => {
-                let node = PbNode::from_bytes(data.into())?;
-                // TODO(matthias): what to do with the data in the root?
-                //let data = decoder::decode_block(cid, data)?;
+            Ok(Some((cid, data))) => {
+                verify_data(&cid, &data)?;
+                match cid.codec() {
+                    0x70 => {
+                        let node = PbNode::from_bytes(data.into())?;
+                        let mut nodes = HashSet::new();
+                        for links in &node.links {
+                            nodes.insert(links.cid);
+                        }
 
-                // TODO(matthias): we assume that the merkle dag is flat for now,
-                // but we have to support general merke dags in the future
-                let mut nodes = HashSet::new();
-                for links in &node.links {
-                    nodes.insert(links.cid);
-                }
+                        if let Some(data) = node.data {
+                            let data = match Data::try_from(data.as_ref()) {
+                                Ok(unixfs) => unixfs.Data.to_vec().into(),
+                                Err(_) => data,
+                            };
+                            if let Err(e) = blockstore_putter.write(&data, comp) {
+                                return Err(anyhow!("Failed to write to the blockstore: {e}"));
+                            }
+                        }
 
-                // TODO(matthias): verify data
-                loop {
-                    match car_reader.next_block().await {
-                        Ok(Some((cid, data))) => {
-                            let data = decoder::decode_block(cid, data)?;
-                        },
-                        Ok(None) => break,
-                        Err(e) => return Err(e),
-                    }
+                        // TODO(matthias): is the data verification sufficient?
+                        loop {
+                            match car_reader.next_block().await {
+                                Ok(Some((cid, data))) => {
+                                    if nodes.contains(&cid) {
+                                        verify_data(&cid, &data)?;
+                                        let data = decoder::decode_block(cid, data)?;
+
+                                        if let Some(data) = data {
+                                            if let Err(e) = blockstore_putter.write(&data, comp) {
+                                                return Err(anyhow!(
+                                                    "Failed to write to the blockstore: {e}"
+                                                ));
+                                            }
+                                        }
+                                    }
+                                },
+                                Ok(None) => break,
+                                Err(e) => return Err(e),
+                            }
+                        }
+                    },
+                    codec => return Err(anyhow!("Unsupported codec found in CID: {codec}")),
                 }
             },
             Ok(None) => {
@@ -119,34 +137,13 @@ impl<C: Collection> IPFSOrigin<C> {
             Err(e) => return Err(e),
         }
 
-        todo!()
-
-        //loop {
-        //    let len = read.read(&mut buf).await.unwrap();
-        //    if let Err(e) = blockstore_putter.write(&buf[..len], comp) {
-        //        anyhow::bail!("Failed to write to the blockstore: {e}");
-        //    }
-        //    bytes.extend(&buf[..len]);
-        //    if len == 0 {
-        //        break;
-        //    }
-        //}
-
-        //let valid = match Code::try_from(requested_cid.hash().code()) {
-        //    Ok(hasher) => &hasher.digest(&bytes) == requested_cid.hash(),
-        //    _ => false,
-        //};
-        //if valid {
-        //    blockstore_putter
-        //        .finalize()
-        //        .await
-        //        .map_err(|e| anyhow!("failed to finalize in blockstore: {e}"))
-        //} else {
-        //    Err(anyhow!("Data verification failed"))
-        //}
+        blockstore_putter
+            .finalize()
+            .await
+            .map_err(|e| anyhow!("Failed to finalize blockstore put: {e}"))
     }
 
-    async fn fetch_from_gateway(&self, requested_cid: &Cid) -> anyhow::Result<Body> {
+    async fn fetch_from_gateway(&self, requested_cid: &Cid) -> Result<Body> {
         for gateway in self.gateways.iter() {
             let url = Uri::builder()
                 .scheme(gateway.protocol.as_str())
@@ -181,5 +178,17 @@ impl<C: Collection> IPFSOrigin<C> {
             }
         }
         Err(anyhow::anyhow!("No response from gateways."))
+    }
+}
+
+fn verify_data(cid: &Cid, data: &[u8]) -> Result<()> {
+    let valid = match Code::try_from(cid.hash().code()) {
+        Ok(hasher) => &hasher.digest(data) == cid.hash(),
+        _ => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(anyhow!("Data verification failed for CID: {cid}"))
     }
 }

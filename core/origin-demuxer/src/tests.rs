@@ -199,7 +199,7 @@ async fn test_origin_muxer() {
 
     // Given: an IPFS-encoded file that will be returned by the server.
     let ipfs_file: Vec<u8> = std::fs::read(
-        "../test-utils/files/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+        "../test-utils/files/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi.car",
     )
     .unwrap();
     // Given: a pointer for that content.

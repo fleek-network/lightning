@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
-use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
@@ -186,12 +185,16 @@ async fn create_app_state(test_name: String) -> AppState {
 }
 
 #[tokio::test]
-async fn test_origin() {
+async fn test_origin_basic() {
     let req_cid =
         Cid::try_from("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi").unwrap();
     let mut config = Config::default();
+    let target_bytes = std::fs::read(
+        "../test-utils/files/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi.jpeg",
+    )
+    .unwrap();
 
-    let state = create_app_state("test-origin".to_string()).await;
+    let state = create_app_state("test-origin-basic".to_string()).await;
 
     let req_fut = async move {
         config.gateways.push(Gateway {
@@ -206,12 +209,7 @@ async fn test_origin() {
             .unwrap();
 
         let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
-        assert!(
-            Code::try_from(req_cid.hash().code())
-                .ok()
-                .map(|code| &code.digest(&bytes) == req_cid.hash())
-                .unwrap()
-        );
+        assert_eq!(bytes, target_bytes);
     };
 
     tokio::select! {

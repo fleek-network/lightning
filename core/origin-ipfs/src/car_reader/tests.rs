@@ -12,7 +12,7 @@ use crate::car_reader::CarReader;
 
 #[tokio::test]
 async fn test_extract_header_v1() {
-    let bytes = std::fs::read("./src/car_reader/test_files/sample-v1.car").unwrap();
+    let bytes = std::fs::read("../test-utils/files/sample-v1.car").unwrap();
     let bytes = Bytes::from_iter(bytes);
     let body = Body::from(bytes);
 
@@ -30,7 +30,7 @@ async fn test_extract_header_v1() {
 
 #[tokio::test]
 async fn test_extract_pragma_v2_after_failed_parsing_header_v1() {
-    let bytes = std::fs::read("./src/car_reader/test_files/sample-unixfs-v2.car").unwrap();
+    let bytes = std::fs::read("../test-utils/files/sample-unixfs-v2.car").unwrap();
     let bytes = Bytes::from_iter(bytes);
     let body = Body::from(bytes);
 
@@ -51,7 +51,7 @@ async fn test_extract_pragma_v2_after_failed_parsing_header_v1() {
 
 #[tokio::test]
 async fn test_extract_pragma_v2() {
-    let bytes = std::fs::read("./src/car_reader/test_files/sample-unixfs-v2.car").unwrap();
+    let bytes = std::fs::read("../test-utils/files/sample-unixfs-v2.car").unwrap();
     let bytes = Bytes::from_iter(bytes);
     let body = Body::from(bytes);
 
@@ -66,7 +66,7 @@ async fn test_extract_pragma_v2() {
 
 #[tokio::test]
 async fn test_extract_header_v2() {
-    let bytes = std::fs::read("./src/car_reader/test_files/sample-unixfs-v2.car").unwrap();
+    let bytes = std::fs::read("../test-utils/files/sample-unixfs-v2.car").unwrap();
     let bytes = Bytes::from_iter(bytes);
     let body = Body::from(bytes);
 
@@ -89,7 +89,7 @@ async fn test_extract_header_v2() {
 
 #[tokio::test]
 async fn test_extract_header_v2_wrapped() {
-    let bytes = std::fs::read("./src/car_reader/test_files/sample-wrapped-v2.car").unwrap();
+    let bytes = std::fs::read("../test-utils/files/sample-wrapped-v2.car").unwrap();
     let bytes = Bytes::from_iter(bytes);
     let body = Body::from(bytes);
 
@@ -112,8 +112,8 @@ async fn test_extract_header_v2_wrapped() {
 
 #[tokio::test]
 async fn test_extract_car_v2() {
-    let target_bytes = std::fs::read("./src/car_reader/test_files/bird.jpg").unwrap();
-    let bytes = std::fs::read("./src/car_reader/test_files/bird_v2.car").unwrap();
+    let target_bytes = std::fs::read("../test-utils/files/bird.jpg").unwrap();
+    let bytes = std::fs::read("../test-utils/files/bird_v2.car").unwrap();
     let bytes = Bytes::from_iter(bytes);
     let body = Body::from(bytes);
 
@@ -135,7 +135,7 @@ async fn test_extract_car_v2() {
 
 #[tokio::test]
 async fn test_extract_v2_wrapped() {
-    let bytes = std::fs::read("./src/car_reader/test_files/sample-wrapped-v2.car").unwrap();
+    let bytes = std::fs::read("../test-utils/files/sample-wrapped-v2.car").unwrap();
     let bytes = Bytes::from_iter(bytes);
     let body = Body::from(bytes);
 
@@ -156,8 +156,8 @@ async fn test_extract_v2_wrapped() {
 
 #[tokio::test]
 async fn test_extract_car_v1() {
-    let target_bytes = std::fs::read("./src/car_reader/test_files/bird.jpg").unwrap();
-    let bytes = std::fs::read("./src/car_reader/test_files/bird_v1.car").unwrap();
+    let target_bytes = std::fs::read("../test-utils/files/bird.jpg").unwrap();
+    let bytes = std::fs::read("../test-utils/files/bird_v1.car").unwrap();
     let bytes = Bytes::from_iter(bytes);
     let body = Body::from(bytes);
 
