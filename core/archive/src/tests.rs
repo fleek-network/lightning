@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use ethers::core::k256::elliptic_curve::rand_core::block;
 use ethers::types::{BlockNumber, U64};
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
@@ -163,7 +162,7 @@ async fn test_get_tx_receipt() {
     archive.start().await;
 
     let index_req = get_index_request(1, [1; 32]);
-    let (block, receipt) = match &index_req {
+    let (_, receipt) = match &index_req {
         IndexRequest::Block(b, r) => (b.clone(), r.clone()),
         _ => panic!("Unexpected request"),
     };
@@ -201,7 +200,7 @@ async fn test_get_latest_earliest() {
 
     let index_req1 = get_index_request(0, [0; 32]);
     index_socket.run(index_req1.clone()).await.unwrap().unwrap();
-    let (block, receipt) = match index_req1 {
+    let (_, receipt) = match index_req1 {
         IndexRequest::Block(b, r) => (b.clone(), r.clone()),
         _ => panic!("Unexpected request"),
     };
@@ -221,7 +220,7 @@ async fn test_get_latest_earliest() {
 
     let index_req2 = get_index_request(1, [1; 32]);
     index_socket.run(index_req2.clone()).await.unwrap().unwrap();
-    let (block, receipt) = match index_req2 {
+    let (_, receipt) = match index_req2 {
         IndexRequest::Block(b, r) => (b.clone(), r.clone()),
         _ => panic!("Unexpected request"),
     };
@@ -289,7 +288,7 @@ fn test_block_info_ser_deser() {
     };
     let (blk_receipt, _txn_receipts) = receipt.to_receipts();
     let blk_info = BlockInfo {
-        block: block,
+        block,
         receipt: blk_receipt,
     };
     let bytes: Vec<u8> = (&blk_info).try_into().unwrap();

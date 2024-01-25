@@ -10,7 +10,6 @@ use atomo::{
     QueryPerm,
     ResolvedTableReference,
 };
-use atomo_rocks::RocksBackendBuilder;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::application::SyncQueryRunnerInterface;
