@@ -116,7 +116,7 @@ pub trait TransportSender: Sized + Send + Sync + 'static {
 
     /// Write some bytes as service payloads. Must ALWAYS be called after
     /// [`TransportSender::start_write`].
-    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize>;
+    fn write(&mut self, buf: Bytes) -> anyhow::Result<usize>;
 }
 
 #[async_trait]

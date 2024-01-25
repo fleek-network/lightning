@@ -187,15 +187,13 @@ impl TransportSender for HttpSender {
         );
     }
 
-    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
-        // Todo: update trait to accept Bytes.
-        let bytes = Bytes::copy_from_slice(buf);
-        let len = bytes.len();
+    fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
+        let len = buf.len();
 
         debug_assert!(self.expected_body_len != 0);
         debug_assert!(self.expected_body_len >= len);
 
-        self.inner_send(bytes);
+        self.inner_send(buf);
 
         if self.expected_body_len <= len {
             self.close();

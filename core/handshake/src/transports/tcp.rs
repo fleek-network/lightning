@@ -198,14 +198,14 @@ impl TransportSender for TcpSender {
         self.send_inner(buffer.into());
     }
 
-    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
-        let len = buf.len() as u32;
+    fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
+        let len = u32::try_from(buf.len())?;
         debug_assert!(self.current_write != 0);
         debug_assert!(self.current_write >= len);
 
         self.current_write -= len;
-        self.send_inner(buf.to_vec().into());
-        Ok(buf.len())
+        self.send_inner(buf);
+        Ok(len as usize)
     }
 }
 

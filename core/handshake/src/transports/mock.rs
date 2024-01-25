@@ -132,15 +132,16 @@ impl TransportSender for MockTransportSender {
         self.current_write = len;
     }
 
-    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
-        debug_assert!(buf.len() <= self.current_write);
+    fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
+        let len = buf.len();
+        debug_assert!(len <= self.current_write);
         self.buffer.put(buf);
         if self.buffer.len() >= self.current_write {
             let bytes = self.buffer.split_to(self.current_write).into();
             self.current_write = 0;
             self.send(schema::ResponseFrame::ServicePayload { bytes });
         }
-        Ok(buf.len())
+        Ok(len)
     }
 }
 

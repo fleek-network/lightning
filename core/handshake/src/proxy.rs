@@ -39,7 +39,7 @@ fn handle_socket_bytes<S: TransportSender>(
             let len = socket_buffer.len().min(*current_write);
             let bytes = socket_buffer.split_to(len);
             *current_write -= len;
-            sender.write(&bytes)?;
+            sender.write(bytes.freeze())?;
         } else if socket_buffer.len() >= 4 {
             // read the payload delimiter
             let bytes = socket_buffer.split_to(4);
@@ -213,7 +213,7 @@ impl<S: TransportSender, R: TransportReceiver, P: ExecutorProviderInterface> Pro
             }
 
             let bytes = self.socket_buffer.split_to(self.current_write);
-            self.sender.write(&bytes).map_err(|e| {
+            self.sender.write(bytes.freeze()).map_err(|e| {
                 self.terminate(TerminationReason::InternalError);
                 e
             })?;
