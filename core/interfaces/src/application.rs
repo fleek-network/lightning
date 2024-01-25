@@ -14,7 +14,6 @@ use atomo::{
     StorageBackend,
     StorageBackendConstructor,
 };
-use atomo_rocks::RocksBackend;
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_types::{

@@ -1,12 +1,9 @@
 use std::marker::PhantomData;
-use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use affair::{Socket, Task};
 use anyhow::{Context, Result};
-use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm};
-use atomo_rocks::{RocksBackend, RocksBackendBuilder};
 use ethers::types::BlockNumber;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{
@@ -263,11 +260,11 @@ impl<C: Collection> ArchiveInner<C> {
 
                 if path.is_dir() {
                     // create the query runner
-                    let db = <<C::ApplicationInterface as ApplicationInterface<C>>::SyncExecutor as SyncQueryRunnerInterface>::atomo_from_path(path)?;
-                    let query_runner = <<C::ApplicationInterface as ApplicationInterface<C>>::SyncExecutor as SyncQueryRunnerInterface>::new(db);
+                    let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_path(path)?;
+                    let query_runner = <c!(C::ApplicationInterface::SyncExecutor)>::new(db);
 
                     // return the query runner
-                    return Ok(ArchiveResponse::HistoricalEpochState(query_runner));
+                    Ok(ArchiveResponse::HistoricalEpochState(query_runner))
                 } else {
                     // if this epoch has happened we should have stored the hash
                     let hash: [u8; 32] = match self.db.get_cf(
@@ -298,11 +295,13 @@ impl<C: Collection> ArchiveInner<C> {
                     };
 
                     // create the query runner
-                    let db = <<C::ApplicationInterface as ApplicationInterface<C>>::SyncExecutor as SyncQueryRunnerInterface>::atomo_from_checkpoint(path, hash, checkpoint)?;
-                    let query_runner = <<C::ApplicationInterface as ApplicationInterface<C>>::SyncExecutor as SyncQueryRunnerInterface>::new(db);
+                    let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_checkpoint(
+                        path, hash, checkpoint,
+                    )?;
+                    let query_runner = <c!(C::ApplicationInterface::SyncExecutor)>::new(db);
 
                     // return the query runner
-                    return Ok(ArchiveResponse::HistoricalEpochState(query_runner));
+                    Ok(ArchiveResponse::HistoricalEpochState(query_runner))
                 }
             },
         }
@@ -397,7 +396,7 @@ impl<C: Collection> ArchiveInner<C> {
     fn handle_block(&self, block: Block, response: BlockExecutionResponse) -> Result<()> {
         let (blk_receipt, txn_receipts) = response.to_receipts();
         let blk_info = BlockInfo {
-            block: block,
+            block,
             receipt: blk_receipt,
         };
 
