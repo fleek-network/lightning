@@ -13,7 +13,9 @@ use crate::config::TransportConfig;
 use crate::handshake::Context;
 use crate::schema;
 use crate::shutdown::ShutdownWaiter;
+use crate::transports::http::{HttpReceiver, HttpSender};
 
+pub mod http;
 pub mod mock;
 pub mod tcp;
 pub mod webrtc;
@@ -52,6 +54,8 @@ transport_pairs! {
     Tcp(TcpSender, TcpReceiver),
     WebRtc(WebRtcSender, WebRtcReceiver),
     WebTransport(WebTransportSender, WebTransportReceiver),
+    Http(HttpSender, HttpReceiver),
+
 }
 
 #[async_trait]
@@ -150,6 +154,11 @@ pub async fn spawn_transport_by_config<P: ExecutorProviderInterface>(
             let (transport, router) =
                 webtransport::WebTransport::bind::<P>(shutdown.clone(), config).await?;
             transport.spawn_listener_task(ctx);
+            Ok(router)
+        },
+        TransportConfig::Http(config) => {
+            let (_, router) = http::HttpTransport::bind::<P>(shutdown.clone(), config).await?;
+            // Axum has a `Context` and will handle `accept()`.
             Ok(router)
         },
     }

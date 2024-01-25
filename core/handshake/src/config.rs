@@ -32,4 +32,5 @@ pub enum TransportConfig {
     Tcp(transports::tcp::TcpConfig),
     WebRTC(transports::webrtc::WebRtcConfig),
     WebTransport(transports::webtransport::WebTransportConfig),
+    Http(transports::http::Config),
 }
