@@ -1,40 +1,48 @@
 use std::marker::PhantomData;
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use affair::{Socket, Task};
 use anyhow::{Context, Result};
+use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm};
+use atomo_rocks::{RocksBackend, RocksBackendBuilder};
 use ethers::types::BlockNumber;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{
-    ArchiveRequest,
-    ArchiveResponse,
     Block,
+    BlockExecutionResponse,
     BlockReceipt,
-    IndexRequest,
     TransactionReceipt,
 };
 use lightning_interfaces::{
     ApplicationInterface,
     ArchiveInterface,
+    ArchiveRequest,
+    ArchiveResponse,
     ArchiveSocket,
+    BlockStoreInterface,
     ConfigConsumer,
+    IndexRequest,
     IndexSocket,
+    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
+use resolved_pathbuf::ResolvedPathBuf;
 use rocksdb::{Options, DB};
 use tokio::sync::{mpsc, Notify};
 use tracing::error;
 
 use crate::config::Config;
 
-type ArchiveTask = Task<ArchiveRequest, Result<ArchiveResponse>>;
+type ArchiveTask<C> = Task<ArchiveRequest, Result<ArchiveResponse<C>>>;
 type IndexTask = Task<IndexRequest, Result<()>>;
 
 // Column families
 const BLKHASH_TO_BLKNUM: &str = "blkhash_to_blknum";
 const BLKNUM_TO_BLK: &str = "blknum_to_blk";
 const TXHASH_TO_TXRCT: &str = "txhash_to_txrct";
+const EPOCH_TO_HASH: &str = "epoch";
 const MISC: &str = "misc";
 
 // Special keys
@@ -45,7 +53,7 @@ pub struct Archive<C: Collection> {
     inner: Option<Arc<ArchiveInner<C>>>,
     /// This socket can be given out to other proccess to query the data that has been archived.
     /// Will be None if this node is not currently in archive mode
-    archive_socket: Mutex<Option<ArchiveSocket>>,
+    archive_socket: Mutex<Option<ArchiveSocket<C>>>,
     /// This socket can be given out to other process to send things that should be archived,
     /// realisticlly only consensus should have this. Will return None if the node is not currently
     /// in archive mode
@@ -59,6 +67,7 @@ impl<C: Collection> ArchiveInterface<C> for Archive<C> {
     fn init(
         config: Self::Config,
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        blockstore: C::BlockStoreInterface,
     ) -> anyhow::Result<Self> {
         if config.is_archive {
             let shutdown_notify = Arc::new(Notify::new());
@@ -71,11 +80,29 @@ impl<C: Collection> ArchiveInterface<C> for Archive<C> {
 
             let cf = vec![BLKHASH_TO_BLKNUM, BLKNUM_TO_BLK, TXHASH_TO_TXRCT, MISC];
             let db = Arc::new(
-                DB::open_cf(&db_options, config.store_path, cf)
+                DB::open_cf(&db_options, &config.store_path, cf)
                     .expect("Failed to create archive db"),
             );
 
-            let inner = ArchiveInner::<C>::new(archive_rx, index_rx, db, shutdown_notify.clone());
+            let historical_state_dir: ResolvedPathBuf = config
+                .store_path
+                .join("historical")
+                .try_into()
+                .expect("resolved historical dir");
+
+            if !historical_state_dir.is_dir() {
+                std::fs::create_dir_all(&historical_state_dir)
+                    .expect("Failed to create historical dir");
+            }
+
+            let inner = ArchiveInner::<C>::new(
+                archive_rx,
+                index_rx,
+                db,
+                shutdown_notify.clone(),
+                historical_state_dir,
+                blockstore,
+            );
             Ok(Self {
                 archive_socket: Mutex::new(Some(archive_socket)),
                 index_socket: Mutex::new(Some(index_socket)),
@@ -96,7 +123,7 @@ impl<C: Collection> ArchiveInterface<C> for Archive<C> {
         }
     }
 
-    fn archive_socket(&self) -> Option<ArchiveSocket> {
+    fn archive_socket(&self) -> Option<ArchiveSocket<C>> {
         self.archive_socket.lock().unwrap().clone()
     }
 
@@ -133,25 +160,33 @@ impl<C: Collection> WithStartAndShutdown for Archive<C> {
 }
 
 struct ArchiveInner<C: Collection> {
-    archive_rx: Arc<Mutex<Option<mpsc::Receiver<ArchiveTask>>>>,
+    archive_rx: Arc<Mutex<Option<mpsc::Receiver<ArchiveTask<C>>>>>,
     index_rx: Arc<Mutex<Option<mpsc::Receiver<IndexTask>>>>,
     db: Arc<DB>,
     shutdown_notify: Arc<Notify>,
     _marker: PhantomData<C>,
+    blockstore: c!(C::BlockStoreInterface),
+    /// Handles the rocks db storage for each epoch
+    historical_state_dir: ResolvedPathBuf,
 }
 
+/// Main logic to handle archive requests
 impl<C: Collection> ArchiveInner<C> {
     fn new(
-        archive_rx: mpsc::Receiver<Task<ArchiveRequest, Result<ArchiveResponse>>>,
+        archive_rx: mpsc::Receiver<Task<ArchiveRequest, Result<ArchiveResponse<C>>>>,
         index_rx: mpsc::Receiver<Task<IndexRequest, Result<()>>>,
         db: Arc<DB>,
         shutdown_notify: Arc<Notify>,
+        historical_state_dir: ResolvedPathBuf,
+        blockstore: c!(C::BlockStoreInterface),
     ) -> Self {
         Self {
             archive_rx: Arc::new(Mutex::new(Some(archive_rx))),
             index_rx: Arc::new(Mutex::new(Some(index_rx))),
             db,
             shutdown_notify,
+            historical_state_dir,
+            blockstore,
             _marker: PhantomData,
         }
     }
@@ -170,7 +205,7 @@ impl<C: Collection> ArchiveInner<C> {
                     archive_task.respond(res);
                 }
                 Some(index_task) = index_rx.recv() => {
-                    let res = self.handle_index_request(index_task.request.clone()).await;
+                    let res = self.handle_index_request(index_task.request.clone());
                     index_task.respond(res);
                 }
             }
@@ -182,7 +217,7 @@ impl<C: Collection> ArchiveInner<C> {
     async fn handle_archive_request(
         &self,
         archive_request: &ArchiveRequest,
-    ) -> Result<ArchiveResponse> {
+    ) -> Result<ArchiveResponse<C>> {
         match archive_request {
             ArchiveRequest::GetBlockByHash(hash) => match self.get_block_by_hash(hash) {
                 Ok(Some(block)) => Ok(ArchiveResponse::Block(block.receipt)),
@@ -221,6 +256,53 @@ impl<C: Collection> ArchiveInner<C> {
                 {
                     Some(tx) => Ok(ArchiveResponse::Transaction(tx.clone())),
                     None => Ok(ArchiveResponse::None),
+                }
+            },
+            ArchiveRequest::GetHistoricalEpochState(epoch) => {
+                let path = self.historical_state_dir.join(epoch.to_string());
+
+                if path.is_dir() {
+                    // create the query runner
+                    let db = <<C::ApplicationInterface as ApplicationInterface<C>>::SyncExecutor as SyncQueryRunnerInterface>::atomo_from_path(path)?;
+                    let query_runner = <<C::ApplicationInterface as ApplicationInterface<C>>::SyncExecutor as SyncQueryRunnerInterface>::new(db);
+
+                    // return the query runner
+                    return Ok(ArchiveResponse::HistoricalEpochState(query_runner));
+                } else {
+                    // if this epoch has happened we should have stored the hash
+                    let hash: [u8; 32] = match self.db.get_cf(
+                        // cursed ?
+                        // this is !sync, so binding a variable here causes the compiler to
+                        // complain
+                        &self
+                            .db
+                            .cf_handle(EPOCH_TO_HASH)
+                            .context("Column family `epoch` not found in db")?,
+                        epoch.to_le_bytes(),
+                    )? {
+                        // will fail if the hash is longer than 32 bytes
+                        Some(hash) => hash.try_into().map_err(|_| {
+                            anyhow::anyhow!("Invalid hash in blockstore, this is a bug")
+                        })?,
+                        None => return Ok(ArchiveResponse::None),
+                    };
+
+                    // read the checkpoint from the blockstore
+                    let checkpoint = match self.blockstore.read_all_to_vec(&hash).await {
+                        Some(checkpoint) => checkpoint,
+                        None => {
+                            return Err(anyhow::anyhow!(
+                                "Could not find checkpoint for epoch, this is a bug"
+                            ));
+                        },
+                    };
+
+                    // create the query runner
+                    let db = <<C::ApplicationInterface as ApplicationInterface<C>>::SyncExecutor as SyncQueryRunnerInterface>::atomo_from_checkpoint(path, hash, checkpoint)?;
+                    let query_runner = <<C::ApplicationInterface as ApplicationInterface<C>>::SyncExecutor as SyncQueryRunnerInterface>::new(db);
+
+                    // return the query runner
+                    return Ok(ArchiveResponse::HistoricalEpochState(query_runner));
                 }
             },
         }
@@ -289,11 +371,33 @@ impl<C: Collection> ArchiveInner<C> {
             None => Ok(None),
         }
     }
+}
 
-    async fn handle_index_request(&self, index_request: IndexRequest) -> Result<()> {
-        let (blk_receipt, txn_receipts) = index_request.receipt.to_receipts();
+/// Incoming index requests from execution are sent here
+impl<C: Collection> ArchiveInner<C> {
+    fn handle_index_request(&self, index_request: IndexRequest) -> Result<()> {
+        match index_request {
+            IndexRequest::Block(block, response) => self.handle_block(block, response),
+            IndexRequest::Epoch(epoch, digest) => self.handle_epoch(epoch, digest),
+        }
+    }
+
+    fn handle_epoch(&self, epoch: u64, hash: [u8; 32]) -> Result<()> {
+        let epoch_cf = self
+            .db
+            .cf_handle(EPOCH_TO_HASH)
+            .context("Column family `epoch` not found in db")?;
+
+        // Store Epoch => Hash
+        self.db.put_cf(&epoch_cf, epoch.to_le_bytes(), hash)?;
+
+        Ok(())
+    }
+
+    fn handle_block(&self, block: Block, response: BlockExecutionResponse) -> Result<()> {
+        let (blk_receipt, txn_receipts) = response.to_receipts();
         let blk_info = BlockInfo {
-            block: index_request.block,
+            block: block,
             receipt: blk_receipt,
         };
 

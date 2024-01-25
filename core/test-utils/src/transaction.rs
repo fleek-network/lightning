@@ -5,7 +5,6 @@ use lightning_interfaces::types::{
     Block,
     BlockExecutionResponse,
     ExecutionData,
-    IndexRequest,
     TransactionDestination,
     TransactionReceipt,
     TransactionRequest,
@@ -14,7 +13,7 @@ use lightning_interfaces::types::{
     UpdatePayload,
     UpdateRequest,
 };
-use lightning_interfaces::ToDigest;
+use lightning_interfaces::{IndexRequest, ToDigest};
 
 pub fn get_update_transactions(num_txns: usize) -> Vec<UpdateRequest> {
     (0..num_txns)
@@ -119,5 +118,5 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
         txn_receipts,
     };
 
-    IndexRequest { block, receipt }
+    IndexRequest::Block(block, receipt)
 }

@@ -49,6 +49,6 @@ pub trait RpcInterface<C: Collection>:
         blockstore: C::BlockStoreInterface,
         fetcher: &C::FetcherInterface,
         signer: &C::SignerInterface,
-        archive_socket: Option<ArchiveSocket>,
+        archive_socket: Option<ArchiveSocket<C>>,
     ) -> anyhow::Result<Self>;
 }

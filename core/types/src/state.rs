@@ -100,6 +100,15 @@ pub enum Value {
     GenesisCommittee(Vec<NodeIndex>),
 }
 
+impl Value {
+    pub fn maybe_hash(self) -> Option<[u8; 32]> {
+        match self {
+            Value::Hash(hash) => Some(hash),
+            _ => None,
+        }
+    }
+}
+
 /// Indicates the participation status of a node.
 #[rustfmt::skip]
 #[derive(

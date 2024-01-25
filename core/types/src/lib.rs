@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 mod application;
-mod archive;
 mod blockstore;
 mod blockstore_server;
 mod bridge;
@@ -22,7 +21,6 @@ mod state;
 mod transaction;
 
 pub use application::*;
-pub use archive::*;
 pub use blockstore::*;
 pub use blockstore_server::*;
 pub use bridge::*;
