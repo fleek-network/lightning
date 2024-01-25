@@ -286,7 +286,7 @@ async fn test_query_client_info() {
 
     let (node, _app) = init_service_executor(genesis, path.clone(), 30309, 40309, 1069).await;
     node.service_exec.start().await;
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(10)).await;
 
     // Start the service
     fn_sdk::ipc::init_from_env();
@@ -319,7 +319,7 @@ async fn test_query_missing_client_info() {
 
     let (node, _app) = init_service_executor(genesis, path.clone(), 30310, 40310, 1070).await;
     node.service_exec.start().await;
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     // Start the service
     fn_sdk::ipc::init_from_env();

@@ -213,6 +213,7 @@ async fn test_origin_basic() {
     };
 
     tokio::select! {
+        biased;
         _ = spawn_server(30100) => {
 
         }
@@ -252,6 +253,7 @@ async fn test_origin_bbb() {
     };
 
     tokio::select! {
+        biased;
         _ = spawn_server(30200) => {
 
         }

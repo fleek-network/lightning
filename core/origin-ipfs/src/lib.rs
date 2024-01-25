@@ -20,8 +20,6 @@ use tracing::info;
 pub mod config;
 pub use config::Config;
 use config::Gateway;
-mod ipfs_stream;
-pub use ipfs_stream::IPFSStream;
 use tokio_util::io::StreamReader;
 
 mod car_reader;
@@ -73,6 +71,7 @@ impl<C: Collection> IPFSOrigin<C> {
     }
 
     pub async fn fetch(&self, uri: &[u8]) -> Result<Blake3Hash> {
+        // Disclaimer(matthias): this method is unpolished and will be improved in due time
         let requested_cid = Cid::try_from(uri).with_context(|| "Failed to parse uri into cid")?;
 
         let body = self.fetch_from_gateway(&requested_cid).await?;
