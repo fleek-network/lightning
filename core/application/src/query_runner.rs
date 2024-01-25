@@ -1,7 +1,16 @@
 use std::collections::BTreeSet;
+use std::path::Path;
 use std::time::Duration;
 
-use atomo::{Atomo, KeyIterator, QueryPerm, ResolvedTableReference};
+use atomo::{
+    Atomo,
+    AtomoBuilder,
+    DefaultSerdeBackend,
+    KeyIterator,
+    QueryPerm,
+    ResolvedTableReference,
+};
+use atomo_rocks::RocksBackendBuilder;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::application::SyncQueryRunnerInterface;
@@ -28,7 +37,7 @@ use lightning_interfaces::types::{
 };
 
 use crate::state::State;
-use crate::storage::AtomoStorage;
+use crate::storage::{AtomoStorage, AtomoStorageBuilder};
 use crate::table::StateTables;
 
 #[derive(Clone)]
@@ -56,8 +65,10 @@ pub struct QueryRunner {
     _node_to_cid: ResolvedTableReference<NodeIndex, BTreeSet<Blake3Hash>>,
 }
 
-impl QueryRunner {
-    pub fn init(atomo: Atomo<QueryPerm, AtomoStorage>) -> Self {
+impl SyncQueryRunnerInterface for QueryRunner {
+    type Backend = AtomoStorage;
+
+    fn new(atomo: Atomo<QueryPerm, AtomoStorage>) -> Self {
         Self {
             metadata_table: atomo.resolve::<Metadata, Value>("metadata"),
             account_table: atomo.resolve::<EthAddress, AccountInfo>("account"),
@@ -83,9 +94,37 @@ impl QueryRunner {
             inner: atomo,
         }
     }
-}
 
-impl SyncQueryRunnerInterface for QueryRunner {
+    fn atomo_from_checkpoint(
+        path: impl AsRef<Path>,
+        hash: [u8; 32],
+        checkpoint: Vec<u8>,
+    ) -> anyhow::Result<Atomo<QueryPerm, Self::Backend>> {
+        let backend = AtomoStorageBuilder::new(Some(path.as_ref()))
+            .from_checkpoint(hash, checkpoint)
+            .read_only();
+
+        let atomo = Self::register_tables(
+            AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(backend),
+        )
+        .build()?
+        .query();
+
+        Ok(atomo)
+    }
+
+    fn atomo_from_path(path: impl AsRef<Path>) -> anyhow::Result<Atomo<QueryPerm, Self::Backend>> {
+        let backend = AtomoStorageBuilder::new(Some(path.as_ref())).read_only();
+
+        let atomo = Self::register_tables(
+            AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(backend),
+        )
+        .build()?
+        .query();
+
+        Ok(atomo)
+    }
+
     fn get_metadata(&self, key: &Metadata) -> Option<Value> {
         self.inner.run(|ctx| self.metadata_table.get(ctx).get(key))
     }

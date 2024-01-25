@@ -1,15 +1,30 @@
 use std::collections::BTreeSet;
+use std::path::Path;
 use std::time::Duration;
 
 use affair::Socket;
 use anyhow::Result;
-use atomo::KeyIterator;
-use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
+use atomo::{
+    Atomo,
+    AtomoBuilder,
+    InMemoryStorage,
+    KeyIterator,
+    QueryPerm,
+    SerdeBackend,
+    StorageBackend,
+    StorageBackendConstructor,
+};
+use atomo_rocks::RocksBackend;
+use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
+use hp_fixed::unsigned::HpUfixed;
 use lightning_types::{
     AccountInfo,
     Blake3Hash,
     Committee,
+    CommodityTypes,
+    Metadata,
     NodeIndex,
+    ServiceRevenue,
     TransactionRequest,
     TxHash,
     Value,
@@ -86,6 +101,46 @@ pub trait ApplicationInterface<C: Collection>:
 
 #[infusion::blank]
 pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
+    type Backend: StorageBackend = InMemoryStorage;
+
+    fn new(atomo: Atomo<QueryPerm, Self::Backend>) -> Self;
+
+    fn atomo_from_checkpoint(
+        path: impl AsRef<Path>,
+        hash: [u8; 32],
+        checkpoint: Vec<u8>,
+    ) -> Result<Atomo<QueryPerm, Self::Backend>>;
+
+    fn atomo_from_path(path: impl AsRef<Path>) -> Result<Atomo<QueryPerm, Self::Backend>>;
+
+    fn register_tables<B: StorageBackendConstructor, S: SerdeBackend>(
+        builder: AtomoBuilder<B, S>,
+    ) -> AtomoBuilder<B, S> {
+        builder
+            .with_table::<Metadata, Value>("metadata")
+            .with_table::<EthAddress, AccountInfo>("account")
+            .with_table::<ClientPublicKey, EthAddress>("client_keys")
+            .with_table::<NodeIndex, NodeInfo>("node")
+            .with_table::<ConsensusPublicKey, NodeIndex>("consensus_key_to_index")
+            .with_table::<NodePublicKey, NodeIndex>("pub_key_to_index")
+            .with_table::<(NodeIndex, NodeIndex), Duration>("latencies")
+            .with_table::<Epoch, Committee>("committee")
+            .with_table::<ServiceId, Service>("service")
+            .with_table::<ProtocolParams, u128>("parameter")
+            .with_table::<NodeIndex, Vec<ReportedReputationMeasurements>>("rep_measurements")
+            .with_table::<NodeIndex, u8>("rep_scores")
+            .with_table::<NodeIndex, u8>("submitted_rep_measurements")
+            .with_table::<NodeIndex, NodeServed>("current_epoch_served")
+            .with_table::<NodeIndex, NodeServed>("last_epoch_served")
+            .with_table::<Epoch, TotalServed>("total_served")
+            .with_table::<CommodityTypes, HpUfixed<6>>("commodity_prices")
+            .with_table::<ServiceId, ServiceRevenue>("service_revenue")
+            .with_table::<TxHash, ()>("executed_digests")
+            .with_table::<NodeIndex, u8>("uptime")
+            .with_table::<Blake3Hash, BTreeSet<NodeIndex>>("cid_to_node")
+            .with_table::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_cid")
+    }
+
     /// Query Metadata Table
     fn get_metadata(&self, key: &lightning_types::Metadata) -> Option<Value>;
 

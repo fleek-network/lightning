@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ethers.workspace = true
 infusion.workspace = true
 anyhow.workspace = true
 serde.workspace = true
@@ -24,6 +25,7 @@ lightning-schema = { path = "../schema/" }
 lightning-types.workspace = true
 affair.workspace = true
 atomo.workspace = true
+atomo-rocks.workspace = true
 fleek-crypto.workspace = true
 hp-fixed.workspace = true
 ink-quill.workspace = true

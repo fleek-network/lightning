@@ -18,6 +18,17 @@ impl<'a> AtomoStorageBuilder<'a> {
     }
 
     #[inline(always)]
+    pub fn read_only(self) -> Self {
+        match self {
+            AtomoStorageBuilder::InMemory(builder) => AtomoStorageBuilder::InMemory(builder),
+            AtomoStorageBuilder::RocksDb(builder) => {
+                let builder = builder.read_only();
+                AtomoStorageBuilder::RocksDb(builder)
+            },
+        }
+    }
+
+    #[inline(always)]
     pub fn with_options(self, opts: Options) -> Self {
         match self {
             AtomoStorageBuilder::InMemory(builder) => AtomoStorageBuilder::InMemory(builder),
@@ -91,6 +102,18 @@ impl AtomoStorage {
             AtomoStorage::InMemory(_storage) => None,
             AtomoStorage::RocksDb(storage) => Some(storage.serialize()),
         }
+    }
+}
+
+impl From<InMemoryStorage> for AtomoStorage {
+    fn from(storage: InMemoryStorage) -> Self {
+        AtomoStorage::InMemory(storage)
+    }
+}
+
+impl From<RocksBackend> for AtomoStorage {
+    fn from(storage: RocksBackend) -> Self {
+        AtomoStorage::RocksDb(storage)
     }
 }
 

@@ -34,7 +34,11 @@ use lightning_interfaces::types::{
     TxHash,
     Value,
 };
-use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
+use lightning_interfaces::{
+    BlockStoreInterface,
+    IncrementalPutInterface,
+    SyncQueryRunnerInterface,
+};
 use tracing::warn;
 
 use crate::config::{Config, Mode, StorageConfig};
@@ -223,7 +227,7 @@ impl Env<UpdatePerm> {
     }
 
     pub fn query_runner(&self) -> QueryRunner {
-        QueryRunner::init(self.inner.query())
+        QueryRunner::new(self.inner.query())
     }
 
     /// Tries to seeds the application state with the genesis block

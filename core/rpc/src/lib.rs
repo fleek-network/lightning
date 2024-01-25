@@ -45,7 +45,7 @@ pub(crate) struct Data<C: Collection> {
     pub node_public_key: NodePublicKey,
     pub consensus_public_key: ConsensusPublicKey,
     /// If this is some it means the node is in archive mode
-    pub archive_socket: Option<ArchiveSocket>,
+    pub archive_socket: Option<ArchiveSocket<C>>,
 }
 
 pub struct Rpc<C: Collection> {
@@ -236,7 +236,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         blockstore: C::BlockStoreInterface,
         fetcher: &C::FetcherInterface,
         signer: &C::SignerInterface,
-        archive_socket: Option<ArchiveSocket>,
+        archive_socket: Option<ArchiveSocket<C>>,
     ) -> anyhow::Result<Self> {
         let data: Arc<Data<C>> = Arc::new(Data {
             query_runner,

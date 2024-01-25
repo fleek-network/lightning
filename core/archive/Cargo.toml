@@ -17,8 +17,13 @@ tracing.workspace = true
 bincode.workspace = true
 ethers.workspace = true
 rocksdb = "0.21"
+atomo-rocks.workspace = true
+atomo.workspace = true
+
+
 
 [dev-dependencies]
+lightning-blockstore = { path = "../blockstore" }
 lightning-application = { path = "../application", features = ["test"] }
 lightning-test-utils = { path = "../test-utils" }
 infusion.workspace = true

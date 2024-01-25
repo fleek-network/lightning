@@ -35,7 +35,7 @@ pub trait StorageBackend {
     fn contains(&self, tid: u8, key: &[u8]) -> bool;
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct InMemoryStorage(Vec<DashMap<BoxedVec, BoxedVec, fxhash::FxBuildHasher>>);
 
 // For the in memory database the constructor can be as same as the actual object.

@@ -48,6 +48,7 @@ pub struct RocksBackendBuilder<'a> {
     columns: Vec<String>,
     column_options: FxHashMap<String, Options>,
     checkpoint: Option<([u8; 32], &'a [u8])>,
+    read_only: bool,
 }
 
 impl<'a> RocksBackendBuilder<'a> {
@@ -60,6 +61,7 @@ impl<'a> RocksBackendBuilder<'a> {
             columns: Default::default(),
             column_options: Default::default(),
             checkpoint: Default::default(),
+            read_only: false,
         }
     }
 
@@ -84,6 +86,13 @@ impl<'a> RocksBackendBuilder<'a> {
     #[inline(always)]
     pub fn from_checkpoint(mut self, hash: [u8; 32], checkpoint: &'a [u8]) -> Self {
         self.checkpoint = Some((hash, checkpoint));
+        self
+    }
+
+    /// Set the database to read-only mode.
+    #[inline(always)]
+    pub fn read_only(mut self) -> Self {
+        self.read_only = true;
         self
     }
 }
@@ -140,9 +149,19 @@ impl<'a> StorageBackendConstructor for RocksBackendBuilder<'a> {
                 let mut options = self.options;
                 // The database should exist at this point.
                 options.create_if_missing(false);
-                DB::open_cf_descriptors(&options, &self.path, cf_iter)?
+                if self.read_only {
+                    DB::open_cf_descriptors_read_only(&options, &self.path, cf_iter, false)?
+                } else {
+                    DB::open_cf_descriptors(&options, &self.path, cf_iter)?
+                }
             },
-            None => DB::open_cf_descriptors(&self.options, self.path, cf_iter)?,
+            None => {
+                if self.read_only {
+                    DB::open_cf_descriptors_read_only(&self.options, self.path, cf_iter, false)?
+                } else {
+                    DB::open_cf_descriptors(&self.options, self.path, cf_iter)?
+                }
+            },
         };
 
         Ok(RocksBackend {

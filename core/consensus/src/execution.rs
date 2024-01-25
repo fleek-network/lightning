@@ -3,10 +3,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use fastcrypto::hash::HashFunction;
 use fleek_blake3 as blake3;
-use lightning_interfaces::types::{Block, Epoch, IndexRequest, NodeIndex, TransactionRequest};
+use lightning_interfaces::types::{Block, Epoch, Metadata, NodeIndex, TransactionRequest};
 use lightning_interfaces::{
     Emitter,
     ExecutionEngineSocket,
+    IndexRequest,
     IndexSocket,
     SyncQueryRunnerInterface,
     ToDigest,
@@ -131,14 +132,25 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
         // If we have the archive socket that means our node is in archive node and we should send
         // the block and the receipt to be indexed
         if let (Some(block), Some(socket)) = (archive_block, &self.index_socket) {
-            if let Err(e) = socket
-                .run(IndexRequest {
-                    block,
-                    receipt: results,
-                })
-                .await
-            {
+            if let Err(e) = socket.run(IndexRequest::Block(block, results)).await {
                 error!("We could not send a message to the archiver: {e}");
+            }
+
+            // At this point we written a checkpoint to disk and updated the last epoch hash
+            if change_epoch {
+                if let Err(e) = socket
+                    .run(IndexRequest::Epoch(
+                        self.query_runner.get_current_epoch(),
+                        self.query_runner
+                            .get_metadata(&Metadata::LastEpochHash)
+                            .expect("We should have a last epoch hash")
+                            .maybe_hash()
+                            .expect("We should have gotten a hash, this is a bug"),
+                    ))
+                    .await
+                {
+                    error!("We could not send a message to the archiver: {e}");
+                }
             }
         }
         self.notifier.new_block();
