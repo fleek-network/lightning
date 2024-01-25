@@ -4,8 +4,9 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::str::FromStr;
 
+use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
-use axum::body::StreamBody;
+use axum::body::Body;
 use axum::extract::{Path, Query};
 use axum::http::StatusCode;
 use axum::routing::get;
@@ -22,14 +23,14 @@ use lightning_schema::handshake::{
     ResponseFrame,
     TerminationReason,
 };
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{mpsc, oneshot};
-use tokio_stream::wrappers::ReceiverStream;
+use tokio::sync::oneshot;
 use tracing::warn;
 
 use crate::handshake::Context;
 use crate::shutdown::ShutdownWaiter;
 use crate::transports::{Transport, TransportReceiver, TransportSender};
+
+type BodyStream = Receiver<anyhow::Result<Bytes>>;
 
 pub struct HttpTransport {}
 
@@ -56,7 +57,7 @@ async fn handler<P: ExecutorProviderInterface>(
     Path(id): Path<u32>,
     Query(params): Query<HashMap<String, String>>,
     Extension(provider): Extension<Context<P>>,
-) -> Result<StreamBody<ReceiverStream<anyhow::Result<Bytes>>>, (StatusCode, String)> {
+) -> Result<Body, (StatusCode, String)> {
     tracing::trace!("received HTTP request for service {id:?}");
 
     let pk = match params.get("pk") {
@@ -101,8 +102,8 @@ async fn handler<P: ExecutorProviderInterface>(
         retry,
     };
 
-    let (frame_tx, frame_rx) = mpsc::channel(8);
-    let (body_tx, body_rx) = mpsc::channel(1024);
+    let (frame_tx, frame_rx) = async_channel::bounded(8);
+    let (body_tx, body_rx) = async_channel::bounded(1024);
     let (termination_tx, termination_rx) = oneshot::channel();
 
     let sender = HttpSender {
@@ -112,7 +113,7 @@ async fn handler<P: ExecutorProviderInterface>(
         termination_tx: Some(termination_tx),
     };
     let receiver = HttpReceiver { inner: frame_rx };
-    let body = StreamBody::new(ReceiverStream::new(body_rx));
+    let body = Body::from_stream(body_rx);
 
     sender
         .frame_tx
@@ -212,7 +213,7 @@ pub struct HttpReceiver {
 #[async_trait]
 impl TransportReceiver for HttpReceiver {
     async fn recv(&mut self) -> Option<RequestFrame> {
-        self.inner.recv().await.flatten()
+        self.inner.recv().await.ok().flatten()
     }
 }
 
