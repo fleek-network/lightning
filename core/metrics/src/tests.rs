@@ -92,7 +92,10 @@ fn test_labeled_event_counter() {
         increment_counter!(family, Some(description), "epoch" => epoch.as_str());
     }
 
-    let metrics = prometheus::gather();
+    let metrics = prometheus::gather()
+        .into_iter()
+        .filter(|mf| mf.get_name() == family)
+        .collect::<Vec<_>>();
     // Only 1 Event Family
     assert_eq!(metrics.len(), 1);
 

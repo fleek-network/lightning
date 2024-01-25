@@ -24,6 +24,7 @@ use lightning_interfaces::{
     SyncronizerInterface,
     WithStartAndShutdown,
 };
+use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
@@ -313,6 +314,10 @@ impl<C: Collection> SyncronizerInner<C> {
 
         if bootstrap_epoch <= current_epoch {
             bail!("Bootstrap nodes are on the same epoch");
+        } else {
+            // Increment usage of Syncronizer in Metrics
+            let metrics_epoch = bootstrap_epoch.to_string();
+            increment_counter!("synchronizer_usage", Some("Counting how often synchronizer has been used per epoch"), "epoch" => metrics_epoch.as_str());
         }
 
         // Try to get the latest checkpoint hash

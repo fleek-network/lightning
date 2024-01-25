@@ -5346,6 +5346,7 @@ dependencies = [
  "anyhow",
  "fleek-crypto",
  "lightning-interfaces",
+ "lightning-metrics",
  "lightning-utils",
  "rand 0.8.5",
  "reqwest",
