@@ -222,3 +222,42 @@ async fn test_origin_basic() {
 
     }
 }
+
+#[tokio::test]
+async fn test_origin_bbb() {
+    let req_cid =
+        Cid::try_from("bafybeibi5vlbuz3jstustlxbxk7tmxsyjjrxak6us4yqq6z2df3jwidiwi").unwrap();
+    let mut config = Config::default();
+    let target_bytes = std::fs::read(
+        "../test-utils/files/bafybeibi5vlbuz3jstustlxbxk7tmxsyjjrxak6us4yqq6z2df3jwidiwi.mp4",
+    )
+    .unwrap();
+
+    let state = create_app_state("test-origin-bbb".to_string()).await;
+
+    let req_fut = async move {
+        config.gateways.push(Gateway {
+            protocol: Protocol::Http,
+            authority: "127.0.0.1:30200".to_string(),
+        });
+        let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore.clone()).unwrap();
+
+        let hash = ipfs_origin
+            .fetch(req_cid.to_bytes().as_slice())
+            .await
+            .unwrap();
+
+        let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
+        assert_eq!(bytes, target_bytes);
+    };
+
+    tokio::select! {
+        _ = spawn_server(30200) => {
+
+        }
+        _ = req_fut => {
+
+        }
+
+    }
+}
