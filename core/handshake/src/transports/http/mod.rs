@@ -1,6 +1,7 @@
 mod config;
 
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::str::FromStr;
 
 use async_trait::async_trait;
@@ -10,7 +11,7 @@ use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Extension, Router};
 use base64::Engine;
-use bytes::Bytes;
+use bytes::{BufMut, Bytes};
 pub use config::Config;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use lightning_interfaces::ExecutorProviderInterface;
@@ -19,10 +20,13 @@ use lightning_schema::handshake::{
     HandshakeResponse,
     RequestFrame,
     ResponseFrame,
+    TerminationReason,
+    RES_SERVICE_PAYLOAD_TAG,
 };
-use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
+use tracing::warn;
 
 use crate::handshake::Context;
 use crate::shutdown::ShutdownWaiter;
@@ -49,23 +53,6 @@ impl Transport for HttpTransport {
     }
 }
 
-impl HttpTransport {
-    fn create_pair_and_body() -> (
-        <Self as Transport>::Sender,
-        <Self as Transport>::Receiver,
-        StreamBody<ReceiverStream<anyhow::Result<Bytes>>>,
-    ) {
-        let (receiver_tx, receiver_rx) = mpsc::channel(4);
-        let (body_tx, body_rx) = mpsc::channel(4);
-        let sender = HttpSender {
-            receiver_tx,
-            body_tx,
-        };
-        let body = StreamBody::new(ReceiverStream::new(body_rx));
-        (sender, HttpReceiver { inner: receiver_rx }, body)
-    }
-}
-
 async fn handler<P: ExecutorProviderInterface>(
     Path(id): Path<u32>,
     Query(params): Query<HashMap<String, String>>,
@@ -77,29 +64,36 @@ async fn handler<P: ExecutorProviderInterface>(
         Some(pk) => {
             let bytes: [u8; 96] = base64::prelude::BASE64_STANDARD
                 .decode(pk)
-                .map_err(|_| (StatusCode::BAD_REQUEST, "invalid pk value".to_string()))?
+                .map_err(|_| bad_request("invalid pk value"))?
                 .try_into()
-                .map_err(|_| (StatusCode::BAD_REQUEST, "invalid pk value".to_string()))?;
+                .map_err(|_| bad_request("invalid pk value"))?;
             ClientPublicKey(bytes)
         },
-        None => return Err((StatusCode::BAD_REQUEST, "missing pk value".to_string())),
+        None => return Err(bad_request("missing pk value")),
     };
     let pop = match params.get("pop") {
-        Some(pk) => {
+        Some(pop) => {
             let bytes: [u8; 48] = base64::prelude::BASE64_STANDARD
-                .decode(pk)
-                .map_err(|_| (StatusCode::BAD_REQUEST, "invalid pop value".to_string()))?
+                .decode(pop)
+                .map_err(|_| bad_request("invalid pop value"))?
                 .try_into()
-                .map_err(|_| (StatusCode::BAD_REQUEST, "invalid pop value".to_string()))?;
+                .map_err(|_| bad_request("invalid pop value"))?;
             ClientSignature(bytes)
         },
-        None => return Err((StatusCode::BAD_REQUEST, "missing pop value".to_string())),
+        None => return Err(bad_request("missing pop value")),
+    };
+    let payload = match params.get("payload") {
+        Some(payload) => base64::prelude::BASE64_STANDARD
+            .decode(payload)
+            .map_err(|_| bad_request("invalid payload"))?
+            .into(),
+        None => return Err(bad_request("missing payload")),
     };
     let retry = params
         .get("retry")
-        .and_then(|retry| Some(u64::from_str(retry)))
+        .map(|retry| u64::from_str(retry))
         .transpose()
-        .map_err(|_| (StatusCode::BAD_REQUEST, "invalid retry value".to_string()))?;
+        .map_err(|_| bad_request("invalid retry value"))?;
 
     let handshake_frame = HandshakeRequestFrame::Handshake {
         service: id,
@@ -108,46 +102,129 @@ async fn handler<P: ExecutorProviderInterface>(
         retry,
     };
 
-    let (sender, receiver, body) = HttpTransport::create_pair_and_body();
+    let (frame_tx, frame_rx) = mpsc::channel(8);
+    let (body_tx, body_rx) = mpsc::channel(1024);
+    let (termination_tx, termination_rx) = oneshot::channel();
+
+    let sender = HttpSender {
+        frame_tx,
+        body_tx,
+        expected_body_len: 0,
+        termination_tx: Some(termination_tx),
+    };
+    let receiver = HttpReceiver { inner: frame_rx };
+    let body = StreamBody::new(ReceiverStream::new(body_rx));
+
+    sender
+        .frame_tx
+        .try_send(Some(RequestFrame::ServicePayload { bytes: payload }))
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "unexpected error".to_string(),
+            )
+        })?;
 
     provider
         .handle_new_connection(handshake_frame, sender, receiver)
         .await;
 
-    Ok(body)
+    // If there is an error while streaming, the status header has already been sent,
+    // this is a hacky way of returning an error status before beginning streaming the body.
+    match termination_rx.await {
+        Ok(reason) => Err(bad_request(format!("handshake failed: {reason:?}"))),
+        Err(_) => Ok(body),
+    }
 }
 
 pub struct HttpSender {
-    receiver_tx: Sender<RequestFrame>,
+    frame_tx: Sender<Option<RequestFrame>>,
     body_tx: Sender<anyhow::Result<Bytes>>,
+    expected_body_len: usize,
+    termination_tx: Option<oneshot::Sender<TerminationReason>>,
+}
+
+impl HttpSender {
+    #[inline(always)]
+    fn close(&mut self) {
+        if self.frame_tx.try_send(None).is_err() {
+            warn!("failed to send close signal to receiver");
+        }
+    }
+
+    #[inline(always)]
+    fn inner_send(&mut self, bytes: Bytes) {
+        if let Err(e) = self.body_tx.try_send(Ok(bytes)) {
+            warn!("payload dropped, failed to send to write loop: {e}");
+        }
+    }
 }
 
 #[async_trait]
 impl TransportSender for HttpSender {
-    fn send_handshake_response(&mut self, response: HandshakeResponse) {
-        todo!()
+    fn send_handshake_response(&mut self, _: HandshakeResponse) {
+        unimplemented!()
     }
 
-    fn send(&mut self, frame: ResponseFrame) {
-        todo!()
+    fn send(&mut self, _: ResponseFrame) {
+        unimplemented!()
+    }
+
+    fn terminate(mut self, reason: TerminationReason) {
+        if let Some(reason_sender) = self.termination_tx.take() {
+            let _ = reason_sender.send(reason);
+        }
     }
 
     fn start_write(&mut self, len: usize) {
-        todo!()
+        {
+            assert!(self.termination_tx.take().is_some());
+        }
+
+        self.expected_body_len = len;
+        debug_assert!(
+            self.expected_body_len == 0,
+            "data should be written completely before calling start_write again"
+        );
+
+        let mut buffer = Vec::with_capacity(5);
+        buffer.put_u32(len as u32 + 1);
+        buffer.put_u8(RES_SERVICE_PAYLOAD_TAG);
+        self.inner_send(buffer.into());
     }
 
     fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
-        todo!()
+        // Todo: update trait to accept Bytes.
+        let bytes = Bytes::copy_from_slice(buf);
+        let len = bytes.len();
+
+        debug_assert!(self.expected_body_len != 0);
+        debug_assert!(self.expected_body_len >= len);
+
+        self.inner_send(bytes);
+
+        if self.expected_body_len <= len {
+            self.close();
+        }
+
+        self.expected_body_len -= len;
+
+        Ok(len)
     }
 }
 
 pub struct HttpReceiver {
-    inner: Receiver<RequestFrame>,
+    inner: Receiver<Option<RequestFrame>>,
 }
 
 #[async_trait]
 impl TransportReceiver for HttpReceiver {
     async fn recv(&mut self) -> Option<RequestFrame> {
-        todo!()
+        self.inner.recv().await.flatten()
     }
+}
+
+#[inline(always)]
+fn bad_request<T: AsRef<str> + Display>(msg: T) -> (StatusCode, String) {
+    (StatusCode::BAD_REQUEST, msg.to_string())
 }
