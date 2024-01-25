@@ -4704,6 +4704,7 @@ dependencies = [
  "futures-util",
  "fxhash",
  "lightning-interfaces",
+ "lightning-metrics",
  "lightning-schema",
  "lightning-utils",
  "multiaddr",

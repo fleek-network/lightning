@@ -14,6 +14,7 @@ bincode.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 lightning-schema = { path = "../schema" }
 lightning-utils = { path = "../utils" }
+lightning-metrics = { path = "../metrics" }
 futures.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
