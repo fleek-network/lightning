@@ -49,6 +49,7 @@ use lightning_resolver::resolver::Resolver;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use lightning_topology::{Config as TopologyConfig, Topology};
+use serial_test::serial;
 use tokio::sync::mpsc;
 
 use crate::shim::{ServiceExecutor, ServiceExecutorConfig};
@@ -263,6 +264,7 @@ async fn init_service_executor(
 }
 
 #[tokio::test]
+#[serial]
 async fn test_query_client_info() {
     let path = std::env::temp_dir().join("lightning-service-ex-test-1");
     if path.exists() {
@@ -305,6 +307,7 @@ async fn test_query_client_info() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_query_missing_client_info() {
     let path = std::env::temp_dir().join("lightning-service-ex-test-2");
     if path.exists() {

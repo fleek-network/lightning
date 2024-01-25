@@ -52,3 +52,4 @@ lightning-topology = {path="../topology"}
 lightning-test-utils = { path="../test-utils" }
 lightning-rep-collector = {path="../rep-collector"}
 hp-fixed.workspace = true
+serial_test = "3.0.0"
