@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use atomo::batch::Operation;
 use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackend, StorageBackendConstructor};
-use fcntl::is_file_locked;
+use fcntl::{is_file_locked, FlockOperations};
 use fxhash::FxHashMap;
 /// Re-export of [`rocksdb::Options`].
 pub use rocksdb::Options;
@@ -234,9 +234,9 @@ pub fn is_db_locked(mut path: PathBuf) -> bool {
         return false;
     }
 
-    if let Ok(file) = OpenOptions::new().read(true).open(path) {
+    if let Ok(file) = OpenOptions::new().write(true).open(path) {
         
-        match is_file_locked(&file, None){
+        match is_file_locked(&file, Some(fcntl::flock::default().with_locktype(fcntl::FcntlLockType::Write))){
             Ok(locked) => locked,
             Err(e) => {
                 tracing::error!("Error checking lock: {:?}", e);
