@@ -82,6 +82,13 @@ impl<C: Collection> IPFSOrigin<C> {
             Ok(Some((cid, data))) => {
                 verify_data(&cid, &data)?;
                 match cid.codec() {
+                    0x55 => {
+                        // TODO(matthias): make sure that if the codec of the root block is raw
+                        // (0x55), then there will never be any more blocks after that
+                        if let Err(e) = blockstore_putter.write(&data, comp) {
+                            return Err(anyhow!("Failed to write to the blockstore: {e}"));
+                        }
+                    },
                     0x70 => {
                         let node = PbNode::from_bytes(data.into())?;
                         let mut nodes = HashSet::new();

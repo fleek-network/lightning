@@ -185,7 +185,7 @@ async fn create_app_state(test_name: String) -> AppState {
 }
 
 #[tokio::test]
-async fn test_origin_basic() {
+async fn test_origin_dag_pb() {
     let req_cid =
         Cid::try_from("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi").unwrap();
     let mut config = Config::default();
@@ -194,7 +194,7 @@ async fn test_origin_basic() {
     )
     .unwrap();
 
-    let state = create_app_state("test-origin-basic".to_string()).await;
+    let state = create_app_state("test-origin-dag-pb".to_string()).await;
 
     let req_fut = async move {
         config.gateways.push(Gateway {
@@ -225,7 +225,7 @@ async fn test_origin_basic() {
 }
 
 #[tokio::test]
-async fn test_origin_bbb() {
+async fn test_origin_bbb_dag_pb() {
     let req_cid =
         Cid::try_from("bafybeibi5vlbuz3jstustlxbxk7tmxsyjjrxak6us4yqq6z2df3jwidiwi").unwrap();
     let mut config = Config::default();
@@ -234,7 +234,7 @@ async fn test_origin_bbb() {
     )
     .unwrap();
 
-    let state = create_app_state("test-origin-bbb".to_string()).await;
+    let state = create_app_state("test-origin-bbb-dag-pb".to_string()).await;
 
     let req_fut = async move {
         config.gateways.push(Gateway {
@@ -255,6 +255,46 @@ async fn test_origin_bbb() {
     tokio::select! {
         biased;
         _ = spawn_server(30200) => {
+
+        }
+        _ = req_fut => {
+
+        }
+
+    }
+}
+
+#[tokio::test]
+async fn test_origin_raw() {
+    let req_cid =
+        Cid::try_from("bafkreihiruy5ng7d5v26c6g4gwhtastyencrefjkruqe33vwrnbyhvr74u").unwrap();
+    let mut config = Config::default();
+    let target_bytes = std::fs::read(
+        "../test-utils/files/bafkreihiruy5ng7d5v26c6g4gwhtastyencrefjkruqe33vwrnbyhvr74u.txt",
+    )
+    .unwrap();
+
+    let state = create_app_state("test-origin-raw".to_string()).await;
+
+    let req_fut = async move {
+        config.gateways.push(Gateway {
+            protocol: Protocol::Http,
+            authority: "127.0.0.1:30201".to_string(),
+        });
+        let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore.clone()).unwrap();
+
+        let hash = ipfs_origin
+            .fetch(req_cid.to_bytes().as_slice())
+            .await
+            .unwrap();
+
+        let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
+        assert_eq!(bytes, target_bytes);
+    };
+
+    tokio::select! {
+        biased;
+        _ = spawn_server(30201) => {
 
         }
         _ = req_fut => {
