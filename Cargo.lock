@@ -645,6 +645,7 @@ dependencies = [
  "fxhash",
  "rand 0.8.5",
  "rocksdb",
+ "tracing",
 ]
 
 [[package]]

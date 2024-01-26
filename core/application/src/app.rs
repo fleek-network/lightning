@@ -112,13 +112,16 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
             .context("db_path must be specified for RocksDb backend")?;
 
         loop {
+            tracing::error!("Checking if db is locked at {:?}", db_path);
             if is_db_locked(db_path.clone()) {
                 if counter >= 10 {
+                    tracing::error!("Tried 10 times and its still locked aborting");
                     break;
                 }
                 tokio::time::sleep(Duration::from_secs(3)).await;
                 counter += 1;
             } else {
+                tracing::error!("DB appears not to be locked");
                 break;
             }
         }
