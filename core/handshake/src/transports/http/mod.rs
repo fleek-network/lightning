@@ -2,7 +2,6 @@ mod config;
 
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::str::FromStr;
 
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
@@ -60,28 +59,6 @@ async fn handler<P: ExecutorProviderInterface>(
 ) -> Result<Body, (StatusCode, String)> {
     tracing::trace!("received HTTP request for service {id:?}");
 
-    let pk = match params.get("pk") {
-        Some(pk) => {
-            let bytes: [u8; 96] = base64::prelude::BASE64_URL_SAFE
-                .decode(pk)
-                .map_err(|_| bad_request("invalid pk value"))?
-                .try_into()
-                .map_err(|_| bad_request("invalid pk value"))?;
-            ClientPublicKey(bytes)
-        },
-        None => return Err(bad_request("missing pk value")),
-    };
-    let pop = match params.get("pop") {
-        Some(pop) => {
-            let bytes: [u8; 48] = base64::prelude::BASE64_URL_SAFE
-                .decode(pop)
-                .map_err(|_| bad_request("invalid pop value"))?
-                .try_into()
-                .map_err(|_| bad_request("invalid pop value"))?;
-            ClientSignature(bytes)
-        },
-        None => return Err(bad_request("missing pop value")),
-    };
     let payload = match params.get("payload") {
         Some(payload) => base64::prelude::BASE64_URL_SAFE
             .decode(payload)
@@ -89,17 +66,12 @@ async fn handler<P: ExecutorProviderInterface>(
             .into(),
         None => return Err(bad_request("missing payload")),
     };
-    let retry = params
-        .get("retry")
-        .map(|retry| u64::from_str(retry))
-        .transpose()
-        .map_err(|_| bad_request("invalid retry value"))?;
 
     let handshake_frame = HandshakeRequestFrame::Handshake {
         service: id,
-        pk,
-        pop,
-        retry,
+        pk: ClientPublicKey([0; 96]),
+        pop: ClientSignature([0; 48]),
+        retry: None,
     };
 
     let (frame_tx, frame_rx) = async_channel::bounded(8);
