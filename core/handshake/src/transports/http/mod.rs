@@ -109,8 +109,8 @@ async fn handler<P: ExecutorProviderInterface>(
     let sender = HttpSender {
         frame_tx,
         body_tx,
-        expected_body_len: None,
-        current_chunk_len: 0,
+        expected_block_count: None,
+        current_block_len: 0,
         termination_tx: Some(termination_tx),
     };
     let receiver = HttpReceiver { inner: frame_rx };
@@ -141,8 +141,8 @@ async fn handler<P: ExecutorProviderInterface>(
 pub struct HttpSender {
     frame_tx: Sender<Option<RequestFrame>>,
     body_tx: Sender<anyhow::Result<Bytes>>,
-    expected_body_len: Option<usize>,
-    current_chunk_len: usize,
+    expected_block_count: Option<usize>,
+    current_block_len: usize,
     termination_tx: Option<oneshot::Sender<TerminationReason>>,
 }
 
@@ -182,38 +182,42 @@ impl TransportSender for HttpSender {
         self.termination_tx.take();
 
         debug_assert!(
-            self.current_chunk_len == 0,
+            self.current_block_len == 0,
             "data should be written completely before calling start_write again"
         );
 
-        self.current_chunk_len = len;
+        self.current_block_len = len;
 
-        if let Some(expected_body_len) = self.expected_body_len.as_mut() {
-            *expected_body_len -= 1;
+        if let Some(expected_block_count) = self.expected_block_count.as_mut() {
+            *expected_block_count -= 1;
         }
     }
 
     fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
         let len = buf.len();
 
-        if self.expected_body_len.is_none() && len == 4 {
-            let content_len = u32::from_be_bytes(buf.as_ref().try_into()?);
-            assert!(
-                self.expected_body_len
-                    .replace(content_len as usize)
-                    .is_none()
-            )
-        }
+        debug_assert!(self.current_block_len != 0);
+        debug_assert!(self.current_block_len >= len);
 
-        debug_assert!(self.current_chunk_len != 0);
-        debug_assert!(self.current_chunk_len >= len);
+        self.current_block_len -= len;
+
+        if self.expected_block_count.is_none() && len == 4 {
+            let expected_block_count = u32::from_be_bytes(buf.as_ref().try_into()?);
+            assert!(
+                self.expected_block_count
+                    .replace(expected_block_count as usize)
+                    .is_none()
+            );
+            return Ok(4);
+        }
 
         self.inner_send(buf);
 
-        self.current_chunk_len -= len;
-
-        let expected_body_len = self.expected_body_len.as_ref().expect("To be initialized");
-        if *expected_body_len == 0 && self.current_chunk_len == 0 {
+        let expected_block_count = self
+            .expected_block_count
+            .as_ref()
+            .expect("To be initialized");
+        if *expected_block_count == 0 && self.current_block_len == 0 {
             self.close();
         }
 
