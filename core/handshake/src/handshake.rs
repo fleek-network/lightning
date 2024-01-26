@@ -91,10 +91,11 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
 
         // If we have routers to use, start the http server
         if !routers.is_empty() {
-            let mut router = Router::new().layer(Extension(run.ctx.clone()));
+            let mut router = Router::new();
             for child in routers {
                 router = router.nest("", child);
             }
+            let router = router.layer(Extension(run.ctx.clone()));
             let waiter = run.shutdown.waiter();
             let http_addr = self.config.http_address;
             tokio::spawn(async move { spawn_http_server(http_addr, router, waiter).await });

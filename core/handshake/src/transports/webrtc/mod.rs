@@ -89,7 +89,7 @@ impl Transport for WebRtcTransport {
         // A bounded channel is used to provide some back pressure for incoming client handshakes.
         let (conn_tx, conn_rx) = channel(1024);
         // Construct our http router for negotiating via SDP.
-        let router = router::<P>(vec![public_addr, local_addr], conns.clone(), conn_tx)?;
+        let router = router(vec![public_addr, local_addr], conns.clone(), conn_tx)?;
 
         Ok((
             Self {

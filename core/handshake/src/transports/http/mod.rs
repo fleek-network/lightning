@@ -54,15 +54,15 @@ impl Transport for HttpTransport {
 }
 
 async fn handler<P: ExecutorProviderInterface>(
+    Extension(provider): Extension<Context<P>>,
     Path(id): Path<u32>,
     Query(params): Query<HashMap<String, String>>,
-    Extension(provider): Extension<Context<P>>,
 ) -> Result<Body, (StatusCode, String)> {
     tracing::trace!("received HTTP request for service {id:?}");
 
     let pk = match params.get("pk") {
         Some(pk) => {
-            let bytes: [u8; 96] = base64::prelude::BASE64_STANDARD
+            let bytes: [u8; 96] = base64::prelude::BASE64_URL_SAFE
                 .decode(pk)
                 .map_err(|_| bad_request("invalid pk value"))?
                 .try_into()
@@ -73,7 +73,7 @@ async fn handler<P: ExecutorProviderInterface>(
     };
     let pop = match params.get("pop") {
         Some(pop) => {
-            let bytes: [u8; 48] = base64::prelude::BASE64_STANDARD
+            let bytes: [u8; 48] = base64::prelude::BASE64_URL_SAFE
                 .decode(pop)
                 .map_err(|_| bad_request("invalid pop value"))?
                 .try_into()
@@ -83,7 +83,7 @@ async fn handler<P: ExecutorProviderInterface>(
         None => return Err(bad_request("missing pop value")),
     };
     let payload = match params.get("payload") {
-        Some(payload) => base64::prelude::BASE64_STANDARD
+        Some(payload) => base64::prelude::BASE64_URL_SAFE
             .decode(payload)
             .map_err(|_| bad_request("invalid payload"))?
             .into(),
@@ -109,7 +109,8 @@ async fn handler<P: ExecutorProviderInterface>(
     let sender = HttpSender {
         frame_tx,
         body_tx,
-        expected_body_len: 0,
+        expected_body_len: None,
+        current_chunk_len: 0,
         termination_tx: Some(termination_tx),
     };
     let receiver = HttpReceiver { inner: frame_rx };
@@ -140,7 +141,8 @@ async fn handler<P: ExecutorProviderInterface>(
 pub struct HttpSender {
     frame_tx: Sender<Option<RequestFrame>>,
     body_tx: Sender<anyhow::Result<Bytes>>,
-    expected_body_len: usize,
+    expected_body_len: Option<usize>,
+    current_chunk_len: usize,
     termination_tx: Option<oneshot::Sender<TerminationReason>>,
 }
 
@@ -177,30 +179,43 @@ impl TransportSender for HttpSender {
     }
 
     fn start_write(&mut self, len: usize) {
-        {
-            assert!(self.termination_tx.take().is_some());
-        }
+        self.termination_tx.take();
 
-        self.expected_body_len = len;
         debug_assert!(
-            self.expected_body_len == 0,
+            self.current_chunk_len == 0,
             "data should be written completely before calling start_write again"
         );
+
+        self.current_chunk_len = len;
+
+        if let Some(expected_body_len) = self.expected_body_len.as_mut() {
+            *expected_body_len -= 1;
+        }
     }
 
     fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
         let len = buf.len();
 
-        debug_assert!(self.expected_body_len != 0);
-        debug_assert!(self.expected_body_len >= len);
+        if self.expected_body_len.is_none() && len == 4 {
+            let content_len = u32::from_be_bytes(buf.as_ref().try_into()?);
+            assert!(
+                self.expected_body_len
+                    .replace(content_len as usize)
+                    .is_none()
+            )
+        }
+
+        debug_assert!(self.current_chunk_len != 0);
+        debug_assert!(self.current_chunk_len >= len);
 
         self.inner_send(buf);
 
-        if self.expected_body_len <= len {
+        self.current_chunk_len -= len;
+
+        let expected_body_len = self.expected_body_len.as_ref().expect("To be initialized");
+        if *expected_body_len == 0 && self.current_chunk_len == 0 {
             self.close();
         }
-
-        self.expected_body_len -= len;
 
         Ok(len)
     }
