@@ -79,8 +79,8 @@ async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
 
         // Append entry point function with parameters
         match param {
-            Some(param) => source.push_str(&format!("main({param})")),
-            None => source.push_str("main()"),
+            Some(param) => source.push_str(&format!("\nmain({param})")),
+            None => source.push_str("\nmain()"),
         }
 
         // Create runtime and execute the source
