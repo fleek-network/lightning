@@ -34,8 +34,11 @@ impl Transport for HttpTransport {
         _: Self::Config,
     ) -> anyhow::Result<(Self, Option<Router>)> {
         let router = Router::new()
-            .route("/services/1", get(handler::fetcher_service_handler::<P>))
-            .route("/services/0", get(handler::js_service_handler::<P>));
+            .route("/services/0", get(handler::fetcher_service_handler::<P>))
+            .route(
+                "/services/1/:origin/:uri",
+                get(handler::js_service_handler::<P>),
+            );
         Ok((Self {}, Some(router)))
     }
 

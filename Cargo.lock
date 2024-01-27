@@ -5082,6 +5082,7 @@ dependencies = [
  "derive_more",
  "enum_dispatch",
  "fleek-crypto",
+ "fleek-service-js-poc",
  "fn-sdk",
  "futures",
  "fxhash",
