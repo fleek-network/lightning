@@ -19,6 +19,7 @@ impl Default for HandshakeConfig {
                 TransportConfig::WebRTC(Default::default()),
                 TransportConfig::WebTransport(Default::default()),
                 TransportConfig::Tcp(Default::default()),
+                TransportConfig::Http(Default::default())
             ],
             http_address: ([0, 0, 0, 0], 4220).into(),
         }
