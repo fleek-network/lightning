@@ -5356,7 +5356,7 @@ version = "0.0.0"
 dependencies = [
  "affair 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "anyhow",
- "axum 0.6.20",
+ "axum 0.7.4",
  "bincode",
  "bytes",
  "der 0.7.8",

@@ -4,6 +4,7 @@ use anyhow::Context;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Router};
+use tokio::net::TcpListener;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
@@ -22,10 +23,12 @@ pub async fn spawn_http_server(
         .route("/state", axum::routing::get(state))
         .layer(Extension(event_tx))
         .layer(Extension(endpoint_task_tx));
-
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .with_graceful_shutdown(shutdown.cancelled())
+    let shutdown = async move {
+        shutdown.cancelled().await;
+    };
+    let listener = TcpListener::bind(&addr).await?;
+    axum::serve::serve(listener, app.into_make_service())
+        .with_graceful_shutdown(shutdown)
         .await
         .context("failed to run http server")
         .map(Into::into)
