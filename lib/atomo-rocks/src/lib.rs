@@ -118,12 +118,14 @@ impl<'a> StorageBackendConstructor for RocksBackendBuilder<'a> {
                     fs::remove_dir_all(&tmp_path)?;
                 }
                 fs::create_dir_all(&tmp_path)?;
-                let (_db, column_names) =
+                let (db, column_names) =
                     build_db_from_checkpoint(&tmp_path, hash, checkpoint, self.options.clone())?;
                 // If the build was successful, we move the db over to the actual directory.
                 if self.path.exists() {
                     fs::remove_dir_all(&self.path)?;
                 }
+
+                std::mem::drop(db);
 
                 fs::rename(&tmp_path, &self.path)?;
                 if tmp_path.exists() {
