@@ -1,7 +1,7 @@
 use std::io;
 
 use anyhow::Result;
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use futures::{SinkExt, StreamExt};
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{RequestHeader, ServiceScope};
@@ -201,7 +201,7 @@ async fn handle_incoming_bi_stream<C: ConnectionInterface>(
 async fn send_message<C: ConnectionInterface>(mut connection: C, message: Message) -> Result<()> {
     let stream_tx = connection.open_uni_stream().await?;
     let mut writer = FramedWrite::new(stream_tx, LengthDelimitedCodec::new());
-    writer.send(Bytes::from(message)).await?;
+    writer.send(message.into()).await?;
     writer.close().await.map_err(Into::into)
 }
 
@@ -224,11 +224,19 @@ async fn send_request<C: ConnectionInterface>(
         channel.send(request).await?;
 
         // Read the response header.
-        let header = channel.next().await.ok_or(io::ErrorKind::BrokenPipe)??;
+        let mut header = channel.next().await.ok_or(io::ErrorKind::BrokenPipe)??;
 
-        // Todo: Use something better than bincode.
-        let status: Status =
-            bincode::deserialize(header.as_ref()).map_err(|_| io::ErrorKind::Other)?;
+        if header.len() != 1 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "invalid encoded response status received",
+            ));
+        }
+
+        let status: Status = header
+            .get_u8()
+            .try_into()
+            .map_err(|_| io::ErrorKind::Other)?;
 
         Ok::<Response, io::Error>(Response::new(status, channel))
     };

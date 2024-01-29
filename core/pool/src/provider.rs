@@ -24,7 +24,6 @@ use lightning_interfaces::{
     SignerInterface,
     WithStartAndShutdown,
 };
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
@@ -444,10 +443,10 @@ impl Request {
 impl RequestInterface for Request {
     fn reject(self, reason: RejectReason) {
         let mut us = self;
-        let header = bincode::serialize(&Status::Failed(reason)).expect("Typed object");
+        let header: Vec<u8> = vec![Status::Failed(reason).into()];
         tokio::spawn(async move {
             let channel = us.channel.as_mut().expect("Channel taken on drop");
-            let _ = channel.send(Bytes::from(header)).await;
+            let _ = channel.send(header.into()).await;
         });
     }
 
@@ -456,10 +455,8 @@ impl RequestInterface for Request {
         if !self.ok_header_sent {
             // We haven't sent the header.
             // Let's send it first and only once.
-            let header = bincode::serialize(&Status::Ok)
-                .map(Bytes::from)
-                .expect("Defined object");
-            channel.send(header).await?;
+            let header: Vec<u8> = vec![Status::Ok.into()];
+            channel.send(header.into()).await?;
             self.ok_header_sent = true;
         }
         channel.send(frame).await
@@ -477,10 +474,42 @@ impl Drop for Request {
     }
 }
 
-#[derive(Deserialize, Serialize)]
 pub enum Status {
     Ok,
     Failed(RejectReason),
+}
+
+impl TryFrom<u8> for Status {
+    type Error = std::io::Error;
+
+    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
+        let result = match value {
+            0 => Self::Ok,
+            1 => Self::Failed(RejectReason::TooManyRequests),
+            2 => Self::Failed(RejectReason::ContentNotFound),
+            3 => Self::Failed(RejectReason::Other),
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "invalid status value",
+                ));
+            },
+        };
+
+        Ok(result)
+    }
+}
+
+impl From<Status> for u8 {
+    fn from(value: Status) -> Self {
+        match value {
+            Status::Ok => 0,
+            Status::Failed(RejectReason::TooManyRequests) => 1,
+            Status::Failed(RejectReason::ContentNotFound) => 2,
+            Status::Failed(RejectReason::Other) => 3,
+            _ => unreachable!(),
+        }
+    }
 }
 
 pub enum State<C, M>

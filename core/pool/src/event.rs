@@ -330,7 +330,7 @@ where
                 .get(&message.service)
                 .cloned()
             {
-                self.enqueue_received_message(sender, (remote, Bytes::from(message.payload)));
+                self.enqueue_received_message(sender, (remote, message.payload.into()));
             }
         }
     }
