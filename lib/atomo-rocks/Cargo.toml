@@ -14,8 +14,5 @@ fxhash = "0.2"
 anyhow.workspace = true
 fleek-blake3 = "1.5"
 
-[target.'cfg(not(target_os = "macos"))'.dependencies]
-fcntl = "0.1.0"
-
 [dev-dependencies]
 rand = "0.8"

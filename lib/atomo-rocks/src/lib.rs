@@ -15,7 +15,8 @@ use rocksdb::{ColumnFamilyDescriptor, WriteBatch};
 pub use serialization::{build_db_from_checkpoint, serialize_db};
 
 /// Helper alias for an [`atomo::AtomoBuilder`] using a [`RocksBackendBuilder`].
-pub type AtomoBuilderWithRocks<S = DefaultSerdeBackend> = AtomoBuilder<RocksBackendBuilder, S>;
+pub type AtomoBuilderWithRocks<'a, S = DefaultSerdeBackend> =
+    AtomoBuilder<RocksBackendBuilder<'a>, S>;
 
 /// Builder for a new [`rocksdb::DB`] backend.
 ///
@@ -41,15 +42,15 @@ pub type AtomoBuilderWithRocks<S = DefaultSerdeBackend> = AtomoBuilder<RocksBack
 /// drop(atomo);
 /// std::fs::remove_dir_all(path).unwrap();
 /// ```
-pub struct RocksBackendBuilder {
+pub struct RocksBackendBuilder<'a> {
     path: PathBuf,
     options: Options,
     columns: Vec<String>,
     column_options: FxHashMap<String, Options>,
-    checkpoint: Option<([u8; 32], Vec<u8>)>,
+    checkpoint: Option<([u8; 32], &'a [u8])>,
 }
 
-impl RocksBackendBuilder {
+impl<'a> RocksBackendBuilder<'a> {
     /// Create a new builder at the given path.
     #[inline(always)]
     pub fn new<P: Into<PathBuf>>(path: P) -> Self {
@@ -81,13 +82,13 @@ impl RocksBackendBuilder {
     /// Warning: providing a checkpoint will overwrite the existing database at the specified path,
     /// if there is one.
     #[inline(always)]
-    pub fn from_checkpoint(mut self, hash: [u8; 32], checkpoint: Vec<u8>) -> Self {
+    pub fn from_checkpoint(mut self, hash: [u8; 32], checkpoint: &'a [u8]) -> Self {
         self.checkpoint = Some((hash, checkpoint));
         self
     }
 }
 
-impl StorageBackendConstructor for RocksBackendBuilder {
+impl<'a> StorageBackendConstructor for RocksBackendBuilder<'a> {
     type Storage = RocksBackend;
 
     type Error = anyhow::Error;
@@ -118,7 +119,7 @@ impl StorageBackendConstructor for RocksBackendBuilder {
                 }
                 fs::create_dir_all(&tmp_path)?;
                 let (_db, column_names) =
-                    build_db_from_checkpoint(&tmp_path, hash, &checkpoint, self.options.clone())?;
+                    build_db_from_checkpoint(&tmp_path, hash, checkpoint, self.options.clone())?;
                 // If the build was successful, we move the db over to the actual directory.
                 if self.path.exists() {
                     fs::remove_dir_all(&self.path)?;
@@ -216,29 +217,6 @@ impl StorageBackend for RocksBackend {
             false
         }
     }
-}
-
-/// Helper method to determine if there is currently a lock on your RocksDB
-/// Will return true if there is any fs problems trying to access the the lock file(Like user
-/// permission errors) but if the directory or lock file does not exist it will return false
-/// indicating you are safe to open a db here.
-#[cfg(not(target_os = "macos"))]
-pub fn is_db_locked(mut path: PathBuf) -> bool {
-    path.push("LOCK");
-
-    if !path.exists() {
-        return false;
-    }
-
-    if let Ok(file) = std::fs::OpenOptions::new().read(true).open(path) {
-        fcntl::is_file_locked(&file, None).unwrap_or(true)
-    } else {
-        true
-    }
-}
-#[cfg(target_os = "macos")]
-pub fn is_db_locked(_path: PathBuf) -> bool {
-    false
 }
 
 #[cfg(test)]
