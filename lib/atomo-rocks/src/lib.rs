@@ -1,13 +1,12 @@
 //! A [`rocksdb`] storage backend implementation for [`atomo`].
 
 mod serialization;
-use std::fs::{self, OpenOptions};
+use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
 use atomo::batch::Operation;
 use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackend, StorageBackendConstructor};
-use fcntl::{is_file_locked, FlockOperations};
 use fxhash::FxHashMap;
 /// Re-export of [`rocksdb::Options`].
 pub use rocksdb::Options;
@@ -125,10 +124,7 @@ impl<'a> StorageBackendConstructor for RocksBackendBuilder<'a> {
                 if self.path.exists() {
                     fs::remove_dir_all(&self.path)?;
                 }
-                tracing::error!(
-                    "Checking if locked before moving: {}",
-                    is_db_locked(tmp_path.clone())
-                );
+
                 fs::rename(&tmp_path, &self.path)?;
                 if tmp_path.exists() {
                     fs::remove_dir_all(&tmp_path)?;
@@ -145,8 +141,6 @@ impl<'a> StorageBackendConstructor for RocksBackendBuilder<'a> {
                 let mut options = self.options;
                 // The database should exist at this point.
                 options.create_if_missing(false);
-                let locked = is_db_locked(self.path.clone());
-                tracing::error!("Checking if locked before building: {}", locked);
                 DB::open_cf_descriptors(&options, &self.path, cf_iter)?
             },
             None => DB::open_cf_descriptors(&self.options, self.path, cf_iter)?,
@@ -226,61 +220,6 @@ impl StorageBackend for RocksBackend {
     }
 }
 
-<<<<<<< HEAD
-/// Helper method to determine if there is currently a lock on your RocksDB
-/// Will return true if there is any fs problems trying to access the the lock file(Like user
-/// permission errors) but if the directory or lock file does not exist it will return false
-/// indicating you are safe to open a db here.
-pub fn is_db_locked(mut path: PathBuf) -> bool {
-    path.push("LOCK");
-    tracing::warn!("Checking for lock file at {:?}", path);
-    if !path.exists() {
-        tracing::warn!("Lock path doesnt exist cant be locked");
-        return false;
-    }
-
-    if let Ok(file) = OpenOptions::new().write(true).open(path) {
-        match is_file_locked(
-            &file,
-            Some(fcntl::flock::default().with_locktype(fcntl::FcntlLockType::Write)),
-        ) {
-            Ok(locked) => locked,
-            Err(e) => {
-                tracing::error!("Error checking lock: {:?}", e);
-                true
-            },
-        }
-    } else {
-        true
-    }
-}
-
-||||||| parent of 3cb48c08 (fix(application): race condition when node checkpoints)
-/// Helper method to determine if there is currently a lock on your RocksDB
-/// Will return true if there is any fs problems trying to access the the lock file(Like user
-/// permission errors) but if the directory or lock file does not exist it will return false
-/// indicating you are safe to open a db here.
-#[cfg(not(target_os = "macos"))]
-pub fn is_db_locked(mut path: PathBuf) -> bool {
-    path.push("LOCK");
-
-    if !path.exists() {
-        return false;
-    }
-
-    if let Ok(file) = std::fs::OpenOptions::new().read(true).open(path) {
-        fcntl::is_file_locked(&file, None).unwrap_or(true)
-    } else {
-        true
-    }
-}
-#[cfg(target_os = "macos")]
-pub fn is_db_locked(_path: PathBuf) -> bool {
-    false
-}
-
-=======
->>>>>>> 3cb48c08 (fix(application): race condition when node checkpoints)
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
