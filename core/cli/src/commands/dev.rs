@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
+use base64::Engine;
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::BlockStoreServerInterface;
 use lightning_node::config::TomlConfigProvider;
@@ -80,7 +81,12 @@ async fn store(input: Vec<PathBuf>) -> Result<()> {
             )
             .await?;
 
-            println!("{:x}\t{path:?}", ByteBuf(&response.result));
+            println!("{path:?}");
+            println!("\tHex: {:x}", ByteBuf(&response.result));
+            println!(
+                "\tBase64 URL Safe (RFC 3548): {}",
+                base64::prelude::BASE64_URL_SAFE.encode(response.result)
+            );
         } else {
             println!("invalid unicode in {path:?}")
         };

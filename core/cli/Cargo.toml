@@ -34,6 +34,7 @@ rand.workspace = true
 panic-report.workspace = true
 os_info = "3.7.0"
 compile-time-run = "0.2.12"
+base64.workspace = true
 
 [features]
 default = []
