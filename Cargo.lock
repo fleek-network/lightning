@@ -5066,6 +5066,7 @@ dependencies = [
  "base64 0.21.5",
  "bincode",
  "bytes",
+ "cid 0.10.1",
  "clap 4.4.12",
  "criterion",
  "dashmap",
