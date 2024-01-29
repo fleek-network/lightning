@@ -26,7 +26,7 @@ use triomphe::Arc;
 
 use crate::config::HandshakeConfig;
 use crate::http::spawn_http_server;
-use crate::proxy::Proxy;
+use crate::proxy::{Proxy, State};
 use crate::shutdown::{ShutdownNotifier, ShutdownWaiter};
 use crate::transports::{
     spawn_transport_by_config,
@@ -120,7 +120,7 @@ pub struct Context<P: ExecutorProviderInterface> {
     provider: P,
     pub(crate) shutdown: ShutdownWaiter,
     connection_counter: Arc<AtomicU64>,
-    secondary_senders: Arc<DashMap<u64, Sender<TransportPair>>>,
+    secondary_senders: Arc<DashMap<u64, Sender<(bool, TransportPair)>>>,
     access_tokens: Arc<DashMap<[u8; 48], TokenState>>,
 }
 
@@ -186,7 +186,9 @@ impl<P: ExecutorProviderInterface> Context<P> {
                     },
                 );
 
-                Proxy::new(sender, receiver, socket, rx, access_token, self.clone()).spawn();
+                Proxy::new(socket, rx, access_token, self.clone()).spawn(Some(
+                    State::OnlyPrimaryConnection((sender, receiver).into()),
+                ));
             },
             // Join request to an existing connection
             HandshakeRequestFrame::JoinRequest { access_token } => {
@@ -216,7 +218,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
                     return;
                 };
 
-                tx.send((sender, receiver).into()).await.ok();
+                tx.send((false, (sender, receiver).into())).await.ok();
             },
             HandshakeRequestFrame::Handshake { retry: Some(_), .. } => {
                 // TODO: Retry logic for primary connections
@@ -224,36 +226,39 @@ impl<P: ExecutorProviderInterface> Context<P> {
         }
     }
 
-    /// Initialize the token with a time to live.
-    /// Returns an error if token has already been initialized.
-    pub async fn handle_access_token_request(
-        &self,
-        access_token: &[u8; 48],
-        ttl: u64,
-    ) -> anyhow::Result<u64> {
+    /// Initialize the token with a time to live. If a token already exists updates the time to
+    /// live if the new one is a greater one.
+    pub fn handle_access_token_request(&self, access_token: &[u8; 48], ttl: u64) -> u64 {
         let mut state = self
             .access_tokens
             .get_mut(access_token)
-            .expect("token state must exist");
+            .expect("Token state must exist.");
 
-        if state.timeout.is_some() {
-            return Err(anyhow!("token already initialized"));
-        }
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get current time.")
+            .as_millis();
 
-        state.timeout = Some(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("failed to get current time")
-                .add(Duration::from_secs(ttl))
-                .as_millis(),
-        );
+        let new_timeout = now + (ttl * 60) as u128;
 
-        Ok(ttl)
+        let timeout = if let Some(prev_timeout) = &mut state.timeout {
+            if new_timeout > *prev_timeout {
+                *prev_timeout = new_timeout;
+                new_timeout
+            } else {
+                *prev_timeout
+            }
+        } else {
+            state.timeout = Some(new_timeout);
+            new_timeout
+        };
+
+        ((timeout - now) / 60) as u64
     }
 
     /// Extend an access token with a new ttl.
     /// Returns an error if the token has not been initialized.
-    pub async fn handle_extend_access_token_request(
+    pub fn handle_extend_access_token_request(
         &self,
         access_token: &[u8; 48],
         new_ttl: u64,
