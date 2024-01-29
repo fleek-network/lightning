@@ -3,7 +3,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
 use fleek_blake3 as blake3;
-use rocksdb::{ColumnFamilyDescriptor, FlushOptions, IteratorMode, Options, DB};
+use rocksdb::{ColumnFamilyDescriptor, IteratorMode, Options, DB};
 
 type Entry = (Box<[u8]>, Box<[u8]>);
 
@@ -39,11 +39,6 @@ pub fn build_db_from_checkpoint(
         return Err(anyhow!("Failed to verify hash"));
     }
 
-    let mut flush_options = FlushOptions::default();
-    flush_options.set_wait(true);
-
-    db.flush_opt(&flush_options)?;
-    db.flush()?;
     db.flush_wal(true)?;
 
     Ok((db, table_names))

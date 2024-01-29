@@ -3,6 +3,7 @@
 mod serialization;
 use std::fs;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use anyhow::Result;
 use atomo::batch::Operation;
@@ -124,26 +125,48 @@ impl<'a> StorageBackendConstructor for RocksBackendBuilder<'a> {
                 if self.path.exists() {
                     fs::remove_dir_all(&self.path)?;
                 }
-
+                db.cancel_all_background_work(true);
                 std::mem::drop(db);
 
                 fs::rename(&tmp_path, &self.path)?;
                 if tmp_path.exists() {
                     fs::remove_dir_all(&tmp_path)?;
                 }
-                let cf_iter: Vec<_> = column_names
-                    .iter()
-                    .map(|name| {
-                        ColumnFamilyDescriptor::new(
-                            name,
-                            self.column_options.remove(name).unwrap_or_default(),
-                        )
-                    })
-                    .collect();
+
                 let mut options = self.options;
                 // The database should exist at this point.
                 options.create_if_missing(false);
-                DB::open_cf_descriptors(&options, &self.path, cf_iter)?
+                let db;
+                let mut counter = 0;
+                loop {
+                    let cf_iter: Vec<_> = column_names
+                        .iter()
+                        .map(|name| {
+                            ColumnFamilyDescriptor::new(
+                                name,
+                                self.column_options.remove(name).unwrap_or_default(),
+                            )
+                        })
+                        .collect();
+
+                    match DB::open_cf_descriptors(&options, &self.path, cf_iter) {
+                        Ok(database) => {
+                            db = database;
+                            break;
+                        },
+                        Err(e) => {
+                            if counter >= 20 {
+                                return Err(anyhow::anyhow!(e));
+                            }
+                            tracing::error!(
+                                "Failed to open checkpoint db after building, trying again"
+                            );
+                            std::thread::sleep(Duration::from_millis(100));
+                            counter += 1;
+                        },
+                    }
+                }
+                db
             },
             None => DB::open_cf_descriptors(&self.options, self.path, cf_iter)?,
         };
