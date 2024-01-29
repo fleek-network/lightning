@@ -3,12 +3,12 @@ use std::path::PathBuf;
 use atomo::{InMemoryStorage, StorageBackend, StorageBackendConstructor};
 use atomo_rocks::{Options, RocksBackend, RocksBackendBuilder};
 
-pub enum AtomoStorageBuilder {
+pub enum AtomoStorageBuilder<'a> {
     InMemory(InMemoryStorage),
-    RocksDb(RocksBackendBuilder),
+    RocksDb(RocksBackendBuilder<'a>),
 }
 
-impl AtomoStorageBuilder {
+impl<'a> AtomoStorageBuilder<'a> {
     #[inline(always)]
     pub fn new<P: Into<PathBuf>>(path: Option<P>) -> Self {
         match path {
@@ -43,7 +43,7 @@ impl AtomoStorageBuilder {
     #[inline(always)]
     #[allow(unused)]
     #[allow(clippy::wrong_self_convention)]
-    pub fn from_checkpoint(self, hash: [u8; 32], checkpoint: Vec<u8>) -> Self {
+    pub fn from_checkpoint(self, hash: [u8; 32], checkpoint: &'a [u8]) -> Self {
         match self {
             AtomoStorageBuilder::InMemory(builder) => AtomoStorageBuilder::InMemory(builder),
             AtomoStorageBuilder::RocksDb(builder) => {
@@ -54,7 +54,7 @@ impl AtomoStorageBuilder {
     }
 }
 
-impl StorageBackendConstructor for AtomoStorageBuilder {
+impl<'a> StorageBackendConstructor for AtomoStorageBuilder<'a> {
     type Storage = AtomoStorage;
 
     type Error = anyhow::Error;

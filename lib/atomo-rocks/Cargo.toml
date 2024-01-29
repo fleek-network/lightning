@@ -13,7 +13,6 @@ rocksdb = "0.21"
 fxhash = "0.2"
 anyhow.workspace = true
 fleek-blake3 = "1.5"
-fcntl = "0.1.0"
 tracing = "0.1.37"
 
 [dev-dependencies]

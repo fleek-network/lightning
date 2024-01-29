@@ -49,7 +49,7 @@ pub struct Env<P> {
 }
 
 impl Env<UpdatePerm> {
-    pub fn new(config: &Config, checkpoint: Option<([u8; 32], Vec<u8>)>) -> Result<Self> {
+    pub fn new(config: &Config, checkpoint: Option<([u8; 32], &[u8])>) -> Result<Self> {
         let storage = match config.storage {
             StorageConfig::RocksDb => {
                 let db_path = config

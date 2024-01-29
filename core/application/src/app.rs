@@ -1,11 +1,9 @@
 use std::marker::PhantomData;
-use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
 
 use affair::{Executor, TokioSpawn};
-use anyhow::{anyhow, Context, Result};
-use atomo_rocks::is_db_locked;
+use anyhow::{anyhow, Result};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
     ApplicationInterface,
@@ -106,39 +104,27 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
         // again if there is a lock on the DB at this stage of the process
         let mut counter = 0;
 
-        let db_path: &PathBuf = config
-            .db_path
-            .as_ref()
-            .context("db_path must be specified for RocksDb backend")?;
-
         loop {
-            tracing::error!("Checking if db is locked at {:?}", db_path);
-            if is_db_locked(db_path.clone()) {
-                if counter >= 10 {
-                    tracing::error!("Tried 10 times and its still locked aborting");
-                    break;
-                }
-                tokio::time::sleep(Duration::from_secs(3)).await;
-                counter += 1;
-            } else {
-                tracing::error!("DB appears not to be locked");
-                break;
+            match Env::new(config, Some((checkpoint_hash, &checkpoint))) {
+                Ok(mut env) => {
+                    info!(
+                        "Successfully built database from checkpoint with hash {checkpoint_hash:?}"
+                    );
+                    // Update the last epoch hash on state
+                    env.update_last_epoch_hash(checkpoint_hash);
+
+                    return Ok(());
+                },
+                Err(e) => {
+                    if counter > 10 {
+                        error!("Failed to build app db from checkpoint: {e:?}");
+                        return Err(anyhow!("Failed to build app db from checkpoint: {}", e));
+                    } else {
+                        counter += 1;
+                        tokio::time::sleep(Duration::from_secs(3)).await;
+                    }
+                },
             }
-        }
-
-        match Env::new(config, Some((checkpoint_hash, checkpoint))) {
-            Ok(mut env) => {
-                info!("Successfully built database from checkpoint with hash {checkpoint_hash:?}");
-
-                // Update the last epoch hash on state
-                env.update_last_epoch_hash(checkpoint_hash);
-
-                Ok(())
-            },
-            Err(e) => {
-                error!("Failed to build app db from checkpoint");
-                Err(anyhow!("Failed to build app db from checkpoint: {}", e))
-            },
         }
     }
 }
