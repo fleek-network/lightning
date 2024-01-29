@@ -289,7 +289,7 @@ impl<C: Collection> ArchiveInner<C> {
                         Some(checkpoint) => checkpoint,
                         None => {
                             return Err(anyhow::anyhow!(
-                                "Could not find checkpoint for epoch, this is a bug"
+                                "Could not find checkpoint in blockstore for epoch, this is a bug"
                             ));
                         },
                     };

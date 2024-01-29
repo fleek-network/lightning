@@ -9,6 +9,8 @@ use jsonrpsee::{Methods, RpcModule};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::{
     ApplicationInterface,
+    ArchiveRequest,
+    ArchiveResponse,
     ArchiveSocket,
     ConfigConsumer,
     FetcherInterface,
@@ -25,6 +27,7 @@ use tower::Service;
 use crate::api::AdminApiServer;
 pub use crate::api::{EthApiServer, FleekApiServer, NetApiServer};
 pub use crate::config::Config;
+use crate::error::RPCError;
 use crate::logic::AdminApi;
 pub use crate::logic::{EthApi, FleekApi, NetApi};
 
@@ -46,6 +49,35 @@ pub(crate) struct Data<C: Collection> {
     pub consensus_public_key: ConsensusPublicKey,
     /// If this is some it means the node is in archive mode
     pub archive_socket: Option<ArchiveSocket<C>>,
+}
+
+impl<C: Collection> Data<C> {
+    #[allow(dead_code)]
+    pub(crate) async fn query_runner(
+        &self,
+        epoch: Option<u64>,
+    ) -> Result<c!(C::ApplicationInterface::SyncExecutor), RPCError> {
+        match epoch {
+            Some(epoch) => {
+                if let Some(socket) = &self.archive_socket {
+                    let res = socket
+                        .run(ArchiveRequest::GetHistoricalEpochState(epoch))
+                        .await
+                        .map_err(RPCError::from)?
+                        .map_err(RPCError::from)?;
+
+                    if let ArchiveResponse::HistoricalEpochState(query_runner) = res {
+                        Ok(query_runner.clone())
+                    } else {
+                        Err(RPCError::BadEpoch)
+                    }
+                } else {
+                    Err(RPCError::BadEpoch)
+                }
+            },
+            None => Ok(self.query_runner.clone()),
+        }
+    }
 }
 
 pub struct Rpc<C: Collection> {

@@ -200,7 +200,7 @@ async fn test_get_latest_earliest() {
 
     let index_req1 = get_index_request(0, [0; 32]);
     index_socket.run(index_req1.clone()).await.unwrap().unwrap();
-    let (_, receipt) = match index_req1 {
+    let (_, receipt_1) = match index_req1 {
         IndexRequest::Block(b, r) => (b.clone(), r.clone()),
         _ => panic!("Unexpected request"),
     };
@@ -213,14 +213,14 @@ async fn test_get_latest_earliest() {
 
     match block {
         ArchiveResponse::Block(block) => {
-            assert_eq!(block.block_hash, receipt.block_hash);
+            assert_eq!(block.block_hash, receipt_1.block_hash);
         },
         _ => panic!("Unexpected response"),
     }
 
     let index_req2 = get_index_request(1, [1; 32]);
     index_socket.run(index_req2.clone()).await.unwrap().unwrap();
-    let (_, receipt) = match index_req2 {
+    let (_, receipt_2) = match index_req2 {
         IndexRequest::Block(b, r) => (b.clone(), r.clone()),
         _ => panic!("Unexpected request"),
     };
@@ -233,7 +233,7 @@ async fn test_get_latest_earliest() {
 
     match block {
         ArchiveResponse::Block(block) => {
-            assert_eq!(block.block_hash, receipt.block_hash);
+            assert_eq!(block.block_hash, receipt_2.block_hash);
         },
         _ => panic!("Unexpected response"),
     }
@@ -246,7 +246,7 @@ async fn test_get_latest_earliest() {
 
     match block {
         ArchiveResponse::Block(block) => {
-            assert_eq!(block.block_hash, receipt.block_hash);
+            assert_eq!(block.block_hash, receipt_1.block_hash);
         },
         _ => panic!("Unexpected response"),
     }

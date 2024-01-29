@@ -33,7 +33,7 @@ pub enum RPCError {
     SignatureError(#[from] ethers::types::SignatureError),
 
     #[error("Recieved an error from the socket {}", *.0)]
-    SocketError(SocketErrorWrapper),
+    SocketError(#[from] SocketErrorWrapper),
 
     #[error("Unimplemented")]
     Unimplemented,
@@ -43,6 +43,15 @@ pub enum RPCError {
 
     #[error("RPCError {}", .0)]
     Custom(String),
+
+    #[error("Bad Epoch")]
+    BadEpoch,
+
+    #[error("Not an archive node")]
+    NotArchiveNode,
+
+    #[error("Error: ")]
+    Anyhow(#[from] anyhow::Error),
 }
 
 impl RPCError {
@@ -67,7 +76,7 @@ impl<T> From<affair::RunError<T>> for SocketErrorWrapper {
 
 impl<T> From<affair::RunError<T>> for RPCError {
     fn from(e: affair::RunError<T>) -> Self {
-        Self::SocketError(e.into())
+        Self::from(SocketErrorWrapper::from(e))
     }
 }
 
@@ -80,6 +89,9 @@ impl From<RPCError> for ErrorObject<'static> {
             RPCError::Unimplemented => internal_err_from_string("Unimplemented".to_string()),
             RPCError::Custom(s) => internal_err_from_string(s),
             RPCError::ParseError(e) => internal_err(e),
+            RPCError::BadEpoch => internal_err_from_string("Bad Epoch".to_string()),
+            RPCError::Anyhow(e) => internal_err_from_string(e.to_string()),
+            RPCError::NotArchiveNode => internal_err_from_string(e.to_string()),
         }
     }
 }
