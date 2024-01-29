@@ -15,6 +15,8 @@ use crate::transports::{match_transport, TransportPair, TransportReceiver, Trans
 
 pub struct Proxy<P: ExecutorProviderInterface> {
     context: Context<P>,
+    /// The id for this connection.
+    connection_id: u64,
     /// The unix socket connection to the service made specifically for this ongoing connection.
     socket: UnixStream,
     /// The buffer using which we read bytes from the unix socket.
@@ -32,8 +34,6 @@ pub struct Proxy<P: ExecutorProviderInterface> {
     /// secondary connection happens while we are in the middle of sending something to the
     /// primary.
     is_primary_the_current_sender: IsPrimary,
-    /// The token for the current connection.
-    token: [u8; 48],
     /// Only [`ResponseFrame::AccessToken`]s that are meant to be sent to the primary. The reason
     /// we have to queue these here is that at times we may be in the middle of sending a service
     /// payload through the transport. And randomly inserting in some other frame in the middle of
@@ -61,20 +61,20 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
     pub fn new(
+        connection_id: u64,
         socket: UnixStream,
         connection_rx: Receiver<(IsPrimary, TransportPair)>,
-        token: [u8; 48],
         context: Context<P>,
     ) -> Self {
         Self {
             context,
+            connection_id,
             socket,
             buffer: Default::default(),
             connection_rx,
             current_write: 0,
             discard_bytes: false,
             is_primary_the_current_sender: false,
-            token,
             queued_primary_response: VecDeque::new(),
         }
     }
@@ -187,6 +187,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
                             // a current service payload we need to discard them before moving on to
                             // send the next payload to the new connection.
                             self.discard_bytes = true;
+                            self.queued_primary_response.clear();
                             return State::NoConnection;
                         }
                     }
@@ -199,6 +200,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
                         (true, true) => {
                             sender.terminate(TerminationReason::ConnectionInUse);
                             self.discard_bytes = true;
+                            self.queued_primary_response.clear();
                             State::OnlyPrimaryConnection(pair)
                         },
                         (false, false) => {
@@ -271,6 +273,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
 
                             if sender.write(bytes.freeze()).is_err() {
                                 self.discard_bytes = true;
+                                self.queued_primary_response.clear();
                                 return State::NoConnection;
                             }
                         }
@@ -317,6 +320,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
                             if self.is_primary_the_current_sender {
                                 self.discard_bytes = true;
                             }
+                            self.queued_primary_response.clear();
                             return State::OnlySecondaryConnection((s_sender, s_receiver).into());
                         }
                     }
@@ -340,9 +344,11 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
                         return match (is_primary, self.is_primary_the_current_sender) {
                             (true, true) => {
                                 self.discard_bytes = true;
+                                self.queued_primary_response.clear();
                                 State::PrimaryAndSecondary(pair, (s_sender, s_receiver).into())
                             },
                             (true, false) => {
+                                self.queued_primary_response.clear();
                                 State::PrimaryAndSecondary(pair, (s_sender, s_receiver).into())
                             },
                             (false, true) => {
@@ -407,6 +413,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
                                     continue 'inner;
                                 }
                                 self.discard_bytes = true;
+                                self.queued_primary_response.clear();
                                 State::OnlySecondaryConnection((s_sender, s_receiver).into())
                             } else {
                                 if s_sender.write(bytes.freeze()).is_ok() {
@@ -446,16 +453,16 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
                 HandleRequestResult::DropTransport
             },
             RequestFrame::AccessToken { ttl } => {
-                let ttl = self.context.handle_access_token_request(&self.token, ttl);
+                let (access_token, ttl) = self.context.extend_access_token(self.connection_id, ttl);
                 self.queued_primary_response
                     .push_front(ResponseFrame::AccessToken {
                         ttl,
-                        access_token: self.token.into(),
+                        access_token: access_token.into(),
                     });
                 HandleRequestResult::Ok
             },
             RequestFrame::ExtendAccessToken { ttl } => {
-                self.context.handle_access_token_request(&self.token, ttl);
+                self.context.extend_access_token(self.connection_id, ttl);
                 HandleRequestResult::Ok
             },
             RequestFrame::DeliveryAcknowledgment { .. } => {
@@ -503,7 +510,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
 
 impl<P: ExecutorProviderInterface> Drop for Proxy<P> {
     fn drop(&mut self) {
-        self.context.cleanup_connection(&self.token);
+        self.context.cleanup_connection(self.connection_id);
     }
 }
 

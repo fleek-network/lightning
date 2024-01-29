@@ -1,8 +1,6 @@
-use std::ops::Add;
 use std::sync::atomic::AtomicU64;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::anyhow;
 use async_channel::{bounded, Sender};
 use axum::{Extension, Router};
 use dashmap::DashMap;
@@ -120,8 +118,17 @@ pub struct Context<P: ExecutorProviderInterface> {
     provider: P,
     pub(crate) shutdown: ShutdownWaiter,
     connection_counter: Arc<AtomicU64>,
-    secondary_senders: Arc<DashMap<u64, Sender<(bool, TransportPair)>>>,
-    access_tokens: Arc<DashMap<[u8; 48], TokenState>>,
+    connections: Arc<DashMap<u64, ConnectionEntry>>,
+}
+
+struct ConnectionEntry {
+    /// The sender half of the connection channel which can be used to notify the proxy
+    /// of new connections and dials made by the user.
+    connection_sender: Sender<(bool, TransportPair)>,
+    /// The full access token for this connection.
+    access_token: [u8; 48],
+    /// The timeout for the access token.
+    timeout: u128,
 }
 
 impl<P: ExecutorProviderInterface> Context<P> {
@@ -130,8 +137,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
             provider,
             shutdown: waiter,
             connection_counter: AtomicU64::new(0).into(),
-            secondary_senders: DashMap::new().into(),
-            access_tokens: DashMap::new().into(),
+            connections: DashMap::new().into(),
         }
     }
 
@@ -155,8 +161,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
 
                 // Attempt to connect to the service, getting the unix socket.
                 let Some(socket) = self.provider.connect(service).await else {
-                    eprintln!("failed to connect");
-                    sender.terminate(crate::schema::TerminationReason::InvalidService);
+                    sender.terminate(TerminationReason::InvalidService);
                     warn!("failed to connect to service {service}");
                     return;
                 };
@@ -166,73 +171,80 @@ impl<P: ExecutorProviderInterface> Context<P> {
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
                 let (tx, rx) = bounded(1);
-                self.secondary_senders.insert(connection_id, tx);
 
                 // TODO: look into potentially more secure and audit-friendly
                 //       implementations of randomness.
+                // For access token use the first 8 bytes as the connection id and 40 bytes of
+                // random values.
                 let mut access_token = [0; 48];
-                loop {
-                    rand::thread_rng().fill_bytes(&mut access_token);
-                    // active keys should never be duplicates
-                    if !self.access_tokens.contains_key(&access_token) {
-                        break;
-                    }
-                }
-                self.access_tokens.insert(
-                    access_token,
-                    TokenState {
-                        connection_id,
-                        timeout: None,
+                rand::thread_rng().fill_bytes(&mut access_token[8..]);
+                access_token[0..8].copy_from_slice(&connection_id.to_be_bytes());
+
+                self.connections.insert(
+                    connection_id,
+                    ConnectionEntry {
+                        connection_sender: tx,
+                        access_token,
+                        timeout: 0,
                     },
                 );
 
-                Proxy::new(socket, rx, access_token, self.clone()).spawn(Some(
+                Proxy::new(connection_id, socket, rx, self.clone()).spawn(Some(
                     State::OnlyPrimaryConnection((sender, receiver).into()),
                 ));
             },
             // Join request to an existing connection
             HandshakeRequestFrame::JoinRequest { access_token } => {
-                let Some(token_state) = self.access_tokens.get(&access_token) else {
+                let connection_id = u64::from_be_bytes(*arrayref::array_ref![access_token, 0, 8]);
+
+                let Some(connection) = self.connections.get(&connection_id) else {
                     sender.terminate(TerminationReason::InvalidToken);
                     return;
                 };
 
-                let Some(timeout) = token_state.timeout else {
-                    sender.terminate(TerminationReason::InvalidToken);
-                    return;
-                };
-
-                if timeout
-                    < SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .expect("failed to get current time")
-                        .as_millis()
-                {
-                    eprintln!("terminated");
+                if connection.access_token != access_token {
                     sender.terminate(TerminationReason::InvalidToken);
                     return;
                 }
 
-                let Some(tx) = self.secondary_senders.get(&token_state.connection_id) else {
-                    sender.terminate(TerminationReason::ServiceTerminated);
+                if connection.timeout
+                    < SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .expect("Failed to get current time")
+                        .as_millis()
+                {
+                    sender.terminate(TerminationReason::InvalidToken);
+                    return;
+                }
+
+                connection
+                    .connection_sender
+                    .send((false, (sender, receiver).into()))
+                    .await
+                    .ok();
+            },
+            HandshakeRequestFrame::Handshake {
+                retry: Some(id), ..
+            } => {
+                let Some(connection) = self.connections.get(&id) else {
+                    sender.terminate(TerminationReason::InvalidToken);
                     return;
                 };
 
-                tx.send((false, (sender, receiver).into())).await.ok();
-            },
-            HandshakeRequestFrame::Handshake { retry: Some(_), .. } => {
-                // TODO: Retry logic for primary connections
+                connection
+                    .connection_sender
+                    .send((true, (sender, receiver).into()))
+                    .await
+                    .ok();
             },
         }
     }
 
-    /// Initialize the token with a time to live. If a token already exists updates the time to
-    /// live if the new one is a greater one.
-    pub fn handle_access_token_request(&self, access_token: &[u8; 48], ttl: u64) -> u64 {
-        let mut state = self
-            .access_tokens
-            .get_mut(access_token)
-            .expect("Token state must exist.");
+    pub fn extend_access_token(&self, connection_id: u64, ttl: u64) -> ([u8; 48], u64) {
+        let Some(mut connection) = self.connections.get_mut(&connection_id) else {
+            // This should never happen.
+            return ([0; 48], 0);
+        };
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -240,53 +252,13 @@ impl<P: ExecutorProviderInterface> Context<P> {
             .as_millis();
 
         let new_timeout = now + (ttl * 60) as u128;
-
-        let timeout = if let Some(prev_timeout) = &mut state.timeout {
-            if new_timeout > *prev_timeout {
-                *prev_timeout = new_timeout;
-                new_timeout
-            } else {
-                *prev_timeout
-            }
-        } else {
-            state.timeout = Some(new_timeout);
-            new_timeout
-        };
-
-        ((timeout - now) / 60) as u64
+        connection.timeout = connection.timeout.max(new_timeout);
+        let ttl = ((connection.timeout - now) / 60) as u64;
+        (connection.access_token, ttl)
     }
 
-    /// Extend an access token with a new ttl.
-    /// Returns an error if the token has not been initialized.
-    pub fn handle_extend_access_token_request(
-        &self,
-        access_token: &[u8; 48],
-        new_ttl: u64,
-    ) -> anyhow::Result<()> {
-        let mut state = self
-            .access_tokens
-            .get_mut(access_token)
-            .expect("token state must exist");
-
-        if state.timeout.is_none() {
-            return Err(anyhow!("token has not been initialized"));
-        }
-
-        state.timeout = Some(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("failed to get current time")
-                .add(Duration::from_secs(new_ttl))
-                .as_millis(),
-        );
-
-        Ok(())
-    }
-
-    pub fn cleanup_connection(&self, access_token: &[u8; 48]) {
-        if let Some((_, state)) = self.access_tokens.remove(access_token) {
-            self.secondary_senders.remove(&state.connection_id);
-        }
+    pub fn cleanup_connection(&self, connection_id: u64) {
+        self.connections.remove(&connection_id);
     }
 }
 
