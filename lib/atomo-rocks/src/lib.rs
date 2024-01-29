@@ -120,12 +120,15 @@ impl StorageBackendConstructor for RocksBackendBuilder {
                 fs::create_dir_all(&tmp_path)?;
                 let (_, column_names) =
                     build_db_from_checkpoint(&tmp_path, hash, &checkpoint, self.options.clone())?;
-                
+
                 // If the build was successful, we move the db over to the actual directory.
                 if self.path.exists() {
                     fs::remove_dir_all(&self.path)?;
                 }
-                tracing::error!("Checking if locked before moving: {}", is_db_locked(tmp_path.clone()));
+                tracing::error!(
+                    "Checking if locked before moving: {}",
+                    is_db_locked(tmp_path.clone())
+                );
                 fs::rename(&tmp_path, &self.path)?;
                 if tmp_path.exists() {
                     fs::remove_dir_all(&tmp_path)?;
@@ -143,7 +146,7 @@ impl StorageBackendConstructor for RocksBackendBuilder {
                 // The database should exist at this point.
                 options.create_if_missing(false);
                 let locked = is_db_locked(self.path.clone());
-                tracing::error!("Checking if locked before building: {}", locked );
+                tracing::error!("Checking if locked before building: {}", locked);
                 DB::open_cf_descriptors(&options, &self.path, cf_iter)?
             },
             None => DB::open_cf_descriptors(&self.options, self.path, cf_iter)?,
@@ -236,13 +239,15 @@ pub fn is_db_locked(mut path: PathBuf) -> bool {
     }
 
     if let Ok(file) = OpenOptions::new().write(true).open(path) {
-        
-        match is_file_locked(&file, Some(fcntl::flock::default().with_locktype(fcntl::FcntlLockType::Write))){
+        match is_file_locked(
+            &file,
+            Some(fcntl::flock::default().with_locktype(fcntl::FcntlLockType::Write)),
+        ) {
             Ok(locked) => locked,
             Err(e) => {
                 tracing::error!("Error checking lock: {:?}", e);
                 true
-            }
+            },
         }
     } else {
         true
