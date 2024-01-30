@@ -5,6 +5,7 @@ use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::notifier::{Notification, NotifierInterface};
 use lightning_interfaces::{ApplicationInterface, Emitter};
 use lightning_utils::application::QueryRunnerExt;
+use tokio::pin;
 use tokio::sync::{mpsc, Notify};
 use tokio::time::sleep;
 
@@ -53,14 +54,23 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
 
     fn notify_on_new_block(&self, tx: mpsc::Sender<Notification>) {
         let notify = self.notify.clone();
-
         tokio::spawn(async move {
             loop {
-                notify.new_block_notify.notified().await;
+                let notify_future = notify.new_block_notify.notified();
+                let shutdown_future = notify.shutdown_notify.notified();
+                pin!(shutdown_future);
+                pin!(notify_future);
 
-                if tx.send(Notification::NewBlock).await.is_err() {
-                    // There is no receiver anymore.
-                    return;
+                tokio::select! {
+                _ = shutdown_future => {
+                    break;
+                }
+                _ = notify_future => {
+                    if tx.send(Notification::NewBlock).await.is_err() {
+                        // There is no receiver anymore.
+                        return;
+                    }
+                }
                 }
             }
         });
@@ -68,14 +78,23 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
 
     fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>) {
         let notify = self.notify.clone();
-
         tokio::spawn(async move {
             loop {
-                notify.new_epoch_notify.notified().await;
+                let notify_future = notify.new_epoch_notify.notified();
+                let shutdown_future = notify.shutdown_notify.notified();
+                pin!(shutdown_future);
+                pin!(notify_future);
 
-                if tx.send(Notification::NewEpoch).await.is_err() {
-                    // There is no receiver anymore.
-                    return;
+                tokio::select! {
+                _ = shutdown_future => {
+                    break;
+                }
+                _ = notify_future => {
+                    if tx.send(Notification::NewEpoch).await.is_err() {
+                        // There is no receiver anymore.
+                        return;
+                    }
+                }
                 }
             }
         });
@@ -98,6 +117,7 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
 pub struct NotificationsEmitter {
     new_block_notify: Arc<Notify>,
     new_epoch_notify: Arc<Notify>,
+    shutdown_notify: Arc<Notify>,
 }
 
 impl Emitter for NotificationsEmitter {
@@ -107,6 +127,10 @@ impl Emitter for NotificationsEmitter {
 
     fn epoch_changed(&self) {
         self.new_epoch_notify.notify_waiters()
+    }
+
+    fn shutdown(&self) {
+        self.shutdown_notify.notify_waiters()
     }
 }
 

@@ -315,6 +315,10 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 
         self.consensus = Some(service)
     }
+
+    pub fn shutdown(&self) {
+        self.execution_state.shutdown();
+    }
 }
 
 impl<C: Collection> WithStartAndShutdown for Consensus<C> {
@@ -352,6 +356,7 @@ impl<C: Collection> WithStartAndShutdown for Consensus<C> {
                             consensus.shutdown().await;
                         }
                         edge_node.shutdown().await;
+                        epoch_state.shutdown();
                         break
                     }
                     _ = reconfigure_future => {
