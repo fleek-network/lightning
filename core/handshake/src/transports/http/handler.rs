@@ -4,6 +4,7 @@ use std::fmt::Display;
 use axum::body::Body;
 use axum::extract::{Path, Query};
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum::Extension;
 use cid::Cid;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
@@ -18,8 +19,9 @@ use crate::transports::http::{HttpReceiver, HttpSender, Service};
 
 pub async fn fetcher_service_handler<P: ExecutorProviderInterface>(
     Path((origin, uri)): Path<(String, String)>,
+    Query(params): Query<HashMap<String, String>>,
     Extension(provider): Extension<Context<P>>,
-) -> Result<Body, (StatusCode, String)> {
+) -> Result<impl IntoResponse, (StatusCode, String)> {
     let origin = match origin.as_str() {
         "ipfs" => Origin::Ipfs,
         "blake3" => Origin::Blake3,
@@ -70,7 +72,15 @@ pub async fn fetcher_service_handler<P: ExecutorProviderInterface>(
     // this is a hacky way of returning an error status before beginning streaming the body.
     match termination_rx.await {
         Ok(reason) => Err(bad_request(format!("handshake failed: {reason:?}"))),
-        Err(_) => Ok(body),
+        Err(_) => {
+            let mut builder = Response::builder();
+            if let Some(content_type) = params.get("mime") {
+                builder = builder.header("Content-Type", content_type);
+            }
+            builder
+                .body(body)
+                .map_err(|_| bad_request("invalid type value"))
+        },
     }
 }
 
@@ -78,7 +88,7 @@ pub async fn js_service_handler<P: ExecutorProviderInterface>(
     Path((origin, uri)): Path<(String, String)>,
     Query(params): Query<HashMap<String, String>>,
     Extension(provider): Extension<Context<P>>,
-) -> Result<Body, (StatusCode, String)> {
+) -> Result<impl IntoResponse, (StatusCode, String)> {
     let origin = match origin.as_str() {
         "ipfs" => Origin::Ipfs,
         "blake3" => Origin::Blake3,
@@ -124,7 +134,15 @@ pub async fn js_service_handler<P: ExecutorProviderInterface>(
     // this is a hacky way of returning an error status before beginning streaming the body.
     match termination_rx.await {
         Ok(reason) => Err(bad_request(format!("handshake failed: {reason:?}"))),
-        Err(_) => Ok(body),
+        Err(_) => {
+            let mut builder = Response::builder();
+            if let Some(content_type) = params.get("mime") {
+                builder = builder.header("Content-Type", content_type);
+            }
+            builder
+                .body(body)
+                .map_err(|_| bad_request("invalid type value"))
+        },
     }
 }
 
