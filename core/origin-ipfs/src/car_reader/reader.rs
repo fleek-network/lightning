@@ -6,7 +6,8 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 
 use super::utils::Buffer;
 
-const MAX_ALLOC: usize = 4 * 1024 * 1024;
+const MAX_ALLOC: usize = 4 * 1024 * 1024; // 4 MB
+const MAX_FILE_SIZE: u64 = 20000000; // 20 MB
 
 pub struct CarReader<R: AsyncRead + Unpin> {
     reader: R,
@@ -104,6 +105,9 @@ impl<R: AsyncRead + Unpin> CarReader<R> {
     }
 
     pub async fn next_block(&mut self) -> Result<Option<(Cid, Vec<u8>)>> {
+        if self.bytes_read >= MAX_FILE_SIZE {
+            return Err(anyhow!("File exceeds max size"));
+        }
         if self.version == 2 && self.data_read == self.data_size {
             // For car v2, we have to stop reading content before the index section starts
             return Ok(None);

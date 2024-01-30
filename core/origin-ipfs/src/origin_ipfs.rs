@@ -22,7 +22,7 @@ use crate::car_reader::{hyper_error, CarReader};
 use crate::config::Gateway;
 use crate::{decoder, Config};
 
-const GATEWAY_TIMEOUT: Duration = Duration::from_millis(1000);
+const GATEWAY_TIMEOUT: Duration = Duration::from_millis(2000);
 
 pub struct IPFSOrigin<C: Collection> {
     client: Arc<Client<HttpsConnector<HttpConnector>, Body>>,
