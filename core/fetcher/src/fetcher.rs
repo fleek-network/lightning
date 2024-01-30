@@ -141,32 +141,16 @@ impl<C: Collection> FetcherInner<C> {
                     match task.request.clone() {
                         FetcherRequest::Put { pointer } => {
                             let tx = tx.clone();
-                            let resolver = self.resolver.clone();
-                            let blockstore = self.blockstore.clone();
-                            let blockstore_server_socket = self.blockstore_server_socket.clone();
+                            let inner = self.clone();
                             tokio::spawn(async move {
-                                task.respond(FetcherResponse::Put(FetcherInner::<C>::put(
-                                    pointer,
-                                    tx,
-                                    resolver,
-                                    blockstore,
-                                    blockstore_server_socket,
-                                ).await));
+                                task.respond(FetcherResponse::Put(inner.put(pointer, &tx).await));
                             });
                         }
                         FetcherRequest::Fetch { hash } => {
                             let tx = tx.clone();
-                            let resolver = self.resolver.clone();
-                            let blockstore = self.blockstore.clone();
-                            let blockstore_server_socket = self.blockstore_server_socket.clone();
+                            let inner = self.clone();
                             tokio::spawn(async move {
-                                task.respond(FetcherResponse::Fetch(FetcherInner::<C>::fetch(
-                                    hash,
-                                    tx,
-                                    resolver,
-                                    blockstore,
-                                    blockstore_server_socket,
-                                ).await));
+                                task.respond(FetcherResponse::Fetch(inner.fetch(hash, &tx).await));
                             });
                         }
                     }
@@ -177,46 +161,39 @@ impl<C: Collection> FetcherInner<C> {
         *self.shutdown_rx.lock().unwrap() = Some(shutdown_rx);
     }
 
-    /// Fetches the data from the corresponding origin, puts it in the blockstore, and stores the
-    /// mapping using the resolver. If the mapping already exists, the data will not be fetched
-    /// from origin again.
+    /// Fetches the data from the corresponding origin, puts it in the blockstore,
+    /// and stores the mapping using the resolver. If pulling a origin fails, it will not ,
+    /// the data will not be fetched from origin again.
+    #[inline(always)]
     async fn put(
+        &self,
         pointer: ImmutablePointer,
-        tx: mpsc::Sender<OriginRequest>,
-        resolver: C::ResolverInterface,
-        blockstore: C::BlockStoreInterface,
-        blockstore_server_socket: BlockStoreServerSocket,
+        origin_tx: &mpsc::Sender<OriginRequest>,
     ) -> anyhow::Result<[u8; 32]> {
-        if let Some(hash) = resolver.get_blake3_hash(pointer.clone()).await {
-            // If we know about a mapping, forward the call to fetch, which will additionally pull
-            // extra origins if the provider no longer has it.
-            return FetcherInner::<C>::fetch(
-                hash,
-                tx,
-                resolver,
-                blockstore,
-                blockstore_server_socket,
-            )
-            .await
-            .map(|_| hash);
+        if let Some(hash) = self.resolver.get_blake3_hash(pointer.clone()).await {
+            // If we know about a mapping, forward the call to fetch which
+            // will attempt to pull from multiple sources.
+            return self.fetch(hash, origin_tx).await.map(|_| hash);
         }
 
-        // Otherwise, use the origin as-is
-        FetcherInner::<C>::fetch_origin(pointer, &tx).await
+        // Otherwise, fetch directly from the origin
+        self.fetch_origin(pointer, origin_tx).await
     }
 
     #[inline(always)]
     async fn fetch_origin(
+        &self,
         pointer: ImmutablePointer,
-        tx: &mpsc::Sender<OriginRequest>,
+        origin_tx: &mpsc::Sender<OriginRequest>,
     ) -> Result<[u8; 32]> {
         let (response_tx, response_rx) = oneshot::channel();
-        tx.send(OriginRequest {
-            pointer,
-            response: response_tx,
-        })
-        .await
-        .expect("Failed to send origin request");
+        origin_tx
+            .send(OriginRequest {
+                pointer,
+                response: response_tx,
+            })
+            .await
+            .expect("Failed to send origin request");
 
         response_rx
             .await?
@@ -225,24 +202,23 @@ impl<C: Collection> FetcherInner<C> {
             .context("failed to fetch from origin")
     }
 
-    /// Fetches the data from the blockstore. If the data does not exist in the blockstore, it will
-    /// be fetched from the origin.
-    async fn fetch(
-        hash: Blake3Hash,
-        tx: mpsc::Sender<OriginRequest>,
-        resolver: C::ResolverInterface,
-        blockstore: C::BlockStoreInterface,
-        blockstore_server_socket: BlockStoreServerSocket,
-    ) -> Result<()> {
-        if blockstore.get_tree(&hash).await.is_some() {
+    /// Attempt to fetch the blake3 content. First, we check the blockstore,
+    /// then iterate through the provider records, requesting from the provider,
+    /// then falling back to the record's immutable pointer.
+    #[inline(always)]
+    async fn fetch(&self, hash: Blake3Hash, origin_tx: &mpsc::Sender<OriginRequest>) -> Result<()> {
+        if self.blockstore.get_tree(&hash).await.is_some() {
             return Ok(());
-        } else if let Some(pointers) = resolver.get_origins(hash) {
+        } else if let Some(pointers) = self.resolver.get_origins(hash) {
             for res_pointer in pointers {
-                if res_pointer.hash == hash && blockstore.get_tree(&hash).await.is_some() {
+                debug_assert_eq!(res_pointer.hash, hash);
+                if self.blockstore.get_tree(&hash).await.is_some() {
                     return Ok(());
                 }
-                // Try to get the content from the peer that advertized the record.
-                let mut res = blockstore_server_socket
+
+                // Try to get the content from the peer that advertised the record.
+                let mut res = self
+                    .blockstore_server_socket
                     .run(ServerRequest {
                         hash,
                         peer: res_pointer.originator,
@@ -257,7 +233,11 @@ impl<C: Collection> FetcherInner<C> {
                     return Ok(());
                 }
 
-                if FetcherInner::<C>::fetch_origin(res_pointer.pointer, &tx)
+                // If not, attempt to pull from the origin. We maintain a list of attempted origins
+                // in the event of failure. This strikes a balance between trying to fetch from a
+                // bunch of peers vs going to the origin right away.
+                if self
+                    .fetch_origin(res_pointer.pointer, origin_tx)
                     .await
                     .is_ok()
                 {
