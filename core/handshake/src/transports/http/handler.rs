@@ -5,7 +5,6 @@ use axum::body::Body;
 use axum::extract::{Path, Query};
 use axum::http::StatusCode;
 use axum::Extension;
-use base64::Engine;
 use cid::Cid;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use fleek_service_js_poc::stream::{Origin, Request};
@@ -27,9 +26,7 @@ pub async fn fetcher_service_handler<P: ExecutorProviderInterface>(
         _ => return Err(bad_request("unknown origin")),
     };
     let uri = match origin {
-        Origin::Blake3 => base64::prelude::BASE64_URL_SAFE
-            .decode(uri)
-            .map_err(|_| bad_request("invalid uri value"))?,
+        Origin::Blake3 => hex::decode(uri).map_err(|_| bad_request("invalid uri value"))?,
         Origin::Ipfs => Cid::try_from(uri)
             .map_err(|_| bad_request("invalid uri value"))?
             .into(),

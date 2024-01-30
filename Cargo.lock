@@ -4886,7 +4886,6 @@ name = "lightning-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "base64 0.21.5",
  "clap 4.4.12",
  "compile-time-run",
  "console-subscriber",
@@ -5078,6 +5077,7 @@ dependencies = [
  "fn-sdk",
  "futures",
  "fxhash",
+ "hex",
  "hyper 0.14.28",
  "infusion",
  "lightning-blockstore",
