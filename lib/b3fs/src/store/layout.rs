@@ -13,7 +13,7 @@
 //! it such as a list of entries (could be a **file**, **directory** or a **symbolic link**) in
 //! this directory and where they link to. For a symblic link we store some bytes that are meant to
 //! be relative path from that directoy. This is of course relative to the root directory that is
-//! *mounted*. (we cover this concept in other places)
+//! *mounted*. (We cover this concept in other places)
 //!
 //! For a directory we also include the hashtree of the merkle tree representing that was merged
 //! in order to calculate the root hash of the directoy. This is done and stored in order so that

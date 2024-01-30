@@ -39,14 +39,14 @@ impl Header {
         self.tag() == &[1, 0, 0, 0]
     }
 
-    /// If the content is a file converts this header into a [`File`]. Otherwise returns [`None`]
-    pub fn as_file(self) -> Option<File> {
+    /// If the content is a file converts this header into a [`File`]. Otherwise, returns [`None`]
+    pub fn into_file(self) -> Option<File> {
         self.is_file().then(|| File::new(self))
     }
 
-    /// If the content is a directory converts this header into a [`Directory`]. Otherwise
+    /// If the content is a directory converts this header into a [`Directory`]. Otherwise,
     /// returns [`None`].
-    pub fn as_directory(self) -> Option<Directory> {
+    pub fn into_directory(self) -> Option<Directory> {
         self.is_directory().then(|| Directory::new(self))
     }
 }

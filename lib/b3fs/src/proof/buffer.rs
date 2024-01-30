@@ -1,9 +1,13 @@
 use std::borrow::Borrow;
 use std::fmt::Debug;
 
+use thiserror::Error;
+
 use super::encoder::ProofEncoder;
 use super::pretty::ProofBufPrettyPrinter;
 use crate::collections::HashTree;
+use crate::proof::ProofBufIter;
+use crate::utils::is_valid_proof_len;
 use crate::walker::{Mode, TreeWalker};
 
 /// A buffer containing a proof for a block of data. This allows us to have a pre-allocated vec
@@ -63,6 +67,12 @@ impl ProofBuf {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// Returns an iterator over this proof buffer.
+    #[inline]
+    pub fn iter(&self) -> ProofBufIter<'_> {
+        ProofBufIter::new(self.as_slice())
+    }
 }
 
 impl AsRef<[u8]> for ProofBuf {
@@ -76,6 +86,33 @@ impl Borrow<[u8]> for ProofBuf {
     #[inline(always)]
     fn borrow(&self) -> &[u8] {
         self.as_slice()
+    }
+}
+
+#[derive(Copy, Clone, Debug, Error)]
+#[error("Invalid proof length.")]
+pub struct InvalidProofSize;
+
+impl TryFrom<Box<[u8]>> for ProofBuf {
+    type Error = InvalidProofSize;
+
+    fn try_from(value: Box<[u8]>) -> Result<Self, Self::Error> {
+        if !is_valid_proof_len(value.len()) {
+            Err(InvalidProofSize)
+        } else {
+            Ok(Self {
+                index: 0,
+                buffer: value,
+            })
+        }
+    }
+}
+
+impl TryFrom<Vec<u8>> for ProofBuf {
+    type Error = InvalidProofSize;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        Self::try_from(value.into_boxed_slice())
     }
 }
 

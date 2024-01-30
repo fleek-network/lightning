@@ -53,6 +53,15 @@ impl<'s> TryFrom<&'s [[u8; 32]]> for HashTree<'s> {
     }
 }
 
+impl<'s> TryFrom<&'s Vec<[u8; 32]>> for HashTree<'s> {
+    type Error = CollectionTryFromError;
+
+    #[inline]
+    fn try_from(value: &'s Vec<[u8; 32]>) -> Result<Self, Self::Error> {
+        Self::try_from(FlatHashSlice::from(value))
+    }
+}
+
 impl<'s> Index<usize> for HashTree<'s> {
     type Output = [u8; 32];
 
@@ -82,6 +91,11 @@ impl<'s> HashTree<'s> {
         Self {
             inner: self.inner.load(),
         }
+    }
+
+    #[inline]
+    pub fn root(&self) -> &'s [u8; 32] {
+        self.inner.get(self.inner.len() - 1)
     }
 
     /// Returns the number of items in this hash tree.

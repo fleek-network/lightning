@@ -28,6 +28,12 @@ pub const fn tree_index(block_counter: usize) -> usize {
     2 * block_counter - block_counter.count_ones() as usize
 }
 
+/// Given the number of hashes, returns the count of items in the hash tree.
+#[inline(always)]
+pub const fn hashtree_size_to_node_count(n: usize) -> usize {
+    (n + 1) >> 1
+}
+
 /// Validates that the provided number of bytes is a valid number of bytes for a proof
 /// buffer. This is only applicable to hashtree inclusion proofs.
 #[inline(always)]
@@ -97,12 +103,22 @@ pub fn flatten<const N: usize, T>(slice: &[[T; N]]) -> &[T] {
 }
 
 /// Used internally as a helper to pretty print hashes as hex strings.
-pub(crate) struct Digest<'d>(pub &'d [u8; 32]);
+pub struct Digest<'d>(pub &'d [u8; 32]);
 
 impl<'d> Debug for Digest<'d> {
     #[inline(always)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", to_hex(self.0))
+    }
+}
+
+/// Used internally as a helper to pretty print hashes as hex strings.
+pub struct OwnedDigest(pub [u8; 32]);
+
+impl Debug for OwnedDigest {
+    #[inline(always)]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", to_hex(&self.0))
     }
 }
 
@@ -115,6 +131,7 @@ mod tests {
         assert!(is_valid_proof_len(0));
         assert!(!is_valid_proof_len(1));
         assert!(!is_valid_proof_len(32));
+        assert!(!is_valid_proof_len(33));
         assert!(!is_valid_proof_len(64));
         assert!(is_valid_proof_len(65));
         assert!(!is_valid_proof_len(66));

@@ -2,12 +2,17 @@
 //! after one another. The [`FlatHashSlice`] in this module is just the right wrapper around our
 //! slice that provides basic functionality needed for this purpose.
 //!
-//! This includes easy iteration over each 32-byte of the data, sanity check that a slice
+//! This includes easy iteration over each 32-byte of the data, sanity checks that a slice
 //! represented in this method is indeed a multiple 32-bytes and easier indexing operations.
 //!
 //! The supported types to go into a valid [`FlatHashSlice`] are `&[[u8; 32]]` as well as
-//! conversion from `&[u8]`. In the later case you should use the `try_from` function as
+//! conversion from `&[u8]`. In the later case, you should use the `try_from` function as
 //! this operation could fail.
+//!
+//! Additionally, to make it easier to interact with persistence and storage, a non-slice
+//! backend is also implemented over a [AsyncMmapFile].
+//!
+//! [AsyncMmapFile]: fmmap::tokio::AsyncMmapFile
 
 use std::fmt::Debug;
 use std::ops::Index;
@@ -32,7 +37,7 @@ enum FlatHashSliceRepr<'s> {
     Slice(&'s [u8]),
     /// This allows us to use a memory mapping as the backend of a hash slice. There are no public
     /// APIs on the struct to generate this backend, and it is only created by the `store` APIs to
-    /// generally returning an hashtree
+    /// generally return a hashtree
     TokioMmap {
         start: usize,
         end: usize,
@@ -67,6 +72,15 @@ impl<'s> From<&'s [[u8; 32]]> for FlatHashSlice<'s> {
     fn from(value: &'s [[u8; 32]]) -> Self {
         Self {
             repr: FlatHashSliceRepr::Slice(flatten(value)),
+        }
+    }
+}
+
+impl<'s> From<&'s Vec<[u8; 32]>> for FlatHashSlice<'s> {
+    #[inline(always)]
+    fn from(value: &'s Vec<[u8; 32]>) -> Self {
+        Self {
+            repr: FlatHashSliceRepr::Slice(flatten(&value)),
         }
     }
 }
@@ -127,6 +141,11 @@ impl<'s> FlatHashSlice<'s> {
         }
     }
 
+    /// Returns the hash at the given index.
+    ///
+    /// # Panics
+    ///
+    /// If the provided index is out of bound.
     #[inline]
     pub fn get(&self, index: usize) -> &'s [u8; 32] {
         if index >= self.len() {
@@ -199,7 +218,7 @@ impl<'s> FlatHashSlice<'s> {
 
         let size = len - n;
         let repr = match self.repr {
-            FlatHashSliceRepr::Slice(s) => FlatHashSliceRepr::Slice(&s[..size]),
+            FlatHashSliceRepr::Slice(s) => FlatHashSliceRepr::Slice(&s[..(size << BYTES_POW_2)]),
             FlatHashSliceRepr::TokioMmap { start, end, file } => FlatHashSliceRepr::TokioMmap {
                 start,
                 end: end - (n << BYTES_POW_2),

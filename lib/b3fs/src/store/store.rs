@@ -9,6 +9,7 @@ use super::file::File;
 use super::header::Header;
 use super::layout::get_header_path;
 
+#[derive(Clone)]
 pub struct Store {
     root_path: PathBuf,
     in_memory_storage: Option<Arc<HashMap<PathBuf, Bytes>>>,
@@ -36,7 +37,7 @@ impl Store {
         &self.root_path
     }
 
-    /// Read the header of a content with the provided hash. After loading the header you can
+    /// Read the header of a content with the provided hash. After loading the header, you can
     /// see if the given root hash is a file or a directory.
     pub async fn read(&self, hash: [u8; 32]) -> Option<Header> {
         if let Some(store) = &self.in_memory_storage {
@@ -48,15 +49,15 @@ impl Store {
         Header::read(self.root_path.clone(), hash).await.ok()
     }
 
-    /// Read the directory with the given hash from the the blockstore.
+    /// Read the directory with the given hash from the blockstore.
     pub async fn read_dir(&self, hash: [u8; 32]) -> Option<Directory> {
         self.read(hash)
             .await
-            .and_then(|header| header.as_directory())
+            .and_then(|header| header.into_directory())
     }
 
-    /// Read the file with the given hash from the the blockstore.
+    /// Read the file with the given hash from the blockstore.
     pub async fn read_file(&self, hash: [u8; 32]) -> Option<File> {
-        self.read(hash).await.and_then(|header| header.as_file())
+        self.read(hash).await.and_then(|header| header.into_file())
     }
 }

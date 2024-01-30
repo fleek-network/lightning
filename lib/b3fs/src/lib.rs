@@ -16,8 +16,6 @@ pub mod directory;
 
 pub mod verifier;
 
-pub mod persistance;
-
 pub mod store;
 
 #[cfg(test)]

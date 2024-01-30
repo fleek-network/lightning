@@ -1,13 +1,13 @@
 use thiserror::Error;
 
-use crate::verifier::IncrementalVerifierError;
+use crate::verifier::VerificationError;
 
 #[derive(Error, Debug)]
 pub enum PutFeedProofError {
     #[error("Putter was running without incremental verification.")]
     UnexpectedCall,
     #[error("Proof is not matching the current root.")]
-    InvalidProof(#[from] IncrementalVerifierError),
+    InvalidProof(#[from] VerificationError),
 }
 
 #[derive(Error, Debug)]
