@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
-use std::time::Duration;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use atomo::{Atomo, KeyIterator, QueryPerm, ResolvedTableReference};
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
@@ -26,12 +27,15 @@ use lightning_interfaces::types::{
     TxHash,
     Value,
 };
+use tracing::error;
 
 use crate::state::State;
 use crate::storage::AtomoStorage;
 use crate::table::StateTables;
 
-#[derive(Clone)]
+// Define a global atomic counter
+static QUERY_RUNNER_COUNT: AtomicUsize = AtomicUsize::new(0);
+
 pub struct QueryRunner {
     inner: Atomo<QueryPerm, AtomoStorage>,
     metadata_table: ResolvedTableReference<Metadata, Value>,
@@ -58,6 +62,7 @@ pub struct QueryRunner {
 
 impl QueryRunner {
     pub fn init(atomo: Atomo<QueryPerm, AtomoStorage>) -> Self {
+        QUERY_RUNNER_COUNT.fetch_add(1, Ordering::Relaxed);
         Self {
             metadata_table: atomo.resolve::<Metadata, Value>("metadata"),
             account_table: atomo.resolve::<EthAddress, AccountInfo>("account"),
@@ -214,5 +219,58 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn get_content_registry(&self, node_index: &NodeIndex) -> Option<BTreeSet<Blake3Hash>> {
         self.inner
             .run(|ctx| self._node_to_cid.get(ctx).get(node_index))
+    }
+}
+
+impl Drop for QueryRunner {
+    fn drop(&mut self) {
+        let count = QUERY_RUNNER_COUNT.fetch_sub(1, Ordering::Relaxed);
+        let current_time = SystemTime::now();
+
+        let unix_time = current_time
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards!")
+            .as_secs();
+
+        error!(
+            "We are dropping a query runner at {}. There are {} left",
+            unix_time,
+            count - 1
+        );
+    }
+}
+
+impl Clone for QueryRunner {
+    fn clone(&self) -> Self {
+        let count = QUERY_RUNNER_COUNT.fetch_add(1, Ordering::Relaxed);
+
+        error!(
+            "Cloning a query runner. There are now {} query runners",
+            count + 1
+        );
+
+        Self {
+            inner: self.inner.clone(),
+            metadata_table: self.metadata_table.clone(),
+            account_table: self.account_table.clone(),
+            client_table: self.client_table,
+            node_table: self.node_table.clone(),
+            pub_key_to_index: self.pub_key_to_index,
+            committee_table: self.committee_table.clone(),
+            services_table: self.services_table,
+            param_table: self.param_table.clone(),
+            current_epoch_served: self.current_epoch_served.clone(),
+            rep_measurements: self.rep_measurements.clone(),
+            latencies: self.latencies,
+            rep_scores: self.rep_scores,
+            _last_epoch_served: self._last_epoch_served.clone(),
+            total_served_table: self.total_served_table.clone(),
+            _service_revenue: self._service_revenue.clone(),
+            _commodity_price: self._commodity_price.clone(),
+            executed_digests_table: self.executed_digests_table,
+            uptime_table: self.uptime_table,
+            _cid_to_node: self._cid_to_node.clone(),
+            _node_to_cid: self._node_to_cid.clone(),
+        }
     }
 }
