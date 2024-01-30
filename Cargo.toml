@@ -16,6 +16,7 @@ bincode = "1.3.3"
 cid = "0.10.1"
 ethers = "2.0.10"
 num-bigint = "0.4.0"
+base64 = "0.21"
 bytes = "1.4"
 bigdecimal = "0.3.1"
 futures = "0.3"
@@ -50,6 +51,7 @@ affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
 atomo-rocks = { path = "lib/atomo-rocks" }
 fleek-crypto = { path = "lib/fleek-crypto" }
+fleek-ipld = { path = "lib/fleek-ipld" }
 hp-fixed = { path = "lib/hp-fixed" }
 blake3-tree = { path = "lib/blake3-tree" }
 ink-quill = { path = "lib/ink-quill" }

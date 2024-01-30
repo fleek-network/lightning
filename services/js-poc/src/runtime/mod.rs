@@ -37,10 +37,12 @@ impl Runtime {
     pub fn exec(&mut self, source: String) -> anyhow::Result<Global<Value>> {
         // Initialize environment
         let time = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+        // TODO: Use a lower level method of disabling access to certain builtin ops.
         self.deno
             .execute_script(
                 "<anon>",
-                format!("globalThis.Date.now = () => {time};").into(),
+                format!("delete Deno.core.ops.op_panic; globalThis.Date.now = () => {time};")
+                    .into(),
             )
             .context("failed to execute environment initialization")?;
 

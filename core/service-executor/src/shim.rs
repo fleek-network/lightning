@@ -44,7 +44,7 @@ pub struct ServiceExecutorConfig {
 impl Default for ServiceExecutorConfig {
     fn default() -> Self {
         Self {
-            services: [0].into_iter().collect(),
+            services: [0, 1].into_iter().collect(),
             ipc_path: "~/.lightning/ipc"
                 .try_into()
                 .expect("Failed to resolve path"),

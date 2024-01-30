@@ -5,6 +5,7 @@ use axum::routing::get;
 use axum::Router;
 use bytes::{BufMut, Bytes, BytesMut};
 use dashmap::DashMap;
+use lightning_interfaces::ExecutorProviderInterface;
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
 
@@ -67,7 +68,7 @@ impl Transport for MockTransport {
     type Sender = MockTransportSender;
     type Receiver = MockTransportReceiver;
 
-    async fn bind(
+    async fn bind<P: ExecutorProviderInterface>(
         _waiter: ShutdownWaiter,
         config: Self::Config,
     ) -> anyhow::Result<(Self, Option<Router>)> {
@@ -131,15 +132,16 @@ impl TransportSender for MockTransportSender {
         self.current_write = len;
     }
 
-    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
-        debug_assert!(buf.len() <= self.current_write);
+    fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
+        let len = buf.len();
+        debug_assert!(len <= self.current_write);
         self.buffer.put(buf);
         if self.buffer.len() >= self.current_write {
             let bytes = self.buffer.split_to(self.current_write).into();
             self.current_write = 0;
             self.send(schema::ResponseFrame::ServicePayload { bytes });
         }
-        Ok(buf.len())
+        Ok(len)
     }
 }
 
@@ -159,6 +161,7 @@ impl TransportReceiver for MockTransportReceiver {
 #[cfg(test)]
 mod tests {
     use fleek_crypto::{ClientPublicKey, ClientSignature};
+    use lightning_service_executor::shim::Provider;
 
     use super::*;
     use crate::shutdown::ShutdownNotifier;
@@ -166,8 +169,10 @@ mod tests {
     #[tokio::test]
     async fn handshake() -> anyhow::Result<()> {
         let notifier = ShutdownNotifier::default();
+        // Todo: use mock provider instead?
         let mut server =
-            MockTransport::bind(notifier.waiter(), MockTransportConfig { port: 420 }).await?;
+            MockTransport::bind::<Provider>(notifier.waiter(), MockTransportConfig { port: 420 })
+                .await?;
 
         let client = dial_mock(420).await.unwrap();
         // send the initial handshake

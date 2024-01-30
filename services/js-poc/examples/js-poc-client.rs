@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use fleek_service_js_poc::stream::Request;
 use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
 use tcp_client::TcpClient;
@@ -35,16 +36,19 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     // Read the execution response
-    let Some(ResponseFrame::ServicePayload { bytes }) = client.recv().await else {
-        panic!("invalid or no response received");
-    };
-    let string = String::from_utf8_lossy(&bytes);
-
-    let duration = time.elapsed();
-
-    println!("Completed in {duration:?}:\n\n{string}");
-
-    Ok(())
+    match client.recv().await {
+        Some(ResponseFrame::ServicePayload { bytes }) => {
+            let string = String::from_utf8_lossy(&bytes);
+            let duration = time.elapsed();
+            println!("Completed in {duration:?}:\n\n{string}");
+            Ok(())
+        },
+        Some(ResponseFrame::Termination { reason }) => {
+            Err(anyhow!("Terminated by server: {reason:?}"))
+        },
+        Some(frame) => Err(anyhow!("Unexpected response received: {frame:?}")),
+        None => Err(anyhow!("Connection closed")),
+    }
 }
 
 mod cli {

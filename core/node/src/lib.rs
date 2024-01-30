@@ -18,7 +18,7 @@ use lightning_interfaces::infu_collection::{
 use lightning_notifier::Notifier;
 use lightning_origin_demuxer::OriginDemuxer;
 use lightning_pinger::Pinger;
-use lightning_pool::Pool;
+use lightning_pool::PoolProvider;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_resolver::resolver::Resolver;
 use lightning_rpc::Rpc;
@@ -54,7 +54,7 @@ impl CollectionBase for FinalTypes {
     type ServiceExecutorInterface<C: Collection> = ServiceExecutor<C>;
     type SignerInterface<C: Collection> = Signer<C>;
     type FetcherInterface<C: Collection> = Fetcher<C>;
-    type PoolInterface<C: Collection> = Pool<C>;
+    type PoolInterface<C: Collection> = PoolProvider<C>;
     type PingerInterface<C: Collection> = Pinger<C>;
     type IndexerInterface<C: Collection> = Indexer<C>;
 }

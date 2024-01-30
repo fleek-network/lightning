@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
@@ -43,7 +42,7 @@ use lightning_notifier::Notifier;
 use lightning_origin_demuxer::{Config as DemuxerOriginConfig, OriginDemuxer};
 use lightning_origin_ipfs::config::{Gateway, Protocol};
 use lightning_origin_ipfs::Config as IPFSOriginConfig;
-use lightning_pool::{muxer, Config as PoolConfig, Pool};
+use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::aggregator::ReputationAggregator;
 use lightning_rep_collector::config::Config as RepCollConfig;
 use lightning_resolver::config::Config as ResolverConfig;
@@ -66,7 +65,7 @@ partial!(TestBinding {
     SignerInterface = Signer<Self>;
     ResolverInterface = Resolver<Self>;
     ApplicationInterface = Application<Self>;
-    PoolInterface = Pool<Self>;
+    PoolInterface = PoolProvider<Self>;
     NotifierInterface = Notifier<Self>;
     TopologyInterface = Topology<Self>;
     ConsensusInterface = MockConsensus<Self>;
@@ -194,7 +193,7 @@ async fn get_fetchers(
                 .unwrap(),
             ..Default::default()
         };
-        let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
+        let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
             config,
             &signer,
             query_runner.clone(),
@@ -332,13 +331,11 @@ async fn test_simple_origin_fetch() {
             _ => panic!("Unexpected response"),
         };
 
-        let bytes = peers[0].blockstore.read_all_to_vec(&hash).await.unwrap();
-        assert!(
-            Code::try_from(req_cid.hash().code())
-                .ok()
-                .map(|code| &code.digest(&bytes) == req_cid.hash())
-                .unwrap()
-        );
+        let target_hash = [
+            98, 198, 247, 73, 200, 10, 39, 129, 58, 132, 6, 107, 146, 166, 253, 195, 127, 216, 55,
+            121, 191, 157, 100, 241, 241, 163, 105, 44, 243, 167, 223, 189,
+        ];
+        assert_eq!(hash, target_hash);
     };
 
     tokio::select! {

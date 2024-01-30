@@ -23,6 +23,9 @@ pub type BoxedChannel =
 /// Multiplexed-transport interface.
 #[trait_variant::make(MuxerInterface: Send)]
 pub trait _MuxerInterface: Clone + Send + Sync + 'static {
+    // Todo: Remove this when we switch to s2n.
+    // We have to keep it for now to let to
+    // maintain cancel safety in `accept`.
     type Connecting: Future<Output = io::Result<Self::Connection>> + Send;
     type Connection: ConnectionInterface;
     type Config: Clone + Send;

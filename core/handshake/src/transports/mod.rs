@@ -13,7 +13,9 @@ use crate::config::TransportConfig;
 use crate::handshake::Context;
 use crate::schema;
 use crate::shutdown::ShutdownWaiter;
+use crate::transports::http::{HttpReceiver, HttpSender};
 
+pub mod http;
 pub mod mock;
 pub mod tcp;
 pub mod webrtc;
@@ -52,6 +54,8 @@ transport_pairs! {
     Tcp(TcpSender, TcpReceiver),
     WebRtc(WebRtcSender, WebRtcReceiver),
     WebTransport(WebTransportSender, WebTransportReceiver),
+    Http(HttpSender, HttpReceiver),
+
 }
 
 #[async_trait]
@@ -61,7 +65,7 @@ pub trait Transport: Sized + Send + Sync + 'static {
     type Receiver: TransportReceiver;
 
     /// Bind the transport with the provided config.
-    async fn bind(
+    async fn bind<P: ExecutorProviderInterface>(
         shutdown: ShutdownWaiter,
         config: Self::Config,
     ) -> anyhow::Result<(Self, Option<Router>)>;
@@ -112,7 +116,7 @@ pub trait TransportSender: Sized + Send + Sync + 'static {
 
     /// Write some bytes as service payloads. Must ALWAYS be called after
     /// [`TransportSender::start_write`].
-    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize>;
+    fn write(&mut self, buf: Bytes) -> anyhow::Result<usize>;
 }
 
 #[async_trait]
@@ -122,32 +126,39 @@ pub trait TransportReceiver: Send + Sync + 'static {
     async fn recv(&mut self) -> Option<schema::RequestFrame>;
 }
 
-pub async fn spawn_transport_by_config(
+pub async fn spawn_transport_by_config<P: ExecutorProviderInterface>(
     shutdown: ShutdownWaiter,
-    ctx: Context<impl ExecutorProviderInterface>,
+    ctx: Context<P>,
     config: TransportConfig,
 ) -> anyhow::Result<Option<Router>> {
     match config {
         TransportConfig::Mock(config) => {
-            let (transport, router) = mock::MockTransport::bind(shutdown.clone(), config).await?;
+            let (transport, router) =
+                mock::MockTransport::bind::<P>(shutdown.clone(), config).await?;
             transport.spawn_listener_task(ctx);
             Ok(router)
         },
         TransportConfig::Tcp(config) => {
-            let (transport, router) = tcp::TcpTransport::bind(shutdown.clone(), config).await?;
+            let (transport, router) =
+                tcp::TcpTransport::bind::<P>(shutdown.clone(), config).await?;
             transport.spawn_listener_task(ctx);
             Ok(router)
         },
         TransportConfig::WebRTC(config) => {
             let (transport, router) =
-                webrtc::WebRtcTransport::bind(shutdown.clone(), config).await?;
+                webrtc::WebRtcTransport::bind::<P>(shutdown.clone(), config).await?;
             transport.spawn_listener_task(ctx);
             Ok(router)
         },
         TransportConfig::WebTransport(config) => {
             let (transport, router) =
-                webtransport::WebTransport::bind(shutdown.clone(), config).await?;
+                webtransport::WebTransport::bind::<P>(shutdown.clone(), config).await?;
             transport.spawn_listener_task(ctx);
+            Ok(router)
+        },
+        TransportConfig::Http(config) => {
+            let (_, router) = http::HttpTransport::bind::<P>(shutdown.clone(), config).await?;
+            // Axum has a `Context` and will handle `accept()`.
             Ok(router)
         },
     }

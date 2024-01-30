@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use axum::Router;
 use bytes::Bytes;
 use dashmap::DashMap;
+use lightning_interfaces::ExecutorProviderInterface;
 use serde::{Deserialize, Serialize};
 use stunclient::StunClient;
 use tokio::sync::mpsc::{channel, Receiver};
@@ -56,7 +57,10 @@ impl Transport for WebRtcTransport {
     type Sender = WebRtcSender;
     type Receiver = WebRtcReceiver;
 
-    async fn bind(waiter: ShutdownWaiter, config: Self::Config) -> Result<(Self, Option<Router>)> {
+    async fn bind<P: ExecutorProviderInterface>(
+        waiter: ShutdownWaiter,
+        config: Self::Config,
+    ) -> Result<(Self, Option<Router>)> {
         info!("Binding WebRTC transport on {}", config.address);
         let conns = Arc::new(DashMap::new());
 
@@ -162,8 +166,7 @@ impl TransportSender for WebRtcSender {
     }
 
     // TODO: consider buffering up to the max payload size to send less chunks/extra bytes
-    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
-        let mut buf: Bytes = buf.to_vec().into();
+    fn write(&mut self, mut buf: Bytes) -> anyhow::Result<usize> {
         debug_assert!(self.current_write >= buf.len());
 
         while !buf.is_empty() {

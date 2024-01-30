@@ -1,10 +1,8 @@
-use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Copy, Deserialize, Serialize, Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum RejectReason {
-    Other,
-    TooManyRequests,
-    ContentNotFound,
+    TooManyRequests = 1,
+    ContentNotFound = 2,
+    Other = 3,
 }

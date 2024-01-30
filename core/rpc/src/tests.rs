@@ -57,7 +57,7 @@ use lightning_interfaces::{
 };
 use lightning_notifier::Notifier;
 use lightning_origin_demuxer::OriginDemuxer;
-use lightning_pool::{muxer, Config as PoolConfig, Pool};
+use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_utils::application::QueryRunnerExt;
@@ -102,7 +102,7 @@ partial!(TestBinding {
     OriginProviderInterface = OriginDemuxer<Self>;
     SignerInterface = Signer<Self>;
     NotifierInterface = Notifier<Self>;
-    PoolInterface = Pool<Self>;
+    PoolInterface = PoolProvider<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
     IndexerInterface = Indexer<Self>;
 });
@@ -133,7 +133,7 @@ fn init_rpc(app: Application<TestBinding>, port: u16) -> Result<(Rpc<TestBinding
     )
     .unwrap();
 
-    let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
+    let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         PoolConfig::default(),
         &signer,
         app.sync_query(),

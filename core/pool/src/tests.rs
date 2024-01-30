@@ -1,4 +1,3 @@
-use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::io;
 use std::net::{IpAddr, SocketAddr};
@@ -40,21 +39,16 @@ use lightning_notifier::Notifier;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{utils, Config as SignerConfig, Signer};
 use lightning_topology::{Config as TopologyConfig, Topology};
-use tokio::sync::oneshot;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{mpsc, oneshot};
+use tokio_util::sync::CancellationToken;
 
-use crate::overlay::{
-    BroadcastRequest,
-    BroadcastTask,
-    NetworkOverlay,
-    Param,
-    PoolTask,
-    SendRequest,
-};
-use crate::{muxer, pool, Config, Pool};
-
+use crate::endpoint::EndpointTask;
+use crate::event::{Event, EventReceiver, Param};
+use crate::{muxer, provider, Config, PoolProvider};
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
-    PoolInterface = Pool<Self>;
+    PoolInterface = PoolProvider<Self>;
     SignerInterface = Signer<Self>;
     NotifierInterface = Notifier<Self>;
     TopologyInterface = Topology<Self>;
@@ -68,8 +62,20 @@ pub struct Peer<C: Collection> {
     _rep_aggregator: C::ReputationAggregatorInterface,
     _notifier: C::NotifierInterface,
     pool: C::PoolInterface,
+    signer: Signer<C>,
+    topology: C::TopologyInterface,
     pub node_public_key: NodePublicKey,
     pub node_index: NodeIndex,
+}
+
+struct PathBuffWrapper(PathBuf);
+
+impl Drop for PathBuffWrapper {
+    fn drop(&mut self) {
+        if self.0.exists() {
+            std::fs::remove_dir_all(&self.0).unwrap();
+        }
+    }
 }
 
 async fn get_pools(
@@ -77,7 +83,11 @@ async fn get_pools(
     port_offset: u16,
     num_peers: usize,
     state_server_address_port: Option<u16>,
-) -> (Vec<Peer<TestBinding>>, Application<TestBinding>, PathBuf) {
+) -> (
+    Vec<Peer<TestBinding>>,
+    Application<TestBinding>,
+    PathBuffWrapper,
+) {
     let mut signers_configs = Vec::new();
     let mut genesis = Genesis::load().unwrap();
     let path = std::env::temp_dir()
@@ -158,7 +168,7 @@ async fn get_pools(
         peers.push(peer);
     }
 
-    (peers, app, path)
+    (peers, app, PathBuffWrapper(path))
 }
 
 // Create a peer that is not in state.
@@ -213,12 +223,12 @@ fn create_peer(
         address,
         http,
     };
-    let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
+    let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         config,
         &signer,
         query_runner.clone(),
         notifier.clone(),
-        topology,
+        topology.clone(),
         rep_aggregator.get_reporter(),
     )
     .unwrap();
@@ -233,10 +243,53 @@ fn create_peer(
     Peer::<TestBinding> {
         _rep_aggregator: rep_aggregator,
         _notifier: notifier,
+        signer,
+        topology,
         pool,
         node_public_key,
         node_index,
     }
+}
+
+struct EventReceiverTestState {
+    event_tx: Sender<Event>,
+    endpoint_task_rx: Receiver<EndpointTask>,
+    shutdown: CancellationToken,
+    _notifier: Notifier<TestBinding>,
+}
+
+fn event_receiver(
+    app: Application<TestBinding>,
+    peer: &Peer<TestBinding>,
+) -> (EventReceiver<TestBinding>, EventReceiverTestState) {
+    let query_runner = app.sync_query();
+    let topology = peer.topology.clone();
+    let notifier = peer._notifier.clone();
+    let (_, sk) = peer.signer.get_sk();
+    let pk = sk.to_pk();
+
+    let (event_tx, event_rx) = mpsc::channel(8);
+    let (endpoint_task_tx, endpoint_task_rx) = mpsc::channel(8);
+
+    let shutdown = CancellationToken::new();
+
+    (
+        EventReceiver::<TestBinding>::new(
+            query_runner,
+            topology,
+            notifier.clone(),
+            event_rx,
+            endpoint_task_tx,
+            pk,
+            shutdown.clone(),
+        ),
+        EventReceiverTestState {
+            event_tx,
+            endpoint_task_rx,
+            _notifier: notifier,
+            shutdown,
+        },
+    )
 }
 
 #[tokio::test]
@@ -272,9 +325,7 @@ async fn test_send_to_one() {
     for peer in &peers {
         peer.pool.shutdown().await;
     }
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
+    drop(path);
 }
 
 #[tokio::test]
@@ -283,7 +334,7 @@ async fn test_send_to_all() {
     let port_offset = 49000;
     let (peers, app, path) = get_pools("send_to_all", port_offset, 4, None).await;
     let unknown_peer = create_unknown_peer(
-        path.clone(),
+        path.0.clone(),
         &app,
         peers.len(),
         format!("0.0.0.0:{}", port_offset + peers.len() as u16)
@@ -336,9 +387,7 @@ async fn test_send_to_all() {
         peer.pool.shutdown().await;
     }
     unknown_peer.pool.shutdown().await;
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
+    drop(path);
 }
 
 #[tokio::test]
@@ -405,9 +454,7 @@ async fn test_open_req_res() {
     for peer in &peers {
         peer.pool.shutdown().await;
     }
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
+    drop(path);
 }
 
 #[tokio::test]
@@ -426,42 +473,29 @@ async fn test_open_req_res_unknown_peer() {
         .await;
 
     // Then: our request fails.
-    let _expected_err: Result<pool::Response, io::Error> =
+    let _expected_err: Result<provider::Response, io::Error> =
         Err(io::Error::from(io::ErrorKind::AddrNotAvailable));
     assert!(matches!(response, _expected_err));
 
     // Clean up.
     peers[0].pool.shutdown().await;
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
+    drop(path);
 }
 
 #[tokio::test]
-async fn test_overlay_get_index() {
+async fn test_log_pool_get_index() {
     // We never bind.
-    let (peers, app, path) = get_pools("test_overlay_get_index", 8000, 4, None).await;
-    let query_runner = app.sync_query();
-    let overlay =
-        NetworkOverlay::<TestBinding>::new(query_runner, peers[0].node_public_key, OnceCell::new());
-
-    assert_eq!(overlay.get_index(), peers[0].node_index);
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
+    let (peers, app, _path) = get_pools("test_log_pool_get_index", 8000, 2, None).await;
+    let (event_receiver, _) = event_receiver(app, &peers[0]);
+    assert_eq!(event_receiver.handler.get_index(), peers[0].node_index);
 }
 
 #[tokio::test]
-async fn test_overlay_update_connections() {
+async fn test_log_pool_update_connections() {
     // Given: a network of 4 nodes.
     // We never bind.
-    let (peers, app, path) = get_pools("test_overlay_update_connections", 8000, 4, None).await;
-    let query_runner = app.sync_query();
-    let mut overlay = NetworkOverlay::<TestBinding>::new(
-        query_runner,
-        peers[0].node_public_key,
-        OnceCell::from(peers[0].node_index),
-    );
+    let (peers, app, _path) = get_pools("test_log_pool_update_connections", 8000, 4, None).await;
+    let (mut event_receiver, _state) = event_receiver(app, &peers[0]);
 
     // When: we tell first node to connect to all the peers.
     // Skip the first one.
@@ -469,11 +503,18 @@ async fn test_overlay_update_connections() {
         .iter()
         .map(|peer| peer.node_index)
         .collect::<HashSet<_>>();
-    overlay.update_connections(peers_to_connect.clone());
+    event_receiver
+        .handler
+        ._update_connections(peers_to_connect.clone());
 
-    // Then: state in the overlay includes the expected peers.
-    let local_overlay = overlay.peers.keys().copied().collect::<HashSet<_>>();
-    assert_eq!(peers_to_connect, local_overlay);
+    // Then: state in the pool includes the expected peers.
+    let connections = event_receiver
+        .handler
+        .pool
+        .keys()
+        .copied()
+        .collect::<HashSet<_>>();
+    assert_eq!(peers_to_connect, connections);
 
     // When: we tell first node to connect to all the peers plus some random peers in state.
     // Skip the first one.
@@ -483,12 +524,19 @@ async fn test_overlay_update_connections() {
         .collect::<HashSet<_>>();
     peers_to_connect.insert(6969);
     peers_to_connect.insert(9696);
-    overlay.update_connections(peers_to_connect.clone());
+    event_receiver
+        .handler
+        ._update_connections(peers_to_connect.clone());
 
-    // Then: state in the overlay includes the only the peers that are in state.
-    let local_overlay = overlay.peers.keys().copied().collect::<HashSet<_>>();
+    // Then: state in the pool includes only the peers that are in state.
+    let connections = event_receiver
+        .handler
+        .pool
+        .keys()
+        .copied()
+        .collect::<HashSet<_>>();
     assert_eq!(
-        local_overlay,
+        connections,
         peers[1..]
             .iter()
             .map(|peer| peer.node_index)
@@ -501,10 +549,12 @@ async fn test_overlay_update_connections() {
         .iter()
         .map(|peer| peer.node_index)
         .collect::<HashSet<_>>();
-    let task = overlay.update_connections(peers_to_connect.clone());
+    let task = event_receiver
+        .handler
+        ._update_connections(peers_to_connect.clone());
 
     // Then: Task includes peers to keep and drop.
-    let BroadcastTask::Update { keep, drop } = task else {
+    let EndpointTask::Update { keep, drop } = task else {
         panic!("invalid task");
     };
     assert!(keep.contains_key(&peers[1].node_index));
@@ -513,192 +563,210 @@ async fn test_overlay_update_connections() {
     assert!(drop.contains(&peers[3].node_index));
     assert_eq!(drop.len(), 2);
 
-    // Then: state in the overlay includes the expected peers.
-    let local_overlay = overlay.peers.keys().copied().collect::<HashSet<_>>();
+    // Then: state in the pool includes the expected peers.
+    let connections = event_receiver
+        .handler
+        .pool
+        .keys()
+        .copied()
+        .collect::<HashSet<_>>();
     assert_eq!(peers_to_connect.len(), 1);
-    assert_eq!(peers_to_connect, local_overlay);
+    assert_eq!(peers_to_connect, connections);
 
     // When: we tell first node to disconnect from all nodes.
     // Skip the first one.
-    overlay.update_connections(HashSet::new());
+    event_receiver.handler._update_connections(HashSet::new());
 
-    // Then: state in the overlay includes the expected peers.
-    let local_overlay = overlay.peers.keys().copied().collect::<HashSet<_>>();
-    assert!(local_overlay.is_empty());
-
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
+    // Then: state in the pool includes the expected peers.
+    let connections = event_receiver
+        .handler
+        .pool
+        .keys()
+        .copied()
+        .collect::<HashSet<_>>();
+    assert!(connections.is_empty());
 }
 
 #[tokio::test]
-async fn test_overlay_pinning_peers_from_topology() {
+async fn test_log_pool_pinning_peers_from_topology() {
     // Given: a network of 4 nodes.
     // We never bind.
-    let (peers, app, path) =
-        get_pools("test_overlay_pinning_peers_from_topology", 8000, 4, None).await;
-    let query_runner = app.sync_query();
-    let mut overlay = NetworkOverlay::<TestBinding>::new(
-        query_runner.clone(),
-        peers[0].node_public_key,
-        OnceCell::from(peers[0].node_index),
-    );
+    let (peers, app, _path) =
+        get_pools("test_log_pool_pinning_peers_from_topology", 8000, 4, None).await;
+    let (mut event_receiver, mut state) = event_receiver(app, &peers[0]);
 
     // Given: a node connects to all.
     let all_peers = peers[1..]
         .iter()
         .map(|peer| peer.node_index)
         .collect::<HashSet<_>>();
-    overlay.update_connections(all_peers);
+    event_receiver.handler._update_connections(all_peers);
 
     // When: we send a send-request to one peer.
     let pinned_peer_index = peers[1].node_index;
-    let (send_request_tx, _) = overlay.register_requester_service(ServiceScope::BlockstoreServer);
     let (respond, _) = oneshot::channel();
-    send_request_tx
-        .send(SendRequest {
-            peer: pinned_peer_index,
+    state
+        .event_tx
+        .send(Event::SendRequest {
+            dst: pinned_peer_index,
             service_scope: ServiceScope::BlockstoreServer,
             request: Bytes::new(),
             respond,
         })
         .await
         .unwrap();
-    let task = overlay.next().await;
 
-    // Then: the task to execute is to send a request.
-    assert!(matches!(task, Some(PoolTask::SendRequest(_))));
+    // Spawn the receiver.
+    let handle = event_receiver.spawn();
 
-    // When: we tell overlay to disconnect from all current peers.
-    overlay.update_connections(HashSet::new());
+    // We poll the event receiver to move past the initial set up task.
+    let mut task = None;
+    while let Some(next_task) = state.endpoint_task_rx.recv().await {
+        if let next_task @ EndpointTask::SendRequest { .. } = next_task {
+            task = Some(next_task);
+            state.shutdown.cancel();
+            break;
+        }
+    }
+    let task = task.unwrap();
+    assert!(matches!(task, EndpointTask::SendRequest { .. }));
+
+    // We get the receiver back.
+    let mut event_receiver = handle.await.unwrap();
+
+    // When: we tell pool to disconnect from all current peers.
+    event_receiver.handler._update_connections(HashSet::new());
 
     // Then: that peer gets pinned and does not get dropped on an update.
-    let local_overlay = overlay.peers.keys().copied().collect::<HashSet<_>>();
+    let connections = event_receiver
+        .handler
+        .pool
+        .keys()
+        .copied()
+        .collect::<HashSet<_>>();
     let mut expected_peers = HashSet::new();
     expected_peers.insert(peers[1].node_index);
-    assert_eq!(local_overlay.len(), 1);
-    assert_eq!(expected_peers, local_overlay);
+    assert_eq!(connections.len(), 1);
+    assert_eq!(expected_peers, connections);
 
-    // When: we unpin the peer and tell the overlay to disconnect.
-    overlay.clean(peers[1].node_index);
+    // When: we unpin the peer and tell the pool to disconnect.
+    event_receiver.handler.clean(peers[1].node_index);
 
-    // Then: the peer is cleared from the overlay state.
-    overlay.update_connections(HashSet::new());
-    let local_overlay = overlay.peers.keys().copied().collect::<HashSet<_>>();
-    assert!(local_overlay.is_empty());
-
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
+    // Then: the peer is cleared from the pool state.
+    event_receiver.handler._update_connections(HashSet::new());
+    let connections = event_receiver
+        .handler
+        .pool
+        .keys()
+        .copied()
+        .collect::<HashSet<_>>();
+    assert!(connections.is_empty());
 }
 
 #[tokio::test]
-async fn test_overlay_pinning_peers_outside_topology_cluster() {
+async fn test_log_pool_pinning_peers_outside_topology_cluster() {
     // Given: a network of 2 nodes.
-    let (peers, app, path) = get_pools(
-        "test_overlay_pinning_peers_outside_topology_cluster",
+    let (peers, app, _path) = get_pools(
+        "test_log_pool_pinning_peers_outside_topology_cluster",
         8000, // We never bind.
         2,
         None,
     )
     .await;
-    let query_runner = app.sync_query();
-    let mut overlay = NetworkOverlay::<TestBinding>::new(
-        query_runner.clone(),
-        peers[0].node_public_key,
-        OnceCell::from(peers[0].node_index),
-    );
+    let (mut event_receiver, _state) = event_receiver(app, &peers[0]);
 
     // Given: no peers in state.
-    let local_overlay = overlay.peers.keys().copied().collect::<HashSet<_>>();
-    assert!(local_overlay.is_empty());
+    let connections = event_receiver
+        .handler
+        .pool
+        .keys()
+        .copied()
+        .collect::<HashSet<_>>();
+    assert!(connections.is_empty());
 
-    // Given: we send a send-request request to the pool and thereby pinning the peer.
+    // Given: we send a send-request request to the pool and thereby pinning the node.
+    // Todo: when we have a mock topology, we can spawn a receiver and send events
+    // instead of bypassing the initial set-up which uses topology in a way that
+    // we dont want for this test.
     let pinned_peer_index = peers[1].node_index;
-    let (send_request_tx, _) = overlay.register_requester_service(ServiceScope::BlockstoreServer);
     let (respond, _) = oneshot::channel();
-    send_request_tx
-        .send(SendRequest {
-            peer: pinned_peer_index,
+    event_receiver
+        .handle_event(Event::SendRequest {
+            dst: pinned_peer_index,
             service_scope: ServiceScope::BlockstoreServer,
             request: Bytes::new(),
             respond,
         })
-        .await
         .unwrap();
-    let _ = overlay.next().await;
 
     // When: we clean the pinned connection.
-    overlay.clean(peers[1].node_index);
+    event_receiver.handler.clean(peers[1].node_index);
 
     // Then: Since it wasn't a peer that was supposed to be in our cluster,
-    // it gets immediately cleared out from the overlay state.
-    let local_overlay = overlay.peers.keys().copied().collect::<HashSet<_>>();
-    assert!(local_overlay.is_empty());
-
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
+    // it gets immediately cleared out from the pool state.
+    let connections = event_receiver
+        .handler
+        .pool
+        .keys()
+        .copied()
+        .collect::<HashSet<_>>();
+    assert!(connections.is_empty());
 }
 
 #[tokio::test]
-async fn test_overlay_only_broadcast_to_peers_in_topology_cluster() {
+async fn test_log_pool_only_broadcast_to_peers_in_topology_cluster() {
     // Given: a network of 4 nodes.
-    let (peers, app, path) = get_pools(
-        "test_overlay_only_broadcast_to_peers_in_topology_cluster",
+    let (peers, app, _path) = get_pools(
+        "test_log_pool_only_broadcast_to_peers_in_topology_cluster",
         8000, // We never bind.
         4,
         None,
     )
     .await;
-    let query_runner = app.sync_query();
-    let mut overlay = NetworkOverlay::<TestBinding>::new(
-        query_runner.clone(),
-        peers[0].node_public_key,
-        OnceCell::from(peers[0].node_index),
-    );
+    let (mut event_receiver, mut state) = event_receiver(app, &peers[0]);
 
     // Given: we connect to 2 peers.
     let peers_to_connect = peers[1..3]
         .iter()
         .map(|peer| peer.node_index)
         .collect::<HashSet<_>>();
-    overlay.update_connections(peers_to_connect.clone());
-    assert_eq!(overlay.peers.len(), 2);
+    event_receiver
+        .handler
+        ._update_connections(peers_to_connect.clone());
+    assert_eq!(event_receiver.handler.pool.len(), 2);
 
     // Given: we send a send-request request to the pool and thereby pinning the node.
     let pinned_peer_index = peers[3].node_index;
-    let (send_request_tx, _) = overlay.register_requester_service(ServiceScope::BlockstoreServer);
     let (respond, _) = oneshot::channel();
-    send_request_tx
-        .send(SendRequest {
-            peer: pinned_peer_index,
+    event_receiver
+        .handle_event(Event::SendRequest {
+            dst: pinned_peer_index,
             service_scope: ServiceScope::BlockstoreServer,
             request: Bytes::new(),
             respond,
         })
-        .await
         .unwrap();
-    let _ = overlay.next().await;
+
+    assert!(matches!(
+        state.endpoint_task_rx.recv().await.unwrap(),
+        EndpointTask::SendRequest { .. }
+    ));
 
     // When: we send a broadcast message.
-    let (send_request_tx, _) = overlay.register_broadcast_service(ServiceScope::Broadcast);
-    send_request_tx
-        .send(BroadcastRequest {
+    event_receiver
+        .handle_event(Event::Broadcast {
             service_scope: ServiceScope::Broadcast,
             message: Bytes::new(),
             param: Param::Filter(Box::new(|_| true)),
         })
-        .await
         .unwrap();
 
     // Then: the task is to broadcast only to peers from topology and not the pinned peer.
-    let task = overlay.next().await.unwrap();
-    match task {
-        PoolTask::Broadcast(BroadcastTask::Send {
+    match state.endpoint_task_rx.recv().await.unwrap() {
+        EndpointTask::SendMessage {
             peers: peers_to_broadcast,
             ..
-        }) => {
+        } => {
             let peers_to_broadcast = peers_to_broadcast
                 .into_iter()
                 .map(|info| info.node_info.index)
@@ -707,58 +775,48 @@ async fn test_overlay_only_broadcast_to_peers_in_topology_cluster() {
             assert!(!peers_to_broadcast.contains(&peers[3].node_index))
         },
         _ => {
-            unreachable!("invalid value expected a broadcast task")
+            panic!("invalid value expected a broadcast task")
         },
-    }
-
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
     }
 }
 
 #[tokio::test]
-async fn test_overlay_only_broadcast_to_one_peer() {
+async fn test_log_pool_only_broadcast_to_one_peer() {
     // Given: a network of 4 nodes.
-    let (peers, app, path) = get_pools(
-        "test_overlay_only_broadcast_to_one_peer",
+    let (peers, app, _path) = get_pools(
+        "test_log_pool_only_broadcast_to_one_peer",
         8000, // We never bind.
         4,
         None,
     )
     .await;
-    let query_runner = app.sync_query();
-    let mut overlay = NetworkOverlay::<TestBinding>::new(
-        query_runner.clone(),
-        peers[0].node_public_key,
-        OnceCell::from(peers[0].node_index),
-    );
+    let (mut event_receiver, mut state) = event_receiver(app, &peers[0]);
 
     // Given: we connect to all peers.
     let peers_to_connect = peers[1..]
         .iter()
         .map(|peer| peer.node_index)
         .collect::<HashSet<_>>();
-    overlay.update_connections(peers_to_connect.clone());
-    assert_eq!(overlay.peers.len(), 3);
+    event_receiver
+        .handler
+        ._update_connections(peers_to_connect.clone());
+    assert_eq!(event_receiver.handler.pool.len(), 3);
 
     // When: we send a broadcast message to one peer.
-    let (send_request_tx, _) = overlay.register_broadcast_service(ServiceScope::Broadcast);
-    send_request_tx
-        .send(BroadcastRequest {
+    event_receiver
+        .handle_event(Event::Broadcast {
             service_scope: ServiceScope::Broadcast,
             message: Bytes::new(),
             param: Param::Index(peers[1].node_index),
         })
-        .await
         .unwrap();
 
     // Then: the message would be sent to that peer only.
-    let task = overlay.next().await.unwrap();
-    match task {
-        PoolTask::Broadcast(BroadcastTask::Send {
+    match state.endpoint_task_rx.recv().await.unwrap() {
+        EndpointTask::SendMessage {
             peers: peers_to_broadcast,
             ..
-        }) => {
+        } => {
             let peers_to_broadcast = peers_to_broadcast
                 .into_iter()
                 .map(|info| info.node_info.index)
@@ -772,32 +830,26 @@ async fn test_overlay_only_broadcast_to_one_peer() {
     }
 
     // When: we send a broadcast message to a peer that is not in state.
-    let (send_request_tx, _) = overlay.register_broadcast_service(ServiceScope::Broadcast);
-    send_request_tx
-        .send(BroadcastRequest {
+    event_receiver
+        .handle_event(Event::Broadcast {
             service_scope: ServiceScope::Broadcast,
             message: Bytes::new(),
             param: Param::Index(6969),
         })
-        .await
         .unwrap();
 
     // Then: the broadcast request gets ignored.
     assert!(
-        tokio::time::timeout(Duration::from_secs(5), overlay.next())
+        tokio::time::timeout(Duration::from_secs(5), state.endpoint_task_rx.recv())
             .await
             .is_err()
     );
-
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
 }
 
 #[tokio::test]
 async fn test_start_shutdown() {
     // Given: two peers.
-    let (peers, app, path) = get_pools("start_shutdown", 60000, 2, Some(60010)).await;
+    let (peers, app, _path) = get_pools("start_shutdown", 60000, 2, Some(60010)).await;
     let query_runner = app.sync_query();
 
     let node_index1 = query_runner
@@ -835,9 +887,5 @@ async fn test_start_shutdown() {
     // Clean up.
     for peer in &peers {
         peer.pool.shutdown().await;
-    }
-
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
     }
 }

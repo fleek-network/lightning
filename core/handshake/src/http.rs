@@ -15,9 +15,15 @@ pub async fn spawn_http_server(
         .layer(CorsLayer::permissive())
         .into_make_service_with_connect_info::<SocketAddr>();
 
-    axum::Server::bind(&addr)
-        .serve(app)
-        .with_graceful_shutdown(waiter.wait_for_shutdown())
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+
+    // Now Axum requires future in `with_graceful_shutdown` to be static.
+    let shutdown = async move {
+        waiter.wait_for_shutdown().await;
+    };
+
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown)
         .await
         .context("failed to run http server")
 }

@@ -41,7 +41,7 @@ use lightning_notifier::Notifier;
 use lightning_origin_demuxer::{Config as DemuxerOriginConfig, OriginDemuxer};
 use lightning_origin_ipfs::config::{Gateway, Protocol};
 use lightning_origin_ipfs::Config as IPFSOriginConfig;
-use lightning_pool::{muxer, Config as PoolConfig, Pool};
+use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::aggregator::ReputationAggregator;
 use lightning_rep_collector::config::Config as RepCollConfig;
 use lightning_resolver::config::Config as ResolverConfig;
@@ -64,7 +64,7 @@ partial!(TestBinding {
     SignerInterface = Signer<Self>;
     ResolverInterface = Resolver<Self>;
     ApplicationInterface = Application<Self>;
-    PoolInterface = Pool<Self>;
+    PoolInterface = PoolProvider<Self>;
     NotifierInterface = Notifier<Self>;
     TopologyInterface = Topology<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
@@ -136,7 +136,7 @@ async fn init_service_executor(
         address: format!("0.0.0.0:{}", pool_port).parse().unwrap(),
         ..Default::default()
     };
-    let pool = Pool::<TestBinding, muxer::quinn::QuinnMuxer>::init(
+    let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         config,
         &signer,
         query_runner.clone(),
@@ -288,7 +288,7 @@ async fn test_query_client_info() {
 
     let (node, _app) = init_service_executor(genesis, path.clone(), 30309, 40309, 1069).await;
     node.service_exec.start().await;
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(4)).await;
 
     // Start the service
     fn_sdk::ipc::init_from_env();
@@ -322,7 +322,7 @@ async fn test_query_missing_client_info() {
 
     let (node, _app) = init_service_executor(genesis, path.clone(), 30310, 40310, 1070).await;
     node.service_exec.start().await;
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(4)).await;
 
     // Start the service
     fn_sdk::ipc::init_from_env();
