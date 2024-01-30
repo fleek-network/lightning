@@ -85,7 +85,16 @@ async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
 
         // Create runtime and execute the source
         let mut runtime = Runtime::new(hash);
-        let res = runtime.exec(source).context("failed to run javascript")?;
+        let res = match runtime.exec(source) {
+            Ok(res) => res,
+            Err(e) => {
+                stream
+                    .send_payload(e.to_string().as_bytes())
+                    .await
+                    .context("failed to send error message")?;
+                return Err(e).context("failed to run javascript");
+            },
+        };
 
         // Resolve async if applicable
         // TODO: figure out why `deno.resolve` doesn't drive async functions
@@ -108,8 +117,10 @@ async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
 
             if local.is_uint8_array() {
                 // If the return type is a u8 array, send the raw data directly to the client
-                let bytes = serde_v8::from_v8::<Vec<u8>>(scope, local)
-                    .context("failed to deserialize response")?;
+                let bytes = match deno_core::_ops::to_v8_slice::<u8>(local) {
+                    Ok(slice) => slice.to_vec(),
+                    Err(e) => return Err(anyhow!("failed to parse bytes: {e}")),
+                };
                 stream
                     .send_payload(&bytes)
                     .await
