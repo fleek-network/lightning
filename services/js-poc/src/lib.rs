@@ -10,6 +10,11 @@ use crate::stream::{Origin, Request, ServiceStream};
 mod runtime;
 pub mod stream;
 
+pub(crate) mod params {
+    pub const HEAP_INIT: usize = 1 << 10;
+    pub const HEAP_LIMIT: usize = 16 << 20;
+}
+
 #[tokio::main(flavor = "current_thread")]
 pub async fn main() {
     fn_sdk::ipc::init_from_env();

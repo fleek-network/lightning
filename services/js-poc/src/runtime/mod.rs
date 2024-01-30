@@ -1,11 +1,12 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
-use deno_core::v8::{Global, Value};
+use deno_core::v8::{CreateParams, Global, Value};
 use deno_core::{JsRuntime, RuntimeOptions, Snapshot};
 use extensions::fleek;
 
 use self::tape::{Punch, Tape};
+use crate::params::{HEAP_INIT, HEAP_LIMIT};
 
 mod extensions;
 mod tape;
@@ -27,6 +28,8 @@ impl Runtime {
                 extensions: vec![fleek::init_ops()],
                 startup_snapshot: Some(Snapshot::Static(SNAPSHOT)),
                 op_metrics_factory_fn: Some(tape.op_metrics_factory_fn()),
+                // Heap initializes with 1KiB, maxes out at 10MiB
+                create_params: Some(CreateParams::default().heap_limits(HEAP_INIT, HEAP_LIMIT)),
                 ..Default::default()
             }),
             tape,
