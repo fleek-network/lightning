@@ -38,4 +38,7 @@ pub trait Emitter: Clone + Send + Sync + 'static {
 
     /// Notify the waiters about new block.
     fn new_block(&self);
+
+    /// Shutdown the emmiter and close any open tasks
+    fn shutdown(&self);
 }
