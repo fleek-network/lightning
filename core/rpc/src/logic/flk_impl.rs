@@ -355,4 +355,12 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
             Err(err) => Err(RPCError::custom(err.to_string()).into()),
         }
     }
+
+    async fn get_js_hashes(&self) -> RpcResult<Vec<(Blake3Hash, u32)>> {
+        Ok(self.data.query_runner.get_js_hashes().into_iter().collect())
+    }
+
+    async fn get_js_hashes_count(&self) -> RpcResult<u128> {
+        Ok(self.data.query_runner.get_js_hashes_count())
+    }
 }

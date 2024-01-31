@@ -134,4 +134,10 @@ pub trait FleekApi {
 
     #[method(name = "metrics")]
     async fn metrics(&self) -> RpcResult<String>;
+
+    #[method(name = "get_js_hashes")]
+    async fn get_js_hashes(&self) -> RpcResult<Vec<(Blake3Hash, u32)>>;
+
+    #[method(name = "get_js_hashes_count")]
+    async fn get_js_hashes_count(&self) -> RpcResult<u128>;
 }

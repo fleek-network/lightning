@@ -54,6 +54,7 @@ pub struct QueryRunner {
     uptime_table: ResolvedTableReference<NodeIndex, u8>,
     _cid_to_node: ResolvedTableReference<Blake3Hash, BTreeSet<NodeIndex>>,
     _node_to_cid: ResolvedTableReference<NodeIndex, BTreeSet<Blake3Hash>>,
+    js_hash_count: ResolvedTableReference<Blake3Hash, u32>,
 }
 
 impl QueryRunner {
@@ -80,6 +81,7 @@ impl QueryRunner {
             uptime_table: atomo.resolve::<NodeIndex, u8>("uptime"),
             _cid_to_node: atomo.resolve::<Blake3Hash, BTreeSet<NodeIndex>>("cid_to_node"),
             _node_to_cid: atomo.resolve::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_cid"),
+            js_hash_count: atomo.resolve::<Blake3Hash, u32>("js_hash_count"),
             inner: atomo,
         }
     }
@@ -214,5 +216,31 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn get_content_registry(&self, node_index: &NodeIndex) -> Option<BTreeSet<Blake3Hash>> {
         self.inner
             .run(|ctx| self._node_to_cid.get(ctx).get(node_index))
+    }
+
+    fn get_js_hashes(&self) -> Vec<(Blake3Hash, u32)> {
+        self.inner.run(|ctx| {
+            let keys = self.js_hash_count.get(ctx).keys();
+            let mut hashes = Vec::new();
+            for key in keys {
+                if let Some(count) = self.js_hash_count.get(ctx).get(key) {
+                    hashes.push((key, count));
+                }
+            }
+            hashes
+        })
+    }
+
+    fn get_js_hashes_count(&self) -> u128 {
+        self.inner.run(|ctx| {
+            let keys = self.js_hash_count.get(ctx).keys();
+            let mut count_all: u128 = 0;
+            for key in keys {
+                if let Some(count) = self.js_hash_count.get(ctx).get(key) {
+                    count_all = count_all.saturating_add(count as u128);
+                }
+            }
+            count_all
+        })
     }
 }
