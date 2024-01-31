@@ -1,7 +1,9 @@
 use anyhow::{anyhow, Context};
 use arrayref::array_ref;
 use cid::Cid;
+use deno_core::v8::IsolateHandle;
 use deno_core::{serde_v8, v8, JsRuntime};
+use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, error, info};
 
 use crate::runtime::Runtime;
@@ -11,8 +13,11 @@ mod runtime;
 pub mod stream;
 
 pub(crate) mod params {
+    use std::time::Duration;
+
     pub const HEAP_INIT: usize = 1 << 10;
     pub const HEAP_LIMIT: usize = 16 << 20;
+    pub const REQ_TIMEOUT: Duration = Duration::from_secs(15);
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -26,8 +31,20 @@ pub async fn main() {
     // Explicitly initialize the v8 platform on the main thread
     JsRuntime::init_platform(None);
 
+    // To cancel events mid execution.
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<IsolateHandle>();
+    tokio::spawn(async move {
+        while let Some(handle) = rx.recv().await {
+            tokio::spawn(async move {
+                tokio::time::sleep(params::REQ_TIMEOUT).await;
+                handle.terminate_execution();
+            });
+        }
+    });
+
     while let Ok(conn) = listener.accept().await {
         let stream = ServiceStream::new(conn);
+        let tx = tx.clone();
 
         // spawn a new thread and tokio runtime to handle the connection
         // TODO: This is very hacky and not very scalable
@@ -38,7 +55,7 @@ pub async fn main() {
                 .enable_all()
                 .build()
                 .expect("failed to create connection async runtime")
-                .block_on(connection_loop(stream))
+                .block_on(connection_loop(tx, stream))
             {
                 error!("session failed: {e:?}");
             }
@@ -46,7 +63,10 @@ pub async fn main() {
     }
 }
 
-async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
+async fn connection_loop(
+    tx: UnboundedSender<IsolateHandle>,
+    mut stream: ServiceStream,
+) -> anyhow::Result<()> {
     while let Some(Request { origin, uri, param }) = stream.read_request().await {
         // Fetch content from origin
         let hash = match origin {
@@ -90,6 +110,8 @@ async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
 
         // Create runtime and execute the source
         let mut runtime = Runtime::new(hash);
+        tx.send(runtime.deno.v8_isolate().thread_safe_handle())
+            .expect("Failed to send the IsolateHandle to main thread.");
         let res = match runtime.exec(source) {
             Ok(res) => res,
             Err(e) => {
@@ -104,14 +126,23 @@ async fn connection_loop(mut stream: ServiceStream) -> anyhow::Result<()> {
         // Resolve async if applicable
         // TODO: figure out why `deno.resolve` doesn't drive async functions
         #[allow(deprecated)]
-        let res = match runtime.deno.resolve_value(res).await {
-            Ok(res) => res,
-            Err(e) => {
+        let res = match tokio::time::timeout(params::REQ_TIMEOUT, runtime.deno.resolve_value(res))
+            .await
+        {
+            Ok(Ok(res)) => res,
+            Ok(Err(e)) => {
                 stream
                     .send_payload(e.to_string().as_bytes())
                     .await
                     .context("failed to send error message")?;
                 return Err(e).context("failed to resolve output");
+            },
+            Err(e) => {
+                stream
+                    .send_payload("Request timeout.".as_bytes())
+                    .await
+                    .context("failed to send error message")?;
+                return Err(e).context("execution timeout");
             },
         };
 
