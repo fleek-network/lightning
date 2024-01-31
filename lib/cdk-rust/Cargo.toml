@@ -22,7 +22,10 @@ wtransport = { version = "0.1", features = ["dangerous-configuration"] }
 lightning-schema = { path = "../../core/schema" }
 arrayref = "0.3"
 fleek-crypto = { path = "../fleek-crypto"}
-worker = { version = "0.0.18", optional = true}
+
+# Fork with wasm-bindgen unpinned.
+# https://github.com/cloudflare/workers-rs/issues/439
+worker = { git = "https://github.com/fleek-network/workers-rs", rev = "97095997bac0864a277cb4d01d54e8d0abccaac3", optional = true }
 
 [features]
 cloudflare = ["dep:worker"]

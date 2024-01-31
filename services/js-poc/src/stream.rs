@@ -15,6 +15,8 @@ pub struct Request {
     /// - for blake3 should be hex encoded bytes
     /// - for ipfs should be cid string
     pub uri: String,
+    /// Optional path to provide as the window location
+    pub path: Option<String>,
     /// Parameter to pass to the script's main function
     #[serde(skip_serializing_if = "Option::is_none")]
     pub param: Option<serde_json::Value>,

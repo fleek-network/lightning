@@ -1,4 +1,4 @@
-// Example script for fetching some content with the sdk 
+// Example script for fetching some content with the sdk
 // cargo run --example js-poc-client $(lgtn-old dev store services/js-poc/examples/example_fetch.js | awk '{print $1}') blake3
 
 const bbb_hash = new Uint8Array([
@@ -37,18 +37,18 @@ const bbb_hash = new Uint8Array([
 ]);
 
 const main = async () => {
-  Fleek.log("Hello world from javascript!");
+  console.log("Hello world from javascript!");
 
   if (await Fleek.fetch_blake3(bbb_hash)) {
-    Fleek.log("Content fetched");
+    console.log("Content fetched");
 
     const handle = await Fleek.load_content(bbb_hash);
-    Fleek.log(`Loaded content handle with ${handle.length} blocks`);
+    console.log(`Loaded content handle with ${handle.length} blocks`);
 
     let total = 0;
     for (let i = 0; i < handle.length; i++) {
       const block = await handle.read(0);
-      Fleek.log(`Read block ${i}: ${block.length}`);
+      console.log(`Read block ${i}: ${block.length}`);
       total += block.length;
     }
 

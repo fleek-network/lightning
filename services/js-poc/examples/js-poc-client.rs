@@ -29,9 +29,14 @@ async fn main() -> anyhow::Result<()> {
     // Send the request
     client
         .send(RequestFrame::ServicePayload {
-            bytes: serde_json::to_string(&Request { origin, uri, param })
-                .expect("failed to encode request")
-                .into(),
+            bytes: serde_json::to_string(&Request {
+                origin,
+                uri,
+                path: None,
+                param,
+            })
+            .expect("failed to encode request")
+            .into(),
         })
         .await?;
 
