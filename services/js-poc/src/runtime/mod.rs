@@ -4,6 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use ::deno_web::{deno_web, TimersPermission};
 use anyhow::{Context, Result};
 use deno_console::deno_console;
+use deno_core::serde_v8::Serializable;
 use deno_core::url::Url;
 use deno_core::v8::{self, CreateParams, Global, Value};
 use deno_core::{JsRuntime, RuntimeOptions, Snapshot};
@@ -50,7 +51,7 @@ impl Runtime {
                 deno_console::init_ops(),
                 deno_url::init_ops(),
                 // TODO: why aren't we able to just use maybe_location to init the global scope?
-                deno_web::init_ops::<Permissions>(Arc::new(Default::default()), Some(location)),
+                deno_web::init_ops::<Permissions>(Arc::new(Default::default()), None),
                 deno_crypto::init_ops(None),
                 // Fleek runtime
                 fleek::init_ops(),
@@ -81,11 +82,12 @@ impl Runtime {
             let time = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
             // TODO: parse directly from u128
             let time: v8::Local<v8::Value> = v8::BigInt::new_from_u64(scope, time as u64).into();
+            let url = location.to_v8(scope).unwrap();
             let undefined = v8::undefined(scope);
 
             // Bootstrap.
             bootstrap_fn
-                .call(scope, undefined.into(), &[time])
+                .call(scope, undefined.into(), &[time, url])
                 .expect("Failed to execute bootstrap");
         }
 
