@@ -45,8 +45,6 @@ impl Runtime {
         let tape = Tape::new(hash);
         let mut deno = JsRuntime::new(RuntimeOptions {
             extensions: vec![
-                // Fleek sdk
-                fleek::init_ops(),
                 // WebApi subset
                 deno_webidl::init_ops(),
                 deno_console::init_ops(),
@@ -54,6 +52,8 @@ impl Runtime {
                 // TODO: why aren't we able to just use maybe_location to init the global scope?
                 deno_web::init_ops::<Permissions>(Arc::new(Default::default()), Some(location)),
                 deno_crypto::init_ops(None),
+                // Fleek runtime
+                fleek::init_ops(),
             ],
             startup_snapshot: Some(Snapshot::Static(SNAPSHOT)),
             op_metrics_factory_fn: Some(tape.op_metrics_factory_fn()),
