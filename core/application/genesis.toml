@@ -170,7 +170,7 @@ price = 0.1
 
 [[commodity_prices]]
 commodity = "Compute"
-price = 0.2
+price = 1
 
 [rep_scores]
 
