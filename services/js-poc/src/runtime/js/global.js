@@ -34,7 +34,7 @@ import {
 import { FileReader } from "ext:deno_web/10_filereader.js";
 import { Blob, File } from "ext:deno_web/09_file.js";
 import { MessageChannel, MessagePort } from "ext:deno_web/13_message_port.js";
-// import * as webidl from "ext:deno_webidl/00_webidl.js";
+import * as webidl from "ext:deno_webidl/00_webidl.js";
 import { DOMException } from "ext:deno_web/01_dom_exception.js";
 import * as performance from "ext:deno_web/15_performance.js";
 import { webgpu, webGPUNonEnumerable } from "ext:deno_webgpu/00_init.js";
@@ -191,6 +191,8 @@ const globalContext = {
   GPUValidationError: webGPUNonEnumerable(() => webgpu.GPUValidationError),
   GPUOutOfMemoryError: webGPUNonEnumerable(() => webgpu.GPUOutOfMemoryError),
   GPUCanvasContext: webGPUNonEnumerable(() => webgpuSurface.GPUCanvasContext),
+
+  [webidl.brand]: nonEnumerable(webidl.brand)
 };
 
 export { globalContext };
