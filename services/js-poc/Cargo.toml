@@ -26,8 +26,8 @@ deno_crypto = "0.149"
 deno_url = "0.135"
 deno_web = "0.166"
 deno_webidl = "0.135"
-# deno_webgpu = "0.102"
-# deno_canvas = "0.4.0"
+deno_canvas = "0.4.0"
+deno_webgpu = "0.102"
 
 [dev-dependencies]
 lightning-schema = { path = "../../core/schema" }
@@ -39,8 +39,8 @@ deno_crypto = "0.149"
 deno_url = "0.135"
 deno_web = "0.166"
 deno_webidl = "0.135"
-# deno_webgpu = "0.102"
-# deno_canvas = "0.4.0"
+deno_canvas = "0.4.0"
+deno_webgpu = "0.102"
 
 [[bin]]
 name = "fn-service-1"

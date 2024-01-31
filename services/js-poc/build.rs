@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
 use ::deno_web::{deno_web, TimersPermission};
+use deno_canvas::deno_canvas;
 use deno_console::deno_console;
 use deno_core::extension;
 use deno_crypto::deno_crypto;
 use deno_url::deno_url;
+use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
 
 struct Permissions {}
@@ -40,6 +42,8 @@ fn main() {
         deno_url::init_ops_and_esm(),
         deno_web::init_ops_and_esm::<Permissions>(Arc::new(Default::default()), None),
         deno_crypto::init_ops_and_esm(None),
+        deno_webgpu::init_ops_and_esm(),
+        deno_canvas::init_ops_and_esm(),
         fleek::init_ops_and_esm(),
     ];
 

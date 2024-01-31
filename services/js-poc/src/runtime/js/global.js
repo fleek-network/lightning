@@ -37,10 +37,68 @@ import { MessageChannel, MessagePort } from "ext:deno_web/13_message_port.js";
 // import * as webidl from "ext:deno_webidl/00_webidl.js";
 import { DOMException } from "ext:deno_web/01_dom_exception.js";
 import * as performance from "ext:deno_web/15_performance.js";
+import { webgpu, webGPUNonEnumerable } from "ext:deno_webgpu/00_init.js";
+import * as webgpuSurface from "ext:deno_webgpu/02_surface.js";
 import { Fleek } from "ext:fleek/fleek.js";
 import { readOnly, writable, getterOnly, nonEnumerable } from 'ext:fleek/util.js';
 
 const { ops } = core;
+
+let image;
+
+function ImageNonEnumerable(getter) {
+  let valueIsSet = false;
+  let value;
+
+  return {
+    get() {
+      loadImage();
+
+      if (valueIsSet) {
+        return value;
+      } else {
+        return getter();
+      }
+    },
+    set(v) {
+      loadImage();
+
+      valueIsSet = true;
+      value = v;
+    },
+    enumerable: false,
+    configurable: true,
+  };
+}
+function ImageWritable(getter) {
+  let valueIsSet = false;
+  let value;
+
+  return {
+    get() {
+      loadImage();
+
+      if (valueIsSet) {
+        return value;
+      } else {
+        return getter();
+      }
+    },
+    set(v) {
+      loadImage();
+
+      valueIsSet = true;
+      value = v;
+    },
+    enumerable: true,
+    configurable: true,
+  };
+}
+function loadImage() {
+  if (!image) {
+    image = ops.op_lazy_load_esm("ext:deno_canvas/01_image.js");
+  }
+}
 
 const globalContext = {
   // Fleek api
@@ -88,6 +146,51 @@ const globalContext = {
   Crypto: nonEnumerable(Crypto),
   CryptoKey: nonEnumerable(CryptoKey),
   SubtleCrypto: nonEnumerable(SubtleCrypto),
+
+  // canvas
+  createImageBitmap: ImageWritable(() => image.createImageBitmap),
+  ImageData: ImageNonEnumerable(() => image.ImageData),
+  ImageBitmap: ImageNonEnumerable(() => image.ImageBitmap),
+
+  // webgpu
+  GPU: webGPUNonEnumerable(() => webgpu.GPU),
+  GPUAdapter: webGPUNonEnumerable(() => webgpu.GPUAdapter),
+  GPUAdapterInfo: webGPUNonEnumerable(() => webgpu.GPUAdapterInfo),
+  GPUSupportedLimits: webGPUNonEnumerable(() => webgpu.GPUSupportedLimits),
+  GPUSupportedFeatures: webGPUNonEnumerable(() => webgpu.GPUSupportedFeatures),
+  GPUDeviceLostInfo: webGPUNonEnumerable(() => webgpu.GPUDeviceLostInfo),
+  GPUDevice: webGPUNonEnumerable(() => webgpu.GPUDevice),
+  GPUQueue: webGPUNonEnumerable(() => webgpu.GPUQueue),
+  GPUBuffer: webGPUNonEnumerable(() => webgpu.GPUBuffer),
+  GPUBufferUsage: webGPUNonEnumerable(() => webgpu.GPUBufferUsage),
+  GPUMapMode: webGPUNonEnumerable(() => webgpu.GPUMapMode),
+  GPUTextureUsage: webGPUNonEnumerable(() => webgpu.GPUTextureUsage),
+  GPUTexture: webGPUNonEnumerable(() => webgpu.GPUTexture),
+  GPUTextureView: webGPUNonEnumerable(() => webgpu.GPUTextureView),
+  GPUSampler: webGPUNonEnumerable(() => webgpu.GPUSampler),
+  GPUBindGroupLayout: webGPUNonEnumerable(() => webgpu.GPUBindGroupLayout),
+  GPUPipelineLayout: webGPUNonEnumerable(() => webgpu.GPUPipelineLayout),
+  GPUBindGroup: webGPUNonEnumerable(() => webgpu.GPUBindGroup),
+  GPUShaderModule: webGPUNonEnumerable(() => webgpu.GPUShaderModule),
+  GPUShaderStage: webGPUNonEnumerable(() => webgpu.GPUShaderStage),
+  GPUComputePipeline: webGPUNonEnumerable(() => webgpu.GPUComputePipeline),
+  GPURenderPipeline: webGPUNonEnumerable(() => webgpu.GPURenderPipeline),
+  GPUColorWrite: webGPUNonEnumerable(() => webgpu.GPUColorWrite),
+  GPUCommandEncoder: webGPUNonEnumerable(() => webgpu.GPUCommandEncoder),
+  GPURenderPassEncoder: webGPUNonEnumerable(() => webgpu.GPURenderPassEncoder),
+  GPUComputePassEncoder: webGPUNonEnumerable(() =>
+    webgpu.GPUComputePassEncoder
+  ),
+  GPUCommandBuffer: webGPUNonEnumerable(() => webgpu.GPUCommandBuffer),
+  GPURenderBundleEncoder: webGPUNonEnumerable(() =>
+    webgpu.GPURenderBundleEncoder
+  ),
+  GPURenderBundle: webGPUNonEnumerable(() => webgpu.GPURenderBundle),
+  GPUQuerySet: webGPUNonEnumerable(() => webgpu.GPUQuerySet),
+  GPUError: webGPUNonEnumerable(() => webgpu.GPUError),
+  GPUValidationError: webGPUNonEnumerable(() => webgpu.GPUValidationError),
+  GPUOutOfMemoryError: webGPUNonEnumerable(() => webgpu.GPUOutOfMemoryError),
+  GPUCanvasContext: webGPUNonEnumerable(() => webgpuSurface.GPUCanvasContext),
 };
 
 export { globalContext };

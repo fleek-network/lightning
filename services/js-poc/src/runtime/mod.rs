@@ -3,6 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use ::deno_web::{deno_web, TimersPermission};
 use anyhow::{Context, Result};
+use deno_canvas::deno_canvas;
 use deno_console::deno_console;
 use deno_core::serde_v8::Serializable;
 use deno_core::url::Url;
@@ -10,6 +11,7 @@ use deno_core::v8::{self, CreateParams, Global, Value};
 use deno_core::{JsRuntime, RuntimeOptions, Snapshot};
 use deno_crypto::deno_crypto;
 use deno_url::deno_url;
+use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
 use extensions::fleek;
 
@@ -53,6 +55,8 @@ impl Runtime {
                 // TODO: why aren't we able to just use maybe_location to init the global scope?
                 deno_web::init_ops::<Permissions>(Arc::new(Default::default()), None),
                 deno_crypto::init_ops(None),
+                deno_webgpu::init_ops(),
+                deno_canvas::init_ops(),
                 // Fleek runtime
                 fleek::init_ops(),
             ],
