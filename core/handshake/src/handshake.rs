@@ -24,7 +24,7 @@ use tracing::warn;
 use triomphe::Arc;
 
 use crate::config::HandshakeConfig;
-use crate::http::spawn_http_server;
+use crate::http::{self, spawn_http_server};
 use crate::proxy::{Proxy, State};
 use crate::shutdown::{ShutdownNotifier, ShutdownWaiter};
 use crate::transports::{
@@ -96,8 +96,9 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
             for child in routers {
                 router = router.nest("", child);
             }
-            let router = router.layer(Extension(run.ctx.clone()));
-            let router = router.layer(Extension(self.pk));
+            let router = router
+                .layer(Extension(run.ctx.clone()))
+                .route_layer(http::fleek_node_response_header(self.pk));
             let waiter = run.shutdown.waiter();
             let http_addr = self.config.http_address;
             tokio::spawn(async move { spawn_http_server(http_addr, router, waiter).await });

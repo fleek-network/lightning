@@ -35,7 +35,7 @@ rcgen = "0.11"
 ring = "0.16"
 time = "0.3"
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors"] }
+tower-http = { version = "0.5", features = ["cors", "set-header"] }
 hyper = "0.14"
 async-channel = "1.9.0"
 stunclient = "0.4"
