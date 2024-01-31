@@ -189,8 +189,8 @@ impl<B: Backend> State<B> {
                 service_id,
                 proofs,
                 metadata: _,
-                hashes: _,
-            } => self.submit_pod(txn.payload.sender, commodity, service_id, proofs),
+                hashes,
+            } => self.submit_pod(txn.payload.sender, commodity, service_id, proofs, hashes),
 
             UpdateMethod::Withdraw {
                 amount,
@@ -375,7 +375,11 @@ impl<B: Backend> State<B> {
         commodity: u128,
         service_id: u32,
         _acknowledgments: Vec<DeliveryAcknowledgmentProof>,
+        hashes: Vec<Blake3Hash>,
     ) -> TransactionResponse {
+        tracing::error!("############################");
+        tracing::error!("Submitted DACK: {hashes:?}");
+
         // Todo: function not done
         let sender: NodeIndex = match self.only_node(sender) {
             Ok(index) => index,
@@ -385,14 +389,17 @@ impl<B: Backend> State<B> {
             Some(node_info) => node_info.owner,
             None => return TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
         };
+        tracing::error!("############################ 1");
 
         if self.services.get(&service_id).is_none() {
             return TransactionResponse::Revert(ExecutionError::InvalidServiceId);
         }
+        tracing::error!("############################ 2");
         // Todo: build proof based on delivery acks
         if !self.verify_proof_of_delivery(&account_owner, &sender, &commodity, &service_id, ()) {
             return TransactionResponse::Revert(ExecutionError::InvalidProof);
         }
+        tracing::error!("############################ 3");
 
         let commodity_type = self
             .services
