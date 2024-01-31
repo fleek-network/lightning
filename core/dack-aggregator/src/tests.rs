@@ -189,6 +189,7 @@ async fn test_submit_dack() {
         commodity,
         proof: DeliveryAcknowledgmentProof,
         metadata: None,
+        hash: None,
     };
     socket.run(dack).await.unwrap();
     // Wait for aggregator to submit txn.

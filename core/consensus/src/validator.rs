@@ -99,8 +99,11 @@ impl Validator {
                         service_id: _,
                         proofs,
                         metadata: _,
+                        hashes,
                     } => {
-                        if proofs.len() > MAX_DELIVERY_ACKNOWLEDGMENTS {
+                        if proofs.len() > MAX_DELIVERY_ACKNOWLEDGMENTS
+                            || hashes.len() > MAX_DELIVERY_ACKNOWLEDGMENTS
+                        {
                             return Err(anyhow!("Too many delivery acknowledgments"));
                         }
                     },

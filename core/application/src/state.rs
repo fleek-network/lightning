@@ -189,6 +189,7 @@ impl<B: Backend> State<B> {
                 service_id,
                 proofs,
                 metadata: _,
+                hashes: _,
             } => self.submit_pod(txn.payload.sender, commodity, service_id, proofs),
 
             UpdateMethod::Withdraw {

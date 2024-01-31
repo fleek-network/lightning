@@ -268,7 +268,13 @@ mod tests {
 
     use anyhow::Result;
     use lightning_blockstore::blockstore::Blockstore;
-    use lightning_interfaces::{partial, BlockStoreInterface};
+    use lightning_dack_aggregator::{Config as DackAggrConfig, DeliveryAcknowledgmentAggregator};
+    use lightning_interfaces::{
+        partial,
+        BlockStoreInterface,
+        DeliveryAcknowledgmentAggregatorInterface,
+        SubmitTxSocket,
+    };
     use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
     use lightning_test_utils::keys::KeyOnlySigner;
 
@@ -279,6 +285,7 @@ mod tests {
         ServiceExecutorInterface = ServiceExecutor<Self>;
         SignerInterface = KeyOnlySigner;
         BlockStoreInterface = Blockstore<Self>;
+        DeliveryAcknowledgmentAggregatorInterface = DeliveryAcknowledgmentAggregator<Self>;
     });
 
     #[tokio::test]
@@ -288,12 +295,28 @@ mod tests {
             Default::default(),
         )
         .unwrap();
+
+        let config = DackAggrConfig {
+            submit_interval: Duration::from_secs(5),
+            db_path: std::env::temp_dir()
+                .join("dack_aggregator")
+                .try_into()
+                .unwrap(),
+        };
+        let signer_socket: SubmitTxSocket =
+            <KeyOnlySigner as lightning_interfaces::SignerInterface<TestBinding>>::get_socket(
+                &signer,
+            );
+        let dack_aggregator =
+            DeliveryAcknowledgmentAggregator::<TestBinding>::init(config, signer_socket).unwrap();
+
         let blockstore = Blockstore::init(lightning_blockstore::config::Config::default())?;
         let service_executor = ServiceExecutor::<TestBinding>::init(
             ServiceExecutorConfig::test_default(),
             &blockstore,
             affair::Socket::raw_bounded(1).0,
             Default::default(),
+            dack_aggregator.socket(),
         )?;
         signer.start().await;
         service_executor.start().await;

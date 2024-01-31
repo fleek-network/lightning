@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::Blake3Hash;
+
 /// A batch of delivery acknowledgments.
 #[derive(Serialize, Deserialize, Debug, Hash)]
 pub struct DeliveryAcknowledgmentBatch;
@@ -16,6 +18,8 @@ pub struct DeliveryAcknowledgment {
     pub proof: DeliveryAcknowledgmentProof,
     /// Optional metadata field
     pub metadata: Option<Vec<u8>>,
+    /// Testnet only: the blake3 hash of the js function
+    pub hash: Option<Blake3Hash>,
 }
 
 #[derive(

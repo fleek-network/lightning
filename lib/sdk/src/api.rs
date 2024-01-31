@@ -8,6 +8,15 @@ pub enum Origin {
     IPFS,
 }
 
+pub async fn submit_js_hash(service_id: u32, hash: [u8; 32]) {
+    let req = Request::SubmitJsHash { hash, service_id };
+    let res = send_and_await_response(req).await;
+    match res {
+        crate::ipc_types::Response::SubmitJsHash { res: _ } => (),
+        _ => unreachable!(),
+    }
+}
+
 /// Returns the balance of a client with the following public key.
 pub async fn query_client_bandwidth_balance(pk: ClientPublicKey) -> u128 {
     let req = Request::QueryClientBandwidth { pk: pk.0 };

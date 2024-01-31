@@ -51,5 +51,6 @@ lightning-notifier = {path="../notifier"}
 lightning-topology = {path="../topology"}
 lightning-test-utils = { path="../test-utils" }
 lightning-rep-collector = {path="../rep-collector"}
+lightning-dack-aggregator = {path="../dack-aggregator"}
 hp-fixed.workspace = true
 serial_test = "3.0.0"

@@ -6,6 +6,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore_server::BlockStoreServer;
 use lightning_broadcast::Broadcast;
 use lightning_consensus::consensus::Consensus;
+use lightning_dack_aggregator::DeliveryAcknowledgmentAggregator;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_handshake::handshake::Handshake;
 use lightning_indexer::Indexer;
@@ -47,7 +48,8 @@ impl CollectionBase for FinalTypes {
     type HandshakeInterface<C: Collection> = Handshake<C>;
     type NotifierInterface<C: Collection> = Notifier<C>;
     type OriginProviderInterface<C: Collection> = OriginDemuxer<C>;
-    type DeliveryAcknowledgmentAggregatorInterface<C: Collection> = infusion::Blank<C>;
+    type DeliveryAcknowledgmentAggregatorInterface<C: Collection> =
+        DeliveryAcknowledgmentAggregator<C>;
     type ReputationAggregatorInterface<C: Collection> = ReputationAggregator<C>;
     type ResolverInterface<C: Collection> = Resolver<C>;
     type RpcInterface<C: Collection> = Rpc<C>;

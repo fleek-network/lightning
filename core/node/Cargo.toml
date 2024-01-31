@@ -27,6 +27,7 @@ lightning-signer = { path = "../signer" }
 lightning-syncronizer = { path = "../syncronizer" }
 lightning-topology = { path = "../topology" }
 lightning-pinger = { path = "../pinger" }
+lightning-dack-aggregator = { path = "../dack-aggregator" }
 mock = { path = "../mock" }
 toml = "0.7"
 infusion.workspace = true

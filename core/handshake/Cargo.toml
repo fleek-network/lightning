@@ -54,6 +54,7 @@ lightning-signer = { path = "../signer" }
 lightning-rpc = { path = "../rpc" }
 lightning-service-executor = { path = "../service-executor" }
 lightning-blockstore = { path = "../blockstore/" }
+lightning-dack-aggregator = { path = "../dack-aggregator" }
 lightning-test-utils = { path = "../test-utils" }
 mock = { path = "../mock" }
 clap = { version = "4.4.6", features = ["derive"] }

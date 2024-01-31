@@ -123,6 +123,9 @@ async fn connection_loop(
             },
         };
 
+        // Submit the hash of the executed js
+        fn_sdk::api::submit_js_hash(1, hash).await;
+
         // Resolve async if applicable
         // TODO: figure out why `deno.resolve` doesn't drive async functions
         #[allow(deprecated)]

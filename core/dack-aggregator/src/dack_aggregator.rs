@@ -6,8 +6,10 @@ use std::sync::{Arc, Mutex};
 use affair::{Socket, Task};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
+    Blake3Hash,
     DeliveryAcknowledgment,
     DeliveryAcknowledgmentProof,
+    ServiceId,
     UpdateMethod,
     MAX_DELIVERY_ACKNOWLEDGMENTS,
 };
@@ -112,6 +114,7 @@ impl AggregatorInner {
                     let mut proofs: HashMap<u32, Vec<DeliveryAcknowledgmentProof>> = HashMap::new();
                     let mut metadata = HashMap::new();
                     let mut commodity = HashMap::new();
+                    let mut hashes: HashMap<ServiceId, Vec<Blake3Hash>> = HashMap::new();
                     let mut num_dacks_taken = 0;
                     for dack_bytes in queue.iter() {
                         match bincode::deserialize::<DeliveryAcknowledgment>(&dack_bytes) {
@@ -122,6 +125,9 @@ impl AggregatorInner {
                                 }
                                 proofs.entry(dack.service_id).or_default().push(dack.proof);
                                 *commodity.entry(dack.service_id).or_insert(0) += dack.commodity;
+                                if let Some(hash) = &dack.hash {
+                                    hashes.entry(dack.service_id).or_default().push(*hash);
+                                }
                                 if let Some(data) = &dack.metadata {
                                     metadata
                                         .entry(dack.service_id)
@@ -144,6 +150,7 @@ impl AggregatorInner {
                             service_id,
                             proofs: service_proofs,
                             metadata: metadata.remove(&service_id),
+                            hashes: hashes.remove(&service_id).map_or(vec![], |x| x)
                         };
                         let submit_tx = self.submit_tx.clone();
                         tokio::spawn(async move {

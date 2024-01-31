@@ -15,6 +15,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::{BlockStoreServer, Config as BlockServerConfig};
 use lightning_broadcast::{Broadcast, Config as BroadcastConfig};
+use lightning_dack_aggregator::{Config as DackAggrConfig, DeliveryAcknowledgmentAggregator};
 use lightning_fetcher::config::Config as FetcherConfig;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_interfaces::infu_collection::Collection;
@@ -26,6 +27,7 @@ use lightning_interfaces::{
     BlockStoreServerInterface,
     BroadcastInterface,
     ConsensusInterface,
+    DeliveryAcknowledgmentAggregatorInterface,
     FetcherInterface,
     NotifierInterface,
     OriginProviderInterface,
@@ -68,6 +70,7 @@ partial!(TestBinding {
     NotifierInterface = Notifier<Self>;
     TopologyInterface = Topology<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
+    DeliveryAcknowledgmentAggregatorInterface = DeliveryAcknowledgmentAggregator<Self>;
 });
 
 struct Peer<C: Collection> {
@@ -80,6 +83,7 @@ struct Peer<C: Collection> {
     _signer: C::SignerInterface,
     _origin_provider: C::OriginProviderInterface,
     _blockstore: C::BlockStoreInterface,
+    _dack_aggregator: C::DeliveryAcknowledgmentAggregatorInterface,
 }
 
 async fn init_service_executor(
@@ -186,6 +190,13 @@ async fn init_service_executor(
     .unwrap();
     resolver.start().await;
 
+    let config = DackAggrConfig {
+        submit_interval: Duration::from_secs(5),
+        db_path: path.join("dack_aggregator").try_into().unwrap(),
+    };
+    let dack_aggregator =
+        DeliveryAcknowledgmentAggregator::<TestBinding>::init(config, signer.get_socket()).unwrap();
+
     let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig {
         root: path.join("blockstore").try_into().unwrap(),
     })
@@ -237,6 +248,7 @@ async fn init_service_executor(
         &blockstore,
         fetcher.get_socket(),
         query_runner,
+        dack_aggregator.socket(),
     )
     .unwrap();
 
@@ -258,6 +270,7 @@ async fn init_service_executor(
         _signer: signer,
         _origin_provider: origin_provider,
         _blockstore: blockstore,
+        _dack_aggregator: dack_aggregator,
     };
 
     (peer, app)

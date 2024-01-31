@@ -8,6 +8,8 @@ use crate::{
     ApplicationInterface,
     ConfigConsumer,
     ConfigProviderInterface,
+    DeliveryAcknowledgmentAggregatorInterface,
+    DeliveryAcknowledgmentSocket,
     FetcherInterface,
     FetcherSocket,
     WithStartAndShutdown,
@@ -27,12 +29,14 @@ pub trait ServiceExecutorInterface<C: Collection>:
         blockstore: ::BlockStoreInterface,
         fetcher: ::FetcherInterface,
         app: ::ApplicationInterface,
+        dack_aggregator: ::DeliveryAcknowledgmentAggregatorInterface,
     ) {
         Self::init(
             config.get::<Self>(),
             blockstore,
             fetcher.get_socket(),
             app.sync_query(),
+            dack_aggregator.socket(),
         )
     }
 
@@ -45,6 +49,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
         blockstore: &C::BlockStoreInterface,
         fetcher_socket: FetcherSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        dack_aggregator_socket: DeliveryAcknowledgmentSocket,
     ) -> anyhow::Result<Self>;
 
     /// Returns the service handle provider which can be used establish connections to the

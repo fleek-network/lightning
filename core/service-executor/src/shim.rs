@@ -10,6 +10,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     BlockStoreInterface,
     ConfigConsumer,
+    DeliveryAcknowledgmentSocket,
     ExecutorProviderInterface,
     FetcherSocket,
     ServiceExecutorInterface,
@@ -77,6 +78,7 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
         blockstore: &C::BlockStoreInterface,
         fetcher_socket: FetcherSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        dack_aggregator_socket: DeliveryAcknowledgmentSocket,
     ) -> anyhow::Result<Self> {
         let ctx = Arc::new(Context {
             kill: Arc::new(Notify::new()),
@@ -84,6 +86,7 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
             ipc_path: config.ipc_path.clone(),
             fetcher_socket,
             query_runner,
+            dack_aggregator_socket,
         });
 
         Ok(ServiceExecutor {
