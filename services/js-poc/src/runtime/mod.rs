@@ -5,7 +5,7 @@ use ::deno_web::{deno_web, TimersPermission};
 use anyhow::{Context, Result};
 use deno_console::deno_console;
 use deno_core::url::Url;
-use deno_core::v8::{CreateParams, Global, Value};
+use deno_core::v8::{self, CreateParams, Global, Value};
 use deno_core::{JsRuntime, RuntimeOptions, Snapshot};
 use deno_crypto::deno_crypto;
 use deno_url::deno_url;
@@ -62,9 +62,32 @@ impl Runtime {
             ..Default::default()
         });
 
-        // Initialize environment
-        let time = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
-        deno.execute_script("<init>", format!(r#"bootstrap({time});"#).into())?;
+        {
+            // Get global scope
+            let context = deno.main_context();
+            let scope = &mut deno.handle_scope();
+            let context_local = v8::Local::new(scope, context);
+            let global_obj = context_local.global(scope);
+
+            // Get bootstrap function pointer
+            let bootstrap_str =
+                v8::String::new_external_onebyte_static(scope, b"bootstrap").unwrap();
+            let bootstrap_fn = global_obj
+                .get(scope, bootstrap_str.into())
+                .expect("Failed to get bootstrap fn");
+            let bootstrap_fn = v8::Local::<v8::Function>::try_from(bootstrap_fn).unwrap();
+
+            // Construct parameters
+            let time = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+            // TODO: parse directly from u128
+            let time: v8::Local<v8::Value> = v8::BigInt::new_from_u64(scope, time as u64).into();
+            let undefined = v8::undefined(scope);
+
+            // Bootstrap.
+            bootstrap_fn
+                .call(scope, undefined.into(), &[time])
+                .expect("Failed to execute bootstrap");
+        }
 
         Ok(Self { deno, tape })
     }
