@@ -4,6 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use async_channel::{bounded, Sender};
 use axum::{Extension, Router};
 use dashmap::DashMap;
+use fleek_crypto::{NodePublicKey, SecretKey};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use infusion::c;
@@ -36,6 +37,7 @@ use crate::transports::{
 pub struct Handshake<C: Collection> {
     status: Mutex<Option<Run<C>>>,
     config: HandshakeConfig,
+    pk: NodePublicKey,
 }
 
 struct Run<C: Collection> {
@@ -50,12 +52,13 @@ impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
         provider: c![C::ServiceExecutorInterface::Provider],
     ) -> anyhow::Result<Self> {
         let shutdown = ShutdownNotifier::default();
-        let (_, _) = signer.get_sk();
+        let (_, sk) = signer.get_sk();
         let ctx = Context::new(provider, shutdown.waiter());
 
         Ok(Self {
             status: Mutex::new(Some(Run::<C> { ctx, shutdown })),
             config,
+            pk: sk.to_pk(),
         })
     }
 }
@@ -94,6 +97,7 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
                 router = router.nest("", child);
             }
             let router = router.layer(Extension(run.ctx.clone()));
+            let router = router.layer(Extension(self.pk));
             let waiter = run.shutdown.waiter();
             let http_addr = self.config.http_address;
             tokio::spawn(async move { spawn_http_server(http_addr, router, waiter).await });

@@ -7,7 +7,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Extension;
 use cid::Cid;
-use fleek_crypto::{ClientPublicKey, ClientSignature};
+use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey};
 use fleek_service_js_poc::stream::{Origin, Request};
 use lightning_interfaces::ExecutorProviderInterface;
 use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame};
@@ -17,10 +17,13 @@ use tokio::sync::oneshot;
 use crate::handshake::Context;
 use crate::transports::http::{HttpReceiver, HttpSender, Service};
 
+const FLEEK_NODE_HEADER: &str = "X-FLEEK-NODE";
+
 pub async fn fetcher_service_handler<P: ExecutorProviderInterface>(
     Path((origin, uri)): Path<(String, String)>,
     Query(params): Query<HashMap<String, String>>,
     Extension(provider): Extension<Context<P>>,
+    Extension(pk): Extension<NodePublicKey>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let origin = match origin.as_str() {
         "ipfs" => Origin::Ipfs,
@@ -73,7 +76,7 @@ pub async fn fetcher_service_handler<P: ExecutorProviderInterface>(
     match termination_rx.await {
         Ok(reason) => Err(bad_request(format!("handshake failed: {reason:?}"))),
         Err(_) => {
-            let mut builder = Response::builder();
+            let mut builder = Response::builder().header(FLEEK_NODE_HEADER, pk.to_string());
             if let Some(content_type) = params.get("mime") {
                 builder = builder.header("Content-Type", content_type);
             }
@@ -88,6 +91,7 @@ pub async fn js_service_handler<P: ExecutorProviderInterface>(
     Path((origin, uri)): Path<(String, String)>,
     Query(params): Query<HashMap<String, String>>,
     Extension(provider): Extension<Context<P>>,
+    Extension(pk): Extension<NodePublicKey>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let origin = match origin.as_str() {
         "ipfs" => Origin::Ipfs,
@@ -135,7 +139,7 @@ pub async fn js_service_handler<P: ExecutorProviderInterface>(
     match termination_rx.await {
         Ok(reason) => Err(bad_request(format!("handshake failed: {reason:?}"))),
         Err(_) => {
-            let mut builder = Response::builder();
+            let mut builder = Response::builder().header(FLEEK_NODE_HEADER, pk.to_string());
             if let Some(content_type) = params.get("mime") {
                 builder = builder.header("Content-Type", content_type);
             }
