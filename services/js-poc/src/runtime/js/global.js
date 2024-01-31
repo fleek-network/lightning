@@ -51,7 +51,7 @@ const globalContext = {
     new Console((msg, level) => ops.log(msg, level > 0))
   ),
   Location: location.locationConstructorDescriptor,
-  location: writable(location.location),
+  location: location.locationDescriptor,
   Window: globalInterfaces.windowConstructorDescriptor,
   window: getterOnly(() => globalThis),
   self: getterOnly(() => globalThis),
