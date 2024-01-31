@@ -28,12 +28,12 @@ fn main() {
     );
 
     let extensions = vec![
-        fleek::init_ops_and_esm(),
         deno_webidl::init_ops_and_esm(),
         deno_console::init_ops_and_esm(),
         deno_url::init_ops_and_esm(),
         deno_web::init_ops_and_esm::<Permissions>(Arc::new(Default::default()), None),
         deno_crypto::init_ops_and_esm(None),
+        fleek::init_ops_and_esm(),
     ];
 
     let _snapshot = deno_core::snapshot_util::create_snapshot(
