@@ -2,7 +2,7 @@
 // cargo run --example js-poc-client $(lgtn-old dev store services/js-poc/examples/example_ssr.js | awk '{print $1}') blake3 '{"path":"/index.html"}'
 
 const main = (params = {}) => {
-  Fleek.log(JSON.stringify(params));
+  console.log(params);
 
   let path = params.path || '';
 
