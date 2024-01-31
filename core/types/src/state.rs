@@ -266,7 +266,7 @@ pub struct HandshakePorts {
 impl Default for HandshakePorts {
     fn default() -> Self {
         Self {
-            http: 4220,
+            http: 80,
             webrtc: 4320,
             webtransport: 4321,
         }
