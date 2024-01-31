@@ -1,10 +1,16 @@
 use std::net::SocketAddr;
 
 use anyhow::Context;
+use axum::body::Body;
+use axum::http::{HeaderName, HeaderValue, Response};
 use axum::Router;
+use fleek_crypto::NodePublicKey;
 use tower_http::cors::CorsLayer;
+use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::shutdown::ShutdownWaiter;
+
+pub const FLEEK_NODE_HEADER: &str = "x-fleek-node";
 
 pub async fn spawn_http_server(
     addr: SocketAddr,
@@ -26,4 +32,13 @@ pub async fn spawn_http_server(
         .with_graceful_shutdown(shutdown)
         .await
         .context("failed to run http server")
+}
+
+pub fn fleek_node_response_header(
+    pk: NodePublicKey,
+) -> SetResponseHeaderLayer<impl FnMut(&Response<Body>) -> Option<HeaderValue> + Clone> {
+    let pk = pk.to_string();
+    SetResponseHeaderLayer::overriding(HeaderName::from_static(FLEEK_NODE_HEADER), move |_: &_| {
+        Some(HeaderValue::from_str(&pk).expect("Base58 alphabet contains only valid characters"))
+    })
 }
