@@ -80,6 +80,7 @@ pub async fn query_client_bandwidth_balance(#[buffer(copy)] address: Vec<u8>) ->
 
 extension!(
     fleek,
+    deps = [deno_webidl, deno_console, deno_url, deno_web, deno_crypto],
     ops = [
         log,
         fetch_blake3,
