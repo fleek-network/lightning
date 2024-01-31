@@ -100,9 +100,14 @@ pub async fn js_service_handler<P: ExecutorProviderInterface>(
         .transpose()?;
 
     let request_frame = RequestFrame::ServicePayload {
-        bytes: serde_json::to_string(&Request { origin, uri, param })
-            .map_err(|_| bad_request("failed to encode request"))?
-            .into(),
+        bytes: serde_json::to_string(&Request {
+            origin,
+            uri,
+            param,
+            path: None,
+        })
+        .map_err(|_| bad_request("failed to encode request"))?
+        .into(),
     };
     let handshake_frame = HandshakeRequestFrame::Handshake {
         service: 1,

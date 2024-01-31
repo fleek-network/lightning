@@ -60,6 +60,8 @@ pub async fn main() {
                 error!("session failed: {e:?}");
             }
         });
+
+        tokio::spawn(async move {});
     }
 }
 
@@ -67,7 +69,13 @@ async fn connection_loop(
     tx: UnboundedSender<IsolateHandle>,
     mut stream: ServiceStream,
 ) -> anyhow::Result<()> {
-    while let Some(Request { origin, uri, param }) = stream.read_request().await {
+    while let Some(Request {
+        origin,
+        uri,
+        path,
+        param,
+    }) = stream.read_request().await
+    {
         // Fetch content from origin
         let hash = match origin {
             Origin::Blake3 => {
@@ -109,9 +117,19 @@ async fn connection_loop(
         }
 
         // Create runtime and execute the source
-        let mut runtime = Runtime::new(hash);
+        let mut runtime = match Runtime::new(hash, path) {
+            Ok(runtime) => runtime,
+            Err(e) => {
+                stream
+                    .send_payload(e.to_string().as_bytes())
+                    .await
+                    .context("failed to send error message")?;
+                return Err(e).context("failed to initialize runtime");
+            },
+        };
         tx.send(runtime.deno.v8_isolate().thread_safe_handle())
             .expect("Failed to send the IsolateHandle to main thread.");
+
         let res = match runtime.exec(source) {
             Ok(res) => res,
             Err(e) => {
@@ -154,9 +172,9 @@ async fn connection_loop(
             let scope = &mut runtime.deno.handle_scope();
             let local = v8::Local::new(scope, res);
 
-            if local.is_uint8_array() {
+            if local.is_uint8_array() || local.is_array_buffer() {
                 // If the return type is a u8 array, send the raw data directly to the client
-                let bytes = match deno_core::_ops::to_v8_slice::<u8>(local) {
+                let bytes = match deno_core::_ops::to_v8_slice_any(local) {
                     Ok(slice) => slice.to_vec(),
                     Err(e) => return Err(anyhow!("failed to parse bytes: {e}")),
                 };

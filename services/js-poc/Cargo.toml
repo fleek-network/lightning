@@ -15,16 +15,32 @@ arrayref = "0.3"
 triomphe = "0.1"
 serde.workspace = true
 serde_json.workspace = true
-deno_core = "0.245"
 hex = "0.4"
 cid = "0.11"
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
+
+# Deno core + webapi extensions
+deno_core = "0.254"
+deno_console = "0.135"
+deno_crypto = "0.149"
+deno_url = "0.135"
+deno_web = "0.166"
+deno_webidl = "0.135"
+# deno_webgpu = "0.102"
+# deno_canvas = "0.4.0"
 
 [dev-dependencies]
 lightning-schema = { path = "../../core/schema" }
 
 [build-dependencies]
-deno_core = "0.245"
+deno_core = "0.254"
+deno_console = "0.135"
+deno_crypto = "0.149"
+deno_url = "0.135"
+deno_web = "0.166"
+deno_webidl = "0.135"
+# deno_webgpu = "0.102"
+# deno_canvas = "0.4.0"
 
 [[bin]]
 name = "fn-service-1"
