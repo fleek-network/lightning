@@ -39,7 +39,6 @@ type IndexTask = Task<IndexRequest, Result<()>>;
 const BLKHASH_TO_BLKNUM: &str = "blkhash_to_blknum";
 const BLKNUM_TO_BLK: &str = "blknum_to_blk";
 const TXHASH_TO_TXRCT: &str = "txhash_to_txrct";
-const EPOCH_TO_HASH: &str = "epoch";
 const MISC: &str = "misc";
 
 // Special keys
@@ -202,7 +201,7 @@ impl<C: Collection> ArchiveInner<C> {
                     archive_task.respond(res);
                 }
                 Some(index_task) = index_rx.recv() => {
-                    let res = self.handle_index_request(index_task.request.clone());
+                    let res = self.handle_index_request(index_task.request.clone()).await;
                     index_task.respond(res);
                 }
             }
@@ -258,51 +257,11 @@ impl<C: Collection> ArchiveInner<C> {
             ArchiveRequest::GetHistoricalEpochState(epoch) => {
                 let path = self.historical_state_dir.join(epoch.to_string());
 
-                if path.is_dir() {
-                    // create the query runner
-                    let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_path(path)?;
-                    let query_runner = <c!(C::ApplicationInterface::SyncExecutor)>::new(db);
+                let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_path(path)?;
+                let query_runner = <c!(C::ApplicationInterface::SyncExecutor)>::new(db);
 
-                    // return the query runner
-                    Ok(ArchiveResponse::HistoricalEpochState(query_runner))
-                } else {
-                    // if this epoch has happened we should have stored the hash
-                    let hash: [u8; 32] = match self.db.get_cf(
-                        // cursed ?
-                        // this is !sync, so binding a variable here causes the compiler to
-                        // complain
-                        &self
-                            .db
-                            .cf_handle(EPOCH_TO_HASH)
-                            .context("Column family `epoch` not found in db")?,
-                        epoch.to_le_bytes(),
-                    )? {
-                        // will fail if the hash is longer than 32 bytes
-                        Some(hash) => hash.try_into().map_err(|_| {
-                            anyhow::anyhow!("Invalid hash in blockstore, this is a bug")
-                        })?,
-                        None => return Ok(ArchiveResponse::None),
-                    };
-
-                    // read the checkpoint from the blockstore
-                    let checkpoint = match self.blockstore.read_all_to_vec(&hash).await {
-                        Some(checkpoint) => checkpoint,
-                        None => {
-                            return Err(anyhow::anyhow!(
-                                "Could not find checkpoint in blockstore for epoch, this is a bug"
-                            ));
-                        },
-                    };
-
-                    // create the query runner
-                    let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_checkpoint(
-                        path, hash, checkpoint,
-                    )?;
-                    let query_runner = <c!(C::ApplicationInterface::SyncExecutor)>::new(db);
-
-                    // return the query runner
-                    Ok(ArchiveResponse::HistoricalEpochState(query_runner))
-                }
+                // return the query runner
+                Ok(ArchiveResponse::HistoricalEpochState(query_runner))
             },
         }
     }
@@ -374,21 +333,36 @@ impl<C: Collection> ArchiveInner<C> {
 
 /// Incoming index requests from execution are sent here
 impl<C: Collection> ArchiveInner<C> {
-    fn handle_index_request(&self, index_request: IndexRequest) -> Result<()> {
+    async fn handle_index_request(&self, index_request: IndexRequest) -> Result<()> {
         match index_request {
             IndexRequest::Block(block, response) => self.handle_block(block, response),
-            IndexRequest::Epoch(epoch, digest) => self.handle_epoch(epoch, digest),
+            IndexRequest::Epoch(epoch, digest) => self.handle_epoch(epoch, digest).await,
         }
     }
 
-    fn handle_epoch(&self, epoch: u64, hash: [u8; 32]) -> Result<()> {
-        let epoch_cf = self
-            .db
-            .cf_handle(EPOCH_TO_HASH)
-            .context("Column family `epoch` not found in db")?;
+    async fn handle_epoch(&self, epoch: u64, hash: [u8; 32]) -> Result<()> {
+        let path = self.historical_state_dir.join(epoch.to_string());
 
-        // Store Epoch => Hash
-        self.db.put_cf(&epoch_cf, epoch.to_le_bytes(), hash)?;
+        // read the checkpoint from the blockstore, at this point application/env::run() has already
+        // written this to the blockstore
+        let checkpoint = match self.blockstore.read_all_to_vec(&hash).await {
+            Some(checkpoint) => checkpoint,
+            None => {
+                return Err(anyhow::anyhow!(
+                    "Could not find checkpoint in blockstore for epoch, this is a bug"
+                ));
+            },
+        };
+
+        // create the query runner, this will write the checkpoint to the historical state dir
+        let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_checkpoint(
+            path,
+            hash,
+            &checkpoint,
+        )?;
+
+        // we dont actullay need to do anything with the query runner, so we ignore it explicity
+        let _ = <c!(C::ApplicationInterface::SyncExecutor)>::new(db);
 
         Ok(())
     }
