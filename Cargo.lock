@@ -5272,6 +5272,7 @@ dependencies = [
  "infusion",
  "lightning-application",
  "lightning-interfaces",
+ "lightning-metrics",
  "lightning-node",
  "lightning-signer",
  "lightning-types",
