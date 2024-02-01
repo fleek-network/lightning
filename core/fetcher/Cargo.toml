@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
 blake3-tree = { path = "../../lib/blake3-tree" }
+lightning-metrics = { path = "../metrics" }
 infusion.workspace = true
 serde.workspace = true
 anyhow.workspace = true
