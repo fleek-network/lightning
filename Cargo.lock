@@ -5415,6 +5415,7 @@ dependencies = [
  "lightning-broadcast",
  "lightning-indexer",
  "lightning-interfaces",
+ "lightning-metrics",
  "lightning-notifier",
  "lightning-origin-demuxer",
  "lightning-origin-ipfs",

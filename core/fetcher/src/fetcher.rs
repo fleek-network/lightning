@@ -23,6 +23,7 @@ use lightning_interfaces::{
     ResolverInterface,
     WithStartAndShutdown,
 };
+use lightning_metrics::increment_counter;
 use tokio::sync::{mpsc, oneshot};
 use tracing::error;
 
@@ -143,14 +144,38 @@ impl<C: Collection> FetcherInner<C> {
                             let tx = tx.clone();
                             let inner = self.clone();
                             tokio::spawn(async move {
-                                task.respond(FetcherResponse::Put(inner.put(pointer, &tx).await));
+                                let res = inner.put(pointer, &tx).await;
+                                if res.is_err() {
+                                    increment_counter!(
+                                        "fetcher_put_request_failed",
+                                        Some("Counter for failed put requests for origin content")
+                                    );
+                                } else {
+                                    increment_counter!(
+                                        "fetcher_put_request_succeed",
+                                        Some("Counter for successful put requests for origin content")
+                                    );
+                                }
+                                task.respond(FetcherResponse::Put(res));
                             });
                         }
                         FetcherRequest::Fetch { hash } => {
                             let tx = tx.clone();
                             let inner = self.clone();
                             tokio::spawn(async move {
-                                task.respond(FetcherResponse::Fetch(inner.fetch(hash, &tx).await));
+                                let res = inner.fetch(hash, &tx).await;
+                                if res.is_err() {
+                                    increment_counter!(
+                                        "fetcher_fetch_request_failed",
+                                        Some("Counter for failed fetch requests for native content")
+                                    );
+                                } else {
+                                    increment_counter!(
+                                        "fetcher_fetch_request_succeed",
+                                        Some("Counter for successful fetch requests for native content")
+                                    );
+                                }
+                                task.respond(FetcherResponse::Fetch(res));
                             });
                         }
                     }
@@ -176,7 +201,7 @@ impl<C: Collection> FetcherInner<C> {
             return self.fetch(hash, origin_tx).await.map(|_| hash);
         }
 
-        // Otherwise, fetch directly from the origin
+        // Otherwise, try to fetch directly from the origin
         self.fetch_origin(pointer, origin_tx).await
     }
 
@@ -195,11 +220,25 @@ impl<C: Collection> FetcherInner<C> {
             .await
             .expect("Failed to send origin request");
 
-        response_rx
+        let res = response_rx
             .await?
             .recv()
             .await?
-            .context("failed to fetch from origin")
+            .context("failed to fetch from origin");
+
+        if res.is_ok() {
+            increment_counter!(
+                "fetcher_from_origin",
+                Some("Counter for content that was fetched from an origin")
+            );
+        } else {
+            increment_counter!(
+                "fetcher_from_origin_failed",
+                Some("Counter for a failed attempts to fetch from an origin")
+            );
+        }
+
+        res
     }
 
     /// Attempt to fetch the blake3 content. First, we check the blockstore,
@@ -208,15 +247,25 @@ impl<C: Collection> FetcherInner<C> {
     #[inline(always)]
     async fn fetch(&self, hash: Blake3Hash, origin_tx: &mpsc::Sender<OriginRequest>) -> Result<()> {
         if self.blockstore.get_tree(&hash).await.is_some() {
+            increment_counter!(
+                "fetcher_from_cache",
+                Some("Counter for content that was already cached locally")
+            );
             return Ok(());
         } else if let Some(pointers) = self.resolver.get_origins(hash) {
             for res_pointer in pointers {
                 debug_assert_eq!(res_pointer.hash, hash);
                 if self.blockstore.get_tree(&hash).await.is_some() {
+                    // in case we have the file
+                    increment_counter!(
+                        "fetcher_from_cache",
+                        Some("Counter for content that was already cached locally")
+                    );
                     return Ok(());
                 }
 
                 // Try to get the content from the peer that advertised the record.
+                // TODO: Maybe use indexer for getting peers instead
                 let mut res = self
                     .blockstore_server_socket
                     .run(ServerRequest {
@@ -225,17 +274,26 @@ impl<C: Collection> FetcherInner<C> {
                     })
                     .await
                     .expect("Failed to send request to blockstore server");
-                if let Ok(()) = res
+                let res = res
                     .recv()
                     .await
-                    .expect("Failed to receive response from blockstore server")
-                {
+                    .expect("Failed to receive response from blockstore server");
+
+                if res.is_ok() {
+                    increment_counter!(
+                        "fetcher_from_peer",
+                        Some("Counter for content that was fetched from a peer")
+                    );
                     return Ok(());
+                } else {
+                    increment_counter!(
+                        "fetcher_from_peer_failed",
+                        Some("Counter for failed attempts to fetch from a peer")
+                    );
                 }
 
-                // If not, attempt to pull from the origin. We maintain a list of attempted origins
-                // in the event of failure. This strikes a balance between trying to fetch from a
-                // bunch of peers vs going to the origin right away.
+                // If not, attempt to pull from the origin. This strikes a balance between trying
+                // to fetch from a bunch of peers vs going to the origin right away.
                 if self
                     .fetch_origin(res_pointer.pointer, origin_tx)
                     .await
