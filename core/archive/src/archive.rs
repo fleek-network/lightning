@@ -257,6 +257,7 @@ impl<C: Collection> ArchiveInner<C> {
             ArchiveRequest::GetHistoricalEpochState(epoch) => {
                 let path = self.historical_state_dir.join(epoch.to_string());
 
+                tracing::trace!(target: "archive", "Getting historical epoch state from {:?}", path);
                 let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_path(path)?;
                 let query_runner = <c!(C::ApplicationInterface::SyncExecutor)>::new(db);
 
@@ -345,6 +346,7 @@ impl<C: Collection> ArchiveInner<C> {
 
         // read the checkpoint from the blockstore, at this point application/env::run() has already
         // written this to the blockstore
+        tracing::trace!(target: "archive", "Reading checkpoint from blockstore for epoch {}", epoch);
         let checkpoint = match self.blockstore.read_all_to_vec(&hash).await {
             Some(checkpoint) => checkpoint,
             None => {
