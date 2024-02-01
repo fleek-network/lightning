@@ -22,14 +22,16 @@ import { URL, URLSearchParams } from "ext:deno_url/00_url.js";
 import * as globalInterfaces from "ext:deno_web/04_global_interfaces.js";
 import { URLPattern } from "ext:deno_url/01_urlpattern.js";
 import {
+  ReadableStream,
   ReadableByteStreamController,
   ReadableStreamBYOBReader,
   ReadableStreamBYOBRequest,
   ReadableStreamDefaultController,
-  TransformStreamDefaultController,
   WritableStream,
   WritableStreamDefaultController,
   WritableStreamDefaultWriter,
+  TransformStream,
+  TransformStreamDefaultController,
 } from "ext:deno_web/06_streams.js";
 import { FileReader } from "ext:deno_web/10_filereader.js";
 import { Blob, File } from "ext:deno_web/09_file.js";
@@ -41,6 +43,12 @@ import { webgpu, webGPUNonEnumerable } from "ext:deno_webgpu/00_init.js";
 import * as webgpuSurface from "ext:deno_webgpu/02_surface.js";
 import { Fleek } from "ext:fleek/fleek.js";
 import { readOnly, writable, getterOnly, nonEnumerable } from 'ext:fleek/util.js';
+
+// TODO:
+// Events
+// AbortController
+// structuredClone
+// Navigator
 
 const { ops } = core;
 
@@ -121,9 +129,11 @@ const globalContext = {
   WritableStreamDefaultWriter: nonEnumerable(WritableStreamDefaultWriter),
   WritableStreamDefaultController: nonEnumerable(WritableStreamDefaultController),
   ReadableByteStreamController: nonEnumerable(ReadableByteStreamController),
+  ReadableStream: nonEnumerable(ReadableStream),
   ReadableStreamBYOBReader: nonEnumerable(ReadableStreamBYOBReader),
   ReadableStreamBYOBRequest: nonEnumerable(ReadableStreamBYOBRequest),
   ReadableStreamDefaultController: nonEnumerable(ReadableStreamDefaultController),
+  TransportStream: nonEnumerable(TransformStream),
   TransformStreamDefaultController: nonEnumerable(TransformStreamDefaultController),
   File: nonEnumerable(File),
   FileReader: nonEnumerable(FileReader),
