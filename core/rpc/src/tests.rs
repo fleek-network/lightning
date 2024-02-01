@@ -707,7 +707,7 @@ async fn test_rpc_get_locked() -> Result<()> {
 
     let client = client(rpc.config.addr());
 
-    let res = crate::api::FleekApiClient::get_locked(&client, node_public_key).await?;
+    let res = crate::api::FleekApiClient::get_locked(&client, node_public_key, None).await?;
     assert_eq!(HpUfixed::<18>::from(500_u32), res);
 
     Ok(())

@@ -25,6 +25,7 @@ pub trait EthApi {
         &self,
         address: EthAddress,
         block_number: Option<BlockNumber>,
+        epoch: Option<u64>,
     ) -> RpcResult<U256>;
 
     #[method(name = "getBalance")]
@@ -32,6 +33,7 @@ pub trait EthApi {
         &self,
         address: EthAddress,
         block_number: Option<BlockNumber>,
+        epoch: Option<u64>,
     ) -> RpcResult<U256>;
 
     #[method(name = "protocolVersion")]
