@@ -97,7 +97,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn atomo_from_checkpoint(
         path: impl AsRef<Path>,
         hash: [u8; 32],
-        checkpoint: Vec<u8>,
+        checkpoint: &[u8],
     ) -> anyhow::Result<Atomo<QueryPerm, Self::Backend>> {
         let backend = AtomoStorageBuilder::new(Some(path.as_ref()))
             .from_checkpoint(hash, checkpoint)
