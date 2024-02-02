@@ -151,6 +151,47 @@ pub async fn js_service_handler<P: ExecutorProviderInterface>(
     }
 }
 
+pub async fn ml_service_handler<P: ExecutorProviderInterface>(
+    Extension(provider): Extension<Context<P>>,
+    body: String,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let request_frame = RequestFrame::ServicePayload {
+        bytes: body.into_bytes().into(),
+    };
+    let handshake_frame = HandshakeRequestFrame::Handshake {
+        service: 2,
+        pk: ClientPublicKey([0; 96]),
+        pop: ClientSignature([0; 48]),
+        retry: None,
+    };
+
+    let (frame_tx, frame_rx) = async_channel::bounded(8);
+    let (body_tx, body_rx) = async_channel::bounded(1024);
+    let (termination_tx, termination_rx) = oneshot::channel();
+
+    let sender = HttpSender::new(Service::Js, frame_tx, body_tx, termination_tx);
+    let receiver = HttpReceiver::new(frame_rx);
+    let body = Body::from_stream(body_rx);
+
+    sender.frame_tx.try_send(Some(request_frame)).map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "unexpected error".to_string(),
+        )
+    })?;
+
+    provider
+        .handle_new_connection(handshake_frame, sender, receiver)
+        .await;
+
+    // If there is an error while streaming, the status header has already been sent,
+    // this is a hacky way of returning an error status before beginning streaming the body.
+    match termination_rx.await {
+        Ok(reason) => Err(bad_request(format!("handshake failed: {reason:?}"))),
+        Err(_) => Ok(Response::new(body)),
+    }
+}
+
 #[inline(always)]
 fn bad_request<T: AsRef<str> + Display>(msg: T) -> (StatusCode, String) {
     (StatusCode::BAD_REQUEST, msg.to_string())

@@ -3630,6 +3630,7 @@ name = "fleek-service-ml"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64 0.21.5",
  "bytes",
  "fn-sdk",
  "serde",
@@ -5629,6 +5630,7 @@ dependencies = [
  "enum_dispatch",
  "fleek-crypto",
  "fleek-service-js-poc",
+ "fleek-service-ml",
  "fn-sdk",
  "futures",
  "fxhash",
@@ -6076,6 +6078,7 @@ dependencies = [
  "fleek-crypto",
  "fleek-service-fetcher",
  "fleek-service-js-poc",
+ "fleek-service-ml",
  "fn-sdk",
  "futures",
  "fxhash",

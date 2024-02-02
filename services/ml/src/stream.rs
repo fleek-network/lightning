@@ -52,7 +52,7 @@ impl ServiceStream {
 
         let len = self.buffer.get_u32() as usize;
 
-        if len == 0 || len > 1025 {
+        if len == 0 || len > 1000000 {
             return None;
         }
 

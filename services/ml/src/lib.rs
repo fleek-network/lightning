@@ -1,14 +1,14 @@
-use bytes::Bytes;
-use opts::Device;
 use serde::{Deserialize, Serialize};
 use task::Task;
 
 mod handler;
 mod libtorch;
-mod model;
+pub mod model;
 mod opts;
 mod stream;
-mod task;
+pub mod task;
+
+pub use opts::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Request {
@@ -17,13 +17,13 @@ pub struct Request {
     /// Task to execute.
     pub task: Task,
     /// Options for the task.
-    pub opts: Bytes,
+    pub opts: String,
 }
 
 #[tokio::main]
 pub async fn main() {
     fn_sdk::ipc::init_from_env();
-    tracing::info!("Initialized IPFS fetcher service!");
+    tracing::info!("Initialized ML service!");
 
     let listener = fn_sdk::ipc::conn_bind().await;
     while let Ok(conn) = listener.accept().await {

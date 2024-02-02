@@ -44,7 +44,7 @@ pub struct ServiceExecutorConfig {
 impl Default for ServiceExecutorConfig {
     fn default() -> Self {
         Self {
-            services: [0, 1].into_iter().collect(),
+            services: [0, 1, 2].into_iter().collect(),
             ipc_path: "~/.lightning/ipc"
                 .try_into()
                 .expect("Failed to resolve path"),
@@ -111,6 +111,10 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
             #[cfg(feature = "services")]
             1 => {
                 fleek_service_js_poc::main();
+            },
+            #[cfg(feature = "services")]
+            2 => {
+                fleek_service_ml::main();
             },
             1001 => {
                 crate::test_services::io_stress::main();

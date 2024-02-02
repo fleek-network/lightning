@@ -3,7 +3,7 @@ mod handler;
 
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::Router;
 use bytes::Bytes;
 pub use config::Config;
@@ -41,6 +41,10 @@ impl Transport for HttpTransport {
             .route(
                 "/services/1/:origin/:uri",
                 get(handler::js_service_handler::<P>),
+            )
+            .route(
+                "/services/2/classify",
+                post(handler::ml_service_handler::<P>),
             );
         Ok((Self {}, Some(router)))
     }
