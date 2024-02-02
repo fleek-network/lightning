@@ -8,6 +8,8 @@ use fleek_crypto::ClientPublicKey;
 use fn_sdk::blockstore::get_internal_path;
 use tracing::info;
 
+use crate::runtime::Permissions;
+
 extension!(
     fleek,
     deps = [
@@ -27,7 +29,11 @@ extension!(
         read_block,
         query_client_flk_balance,
         query_client_bandwidth_balance
-    ]
+    ],
+    state = |state| {
+        // initialize permissions
+        state.put(Permissions {})
+    }
 );
 
 #[op2(fast)]
