@@ -19,6 +19,13 @@ import { MessageChannel, MessagePort } from "ext:deno_web/13_message_port.js";
 import * as compression from "ext:deno_web/14_compression.js";
 import * as performance from "ext:deno_web/15_performance.js";
 
+import * as headers from "ext:deno_fetch/20_headers.js";
+import * as formData from "ext:deno_fetch/21_formdata.js";
+import * as request from "ext:deno_fetch/23_request.js";
+import * as response from "ext:deno_fetch/23_response.js";
+import * as fetch from "ext:deno_fetch/26_fetch.js";
+import * as eventSource from "ext:deno_fetch/27_eventsource.js";
+
 import * as crypto from "ext:deno_crypto/00_crypto.js";
 
 import { webgpu, webGPUNonEnumerable } from "ext:deno_webgpu/00_init.js";
@@ -133,6 +140,14 @@ const globalContext = {
   URLSearchParams: nonEnumerable(URLSearchParams),
   MessageChannel: nonEnumerable(MessageChannel),
   MessagePort: nonEnumerable(MessagePort),
+
+  // Fetch apis
+  Headers: nonEnumerable(headers.Headers),
+  FormData: nonEnumerable(formData.FormData),
+  Request: nonEnumerable(request.Request),
+  Response: nonEnumerable(response.Response),
+  fetch: writable(fetch.fetch),
+  EventSource: writable(eventSource.EventSource),
 
   // Crypto apis
   crypto: readOnly(crypto.crypto),

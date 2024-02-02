@@ -15,6 +15,7 @@ extension!(
         deno_console,
         deno_url,
         deno_web,
+        deno_fetch,
         deno_crypto,
         deno_webgpu,
         deno_canvas
