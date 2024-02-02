@@ -9,6 +9,27 @@ use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
 
+extension!(
+    fleek,
+    deps = [
+        deno_webidl,
+        deno_console,
+        deno_url,
+        deno_web,
+        deno_crypto,
+        deno_webgpu,
+        deno_canvas
+    ],
+    esm_entry_point = "ext:fleek/bootstrap.js",
+    esm = [
+        dir "src/runtime/js",
+        "util.js",
+        "fleek.js",
+        "global.js",
+        "bootstrap.js"
+    ]
+);
+
 struct Permissions {}
 impl TimersPermission for Permissions {
     fn allow_hrtime(&mut self) -> bool {
@@ -17,25 +38,6 @@ impl TimersPermission for Permissions {
 }
 
 fn main() {
-    extension!(
-        fleek,
-        deps = [
-            deno_webidl,
-            deno_console,
-            deno_url,
-            deno_web,
-            deno_crypto
-        ],
-        esm_entry_point = "ext:fleek/bootstrap.js",
-        esm = [
-            dir "src/runtime/js",
-            "util.js",
-            "fleek.js",
-            "global.js",
-            "bootstrap.js"
-        ]
-    );
-
     let extensions = vec![
         deno_webidl::init_ops_and_esm(),
         deno_console::init_ops_and_esm(),
