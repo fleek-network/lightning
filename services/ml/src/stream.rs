@@ -2,6 +2,7 @@ use bytes::{Buf, BytesMut};
 use fn_sdk::connection::Connection;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
 use crate::Request;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -37,7 +38,14 @@ impl ServiceStream {
     // Note: this is not cancel safe.
     pub async fn recv(&mut self) -> Option<Request> {
         while self.buffer.len() < 5 {
-            if self.connection.stream.read_buf(&mut self.buffer).await.ok()? == 0 {
+            if self
+                .connection
+                .stream
+                .read_buf(&mut self.buffer)
+                .await
+                .ok()?
+                == 0
+            {
                 return None;
             }
         }
@@ -51,7 +59,14 @@ impl ServiceStream {
         self.buffer.reserve(len + 4);
 
         while self.buffer.len() < len {
-            if self.connection.stream.read_buf(&mut self.buffer).await.ok()? == 0 {
+            if self
+                .connection
+                .stream
+                .read_buf(&mut self.buffer)
+                .await
+                .ok()?
+                == 0
+            {
                 return None;
             }
         }

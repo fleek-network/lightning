@@ -5,5 +5,5 @@ use serde::{Deserialize, Serialize};
 pub enum Device {
     Cpu,
     // This is not supported atm.
-    Cuda,
+    Cuda(usize),
 }
