@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use ::deno_fetch::{deno_fetch, FetchPermissions};
 use ::deno_web::{deno_web, TimersPermission};
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
@@ -16,6 +17,7 @@ extension!(
         deno_console,
         deno_url,
         deno_web,
+        deno_fetch,
         deno_crypto,
         deno_webgpu,
         deno_canvas
@@ -36,6 +38,22 @@ impl TimersPermission for Permissions {
         unreachable!()
     }
 }
+impl FetchPermissions for Permissions {
+    fn check_net_url(
+        &mut self,
+        _url: &deno_core::url::Url,
+        _api_name: &str,
+    ) -> Result<(), deno_core::error::AnyError> {
+        unreachable!()
+    }
+    fn check_read(
+        &mut self,
+        _p: &std::path::Path,
+        _api_name: &str,
+    ) -> Result<(), deno_core::error::AnyError> {
+        unreachable!()
+    }
+}
 
 fn main() {
     let extensions = vec![
@@ -43,6 +61,7 @@ fn main() {
         deno_console::init_ops_and_esm(),
         deno_url::init_ops_and_esm(),
         deno_web::init_ops_and_esm::<Permissions>(Arc::new(Default::default()), None),
+        deno_fetch::init_ops_and_esm::<Permissions>(Default::default()),
         deno_crypto::init_ops_and_esm(None),
         deno_webgpu::init_ops_and_esm(),
         deno_canvas::init_ops_and_esm(),

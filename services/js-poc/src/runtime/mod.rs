@@ -1,8 +1,9 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use ::deno_fetch::{deno_fetch, FetchPermissions, Options};
 use ::deno_web::{deno_web, TimersPermission};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
 use deno_core::serde_v8::Serializable;
@@ -35,6 +36,24 @@ impl TimersPermission for Permissions {
         false
     }
 }
+impl FetchPermissions for Permissions {
+    fn check_net_url(
+        &mut self,
+        _url: &Url,
+        _api_name: &str,
+    ) -> std::prelude::v1::Result<(), deno_core::error::AnyError> {
+        Ok(())
+    }
+
+    fn check_read(
+        &mut self,
+        _p: &std::path::Path,
+        _api_name: &str,
+    ) -> std::prelude::v1::Result<(), deno_core::error::AnyError> {
+        // Disable reading files via fetch
+        Err(anyhow!("paths are disabled :("))
+    }
+}
 
 impl Runtime {
     /// Create a new runtime
@@ -52,8 +71,8 @@ impl Runtime {
                 deno_webidl::init_ops(),
                 deno_console::init_ops(),
                 deno_url::init_ops(),
-                // TODO: why aren't we able to just use maybe_location to init the global scope?
                 deno_web::init_ops::<Permissions>(Arc::new(Default::default()), None),
+                deno_fetch::init_ops::<Permissions>(Options::default()),
                 deno_crypto::init_ops(None),
                 deno_webgpu::init_ops(),
                 deno_canvas::init_ops(),
