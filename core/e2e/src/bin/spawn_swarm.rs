@@ -25,13 +25,17 @@ struct Cli {
     #[arg(short, long, default_value_t = 4)]
     num_nodes: usize,
 
-    /// Number of committee members.
+    /// Number of committee members
     #[arg(short, long, default_value_t = 4)]
     committee_size: usize,
 
     /// Epoch duration in millis
     #[arg(short, long, default_value_t = 60000)]
     epoch_time: u64,
+
+    /// Use persistence for the application state
+    #[arg(short, long, default_value_t = false)]
+    persistence: bool,
 }
 
 #[tokio::main]
@@ -65,6 +69,7 @@ async fn main() -> Result<()> {
         .with_epoch_start(epoch_start)
         .with_archiver()
         .with_port_assigner(port_assigner)
+        .persistence(args.persistence)
         .build();
     swarm.launch().await.unwrap();
 

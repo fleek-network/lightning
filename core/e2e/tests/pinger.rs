@@ -32,7 +32,7 @@ async fn e2e_detect_offline_node() -> Result<()> {
         .with_committee_size(4)
         .with_epoch_time(25000)
         .with_epoch_start(epoch_start)
-        .use_persistence()
+        .persistence(true)
         .build();
     swarm.launch_genesis_committee().await.unwrap();
 

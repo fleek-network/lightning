@@ -190,8 +190,8 @@ impl SwarmBuilder {
         self
     }
 
-    pub fn use_persistence(mut self) -> Self {
-        self.use_persistence = true;
+    pub fn persistence(mut self, persistence: bool) -> Self {
+        self.use_persistence = persistence;
         self
     }
 

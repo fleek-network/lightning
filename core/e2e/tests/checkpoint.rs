@@ -30,7 +30,7 @@ async fn e2e_checkpoint() -> Result<()> {
         .with_num_nodes(4)
         .with_epoch_time(30000)
         .with_epoch_start(epoch_start)
-        .use_persistence()
+        .persistence(true)
         .build();
     swarm.launch().await.unwrap();
 
