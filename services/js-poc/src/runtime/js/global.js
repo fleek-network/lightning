@@ -1,48 +1,31 @@
 import { core } from "ext:core/mod.js";
-import { atob, btoa } from "ext:deno_web/05_base64.js";
-import {
-  TextDecoder,
-  TextDecoderStream,
-  TextEncoder,
-  TextEncoderStream,
-} from "ext:deno_web/08_text_encoding.js";
-import * as location from "ext:deno_web/12_location.js";
-import { Console } from "ext:deno_console/01_console.js";
-import {
-  CompressionStream,
-  DecompressionStream,
-} from "ext:deno_web/14_compression.js";
-import {
-  Crypto,
-  crypto,
-  CryptoKey,
-  SubtleCrypto,
-} from "ext:deno_crypto/00_crypto.js";
-import { URL, URLSearchParams } from "ext:deno_url/00_url.js";
-import * as globalInterfaces from "ext:deno_web/04_global_interfaces.js";
-import { URLPattern } from "ext:deno_url/01_urlpattern.js";
-import {
-  ReadableStream,
-  ReadableByteStreamController,
-  ReadableStreamBYOBReader,
-  ReadableStreamBYOBRequest,
-  ReadableStreamDefaultController,
-  WritableStream,
-  WritableStreamDefaultController,
-  WritableStreamDefaultWriter,
-  TransformStream,
-  TransformStreamDefaultController,
-} from "ext:deno_web/06_streams.js";
-import { FileReader } from "ext:deno_web/10_filereader.js";
-import { Blob, File } from "ext:deno_web/09_file.js";
-import { MessageChannel, MessagePort } from "ext:deno_web/13_message_port.js";
+
 import * as webidl from "ext:deno_webidl/00_webidl.js";
+
+import { Console } from "ext:deno_console/01_console.js";
+
+import { URL, URLSearchParams } from "ext:deno_url/00_url.js";
+import { URLPattern } from "ext:deno_url/01_urlpattern.js";
+
 import { DOMException } from "ext:deno_web/01_dom_exception.js";
+import * as globalInterfaces from "ext:deno_web/04_global_interfaces.js";
+import * as base64 from "ext:deno_web/05_base64.js";
+import * as streams from "ext:deno_web/06_streams.js";
+import * as encoding from "ext:deno_web/08_text_encoding.js";
+import * as file from "ext:deno_web/09_file.js";
+import { FileReader } from "ext:deno_web/10_filereader.js";
+import * as location from "ext:deno_web/12_location.js";
+import { MessageChannel, MessagePort } from "ext:deno_web/13_message_port.js";
+import * as compression from "ext:deno_web/14_compression.js";
 import * as performance from "ext:deno_web/15_performance.js";
+
+import * as crypto from "ext:deno_crypto/00_crypto.js";
+
 import { webgpu, webGPUNonEnumerable } from "ext:deno_webgpu/00_init.js";
 import * as webgpuSurface from "ext:deno_webgpu/02_surface.js";
-import { Fleek } from "ext:fleek/fleek.js";
+
 import { readOnly, writable, getterOnly, nonEnumerable } from 'ext:fleek/util.js';
+import { Fleek } from "ext:fleek/fleek.js";
 
 // TODO:
 // Events
@@ -124,27 +107,27 @@ const globalContext = {
 
   // Web apis
   DOMException: nonEnumerable(DOMException),
-  Blob: nonEnumerable(Blob),
-  WritableStream: nonEnumerable(WritableStream),
-  WritableStreamDefaultWriter: nonEnumerable(WritableStreamDefaultWriter),
-  WritableStreamDefaultController: nonEnumerable(WritableStreamDefaultController),
-  ReadableByteStreamController: nonEnumerable(ReadableByteStreamController),
-  ReadableStream: nonEnumerable(ReadableStream),
-  ReadableStreamBYOBReader: nonEnumerable(ReadableStreamBYOBReader),
-  ReadableStreamBYOBRequest: nonEnumerable(ReadableStreamBYOBRequest),
-  ReadableStreamDefaultController: nonEnumerable(ReadableStreamDefaultController),
-  TransportStream: nonEnumerable(TransformStream),
-  TransformStreamDefaultController: nonEnumerable(TransformStreamDefaultController),
-  File: nonEnumerable(File),
+  WritableStream: nonEnumerable(streams.WritableStream),
+  WritableStreamDefaultWriter: nonEnumerable(streams.WritableStreamDefaultWriter),
+  WritableStreamDefaultController: nonEnumerable(streams.WritableStreamDefaultController),
+  ReadableByteStreamController: nonEnumerable(streams.ReadableByteStreamController),
+  ReadableStream: nonEnumerable(streams.ReadableStream),
+  ReadableStreamBYOBReader: nonEnumerable(streams.ReadableStreamBYOBReader),
+  ReadableStreamBYOBRequest: nonEnumerable(streams.ReadableStreamBYOBRequest),
+  ReadableStreamDefaultController: nonEnumerable(streams.ReadableStreamDefaultController),
+  TransportStream: nonEnumerable(streams.TransformStream),
+  TransformStreamDefaultController: nonEnumerable(streams.TransformStreamDefaultController),
+  Blob: nonEnumerable(file.Blob),
+  File: nonEnumerable(file.File),
   FileReader: nonEnumerable(FileReader),
-  CompressionStream: nonEnumerable(CompressionStream),
-  DecompressionStream: nonEnumerable(DecompressionStream),
-  TextDecoder: nonEnumerable(TextDecoder),
-  TextDecoderStream: nonEnumerable(TextDecoderStream),
-  TextEncoder: nonEnumerable(TextEncoder),
-  TextEncoderStream: nonEnumerable(TextEncoderStream),
-  atob: writable(atob),
-  btoa: writable(btoa),
+  CompressionStream: nonEnumerable(compression.CompressionStream),
+  DecompressionStream: nonEnumerable(compression.DecompressionStream),
+  TextDecoder: nonEnumerable(encoding.TextDecoder),
+  TextDecoderStream: nonEnumerable(encoding.TextDecoderStream),
+  TextEncoder: nonEnumerable(encoding.TextEncoder),
+  TextEncoderStream: nonEnumerable(encoding.TextEncoderStream),
+  atob: writable(base64.atob),
+  btoa: writable(base64.btoa),
   URL: nonEnumerable(URL),
   URLPattern: nonEnumerable(URLPattern),
   URLSearchParams: nonEnumerable(URLSearchParams),
@@ -152,10 +135,10 @@ const globalContext = {
   MessagePort: nonEnumerable(MessagePort),
 
   // Crypto apis
-  crypto: readOnly(crypto),
-  Crypto: nonEnumerable(Crypto),
-  CryptoKey: nonEnumerable(CryptoKey),
-  SubtleCrypto: nonEnumerable(SubtleCrypto),
+  crypto: readOnly(crypto.crypto),
+  Crypto: nonEnumerable(crypto.Crypto),
+  CryptoKey: nonEnumerable(crypto.CryptoKey),
+  SubtleCrypto: nonEnumerable(crypto.SubtleCrypto),
 
   // canvas
   createImageBitmap: ImageWritable(() => image.createImageBitmap),
