@@ -8,6 +8,27 @@ use fleek_crypto::ClientPublicKey;
 use fn_sdk::blockstore::get_internal_path;
 use tracing::info;
 
+extension!(
+    fleek,
+    deps = [
+        deno_webidl,
+        deno_console,
+        deno_url,
+        deno_web,
+        deno_crypto,
+        deno_webgpu,
+        deno_canvas
+    ],
+    ops = [
+        log,
+        fetch_blake3,
+        load_content,
+        read_block,
+        query_client_flk_balance,
+        query_client_bandwidth_balance
+    ]
+);
+
 #[op2(fast)]
 pub fn log(#[string] message: String) {
     info!("Runtime: {message}");
@@ -77,16 +98,3 @@ pub async fn query_client_bandwidth_balance(#[buffer(copy)] address: Vec<u8>) ->
             .to_string(),
     )
 }
-
-extension!(
-    fleek,
-    deps = [deno_webidl, deno_console, deno_url, deno_web, deno_crypto],
-    ops = [
-        log,
-        fetch_blake3,
-        load_content,
-        read_block,
-        query_client_flk_balance,
-        query_client_bandwidth_balance
-    ]
-);
