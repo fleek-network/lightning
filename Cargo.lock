@@ -3580,6 +3580,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "fleek-service-ai"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "base64 0.21.5",
+ "bytes",
+ "fn-sdk",
+ "serde",
+ "serde_json",
+ "tch",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "fleek-service-fetcher"
 version = "0.0.1"
 dependencies = [
@@ -3623,22 +3639,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "triomphe",
-]
-
-[[package]]
-name = "fleek-service-ml"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "base64 0.21.5",
- "bytes",
- "fn-sdk",
- "serde",
- "serde_json",
- "tch",
- "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -5629,8 +5629,8 @@ dependencies = [
  "derive_more",
  "enum_dispatch",
  "fleek-crypto",
+ "fleek-service-ai",
  "fleek-service-js-poc",
- "fleek-service-ml",
  "fn-sdk",
  "futures",
  "fxhash",
@@ -6076,9 +6076,9 @@ dependencies = [
  "bytes",
  "dashmap",
  "fleek-crypto",
+ "fleek-service-ai",
  "fleek-service-fetcher",
  "fleek-service-js-poc",
- "fleek-service-ml",
  "fn-sdk",
  "futures",
  "fxhash",

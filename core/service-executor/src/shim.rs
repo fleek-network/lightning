@@ -114,7 +114,7 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
             },
             #[cfg(feature = "services")]
             2 => {
-                fleek_service_ml::main();
+                fleek_service_ai::main();
             },
             1001 => {
                 crate::test_services::io_stress::main();

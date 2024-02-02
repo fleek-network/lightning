@@ -23,7 +23,7 @@ pub struct Request {
 #[tokio::main]
 pub async fn main() {
     fn_sdk::ipc::init_from_env();
-    tracing::info!("Initialized ML service!");
+    tracing::info!("Initialized AI service!");
 
     let listener = fn_sdk::ipc::conn_bind().await;
     while let Ok(conn) = listener.accept().await {

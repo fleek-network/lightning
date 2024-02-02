@@ -7,5 +7,5 @@ fn main() {
         )
         .init();
 
-    fleek_service_ml::main()
+    fleek_service_ai::main()
 }
