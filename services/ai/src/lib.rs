@@ -16,8 +16,6 @@ pub struct Request {
     pub device: Device,
     /// Task to execute.
     pub task: Task,
-    /// Options for the task.
-    pub opts: String,
 }
 
 #[tokio::main]
