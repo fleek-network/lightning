@@ -12,6 +12,7 @@ use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{ApplicationInterface, ServiceScope, SyncQueryRunnerInterface};
+use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -99,6 +100,11 @@ where
     }
 
     fn enqueue_dial_task(&mut self, info: NodeInfo, muxer: M) -> anyhow::Result<()> {
+        increment_counter!(
+            "pool_enqueue_request",
+            Some("Counter for connection requests made")
+        );
+
         if let Entry::Vacant(entry) = self.pending_dial.entry(info.index) {
             let cancel = CancellationToken::new();
             entry.insert(cancel.clone());
@@ -127,6 +133,8 @@ where
             });
 
             self.ongoing_async_tasks.push(handle);
+        } else {
+            increment_counter!("pool_pool_hit", Some("Counter for pool hits"));
         }
 
         Ok(())
