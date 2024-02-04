@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Context};
 use base64::Engine;
-use bytes::Bytes;
 use fn_sdk::connection::Connection;
 
 use crate::libtorch;
@@ -12,7 +11,6 @@ use crate::task::Task;
 
 pub async fn handle(connection: Connection) -> anyhow::Result<()> {
     let mut stream = ServiceStream::new(connection);
-
     while let Some(request) = stream.recv().await {
         let device = request.device;
         match request.task {
@@ -32,10 +30,20 @@ pub async fn handle(connection: Connection) -> anyhow::Result<()> {
             Task::Train {
                 epochs,
                 model_uri,
-                train_set_uri,
-                ..
+                train_data_uri,
+                train_label_uri,
+                validation_data_uri,
+                validation_label_uri,
             } => {
-                let result = handle_train_task(epochs, model_uri, train_set_uri).await?;
+                let result = handle_train_task(
+                    epochs,
+                    model_uri,
+                    train_data_uri,
+                    train_label_uri,
+                    validation_data_uri,
+                    validation_label_uri,
+                )
+                .await?;
                 stream
                     .send(serde_json::to_string(&result)?.as_bytes())
                     .await?;
@@ -65,34 +73,60 @@ async fn get_hash(uri: String) -> anyhow::Result<[u8; 32]> {
 }
 
 async fn handle_train_task(
-    epochs: u32,
+    _epochs: u32,
     model_uri: String,
-
-    train_set_uri: String,
+    train_data_uri: String,
+    train_label_uri: String,
+    validation_data_uri: String,
+    validation_label_uri: String,
 ) -> anyhow::Result<TrainingResult> {
-    // let _ = get_hash(model_uri).await?;
-    // let _ = get_hash(train_set_uri).await?;
-    //
-    // let model = fn_sdk::blockstore::ContentHandle::load(&model_hash)
-    //     .await
-    //     .context("failed to get handle for source from blockstore")?
-    //     .read_to_end()
-    //     .await
-    //     .context("failed to read source from blockstore")?;
-    // let mut model =
-    //     String::from_utf8(model).context("failed to parse source as utf8")?;
-    //
-    // let train_set = fn_sdk::blockstore::ContentHandle::load(&train_set_hash)
-    //     .await
-    //     .context("failed to get handle for source from blockstore")?
-    //     .read_to_end()
-    //     .await
-    //     .context("failed to read source from blockstore")?;
+    let model_hash = get_hash(model_uri).await?;
+    let train_data_hash = get_hash(train_data_uri).await?;
+    let train_label_hash = get_hash(train_label_uri).await?;
+    let validation_data_hash = get_hash(validation_data_uri).await?;
+    let validation_label_hash = get_hash(validation_label_uri).await?;
+
+    let model = fn_sdk::blockstore::ContentHandle::load(&model_hash)
+        .await
+        .context("failed to get handle for source from blockstore")?
+        .read_to_end()
+        .await
+        .context("failed to read model from blockstore")?;
+    let train_data = fn_sdk::blockstore::ContentHandle::load(&train_data_hash)
+        .await
+        .context("failed to get handle for source from blockstore")?
+        .read_to_end()
+        .await
+        .context("failed to read train set from blockstore")?;
+    let train_labels = fn_sdk::blockstore::ContentHandle::load(&train_label_hash)
+        .await
+        .context("failed to get handle for source from blockstore")?
+        .read_to_end()
+        .await
+        .context("failed to read train set from blockstore")?;
+    let validation_data = fn_sdk::blockstore::ContentHandle::load(&validation_data_hash)
+        .await
+        .context("failed to get handle for source from blockstore")?
+        .read_to_end()
+        .await
+        .context("failed to read validation set from blockstore")?;
+    let validation_labels = fn_sdk::blockstore::ContentHandle::load(&validation_label_hash)
+        .await
+        .context("failed to get handle for source from blockstore")?
+        .read_to_end()
+        .await
+        .context("failed to read validation set from blockstore")?;
 
     train::train(
         Config {
-            model: Bytes::new(),
+            model: model.into(),
         },
-        Dataset {},
+        Dataset {
+            train_images: train_data.into(),
+            train_labels: train_labels.into(),
+            validation_images: validation_data.into(),
+            validation_labels: validation_labels.into(),
+            labels: 10,
+        },
     )
 }

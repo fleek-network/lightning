@@ -1,3 +1,4 @@
+mod mnist;
 pub mod train;
 
 use tch::nn::ModuleT;

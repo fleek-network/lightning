@@ -25,9 +25,13 @@ pub enum Task {
         epochs: u32,
         /// Uri for getting the models from origin.
         model_uri: String,
-        /// Uri for getting the training set from origin.
-        train_set_uri: String,
-        /// Uri for getting the validation set from origin.
-        validation_set_uri: String,
+        /// Uri for getting the training data from origin.
+        train_data_uri: String,
+        /// Uri for getting the training labels from origin.
+        train_label_uri: String,
+        /// Uri for getting the validation data from origin.
+        validation_data_uri: String,
+        /// Uri for getting the validation labels from origin.
+        validation_label_uri: String,
     },
 }

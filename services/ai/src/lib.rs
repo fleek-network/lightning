@@ -25,7 +25,6 @@ pub async fn main() {
 
     let listener = fn_sdk::ipc::conn_bind().await;
     while let Ok(conn) = listener.accept().await {
-        println!("New conn");
         tokio::spawn(async move {
             if handler::handle(conn).await.is_err() {
                 tracing::info!("there was an error when handling the connection");
