@@ -5,9 +5,10 @@ edition.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+base64 = "0.21"
 bytes.workspace = true
 fn-sdk = { path = "../../lib/sdk" }
-base64 = "0.21"
+hex = "0.4"
 serde.workspace = true
 serde_json.workspace = true
 tch = { version = "0.15", features = ["download-libtorch"] }

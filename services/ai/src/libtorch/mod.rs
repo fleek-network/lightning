@@ -1,3 +1,5 @@
+pub mod train;
+
 use tch::nn::ModuleT;
 use tch::vision::imagenet;
 
