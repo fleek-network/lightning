@@ -197,10 +197,10 @@ async fn test_origin_dag_pb() {
     let state = create_app_state("test-origin-dag-pb".to_string()).await;
 
     let req_fut = async move {
-        config.gateways.push(Gateway {
+        config.gateways = vec![Gateway {
             protocol: Protocol::Http,
-            authority: "127.0.0.1:30100".to_string(),
-        });
+            authority: "127.0.0.1:30200".to_string(),
+        }];
         let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore.clone()).unwrap();
 
         let hash = ipfs_origin
@@ -237,10 +237,10 @@ async fn test_origin_bbb_dag_pb() {
     let state = create_app_state("test-origin-bbb-dag-pb".to_string()).await;
 
     let req_fut = async move {
-        config.gateways.push(Gateway {
+        config.gateways = vec![Gateway {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30200".to_string(),
-        });
+        }];
         let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore.clone()).unwrap();
 
         let hash = ipfs_origin
@@ -277,10 +277,10 @@ async fn test_origin_raw() {
     let state = create_app_state("test-origin-raw".to_string()).await;
 
     let req_fut = async move {
-        config.gateways.push(Gateway {
+        config.gateways = vec![Gateway {
             protocol: Protocol::Http,
-            authority: "127.0.0.1:30201".to_string(),
-        });
+            authority: "127.0.0.1:30200".to_string(),
+        }];
         let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore.clone()).unwrap();
 
         let hash = ipfs_origin
