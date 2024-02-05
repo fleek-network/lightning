@@ -29,6 +29,8 @@ pub struct Args {
 pub enum Command {
     /// Run the full node.
     Run,
+    /// Debugging
+    Debug,
     /// Key management utilities.
     #[command(subcommand)]
     Keys(KeySubCmd),
