@@ -35,7 +35,8 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
-use tracing::warn;
+use lightning_utils::application::QueryRunnerExt;
+use tracing::{info, warn};
 
 use crate::config::{Config, Mode, StorageConfig};
 use crate::genesis::{Genesis, GenesisPrices};
@@ -194,6 +195,10 @@ impl Env<UpdatePerm> {
         });
 
         if response.change_epoch {
+            let epoch = self.query_runner().get_epoch_info().epoch;
+            info!("#######################################");
+            info!("Epoch changed to {epoch}");
+            info!("#######################################");
             let storage = self.inner.get_storage_backend_unsafe();
             // This will return `None` only if the InMemory backend is used.
             if let Some(checkpoint) = storage.serialize() {

@@ -5,7 +5,7 @@ use std::thread::JoinHandle;
 use infusion::tag;
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::Blake3Hash;
-use lightning_interfaces::{BlockStoreInterface, SyncronizerInterface};
+use lightning_interfaces::{BlockStoreInterface, SignerInterface, SyncronizerInterface};
 use tokio::sync::{oneshot, Notify};
 
 use crate::containerized_node::RuntimeType;
@@ -65,6 +65,15 @@ impl<C: Collection> Container<C> {
                         .container
                         .get::<<C as Collection>::BlockStoreInterface>(tag!(C::BlockStoreInterface))
                         .clone();
+
+                    let node_public_key = node
+                        .container
+                        .get::<<C as Collection>::SignerInterface>(tag!(C::SignerInterface))
+                        .get_ed25519_pk();
+
+                    tracing::info!("##################################");
+                    tracing::info!("Node Public Key: {node_public_key}");
+                    tracing::info!("##################################");
 
                     tx.send((ckpt_rx, blockstore)).expect("Failed to send");
 

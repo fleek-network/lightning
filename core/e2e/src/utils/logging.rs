@@ -50,6 +50,6 @@ pub fn setup() {
             TerminalMode::Mixed,
             ColorChoice::Auto,
         ),
-        WriteLogger::new(LevelFilter::Trace, config, File::create(log_file).unwrap()),
+        WriteLogger::new(log_filter, config, File::create(log_file).unwrap()),
     ]);
 }
