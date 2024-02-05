@@ -11,7 +11,7 @@ use tracing_subscriber::EnvFilter;
 
 use crate::args::{Args, Command};
 use crate::commands::run::CustomStartShutdown;
-use crate::commands::{dev, keys, opt, print_config, run};
+use crate::commands::{debug, dev, keys, opt, print_config, run};
 use crate::utils::fs::ensure_parent_exist;
 
 pub struct Cli {
@@ -60,6 +60,7 @@ impl Cli {
     {
         match self.args.cmd {
             Command::Run => run::exec::<C>(config_path, custom_start_shutdown).await,
+            Command::Debug => debug::exec::<C>(config_path, custom_start_shutdown).await,
             Command::Keys(cmd) => keys::exec::<C>(cmd, config_path).await,
             Command::Opt(cmd) => opt::exec::<C>(cmd, config_path).await,
             Command::PrintConfig { default } => print_config::exec::<C>(default, config_path).await,

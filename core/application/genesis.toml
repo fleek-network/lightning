@@ -104,6 +104,7 @@ stake.locked = "0"
 stake.locked_until = 0
 genesis_committee = true
 
+
 [[service]]
 id = 0
 owner = "0xDC0A31F9eeb151f82BF1eE6831095284fC215Ee7"
