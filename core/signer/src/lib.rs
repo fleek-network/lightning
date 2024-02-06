@@ -94,7 +94,7 @@ impl<C: Collection> WithStartAndShutdown for Signer<C> {
 
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
-        self.shutdown_notify.notify_one();
+        self.shutdown_notify.notify_waiters();
     }
 }
 
@@ -287,6 +287,10 @@ impl SignerInner {
             .unwrap()
             .take()
             .expect("New block notification channel must be opened");
+
+        let shutdown_future = shutdown_notify.notified();
+        tokio::pin!(shutdown_future);
+
         loop {
             tokio::select! {
                 task = rx.recv() => {
@@ -344,7 +348,7 @@ impl SignerInner {
                         panic!("Got unexpected notification from Notifier: {:?}", notification)
                     }
                 }
-                _ = shutdown_notify.notified() => break,
+                _ = &mut shutdown_future => break,
             }
         }
         *self.rx.lock().unwrap() = Some(rx);
