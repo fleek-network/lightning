@@ -165,7 +165,7 @@ impl<C: Collection> ReputationAggregatorInner<C> {
                 }
                 notification = notify_before_epoch_rx.recv() => {
                     if let Some(Notification::BeforeEpochChange) = notification {
-                        self.submit_aggregation();
+                        self.submit_aggregation().await;
                         self.measurement_manager.lock().unwrap().clear_measurements();
                     } else {
                         error!("Failed to receive message");
@@ -192,7 +192,7 @@ impl<C: Collection> ReputationAggregatorInner<C> {
     /// Called by the scheduler to notify that it is time to submit the aggregation, to do
     /// so one should use the [`notify_new_epoch_rx`] that is passed during the initialization
     /// to submit a transaction to the consensus.
-    fn submit_aggregation(&self) {
+    async fn submit_aggregation(&self) {
         let measurements: BTreeMap<NodeIndex, ReputationMeasurements> = self
             .measurement_manager
             .lock()
@@ -228,30 +228,28 @@ impl<C: Collection> ReputationAggregatorInner<C> {
                         break;
                     }
                 }
-                let submit_tx = self.submit_tx.clone();
-                tokio::spawn(async move {
-                    info!("Submitting reputation measurements (1)");
-                    if let Err(e) = submit_tx
-                        .run(UpdateMethod::SubmitReputationMeasurements {
-                            measurements: measurements1,
-                        })
-                        .await
-                    {
-                        error!("Submitting reputation measurements failed: {e:?}");
-                    }
-                });
-                let submit_tx = self.submit_tx.clone();
-                tokio::spawn(async move {
-                    info!("Submitting reputation measurements (2)");
-                    if let Err(e) = submit_tx
-                        .run(UpdateMethod::SubmitReputationMeasurements {
-                            measurements: measurements2,
-                        })
-                        .await
-                    {
-                        error!("Submitting reputation measurements failed: {e:?}");
-                    }
-                });
+
+                info!("Submitting reputation measurements (1)");
+                if let Err(e) = self
+                    .submit_tx
+                    .enqueue(UpdateMethod::SubmitReputationMeasurements {
+                        measurements: measurements1,
+                    })
+                    .await
+                {
+                    error!("Submitting reputation measurements failed: {e:?}");
+                }
+
+                info!("Submitting reputation measurements (2)");
+                if let Err(e) = self
+                    .submit_tx
+                    .enqueue(UpdateMethod::SubmitReputationMeasurements {
+                        measurements: measurements2,
+                    })
+                    .await
+                {
+                    error!("Submitting reputation measurements failed: {e:?}");
+                }
             }
         } else {
             info!("No reputation measurements to submit");
