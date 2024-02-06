@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::notifier::{Notification, NotifierInterface};
-use lightning_interfaces::{ApplicationInterface, Emitter};
+use lightning_interfaces::{ApplicationInterface, Emitter, SyncQueryRunnerInterface};
 use lightning_utils::application::QueryRunnerExt;
 use tokio::pin;
 use tokio::sync::{mpsc, Notify};
@@ -17,7 +17,7 @@ pub struct Notifier<C: Collection> {
 impl<C: Collection> Clone for Notifier<C> {
     fn clone(&self) -> Self {
         Self {
-            query_runner: self.query_runner.clone(),
+            query_runner: self.query_runner.my_clone(file!(), line!()),
             notify: self.notify.clone(),
         }
     }
@@ -47,7 +47,7 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
 
     fn init(app: &c![C::ApplicationInterface]) -> Self {
         Self {
-            query_runner: app.sync_query(),
+            query_runner: app.sync_query(file!(), line!()),
             notify: Default::default(),
         }
     }

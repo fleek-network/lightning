@@ -28,7 +28,7 @@ pub trait SyncronizerInterface<C: Collection>:
         signer: ::SignerInterface,
         notifier: ::NotifierInterface,
     ) {
-        let sqr = app.sync_query();
+        let sqr = app.sync_query(file!(), line!());
         let (tx_epoch_change, rx_epoch_change) = tokio::sync::mpsc::channel(10);
         notifier.notify_on_new_epoch(tx_epoch_change);
         Self::init(

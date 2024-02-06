@@ -60,7 +60,7 @@ pub trait PoolInterface<C: Collection>:
         Self::init(
             config.get::<Self>(),
             signer,
-            app.sync_query(),
+            app.sync_query(file!(), line!()),
             notifier.clone(),
             topology.clone(),
             rep_aggregator.get_reporter(),

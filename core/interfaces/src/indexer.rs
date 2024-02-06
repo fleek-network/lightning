@@ -11,7 +11,11 @@ pub trait IndexerInterface<C: Collection>: ConfigConsumer + Clone + Send + Sync 
         app: ::ApplicationInterface,
         signer: ::SignerInterface,
     ) {
-        Self::init(config.get::<Self>(), app.sync_query(), signer)
+        Self::init(
+            config.get::<Self>(),
+            app.sync_query(file!(), line!()),
+            signer,
+        )
     }
 
     fn init(

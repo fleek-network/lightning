@@ -55,7 +55,7 @@ pub trait ArchiveInterface<C: Collection>:
         app: ::ApplicationInterface,
         blockstore: ::BlockStoreInterface,
     ) {
-        let sqr = app.sync_query();
+        let sqr = app.sync_query(file!(), line!());
         Self::init(config.get::<Self>(), sqr, blockstore.clone())
     }
 

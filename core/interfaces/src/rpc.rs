@@ -33,7 +33,7 @@ pub trait RpcInterface<C: Collection>:
         Self::init(
             config.get::<Self>(),
             consensus.mempool(),
-            app.sync_query(),
+            app.sync_query(file!(), line!()),
             blockstore.clone(),
             fetcher,
             signer,

@@ -32,7 +32,7 @@ async fn init_archive(path: &str) -> (Archive<TestBinding>, Application<TestBind
     let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
     let app = Application::<TestBinding>::init(AppConfig::test(), blockstore.clone()).unwrap();
 
-    let (_, query_runner) = (app.transaction_executor(), app.sync_query());
+    let (_, query_runner) = (app.transaction_executor(), app.sync_query(file!(), line!()));
     app.start().await;
 
     let path = std::env::temp_dir().join(path);

@@ -111,9 +111,12 @@ async fn test_submission() {
     .unwrap();
     app.start().await;
 
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let (update_socket, query_runner) =
+        (app.transaction_executor(), app.sync_query(file!(), line!()));
 
-    let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+    let mut signer =
+        Signer::<TestBinding>::init(signer_config, query_runner.my_clone(file!(), line!()))
+            .unwrap();
 
     let notifier = Notifier::<TestBinding>::init(&app);
 
@@ -128,7 +131,7 @@ async fn test_submission() {
         consensus_config,
         &signer,
         update_socket,
-        query_runner.clone(),
+        query_runner.my_clone(file!(), line!()),
         infusion::Blank::default(),
         None,
         &notifier,
@@ -150,8 +153,12 @@ async fn test_submission() {
     let us = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
 
     // Given: an indexer.
-    let indexer =
-        Indexer::<TestBinding>::init(Default::default(), query_runner.clone(), &signer).unwrap();
+    let indexer = Indexer::<TestBinding>::init(
+        Default::default(),
+        query_runner.my_clone(file!(), line!()),
+        &signer,
+    )
+    .unwrap();
 
     // When: we register a cid.
     let cid = [0u8; 32];

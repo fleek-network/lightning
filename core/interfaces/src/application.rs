@@ -88,7 +88,7 @@ pub trait ApplicationInterface<C: Collection>:
     /// and is the reason why we have `Atomo` to allow us to have the same kind of behavior
     /// without slowing down the system.
     #[blank = Default::default()]
-    fn sync_query(&self) -> Self::SyncExecutor;
+    fn sync_query(&self, file: &'static str, line: u32) -> Self::SyncExecutor;
 
     /// Will seed its underlying database with the checkpoint provided
     async fn load_from_checkpoint(
@@ -99,7 +99,7 @@ pub trait ApplicationInterface<C: Collection>:
 }
 
 #[infusion::blank]
-pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
+pub trait SyncQueryRunnerInterface: Send + Sync + 'static {
     type Backend: StorageBackend = InMemoryStorage;
 
     fn new(atomo: Atomo<QueryPerm, Self::Backend>) -> Self;
@@ -224,6 +224,8 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Returns the node's content registry.
     fn get_content_registry(&self, node_index: &NodeIndex) -> Option<BTreeSet<Blake3Hash>>;
+
+    fn my_clone(&self, file: &'static str, line: u32) -> Self;
 }
 
 #[derive(Clone, Debug)]

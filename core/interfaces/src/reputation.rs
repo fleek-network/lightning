@@ -23,7 +23,7 @@ pub trait ReputationAggregatorInterface<C: Collection>:
             config.get::<Self>(),
             signer.get_socket(),
             notifier.clone(),
-            app.sync_query(),
+            app.sync_query(file!(), line!()),
         )
     }
 

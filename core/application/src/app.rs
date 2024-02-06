@@ -9,6 +9,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
     ExecutionEngineSocket,
+    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use tracing::{error, info};
@@ -91,8 +92,8 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
     /// putting the entire application state in an `Arc<RwLock<T>>`, but that is not optimal
     /// and is the reason why we have `Atomo` to allow us to have the same kind of behavior
     /// without slowing down the system.
-    fn sync_query(&self) -> Self::SyncExecutor {
-        self.query_runner.clone()
+    fn sync_query(&self, file: &'static str, line: u32) -> Self::SyncExecutor {
+        self.query_runner.my_clone(file, line)
     }
 
     async fn load_from_checkpoint(
