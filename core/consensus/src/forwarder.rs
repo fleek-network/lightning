@@ -92,8 +92,7 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
                 timeout(TIMEOUT_DURATION, e.1.submit_transaction(request.clone()))
                     .await
                     .ok()
-                    .map(|res| res.ok())
-                    .flatten()
+                    .and_then(|res| res.ok())
                     .map(|_| e)
             }))
             .await
