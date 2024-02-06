@@ -36,7 +36,7 @@ pub trait SignerInterface<C: Collection>:
     ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
 {
     fn _init(config: ::ConfigProviderInterface, app: ::ApplicationInterface) {
-        Self::init(config.get::<Self>(), app.sync_query())
+        Self::init(config.get::<Self>(), app.sync_query(file!(), line!()))
     }
 
     fn _post(&mut self, c: ::ConsensusInterface, n: ::NotifierInterface) {

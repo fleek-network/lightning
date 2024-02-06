@@ -59,6 +59,8 @@ pub struct QueryRunner {
     _cid_to_node: ResolvedTableReference<Blake3Hash, BTreeSet<NodeIndex>>,
     _node_to_cid: ResolvedTableReference<NodeIndex, BTreeSet<Blake3Hash>>,
     js_hash_count: ResolvedTableReference<Blake3Hash, u32>,
+    file: &'static str,
+    line: u32,
 }
 
 impl QueryRunner {
@@ -87,6 +89,8 @@ impl QueryRunner {
             _cid_to_node: atomo.resolve::<Blake3Hash, BTreeSet<NodeIndex>>("cid_to_node"),
             _node_to_cid: atomo.resolve::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_cid"),
             js_hash_count: atomo.resolve::<Blake3Hash, u32>("js_hash_count"),
+            file: "initial",
+            line: 0,
             inner: atomo,
         }
     }
@@ -248,32 +252,12 @@ impl SyncQueryRunnerInterface for QueryRunner {
             count_all
         })
     }
-}
 
-impl Drop for QueryRunner {
-    fn drop(&mut self) {
-        let count = QUERY_RUNNER_COUNT.fetch_sub(1, Ordering::Relaxed);
-        let current_time = SystemTime::now();
-
-        let unix_time = current_time
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards!")
-            .as_secs();
-
-        error!(
-            "We are dropping a query runner at {}. There are {} left",
-            unix_time,
-            count - 1
-        );
-    }
-}
-
-impl Clone for QueryRunner {
-    fn clone(&self) -> Self {
+    fn my_clone(&self, file: &'static str, line: u32) -> Self {
         let count = QUERY_RUNNER_COUNT.fetch_add(1, Ordering::Relaxed);
 
         error!(
-            "Cloning a query runner. There are now {} query runners",
+            "Cloning a query runner in file {file} at line {line}. There are now {} query runners",
             count + 1
         );
 
@@ -300,6 +284,66 @@ impl Clone for QueryRunner {
             _cid_to_node: self._cid_to_node.clone(),
             _node_to_cid: self._node_to_cid.clone(),
             js_hash_count: self.js_hash_count.clone(),
+            file,
+            line,
         }
     }
 }
+
+impl Drop for QueryRunner {
+    fn drop(&mut self) {
+        let count = QUERY_RUNNER_COUNT.fetch_sub(1, Ordering::Relaxed);
+        let current_time = SystemTime::now();
+
+        let unix_time = current_time
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards!")
+            .as_secs();
+
+        error!(
+            "We are dropping a query runner at {}. There are {} left. The query runner was cloned in file {} in line {}",
+            unix_time,
+            count - 1,
+            self.file,
+            self.line,
+        );
+    }
+}
+
+//impl Clone for QueryRunner {
+//    fn clone(&self) -> Self {
+//        let count = QUERY_RUNNER_COUNT.fetch_add(1, Ordering::Relaxed);
+//
+//        error!(
+//            "Cloning a query runner. There are now {} query runners",
+//            count + 1
+//        );
+//
+//        Self {
+//            inner: self.inner.clone(),
+//            metadata_table: self.metadata_table.clone(),
+//            account_table: self.account_table.clone(),
+//            client_table: self.client_table.clone(),
+//            node_table: self.node_table.clone(),
+//            pub_key_to_index: self.pub_key_to_index.clone(),
+//            committee_table: self.committee_table.clone(),
+//            services_table: self.services_table.clone(),
+//            param_table: self.param_table.clone(),
+//            current_epoch_served: self.current_epoch_served.clone(),
+//            rep_measurements: self.rep_measurements.clone(),
+//            latencies: self.latencies.clone(),
+//            rep_scores: self.rep_scores.clone(),
+//            _last_epoch_served: self._last_epoch_served.clone(),
+//            total_served_table: self.total_served_table.clone(),
+//            _service_revenue: self._service_revenue.clone(),
+//            _commodity_price: self._commodity_price.clone(),
+//            executed_digests_table: self.executed_digests_table.clone(),
+//            uptime_table: self.uptime_table.clone(),
+//            _cid_to_node: self._cid_to_node.clone(),
+//            _node_to_cid: self._node_to_cid.clone(),
+//            js_hash_count: self.js_hash_count.clone(),
+//            file: file!(),
+//            line,
+//        }
+//    }
+//}

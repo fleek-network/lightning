@@ -35,7 +35,7 @@ impl<C: Collection> Clone for Indexer<C> {
             pk: self.pk,
             local_index: self.local_index.clone(),
             submit_tx: self.submit_tx.clone(),
-            query_runner: self.query_runner.clone(),
+            query_runner: self.query_runner.my_clone(file!(), line!()),
             _marker: PhantomData,
         }
     }

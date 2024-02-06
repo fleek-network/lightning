@@ -32,7 +32,7 @@ pub trait BroadcastInterface<C: Collection>:
     ) {
         Self::init(
             config.get::<Self>(),
-            app.sync_query(),
+            app.sync_query(file!(), line!()),
             signer,
             rep_aggregator.get_reporter(),
             pool,

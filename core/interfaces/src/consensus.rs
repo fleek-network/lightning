@@ -41,7 +41,7 @@ pub trait ConsensusInterface<C: Collection>:
     ) {
         let executor = app.transaction_executor();
 
-        let sqr = app.sync_query();
+        let sqr = app.sync_query(file!(), line!());
         let pubsub = broadcast.get_pubsub(crate::types::Topic::Consensus);
         Self::init(
             config.get::<Self>(),

@@ -78,7 +78,7 @@ impl<C: Collection> WithStartAndShutdown for Signer<C> {
             let inner = self.inner.clone();
             //let rx = self.rx.lock().unwrap().take().unwrap();
             let mempool_socket = self.mempool_socket.clone().unwrap();
-            let query_runner = self.query_runner.clone();
+            let query_runner = self.query_runner.my_clone(file!(), line!());
             let shutdown_notify = self.shutdown_notify.clone();
 
             let is_running = self.is_running.clone();

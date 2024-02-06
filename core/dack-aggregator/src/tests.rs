@@ -91,9 +91,12 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
     .unwrap();
     app.start().await;
 
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let (update_socket, query_runner) =
+        (app.transaction_executor(), app.sync_query(file!(), line!()));
 
-    let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+    let mut signer =
+        Signer::<TestBinding>::init(signer_config, query_runner.my_clone(file!(), line!()))
+            .unwrap();
     let notifier = Notifier::<TestBinding>::init(&app);
 
     let consensus_config = ConsensusConfig {
@@ -107,7 +110,7 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
         consensus_config,
         &signer,
         update_socket,
-        query_runner.clone(),
+        query_runner.my_clone(file!(), line!()),
         infusion::Blank::default(),
         None,
         &notifier,
@@ -177,7 +180,7 @@ async fn test_submit_dack() {
     }
     let node = init_aggregator(path.clone()).await;
 
-    let query_runner = node._app.sync_query();
+    let query_runner = node._app.sync_query(file!(), line!());
 
     let socket = node.aggregator.socket();
     node.aggregator.start().await;

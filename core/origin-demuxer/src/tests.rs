@@ -20,6 +20,7 @@ use lightning_interfaces::{
     NotifierInterface,
     OriginProviderInterface,
     SignerInterface,
+    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
@@ -142,9 +143,12 @@ async fn create_app_state(test_name: String) -> AppState {
     .unwrap();
     app.start().await;
 
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let (update_socket, query_runner) =
+        (app.transaction_executor(), app.sync_query(file!(), line!()));
 
-    let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+    let mut signer =
+        Signer::<TestBinding>::init(signer_config, query_runner.my_clone(file!(), line!()))
+            .unwrap();
     let notifier = Notifier::<TestBinding>::init(&app);
 
     let consensus_config = ConsensusConfig {
@@ -158,7 +162,7 @@ async fn create_app_state(test_name: String) -> AppState {
         consensus_config,
         &signer,
         update_socket,
-        query_runner.clone(),
+        query_runner.my_clone(file!(), line!()),
         infusion::Blank::default(),
         None,
         &notifier,

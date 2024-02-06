@@ -20,7 +20,7 @@ pub trait TopologyInterface<C: Collection>: ConfigConsumer + Sized + Send + Sync
         Self::init(
             config.get::<Self>(),
             signer.get_ed25519_pk(),
-            app.sync_query(),
+            app.sync_query(file!(), line!()),
         )
     }
 

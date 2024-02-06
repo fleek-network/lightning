@@ -24,7 +24,7 @@ pub trait PingerInterface<C: Collection>:
     ) {
         Self::init(
             config.get::<Self>(),
-            app.sync_query(),
+            app.sync_query(file!(), line!()),
             rep_aggregator.get_reporter(),
             notifier.clone(),
             signer,

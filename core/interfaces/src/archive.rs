@@ -15,7 +15,7 @@ pub trait ArchiveInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
     fn _init(config: ::ConfigProviderInterface, app: ::ApplicationInterface) {
-        let sqr = app.sync_query();
+        let sqr = app.sync_query(file!(), line!());
         Self::init(config.get::<Self>(), sqr)
     }
 

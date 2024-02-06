@@ -22,6 +22,7 @@ use lightning_interfaces::{
     ResponderInterface,
     ResponseInterface,
     SignerInterface,
+    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -228,7 +229,7 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
         let (endpoint_task_tx, endpoint_task_rx) = mpsc::channel(1024);
         let (event_tx, event_rx) = mpsc::channel(1024);
         let receiver = EventReceiver::<C>::new(
-            sync_query.clone(),
+            sync_query.my_clone(file!(), line!()),
             topology,
             notifier,
             event_rx,

@@ -35,7 +35,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
             config.get::<Self>(),
             blockstore,
             fetcher.get_socket(),
-            app.sync_query(),
+            app.sync_query(file!(), line!()),
             dack_aggregator.socket(),
         )
     }

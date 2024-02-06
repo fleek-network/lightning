@@ -135,7 +135,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         EdgeConsensus::spawn(
             self.pub_sub.clone(),
             self.execution_state.clone(),
-            self.query_runner.clone(),
+            self.query_runner.my_clone(file!(), line!()),
             self.narwhal_args
                 .primary_network_keypair
                 .public()
@@ -245,7 +245,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         shutdown_notify: Arc<Notify>,
     ) {
         let txn_socket = self.txn_socket.clone();
-        let query_runner = self.query_runner.clone();
+        let query_runner = self.query_runner.my_clone(file!(), line!());
         task::spawn(async move {
             loop {
                 let time_to_sleep = time::sleep(time_until_change);
@@ -403,7 +403,10 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         let reconfigure_notify = Arc::new(Notify::new());
         let networking_keypair = NetworkKeyPair::from(primary_sk);
         let primary_keypair = KeyPair::from(consensus_sk);
-        let forwarder = Forwarder::new(query_runner.clone(), primary_keypair.public().clone());
+        let forwarder = Forwarder::new(
+            query_runner.my_clone(file!(), line!()),
+            primary_keypair.public().clone(),
+        );
         let narwhal_args = NarwhalArgs {
             primary_keypair,
             primary_network_keypair: networking_keypair.copy(),
@@ -418,7 +421,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             executor,
             reconfigure_notify.clone(),
             tx_narwhal_batches,
-            query_runner.clone(),
+            query_runner.my_clone(file!(), line!()),
             indexer_socket,
             notifier.get_emitter(),
         ));

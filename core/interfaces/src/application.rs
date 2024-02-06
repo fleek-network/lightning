@@ -74,7 +74,7 @@ pub trait ApplicationInterface<C: Collection>:
     /// and is the reason why we have `Atomo` to allow us to have the same kind of behavior
     /// without slowing down the system.
     #[blank = Default::default()]
-    fn sync_query(&self) -> Self::SyncExecutor;
+    fn sync_query(&self, file: &'static str, line: u32) -> Self::SyncExecutor;
 
     /// Will seed its underlying database with the checkpoint provided
     async fn load_from_checkpoint(
@@ -85,7 +85,7 @@ pub trait ApplicationInterface<C: Collection>:
 }
 
 #[infusion::blank]
-pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
+pub trait SyncQueryRunnerInterface: Send + Sync + 'static {
     /// Query Metadata Table
     fn get_metadata(&self, key: &lightning_types::Metadata) -> Option<Value>;
 
@@ -174,6 +174,8 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_js_hashes(&self) -> Vec<(Blake3Hash, u32)>;
 
     fn get_js_hashes_count(&self) -> u128;
+
+    fn my_clone(&self, file: &'static str, line: u32) -> Self;
 }
 
 #[derive(Clone, Debug)]

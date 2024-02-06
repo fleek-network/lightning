@@ -25,7 +25,12 @@ pub trait ResolverInterface<C: Collection>:
         app: ::ApplicationInterface,
     ) {
         let pubsub = broadcast.get_pubsub(crate::types::Topic::Resolver);
-        Self::init(config.get::<Self>(), signer, pubsub, app.sync_query())
+        Self::init(
+            config.get::<Self>(),
+            signer,
+            pubsub,
+            app.sync_query(file!(), line!()),
+        )
     }
 
     type OriginFinder: OriginFinderAsyncIter;

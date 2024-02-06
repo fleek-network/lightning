@@ -169,9 +169,12 @@ mod tests {
         .unwrap();
         app.start().await;
 
-        let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+        let (update_socket, query_runner) =
+            (app.transaction_executor(), app.sync_query(file!(), line!()));
 
-        let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+        let mut signer =
+            Signer::<TestBinding>::init(signer_config, query_runner.my_clone(file!(), line!()))
+                .unwrap();
 
         let notifier = Notifier::<TestBinding>::init(&app);
 
@@ -186,7 +189,7 @@ mod tests {
             consensus_config,
             &signer,
             update_socket,
-            query_runner.clone(),
+            query_runner.my_clone(file!(), line!()),
             infusion::Blank::default(),
             None,
             &notifier,
@@ -425,7 +428,7 @@ mod tests {
 
         // Then: content registry was updated.
         let (_, sk) = state.signer.get_sk();
-        let query_runner = state.app.sync_query();
+        let query_runner = state.app.sync_query(file!(), line!());
         let local_index = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
 
         let mut interval = tokio::time::interval(Duration::from_secs(1));

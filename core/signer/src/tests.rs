@@ -79,9 +79,12 @@ async fn test_send_two_txs_in_a_row() {
     .unwrap();
     app.start().await;
 
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let (update_socket, query_runner) =
+        (app.transaction_executor(), app.sync_query(file!(), line!()));
 
-    let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+    let mut signer =
+        Signer::<TestBinding>::init(signer_config, query_runner.my_clone(file!(), line!()))
+            .unwrap();
     let signer_socket = signer.get_socket();
 
     let notifier = Notifier::<TestBinding>::init(&app);
@@ -97,7 +100,7 @@ async fn test_send_two_txs_in_a_row() {
         consensus_config,
         &signer,
         update_socket,
-        query_runner.clone(),
+        query_runner.my_clone(file!(), line!()),
         infusion::Blank::default(),
         None,
         &notifier,
@@ -181,9 +184,11 @@ async fn test_retry_send() {
     .unwrap();
     app.start().await;
 
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let (update_socket, query_runner) =
+        (app.transaction_executor(), app.sync_query(file!(), line!()));
 
-    let mut signer = Signer::<TestBinding>::init(signer_config, app.sync_query()).unwrap();
+    let mut signer =
+        Signer::<TestBinding>::init(signer_config, app.sync_query(file!(), line!())).unwrap();
 
     let signer_socket = signer.get_socket();
 
@@ -200,7 +205,7 @@ async fn test_retry_send() {
         consensus_config,
         &signer,
         update_socket,
-        query_runner.clone(),
+        query_runner.my_clone(file!(), line!()),
         infusion::Blank::default(),
         None,
         &notifier,
@@ -244,14 +249,17 @@ async fn test_retry_send() {
 #[tokio::test]
 async fn test_shutdown() {
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-    let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
+    let (update_socket, query_runner) =
+        (app.transaction_executor(), app.sync_query(file!(), line!()));
+    let mut signer =
+        Signer::<TestBinding>::init(Config::test(), query_runner.my_clone(file!(), line!()))
+            .unwrap();
     let notifier = Notifier::<TestBinding>::init(&app);
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
         update_socket,
-        query_runner.clone(),
+        query_runner.my_clone(file!(), line!()),
         infusion::Blank::default(),
         None,
         &notifier,
@@ -277,14 +285,17 @@ async fn test_shutdown() {
 #[tokio::test]
 async fn test_shutdown_and_start_again() {
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-    let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
+    let (update_socket, query_runner) =
+        (app.transaction_executor(), app.sync_query(file!(), line!()));
+    let mut signer =
+        Signer::<TestBinding>::init(Config::test(), query_runner.my_clone(file!(), line!()))
+            .unwrap();
     let notifier = Notifier::<TestBinding>::init(&app);
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
         update_socket,
-        query_runner.clone(),
+        query_runner.my_clone(file!(), line!()),
         infusion::Blank::default(),
         None,
         &notifier,
@@ -326,14 +337,17 @@ async fn test_shutdown_and_start_again() {
 #[tokio::test]
 async fn test_sign_raw_digest() {
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-    let mut signer = Signer::<TestBinding>::init(Config::test(), query_runner.clone()).unwrap();
+    let (update_socket, query_runner) =
+        (app.transaction_executor(), app.sync_query(file!(), line!()));
+    let mut signer =
+        Signer::<TestBinding>::init(Config::test(), query_runner.my_clone(file!(), line!()))
+            .unwrap();
     let notifier = Notifier::<TestBinding>::init(&app);
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
         &signer,
         update_socket,
-        query_runner.clone(),
+        query_runner.my_clone(file!(), line!()),
         infusion::Blank::default(),
         None,
         &notifier,
@@ -377,7 +391,7 @@ async fn test_load_keys() {
     };
 
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
-    let (_, query_runner) = (app.transaction_executor(), app.sync_query());
+    let (_, query_runner) = (app.transaction_executor(), app.sync_query(file!(), line!()));
     let signer = Signer::<TestBinding>::init(config, query_runner).unwrap();
 
     // Make sure that the signer loaded the keys from the provided paths.
@@ -412,7 +426,7 @@ async fn test_fail_to_encode_keys() {
         futures::executor::block_on(async move {
             let app =
                 Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
-            let (_, query_runner) = (app.transaction_executor(), app.sync_query());
+            let (_, query_runner) = (app.transaction_executor(), app.sync_query(file!(), line!()));
             Signer::<TestBinding>::init(config, query_runner).unwrap();
         })
     });
@@ -445,7 +459,7 @@ async fn test_no_keys_exist() {
     };
 
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
-    let (_, query_runner) = (app.transaction_executor(), app.sync_query());
+    let (_, query_runner) = (app.transaction_executor(), app.sync_query(file!(), line!()));
     let signer = Signer::<TestBinding>::init(config, query_runner);
 
     // Initiating the signer should return an error if no keys exist.
