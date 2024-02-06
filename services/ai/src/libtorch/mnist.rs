@@ -1,4 +1,5 @@
 //! Utils for reading MNIST hand-written digit dataset from memory.
+// Copied and modified from `tch-rs`.
 use std::io;
 use std::io::{Cursor, Read};
 

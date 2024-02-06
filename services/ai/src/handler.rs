@@ -15,17 +15,31 @@ pub async fn handle(connection: Connection) -> anyhow::Result<()> {
         let device = request.device;
         match request.task {
             Task::Run { model, input, .. } => {
-                let input = base64::prelude::BASE64_STANDARD.decode(input)?;
-                let result = match model.name.parse::<Model>()? {
-                    Model::Resnet18 => {
-                        libtorch::run_resnet18(&input, device, IMAGENET_CLASS_COUNT)?
+                match model.uri.parse::<Model>() {
+                    Ok(archived_model) => {
+                        // Todo: define a better API to communicate type of the input.
+                        // We won't need this when https://github.com/pytorch/pytorch/issues/48525
+                        // is resolved.
+                        let input = base64::prelude::BASE64_STANDARD.decode(input)?;
+                        let result = match archived_model {
+                            Model::Resnet18 => {
+                                libtorch::run_resnet18(&input, device, IMAGENET_CLASS_COUNT)?
+                            },
+                            Model::Resnet34 => {
+                                libtorch::run_resnet34(&input, device, IMAGENET_CLASS_COUNT)?
+                            },
+                        };
+                        let json_str = serde_json::to_string(&result.first())?;
+                        stream.send(json_str.as_bytes()).await?;
                     },
-                    Model::Resnet34 => {
-                        libtorch::run_resnet34(&input, device, IMAGENET_CLASS_COUNT)?
+                    Err(_) => {
+                        let model = load_resource(&model.uri).await?;
+                        let input = base64::prelude::BASE64_STANDARD.decode(input)?;
+                        let output =
+                            libtorch::load_and_run_model(model.into(), input.into(), device)?;
+                        stream.send(output.as_bytes()).await?;
                     },
                 };
-                let json_str = serde_json::to_string(&result.first())?;
-                stream.send(json_str.as_bytes()).await?;
             },
             Task::Train {
                 epochs,
@@ -88,31 +102,31 @@ async fn handle_train_task(
 
     let model = fn_sdk::blockstore::ContentHandle::load(&model_hash)
         .await
-        .context("failed to get handle for source from blockstore")?
+        .context("failed to get handle for model from blockstore")?
         .read_to_end()
         .await
         .context("failed to read model from blockstore")?;
     let train_data = fn_sdk::blockstore::ContentHandle::load(&train_data_hash)
         .await
-        .context("failed to get handle for source from blockstore")?
+        .context("failed to get handle for train data from blockstore")?
         .read_to_end()
         .await
         .context("failed to read train set from blockstore")?;
     let train_labels = fn_sdk::blockstore::ContentHandle::load(&train_label_hash)
         .await
-        .context("failed to get handle for source from blockstore")?
+        .context("failed to get handle for train labels from blockstore")?
         .read_to_end()
         .await
         .context("failed to read train set from blockstore")?;
     let validation_data = fn_sdk::blockstore::ContentHandle::load(&validation_data_hash)
         .await
-        .context("failed to get handle for source from blockstore")?
+        .context("failed to get handle for validation data from blockstore")?
         .read_to_end()
         .await
         .context("failed to read validation set from blockstore")?;
     let validation_labels = fn_sdk::blockstore::ContentHandle::load(&validation_label_hash)
         .await
-        .context("failed to get handle for source from blockstore")?
+        .context("failed to get handle for validation labels from blockstore")?
         .read_to_end()
         .await
         .context("failed to read validation set from blockstore")?;
@@ -129,4 +143,15 @@ async fn handle_train_task(
             labels: 10,
         },
     )
+}
+
+async fn load_resource(uri: &str) -> anyhow::Result<Vec<u8>> {
+    // Todo: update param to accept &str.
+    let hash = get_hash(uri.to_string()).await?;
+    fn_sdk::blockstore::ContentHandle::load(&hash)
+        .await
+        .context("failed to get resource from blockstore")?
+        .read_to_end()
+        .await
+        .map_err(Into::into)
 }

@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 /// Options for the model.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Opts {
-    /// Name of the model.
-    pub name: String,
+    /// Uri of the model.
+    pub uri: String,
     /// Load pre-trained weights.
     pub pretrained: bool,
     /// Custom configuration.
