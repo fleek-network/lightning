@@ -94,7 +94,7 @@ impl<C: Collection> WithStartAndShutdown for Signer<C> {
 
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
-        self.shutdown_notify.notify_waiters();
+        self.shutdown_notify.notify_one();
     }
 }
 
