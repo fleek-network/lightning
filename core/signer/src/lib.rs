@@ -312,7 +312,7 @@ impl SignerInner {
                         payload: update_payload,
                     };
 
-                    if let Err(e) = mempool_socket.run(update_request.clone().into())
+                    if let Err(e) = mempool_socket.enqueue(update_request.clone().into())
                         .await
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                     {

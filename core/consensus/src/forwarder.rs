@@ -16,10 +16,12 @@ use lightning_interfaces::SyncQueryRunnerInterface;
 use lightning_utils::application::QueryRunnerExt;
 use narwhal_types::{TransactionProto, TransactionsClient};
 use rand::seq::SliceRandom;
+use tokio::time::{timeout, Duration};
 use tonic::transport::channel::Channel;
 use tracing::error;
 
 const TARGETED_CONNECTION_NUM: usize = 10;
+const TIMEOUT_DURATION: Duration = Duration::new(4, 0);
 
 pub struct Forwarder<Q: SyncQueryRunnerInterface> {
     /// Query runner used to read application state
@@ -87,9 +89,11 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
 
         self.active_connections.extend(
             futures::future::join_all(active_connections.into_iter().map(|mut e| async {
-                e.1.submit_transaction(request.clone())
+                timeout(TIMEOUT_DURATION, e.1.submit_transaction(request.clone()))
                     .await
                     .ok()
+                    .map(|res| res.ok())
+                    .flatten()
                     .map(|_| e)
             }))
             .await
