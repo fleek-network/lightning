@@ -94,7 +94,10 @@ impl<C: Collection> WithStartAndShutdown for Signer<C> {
 
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
-        self.shutdown_notify.notify_one();
+        error!("##########################");
+        error!("calling SIGNER shutdown()");
+        error!("##########################");
+        self.shutdown_notify.notify_waiters();
     }
 }
 
@@ -287,10 +290,18 @@ impl SignerInner {
             .unwrap()
             .take()
             .expect("New block notification channel must be opened");
+
+        let shutdown_future = shutdown_notify.notified();
+        tokio::pin!(shutdown_future);
+
         loop {
             tokio::select! {
                 task = rx.recv() => {
+                    error!("##########################");
+                    error!("rx.recv() start");
                     let Some(task) = task else {
+                        error!("##########################");
+                        error!("rx.recv() continue");
                         continue;
                     };
                     let update_method = task.request.clone();
@@ -308,12 +319,14 @@ impl SignerInner {
                         payload: update_payload,
                     };
 
+                    error!("in rx.recv() before mempool_socket.run +++++++++++++++++++++++");
                     if let Err(e) = mempool_socket.run(update_request.clone().into())
                         .await
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                     {
                         error!("Failed to send transaction to mempool: {e:?}");
                     }
+                    error!("in rx.recv() run mempool_socket.run +++++++++++++++++++++++");
 
                     // Optimistically increment nonce
                     next_nonce += 1;
@@ -327,8 +340,13 @@ impl SignerInner {
                     if base_timestamp.is_none() {
                         base_timestamp = Some(timestamp);
                     }
+
+                    error!("rx.recv() end");
+                    error!("##########################");
                 }
                 notification = new_block_rx.recv() => {
+                    error!("##########################");
+                    error!("new_block_rx.recv() start");
                     if let Some(Notification::NewBlock) = notification {
                         SignerInner::sync_with_application(
                             &self.node_public_key,
@@ -343,8 +361,15 @@ impl SignerInner {
                     } else {
                         panic!("Got unexpected notification from Notifier: {:?}", notification)
                     }
+                    error!("##########################");
+                    error!("new_block_rx.recv() end");
                 }
-                _ = shutdown_notify.notified() => break,
+                _ = &mut shutdown_future => {
+                    error!("##########################");
+                    error!("SIGNER SHUTDOWN");
+                    error!("##########################");
+                    break;
+                },
             }
         }
         *self.rx.lock().unwrap() = Some(rx);
