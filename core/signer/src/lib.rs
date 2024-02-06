@@ -320,7 +320,7 @@ impl SignerInner {
                     };
 
                     error!("in rx.recv() before mempool_socket.run +++++++++++++++++++++++");
-                    if let Err(e) = mempool_socket.run(update_request.clone().into())
+                    if let Err(e) = mempool_socket.enqueue(update_request.clone().into())
                         .await
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                     {

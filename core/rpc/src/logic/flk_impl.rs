@@ -314,9 +314,9 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
         Ok(self
             .data
             .mempool_socket
-            .run(tx)
+            .enqueue(tx)
             .await
-            .map_err(RPCError::from)?)
+            .map_err(|e| RPCError::socket(e.to_string()))?)
     }
 
     async fn put(&self, data: Vec<u8>) -> RpcResult<Blake3Hash> {
