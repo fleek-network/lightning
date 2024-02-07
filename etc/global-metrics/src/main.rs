@@ -75,7 +75,7 @@ async fn service_discovery(
 
     let mut discovery_chunk = Vec::new();
     for node in nodes {
-        let node_target = format!("{}:{}", node.domain.to_string(), node.ports.rpc.to_string());
+        let node_target = format!("{}:{}", node.domain, node.ports.rpc);
 
         let ip_info = match maxmind.get_ip_info(node.domain.to_string()).await {
             Ok(city) => city,
