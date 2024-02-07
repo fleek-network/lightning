@@ -35,9 +35,7 @@ pub async fn handle(connection: Connection) -> anyhow::Result<()> {
                     },
                     Err(_) => {
                         let model = load_resource(&model).await?;
-                        let input = base64::prelude::BASE64_STANDARD.decode(input)?;
-                        let output =
-                            libtorch::load_and_run_model(model.into(), input.into(), device)?;
+                        let output = libtorch::load_and_run_model(model.into(), input, device)?;
                         stream.send(output.as_ref()).await?;
                     },
                 };
@@ -68,22 +66,15 @@ pub async fn handle(connection: Connection) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn get_hash(uri: String) -> anyhow::Result<[u8; 32]> {
-    // Todo: handle different origin types.
-    let hash = hex::decode(uri).context("failed to decode blake3 hash")?;
-    if hash.len() != 32 {
-        return Err(anyhow!("invalid blake3 hash length"));
-    }
-
-    let hash: [u8; 32] = hash
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("invalid hash"))?;
-
-    if fn_sdk::api::fetch_blake3(hash).await {
-        Ok(hash)
-    } else {
-        return Err(anyhow!("failed to fetch file"));
-    }
+async fn load_resource(uri: &str) -> anyhow::Result<Vec<u8>> {
+    // Todo: update param to accept &str.
+    let hash = get_hash(uri.to_string()).await?;
+    fn_sdk::blockstore::ContentHandle::load(&hash)
+        .await
+        .context("failed to get resource from blockstore")?
+        .read_to_end()
+        .await
+        .map_err(Into::into)
 }
 
 async fn handle_train_task(
@@ -144,13 +135,20 @@ async fn handle_train_task(
     )
 }
 
-async fn load_resource(uri: &str) -> anyhow::Result<Vec<u8>> {
-    // Todo: update param to accept &str.
-    let hash = get_hash(uri.to_string()).await?;
-    fn_sdk::blockstore::ContentHandle::load(&hash)
-        .await
-        .context("failed to get resource from blockstore")?
-        .read_to_end()
-        .await
-        .map_err(Into::into)
+async fn get_hash(uri: String) -> anyhow::Result<[u8; 32]> {
+    // Todo: handle different origin types.
+    let hash = hex::decode(uri).context("failed to decode blake3 hash")?;
+    if hash.len() != 32 {
+        return Err(anyhow!("invalid blake3 hash length"));
+    }
+
+    let hash: [u8; 32] = hash
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("invalid hash"))?;
+
+    if fn_sdk::api::fetch_blake3(hash).await {
+        Ok(hash)
+    } else {
+        return Err(anyhow!("failed to fetch file"));
+    }
 }

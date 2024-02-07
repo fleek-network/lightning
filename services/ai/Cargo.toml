@@ -17,6 +17,12 @@ tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 tokio.workspace = true
 
+[dev-dependencies]
+reqwest = "0.11"
+image = "0.24"
+tch = { version = "0.15", features = ["download-libtorch", "image"] }
+
+
 [[bin]]
 name = "fn-service-2"
 path = "src/bin.rs"
