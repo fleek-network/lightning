@@ -22,6 +22,7 @@ use rand::RngCore;
 use tokio::sync::Mutex;
 use tracing::warn;
 use triomphe::Arc;
+use fn_sdk::header::{ConnectionHeader, write_header};
 
 use crate::config::HandshakeConfig;
 use crate::http::{self, spawn_http_server};
@@ -150,7 +151,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
         &self,
         request: HandshakeRequestFrame,
         sender: S,
-        receiver: R,
+        mut receiver: R,
     ) where
         (S, R): Into<TransportPair>,
     {
@@ -159,17 +160,29 @@ impl<P: ExecutorProviderInterface> Context<P> {
             HandshakeRequestFrame::Handshake {
                 retry: None,
                 service,
+                pk,
                 ..
             } => {
                 // TODO: Verify proof of possession
                 // TODO: Send handshake response
 
                 // Attempt to connect to the service, getting the unix socket.
-                let Some(socket) = self.provider.connect(service).await else {
+                let Some(mut socket) = self.provider.connect(service).await else {
                     sender.terminate(TerminationReason::InvalidService);
                     warn!("failed to connect to service {service}");
                     return;
                 };
+
+                let header = ConnectionHeader {
+                    pk: Some(pk),
+                    transport_detail: receiver.detail(),
+                };
+
+                if let Err(e) = write_header(&header, &mut socket).await {
+                    sender.terminate(TerminationReason::ServiceTerminated);
+                    warn!("failed to write connection header to service {service}: {e}");
+                    return;
+                }
 
                 let connection_id = self
                     .connection_counter

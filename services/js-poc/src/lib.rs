@@ -26,7 +26,7 @@ pub async fn main() {
 
     info!("Initialized POC JS service!");
 
-    let listener = fn_sdk::ipc::conn_bind().await;
+    let mut listener = fn_sdk::ipc::conn_bind().await;
 
     // Explicitly initialize the v8 platform on the main thread
     JsRuntime::init_platform(None);
