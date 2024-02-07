@@ -5,6 +5,7 @@ use async_channel::{bounded, Sender};
 use axum::{Extension, Router};
 use dashmap::DashMap;
 use fleek_crypto::{NodePublicKey, SecretKey};
+use fn_sdk::header::{write_header, ConnectionHeader};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use infusion::c;
@@ -22,7 +23,6 @@ use rand::RngCore;
 use tokio::sync::Mutex;
 use tracing::warn;
 use triomphe::Arc;
-use fn_sdk::header::{ConnectionHeader, write_header};
 
 use crate::config::HandshakeConfig;
 use crate::http::{self, spawn_http_server};

@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use axum::Router;
 use bytes::{BufMut, Bytes, BytesMut};
+use fn_sdk::header::TransportDetail;
 use lightning_interfaces::ExecutorProviderInterface;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use fn_sdk::header::TransportDetail;
 
 use self::mock::{MockTransportReceiver, MockTransportSender};
 use self::tcp::{TcpReceiver, TcpSender};
