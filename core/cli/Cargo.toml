@@ -36,6 +36,25 @@ panic-report.workspace = true
 os_info = "3.7.0"
 compile-time-run = "0.2.12"
 
+[dev-dependencies]
+serial_test = "3.0.0"
+lightning-application = { path = "../application" }
+lightning-syncronizer = { path = "../syncronizer" }
+lightning-broadcast = { path = "../broadcast" }
+lightning-consensus = { path = "../consensus" }
+lightning-handshake = { path = "../handshake" }
+lightning-service-executor = { path = "../service-executor" }
+lightning-pool = { path = "../pool" }
+lightning-rep-collector = { path = "../rep-collector" }
+lightning-signer = { path = "../signer" }
+lightning-blockstore = { path = "../blockstore" }
+lightning-blockstore-server = { path = "../blockstore-server" }
+lightning-resolver = { path = "../resolver" }
+lightning-archive = { path = "../archive" }
+lightning-pinger = { path = "../pinger" }
+lightning-rpc = { path = "../rpc" }
+fleek-blake3 = "1.5"
+
 [features]
 default = []
 # Opt-in for compiling services directly inside the node
