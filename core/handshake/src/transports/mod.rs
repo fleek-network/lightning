@@ -4,6 +4,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use lightning_interfaces::ExecutorProviderInterface;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use fn_sdk::header::TransportDetail;
 
 use self::mock::{MockTransportReceiver, MockTransportSender};
 use self::tcp::{TcpReceiver, TcpSender};
@@ -121,6 +122,12 @@ pub trait TransportSender: Sized + Send + Sync + 'static {
 
 #[async_trait]
 pub trait TransportReceiver: Send + Sync + 'static {
+    /// Returns the transport detail from this connection which is then sent to the service on
+    /// the hello frame.
+    fn detail(&mut self) -> TransportDetail {
+        TransportDetail::Other
+    }
+
     /// Receive a frame from the connection. Returns `None` when the connection
     /// is closed.
     async fn recv(&mut self) -> Option<schema::RequestFrame>;

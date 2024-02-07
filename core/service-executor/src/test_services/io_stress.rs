@@ -107,7 +107,7 @@ pub async fn main() {
     fn_sdk::ipc::init_from_env();
     info!("Running io_stress service!");
 
-    let listener = fn_sdk::ipc::conn_bind().await;
+    let mut listener = fn_sdk::ipc::conn_bind().await;
     while let Ok(conn) = listener.accept().await {
         tokio::spawn(connection_loop(conn));
     }
