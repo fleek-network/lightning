@@ -14,7 +14,7 @@ geo-types = "0.7.11"
 hyper = "0.14.27"
 hyper-tls = "0.5.0"
 lazy_static = "1.4.0"
-lightning-types = { git = "https://github.com/fleek-network/lightning.git", branch = "b/add-registry-with-index"}
+lightning-types = { path = "../../core/types" }
 maxminddb = "0.23.0"
 serde = {version = "1.0.188", features = ["derive"]}
 serde_derive = "1.0.186"
