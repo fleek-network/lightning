@@ -49,7 +49,7 @@ use crate::storage::{AtomoStorage, AtomoStorageBuilder};
 use crate::table::StateTables;
 
 pub struct Env<P> {
-    inner: Atomo<P, AtomoStorage>,
+    pub inner: Atomo<P, AtomoStorage>,
 }
 
 impl Env<UpdatePerm> {
