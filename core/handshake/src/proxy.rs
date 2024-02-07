@@ -533,6 +533,7 @@ mod tests {
 
     use anyhow::Result;
     use fleek_crypto::{ClientPublicKey, ClientSignature};
+    use fn_sdk::header::read_header;
     use futures::{SinkExt, StreamExt};
     use lightning_interfaces::types::ServiceId;
     use lightning_interfaces::ExecutorProviderInterface;
@@ -558,8 +559,12 @@ mod tests {
     struct MockServiceProvider;
 
     impl MockServiceProvider {
-        fn echo_service(stream: UnixStream) {
+        fn echo_service(mut stream: UnixStream) {
             tokio::spawn(async move {
+                read_header(&mut stream)
+                    .await
+                    .expect("Could not read hello frame.");
+
                 let mut framed =
                     Framed::new(stream, tokio_util::codec::LengthDelimitedCodec::new());
 
