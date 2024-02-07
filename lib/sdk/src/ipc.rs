@@ -29,9 +29,8 @@ pub async fn conn_bind() -> ConnectionListener {
         .expect("Service setupt not complete.")
         .join("conn");
 
-    ConnectionListener {
-        listener: UnixListener::bind(path).expect("IPC bind failed."),
-    }
+    let listener = UnixListener::bind(path).expect("IPC bind failed.");
+    ConnectionListener::new(listener)
 }
 
 /// Init the service event loop using environment variables. This method *MUST* only be called
