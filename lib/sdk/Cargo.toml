@@ -14,7 +14,11 @@ derive_more = "0.99"
 fleek-crypto = { path = "../fleek-crypto/" }
 hp-fixed = { path = "../hp-fixed/" }
 triomphe = "0.1.9"
-tokio = { version = "1.32", features = ["rt", "sync", "fs", "net", "time"] }
+tokio = { version = "1.32", features = ["rt", "sync", "fs", "net", "time", "io-util"] }
 arrayvec = "0.7"
 ringbuf = "0.3"
 blake3-tree = { path = "../blake3-tree" }
+url = { version="2.5.0", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_cbor = "0.11"
+thiserror = "1.0"
