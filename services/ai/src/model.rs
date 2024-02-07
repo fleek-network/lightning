@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 pub struct Opts {
     /// Uri of the model.
     pub uri: String,
-    /// Load pre-trained weights.
-    pub pretrained: bool,
+    /// Uri pre-trained weights.
+    pub weights: Option<String>,
     /// Custom configuration.
     pub custom: Option<CustomOpts>,
 }

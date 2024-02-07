@@ -6,8 +6,10 @@ use axum::extract::{Path, Query};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Extension;
+use bytes::Bytes;
 use cid::Cid;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
+use fleek_service_ai::{task, Device};
 use fleek_service_js_poc::stream::{Origin, Request};
 use lightning_interfaces::ExecutorProviderInterface;
 use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame};
@@ -151,12 +153,23 @@ pub async fn js_service_handler<P: ExecutorProviderInterface>(
     }
 }
 
-pub async fn ml_service_handler<P: ExecutorProviderInterface>(
+pub async fn ai_service_handler<P: ExecutorProviderInterface>(
+    Path((origin, uri)): Path<(String, String)>,
     Extension(provider): Extension<Context<P>>,
-    body: String,
+    payload: Bytes,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let task = task::Run {
+        input: payload,
+        origin: origin.as_str().into(),
+        weights: None,
+        model: uri,
+        device: Device::Cpu,
+    };
+    let request = fleek_service_ai::Request::Run(task);
     let request_frame = RequestFrame::ServicePayload {
-        bytes: body.into_bytes().into(),
+        bytes: serde_json::to_string(&request)
+            .map_err(|_| bad_request("failed to encode task"))?
+            .into(),
     };
     let handshake_frame = HandshakeRequestFrame::Handshake {
         service: 2,

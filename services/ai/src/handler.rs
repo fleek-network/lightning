@@ -2,24 +2,25 @@ use anyhow::{anyhow, Context};
 use base64::Engine;
 use fn_sdk::connection::Connection;
 
-use crate::libtorch;
 use crate::libtorch::train::{Config, Dataset, TrainingResult};
 use crate::libtorch::{train, IMAGENET_CLASS_COUNT};
 use crate::model::Model;
 use crate::stream::ServiceStream;
-use crate::task::Task;
+use crate::task::{Run, Train};
+use crate::{libtorch, Request};
 
 pub async fn handle(connection: Connection) -> anyhow::Result<()> {
     let mut stream = ServiceStream::new(connection);
     while let Some(request) = stream.recv().await {
-        let device = request.device;
-        match request.task {
-            Task::Run { model, input, .. } => {
-                match model.uri.parse::<Model>() {
+        match request {
+            Request::Run(Run {
+                model,
+                input,
+                device,
+                ..
+            }) => {
+                match model.parse::<Model>() {
                     Ok(archived_model) => {
-                        // Todo: define a better API to communicate type of the input.
-                        // We won't need this when https://github.com/pytorch/pytorch/issues/48525
-                        // is resolved.
                         let input = base64::prelude::BASE64_STANDARD.decode(input)?;
                         let result = match archived_model {
                             Model::Resnet18 => {
@@ -33,24 +34,23 @@ pub async fn handle(connection: Connection) -> anyhow::Result<()> {
                         stream.send(json_str.as_bytes()).await?;
                     },
                     Err(_) => {
-                        let model = load_resource(&model.uri).await?;
+                        let model = load_resource(&model).await?;
                         let input = base64::prelude::BASE64_STANDARD.decode(input)?;
                         let output =
                             libtorch::load_and_run_model(model.into(), input.into(), device)?;
-                        stream.send(output.as_bytes()).await?;
+                        stream.send(output.as_ref()).await?;
                     },
                 };
             },
-            Task::Train {
-                epochs,
+            Request::Train(Train {
                 model_uri,
                 train_data_uri,
                 train_label_uri,
                 validation_data_uri,
                 validation_label_uri,
-            } => {
+                ..
+            }) => {
                 let result = handle_train_task(
-                    epochs,
                     model_uri,
                     train_data_uri,
                     train_label_uri,
@@ -87,7 +87,6 @@ async fn get_hash(uri: String) -> anyhow::Result<[u8; 32]> {
 }
 
 async fn handle_train_task(
-    _epochs: u32,
     model_uri: String,
     train_data_uri: String,
     train_label_uri: String,

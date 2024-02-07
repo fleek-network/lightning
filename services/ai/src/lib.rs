@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use task::Task;
 
 mod handler;
 mod libtorch;
@@ -10,12 +9,13 @@ pub mod task;
 
 pub use opts::*;
 
+use crate::task::{Run, Train};
+
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Request {
-    /// Devices on which tensor computations are run.
-    pub device: Device,
+pub enum Request {
     /// Task to execute.
-    pub task: Task,
+    Run(Run),
+    Train(Train),
 }
 
 #[tokio::main]
