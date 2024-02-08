@@ -39,6 +39,7 @@ use lightning_interfaces::{
     IncrementalPutInterface,
     SyncQueryRunnerInterface,
 };
+use lightning_metrics::increment_counter;
 use tracing::warn;
 
 use crate::config::{Config, Mode, StorageConfig};
@@ -196,6 +197,13 @@ impl Env<UpdatePerm> {
         });
 
         if response.change_epoch {
+            increment_counter!(
+                "epoch_change_by_txn",
+                Some(
+                    "Counter for the number of times the node changed epochs naturally by executing transactions"
+                )
+            );
+
             let storage = self.inner.get_storage_backend_unsafe();
             // This will return `None` only if the InMemory backend is used.
             if let Some(checkpoint) = storage.serialize() {

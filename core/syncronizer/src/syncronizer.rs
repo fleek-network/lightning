@@ -24,6 +24,7 @@ use lightning_interfaces::{
     SyncronizerInterface,
     WithStartAndShutdown,
 };
+use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
@@ -265,6 +266,12 @@ impl<C: Collection> SyncronizerInner<C> {
                 _ = time_to_check => {
                     if let Ok(checkpoint_hash) = self.try_sync().await{
                         // Our blockstore succesfully downloaded the checkpoint lets send up the hash and return
+
+                        increment_counter!(
+                            "epoch_change_by_checkpoint",
+                            Some("Counter for the number of times the node restarted from a new checkpoint instead of changing epochs naturally")
+                        );
+
                         let _ = tx_update_ready.send(checkpoint_hash);
                         return;
                     }

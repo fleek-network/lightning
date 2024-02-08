@@ -17,6 +17,7 @@ multiaddr = "0.17.1"
 lightning-interfaces = { path = "../interfaces" }
 lightning-reputation = { path = "../reputation" }
 lightning-utils = { path = "../utils" }
+lightning-metrics = { path = "../metrics" }
 num-traits.workspace = true
 rand.workspace = true
 fleek-blake3 = "1.5"
