@@ -132,7 +132,7 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
         // If we have the archive socket that means our node is in archive node and we should send
         // the block and the receipt to be indexed
         if let (Some(block), Some(socket)) = (archive_block, &self.index_socket) {
-            if let Err(e) = socket.run(IndexRequest::Block(block, results)).await {
+            if let Err(e) = socket.enqueue(IndexRequest::Block(block, results)).await {
                 error!("We could not send a message to the archiver: {e}");
             }
 
