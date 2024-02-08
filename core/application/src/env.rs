@@ -35,6 +35,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
+use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use tracing::{info, warn};
 
@@ -199,6 +200,13 @@ impl Env<UpdatePerm> {
             info!("#######################################");
             info!("Epoch changed to {epoch}");
             info!("#######################################");
+            increment_counter!(
+                "epoch_change_by_txn",
+                Some(
+                    "Counter for the number of times the node changed epochs naturally by executing transactions"
+                )
+            );
+
             let storage = self.inner.get_storage_backend_unsafe();
             // This will return `None` only if the InMemory backend is used.
             if let Some(checkpoint) = storage.serialize() {
