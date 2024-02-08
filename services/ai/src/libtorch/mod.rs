@@ -36,7 +36,7 @@ pub fn load_and_run_model(
 
     // This means data has to be preprocessed by client to make sure
     // it is a valid input for the model.
-    let output = module.forward_ts(&vec![input])?;
+    let output = module.forward_ts(&[input])?;
 
     // Serialize the result.
     // Todo: calculate capacity upfront.

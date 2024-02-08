@@ -149,6 +149,6 @@ async fn get_hash(uri: String) -> anyhow::Result<[u8; 32]> {
     if fn_sdk::api::fetch_blake3(hash).await {
         Ok(hash)
     } else {
-        return Err(anyhow!("failed to fetch file"));
+        Err(anyhow!("failed to fetch file"))
     }
 }
