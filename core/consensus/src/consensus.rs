@@ -345,14 +345,14 @@ impl<C: Collection> WithStartAndShutdown for Consensus<C> {
         task::spawn(async move {
             let edge_node = epoch_state.spawn_edge_consensus(reconfigure_notify.clone());
             epoch_state.start_current_epoch().await;
+            let shutdown_future = shutdown_notify.notified();
+            pin!(shutdown_future);
             loop {
                 let reconfigure_future = reconfigure_notify.notified();
-                let shutdown_future = shutdown_notify.notified();
-                pin!(shutdown_future);
-                pin!(reconfigure_future);
 
                 select! {
-                    _ = shutdown_future => {
+                    biased;
+                    _ = &mut shutdown_future => {
                         if let Some(consensus) = epoch_state.consensus.take() {
                             consensus.shutdown().await;
                         }
