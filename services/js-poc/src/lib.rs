@@ -16,7 +16,7 @@ pub(crate) mod params {
     use std::time::Duration;
 
     pub const HEAP_INIT: usize = 1 << 10;
-    pub const HEAP_LIMIT: usize = 16 << 20;
+    pub const HEAP_LIMIT: usize = 50 << 20;
     pub const REQ_TIMEOUT: Duration = Duration::from_secs(15);
 }
 
