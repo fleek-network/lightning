@@ -251,6 +251,10 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                 let time_to_sleep = time::sleep(time_until_change);
 
                 tokio::select! {
+                    biased;
+                    _ = shutdown_notify.notified() => {
+                        break;
+                    }
                     _ = time_to_sleep => {
                         let new_epoch = query_runner.get_current_epoch();
                         if new_epoch != epoch {
@@ -267,9 +271,6 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 
                         time_until_change = Duration::from_secs(120);
                     },
-                    _ = shutdown_notify.notified() => {
-                        break;
-                    }
                 }
             }
         });
