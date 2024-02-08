@@ -250,7 +250,7 @@ where
                 PutFinalizeError::WriteFailed
             })?;
 
-        self.indexer.register(hash);
+        self.indexer.register(hash).await;
 
         Ok(hash)
     }

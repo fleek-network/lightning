@@ -85,7 +85,7 @@ impl<C: Collection> IndexerInterface<C> for Indexer<C> {
         })
     }
 
-    fn register(&self, cid: Blake3Hash) {
+    async fn register(&self, cid: Blake3Hash) {
         if let Some(index) = self.get_index() {
             if self
                 .query_runner
@@ -94,21 +94,18 @@ impl<C: Collection> IndexerInterface<C> for Indexer<C> {
                 .unwrap_or(true)
             {
                 let updates = vec![ContentUpdate { cid, remove: false }];
-                let submit_tx = self.submit_tx.clone();
-
-                tokio::spawn(async move {
-                    if let Err(e) = submit_tx
-                        .run(UpdateMethod::UpdateContentRegistry { updates })
-                        .await
-                    {
-                        tracing::error!("Submitting content registry update failed: {e:?}");
-                    }
-                });
+                if let Err(e) = self
+                    .submit_tx
+                    .enqueue(UpdateMethod::UpdateContentRegistry { updates })
+                    .await
+                {
+                    tracing::error!("Submitting content registry update failed: {e:?}");
+                }
             }
         }
     }
 
-    fn unregister(&self, cid: Blake3Hash) {
+    async fn unregister(&self, cid: Blake3Hash) {
         if let Some(index) = self.get_index() {
             if self
                 .query_runner
@@ -117,16 +114,14 @@ impl<C: Collection> IndexerInterface<C> for Indexer<C> {
                 .unwrap_or(false)
             {
                 let updates = vec![ContentUpdate { cid, remove: true }];
-                let submit_tx = self.submit_tx.clone();
 
-                tokio::spawn(async move {
-                    if let Err(e) = submit_tx
-                        .run(UpdateMethod::UpdateContentRegistry { updates })
-                        .await
-                    {
-                        tracing::error!("Submitting content registry update failed: {e:?}");
-                    }
-                });
+                if let Err(e) = self
+                    .submit_tx
+                    .enqueue(UpdateMethod::UpdateContentRegistry { updates })
+                    .await
+                {
+                    tracing::error!("Submitting content registry update failed: {e:?}");
+                }
             }
         }
     }
