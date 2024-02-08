@@ -10766,7 +10766,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c7cb00bc2770454b515388d45be7097a3ded2eca172f3dcdb7ca4cc06c40bf1"
 dependencies = [
  "half 2.3.1",
- "image",
  "lazy_static",
  "libc",
  "ndarray",

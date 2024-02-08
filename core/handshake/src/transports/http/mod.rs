@@ -43,10 +43,9 @@ impl Transport for HttpTransport {
                 get(handler::js_service_handler::<P>),
             )
             .route(
-                "/services/2/run/:origin/:uri",
+                "/services/2/infer/:origin/:uri",
                 post(handler::ai_service_handler::<P>),
-            )
-            .route("/services/2/train", post(handler::ai_service_handler::<P>));
+            );
         Ok((Self {}, Some(router)))
     }
 

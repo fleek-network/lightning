@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Utils for reading MNIST hand-written digit dataset from memory.
 // Copied and modified from `tch-rs`.
 use std::io;

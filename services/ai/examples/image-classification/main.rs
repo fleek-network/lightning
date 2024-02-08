@@ -1,3 +1,4 @@
+// This example requires `mode_resnet18.pt` to be stored in the node.
 use std::io::Cursor;
 
 use reqwest::Body;
@@ -22,10 +23,15 @@ async fn main() -> anyhow::Result<()> {
     input.save_to_stream(Cursor::new(&mut buffer))?;
 
     let response = reqwest::Client::new()
-        .post("http://127.0.0.1:4220/services/2/run/blake3/fb7c113fd7f7b9b284eba5df851210d8f7138855f48725242bf4324a0877d4d0")
+        .post("http://127.0.0.1:4220/services/2/infer/blake3/fb7c113fd7f7b9b284eba5df851210d8f7138855f48725242bf4324a0877d4d0")
         .body(Body::from(buffer))
         .send()
         .await?;
+
+    if !response.status().is_success() {
+        anyhow::bail!("Received {}", response.status(),)
+    }
+
     let response_data = response.bytes().await?;
     let output = Tensor::load_from_stream(Cursor::new(response_data))?;
 

@@ -9,7 +9,7 @@ use axum::Extension;
 use bytes::Bytes;
 use cid::Cid;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
-use fleek_service_ai::{task, Device};
+use fleek_service_ai::Device;
 use fleek_service_js_poc::stream::{Origin, Request};
 use lightning_interfaces::ExecutorProviderInterface;
 use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame};
@@ -158,14 +158,14 @@ pub async fn ai_service_handler<P: ExecutorProviderInterface>(
     Extension(provider): Extension<Context<P>>,
     payload: Bytes,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let task = task::Run {
+    let task = fleek_service_ai::Infer {
         input: payload,
         origin: origin.as_str().into(),
         weights: None,
         model: uri,
         device: Device::Cpu,
     };
-    let request = fleek_service_ai::Request::Run(task);
+    let request = fleek_service_ai::Request::Infer(task);
     let request_frame = RequestFrame::ServicePayload {
         bytes: serde_json::to_string(&request)
             .map_err(|_| bad_request("failed to encode task"))?
