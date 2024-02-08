@@ -34,26 +34,10 @@ use lightning_interfaces::types::{
     TxHash,
     Value,
 };
-<<<<<<< HEAD
 use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
+use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use tracing::{info, warn};
-||||||| parent of 0b488956 (feat(metrics): add counters for epoch change by txn and checkpointing)
-use lightning_interfaces::{
-    BlockStoreInterface,
-    IncrementalPutInterface,
-    SyncQueryRunnerInterface,
-};
-use tracing::warn;
-=======
-use lightning_interfaces::{
-    BlockStoreInterface,
-    IncrementalPutInterface,
-    SyncQueryRunnerInterface,
-};
-use lightning_metrics::increment_counter;
-use tracing::warn;
->>>>>>> 0b488956 (feat(metrics): add counters for epoch change by txn and checkpointing)
 
 use crate::config::{Config, Mode, StorageConfig};
 use crate::genesis::{Genesis, GenesisPrices};
