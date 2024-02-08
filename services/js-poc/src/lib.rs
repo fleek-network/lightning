@@ -82,6 +82,10 @@ async fn connection_loop(
             Origin::Blake3 => {
                 let hash = hex::decode(uri).context("failed to decode blake3 hash")?;
                 if hash.len() != 32 {
+                    stream
+                        .send_payload(b"Invalid blake3 hash length")
+                        .await
+                        .context("failed to send error message")?;
                     return Err(anyhow!("invalid blake3 hash length"));
                 }
                 let hash = *array_ref![hash, 0, 32];
@@ -89,16 +93,38 @@ async fn connection_loop(
                 if fn_sdk::api::fetch_blake3(hash).await {
                     hash
                 } else {
+                    stream
+                        .send_payload(b"Failed to fetch blake3 content")
+                        .await
+                        .context("failed to send error message")?;
                     return Err(anyhow!("failed to fetch file"));
                 }
             },
-            Origin::Ipfs => fn_sdk::api::fetch_from_origin(
-                origin.into(),
-                Cid::try_from(uri).context("invalid ipfs cid")?.to_bytes(),
-            )
-            .await
-            .context("failed to fetch from origin")?,
-            o => return Err(anyhow!("unknown origin: {o:?}")),
+            Origin::Ipfs => {
+                match fn_sdk::api::fetch_from_origin(
+                    origin.into(),
+                    Cid::try_from(uri).context("invalid ipfs cid")?.to_bytes(),
+                )
+                .await
+                {
+                    Some(_) => todo!(),
+                    None => {
+                        stream
+                            .send_payload(b"Failed to fetch from origin")
+                            .await
+                            .context("failed to send error message")?;
+                        return Err(anyhow!("failed to fetch from origin"));
+                    },
+                }
+            },
+            o => {
+                let err = anyhow!("unknown origin: {o:?}");
+                stream
+                    .send_payload(err.to_string().as_bytes())
+                    .await
+                    .context("failed to send error message")?;
+                return Err(err);
+            },
         };
 
         // Read and parse source from the blockstore
@@ -129,7 +155,7 @@ async fn connection_loop(
             },
         };
         tx.send(runtime.deno.v8_isolate().thread_safe_handle())
-            .expect("Failed to send the IsolateHandle to main thread.");
+            .context("Failed to send the IsolateHandle to main thread.")?;
 
         let res = match runtime.exec(source) {
             Ok(res) => res,
@@ -161,7 +187,7 @@ async fn connection_loop(
             },
             Err(e) => {
                 stream
-                    .send_payload("Request timeout.".as_bytes())
+                    .send_payload(b"Request timeout")
                     .await
                     .context("failed to send error message")?;
                 return Err(e).context("execution timeout");
