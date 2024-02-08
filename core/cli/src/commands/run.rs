@@ -11,7 +11,6 @@ use lightning_interfaces::{
     ConfigProviderInterface,
     SyncronizerInterface,
 };
-use lightning_metrics::increment_counter;
 use lightning_node::config::TomlConfigProvider;
 use lightning_utils::shutdown::ShutdownController;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -95,11 +94,6 @@ where
                 .container
                 .get::<<C as Collection>::SyncronizerInterface>(tag!(C::SyncronizerInterface))
                 .checkpoint_socket();
-
-                increment_counter!(
-                    "checkpoint_loaded",
-                    Some("Counter for number of times the node restarted from a new checkpoint")
-                );
             }
         }
     }

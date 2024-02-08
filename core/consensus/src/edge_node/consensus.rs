@@ -11,6 +11,7 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
     ToDigest,
 };
+use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use quick_cache::unsync::Cache;
 use tokio::pin;
@@ -301,6 +302,11 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         let _ = pub_sub.send(&request, None).await;
                         pending_requests.insert(digest, ());
                         info!("Send request for missing parcel with digest: {digest:?}");
+
+                        increment_counter!(
+                            "consensus_missing_parcel_request",
+                            Some("Counter for the number of times the node sent a request for a missing consensus parcel")
+                        );
                     }
                 }
             }
