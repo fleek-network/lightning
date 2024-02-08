@@ -92,13 +92,15 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
     let mut pending_requests = Cache::new(100);
 
     let mut txn_store = TransactionStore::new();
+
+    let shutdown_future = shutdown_notify.notified();
+    pin!(shutdown_future);
     loop {
         // todo(dalton): revisit pinning these and using Notify over oneshot
-        let shutdown_future = shutdown_notify.notified();
-        pin!(shutdown_future);
 
         tokio::select! {
-            _ = shutdown_future => {
+            biased;
+            _ = &mut shutdown_future => {
                 return;
             },
             Some((parcel, epoch_changed)) = rx_narwhal_batch.recv() => {
