@@ -8,6 +8,7 @@ import { URL, URLSearchParams } from "ext:deno_url/00_url.js";
 import { URLPattern } from "ext:deno_url/01_urlpattern.js";
 
 import { DOMException } from "ext:deno_web/01_dom_exception.js";
+import * as abortSignal from "ext:deno_web/03_abort_signal.js";
 import * as globalInterfaces from "ext:deno_web/04_global_interfaces.js";
 import * as base64 from "ext:deno_web/05_base64.js";
 import * as streams from "ext:deno_web/06_streams.js";
@@ -36,7 +37,6 @@ import { Fleek } from "ext:fleek/fleek.js";
 
 // TODO:
 // Events
-// AbortController
 // structuredClone
 // Navigator
 
@@ -114,6 +114,8 @@ const globalContext = {
 
   // Web apis
   DOMException: nonEnumerable(DOMException),
+  AbortSignal: nonEnumerable(abortSignal.AbortSignal),
+  AbortController: nonEnumerable(abortSignal.AbortController),
   WritableStream: nonEnumerable(streams.WritableStream),
   WritableStreamDefaultWriter: nonEnumerable(streams.WritableStreamDefaultWriter),
   WritableStreamDefaultController: nonEnumerable(streams.WritableStreamDefaultController),
