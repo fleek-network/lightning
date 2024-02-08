@@ -20,7 +20,7 @@ pub trait IndexerInterface<C: Collection>: ConfigConsumer + Clone + Send + Sync 
         signer: &c!(C::SignerInterface),
     ) -> anyhow::Result<Self>;
 
-    fn register(&self, cid: Blake3Hash);
+    async fn register(&self, cid: Blake3Hash);
 
-    fn unregister(&self, cid: Blake3Hash);
+    async fn unregister(&self, cid: Blake3Hash);
 }
