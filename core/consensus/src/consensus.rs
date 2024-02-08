@@ -264,7 +264,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                         info!("Narwhal: Signalling ready to change epoch");
 
                         if let Err(e) = txn_socket
-                        .run(UpdateMethod::ChangeEpoch { epoch })
+                        .enqueue(UpdateMethod::ChangeEpoch { epoch })
                         .await {
                             error!("Error sending change epoch signal to socket {}", e);
                         }
