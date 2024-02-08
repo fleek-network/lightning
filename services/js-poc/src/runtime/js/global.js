@@ -8,6 +8,7 @@ import { URL, URLSearchParams } from "ext:deno_url/00_url.js";
 import { URLPattern } from "ext:deno_url/01_urlpattern.js";
 
 import { DOMException } from "ext:deno_web/01_dom_exception.js";
+import * as timers from "ext:deno_web/02_timers.js";
 import * as abortSignal from "ext:deno_web/03_abort_signal.js";
 import * as globalInterfaces from "ext:deno_web/04_global_interfaces.js";
 import * as base64 from "ext:deno_web/05_base64.js";
@@ -114,6 +115,10 @@ const globalContext = {
 
   // Web apis
   DOMException: nonEnumerable(DOMException),
+  clearInterval: writable(timers.clearInterval),
+  clearTimeout: writable(timers.clearTimeout),
+  setInterval: writable(timers.setInterval),
+  setTimeout: writable(timers.setTimeout),
   AbortSignal: nonEnumerable(abortSignal.AbortSignal),
   AbortController: nonEnumerable(abortSignal.AbortController),
   WritableStream: nonEnumerable(streams.WritableStream),
