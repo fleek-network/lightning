@@ -240,7 +240,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 
     fn wait_to_signal_epoch_change(&self, mut time_until_change: Duration, epoch: Epoch) {
         let txn_socket = self.txn_socket.clone();
-        let query_runner = self.query_runner.clone();
+        let query_runner = self.query_runner.my_clone(file!(), line!());
 
         let shutdown = self.shutdown_notify.clone();
         task::spawn(async move {
