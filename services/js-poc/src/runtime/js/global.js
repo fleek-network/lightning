@@ -111,6 +111,7 @@ const globalContext = {
   location: location.locationDescriptor,
   Window: globalInterfaces.windowConstructorDescriptor,
   window: getterOnly(() => globalThis),
+  global: getterOnly(() => globalThis),
   self: getterOnly(() => globalThis),
 
   // Web apis
