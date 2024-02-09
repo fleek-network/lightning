@@ -383,7 +383,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
                                     continue 'outer;
                                 }
 
-                                // When we are here it means we're reading a new message so any
+                                // When we are here, it means we're reading a new message so any
                                 // assumption about the previous payload has to be reset.
                                 self.is_primary_the_current_sender = false;
                                 self.discard_bytes = false;

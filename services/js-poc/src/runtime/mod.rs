@@ -3,7 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use ::deno_fetch::{deno_fetch, FetchPermissions, Options};
 use ::deno_web::{deno_web, TimersPermission};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
 use deno_core::serde_v8::Serializable;
@@ -61,14 +61,8 @@ impl FetchPermissions for Permissions {
 
 impl Runtime {
     /// Create a new runtime
-    pub fn new(hash: [u8; 32], path: Option<String>) -> Result<Self> {
-        let mut location = Url::parse(&format!("blake3://{}", hex::encode(hash)))
-            .context("failed to create base url")?;
-        if let Some(path) = path {
-            location = location.join(&path).context("invalid path string")?;
-        }
-
-        let tape = Tape::new(hash);
+    pub fn new(mut location: Url) -> Result<Self> {
+        let tape = Tape::new(location.clone());
         let mut deno = JsRuntime::new(RuntimeOptions {
             extensions: vec![
                 // WebApi subset

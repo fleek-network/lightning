@@ -71,7 +71,7 @@ ReqRes! {
     },
     /// Query a client's FLK balance.
     QueryClientFLK {
-        /// The public key of the user .
+        /// The public key of the user.
         pk: ClientPublicKeyBytes,
         =>
         /// The balance of the user.

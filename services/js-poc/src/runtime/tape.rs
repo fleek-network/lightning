@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use deno_core::url::Url;
 use deno_core::{OpMetricsEvent, OpMetricsFactoryFn, OpMetricsFn};
 
 #[derive(Clone)]
@@ -9,7 +10,7 @@ pub struct Tape {
 }
 
 impl Tape {
-    pub fn new(hash: [u8; 32]) -> Self {
+    pub fn new(hash: Url) -> Self {
         Self {
             feed: Rc::new(RefCell::new(vec![Punch::Start(hash)])),
         }
@@ -61,7 +62,7 @@ impl std::fmt::Debug for Tape {
 
 #[derive(Clone)]
 pub enum Punch {
-    Start([u8; 32]),
+    Start(Url),
     OpDispatched(String),
     OpCompleted(String),
     OpError(String),
@@ -73,15 +74,8 @@ pub enum Punch {
 
 impl std::fmt::Debug for Punch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use std::fmt::Write;
         match self {
-            Self::Start(arg0) => {
-                let hex: String = arg0.iter().fold(String::with_capacity(64), |mut s, b| {
-                    write!(s, "{b:02x}").unwrap();
-                    s
-                });
-                f.debug_tuple("Start").field(&hex).finish()
-            },
+            Self::Start(arg0) => f.debug_tuple("Start").field(arg0).finish(),
             Self::OpDispatched(arg0) => f.debug_tuple("OpDispatched").field(arg0).finish(),
             Self::OpCompleted(arg0) => f.debug_tuple("OpCompleted").field(arg0).finish(),
             Self::OpError(arg0) => f.debug_tuple("OpError").field(arg0).finish(),

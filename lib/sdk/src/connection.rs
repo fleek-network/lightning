@@ -1,10 +1,12 @@
 use std::pin::Pin;
 
+use bytes::BytesMut;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc;
 
 use crate::header::{read_header, ConnectionHeader, TransportDetail};
+use crate::io_util::read_length_delimited;
 
 /// Listener for incoming connections
 pub struct ConnectionListener {
@@ -95,7 +97,32 @@ impl Connection {
         Ok(())
     }
 
+    /// Write a full service payload to the handshake server, tHe entire buffer is written as one
+    /// service payload in the proper length prepended encoding.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is not cancel safe. If it is used in a tokio select and another branch completes
+    /// first data may be partially written.
+    #[inline(always)]
+    pub async fn write_payload(&mut self, payload: &[u8]) -> std::io::Result<()> {
+        self.stream.write_u32(payload.len() as u32).await?;
+        self.stream.write_all(payload).await?;
+        Ok(())
+    }
+
+    /// Read a full payload from the handshake server.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is not cancel safe. On cancellation data may be partially read from the
+    /// handshake, leading to unexpected behavior on the subsequent call.
+    pub async fn read_payload(&mut self) -> Option<BytesMut> {
+        read_length_delimited(&mut self.stream).await
+    }
+
     /// Returns true if this connection is an HTTP request.
+    #[inline(always)]
     pub fn is_http_request(&self) -> bool {
         matches!(
             self.header.transport_detail,
@@ -104,6 +131,7 @@ impl Connection {
     }
 
     /// Returns true if this connection is an anonymous connection without a public key.
+    #[inline(always)]
     pub fn is_anonymous(&self) -> bool {
         self.header.pk.is_none()
     }

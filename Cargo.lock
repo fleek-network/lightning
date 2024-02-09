@@ -3714,6 +3714,7 @@ version = "0.0.0"
 dependencies = [
  "arrayvec",
  "blake3-tree",
+ "bytes",
  "derive_more",
  "fleek-crypto",
  "hp-fixed",

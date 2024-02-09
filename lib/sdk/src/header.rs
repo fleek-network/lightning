@@ -3,9 +3,11 @@ use std::collections::HashMap;
 use fleek_crypto::ClientPublicKey;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use tokio::net::UnixStream;
 use url::Url;
+
+use crate::io_util::read_length_delimited;
 
 /// The header of this connection.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -16,8 +18,8 @@ pub struct ConnectionHeader {
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub enum HttpMethod {
-    Post,
     Get,
+    Post,
     Put,
     Delete,
 }
@@ -33,27 +35,7 @@ pub enum TransportDetail {
 }
 
 pub async fn read_header(stream: &mut UnixStream) -> Option<ConnectionHeader> {
-    let mut size = [0; 4];
-    // really unnecessary.
-    let mut i = 0;
-    while i < 4 {
-        match stream.read(&mut size[i..]).await {
-            Ok(0) | Err(_) => return None,
-            Ok(n) => {
-                i += n;
-            },
-        }
-    }
-    let size = u32::from_be_bytes(size) as usize;
-    // now let's read `size` bytes.
-    let mut buffer = Vec::with_capacity(size);
-    while buffer.len() < size {
-        match stream.read_buf(&mut buffer).await {
-            Ok(0) | Err(_) => return None,
-            Ok(_) => {},
-        }
-    }
-    debug_assert_eq!(buffer.len(), size);
+    let buffer = read_length_delimited(stream).await?;
     serde_cbor::from_slice(&buffer).ok()
 }
 
