@@ -1,4 +1,5 @@
 use anyhow::{anyhow, bail, Context};
+use bytes::Bytes;
 use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use url::Url;
@@ -40,11 +41,16 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
                 model,
                 input,
                 device,
+                origin,
                 ..
             }) => {
-                let model = load_resource(&model).await?;
-                let output = inference::load_and_run_model(model.into(), input, device)?;
-                connection.write_payload(output.as_ref()).await?;
+                match handle_inference_task(model, origin, input, device).await {
+                    Ok(output) => connection.write_payload(output.as_ref()).await?,
+                    Err(e) => {
+                        // Todo: let's define a better API to communicate success vs error.
+                        connection.write_payload(e.to_string().as_bytes()).await?;
+                    },
+                }
             },
             Request::Train(Train { .. }) => {
                 bail!("under construction");
@@ -62,31 +68,49 @@ fn parse_http_url(url: &Url) -> Option<(Origin, String)> {
     Some((seg1.into(), seg2.into()))
 }
 
-async fn load_resource(uri: &str) -> anyhow::Result<Vec<u8>> {
-    // Todo: update param to accept &str.
-    let hash = get_hash(uri.to_string()).await?;
-    fn_sdk::blockstore::ContentHandle::load(&hash)
+#[inline(always)]
+async fn handle_inference_task(
+    model: String,
+    origin: Origin,
+    input: Bytes,
+    device: Device,
+) -> anyhow::Result<Bytes> {
+    let hash = get_hash(origin, &model).await?;
+    let model = fn_sdk::blockstore::ContentHandle::load(&hash)
         .await
         .context("failed to get resource from blockstore")?
         .read_to_end()
-        .await
-        .map_err(Into::into)
+        .await?;
+    inference::load_and_run_model(model.into(), input, device)
 }
 
-async fn get_hash(uri: String) -> anyhow::Result<[u8; 32]> {
-    // Todo: handle different origin types.
-    let hash = hex::decode(uri).context("failed to decode blake3 hash")?;
-    if hash.len() != 32 {
-        return Err(anyhow!("invalid blake3 hash length"));
-    }
+#[inline(always)]
+async fn get_hash(origin: Origin, uri: &str) -> anyhow::Result<[u8; 32]> {
+    match origin {
+        Origin::Blake3 => {
+            let hash = hex::decode(uri).context("failed to decode blake3 hash")?;
+            if hash.len() != 32 {
+                return Err(anyhow!("invalid blake3 hash length"));
+            }
 
-    let hash: [u8; 32] = hash
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("invalid hash"))?;
+            let hash: [u8; 32] = hash
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("invalid hash"))?;
 
-    if fn_sdk::api::fetch_blake3(hash).await {
-        Ok(hash)
-    } else {
-        Err(anyhow!("failed to fetch file"))
+            if fn_sdk::api::fetch_blake3(hash).await {
+                Ok(hash)
+            } else {
+                Err(anyhow!("failed to fetch file"))
+            }
+        },
+        Origin::Ipfs => fn_sdk::api::fetch_from_origin(fn_sdk::api::Origin::IPFS, uri.as_bytes())
+            .await
+            .ok_or(anyhow::anyhow!("failed to get hash from IPFS origin")),
+        Origin::Http => {
+            anyhow::bail!("HTTP origin is not supported");
+        },
+        Origin::Unknown => {
+            anyhow::bail!("unknown origin");
+        },
     }
 }
