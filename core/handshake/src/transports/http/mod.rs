@@ -3,10 +3,11 @@ mod handler;
 
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
-use axum::routing::{get, post};
+use axum::routing::any;
 use axum::Router;
 use bytes::Bytes;
 pub use config::Config;
+use fn_sdk::header::TransportDetail;
 use lightning_interfaces::ExecutorProviderInterface;
 use lightning_schema::handshake::{
     HandshakeRequestFrame,
@@ -33,19 +34,7 @@ impl Transport for HttpTransport {
         _: ShutdownWaiter,
         _: Self::Config,
     ) -> anyhow::Result<(Self, Option<Router>)> {
-        let router = Router::new()
-            .route(
-                "/services/0/:origin/:uri",
-                get(handler::fetcher_service_handler::<P>),
-            )
-            .route(
-                "/services/1/:origin/:uri",
-                get(handler::js_service_handler::<P>),
-            )
-            .route(
-                "/services/2/infer/:origin/:uri",
-                post(handler::ai_service_handler::<P>),
-            );
+        let router = Router::new().route("/services/:service/*path", any(handler::handler::<P>));
         Ok((Self {}, Some(router)))
     }
 
@@ -184,16 +173,26 @@ impl TransportSender for HttpSender {
 
 pub struct HttpReceiver {
     inner: Receiver<Option<RequestFrame>>,
+    detail: Option<TransportDetail>,
 }
 
 impl HttpReceiver {
-    pub fn new(inner: Receiver<Option<RequestFrame>>) -> Self {
-        Self { inner }
+    pub fn new(inner: Receiver<Option<RequestFrame>>, detail: TransportDetail) -> Self {
+        Self {
+            inner,
+            detail: Some(detail),
+        }
     }
 }
 
 #[async_trait]
 impl TransportReceiver for HttpReceiver {
+    fn detail(&mut self) -> TransportDetail {
+        self.detail
+            .take()
+            .expect("HTTP Transport detail already taken.")
+    }
+
     async fn recv(&mut self) -> Option<RequestFrame> {
         self.inner.recv().await.ok().flatten()
     }

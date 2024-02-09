@@ -5686,8 +5686,6 @@ dependencies = [
  "derive_more",
  "enum_dispatch",
  "fleek-crypto",
- "fleek-service-ai",
- "fleek-service-js-poc",
  "fn-sdk",
  "futures",
  "fxhash",
@@ -5720,6 +5718,7 @@ dependencies = [
  "tower-http 0.5.1",
  "tracing",
  "triomphe",
+ "url",
  "wtransport",
 ]
 
