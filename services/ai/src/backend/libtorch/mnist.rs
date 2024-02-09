@@ -7,7 +7,7 @@ use std::io::{Cursor, Read};
 use bytes::Bytes;
 use tch::{Kind, Tensor};
 
-use crate::libtorch::train::Dataset;
+use crate::backend::libtorch::train::Dataset;
 
 fn read_u32<T: Read>(reader: &mut T) -> io::Result<u32> {
     let mut b = vec![0u8; 4];

@@ -4,8 +4,8 @@ use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use url::Url;
 
-use crate::libtorch::inference;
-use crate::{Device, Infer, Origin, Request, Train};
+use crate::backend::{libtorch, onnx};
+use crate::{Backend, Device, Infer, Origin, Request, Train};
 
 pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
     if connection.is_http_request() {
@@ -27,9 +27,12 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
             .read_payload()
             .await
             .context("Could not read body")?;
-        let model = load_resource(&uri).await?;
-        let output = inference::load_and_run_model(model.into(), body.into(), Device::Cpu)?;
+
+        // Todo: close connection properly.
+        let output =
+            handle_inference_task(uri, origin, body.into(), Device::Cpu, Backend::Onnx).await?;
         connection.write_payload(output.as_ref()).await?;
+
         return Ok(());
     }
 
@@ -42,15 +45,12 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
                 input,
                 device,
                 origin,
+                backend,
                 ..
             }) => {
-                match handle_inference_task(model, origin, input, device).await {
-                    Ok(output) => connection.write_payload(output.as_ref()).await?,
-                    Err(e) => {
-                        // Todo: let's define a better API to communicate success vs error.
-                        connection.write_payload(e.to_string().as_bytes()).await?;
-                    },
-                }
+                // Todo: Let's define a better API to communicate success vs failure.
+                let output = handle_inference_task(model, origin, input, device, backend).await?;
+                connection.write_payload(output.as_ref()).await?;
             },
             Request::Train(Train { .. }) => {
                 bail!("under construction");
@@ -74,43 +74,42 @@ async fn handle_inference_task(
     origin: Origin,
     input: Bytes,
     device: Device,
+    backend: Backend,
 ) -> anyhow::Result<Bytes> {
-    let hash = get_hash(origin, &model).await?;
+    let hash = match origin {
+        Origin::Blake3 => {
+            let hash = hex::decode(model).context("failed to decode blake3 hash")?;
+            if hash.len() != 32 {
+                return Err(anyhow!("invalid blake3 hash length"));
+            }
+
+            let hash: [u8; 32] = hash.try_into().map_err(|_| anyhow!("invalid hash"))?;
+
+            if fn_sdk::api::fetch_blake3(hash).await {
+                hash
+            } else {
+                bail!("failed to fetch file")
+            }
+        },
+        Origin::Ipfs => fn_sdk::api::fetch_from_origin(fn_sdk::api::Origin::IPFS, model.as_bytes())
+            .await
+            .ok_or(anyhow!("failed to get hash from IPFS origin"))?,
+        Origin::Http => {
+            bail!("HTTP origin is not supported");
+        },
+        Origin::Unknown => {
+            bail!("unknown origin");
+        },
+    };
+
     let model = fn_sdk::blockstore::ContentHandle::load(&hash)
         .await
         .context("failed to get resource from blockstore")?
         .read_to_end()
         .await?;
-    inference::load_and_run_model(model.into(), input, device)
-}
 
-#[inline(always)]
-async fn get_hash(origin: Origin, uri: &str) -> anyhow::Result<[u8; 32]> {
-    match origin {
-        Origin::Blake3 => {
-            let hash = hex::decode(uri).context("failed to decode blake3 hash")?;
-            if hash.len() != 32 {
-                return Err(anyhow!("invalid blake3 hash length"));
-            }
-
-            let hash: [u8; 32] = hash
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("invalid hash"))?;
-
-            if fn_sdk::api::fetch_blake3(hash).await {
-                Ok(hash)
-            } else {
-                Err(anyhow!("failed to fetch file"))
-            }
-        },
-        Origin::Ipfs => fn_sdk::api::fetch_from_origin(fn_sdk::api::Origin::IPFS, uri.as_bytes())
-            .await
-            .ok_or(anyhow::anyhow!("failed to get hash from IPFS origin")),
-        Origin::Http => {
-            anyhow::bail!("HTTP origin is not supported");
-        },
-        Origin::Unknown => {
-            anyhow::bail!("unknown origin");
-        },
+    match backend {
+        Backend::LibTorch => libtorch::inference::load_and_run_model(model.into(), input, device),
+        Backend::Onnx => onnx::inference::load_and_run_model(model.into(), input, device),
     }
 }

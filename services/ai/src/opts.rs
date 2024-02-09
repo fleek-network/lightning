@@ -27,3 +27,10 @@ impl From<&str> for Origin {
         }
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum Backend {
+    LibTorch,
+    Onnx,
+}

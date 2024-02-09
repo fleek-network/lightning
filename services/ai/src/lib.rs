@@ -1,5 +1,5 @@
+mod backend;
 mod handler;
-mod libtorch;
 mod opts;
 
 use bytes::Bytes;
@@ -16,7 +16,7 @@ pub enum Request {
 pub struct Infer {
     /// Input for inference.
     ///
-    /// This is a serialized tensor.
+    /// When using the LibTorch backend, this is a serialized Pytorch tensor.
     /// Please see https://pytorch.org/docs/stable/notes/serialization.html.
     pub input: Bytes,
     /// Uri of the model.
@@ -27,6 +27,10 @@ pub struct Infer {
     pub weights: Option<String>,
     /// Devices on which tensor computations are run.
     pub device: Device,
+    /// Backend to use for inference.
+    ///
+    /// This will be used for context when interpreting the encoded input and model.
+    pub backend: Backend,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -51,6 +55,11 @@ pub struct Train {
 pub async fn main() {
     fn_sdk::ipc::init_from_env();
     tracing::info!("Initialized AI service!");
+
+    // Entry point of the Onnx runtime.
+    if let Err(e) = ort::init().with_name("fleek-ai-inference").commit() {
+        tracing::error!("failed to initialize the Onnx runtime: {e}");
+    }
 
     let mut listener = fn_sdk::ipc::conn_bind().await;
     while let Ok(conn) = listener.accept().await {

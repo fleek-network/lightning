@@ -8,7 +8,7 @@ use tch::nn::{Adam, ModuleT, OptimizerConfig, VarStore};
 use tch::vision::dataset;
 use tch::{CModule, Device, TrainableCModule};
 
-use crate::libtorch::mnist;
+use crate::backend::libtorch::mnist;
 
 pub struct Config {
     pub model: Bytes,
