@@ -1,5 +1,3 @@
-#![feature(str_split_remainder)]
-
 use anyhow::{anyhow, Context};
 use arrayref::array_ref;
 use cid::Cid;
@@ -278,8 +276,13 @@ fn extract_request(url: &Url, body: &[u8]) -> Option<Request> {
     };
 
     let mut path = String::new();
-    path.push('/');
-    path.push_str(segments.remainder().unwrap_or(""));
+    for s in segments {
+        path.push('/');
+        path.push_str(s);
+    }
+    if path.is_empty() {
+        path.push('/');
+    }
     if let Some(q) = url.query() {
         path.push('?');
         path.push_str(q);
