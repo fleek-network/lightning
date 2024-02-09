@@ -199,7 +199,7 @@ async fn test_origin_dag_pb() {
     let req_fut = async move {
         config.gateways = vec![Gateway {
             protocol: Protocol::Http,
-            authority: "127.0.0.1:30200".to_string(),
+            authority: "127.0.0.1:30100".to_string(),
         }];
         let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore.clone()).unwrap();
 
@@ -214,8 +214,8 @@ async fn test_origin_dag_pb() {
 
     tokio::select! {
         biased;
-        _ = spawn_server(30100) => {
-
+        Err(e) = spawn_server(30100) => {
+            panic!("{e}");
         }
         _ = req_fut => {
 
@@ -254,8 +254,8 @@ async fn test_origin_bbb_dag_pb() {
 
     tokio::select! {
         biased;
-        _ = spawn_server(30200) => {
-
+        Err(e) = spawn_server(30200) => {
+            panic!("{e}");
         }
         _ = req_fut => {
 
@@ -279,7 +279,7 @@ async fn test_origin_raw() {
     let req_fut = async move {
         config.gateways = vec![Gateway {
             protocol: Protocol::Http,
-            authority: "127.0.0.1:30200".to_string(),
+            authority: "127.0.0.1:30201".to_string(),
         }];
         let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore.clone()).unwrap();
 
@@ -294,8 +294,8 @@ async fn test_origin_raw() {
 
     tokio::select! {
         biased;
-        _ = spawn_server(30201) => {
-
+        Err(e) = spawn_server(30201) => {
+            panic!("{e}");
         }
         _ = req_fut => {
 
