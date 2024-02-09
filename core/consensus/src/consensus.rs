@@ -238,21 +238,20 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         (narwhal_committee, worker_cache, epoch, epoch_end)
     }
 
-    async fn wait_to_signal_epoch_change(
-        &self,
-        mut time_until_change: Duration,
-        epoch: Epoch,
-        shutdown_notify: Arc<Notify>,
-    ) {
+    fn wait_to_signal_epoch_change(&self, mut time_until_change: Duration, epoch: Epoch) {
         let txn_socket = self.txn_socket.clone();
         let query_runner = self.query_runner.clone();
+
+        let shutdown = self.shutdown_notify.clone();
         task::spawn(async move {
+            let shutdown_fut = shutdown.notified();
+            pin!(shutdown_fut);
             loop {
                 let time_to_sleep = time::sleep(time_until_change);
 
                 tokio::select! {
                     biased;
-                    _ = shutdown_notify.notified() => {
+                    _ = &mut shutdown_fut => {
                         break;
                     }
                     _ = time_to_sleep => {
@@ -307,12 +306,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         let until_epoch_ends: u64 = (epoch_end as u128).saturating_sub(now).try_into().unwrap();
         let time_until_epoch_change = Duration::from_millis(until_epoch_ends);
 
-        self.wait_to_signal_epoch_change(
-            time_until_epoch_change,
-            epoch,
-            self.shutdown_notify.clone(),
-        )
-        .await;
+        self.wait_to_signal_epoch_change(time_until_epoch_change, epoch);
 
         self.consensus = Some(service)
     }
