@@ -1,7 +1,6 @@
 mod handler;
 mod libtorch;
 mod opts;
-mod stream;
 
 use bytes::Bytes;
 pub use opts::*;
