@@ -17,7 +17,7 @@ use deno_webidl::deno_webidl;
 use extensions::fleek;
 
 use self::tape::{Punch, Tape};
-use crate::params::{HEAP_INIT, HEAP_LIMIT};
+use crate::params::{FETCH_BLACKLIST, HEAP_INIT, HEAP_LIMIT};
 
 mod extensions;
 mod tape;
@@ -39,12 +39,16 @@ impl TimersPermission for Permissions {
 impl FetchPermissions for Permissions {
     fn check_net_url(
         &mut self,
-        _url: &Url,
+        url: &Url,
         _api_name: &str,
     ) -> std::prelude::v1::Result<(), deno_core::error::AnyError> {
+        if let Some(host) = url.host_str() {
+            if FETCH_BLACKLIST.contains(&host) {
+                return Err(anyhow!("{host} is blacklisted"));
+            }
+        }
         Ok(())
     }
-
     fn check_read(
         &mut self,
         _p: &std::path::Path,
