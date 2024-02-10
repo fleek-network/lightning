@@ -10,6 +10,9 @@ bytes = { version = "1.5", features = ["serde"] }
 derive_more = "0.99"
 fn-sdk = { path = "../../lib/sdk" }
 hex = "0.4"
+ndarray = "0.15"
+ndarray-npy = "0.8"
+npyz = "0.8"
 ort = "2.0.0-alpha.4"
 serde.workspace = true
 serde_json.workspace = true
@@ -23,7 +26,6 @@ url ="2.5.0"
 reqwest = "0.11"
 image = "0.24"
 tch = { version = "0.15", features = [ "download-libtorch" ] }
-
 
 [[bin]]
 name = "fn-service-2"

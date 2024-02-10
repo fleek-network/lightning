@@ -1,6 +1,7 @@
 mod backend;
 mod handler;
 mod opts;
+mod tensor;
 
 use bytes::Bytes;
 pub use opts::*;
