@@ -1,7 +1,7 @@
-mod backend;
+pub mod backend;
 mod handler;
 mod opts;
-mod tensor;
+pub mod tensor;
 
 use bytes::Bytes;
 pub use opts::*;

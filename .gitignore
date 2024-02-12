@@ -6,3 +6,7 @@ target
 .idea
 ./makefile
 ./dockerfile
+.onnx
+.pt
+**.jpeg
+**.jpg

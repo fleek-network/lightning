@@ -1,4 +1,4 @@
-//! Utils to convert Numpy arrays to [ndarray] arrays.
+//! Utils to convert tensors to Numpy arrays.
 use std::io;
 use std::io::Cursor;
 
@@ -8,7 +8,7 @@ use npyz::{DType, TypeChar};
 
 use crate::tensor::Tensor;
 
-pub fn write_tensor<W: io::Write>(writer: W, tensor: Tensor) -> anyhow::Result<()> {
+pub fn convert_to_numpy<W: io::Write>(writer: W, tensor: Tensor) -> anyhow::Result<()> {
     match tensor {
         Tensor::Int32(arr) => arr.write_npy(writer)?,
         Tensor::Int64(arr) => arr.write_npy(writer)?,

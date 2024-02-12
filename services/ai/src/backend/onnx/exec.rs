@@ -53,8 +53,8 @@ impl Executor {
 
 #[derive(Deserialize, Serialize)]
 pub struct Output {
-    format: String,
-    outputs: HashMap<String, String>,
+    pub format: String,
+    pub outputs: HashMap<String, String>,
 }
 
 fn serialize_session_outputs<T: ExtractTensorData>(
@@ -69,7 +69,7 @@ where
         match value.dtype()? {
             ValueType::Tensor { .. } => {
                 let tensor = value.extract_tensor::<T>()?;
-                numpy::write_tensor(
+                numpy::convert_to_numpy(
                     Cursor::new(&mut buffer),
                     tensor.view().deref().to_owned().into(),
                 )?;
