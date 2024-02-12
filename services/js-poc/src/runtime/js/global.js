@@ -1,4 +1,9 @@
-import { core } from "ext:core/mod.js";
+import { core, primordials } from "ext:core/mod.js";
+const {
+  ObjectDefineProperties,
+  ObjectPrototypeIsPrototypeOf,
+  SymbolFor
+} = primordials;
 
 import * as webidl from "ext:deno_webidl/00_webidl.js";
 
@@ -99,6 +104,85 @@ function loadImage() {
   }
 }
 
+class Navigator {
+  constructor() {
+    webidl.illegalConstructor();
+  }
+
+  [SymbolFor("Deno.privateCustomInspect")](inspect, inspectOptions) {
+    return inspect(
+      console.createFilteredInspectProxy({
+        object: this,
+        evaluate: ObjectPrototypeIsPrototypeOf(NavigatorPrototype, this),
+        keys: [
+          "hardwareConcurrency",
+          "userAgent",
+          "language",
+          "languages",
+        ],
+      }),
+      inspectOptions,
+    );
+  }
+}
+
+const navigator = webidl.createBranded(Navigator);
+
+function memoizeLazy(f) {
+  let v_ = null;
+  return () => {
+    if (v_ === null) {
+      v_ = f();
+    }
+    return v_;
+  };
+}
+
+ObjectDefineProperties(Navigator.prototype, {
+  gpu: {
+    configurable: true,
+    enumerable: true,
+    get() {
+      webidl.assertBranded(this, NavigatorPrototype);
+      const webgpu = loadWebGPU();
+      return webgpu.gpu;
+    },
+  },
+  hardwareConcurrency: {
+    configurable: true,
+    enumerable: true,
+    get() {
+      webidl.assertBranded(this, NavigatorPrototype);
+      return 1;
+    },
+  },
+  userAgent: {
+    configurable: true,
+    enumerable: true,
+    get() {
+      webidl.assertBranded(this, NavigatorPrototype);
+      return 'todo';
+    },
+  },
+  language: {
+    configurable: true,
+    enumerable: true,
+    get() {
+      webidl.assertBranded(this, NavigatorPrototype);
+      return 'todo';
+    },
+  },
+  languages: {
+    configurable: true,
+    enumerable: true,
+    get() {
+      webidl.assertBranded(this, NavigatorPrototype);
+      return ['todo'];
+    },
+  },
+});
+const NavigatorPrototype = Navigator.prototype;
+
 const globalContext = {
   // Fleek api
   Fleek: nonEnumerable(Fleek),
@@ -109,6 +193,8 @@ const globalContext = {
   ),
   Location: location.locationConstructorDescriptor,
   location: location.locationDescriptor,
+  Navigator: nonEnumerable(Navigator),
+  navigator: getterOnly(() => navigator),
   Window: globalInterfaces.windowConstructorDescriptor,
   window: getterOnly(() => globalThis),
   global: getterOnly(() => globalThis),
