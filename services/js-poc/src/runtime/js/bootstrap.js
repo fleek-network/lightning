@@ -16,6 +16,5 @@ globalThis.bootstrap = (time, url) => {
   loc.setLocationHref(url);
 
   // Block internal access to deno from the script scope
-  delete Deno.core;
-  delete Deno.internal;
+  delete globalThis.Deno;
 };
