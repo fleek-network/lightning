@@ -157,6 +157,20 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
             }))
     }
 
+    async fn get_node_info_epoch(&self, pk: NodePublicKey) -> RpcResult<(Option<NodeInfo>, Epoch)> {
+        Ok((
+            self.data
+                .query_runner
+                .pubkey_to_index(&pk)
+                .and_then(|node_idx| {
+                    self.data
+                        .query_runner
+                        .get_node_info::<NodeInfo>(&node_idx, |n| n)
+                }),
+            self.data.query_runner.get_epoch_info().epoch,
+        ))
+    }
+
     async fn get_public_keys(&self) -> RpcResult<PublicKeys> {
         Ok(PublicKeys {
             node_public_key: self.data.node_public_key,
@@ -281,6 +295,13 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
 
     async fn is_valid_node(&self, pk: NodePublicKey) -> RpcResult<bool> {
         Ok(self.data.query_runner.is_valid_node(&pk))
+    }
+
+    async fn is_valid_node_epoch(&self, pk: NodePublicKey) -> RpcResult<(bool, Epoch)> {
+        Ok((
+            self.data.query_runner.is_valid_node(&pk),
+            self.data.query_runner.get_epoch_info().epoch,
+        ))
     }
 
     async fn get_node_registry(&self, paging: Option<PagingParams>) -> RpcResult<Vec<NodeInfo>> {
