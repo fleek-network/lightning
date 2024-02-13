@@ -134,7 +134,7 @@ async fn handle_request(
             )
             .await
             {
-                Some(_) => todo!(),
+                Some(hash) => hash,
                 None => {
                     connection
                         .write_payload(b"Failed to fetch from origin")
