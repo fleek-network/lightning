@@ -6108,6 +6108,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "fleek-crypto",
+ "futures",
  "lightning-interfaces",
  "lightning-metrics",
  "lightning-utils",

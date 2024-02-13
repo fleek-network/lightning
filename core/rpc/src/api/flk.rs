@@ -130,7 +130,7 @@ pub trait FleekApi {
     async fn get_latencies(&self) -> RpcResult<Vec<((NodePublicKey, NodePublicKey), Duration)>>;
 
     #[method(name = "get_last_epoch_hash")]
-    async fn get_last_epoch_hash(&self) -> RpcResult<[u8; 32]>;
+    async fn get_last_epoch_hash(&self) -> RpcResult<([u8; 32], Epoch)>;
 
     #[method(name = "send_txn")]
     async fn send_txn(&self, tx: TransactionRequest) -> RpcResult<()>;

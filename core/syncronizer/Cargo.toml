@@ -9,6 +9,7 @@ edition.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 lightning-utils = { path = "../utils" }
 lightning-metrics = { path = "../metrics" }
+futures.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 reqwest.workspace = true

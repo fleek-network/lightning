@@ -4,6 +4,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::Result;
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::{logging, rpc};
+use lightning_interfaces::types::Epoch;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
 use serial_test::serial;
@@ -66,7 +67,7 @@ async fn e2e_checkpoint() -> Result<()> {
             .await
             .unwrap();
 
-        let epoch_hash = rpc::parse_response::<[u8; 32]>(response)
+        let (epoch_hash, _) = rpc::parse_response::<([u8; 32], Epoch)>(response)
             .await
             .expect("Failed to parse response.");
         if target_hash.is_none() {

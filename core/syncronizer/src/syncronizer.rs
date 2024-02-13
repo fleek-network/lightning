@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{
@@ -34,7 +34,7 @@ use tokio::task::JoinHandle;
 use tracing::info;
 
 use crate::config::Config;
-use crate::rpc::{self, rpc_epoch, rpc_last_epoch_hash};
+use crate::rpc::{self, rpc_epoch};
 use crate::utils;
 
 pub struct Syncronizer<C: Collection> {
@@ -166,13 +166,13 @@ impl<C: Collection> Syncronizer<C> {
         // passed into a thread, and thus need to satisfy the 'static lifetime.
 
         // Check if node is staked.
-        if !rpc::sync_call(rpc::check_is_valid_node(
+        let is_valid = rpc::sync_call(rpc::check_is_valid_node(
             our_public_key,
             genesis_committee.clone(),
             rpc_client.clone(),
         ))
-        .expect("Cannot reach bootstrap nodes")
-        {
+        .expect("Cannot reach bootstrap nodes");
+        if is_valid {
             // TODO(matthias): print this message in a loop?
             println!(
                 "The node is not staked. Only staked nodes can participate in the network. Submit a stake transaction and try again."
@@ -185,7 +185,7 @@ impl<C: Collection> Syncronizer<C> {
             rpc_client.clone(),
         ))
         .expect("Cannot reach bootstrap nodes")
-        .unwrap(); // safe unwrap because we check if the node is valid above
+        .unwrap(); // we unwrap here because we already checked if the node is valid above
 
         let epoch_info = rpc::sync_call(rpc::get_epoch_info(
             genesis_committee.clone(),
@@ -316,6 +316,7 @@ impl<C: Collection> SyncronizerInner<C> {
 
         // Get the epoch the bootstrap nodes are at
         let bootstrap_epoch = self.get_current_epoch().await?;
+
         //let bootstrap_epoch = self.ask_bootstrap_nodes(rpc_epoch().to_string()).await?;
 
         if bootstrap_epoch <= current_epoch {
@@ -339,7 +340,7 @@ impl<C: Collection> SyncronizerInner<C> {
     }
 
     /// This function will rpc request genesis nodes in sequence and stop when one of them responds
-    async fn ask_bootstrap_nodes<T: DeserializeOwned>(&self, req: String) -> Result<T> {
+    async fn ask_bootstrap_nodes<T: DeserializeOwned>(&self, req: String) -> Result<Vec<T>> {
         rpc::ask_nodes(req, &self.genesis_committee, &self.rpc_client).await
     }
 
@@ -366,13 +367,17 @@ impl<C: Collection> SyncronizerInner<C> {
     // This function will hit the bootstrap nodes(Genesis committee) to ask what epoch they are on
     // who the current committee is
     async fn get_latest_checkpoint_hash(&self) -> Result<[u8; 32]> {
-        self.ask_bootstrap_nodes(rpc_last_epoch_hash().to_string())
-            .await
+        rpc::last_epoch_hash(&self.genesis_committee, &self.rpc_client).await
     }
 
     /// Returns the epoch the bootstrap nodes are on
     async fn get_current_epoch(&self) -> Result<Epoch> {
-        self.ask_bootstrap_nodes(rpc_epoch().to_string()).await
+        let epochs = self.ask_bootstrap_nodes(rpc_epoch().to_string()).await?;
+        let epoch = epochs
+            .into_iter()
+            .max()
+            .context("Failed to get epoch from bootstrap nodes")?;
+        Ok(epoch)
     }
 }
 
