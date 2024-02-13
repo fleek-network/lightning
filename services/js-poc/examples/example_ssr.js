@@ -1,10 +1,8 @@
 // Example simple ssr script for testing ideas for a browser request
 // cargo run --example js-poc-client $(lgtn-old dev store services/js-poc/examples/example_ssr.js | awk '{print $1}') blake3 '{"path":"/index.html"}'
 
-const main = (params = {}) => {
-  console.log(params);
-
-  let path = params.path || '';
+const main = () => {
+  const path = window.location.pathname;
 
   switch (path) {
     case '/index.html':
