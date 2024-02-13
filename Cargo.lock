@@ -5516,7 +5516,7 @@ dependencies = [
  "resolved-pathbuf",
  "serde",
  "serde_json",
- "serial_test 3.0.0",
+ "serial_test",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -5625,7 +5625,7 @@ dependencies = [
  "resolved-pathbuf",
  "serde",
  "serde_json",
- "serial_test 2.0.0",
+ "serial_test",
  "simplelog",
  "tokio",
  "toml 0.7.8",
@@ -6158,7 +6158,7 @@ dependencies = [
  "panic-report",
  "resolved-pathbuf",
  "serde",
- "serial_test 3.0.0",
+ "serial_test",
  "tokio",
  "tracing",
  "triomphe",
@@ -9959,20 +9959,6 @@ dependencies = [
 
 [[package]]
 name = "serial_test"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e56dd856803e253c8f298af3f4d7eb0ae5e23a737252cd90bb4f3b435033b2d"
-dependencies = [
- "dashmap",
- "futures",
- "lazy_static",
- "log",
- "parking_lot",
- "serial_test_derive 2.0.0",
-]
-
-[[package]]
-name = "serial_test"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "953ad9342b3aaca7cb43c45c097dd008d4907070394bd0751a0aa8817e5a018d"
@@ -9982,18 +9968,7 @@ dependencies = [
  "lazy_static",
  "log",
  "parking_lot",
- "serial_test_derive 3.0.0",
-]
-
-[[package]]
-name = "serial_test_derive"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91d129178576168c589c9ec973feedf7d3126c01ac2bf08795109aa35b69fb8f"
-dependencies = [
- "proc-macro2 1.0.74",
- "quote 1.0.35",
- "syn 2.0.46",
+ "serial_test_derive",
 ]
 
 [[package]]

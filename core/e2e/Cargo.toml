@@ -37,7 +37,7 @@ reqwest = { workspace = true, features = ["json"] }
 serde.workspace = true
 rand.workspace = true
 hp-fixed.workspace = true
-serial_test = "2.0.0"
+serial_test = "3.0.0"
 simplelog = "0.12.1"
 tracing.workspace = true
 chrono = "0.4.26"
