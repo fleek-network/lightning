@@ -172,7 +172,7 @@ impl<C: Collection> Syncronizer<C> {
             rpc_client.clone(),
         ))
         .expect("Cannot reach bootstrap nodes");
-        if is_valid {
+        if !is_valid {
             // TODO(matthias): print this message in a loop?
             println!(
                 "The node is not staked. Only staked nodes can participate in the network. Submit a stake transaction and try again."
@@ -208,7 +208,6 @@ impl<C: Collection> Syncronizer<C> {
                     genesis_committee.clone(),
                     rpc_client.clone(),
                 ));
-                println!(" after...");
             },
             _ => (),
         }
