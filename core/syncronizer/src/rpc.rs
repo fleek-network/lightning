@@ -3,7 +3,7 @@ use std::net::IpAddr;
 
 use anyhow::{anyhow, Result};
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::types::{EpochInfo, NodeIndex, NodeInfo};
+use lightning_interfaces::types::{Epoch, EpochInfo, NodeIndex, NodeInfo};
 use serde::de::DeserializeOwned;
 use tokio::runtime::Handle;
 
@@ -34,17 +34,52 @@ pub async fn rpc_request<T: DeserializeOwned>(
 
 pub async fn ask_nodes<T: DeserializeOwned>(
     req: String,
+    nodes: &[(NodeIndex, NodeInfo)],
+    rpc_client: &reqwest::Client,
+) -> Result<Vec<T>> {
+    let mut futs = Vec::new();
+    for (_, node) in nodes {
+        let req_clone = req.clone();
+        let fut = async move {
+            rpc_request::<T>(rpc_client, node.domain, node.ports.rpc, req_clone)
+                .await
+                .ok()
+        };
+        futs.push(fut);
+    }
+
+    let results: Vec<T> = futures::future::join_all(futs)
+        .await
+        .into_iter()
+        .flatten()
+        .map(|x| x.result)
+        .collect();
+
+    if results.is_empty() {
+        Err(anyhow!("Unable to get a responce from nodes"))
+    } else {
+        Ok(results)
+    }
+}
+
+pub async fn ask_nodes_old<T: DeserializeOwned>(
+    req: String,
     nodes: &Vec<(NodeIndex, NodeInfo)>,
     rpc_client: &reqwest::Client,
-) -> Result<T> {
+) -> Result<Vec<T>> {
+    let mut results = Vec::with_capacity(nodes.len());
     for (_, node) in nodes {
         if let Ok(res) =
             rpc_request::<T>(rpc_client, node.domain, node.ports.rpc, req.clone()).await
         {
-            return Ok(res.result);
+            results.push(res.result);
         }
     }
-    Err(anyhow!("Unable to get a responce from nodes"))
+    if results.is_empty() {
+        Err(anyhow!("Unable to get a responce from nodes"))
+    } else {
+        Ok(results)
+    }
 }
 
 /// Runs the given future to completion on the current tokio runtime.
@@ -65,7 +100,13 @@ pub async fn get_epoch_info(
     nodes: Vec<(NodeIndex, NodeInfo)>,
     rpc_client: reqwest::Client,
 ) -> Result<EpochInfo> {
-    ask_nodes(rpc_epoch_info().to_string(), &nodes, &rpc_client).await
+    let mut epochs: Vec<EpochInfo> =
+        ask_nodes(rpc_epoch_info().to_string(), &nodes, &rpc_client).await?;
+    if epochs.is_empty() {
+        return Err(anyhow!("Failed to get epoch info from bootstrap nodes"));
+    }
+    epochs.sort_by(|a, b| a.epoch.partial_cmp(&b.epoch).unwrap());
+    Ok(epochs.pop().unwrap())
 }
 
 /// Returns the node info for our node, if it's already on the state.
@@ -74,12 +115,18 @@ pub async fn get_node_info(
     nodes: Vec<(NodeIndex, NodeInfo)>,
     rpc_client: reqwest::Client,
 ) -> Result<Option<NodeInfo>> {
-    ask_nodes(
+    let mut node_info: Vec<(Option<NodeInfo>, Epoch)> = ask_nodes(
         rpc_node_info(&node_public_key).to_string(),
         &nodes,
         &rpc_client,
     )
-    .await
+    .await?;
+
+    if node_info.is_empty() {
+        return Err(anyhow!("Failed to get node info from bootstrap nodes"));
+    }
+    node_info.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
+    Ok(node_info.pop().unwrap().0)
 }
 
 /// Returns the node info for our node, if it's already on the state.
@@ -88,12 +135,35 @@ pub async fn check_is_valid_node(
     nodes: Vec<(NodeIndex, NodeInfo)>,
     rpc_client: reqwest::Client,
 ) -> Result<bool> {
-    ask_nodes(
+    let mut is_valid: Vec<(bool, Epoch)> = ask_nodes(
         rpc_is_valid_node(&node_public_key).to_string(),
         &nodes,
         &rpc_client,
     )
-    .await
+    .await?;
+
+    if is_valid.is_empty() {
+        return Err(anyhow!("Failed to get node validity from bootstrap nodes"));
+    }
+    is_valid.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
+    Ok(is_valid.pop().unwrap().0)
+}
+
+/// Returns the hash of the last epoch ckpt, and the current epoch.
+pub async fn last_epoch_hash(
+    nodes: &[(NodeIndex, NodeInfo)],
+    rpc_client: &reqwest::Client,
+) -> Result<[u8; 32]> {
+    let mut hash: Vec<([u8; 32], Epoch)> =
+        ask_nodes(rpc_last_epoch_hash().to_string(), nodes, rpc_client).await?;
+
+    if hash.is_empty() {
+        return Err(anyhow!(
+            "Failed to get last epoch hash from bootstrap nodes"
+        ));
+    }
+    hash.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
+    Ok(hash.pop().unwrap().0)
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -134,7 +204,7 @@ pub fn rpc_epoch_info() -> serde_json::Value {
 pub fn rpc_node_info(public_key: &NodePublicKey) -> serde_json::Value {
     serde_json::json!({
         "jsonrpc": "2.0",
-        "method":"flk_get_node_info",
+        "method":"flk_get_node_info_epoch",
         "params":{"public_key": public_key},
         "id":1,
     })
@@ -143,7 +213,7 @@ pub fn rpc_node_info(public_key: &NodePublicKey) -> serde_json::Value {
 pub fn rpc_is_valid_node(public_key: &NodePublicKey) -> serde_json::Value {
     serde_json::json!({
         "jsonrpc": "2.0",
-        "method":"flk_is_valid_node",
+        "method":"flk_is_valid_node_epoch",
         "params":{"public_key": public_key},
         "id":1,
     })

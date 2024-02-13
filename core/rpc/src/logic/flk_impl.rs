@@ -362,7 +362,7 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
             .collect())
     }
 
-    async fn get_last_epoch_hash(&self) -> RpcResult<[u8; 32]> {
+    async fn get_last_epoch_hash(&self) -> RpcResult<([u8; 32], Epoch)> {
         let last_epoch_hash = match self
             .data
             .query_runner
@@ -371,7 +371,10 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
             Some(Value::Hash(hash)) => hash,
             _ => [0; 32],
         };
-        Ok(last_epoch_hash)
+        Ok((
+            last_epoch_hash,
+            self.data.query_runner.get_epoch_info().epoch,
+        ))
     }
 
     async fn send_txn(&self, tx: TransactionRequest) -> RpcResult<()> {
