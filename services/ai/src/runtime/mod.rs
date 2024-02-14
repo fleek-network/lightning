@@ -3,48 +3,53 @@ use std::io::Cursor;
 use std::ops::Deref;
 
 use anyhow::bail;
-use base64::prelude::BASE64_STANDARD;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
+use bytes::Bytes;
 use ndarray::ArrayD;
-use ort::{inputs, ExtractTensorData, Session, SessionOutputs, ValueType};
+use ort::{inputs, ExtractTensorData, SessionOutputs, ValueType};
 use serde::{Deserialize, Serialize};
 
 use crate::tensor::{numpy, Tensor};
 
-pub struct Executor {
-    session: Session,
+pub struct Session {
+    onnx: ort::Session,
 }
 
-impl Executor {
-    pub fn new(session: Session) -> Self {
-        Self { session }
+impl Session {
+    pub fn new(model: Bytes) -> anyhow::Result<Self> {
+        let session = ort::Session::builder()?.with_model_from_memory(model.as_ref())?;
+        Ok(Self { onnx: session })
     }
 
     /// Runs model on the input.
-    pub fn run(&self, input: Tensor) -> anyhow::Result<Output> {
+    pub fn run(&self, input: Bytes) -> anyhow::Result<Output> {
+        // Deserialize input.
+        let input = numpy::load_tensor_from_mem(input.as_ref())?;
+
         match input {
             Tensor::Int32(array) => {
-                let outputs = self.session.run(inputs![array.view()]?)?;
+                let outputs = self.onnx.run(inputs![array.view()]?)?;
                 serialize_session_outputs::<i32>(outputs)
             },
             Tensor::Int64(array) => {
-                let outputs = self.session.run(inputs![array.view()]?)?;
+                let outputs = self.onnx.run(inputs![array.view()]?)?;
                 serialize_session_outputs::<i64>(outputs)
             },
             Tensor::Uint32(array) => {
-                let outputs = self.session.run(inputs![array.view()]?)?;
+                let outputs = self.onnx.run(inputs![array.view()]?)?;
                 serialize_session_outputs::<u32>(outputs)
             },
             Tensor::Uint64(array) => {
-                let outputs = self.session.run(inputs![array.view()]?)?;
+                let outputs = self.onnx.run(inputs![array.view()]?)?;
                 serialize_session_outputs::<u64>(outputs)
             },
             Tensor::Float32(array) => {
-                let outputs = self.session.run(inputs![array.view()]?)?;
+                let outputs = self.onnx.run(inputs![array.view()]?)?;
                 serialize_session_outputs::<f32>(outputs)
             },
             Tensor::Float64(array) => {
-                let outputs = self.session.run(inputs![array.view()]?)?;
+                let outputs = self.onnx.run(inputs![array.view()]?)?;
                 serialize_session_outputs::<f64>(outputs)
             },
         }

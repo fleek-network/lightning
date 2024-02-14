@@ -3659,6 +3659,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64 0.21.5",
+ "bincode",
  "bytes",
  "derive_more",
  "fn-sdk",
@@ -3669,7 +3670,6 @@ dependencies = [
  "ort",
  "serde",
  "serde_json",
- "tch",
  "tokio",
  "tracing",
  "tracing-subscriber",

@@ -4,8 +4,8 @@ use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use url::Url;
 
-use crate::backend::{libtorch, onnx};
-use crate::{Backend, Device, Infer, Origin, Request, Train};
+use crate::runtime::Session;
+use crate::{Origin, StartSession};
 
 pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
     if connection.is_http_request() {
@@ -28,34 +28,36 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
             .await
             .context("Could not read body")?;
 
-        // Todo: close connection properly.
-        let output =
-            handle_inference_task(uri, origin, body.into(), Device::Cpu, Backend::Onnx).await?;
-        connection.write_payload(output.as_ref()).await?;
+        // Load model.
+        let model = load_model(uri, origin).await?;
+        let session = Session::new(model)?;
+
+        // Run inference.
+        let output = session.run(body.into())?;
+        let json_output = serde_json::to_string(&output)?;
+
+        connection.write_payload(json_output.as_bytes()).await?;
 
         return Ok(());
     }
 
+    // Read the header.
+    let Some(initial_message) = connection.read_payload().await else {
+        return Ok(());
+    };
+
+    let message: StartSession =
+        bincode::deserialize(&initial_message).context("Could not deserialize initial message")?;
+
+    // Load model.
+    let model = load_model(message.model, message.origin).await?;
+    let session = Session::new(model)?;
+
+    // Process incoming inference requests.
     while let Some(payload) = connection.read_payload().await {
-        let request: Request =
-            serde_json::from_slice(&payload).context("Could not deserialize payload")?;
-        match request {
-            Request::Infer(Infer {
-                model,
-                input,
-                device,
-                origin,
-                backend,
-                ..
-            }) => {
-                // Todo: Let's define a better API to communicate success vs failure.
-                let output = handle_inference_task(model, origin, input, device, backend).await?;
-                connection.write_payload(output.as_ref()).await?;
-            },
-            Request::Train(Train { .. }) => {
-                bail!("under construction");
-            },
-        }
+        let output = session.run(payload.freeze())?;
+        let json_output = serde_json::to_string(&output)?;
+        connection.write_payload(json_output.as_bytes()).await?;
     }
 
     Ok(())
@@ -68,14 +70,7 @@ fn parse_http_url(url: &Url) -> Option<(Origin, String)> {
     Some((seg1.into(), seg2.into()))
 }
 
-#[inline(always)]
-async fn handle_inference_task(
-    model: String,
-    origin: Origin,
-    input: Bytes,
-    device: Device,
-    backend: Backend,
-) -> anyhow::Result<Bytes> {
+async fn load_model(model: String, origin: Origin) -> anyhow::Result<Bytes> {
     let hash = match origin {
         Origin::Blake3 => {
             let hash = hex::decode(model).context("failed to decode blake3 hash")?;
@@ -108,8 +103,5 @@ async fn handle_inference_task(
         .read_to_end()
         .await?;
 
-    match backend {
-        Backend::LibTorch => libtorch::inference::load_and_run_model(model.into(), input, device),
-        Backend::Onnx => onnx::inference::load_and_run_model(model.into(), input, device),
-    }
+    Ok(model.into())
 }

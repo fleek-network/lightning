@@ -1,7 +1,8 @@
-use ndarray::ArrayD;
-
 pub mod numpy;
 
+use ndarray::ArrayD;
+
+// Todo: add support for remaining types.
 pub enum Tensor {
     Int32(ArrayD<i32>),
     Int64(ArrayD<i64>),
