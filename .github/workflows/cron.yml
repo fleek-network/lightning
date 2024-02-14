@@ -52,7 +52,9 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          cache-directories: ~/.cargo/registry/src/**/librocksdb-sys-*
+          cache-directories: |
+            ~/.cargo/registry/src/**/librocksdb-sys-* 
+            ~/.cache/ort.pyke.io
           cache-all-crates: "true"
       - name: Build Release
         run: cargo build --all --release

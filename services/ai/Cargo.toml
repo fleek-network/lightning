@@ -14,7 +14,7 @@ hex = "0.4"
 ndarray = "0.15"
 ndarray-npy = "0.8"
 npyz = "0.8"
-ort = { version = "2.0.0-alpha.4" }
+ort = { version = "2.0.0-rc.0" }
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
