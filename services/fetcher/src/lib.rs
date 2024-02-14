@@ -141,12 +141,14 @@ async fn handle_request(conn: &mut Connection, origin: Origin, uri: Bytes) -> an
 
     debug!("got content handle");
 
-    let bytes = (content_handle.len() as u32).to_be_bytes();
-    if let Err(e) = conn.write_payload(bytes.as_slice()).await {
-        bail!("failed to send number of blocks: {e}");
+    // Only write block count for non-HTTP transports.
+    if !conn.is_http_request() {
+        let bytes = (content_handle.len() as u32).to_be_bytes();
+        if let Err(e) = conn.write_payload(bytes.as_slice()).await {
+            bail!("failed to send number of blocks: {e}");
+        }
+        debug!("sent block count {}", content_handle.len());
     }
-
-    debug!("sent block count {}", content_handle.len());
 
     for block in 0..content_handle.len() {
         let Ok(bytes) = content_handle.read(block).await else {
