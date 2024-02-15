@@ -62,26 +62,6 @@ pub async fn ask_nodes<T: DeserializeOwned>(
     }
 }
 
-pub async fn ask_nodes_old<T: DeserializeOwned>(
-    req: String,
-    nodes: &Vec<(NodeIndex, NodeInfo)>,
-    rpc_client: &reqwest::Client,
-) -> Result<Vec<T>> {
-    let mut results = Vec::with_capacity(nodes.len());
-    for (_, node) in nodes {
-        if let Ok(res) =
-            rpc_request::<T>(rpc_client, node.domain, node.ports.rpc, req.clone()).await
-        {
-            results.push(res.result);
-        }
-    }
-    if results.is_empty() {
-        Err(anyhow!("Unable to get a responce from nodes"))
-    } else {
-        Ok(results)
-    }
-}
-
 /// Runs the given future to completion on the current tokio runtime.
 /// This call is intentionally blocking.
 pub fn sync_call<F>(fut: F) -> F::Output
