@@ -17,7 +17,7 @@ use quick_cache::unsync::Cache;
 use tokio::pin;
 use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinHandle;
-use tracing::info;
+use tracing::{error, info};
 
 use super::transaction_store::{NotExecuted, TransactionStore};
 use crate::consensus::PubSubMsg;
@@ -59,6 +59,7 @@ impl EdgeConsensus {
 
     /// Consume this executor and shutdown all of the workers and processes.
     pub async fn shutdown(self) {
+        error!("EDGE NODE shutdown() called #######################");
         // Send the shutdown signal.
         self.tx_shutdown.notify_waiters();
 
@@ -101,9 +102,11 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
         tokio::select! {
             biased;
             _ = &mut shutdown_future => {
+                error!("EDGE NODE SHUTDOWN #######################");
                 return;
             },
             Some((parcel, epoch_changed)) = rx_narwhal_batch.recv() => {
+                error!("enter - rx_narwhal_batch.recv()");
                 if !on_committee {
                     // This should never happen if it somehow does there is critical error somewhere
                     panic!("We somehow sent ourselves a parcel from narwhal while not on committee");
@@ -136,8 +139,10 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         .unwrap_or(u32::MAX);
                     on_committee = committee.contains(&our_index);
                 }
+                error!("exit - rx_narwhal_batch.recv()");
             },
             Some(mut msg) = pub_sub.recv_event() => {
+                error!("enter - pub_sub.recv_event()");
                 match msg.take().unwrap() {
                     PubSubMsg::Transactions(parcel) => {
                         let epoch = query_runner.get_current_epoch();
@@ -145,6 +150,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         let is_committee = committee.contains(&originator);
                         if !is_valid_message(is_committee, parcel.epoch, epoch) {
                             msg.mark_invalid_sender();
+                            error!("continue - pub_sub.recv_event()");
                             continue;
                         }
 
@@ -225,6 +231,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         if originator != att.node_index
                             || !is_valid_message(is_committee, att.epoch, epoch) {
                             msg.mark_invalid_sender();
+                            error!("continue - pub_sub.recv_event()");
                             continue;
                         }
 
@@ -292,9 +299,11 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         }
                     }
                 }
+                error!("exit - pub_sub.recv_event()");
 
             },
             digest = timeout_rx.recv() => {
+                error!("enter - timeout_rx.recv()");
                 // Timeout for a missing parcel. If we still haven't received the parcel, we send a
                 // request.
                 if let Some(digest) = digest {
@@ -311,6 +320,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         );
                     }
                 }
+                error!("exit - timeout_rx.recv()");
             }
         }
     }

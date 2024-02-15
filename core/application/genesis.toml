@@ -1,125 +1,178 @@
-
 chain_id = 1337
-epoch_start = 1684276288383
-epoch_time = 120000
-committee_size = 10
+epoch_start = 1708023220756
+epoch_time = 60000
+committee_size = 4
 min_stake = 1000
 eligibility_time = 1
 lock_time = 5
+max_inflation = 10
 protocol_share = 0
 node_share = 80
 service_builder_share = 20
-max_inflation = 10
 consumer_rebate = 0
 max_boost = 4
-max_lock_time = 1460                                                 # 1460 days(epoch) meaning 4 years
-supply_at_genesis = 1000000                                          # set to 1 million for testing, to be determined when initial allocations are set
+max_lock_time = 1460
+supply_at_genesis = 1000000
 protocol_fund_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 governance_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 
 [[node_info]]
-owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
-primary_public_key = "F5tV4PLSzx1Lt4mYBe13aYQ8hsLMTCfjgY2pLr82AumH"
-consensus_public_key = "u76G7q22Qc5nRC5Fi6dzbNE7FQxqRKEtTS9qjDftWFwhBKmoozGLv8wFiFmGnYDFMEKyYxozWRdM3wgjs1Na3fvxDARxi9CSNJUZJfPXC2WUu3uLnUw96jPBRp7rtHEzS5H"
-worker_public_key = "F5tV4PLSzx1Lt4mYBe13aYQ8hsLMTCfjgY2pLr82AumH"
+owner = "0xf92e239bc1ade3f5b98994fbdcaa99657ce356d2"
+primary_public_key = "8ZCBNU5PgsnLGAvevPPBGxABmm6B4tv1AeEnkw3X7UoA"
+consensus_public_key = "oEHAAnRvJELumsC24aZU2KyQDK4M1HbqgKpE7pwFuS8s1GztsMxZgu34NhX4T6GAKGYLBrSyxWUAnVQ35WxTJ6dAdMPrbP4xQ5H4DBaGvrN9H7aGs2Q2qwb99kWRFNz9aa9"
 primary_domain = "127.0.0.1"
 worker_domain = "127.0.0.1"
-ports.primary = 14310
-ports.worker = 14311
-ports.mempool = 14210
-ports.rpc = 14230
-ports.pool = 14300
-ports.pinger = 14350
-ports.handshake.http = 14220
-ports.handshake.webrtc = 14320
-ports.handshake.webtransport = 14321
-stake.staked = "1000"
-stake.stake_locked_until = 0
-stake.locked = "0"
-stake.locked_until = 0
-genesis_committee = true
+worker_public_key = "8ZCBNU5PgsnLGAvevPPBGxABmm6B4tv1AeEnkw3X7UoA"
+genesis_committee = false
+
+[node_info.ports]
+primary = 4310
+worker = 4311
+mempool = 4210
+rpc = 4230
+pool = 4300
+pinger = 4350
+
+[node_info.ports.handshake]
+http = 4220
+webrtc = 4320
+webtransport = 4321
+
+[node_info.stake]
+staked = "1000000000000000000000"
+stake_locked_until = 0
+locked = "0"
+locked_until = 0
 
 [[node_info]]
-owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
-primary_public_key = "Qt1DzUoTEn7n4itYpAPhaDsXhcriuXe1e7n7uZztGfg"
-consensus_public_key = "21cq5icj1pWKk9DBwdUFSW6nqBrwtzHtvKWcLNrqFRxZV8UbdKYzdoSs8C1u7s7M4FKADDqsHnxETh56hdSK2Z65nsbW3xME1fNcT1s8dfHwCFk567mV4fmSSgH73mTe1H3a"
-worker_public_key = "Qt1DzUoTEn7n4itYpAPhaDsXhcriuXe1e7n7uZztGfg"
+owner = "0x17d4b997a7c3307586a144904d47f6ca1ab60c09"
+primary_public_key = "2eH4Up8PjLDQzkdHjesvQdCJuWAxymRnHG2JJXbK3aBW"
+consensus_public_key = "mUdtQMadVD27zmdf6FmmLGcXMW4KZmJfNXZUXx4nH4V3bdNtbZg99RQg17NQ36cpWwLv1iHNocW1N8d2Hj3FEAtfewYpuL7xSBYjrVAZfCuwK4gsZrAjZfMtZJukJVCtnnP"
 primary_domain = "127.0.0.1"
 worker_domain = "127.0.0.1"
-ports.primary = 24310
-ports.worker = 24311
-ports.mempool = 24210
-ports.rpc = 24230
-ports.pool = 24300
-ports.pinger = 24350
-ports.handshake.http = 24220
-ports.handshake.webrtc = 24320
-ports.handshake.webtransport = 24321
-stake.staked = "1000"
-stake.stake_locked_until = 0
-stake.locked = "0"
-stake.locked_until = 0
+worker_public_key = "2eH4Up8PjLDQzkdHjesvQdCJuWAxymRnHG2JJXbK3aBW"
 genesis_committee = true
 
-[[node_info]]
-owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
-primary_public_key = "8XT8Kb1PCd2kzmwHLQ8Nw9aAuKJin6tihaPQBCyf6ymn"
-consensus_public_key = "uNHES9wjYK3HkbcPWrBiQQZ2NmcfBVKke8tbH9X7RFT9ZvjL5f55FfPvpjh2RWpxTRyMhKAxYG42TaRv2RGyEZkYcx2aJMfgPYqYaiT8KC1EPHzJYgVmYc7z2ER69LNWC7r"
-worker_public_key = "8XT8Kb1PCd2kzmwHLQ8Nw9aAuKJin6tihaPQBCyf6ymn"
-primary_domain = "127.0.0.1"
-worker_domain = "127.0.0.1"
-ports.primary = 34310
-ports.worker = 34311
-ports.mempool = 34210
-ports.rpc = 34230
-ports.pool = 34300
-ports.pinger = 34350
-ports.handshake.http = 34220
-ports.handshake.webrtc = 34320
-ports.handshake.webtransport = 34321
-stake.staked = "1000"
-stake.stake_locked_until = 0
-stake.locked = "0"
-stake.locked_until = 0
-genesis_committee = true
+[node_info.ports]
+primary = 12001
+worker = 12002
+mempool = 12001
+rpc = 12002
+pool = 12003
+pinger = 12004
+
+[node_info.ports.handshake]
+http = 12003
+webrtc = 12005
+webtransport = 12006
+
+[node_info.stake]
+staked = "1000000000000000000000"
+stake_locked_until = 0
+locked = "0"
+locked_until = 0
 
 [[node_info]]
-owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
-primary_public_key = "DA3mDUC5y7s5dNF4bL5MfTy7TtXjwt16rtspGuJcwZHS"
-consensus_public_key = "rnSokyL9vj1cnxsrHVmuMCP677Ns4Xh6N5FmfKvjinxVCA9W8w6DiqXSQTX92TtoapS5eqcHCuKnNKamqxh5MnLpHGZ9UkjKUPWsc7hnQXqQobHTXdw1GSh88wEir94mEba"
-worker_public_key = "DA3mDUC5y7s5dNF4bL5MfTy7TtXjwt16rtspGuJcwZHS"
+owner = "0x422434a0eeee9ab2b726284d4a89160a9111eabf"
+primary_public_key = "BqifnTUgQEWoMvrsGDAcPKUXQJ1kdkke1WjfewQ3KoR7"
+consensus_public_key = "23XQFTuR9irTsvgKgqGWB8sCDrUQKeLNw3AHEJnjqfYmmAk7ghzrA2cvvg5TBhWzXLwgSNMqQTjuzfFQcvALFTvRVRQVjf9azQ6v7t5PECHAtsyq9tnRuFC3d955u3BiPFyV"
 primary_domain = "127.0.0.1"
 worker_domain = "127.0.0.1"
-ports.primary = 44310
-ports.worker = 44311
-ports.mempool = 44210
-ports.rpc = 44230
-ports.pool = 44300
-ports.pinger = 44350
-ports.handshake.http = 44220
-ports.handshake.webrtc = 44320
-ports.handshake.webtransport = 44321
-stake.staked = "1000"
-stake.stake_locked_until = 0
-stake.locked = "0"
-stake.locked_until = 0
+worker_public_key = "BqifnTUgQEWoMvrsGDAcPKUXQJ1kdkke1WjfewQ3KoR7"
 genesis_committee = true
+
+[node_info.ports]
+primary = 12007
+worker = 12008
+mempool = 12004
+rpc = 12005
+pool = 12009
+pinger = 12010
+
+[node_info.ports.handshake]
+http = 12006
+webrtc = 12011
+webtransport = 12012
+
+[node_info.stake]
+staked = "1000000000000000000000"
+stake_locked_until = 0
+locked = "0"
+locked_until = 0
+
+[[node_info]]
+owner = "0x2a390fa93ff1c42d8be1870c71abb7e83fbcce87"
+primary_public_key = "BcxmPpH967oYWeW2g6a23oizz1Qo37iPkpPA92VjvvgW"
+consensus_public_key = "21H1629J3SJhaqchKv6TJz3ibmK35kmK2xhNH8SWYX4TZ1dRn6iRJr1duEu23ueN5mTVLKJ9gCPzzJgrmoS1fVqNCG5vrqA2MxPiJtNLvciuWRNCkn4EYdhdh15Gsv3LJNmL"
+primary_domain = "127.0.0.1"
+worker_domain = "127.0.0.1"
+worker_public_key = "BcxmPpH967oYWeW2g6a23oizz1Qo37iPkpPA92VjvvgW"
+genesis_committee = true
+
+[node_info.ports]
+primary = 12013
+worker = 12014
+mempool = 12007
+rpc = 12008
+pool = 12015
+pinger = 12016
+
+[node_info.ports.handshake]
+http = 12009
+webrtc = 12017
+webtransport = 12018
+
+[node_info.stake]
+staked = "1000000000000000000000"
+stake_locked_until = 0
+locked = "0"
+locked_until = 0
+
+[[node_info]]
+owner = "0x8bc92829c521dbc579cec7e7287ae5c925a4ea1e"
+primary_public_key = "CdfWybZ4vmwYZf2dyqrcCA6DhoRyhNgoL4gWaNnZ6v42"
+consensus_public_key = "26iyPu1Mjm6ErXcQhjxKuzcSVzZMXoLZdcqsWHQNxYyKM8oeAmFS7ngXiKx1M2ghPVFm9ymZ4hjx51LEkYRVZKFfx3UK5xnydpWMUzfS15ts3bu8YApwGpUrKSbFG2zAwWjL"
+primary_domain = "127.0.0.1"
+worker_domain = "127.0.0.1"
+worker_public_key = "CdfWybZ4vmwYZf2dyqrcCA6DhoRyhNgoL4gWaNnZ6v42"
+genesis_committee = true
+
+[node_info.ports]
+primary = 12019
+worker = 12020
+mempool = 12010
+rpc = 12011
+pool = 12021
+pinger = 12022
+
+[node_info.ports.handshake]
+http = 12012
+webrtc = 12023
+webtransport = 12024
+
+[node_info.stake]
+staked = "1000000000000000000000"
+stake_locked_until = 0
+locked = "0"
+locked_until = 0
 
 [[service]]
 id = 0
-owner = "0xDC0A31F9eeb151f82BF1eE6831095284fC215Ee7"
+owner = "0xdc0a31f9eeb151f82bf1ee6831095284fc215ee7"
 commodity_type = "Bandwidth"
 
 [[service]]
 id = 1
-owner = "0x684166BDbf530a256d7c92Fa0a4128669aFd9B9F"
+owner = "0x684166bdbf530a256d7c92fa0a4128669afd9b9f"
 commodity_type = "Compute"
 
 [[account]]
-public_key = "0x959807B8D94B324A74117956731F09E2893aCd72"
+public_key = "0x959807b8d94b324a74117956731f09e2893acd72"
 flk_balance = "100690000000000000000"
 stables_balance = 100
 bandwidth_balance = 100
+
+[client]
 
 [[commodity_prices]]
 commodity = "Bandwidth"
@@ -129,10 +182,4 @@ price = 0.1
 commodity = "Compute"
 price = 0.2
 
-[rep_scores]
-
 [total_served]
-
-[current_epoch_served]
-
-[client]
