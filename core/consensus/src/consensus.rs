@@ -170,10 +170,14 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 
     async fn move_to_next_epoch(&mut self) {
         if let Some(state) = self.consensus.take() {
-            state.shutdown().await
+            error!("before - state.shutdown() #######################");
+            state.shutdown().await;
+            error!("after - state.shutdown() #######################");
         }
 
-        self.start_current_epoch().await
+        error!("before - start_current_epoch() #######################");
+        self.start_current_epoch().await;
+        error!("after - start_current_epoch() #######################");
     }
 
     fn get_epoch_info(&self) -> (Committee, WorkerCache, u64, u64) {
@@ -346,15 +350,19 @@ impl<C: Collection> WithStartAndShutdown for Consensus<C> {
                 select! {
                     biased;
                     _ = &mut shutdown_future => {
+                        error!("enter - shutdown_future (l. 349) #######################");
                         if let Some(consensus) = epoch_state.consensus.take() {
                             consensus.shutdown().await;
                         }
                         edge_node.shutdown().await;
                         epoch_state.shutdown();
+                        error!("exit - shutdown_future (l. 349) #######################");
                         break
                     }
                     _ = reconfigure_future => {
+                        error!("enter - reconfigure_future #######################");
                         epoch_state.move_to_next_epoch().await;
+                        error!("exit - reconfigure_future #######################");
                         continue
                     }
                 }
