@@ -5542,6 +5542,7 @@ dependencies = [
  "console-subscriber",
  "fleek-blake3",
  "fleek-crypto",
+ "futures",
  "infusion",
  "lightning-application",
  "lightning-archive",

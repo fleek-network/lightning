@@ -21,6 +21,7 @@ fleek-crypto.workspace = true
 resolved-pathbuf.workspace = true
 infusion.workspace = true
 tokio.workspace = true
+futures.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 clap = { version = "4.4.2", features = ["derive"] }
