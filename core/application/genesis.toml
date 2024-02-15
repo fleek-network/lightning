@@ -1,3 +1,4 @@
+
 chain_id = 1337
 epoch_start = 1684276288383
 epoch_time = 120000
@@ -103,7 +104,6 @@ stake.stake_locked_until = 0
 stake.locked = "0"
 stake.locked_until = 0
 genesis_committee = true
-
 
 [[service]]
 id = 0

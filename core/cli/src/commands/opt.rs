@@ -79,7 +79,7 @@ async fn opt_in<C: Collection<SignerInterface = Signer<C>>>(
     let epoch_end_delta = get_epoch_end_delta(&genesis_committee, &rpc_client)
         .await
         .context("Failed to get epoch info from genesis committee")?;
-    if epoch_end_delta < Duration::from_secs(300) {
+    if epoch_end_delta < Duration::from_secs(10) {
         println!(
             "The current epoch will end in less than 5 minutes. Please wait until the epoch change
      to send the OptIn transaction."

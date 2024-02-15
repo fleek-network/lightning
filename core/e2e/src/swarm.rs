@@ -1,6 +1,7 @@
 use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use fleek_crypto::{
@@ -10,6 +11,7 @@ use fleek_crypto::{
     EthAddress,
     NodePublicKey,
     NodeSecretKey,
+    PublicKey,
     SecretKey,
 };
 use futures::future::try_join_all;
@@ -28,7 +30,7 @@ use lightning_consensus::consensus::Consensus;
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::webrtc::WebRtcConfig;
-use lightning_interfaces::types::{Blake3Hash, NodePorts, Staking};
+use lightning_interfaces::types::{Blake3Hash, HandshakePorts, NodePorts, Staking};
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
@@ -244,6 +246,42 @@ impl SwarmBuilder {
         // we can pass to the containerized nodes.
         let mut tmp_nodes = Vec::with_capacity(num_nodes);
 
+        let owner_eth: EthAddress = AccountOwnerSecretKey::generate().to_pk().into();
+        let node_pk =
+            NodePublicKey::from_base58("8ZCBNU5PgsnLGAvevPPBGxABmm6B4tv1AeEnkw3X7UoA").unwrap();
+        let consensus_pk = ConsensusPublicKey::from_base58("oEHAAnRvJELumsC24aZU2KyQDK4M1HbqgKpE7pwFuS8s1GztsMxZgu34NhX4T6GAKGYLBrSyxWUAnVQ35WxTJ6dAdMPrbP4xQ5H4DBaGvrN9H7aGs2Q2qwb99kWRFNz9aa9").unwrap();
+        let handshake = HandshakePorts {
+            http: 4220,
+            webrtc: 4320,
+            webtransport: 4321,
+        };
+        let ports = NodePorts {
+            primary: 4310,
+            worker: 4311,
+            mempool: 4210,
+            rpc: 4230,
+            pool: 4300,
+            pinger: 4350,
+            handshake,
+        };
+        let node_info = GenesisNode::new(
+            owner_eth,
+            node_pk,
+            "127.0.0.1".parse().unwrap(),
+            consensus_pk,
+            "127.0.0.1".parse().unwrap(),
+            node_pk,
+            ports,
+            Some(Staking {
+                staked: HpUfixed::<18>::from(genesis.min_stake),
+                ..Default::default()
+            }),
+            false,
+        );
+        genesis.node_info.push(node_info);
+
+        //tmp_nodes.push((owner_sk, node_pk, config));
+
         for index in 0..num_nodes {
             let root = directory.join(format!("node-{index}"));
             fs::create_dir_all(&root).expect("Failed to create node directory");
@@ -315,6 +353,16 @@ impl SwarmBuilder {
 
         // Now that we have built the configuration of all nodes and also have compiled the
         // proper genesis config. We can inject the genesis config.
+
+        let toml = toml::to_string(&genesis).unwrap();
+        let path = PathBuf::from(
+            "/home/matthias/Documents/workspace/fleek-network/lightning/core/application/genesis.toml",
+        );
+        if path.exists() {
+            std::fs::remove_file(&path).unwrap();
+        }
+        let mut file = File::create(&path).unwrap();
+        file.write_all(toml.as_bytes()).unwrap();
 
         let mut nodes = HashMap::new();
         for (index, (owner_sk, node_pk, config)) in tmp_nodes.into_iter().enumerate() {

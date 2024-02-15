@@ -118,10 +118,10 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
             .connect_timeout(Duration::from_secs(5))
             .build()?;
 
-        if !cfg!(debug_assertions) {
-            // We only run the prelude in prod mode to avoid interfering with tests.
-            Syncronizer::<C>::prelude(our_public_key, &genesis_committee, &rpc_client);
-        }
+        //if !cfg!(debug_assertions) {
+        // We only run the prelude in prod mode to avoid interfering with tests.
+        Syncronizer::<C>::prelude(our_public_key, &genesis_committee, &rpc_client);
+        //}
 
         let inner = SyncronizerInner::new(
             our_public_key,
