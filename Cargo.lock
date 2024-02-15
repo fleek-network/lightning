@@ -5552,6 +5552,7 @@ dependencies = [
  "lightning-consensus",
  "lightning-handshake",
  "lightning-interfaces",
+ "lightning-metrics",
  "lightning-node",
  "lightning-pinger",
  "lightning-pool",

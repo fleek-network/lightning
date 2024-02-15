@@ -16,6 +16,7 @@ mock = { path = "../mock" }
 # TODO: cli ideally shouldn't depend on these directly
 lightning-application = { path = "../application" }
 lightning-signer = { path = "../signer" }
+lightning-metrics = { path = "../metrics" }
 
 fleek-crypto.workspace = true
 resolved-pathbuf.workspace = true

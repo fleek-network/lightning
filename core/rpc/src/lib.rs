@@ -18,6 +18,7 @@ use lightning_interfaces::{
     MempoolSocket,
     RpcInterface,
     SignerInterface,
+    SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use reqwest::StatusCode;
@@ -67,7 +68,7 @@ impl<C: Collection> Data<C> {
                         .map_err(RPCError::from)?;
 
                     if let ArchiveResponse::HistoricalEpochState(query_runner) = res {
-                        Ok(query_runner.clone())
+                        Ok(query_runner.my_clone(file!(), line!()))
                     } else {
                         Err(RPCError::BadEpoch)
                     }
@@ -75,7 +76,7 @@ impl<C: Collection> Data<C> {
                     Err(RPCError::BadEpoch)
                 }
             },
-            None => Ok(self.query_runner.clone()),
+            None => Ok(self.query_runner.my_clone(file!(), line!())),
         }
     }
 }
