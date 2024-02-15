@@ -3419,7 +3419,6 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "tch",
  "tokio",
 ]
 
@@ -9688,16 +9687,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f98d2aa92eebf49b69786be48e4477826b256916e84a57ff2a4f21923b48eb4c"
 
 [[package]]
-name = "safetensors"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d93279b86b3de76f820a8854dd06cbc33cfa57a417b19c47f6a25280112fb1df"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "salsa20"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10931,23 +10920,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tch"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c7cb00bc2770454b515388d45be7097a3ded2eca172f3dcdb7ca4cc06c40bf1"
-dependencies = [
- "half 2.3.1",
- "lazy_static",
- "libc",
- "ndarray",
- "rand 0.8.5",
- "safetensors",
- "thiserror",
- "torch-sys",
- "zip 0.6.6",
-]
-
-[[package]]
 name = "telemetry-subscribers"
 version = "0.2.0"
 source = "git+https://github.com/MystenLabs/sui.git?rev=b06ada015694890d7c46347b13fbc3e9a763513c#b06ada015694890d7c46347b13fbc3e9a763513c"
@@ -11466,21 +11438,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "torch-sys"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29e0244e5b148a31dd7fe961165037d1927754d024095c1013937532d7e73a22"
-dependencies = [
- "anyhow",
- "cc",
- "libc",
- "serde",
- "serde_json",
- "ureq",
- "zip 0.6.6",
-]
-
-[[package]]
 name = "tower"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11941,13 +11898,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8cdd25c339e200129fe4de81451814e5228c9b771d57378817d6117cc2b3f97"
 dependencies = [
  "base64 0.21.5",
- "flate2",
  "log",
  "once_cell",
  "rustls 0.21.10",
  "rustls-webpki 0.101.7",
- "serde",
- "serde_json",
  "url",
  "webpki-roots 0.25.3",
 ]

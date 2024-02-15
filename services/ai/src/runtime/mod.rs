@@ -28,6 +28,14 @@ impl Session {
         let input = numpy::load_tensor_from_mem(input.as_ref())?;
 
         match input {
+            Tensor::Int8(array) => {
+                let outputs = self.onnx.run(inputs![array.view()]?)?;
+                serialize_session_outputs::<i8>(outputs)
+            },
+            Tensor::Int16(array) => {
+                let outputs = self.onnx.run(inputs![array.view()]?)?;
+                serialize_session_outputs::<i16>(outputs)
+            },
             Tensor::Int32(array) => {
                 let outputs = self.onnx.run(inputs![array.view()]?)?;
                 serialize_session_outputs::<i32>(outputs)
@@ -35,6 +43,14 @@ impl Session {
             Tensor::Int64(array) => {
                 let outputs = self.onnx.run(inputs![array.view()]?)?;
                 serialize_session_outputs::<i64>(outputs)
+            },
+            Tensor::Uint8(array) => {
+                let outputs = self.onnx.run(inputs![array.view()]?)?;
+                serialize_session_outputs::<u8>(outputs)
+            },
+            Tensor::Uint16(array) => {
+                let outputs = self.onnx.run(inputs![array.view()]?)?;
+                serialize_session_outputs::<u16>(outputs)
             },
             Tensor::Uint32(array) => {
                 let outputs = self.onnx.run(inputs![array.view()]?)?;

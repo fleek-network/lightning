@@ -10,8 +10,12 @@ use crate::tensor::Tensor;
 
 pub fn convert_to_numpy<W: io::Write>(writer: W, tensor: Tensor) -> anyhow::Result<()> {
     match tensor {
+        Tensor::Int8(arr) => arr.write_npy(writer)?,
+        Tensor::Int16(arr) => arr.write_npy(writer)?,
         Tensor::Int32(arr) => arr.write_npy(writer)?,
         Tensor::Int64(arr) => arr.write_npy(writer)?,
+        Tensor::Uint8(arr) => arr.write_npy(writer)?,
+        Tensor::Uint16(arr) => arr.write_npy(writer)?,
         Tensor::Uint32(arr) => arr.write_npy(writer)?,
         Tensor::Uint64(arr) => arr.write_npy(writer)?,
         Tensor::Float32(arr) => arr.write_npy(writer)?,
