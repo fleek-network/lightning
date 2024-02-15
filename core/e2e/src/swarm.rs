@@ -25,6 +25,7 @@ use lightning_blockstore_server::{BlockStoreServer, Config as BlockStoreServerCo
 use lightning_broadcast::{Broadcast, Config as BroadcastConfig};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
+use lightning_dack_aggregator::{Config as DackAggConfig, DeliveryAcknowledgmentAggregator};
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::webrtc::WebRtcConfig;
@@ -425,6 +426,14 @@ fn build_config(
     config.inject::<Pinger<FinalTypes>>(PingerConfig {
         address: format!("127.0.0.1:{}", ports.pinger).parse().unwrap(),
         ping_interval: Duration::from_millis(1000),
+    });
+
+    config.inject::<DeliveryAcknowledgmentAggregator<FinalTypes>>(DackAggConfig {
+        db_path: root
+            .join("data/dack_aggregator")
+            .try_into()
+            .expect("failed to resolve path"),
+        submit_interval: Duration::from_secs(10),
     });
     config
 }
