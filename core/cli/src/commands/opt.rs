@@ -29,7 +29,6 @@ use lightning_types::{
     UpdateRequest,
 };
 use lightning_utils::rpc::rpc_request;
-use reqwest::Client;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::de::DeserializeOwned;
 use serde_json::json;
@@ -97,7 +96,7 @@ async fn opt_in<C: Collection<SignerInterface = Signer<C>>>(
         chain_id,
     );
 
-    genesis_committee_rpc::<()>(&genesis_committee, send_transaction(tx))
+    send_txn(tx, &genesis_committee, &rpc_client)
         .await
         .context("Failed to send transaction to genesis committee")?;
 
@@ -157,7 +156,7 @@ async fn opt_out<C: Collection<SignerInterface = Signer<C>>>(
         chain_id,
     );
 
-    genesis_committee_rpc::<()>(&genesis_committee, send_transaction(tx))
+    send_txn(tx, &genesis_committee, &rpc_client)
         .await
         .context("Failed to send transaction to genesis committee")?;
 
@@ -303,54 +302,72 @@ pub async fn query_node_info(
     nodes: &[NodeInfo],
     rpc_client: &reqwest::Client,
 ) -> Result<Option<NodeInfo>> {
-    let mut node_info: Vec<(Option<NodeInfo>, Epoch)> =
+    let mut node_info: Vec<((Option<NodeInfo>, Epoch), String)> =
         query_genesis_committee(get_node_info(public_key), nodes, rpc_client).await?;
 
     if node_info.is_empty() {
         return Err(anyhow!("Failed to get node info from bootstrap nodes"));
     }
     node_info.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
-    Ok(node_info.pop().unwrap().0)
+    Ok(node_info.pop().unwrap().0.0)
 }
 
 pub async fn query_epoch_info(
     nodes: &[NodeInfo],
     rpc_client: &reqwest::Client,
 ) -> Result<EpochInfo> {
-    let mut epochs: Vec<EpochInfo> =
+    let mut epochs: Vec<(EpochInfo, String)> =
         query_genesis_committee(get_epoch_info(), nodes, rpc_client).await?;
     if epochs.is_empty() {
         return Err(anyhow!("Failed to get epoch info from bootstrap nodes"));
     }
-    epochs.sort_by(|a, b| a.epoch.partial_cmp(&b.epoch).unwrap());
-    Ok(epochs.pop().unwrap())
+    epochs.sort_by(|(a, _), (b, _)| a.epoch.partial_cmp(&b.epoch).unwrap());
+    Ok(epochs.pop().unwrap().0)
+}
+
+pub async fn send_txn(
+    update_request: UpdateRequest,
+    nodes: &[NodeInfo],
+    rpc_client: &reqwest::Client,
+) -> Result<()> {
+    let mut epochs: Vec<(EpochInfo, String)> =
+        query_genesis_committee(get_epoch_info(), nodes, rpc_client).await?;
+    if epochs.is_empty() {
+        return Err(anyhow!("Failed to get epoch info from bootstrap nodes"));
+    }
+
+    // Pick a bootstrap node that is on the highest epoch
+    epochs.sort_by(|(a, _), (b, _)| a.epoch.partial_cmp(&b.epoch).unwrap());
+    let rpc_address = epochs.pop().unwrap().1;
+
+    rpc_request::<()>(rpc_client, rpc_address, send_transaction(update_request))
+        .await
+        .map(|_| ())
 }
 
 pub async fn query_genesis_committee<T: DeserializeOwned>(
     req: String,
     nodes: &[NodeInfo],
     rpc_client: &reqwest::Client,
-) -> Result<Vec<T>> {
+) -> Result<Vec<(T, String)>> {
     let mut futs = Vec::new();
     for node in nodes {
         let req_clone = req.clone();
         let fut = async move {
-            rpc_request::<T>(
-                rpc_client,
-                format!("http://{}:{}/rpc/v0", node.domain, node.ports.rpc),
-                req_clone,
-            )
-            .await
-            .ok()
+            let address = format!("http://{}:{}/rpc/v0", node.domain, node.ports.rpc);
+            match rpc_request::<T>(rpc_client, address.clone(), req_clone).await {
+                Ok(res) => Some((res, address)),
+                Err(_) => None,
+            }
         };
         futs.push(fut);
     }
 
-    let results: Vec<T> = futures::future::join_all(futs)
+    let results: Vec<(T, String)> = futures::future::join_all(futs)
         .await
         .into_iter()
         .flatten()
-        .map(|x| x.result)
+        .map(|(x, address)| (x.result, address))
         .collect();
 
     if results.is_empty() {
@@ -358,27 +375,6 @@ pub async fn query_genesis_committee<T: DeserializeOwned>(
     } else {
         Ok(results)
     }
-}
-
-async fn genesis_committee_rpc<T: DeserializeOwned>(
-    genesis_committee: &Vec<NodeInfo>,
-    request: String,
-) -> Result<T> {
-    let client = Client::new();
-    for node in genesis_committee {
-        if let Ok(res) = rpc_request::<T>(
-            &client,
-            format!("http://{}:{}/rpc/v0", node.domain, node.ports.rpc),
-            request.clone(),
-        )
-        .await
-        {
-            return Ok(res.result);
-        }
-    }
-    Err(anyhow::anyhow!(
-        "Unable to get a response from genesis committee"
-    ))
 }
 
 async fn wait_for_participation_status(
