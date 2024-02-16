@@ -60,7 +60,7 @@ impl EdgeConsensus {
     /// Consume this executor and shutdown all of the workers and processes.
     pub async fn shutdown(self) {
         // Send the shutdown signal.
-        self.tx_shutdown.notify_waiters();
+        self.tx_shutdown.notify_one();
 
         // Gracefully wait for all the subtasks to finish and return.
         self.handle.await.unwrap();
