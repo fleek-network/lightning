@@ -67,6 +67,8 @@ pub struct Consensus<C: Collection> {
     /// Called from the shutdown function to notify the start event loop to
     /// exit.
     shutdown_notify: Arc<Notify>,
+    /// To notify the epoch state when consensus is shutting down
+    shutdown_notify_epoch_state: Arc<Notify>,
     /// bool indicating if narwhal is running
     is_running: AtomicBool,
 }
@@ -96,7 +98,7 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, N
     pub_sub: P,
     /// Narhwal sends payloads ready for broadcast to this receiver
     rx_narwhal_batches: Option<mpsc::Receiver<(AuthenticStampedParcel, bool)>>,
-    /// To notify when consensus is shutting down
+    /// To notify when consensus is shutting down.
     shutdown_notify: Arc<Notify>,
 }
 
@@ -365,7 +367,8 @@ impl<C: Collection> WithStartAndShutdown for Consensus<C> {
 
     /// Send the shutdown signal to the system.
     async fn shutdown(&self) {
-        self.shutdown_notify.notify_waiters();
+        self.shutdown_notify.notify_one();
+        self.shutdown_notify_epoch_state.notify_one();
         self.is_running.store(false, Ordering::Relaxed);
     }
 }
@@ -419,6 +422,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         ));
 
         let shutdown_notify = Arc::new(Notify::new());
+        let shutdown_notify_epoch_state = Arc::new(Notify::new());
 
         let epoch_state = EpochState::new(
             signer.get_ed25519_pk(),
@@ -430,7 +434,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             signer.get_socket(),
             pubsub,
             rx_narwhal_batches,
-            shutdown_notify.clone(),
+            shutdown_notify_epoch_state.clone(),
         );
 
         Ok(Self {
@@ -438,6 +442,7 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
             mempool_socket: TokioSpawn::spawn_async(forwarder),
             reconfigure_notify,
             shutdown_notify,
+            shutdown_notify_epoch_state,
             is_running: AtomicBool::new(false),
         })
     }
