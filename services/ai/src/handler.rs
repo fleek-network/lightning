@@ -36,6 +36,7 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
         let output = session.run(body.into())?;
         let json_output = serde_json::to_string(&output)?;
 
+        // println!("json_output len: {}", json_output.as_bytes().len());
         connection.write_payload(json_output.as_bytes()).await?;
 
         return Ok(());

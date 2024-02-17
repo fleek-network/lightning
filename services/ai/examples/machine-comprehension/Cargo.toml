@@ -1,0 +1,21 @@
+[package]
+name = "example-machine-comprehension"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+anyhow = "1.0"
+base64 = "0.21"
+bytes.workspace = true
+ndarray = "0.15"
+ndarray-npy = "0.8"
+npyz = "0.8"
+rand = "0.8"
+reqwest = "0.11"
+serde_json.workspace = true
+tokenizers = { version = "0.15", default-features = false, features = [ "onig", "http" ] }
+tokio.workspace = true
+common = { path = "../common" }
+serde = { version = "1.0.194", features = ["derive"] }
+
