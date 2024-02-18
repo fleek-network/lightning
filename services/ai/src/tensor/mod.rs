@@ -1,6 +1,7 @@
 pub mod numpy;
 
 use ndarray::ArrayD;
+use ort::Value;
 
 // Todo: add support for remaining types.
 pub enum Tensor {
@@ -73,5 +74,44 @@ impl From<ArrayD<u32>> for Tensor {
 impl From<ArrayD<u64>> for Tensor {
     fn from(value: ArrayD<u64>) -> Self {
         Self::Uint64(value)
+    }
+}
+
+impl TryFrom<Tensor> for Value {
+    type Error = std::io::Error;
+
+    fn try_from(value: Tensor) -> Result<Self, Self::Error> {
+        match value {
+            Tensor::Int8(array) => array
+                .try_into()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
+            Tensor::Int16(array) => array
+                .try_into()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
+            Tensor::Int32(array) => array
+                .try_into()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
+            Tensor::Int64(array) => array
+                .try_into()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
+            Tensor::Uint8(array) => array
+                .try_into()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
+            Tensor::Uint16(array) => array
+                .try_into()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
+            Tensor::Uint32(array) => array
+                .try_into()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
+            Tensor::Uint64(array) => array
+                .try_into()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
+            Tensor::Float32(array) => array
+                .try_into()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
+            Tensor::Float64(array) => array
+                .try_into()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
+        }
     }
 }

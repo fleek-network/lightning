@@ -6,11 +6,10 @@ use anyhow::bail;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use bytes::Bytes;
-use ndarray::ArrayD;
-use ort::{inputs, ExtractTensorData, SessionOutputs, ValueType};
+use ort::{SessionInputs, SessionOutputs, TensorElementType, Value, ValueType};
 use serde::{Deserialize, Serialize};
 
-use crate::tensor::{numpy, Tensor};
+use crate::tensor::numpy;
 
 pub struct Session {
     onnx: ort::Session,
@@ -19,56 +18,31 @@ pub struct Session {
 impl Session {
     pub fn new(model: Bytes) -> anyhow::Result<Self> {
         let session = ort::Session::builder()?.with_model_from_memory(model.as_ref())?;
+        for (i, input) in session.inputs.iter().enumerate() {
+            println!(
+                "    {i} {}: {}",
+                input.name,
+                display_value_type(&input.input_type)
+            );
+        }
         Ok(Self { onnx: session })
     }
 
     /// Runs model on the input.
     pub fn run(&self, input: Bytes) -> anyhow::Result<Output> {
-        // Deserialize input.
-        let input = numpy::load_tensor_from_mem(input.as_ref())?;
-
-        match input {
-            Tensor::Int8(array) => {
-                let outputs = self.onnx.run(inputs![array.view()]?)?;
-                serialize_session_outputs::<i8>(outputs)
+        let input = serde_json::from_slice::<Input>(input.as_ref())?;
+        let outputs = match input {
+            Input::Raw(input) => {
+                let tensor = numpy::load_tensor_from_mem(&input)?;
+                let value: Value = tensor.try_into()?;
+                self.onnx.run(SessionInputs::from([value]))?
             },
-            Tensor::Int16(array) => {
-                let outputs = self.onnx.run(inputs![array.view()]?)?;
-                serialize_session_outputs::<i16>(outputs)
+            Input::Map(input) => {
+                let session_input = process_map_input(input)?;
+                self.onnx.run(session_input)?
             },
-            Tensor::Int32(array) => {
-                let outputs = self.onnx.run(inputs![array.view()]?)?;
-                serialize_session_outputs::<i32>(outputs)
-            },
-            Tensor::Int64(array) => {
-                let outputs = self.onnx.run(inputs![array.view()]?)?;
-                serialize_session_outputs::<i64>(outputs)
-            },
-            Tensor::Uint8(array) => {
-                let outputs = self.onnx.run(inputs![array.view()]?)?;
-                serialize_session_outputs::<u8>(outputs)
-            },
-            Tensor::Uint16(array) => {
-                let outputs = self.onnx.run(inputs![array.view()]?)?;
-                serialize_session_outputs::<u16>(outputs)
-            },
-            Tensor::Uint32(array) => {
-                let outputs = self.onnx.run(inputs![array.view()]?)?;
-                serialize_session_outputs::<u32>(outputs)
-            },
-            Tensor::Uint64(array) => {
-                let outputs = self.onnx.run(inputs![array.view()]?)?;
-                serialize_session_outputs::<u64>(outputs)
-            },
-            Tensor::Float32(array) => {
-                let outputs = self.onnx.run(inputs![array.view()]?)?;
-                serialize_session_outputs::<f32>(outputs)
-            },
-            Tensor::Float64(array) => {
-                let outputs = self.onnx.run(inputs![array.view()]?)?;
-                serialize_session_outputs::<f64>(outputs)
-            },
-        }
+        };
+        serialize_session_outputs(outputs)
     }
 }
 
@@ -78,22 +52,76 @@ pub struct Output {
     pub outputs: HashMap<String, String>,
 }
 
-fn serialize_session_outputs<T: ExtractTensorData>(
-    outputs: SessionOutputs,
-) -> anyhow::Result<Output>
-where
-    Tensor: From<ArrayD<T>>,
-{
+fn serialize_session_outputs(outputs: SessionOutputs) -> anyhow::Result<Output> {
     let mut result = HashMap::new();
     for (name, value) in outputs.deref().iter() {
         let mut buffer = Vec::new();
         match value.dtype()? {
-            ValueType::Tensor { .. } => {
-                let tensor = value.extract_tensor::<T>()?;
-                numpy::convert_to_numpy(
-                    Cursor::new(&mut buffer),
-                    tensor.view().deref().to_owned().into(),
-                )?;
+            ValueType::Tensor { ty, .. } => {
+                let tensor = match ty {
+                    TensorElementType::Int8 => value
+                        .extract_tensor::<i8>()?
+                        .view()
+                        .deref()
+                        .to_owned()
+                        .into(),
+                    TensorElementType::Int16 => value
+                        .extract_tensor::<i16>()?
+                        .view()
+                        .deref()
+                        .to_owned()
+                        .into(),
+                    TensorElementType::Int32 => value
+                        .extract_tensor::<i32>()?
+                        .view()
+                        .deref()
+                        .to_owned()
+                        .into(),
+                    TensorElementType::Int64 => value
+                        .extract_tensor::<i64>()?
+                        .view()
+                        .deref()
+                        .to_owned()
+                        .into(),
+                    TensorElementType::Uint8 => value
+                        .extract_tensor::<u8>()?
+                        .view()
+                        .deref()
+                        .to_owned()
+                        .into(),
+                    TensorElementType::Uint16 => value
+                        .extract_tensor::<u16>()?
+                        .view()
+                        .deref()
+                        .to_owned()
+                        .into(),
+                    TensorElementType::Uint32 => value
+                        .extract_tensor::<u32>()?
+                        .view()
+                        .deref()
+                        .to_owned()
+                        .into(),
+                    TensorElementType::Uint64 => value
+                        .extract_tensor::<u64>()?
+                        .view()
+                        .deref()
+                        .to_owned()
+                        .into(),
+                    TensorElementType::Float32 => value
+                        .extract_tensor::<f32>()?
+                        .view()
+                        .deref()
+                        .to_owned()
+                        .into(),
+                    TensorElementType::Float64 => value
+                        .extract_tensor::<f64>()?
+                        .view()
+                        .deref()
+                        .to_owned()
+                        .into(),
+                    _ => bail!("unsupported value type"),
+                };
+                numpy::convert_to_numpy(Cursor::new(&mut buffer), tensor)?;
             },
             _ => bail!("unsupported type for output"),
         }
@@ -104,4 +132,64 @@ where
         format: "npy".to_string(),
         outputs: result,
     })
+}
+
+fn display_value_type(value: &ValueType) -> String {
+    match value {
+        ValueType::Tensor { ty, dimensions } => {
+            format!(
+                "Tensor<{}>({})",
+                display_element_type(*ty),
+                dimensions
+                    .iter()
+                    .map(|c| if *c == -1 {
+                        "dyn".to_string()
+                    } else {
+                        c.to_string()
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        },
+        ValueType::Map { key, value } => format!(
+            "Map<{}, {}>",
+            display_element_type(*key),
+            display_element_type(*value)
+        ),
+        ValueType::Sequence(inner) => format!("Sequence<{}>", display_value_type(inner)),
+    }
+}
+
+fn display_element_type(t: TensorElementType) -> &'static str {
+    match t {
+        TensorElementType::Bfloat16 => "bf16",
+        TensorElementType::Bool => "bool",
+        TensorElementType::Float16 => "f16",
+        TensorElementType::Float32 => "f32",
+        TensorElementType::Float64 => "f64",
+        TensorElementType::Int16 => "i16",
+        TensorElementType::Int32 => "i32",
+        TensorElementType::Int64 => "i64",
+        TensorElementType::Int8 => "i8",
+        TensorElementType::String => "str",
+        TensorElementType::Uint16 => "u16",
+        TensorElementType::Uint32 => "u32",
+        TensorElementType::Uint64 => "u64",
+        TensorElementType::Uint8 => "u8",
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+pub enum Input {
+    Raw(Bytes),
+    Map(HashMap<String, Bytes>),
+}
+
+fn process_map_input(input: HashMap<String, Bytes>) -> anyhow::Result<SessionInputs<'static>> {
+    let mut mapped_values: HashMap<String, Value> = HashMap::new();
+    for (input_name, bytes) in input.into_iter() {
+        let tensor = numpy::load_tensor_from_mem(&bytes)?;
+        mapped_values.insert(input_name, tensor.try_into()?);
+    }
+    mapped_values.try_into().map_err(Into::into)
 }
