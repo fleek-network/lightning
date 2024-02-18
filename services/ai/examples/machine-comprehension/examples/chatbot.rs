@@ -18,10 +18,10 @@ const EOS: usize = 50256;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let mut stdout = io::stdout();
-
     let tokenizer =
         Tokenizer::from_file("/Users/acadia/models/dialogpt-medium/tokenizer.json").unwrap();
+
+    let mut stdout = io::stdout();
 
     loop {
         print!("User > ");
@@ -37,16 +37,17 @@ async fn main() -> anyhow::Result<()> {
             break;
         }
 
-        let mut history = String::new();
-        history.push_str(&input);
-        history.push_str(" ");
+        let mut conversation = String::new();
+        conversation.push_str("<|endoftext|>");
+        conversation.push_str(&input);
+        conversation.push_str("<|endoftext|>");
 
         print!("Bot > ");
         stdout.flush().unwrap();
 
         'inner: loop {
             // Create encoding from current history.
-            let encoding = tokenizer.encode(history.as_str(), true).unwrap();
+            let encoding = tokenizer.encode(conversation.as_str(), true).unwrap();
 
             // Build inputs.
 
@@ -140,9 +141,8 @@ async fn main() -> anyhow::Result<()> {
             // Add new token to history.
             tokens = concatenate![Axis(0), tokens, array![token.try_into().unwrap()]];
 
-            // Check model token.
+            // The bot is done talking.
             if token == EOS {
-                // Todo: What do we do here?
                 break 'inner;
             }
 
@@ -150,7 +150,7 @@ async fn main() -> anyhow::Result<()> {
             let token_str = tokenizer.decode(&[token as _], true).unwrap();
 
             // Add to history.
-            history.push_str(&format!(" {token_str}"));
+            conversation.push_str(&token_str);
 
             // Display to user.
             print!("{}", token_str);
