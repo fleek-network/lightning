@@ -149,6 +149,7 @@ async fn test_query() {
         transactions_to_lose: HashSet::new(),
         new_block_interval: Duration::from_secs(5),
     };
+
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer,
@@ -515,6 +516,7 @@ async fn test_reputation_calculation_and_query() {
         &notifier1,
     )
     .unwrap();
+
     let consensus2 = MockConsensus::<TestBinding>::init(
         consensus_config,
         &signer2,

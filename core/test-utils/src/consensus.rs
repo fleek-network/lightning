@@ -8,7 +8,7 @@ use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::SignerInterface;
-use lightning_interfaces::types::{Block, TransactionRequest};
+use lightning_interfaces::types::{Block, Event, TransactionRequest};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
@@ -80,6 +80,8 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
     fn mempool(&self) -> MempoolSocket {
         self.socket.clone()
     }
+
+    fn set_event_tx(&mut self, _tx: mpsc::Sender<Vec<Event>>) {}
 }
 
 impl<C: Collection> WithStartAndShutdown for MockConsensus<C> {

@@ -182,6 +182,7 @@ mod tests {
             transactions_to_lose: HashSet::new(),
             new_block_interval: Duration::from_secs(5),
         };
+
         let consensus = MockConsensus::<TestBinding>::init(
             consensus_config,
             &signer,

@@ -3,7 +3,8 @@ use std::time::Duration;
 
 use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use jsonrpsee::core::RpcResult;
+use jsonrpsee::core::{RpcResult, SubscriptionResult};
+use jsonrpsee::{PendingSubscriptionSink, SubscriptionMessage};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     AccountInfo,
@@ -27,6 +28,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::{PagingParams, SyncQueryRunnerInterface};
+use lightning_types::EventType;
 use lightning_utils::application::QueryRunnerExt;
 
 use crate::api::FleekApiServer;
@@ -421,5 +423,36 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
             Ok(metrics) => Ok(metrics),
             Err(err) => Err(RPCError::custom(err.to_string()).into()),
         }
+    }
+
+    async fn handle_subscription(
+        &self,
+        pending: PendingSubscriptionSink,
+        event_type: Option<EventType>,
+    ) -> SubscriptionResult {
+        let sink = pending.accept().await?;
+
+        let mut rx = self.data.event_handler.register_listener();
+
+        while let Ok(event) = rx.recv().await {
+            if let Some(ref typee) = event_type {
+                if &event.event_type() != typee {
+                    continue;
+                }
+            }
+
+            tracing::trace!(?event, "sending event to subscriber");
+
+            if sink
+                .send(SubscriptionMessage::from_json(&event)?)
+                .await
+                .is_err()
+            {
+                tracing::trace!("flk subscription closed");
+                break;
+            }
+        }
+
+        Ok(())
     }
 }

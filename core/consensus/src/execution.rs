@@ -1,9 +1,9 @@
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
 use fastcrypto::hash::HashFunction;
 use fleek_blake3 as blake3;
-use lightning_interfaces::types::{Block, Epoch, Metadata, NodeIndex, TransactionRequest};
+use lightning_interfaces::types::{Block, Epoch, Event, Metadata, NodeIndex, TransactionRequest};
 use lightning_interfaces::{
     Emitter,
     ExecutionEngineSocket,
@@ -75,6 +75,8 @@ pub struct Execution<Q: SyncQueryRunnerInterface, NE: Emitter> {
     index_socket: Option<IndexSocket>,
     /// Notifications emitter
     notifier: NE,
+    /// Send the event to the RPC
+    event_tx: OnceLock<mpsc::Sender<Vec<Event>>>,
 }
 
 impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
@@ -93,6 +95,7 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
             query_runner,
             index_socket,
             notifier,
+            event_tx: OnceLock::new(),
         }
     }
 
@@ -123,6 +126,26 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
         // Unfailable
         let results = self.executor.run(block).await.unwrap();
         info!("Consensus submitted new block to application");
+
+        match self.event_tx.get() {
+            Some(tx) => {
+                if let Err(e) = tx
+                    .send(
+                        results
+                            .txn_receipts
+                            .iter()
+                            .filter_map(|r| r.event.clone())
+                            .collect(),
+                    )
+                    .await
+                {
+                    error!("We could not send a message to the RPC: {e}");
+                }
+            },
+            None => {
+                error!("Once Cell not initialized, this is a bug");
+            },
+        }
 
         if results.change_epoch {
             change_epoch = true;
@@ -161,6 +184,10 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
     pub fn shutdown(&self) {
         self.notifier.shutdown();
         self.executor.downgrade();
+    }
+
+    pub fn set_event_tx(&self, tx: mpsc::Sender<Vec<Event>>) {
+        self.event_tx.set(tx).unwrap();
     }
 }
 

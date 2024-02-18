@@ -1,7 +1,7 @@
 //! The types used by the Application interface.
 
 use ethers::types::{Block as EthersBlock, H256, U64};
-use fleek_crypto::NodePublicKey;
+use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +12,83 @@ pub const MAX_UPDATES_CONTENT_REGISTRY: usize = 100;
 
 /// Max number of delivery acknowledgements allowed per transaction.
 pub const MAX_DELIVERY_ACKNOWLEDGMENTS: usize = 1000;
+
+macro_rules! create_events {
+    (
+        pub enum Event {
+            $(
+                $variant:ident {
+                    $(
+                        $field:ident: $type:ty
+                    ),* $(,)?
+                }
+            ),* $(,)?
+        }
+    ) => {
+        #[derive(Eq, Hash, Debug, PartialEq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
+        pub enum Event {
+            $(
+                $variant {
+                    $(
+                        $field: $type
+                    ),*
+                }
+            ),*
+        }
+
+        #[derive(Eq, Hash, Debug, PartialEq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
+        pub enum EventType {
+            $(
+                $variant,
+            )*
+        }
+
+        impl Event {
+            pub fn event_type(&self) -> EventType {
+                match self {
+                    $(
+                        Self::$variant { .. } => EventType::$variant,
+                    )*
+                }
+            }
+        }
+    }
+}
+
+create_events! {
+    pub enum Event {
+        Transfer {
+            token: EthAddress,
+            from: EthAddress,
+            to: EthAddress,
+            amount: HpUfixed<18>,
+        },
+        ServiceEvent {
+            service_id: u32,
+            event: Vec<u8>,
+        },
+    }
+}
+
+impl Event {
+    pub fn transfer(
+        token: EthAddress,
+        from: EthAddress,
+        to: EthAddress,
+        amount: HpUfixed<18>,
+    ) -> Self {
+        Self::Transfer {
+            token,
+            from,
+            to,
+            amount,
+        }
+    }
+
+    pub fn service_event(service_id: u32, event: Vec<u8>) -> Self {
+        Self::ServiceEvent { service_id, event }
+    }
+}
 
 /// The response generated from executing an entire batch of transactions (aka a block).
 #[derive(Debug, Hash, Clone)]

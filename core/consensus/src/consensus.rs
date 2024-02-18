@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use affair::{Executor, TokioSpawn};
@@ -12,7 +12,7 @@ use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
-use lightning_interfaces::types::{Epoch, EpochInfo, UpdateMethod};
+use lightning_interfaces::types::{Epoch, EpochInfo, Event, UpdateMethod};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
@@ -33,7 +33,7 @@ use narwhal_node::NodeStorage;
 use prometheus::Registry;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, Mutex, Notify};
+use tokio::sync::{mpsc, Notify};
 use tokio::{pin, select, task, time};
 use tracing::{error, info};
 use typed_store::DBMetrics;
@@ -316,6 +316,10 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
     pub fn shutdown(&self) {
         self.execution_state.shutdown();
     }
+
+    fn set_event_tx(&mut self, tx: tokio::sync::mpsc::Sender<Vec<Event>>) {
+        self.execution_state.set_event_tx(tx);
+    }
 }
 
 impl<C: Collection> WithStartAndShutdown for Consensus<C> {
@@ -333,9 +337,10 @@ impl<C: Collection> WithStartAndShutdown for Consensus<C> {
         let mut epoch_state = self
             .epoch_state
             .lock()
-            .await
+            .expect("Mutex poisened")
             .take()
             .expect("Consensus was tried to start before initialization");
+
         self.is_running.store(true, Ordering::Relaxed);
 
         task::spawn(async move {
@@ -452,6 +457,15 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
     /// transaction to the consensus.
     fn mempool(&self) -> MempoolSocket {
         self.mempool_socket.clone()
+    }
+
+    fn set_event_tx(&mut self, tx: tokio::sync::mpsc::Sender<Vec<Event>>) {
+        self.epoch_state
+            .lock()
+            .expect("Mutex poisened")
+            .as_mut()
+            .expect("Consensus was tried to start before initialization")
+            .set_event_tx(tx);
     }
 }
 

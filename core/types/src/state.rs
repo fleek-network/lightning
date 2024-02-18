@@ -26,6 +26,16 @@ pub enum Tokens {
     FLK,
 }
 
+impl Tokens {
+    pub fn address(&self) -> EthAddress {
+        // todo!(n)
+        match self {
+            Tokens::USDC => EthAddress([0; 20]),
+            Tokens::FLK => EthAddress([1; 20]),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, schemars::JsonSchema)]
 pub struct NodeServed {
     pub served: CommodityServed,

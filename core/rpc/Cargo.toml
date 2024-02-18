@@ -36,8 +36,8 @@ lightning-openrpc = { path = "../rpc-openrpc" }
 lightning-openrpc-macros = { path = "../rpc-openrpc-macros" }
 lightning-utils = { path = "../utils" }
 alloy-primitives = "0.5.2"
-axum.workspace = true
-hyper = "0.14.27"
+hyper = { version = "0.14.27", features = ["server", "full"] }
+futures.workspace = true
 
 
 [dev-dependencies]

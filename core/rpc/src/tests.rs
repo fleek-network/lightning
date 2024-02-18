@@ -60,12 +60,14 @@ use lightning_origin_demuxer::OriginDemuxer;
 use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::{Config as SignerConfig, Signer};
+use lightning_types::Event;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::rpc as utils;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use crate::api::FleekApiClient;
 use crate::config::Config as RpcConfig;
 use crate::Rpc;
 
@@ -1355,6 +1357,55 @@ async fn test_admin_rpc_store() -> Result<()> {
         .await
         .unwrap();
     assert_eq!(expected_content, stored_content);
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+// #[traced_test]
+async fn test_rpc_events() -> Result<()> {
+    // Create keys
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner_public_key = owner_secret_key.to_pk();
+
+    // Init application service
+    let mut genesis = Genesis::load().unwrap();
+    genesis.account.push(GenesisAccount {
+        public_key: owner_public_key.into(),
+        flk_balance: 1000u64.into(),
+        stables_balance: 0,
+        bandwidth_balance: 0,
+    });
+
+    let port = 30023;
+    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
+        .await
+        .unwrap();
+
+    rpc.start().await;
+    wait_for_server_start(port).await?;
+
+    let sender = rpc.event_tx();
+
+    let client = jsonrpsee::ws_client::WsClientBuilder::default()
+        .build(&format!("ws://127.0.0.1:{port}/rpc/v0"))
+        .await?;
+
+    let mut sub = FleekApiClient::handle_subscription(&client, None).await?;
+
+    let event = Event::transfer(
+        EthAddress::from([0; 20]),
+        EthAddress::from([1; 20]),
+        EthAddress::from([2; 20]),
+        HpUfixed::<18>::from(10_u16),
+    );
+
+    sender
+        .send(vec![event.clone()])
+        .await
+        .expect("can send event");
+
+    assert_eq!(sub.next().await.expect("An event from the sub")?, event);
 
     Ok(())
 }

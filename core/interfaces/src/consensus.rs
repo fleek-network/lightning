@@ -7,7 +7,7 @@ use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
 use crate::signer::SignerInterface;
-use crate::types::TransactionRequest;
+use crate::types::{Event, TransactionRequest};
 use crate::{
     ApplicationInterface,
     ArchiveInterface,
@@ -15,6 +15,7 @@ use crate::{
     ConfigProviderInterface,
     IndexSocket,
     NotifierInterface,
+    RpcInterface,
 };
 
 /// A socket that gives services and other sub-systems the required functionality to
@@ -54,9 +55,14 @@ pub trait ConsensusInterface<C: Collection>:
         )
     }
 
+    fn _post(&mut self, rpc: ::RpcInterface) {
+        self.set_event_tx(rpc.event_tx());
+    }
+
     type Certificate: LightningMessage + Clone;
 
     /// Create a new consensus service with the provided config and executor.
+    #[allow(clippy::too_many_arguments)]
     fn init<S: SignerInterface<C>>(
         config: Self::Config,
         signer: &S,
@@ -72,4 +78,6 @@ pub trait ConsensusInterface<C: Collection>:
     /// transaction to the consensus.
     #[blank = Socket::raw_bounded(64).0]
     fn mempool(&self) -> MempoolSocket;
+
+    fn set_event_tx(&mut self, tx: tokio::sync::mpsc::Sender<Vec<Event>>);
 }

@@ -7,6 +7,7 @@ use hyper::service::{make_service_fn, service_fn};
 use jsonrpsee::server::{stop_channel, Server as JSONRPCServer, ServerHandle};
 use jsonrpsee::{Methods, RpcModule};
 use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::types::Event;
 use lightning_interfaces::{
     ApplicationInterface,
     ArchiveRequest,
@@ -28,13 +29,15 @@ use crate::api::AdminApiServer;
 pub use crate::api::{EthApiServer, FleekApiServer, NetApiServer};
 pub use crate::config::Config;
 use crate::error::RPCError;
+use crate::event::EventDistributor;
 use crate::logic::AdminApi;
 pub use crate::logic::{EthApi, FleekApi, NetApi};
 
 pub mod api;
-mod api_types;
+pub mod api_types;
 pub mod config;
-mod error;
+pub mod error;
+pub mod event;
 mod logic;
 
 #[cfg(test)]
@@ -49,10 +52,10 @@ pub(crate) struct Data<C: Collection> {
     pub consensus_public_key: ConsensusPublicKey,
     /// If this is some it means the node is in archive mode
     pub archive_socket: Option<ArchiveSocket<C>>,
+    pub event_handler: EventDistributor,
 }
 
 impl<C: Collection> Data<C> {
-    #[allow(dead_code)]
     pub(crate) async fn query_runner(
         &self,
         epoch: Option<u64>,
@@ -92,7 +95,7 @@ pub struct Rpc<C: Collection> {
     // need interior mutability to support restarts
     handle: Mutex<Option<ServerHandle>>,
 
-    _data: Arc<Data<C>>,
+    data: Arc<Data<C>>,
 }
 
 async fn health() -> &'static str {
@@ -208,19 +211,11 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
                                         .body(hyper::Body::empty())
                                 }
                             },
-                            _ => {
-                                if method == hyper::Method::POST {
-                                    match json_rpc_service.call(req).await {
-                                        Ok(res) => Ok(res),
-                                        Err(err) => hyper::Response::builder()
-                                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                            .body(hyper::Body::from(err.to_string())),
-                                    }
-                                } else {
-                                    hyper::Response::builder()
-                                        .status(StatusCode::NOT_FOUND)
-                                        .body(hyper::Body::empty())
-                                }
+                            _ => match json_rpc_service.call(req).await {
+                                Ok(res) => Ok(res),
+                                Err(err) => hyper::Response::builder()
+                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                    .body(hyper::Body::from(err.to_string())),
                             },
                         }
                     }
@@ -229,15 +224,11 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
         });
 
         let addr = self.config.addr();
+        let server = hyper::Server::bind(&addr).serve(make_service);
+
         tokio::spawn(async move {
-            match axum::Server::bind(&addr)
-                .serve(make_service)
-                .with_graceful_shutdown(async move { stop.shutdown().await })
-                .await
-            {
-                Ok(_) => (),
-                Err(err) => tracing::error!("RPC server error: {}", err),
-            }
+            let graceful = server.with_graceful_shutdown(async move { stop.shutdown().await });
+            graceful.await.expect("Rpc Server to start");
         });
 
         *self.handle.lock().await = Some(server_handle);
@@ -278,6 +269,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
             node_public_key: signer.get_ed25519_pk(),
             consensus_public_key: signer.get_bls_pk(),
             archive_socket,
+            event_handler: EventDistributor::spawn(),
         });
 
         let module = Self::create_modules_from_config(&config, data.clone())?;
@@ -289,8 +281,12 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
             module,
             admin_module,
             handle: Mutex::new(None),
-            _data: data,
+            data,
         })
+    }
+
+    fn event_tx(&self) -> tokio::sync::mpsc::Sender<Vec<Event>> {
+        self.data.event_handler.sender()
     }
 }
 

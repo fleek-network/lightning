@@ -1,9 +1,11 @@
 use infusion::c;
+use tokio::sync::mpsc;
 
 use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
 use crate::consensus::MempoolSocket;
 use crate::infu_collection::Collection;
+use crate::types::Event;
 use crate::{
     ApplicationInterface,
     ArchiveInterface,
@@ -51,4 +53,6 @@ pub trait RpcInterface<C: Collection>:
         signer: &C::SignerInterface,
         archive_socket: Option<ArchiveSocket<C>>,
     ) -> anyhow::Result<Self>;
+
+    fn event_tx(&self) -> mpsc::Sender<Vec<Event>>;
 }

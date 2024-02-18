@@ -2,13 +2,15 @@ use std::time::Duration;
 
 use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use jsonrpsee::core::RpcResult;
+use jsonrpsee::core::{RpcResult, SubscriptionResult};
 use jsonrpsee::proc_macros::rpc;
 use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,
     Epoch,
     EpochInfo,
+    Event,
+    EventType,
     NodeIndex,
     NodeInfo,
     NodeInfoWithIndex,
@@ -191,4 +193,7 @@ pub trait FleekApi {
 
     #[method(name = "metrics")]
     async fn metrics(&self) -> RpcResult<String>;
+
+    #[subscription(name = "subscribe", item = Event)]
+    async fn handle_subscription(&self, event_type: Option<EventType>) -> SubscriptionResult;
 }

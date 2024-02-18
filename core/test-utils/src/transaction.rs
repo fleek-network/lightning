@@ -66,6 +66,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
             from: tx.payload.sender,
             to: to.clone(),
             response: TransactionResponse::Success(ExecutionData::None),
+            event: None,
         });
     }
 
@@ -78,6 +79,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
             from: TransactionSender::AccountOwner(EthAddress(tx.from.0)),
             to: to.clone(),
             response: TransactionResponse::Success(ExecutionData::None),
+            event: None,
         });
     }
 
@@ -93,6 +95,7 @@ pub fn get_index_request(block_index: u8, parent_hash: [u8; 32]) -> IndexRequest
                 from: tx.payload.sender,
                 to: to.clone(),
                 response: TransactionResponse::Success(ExecutionData::None),
+                event: None,
             }
         })
         .collect();

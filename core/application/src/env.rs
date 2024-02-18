@@ -175,6 +175,13 @@ impl Env<UpdatePerm> {
                     response.change_epoch = true;
                 }
 
+                let mut event = None;
+                if let TransactionResponse::Success(_) = results {
+                    if let Some(e) = txn.event() {
+                        event = Some(e);
+                    }
+                }
+
                 let receipt = TransactionReceipt {
                     block_hash: block.digest,
                     block_number,
@@ -183,6 +190,7 @@ impl Env<UpdatePerm> {
                     from: txn.sender(),
                     to: txn.to(),
                     response: results,
+                    event,
                 };
                 /* Todo(dalton): Check if the transaction resulted in the committee change(Like a current validator getting slashed)
                     if so acknowledge that in the block response

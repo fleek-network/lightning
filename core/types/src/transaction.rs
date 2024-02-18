@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     Epoch,
+    Event,
     ProofOfConsensus,
     ProofOfMisbehavior,
     ProtocolParams,
@@ -160,6 +161,32 @@ impl TransactionRequest {
                 .chain_id
                 .expect("Chain ID should be included in Ethereum Transaction")
                 .as_u32(),
+        }
+    }
+
+    pub fn event(&self) -> Option<Event> {
+        if let TransactionSender::AccountOwner(sender) = self.sender() {
+            match self {
+                Self::UpdateRequest(payload) => match &payload.payload.method {
+                    UpdateMethod::Transfer { amount, token, to } => Some(Event::transfer(
+                        token.address(),
+                        sender,
+                        *to,
+                        amount.clone(),
+                    )),
+                    UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+                        service_id,
+                        metadata: event,
+                        ..
+                    } => event
+                        .to_owned()
+                        .map(|e| Event::service_event(*service_id, e)),
+                    _ => None,
+                },
+                _ => None,
+            }
+        } else {
+            None
         }
     }
 }

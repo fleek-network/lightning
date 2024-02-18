@@ -3,7 +3,7 @@ use fleek_crypto::{EthAddress, TransactionSender};
 use serde::{Deserialize, Serialize};
 
 use super::{Epoch, NodeInfo};
-use crate::UpdateMethod;
+use crate::{Event, UpdateMethod};
 
 /// Info on a Narwhal epoch
 #[derive(
@@ -50,6 +50,8 @@ pub struct TransactionReceipt {
     pub to: TransactionDestination,
     /// The results of the transaction
     pub response: TransactionResponse,
+    /// The event that was emitted by the transaction
+    pub event: Option<Event>,
 }
 
 /// What state function a transaction was calling. If an ethereum transaction it will either be
