@@ -1,25 +1,46 @@
-#![allow(unused)]
-
+// You need to store the model on the node.
+// Export the model along with config files using the optimum cli.
+// See https://huggingface.co/docs/transformers/en/serialization#exporting-a--transformers-model-to-onnx-with-cli.
+// You can find more info about the model here https://huggingface.co/microsoft/DialoGPT-medium.
+// `tokenizer.json` should be included when you export the model.
 use std::collections::HashMap;
 use std::io;
 use std::io::{Cursor, Write};
+use std::net::SocketAddr;
 
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use base64::Engine;
-use bytes::Bytes;
-use common::{to_array_d, Output};
-use ndarray::{array, concatenate, s, Array1, Axis};
+use cdk_rust::schema::ResponseFrame;
+use cdk_rust::transport::tcp::TcpTransport;
+use cdk_rust::Builder;
+use common::service_api::{Device, Origin, StartSession};
+use common::{to_array_d, Input, Output};
+use ndarray::{s, Array1, Axis};
 use ndarray_npy::WriteNpyExt;
-use reqwest::Body;
-use serde::{Deserialize, Serialize};
 use tokenizers::Tokenizer;
 
 const EOS: usize = 50256;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let tokenizer =
-        Tokenizer::from_file("/Users/acadia/models/dialogpt-medium/tokenizer.json").unwrap();
+    let tokenizer = Tokenizer::from_file("tokenizer.json").unwrap();
+
+    let target: SocketAddr = "127.0.0.1:4221".parse()?;
+    let transport = TcpTransport::new(target);
+    let connector = Builder::primary([0u8; 32], 2)
+        .transport(transport)
+        .build()?;
+    let (mut sender, mut receiver) = connector.connect().await?.split();
+
+    // Start the session.
+    let start_session = StartSession {
+        model: "387cbc21bd420764043db21330ccfbaaceafa9aa6c858a0cc16d8fc611c0dbb8".to_string(),
+        origin: Origin::Blake3,
+        device: Device::Cpu,
+    };
+    sender
+        .send(bincode::serialize(&start_session)?.into())
+        .await?;
 
     let mut stdout = io::stdout();
 
@@ -38,6 +59,7 @@ async fn main() -> anyhow::Result<()> {
         }
 
         let mut conversation = String::new();
+        // This token is also the BOS.
         conversation.push_str("<|endoftext|>");
         conversation.push_str(&input);
         conversation.push_str("<|endoftext|>");
@@ -46,16 +68,14 @@ async fn main() -> anyhow::Result<()> {
         stdout.flush().unwrap();
 
         'inner: loop {
-            // Create encoding from current history.
+            // Create encoding from current conversation.
             let encoding = tokenizer.encode(conversation.as_str(), true).unwrap();
-
-            // Build inputs.
 
             // Gather attention mask.
             let attention_mask = encoding
                 .get_attention_mask()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .copied()
                 .map(|mask| mask as i64)
                 .collect::<Vec<_>>();
             let attention_mask = Array1::from(attention_mask);
@@ -66,8 +86,8 @@ async fn main() -> anyhow::Result<()> {
             // Gather position ids.
             let position_ids = encoding
                 .get_word_ids()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .copied()
                 .map(|id| id.unwrap() as i64)
                 .collect::<Vec<_>>();
             let position_ids = Array1::from(position_ids);
@@ -75,16 +95,13 @@ async fn main() -> anyhow::Result<()> {
             let mut buffer_position_ids = Vec::new();
             position_ids.write_npy(Cursor::new(&mut buffer_position_ids))?;
 
-            // Todo: This might not be needed.
-            // Get tokens attention mask.
+            // Gather input ids.
             let tokens = encoding
                 .get_ids()
                 .iter()
                 .map(|i| *i as i64)
                 .collect::<Vec<_>>();
-            let mut tokens = Array1::from_iter(tokens.iter().cloned());
-
-            // Gather input ids.
+            let tokens = Array1::from_iter(tokens.iter().cloned());
             let input_ids = tokens.view().insert_axis(Axis(0));
             let mut buffer_input_ids = Vec::new();
             input_ids.write_npy(Cursor::new(&mut buffer_input_ids))?;
@@ -97,18 +114,21 @@ async fn main() -> anyhow::Result<()> {
             let payload = serde_json::to_string(&Input::Map(inputs))?;
 
             // Send service a request.
-            let resp = reqwest::Client::new().post("http://127.0.0.1:4220/services/2/blake3/387cbc21bd420764043db21330ccfbaaceafa9aa6c858a0cc16d8fc611c0dbb8")
-                .body(Body::from(payload.into_bytes()))
-                .send().await?;
-
-            if !resp.status().is_success() {
-                let msg = String::from_utf8(resp.bytes().await?.into())?;
-                bail!("invalid response status: {:?}", msg);
-            }
-
-            // Process json response and prepare output.
-            let data = resp.bytes().await?;
-            let outputs: Output = serde_json::from_slice(data.as_ref())?;
+            sender.send(payload.into_bytes().into()).await?;
+            let resp = receiver
+                .recv()
+                .await
+                .ok_or(anyhow!("expected a response from the service"))??;
+            let outputs: Output = match resp {
+                ResponseFrame::ServicePayload { bytes } => {
+                    // Process json response and prepare output.
+                    serde_json::from_slice(bytes.as_ref())?
+                },
+                ResponseFrame::Termination { reason } => {
+                    bail!("service terminated the connection: {reason:?}")
+                },
+                _ => bail!("expected a service payload frame"),
+            };
 
             // Decode output.
             let npy = base64::prelude::BASE64_STANDARD
@@ -135,11 +155,8 @@ async fn main() -> anyhow::Result<()> {
             probabilities
                 .sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Less));
 
-            // Greedy search or beam search?
+            // Greedy search. We could implement beam search.
             let token = probabilities[0].0;
-
-            // Add new token to history.
-            tokens = concatenate![Axis(0), tokens, array![token.try_into().unwrap()]];
 
             // The bot is done talking.
             if token == EOS {
@@ -152,7 +169,7 @@ async fn main() -> anyhow::Result<()> {
             // Add to history.
             conversation.push_str(&token_str);
 
-            // Display to user.
+            // Print next token from bot.
             print!("{}", token_str);
             stdout.flush().unwrap();
         }
@@ -162,10 +179,4 @@ async fn main() -> anyhow::Result<()> {
     println!();
 
     Ok(())
-}
-
-#[derive(Deserialize, Serialize)]
-pub enum Input {
-    Raw(Bytes),
-    Map(HashMap<String, Bytes>),
 }

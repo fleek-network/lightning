@@ -47,7 +47,11 @@ pub async fn handler<P: ExecutorProviderInterface>(
     };
 
     let (frame_tx, frame_rx) = async_channel::bounded(8);
-    let (body_tx, body_rx) = async_channel::bounded(1024);
+    // Todo: Fix synchronization between data transfer and connection proxy.
+    // Notes: Reducing the size of this queue produces enough backpressure to slow down the
+    // transfer of data and if the socket is dropped before all the data is transferred,
+    // the proxy drops the connection and the client receives incomplete data.
+    let (body_tx, body_rx) = async_channel::bounded(2_000_000);
     let (termination_tx, termination_rx) = oneshot::channel();
 
     let sender = HttpSender::new(Service::Js, frame_tx, body_tx, termination_tx);

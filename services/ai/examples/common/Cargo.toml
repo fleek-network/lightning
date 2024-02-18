@@ -1,0 +1,13 @@
+[package]
+name = "common"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+bytes.workspace = true
+ndarray = "0.15"
+npyz = "0.8"
+serde = { version = "1.0.194", features = ["derive"] }
+
+

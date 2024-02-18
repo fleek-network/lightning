@@ -1,16 +1,14 @@
-use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::Path;
 
 use anyhow::bail;
 use base64::Engine;
-use example_image_classification::imagenet::CLASSES;
-use example_image_classification::to_array_d;
+use common::imagenet::CLASSES;
+use common::{to_array_d, Input, Output};
 use image::GenericImageView;
 use ndarray::{Array, Axis};
 use ndarray_npy::WriteNpyExt;
 use reqwest::Body;
-use serde::{Deserialize, Serialize};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -41,9 +39,11 @@ async fn main() -> anyhow::Result<()> {
     let mut buffer = Vec::new();
     input.write_npy(Cursor::new(&mut buffer))?;
 
+    let payload = serde_json::to_string(&Input::Raw(buffer.into()))?;
+
     // Send service a request.
     let resp = reqwest::Client::new().post("http://127.0.0.1:4220/services/2/blake3/f2700c0d695006d953ca920b7eb73602b5aef7dbe7b6506d296528f13ebf0d95")
-        .body(Body::from(buffer))
+        .body(Body::from(payload.into_bytes()))
         .send().await?;
 
     if !resp.status().is_success() {
@@ -80,10 +80,4 @@ async fn main() -> anyhow::Result<()> {
     println!("{:?}", output);
 
     Ok(())
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Output {
-    pub format: String,
-    pub outputs: HashMap<String, String>,
 }

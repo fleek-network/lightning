@@ -7,7 +7,8 @@ publish = false
 [dependencies]
 anyhow = "1.0"
 base64 = "0.21"
-bytes.workspace = true
+bincode.workspace = true
+cdk-rust = { path = "../../../../lib/cdk-rust" }
 ndarray = "0.15"
 ndarray-npy = "0.8"
 npyz = "0.8"
@@ -17,5 +18,4 @@ serde_json.workspace = true
 tokenizers = { version = "0.15", default-features = false, features = [ "onig", "http" ] }
 tokio.workspace = true
 common = { path = "../common" }
-serde = { version = "1.0.194", features = ["derive"] }
 
