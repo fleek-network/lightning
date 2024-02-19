@@ -7,10 +7,10 @@ use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     ConfigConsumer,
+    KeystoreInterface,
     PoolInterface,
     ReputationAggregatorInterface,
     ServiceScope,
-    SignerInterface,
     WithStartAndShutdown,
 };
 use tokio::sync::{oneshot, Mutex};
@@ -104,11 +104,11 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
     fn init(
         _config: Self::Config,
         sqr: c!(C::ApplicationInterface::SyncExecutor),
-        signer: &c!(C::SignerInterface),
+        keystore: C::KeystoreInterface,
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
         pool: &c!(C::PoolInterface),
     ) -> anyhow::Result<Self> {
-        let (_, sk) = signer.get_sk();
+        let sk = keystore.get_ed25519_sk();
         let event_handler = pool.open_event(ServiceScope::Broadcast);
 
         let ctx = Context::<C>::new(Database::default(), sqr, rep_reporter, event_handler, sk);

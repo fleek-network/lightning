@@ -6,12 +6,12 @@ use lightning_schema::LightningMessage;
 use lightning_types::{Digest, NodeIndex};
 
 use crate::infu_collection::Collection;
-use crate::signer::SignerInterface;
 use crate::types::Topic;
 use crate::{
     ApplicationInterface,
     ConfigConsumer,
     ConfigProviderInterface,
+    KeystoreInterface,
     PoolInterface,
     ReputationAggregatorInterface,
     WithStartAndShutdown,
@@ -26,14 +26,14 @@ pub trait BroadcastInterface<C: Collection>:
     fn _init(
         config: ::ConfigProviderInterface,
         app: ::ApplicationInterface,
-        signer: ::SignerInterface,
+        keystore: ::KeystoreInterface,
         rep_aggregator: ::ReputationAggregatorInterface,
         pool: ::PoolInterface,
     ) {
         Self::init(
             config.get::<Self>(),
             app.sync_query(),
-            signer,
+            keystore.clone(),
             rep_aggregator.get_reporter(),
             pool,
         )
@@ -49,7 +49,7 @@ pub trait BroadcastInterface<C: Collection>:
     fn init(
         config: Self::Config,
         sqr: c!(C::ApplicationInterface::SyncExecutor),
-        signer: &c!(C::SignerInterface),
+        keystore: C::KeystoreInterface,
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
         pool: &c!(C::PoolInterface),
     ) -> Result<Self>;
