@@ -10,12 +10,12 @@ use lightning_interfaces::types::{NodeIndex, NodeInfo, Participation};
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
+    KeystoreInterface,
     Notification,
     NotifierInterface,
     PingerInterface,
     ReputationAggregatorInterface,
     ReputationReporterInterface,
-    SignerInterface,
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
@@ -44,13 +44,13 @@ impl<C: Collection> PingerInterface<C> for Pinger<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
         notifier: C::NotifierInterface,
-        signer: &C::SignerInterface,
+        keystore: C::KeystoreInterface,
     ) -> anyhow::Result<Self> {
         let (notifier_tx, notifier_rx) = mpsc::channel(10);
         notifier.notify_on_new_epoch(notifier_tx);
 
         let (shutdown_tx, shutdown_rx) = mpsc::channel(10);
-        let (_, node_sk) = signer.get_sk();
+        let node_sk = keystore.get_ed25519_sk();
         let inner = PingerInner::<C>::new(
             config,
             node_sk,
