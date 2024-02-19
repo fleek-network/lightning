@@ -9,9 +9,9 @@ use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     ConfigConsumer,
+    KeystoreInterface,
     PubSub,
     ResolverInterface,
-    SignerInterface,
     SyncQueryRunnerInterface,
     ToDigest,
     WithStartAndShutdown,
@@ -73,11 +73,11 @@ impl<C: Collection> ResolverInterface<C> for Resolver<C> {
     /// Initialize and return the resolver service.
     fn init(
         config: Self::Config,
-        signer: &c!(C::SignerInterface),
+        keystore: C::KeystoreInterface,
         pubsub: c!(C::BroadcastInterface::PubSub<ResolvedImmutablePointerRecord>),
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self> {
-        let (_, node_sk) = signer.get_sk();
+        let node_sk = keystore.get_ed25519_sk();
 
         let mut db_options = Options::default();
         db_options.create_if_missing(true);

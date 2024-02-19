@@ -6,7 +6,7 @@ mod tests;
 use std::marker::PhantomData;
 use std::sync::{Arc, OnceLock};
 
-use fleek_crypto::{NodePublicKey, SecretKey};
+use fleek_crypto::NodePublicKey;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, ContentUpdate, NodeIndex, UpdateMethod};
@@ -14,6 +14,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
     IndexerInterface,
+    KeystoreInterface,
     SignerInterface,
     SubmitTxSocket,
     SyncQueryRunnerInterface,
@@ -66,18 +67,19 @@ impl<C: Collection> IndexerInterface<C> for Indexer<C> {
     fn init(
         _: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        signer: &c!(C::SignerInterface),
+        keystore: C::KeystoreInterface,
+        signer: &C::SignerInterface,
     ) -> anyhow::Result<Self> {
         let submit_tx = signer.get_socket();
 
-        let (_, sk) = signer.get_sk();
+        let pk = keystore.get_ed25519_pk();
         let local_index = OnceLock::new();
-        if let Some(index) = query_runner.pubkey_to_index(&sk.to_pk()) {
+        if let Some(index) = query_runner.pubkey_to_index(&pk) {
             local_index.set(index).expect("Cell to be empty");
         }
 
         Ok(Self {
-            pk: sk.to_pk(),
+            pk,
             local_index: Arc::new(local_index),
             submit_tx,
             query_runner,

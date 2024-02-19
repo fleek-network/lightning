@@ -8,7 +8,7 @@ use crate::{
     BroadcastInterface,
     ConfigConsumer,
     ConfigProviderInterface,
-    SignerInterface,
+    KeystoreInterface,
     WithStartAndShutdown,
 };
 
@@ -21,11 +21,16 @@ pub trait ResolverInterface<C: Collection>:
     fn _init(
         config: ::ConfigProviderInterface,
         broadcast: ::BroadcastInterface,
-        signer: ::SignerInterface,
+        keystore: ::KeystoreInterface,
         app: ::ApplicationInterface,
     ) {
         let pubsub = broadcast.get_pubsub(crate::types::Topic::Resolver);
-        Self::init(config.get::<Self>(), signer, pubsub, app.sync_query())
+        Self::init(
+            config.get::<Self>(),
+            keystore.clone(),
+            pubsub,
+            app.sync_query(),
+        )
     }
 
     type OriginFinder: OriginFinderAsyncIter;
@@ -33,7 +38,7 @@ pub trait ResolverInterface<C: Collection>:
     /// Initialize and return the resolver service.
     fn init(
         config: Self::Config,
-        signer: &c!(C::SignerInterface),
+        keystore: C::KeystoreInterface,
         pubsub: c!(C::BroadcastInterface::PubSub<ResolvedImmutablePointerRecord>),
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self>;
