@@ -5,7 +5,7 @@ use std::time::{Duration, SystemTime};
 
 use affair::{Executor, TokioSpawn};
 use derive_more::{From, IsVariant, TryInto};
-use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
+use fleek_crypto::{ConsensusPublicKey, NodePublicKey, SecretKey};
 use lightning_interfaces::application::ExecutionEngineSocket;
 use lightning_interfaces::common::WithStartAndShutdown;
 use lightning_interfaces::config::ConfigConsumer;
@@ -18,6 +18,7 @@ use lightning_interfaces::{
     BroadcastInterface,
     Emitter,
     IndexSocket,
+    KeystoreInterface,
     NotifierInterface,
     PubSub,
     SyncQueryRunnerInterface,
@@ -388,9 +389,10 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
     type Certificate = PubSubMsg;
 
     /// Create a new consensus service with the provided config and executor.
-    fn init<S: SignerInterface<C>>(
+    fn init(
         config: Self::Config,
-        signer: &S,
+        keystore: C::KeystoreInterface,
+        signer: &C::SignerInterface,
         executor: ExecutionEngineSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
@@ -402,7 +404,8 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         // Init the metrics for narwhal
         DBMetrics::init(&registry);
 
-        let (consensus_sk, primary_sk) = signer.get_sk();
+        let (consensus_sk, primary_sk) = (keystore.get_bls_sk(), keystore.get_ed25519_sk());
+        let (consensus_pk, primary_pk) = (consensus_sk.to_pk(), primary_sk.to_pk());
         let reconfigure_notify = Arc::new(Notify::new());
         let networking_keypair = NetworkKeyPair::from(primary_sk);
         let primary_keypair = KeyPair::from(consensus_sk);
@@ -430,8 +433,8 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         let shutdown_notify_epoch_state = Arc::new(Notify::new());
 
         let epoch_state = EpochState::new(
-            signer.get_ed25519_pk(),
-            signer.get_bls_pk(),
+            primary_pk,
+            consensus_pk,
             query_runner,
             narwhal_args,
             config.store_path,

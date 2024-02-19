@@ -14,6 +14,7 @@ use crate::{
     BroadcastInterface,
     ConfigProviderInterface,
     IndexSocket,
+    KeystoreInterface,
     NotifierInterface,
     RpcInterface,
 };
@@ -34,6 +35,7 @@ pub trait ConsensusInterface<C: Collection>:
 {
     fn _init(
         config: ::ConfigProviderInterface,
+        keystore: ::KeystoreInterface,
         signer: ::SignerInterface,
         app: ::ApplicationInterface,
         broadcast: ::BroadcastInterface,
@@ -46,6 +48,7 @@ pub trait ConsensusInterface<C: Collection>:
         let pubsub = broadcast.get_pubsub(crate::types::Topic::Consensus);
         Self::init(
             config.get::<Self>(),
+            keystore.clone(),
             signer,
             executor,
             sqr,
@@ -63,9 +66,10 @@ pub trait ConsensusInterface<C: Collection>:
 
     /// Create a new consensus service with the provided config and executor.
     #[allow(clippy::too_many_arguments)]
-    fn init<S: SignerInterface<C>>(
+    fn init(
         config: Self::Config,
-        signer: &S,
+        keystore: C::KeystoreInterface,
+        signer: &C::SignerInterface,
         executor: ExecutionEngineSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),

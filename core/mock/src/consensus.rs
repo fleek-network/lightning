@@ -20,7 +20,6 @@ use lightning_interfaces::{
     IndexSocket,
     MempoolSocket,
     NotifierInterface,
-    SignerInterface,
     WithStartAndShutdown,
 };
 use rand::{thread_rng, Rng, SeedableRng};
@@ -150,9 +149,10 @@ impl<C: Collection> WithStartAndShutdown for MockConsensus<C> {
 impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
     type Certificate = ();
 
-    fn init<S: SignerInterface<C>>(
+    fn init(
         config: Self::Config,
-        _signer: &S,
+        _keystore: C::KeystoreInterface,
+        _signer: &C::SignerInterface,
         executor: ExecutionEngineSocket,
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
         _pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),

@@ -7,7 +7,6 @@ use lightning_interfaces::application::ExecutionEngineSocket;
 use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::signer::SignerInterface;
 use lightning_interfaces::types::{Block, Event, TransactionRequest};
 use lightning_interfaces::{
     ApplicationInterface,
@@ -49,9 +48,10 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
     type Certificate = ();
 
     /// Create a new consensus service with the provided config and executor.
-    fn init<S: SignerInterface<C>>(
+    fn init(
         config: Self::Config,
-        _signer: &S,
+        _keystore: C::KeystoreInterface,
+        _signer: &C::SignerInterface,
         executor: ExecutionEngineSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         _pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
