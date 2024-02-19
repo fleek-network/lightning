@@ -104,6 +104,7 @@ fn build_config(
             address: ([0, 0, 0, 0], ports.handshake.webrtc).into(),
         })],
         http_address: ([127, 0, 0, 1], ports.handshake.http).into(),
+        ..Default::default()
     });
 
     config.inject::<ServiceExecutor<FinalTypes>>(ServiceExecutorConfig {
