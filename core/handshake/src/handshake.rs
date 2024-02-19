@@ -26,7 +26,7 @@ use tracing::warn;
 use triomphe::Arc;
 
 use crate::config::HandshakeConfig;
-use crate::http::{self, spawn_http_server};
+use crate::http::{self, spawn_http_server, spawn_https_server};
 use crate::proxy::{Proxy, State};
 use crate::shutdown::{ShutdownNotifier, ShutdownWaiter};
 use crate::transports::{
@@ -109,14 +109,18 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
             let router = router
                 .layer(Extension(run.ctx.clone()))
                 .route_layer(http::fleek_node_response_header(self.pk));
+
+            // Start optional HTTPS server.
+            if let Some(https) = self.config.https.clone() {
+                let https_router = router.clone();
+                let handle = run.handle.clone();
+                tokio::spawn(async move { spawn_https_server(https_router, https, handle).await });
+            }
+
+            // Start HTTP server.
             let waiter = run.shutdown.waiter();
             let http_addr = self.config.http_address;
-            let tls = self
-                .config
-                .tls
-                .clone()
-                .map(|config| (run.handle.clone(), config));
-            tokio::spawn(async move { spawn_http_server(http_addr, router, tls, waiter).await });
+            tokio::spawn(async move { spawn_http_server(http_addr, router, waiter).await });
         }
     }
 

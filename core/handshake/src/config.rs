@@ -11,7 +11,7 @@ pub struct HandshakeConfig {
     #[serde(rename = "transport")]
     pub transports: Vec<TransportConfig>,
     pub http_address: SocketAddr,
-    pub tls: Option<TlsConfig>,
+    pub https: Option<HttpsConfig>,
 }
 
 impl Default for HandshakeConfig {
@@ -24,7 +24,7 @@ impl Default for HandshakeConfig {
                 TransportConfig::Http(Default::default()),
             ],
             http_address: ([0, 0, 0, 0], 80).into(),
-            tls: None,
+            https: None,
         }
     }
 }
@@ -40,7 +40,8 @@ pub enum TransportConfig {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct TlsConfig {
+pub struct HttpsConfig {
     pub cert: PathBuf,
     pub key: PathBuf,
+    pub address: SocketAddr,
 }
