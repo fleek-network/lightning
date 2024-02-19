@@ -1,28 +1,16 @@
 mod config;
-pub mod utils;
 
 #[cfg(test)]
 pub mod tests;
 
 use std::collections::VecDeque;
-use std::fs::read_to_string;
-use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use affair::{Socket, Task};
-use anyhow::anyhow;
-pub use config::Config;
-use fleek_crypto::{
-    ConsensusPublicKey,
-    ConsensusSecretKey,
-    NodePublicKey,
-    NodeSecretKey,
-    NodeSignature,
-    SecretKey,
-    TransactionSender,
-};
+pub use config::SignerConfig;
+use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, SecretKey, TransactionSender};
 use lightning_interfaces::common::{ToDigest, WithStartAndShutdown};
 use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::infu_collection::{c, Collection};
@@ -35,6 +23,7 @@ use lightning_interfaces::types::{
 };
 use lightning_interfaces::{
     ApplicationInterface,
+    KeystoreInterface,
     MempoolSocket,
     Notification,
     SyncQueryRunnerInterface,
@@ -101,12 +90,13 @@ impl<C: Collection> WithStartAndShutdown for Signer<C> {
 impl<C: Collection> SignerInterface<C> for Signer<C> {
     /// Initialize the signature service.
     fn init(
-        config: Config,
+        _config: Self::Config,
+        keystore: C::KeystoreInterface,
         query_runner: c![C::ApplicationInterface::SyncExecutor],
     ) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
         let new_block_rx = Arc::new(Mutex::new(None));
-        let inner = SignerInner::init(config, rx, new_block_rx.clone())?;
+        let inner = SignerInner::init::<C>(keystore, rx, new_block_rx.clone())?;
         Ok(Self {
             inner: Arc::new(inner),
             socket,
@@ -132,29 +122,6 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
         *notifier = Some(new_block_rx)
     }
 
-    /// Returns the `BLS` public key of the current node.
-    fn get_bls_pk(&self) -> ConsensusPublicKey {
-        self.inner.consensus_public_key
-    }
-
-    /// Returns the `Ed25519` (network) public key of the current node.
-    fn get_ed25519_pk(&self) -> NodePublicKey {
-        self.inner.node_public_key
-    }
-
-    /// Returns the loaded secret key material.
-    ///
-    /// # Safety
-    ///
-    /// Just like any other function which deals with secret material this function should
-    /// be used with the greatest caution.
-    fn get_sk(&self) -> (ConsensusSecretKey, NodeSecretKey) {
-        (
-            self.inner.consensus_secret_key.clone(),
-            self.inner.node_secret_key.clone(),
-        )
-    }
-
     /// Returns a socket that can be used to submit transactions to the mempool, these
     /// transactions are signed by the node and a proper nonce is assigned by the
     /// implementation.
@@ -176,89 +143,28 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
     fn sign_raw_digest(&self, digest: &[u8; 32]) -> NodeSignature {
         self.inner.node_secret_key.sign(digest)
     }
-
-    /// Generates the node secret key.
-    ///
-    /// # Safety
-    ///
-    /// This function will return an error if the key already exists.
-    fn generate_node_key(path: &Path) -> anyhow::Result<()> {
-        if path.exists() {
-            return Err(anyhow!("Node secret key already exists"));
-        } else {
-            let node_secret_key = NodeSecretKey::generate();
-            utils::save(path, node_secret_key.encode_pem())?;
-        }
-        Ok(())
-    }
-
-    /// Generates the network secret keys.
-    ///
-    /// # Safety
-    ///
-    /// This function will return an error if the key already exists.
-    fn generate_consensus_key(path: &Path) -> anyhow::Result<()> {
-        if path.exists() {
-            return Err(anyhow!("Consensus secret key already exists"));
-        } else {
-            let consensus_secret_key = ConsensusSecretKey::generate();
-            utils::save(path, consensus_secret_key.encode_pem())?;
-        }
-        Ok(())
-    }
 }
 
 #[allow(clippy::type_complexity)]
 struct SignerInner {
     node_secret_key: NodeSecretKey,
     node_public_key: NodePublicKey,
-    consensus_secret_key: ConsensusSecretKey,
-    consensus_public_key: ConsensusPublicKey,
     rx: Arc<Mutex<Option<mpsc::Receiver<Task<UpdateMethod, u64>>>>>,
     new_block_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
 }
 
 impl SignerInner {
-    fn init(
-        config: Config,
+    fn init<C: Collection>(
+        keystore: C::KeystoreInterface,
         rx: mpsc::Receiver<Task<UpdateMethod, u64>>,
         new_block_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
     ) -> anyhow::Result<Self> {
-        let node_secret_key = if config.node_key_path.exists() {
-            // read pem file, if we cant read the pem file we should panic
-            let encoded =
-                read_to_string(&config.node_key_path).expect("Failed to read node pem file");
-            // todo(dalton): We should panic if we cannot decode pem file. But we should try to
-            // identify the encoding and try a few different ways first. Also we should
-            // support passworded pems
-            NodeSecretKey::decode_pem(&encoded).expect("Failed to decode node pem file")
-        } else {
-            return Err(anyhow!(
-                "Node secret key does not exist. Use the CLI to generate keys."
-            ));
-        };
-
-        let consensus_secret_key = if config.consensus_key_path.exists() {
-            // read pem file, if we cant read the pem file we should panic
-            let encoded = read_to_string(&config.consensus_key_path)
-                .expect("Failed to read consensus pem file");
-            // todo(dalton): We should panic if we cannot decode pem file. But we should try to
-            // identify the encoding and try a few different ways first. Also we should
-            // support passworded pems
-            ConsensusSecretKey::decode_pem(&encoded).expect("Failed to decode consensus pem file")
-        } else {
-            return Err(anyhow!(
-                "Consensus secret key does not exist. Use the CLI to generate keys."
-            ));
-        };
-
+        let node_secret_key = keystore.get_ed25519_sk();
         let node_public_key = node_secret_key.to_pk();
-        let consensus_public_key = consensus_secret_key.to_pk();
+
         Ok(Self {
             node_secret_key,
             node_public_key,
-            consensus_secret_key,
-            consensus_public_key,
             rx: Arc::new(Mutex::new(Some(rx))),
             new_block_rx,
         })
@@ -442,5 +348,5 @@ struct PendingTransaction {
 impl<C: Collection> ConfigConsumer for Signer<C> {
     const KEY: &'static str = "signer";
 
-    type Config = Config;
+    type Config = SignerConfig;
 }
