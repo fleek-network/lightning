@@ -9,6 +9,7 @@ use super::*;
 // Define the collection of every top-level trait in the system.
 collection!([
     ConfigProviderInterface,
+    KeystoreInterface,
     ApplicationInterface,
     BlockStoreInterface,
     BlockStoreServerInterface,

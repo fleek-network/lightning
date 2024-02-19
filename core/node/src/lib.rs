@@ -15,6 +15,7 @@ use lightning_interfaces::infu_collection::{
     ConsensusInterfaceContainer,
     ConsensusInterfaceModifier,
 };
+use lightning_keystore::Keystore;
 use lightning_notifier::Notifier;
 use lightning_origin_demuxer::OriginDemuxer;
 use lightning_pinger::Pinger;
@@ -52,6 +53,7 @@ impl CollectionBase for FinalTypes {
     type ResolverInterface<C: Collection> = Resolver<C>;
     type RpcInterface<C: Collection> = Rpc<C>;
     type ServiceExecutorInterface<C: Collection> = ServiceExecutor<C>;
+    type KeystoreInterface<C: Collection> = Keystore<C>;
     type SignerInterface<C: Collection> = Signer<C>;
     type FetcherInterface<C: Collection> = Fetcher<C>;
     type PoolInterface<C: Collection> = PoolProvider<C>;
