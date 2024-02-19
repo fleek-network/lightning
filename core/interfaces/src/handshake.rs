@@ -3,7 +3,7 @@ use infusion::c;
 use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
-use crate::{ConfigProviderInterface, ServiceExecutorInterface, SignerInterface};
+use crate::{ConfigProviderInterface, KeystoreInterface, ServiceExecutorInterface};
 
 #[infusion::service]
 pub trait HandshakeInterface<C: Collection>:
@@ -12,11 +12,11 @@ pub trait HandshakeInterface<C: Collection>:
     fn _init(
         config: ::ConfigProviderInterface,
         service_executor: ::ServiceExecutorInterface,
-        signer: ::SignerInterface,
+        keystore: ::KeystoreInterface,
     ) {
         Self::init(
             config.get::<Self>(),
-            signer,
+            keystore.clone(),
             service_executor.get_provider(),
         )
     }
@@ -24,7 +24,7 @@ pub trait HandshakeInterface<C: Collection>:
     /// Initialize a new handshake server.
     fn init(
         config: Self::Config,
-        signer: &C::SignerInterface,
+        keystore: C::KeystoreInterface,
         provider: c![C::ServiceExecutorInterface::Provider],
     ) -> anyhow::Result<Self>;
 }

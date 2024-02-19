@@ -5,7 +5,7 @@ use async_channel::{bounded, Sender};
 use axum::{Extension, Router};
 use axum_server::Handle;
 use dashmap::DashMap;
-use fleek_crypto::{NodePublicKey, SecretKey};
+use fleek_crypto::NodePublicKey;
 use fn_sdk::header::{write_header, ConnectionHeader};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -15,8 +15,8 @@ use lightning_interfaces::{
     ConfigConsumer,
     ExecutorProviderInterface,
     HandshakeInterface,
+    KeystoreInterface,
     ServiceExecutorInterface,
-    SignerInterface,
     WithStartAndShutdown,
 };
 use lightning_schema::handshake::{HandshakeRequestFrame, TerminationReason};
@@ -53,11 +53,11 @@ struct Run<C: Collection> {
 impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
     fn init(
         config: Self::Config,
-        signer: &C::SignerInterface,
+        keystore: C::KeystoreInterface,
         provider: c![C::ServiceExecutorInterface::Provider],
     ) -> anyhow::Result<Self> {
         let shutdown = ShutdownNotifier::default();
-        let (_, sk) = signer.get_sk();
+        let pk = keystore.get_ed25519_pk();
         let ctx = Context::new(provider, shutdown.waiter());
         let handle = Handle::new();
 
@@ -68,7 +68,7 @@ impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
                 handle,
             })),
             config,
-            pk: sk.to_pk(),
+            pk,
         })
     }
 }
