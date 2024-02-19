@@ -108,16 +108,19 @@ async fn handle_request(conn: &mut Connection, origin: Origin, uri: Bytes) -> an
     // Fetch the content from the origin
     let hash = match origin {
         Origin::Unknown => {
+            let _ = conn.write_payload(b"Unknown origin").await;
             bail!("unknown origin");
         },
         Origin::Blake3 => {
             if uri.len() != 32 {
+                let _ = conn.write_payload(b"Invalid blake3 hash").await;
                 bail!("expected a 32 byte hash");
             }
 
             // Fetch the content from the network
             let hash = *array_ref!(uri, 0, 32);
             if !fn_sdk::api::fetch_blake3(hash).await {
+                let _ = conn.write_payload(b"Failed to fetch blake3 content").await;
                 bail!("failed to fetch content");
             }
 
@@ -126,6 +129,7 @@ async fn handle_request(conn: &mut Connection, origin: Origin, uri: Bytes) -> an
         origin => {
             // Fetch the content from the origin
             let Some(hash) = fn_sdk::api::fetch_from_origin(origin.into(), uri).await else {
+                let _ = conn.write_payload(b"Failed to fetch from origin").await;
                 bail!("failed to fetch from origin");
             };
             hash
