@@ -1,0 +1,18 @@
+[package]
+name = "lightning-keystore"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+lightning-interfaces = { path = "../interfaces" }
+lightning-utils = { path = "../utils" }
+fleek-crypto.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+serde.workspace = true
+resolved-pathbuf.workspace = true
+triomphe = "0.1"
+
+[dev-dependencies]
+lightning-test-utils = { path = "../test-utils" }
+infusion.workspace = true

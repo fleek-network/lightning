@@ -5901,6 +5901,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-keystore"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "fleek-crypto",
+ "infusion",
+ "lightning-interfaces",
+ "lightning-test-utils",
+ "lightning-utils",
+ "resolved-pathbuf",
+ "serde",
+ "tokio",
+ "triomphe",
+]
+
+[[package]]
 name = "lightning-metrics"
 version = "0.1.0"
 dependencies = [
@@ -5932,6 +5948,7 @@ dependencies = [
  "lightning-handshake",
  "lightning-indexer",
  "lightning-interfaces",
+ "lightning-keystore",
  "lightning-notifier",
  "lightning-origin-demuxer",
  "lightning-pinger",
