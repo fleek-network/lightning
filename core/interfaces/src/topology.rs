@@ -4,7 +4,7 @@ use fleek_crypto::NodePublicKey;
 use infusion::c;
 
 use crate::infu_collection::Collection;
-use crate::{ApplicationInterface, ConfigConsumer, ConfigProviderInterface, SignerInterface};
+use crate::{ApplicationInterface, ConfigConsumer, ConfigProviderInterface, KeystoreInterface};
 
 /// The algorithm used for clustering our network and dynamically creating a network topology.
 /// This clustering is later used in other parts of the codebase when connection to other nodes
@@ -14,7 +14,7 @@ use crate::{ApplicationInterface, ConfigConsumer, ConfigProviderInterface, Signe
 pub trait TopologyInterface<C: Collection>: ConfigConsumer + Sized + Send + Sync + Clone {
     fn _init(
         config: ::ConfigProviderInterface,
-        signer: ::SignerInterface,
+        signer: ::KeystoreInterface,
         app: ::ApplicationInterface,
     ) {
         Self::init(

@@ -7,11 +7,11 @@ pub use lightning_types::RejectReason;
 use tokio_stream::Stream;
 
 use crate::infu_collection::{c, Collection};
-use crate::signer::SignerInterface;
 use crate::{
     ApplicationInterface,
     ConfigConsumer,
     ConfigProviderInterface,
+    KeystoreInterface,
     NotifierInterface,
     ReputationAggregatorInterface,
     TopologyInterface,
@@ -51,7 +51,7 @@ pub trait PoolInterface<C: Collection>:
 {
     fn _init(
         config: ::ConfigProviderInterface,
-        signer: ::SignerInterface,
+        keystore: ::KeystoreInterface,
         app: ::ApplicationInterface,
         notifier: ::NotifierInterface,
         topology: ::TopologyInterface,
@@ -59,7 +59,7 @@ pub trait PoolInterface<C: Collection>:
     ) {
         Self::init(
             config.get::<Self>(),
-            signer,
+            keystore.clone(),
             app.sync_query(),
             notifier.clone(),
             topology.clone(),
@@ -73,7 +73,7 @@ pub trait PoolInterface<C: Collection>:
 
     fn init(
         config: Self::Config,
-        signer: &c!(C::SignerInterface),
+        keystore: C::KeystoreInterface,
         sqr: c!(C::ApplicationInterface::SyncExecutor),
         notifier: c!(C::NotifierInterface),
         topology: c!(C::TopologyInterface),

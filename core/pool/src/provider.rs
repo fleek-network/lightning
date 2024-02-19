@@ -15,13 +15,13 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
     EventHandlerInterface,
+    KeystoreInterface,
     ReputationAggregatorInterface,
     RequestHeader,
     RequestInterface,
     RequesterInterface,
     ResponderInterface,
     ResponseInterface,
-    SignerInterface,
     WithStartAndShutdown,
 };
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -203,13 +203,13 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
 
     fn init(
         config: Self::Config,
-        signer: &c!(C::SignerInterface),
+        keystore: C::KeystoreInterface,
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         notifier: c!(C::NotifierInterface),
         topology: c!(C::TopologyInterface),
         _: c!(C::ReputationAggregatorInterface::ReputationReporter),
     ) -> Result<PoolProvider<C, QuinnMuxer>> {
-        let (_, sk) = signer.get_sk();
+        let sk = keystore.get_ed25519_sk();
         let public_key = sk.to_pk();
 
         let mut transport_config = quinn::TransportConfig::default();
