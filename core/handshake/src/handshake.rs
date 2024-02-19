@@ -1,8 +1,9 @@
 use std::sync::atomic::AtomicU64;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_channel::{bounded, Sender};
 use axum::{Extension, Router};
+use axum_server::Handle;
 use dashmap::DashMap;
 use fleek_crypto::{NodePublicKey, SecretKey};
 use fn_sdk::header::{write_header, ConnectionHeader};
@@ -44,6 +45,9 @@ pub struct Handshake<C: Collection> {
 struct Run<C: Collection> {
     ctx: Context<c![C::ServiceExecutorInterface::Provider]>,
     shutdown: ShutdownNotifier,
+    // The axum_server Server API (TLS server) does not have a `with_graceful_shutdown`
+    // similarly to axum Server. The only way to shut it down gracefully is via its Handle API.
+    handle: Handle,
 }
 
 impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
@@ -55,9 +59,14 @@ impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
         let shutdown = ShutdownNotifier::default();
         let (_, sk) = signer.get_sk();
         let ctx = Context::new(provider, shutdown.waiter());
+        let handle = Handle::new();
 
         Ok(Self {
-            status: Mutex::new(Some(Run::<C> { ctx, shutdown })),
+            status: Mutex::new(Some(Run::<C> {
+                ctx,
+                shutdown,
+                handle,
+            })),
             config,
             pk: sk.to_pk(),
         })
@@ -102,13 +111,19 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
                 .route_layer(http::fleek_node_response_header(self.pk));
             let waiter = run.shutdown.waiter();
             let http_addr = self.config.http_address;
-            tokio::spawn(async move { spawn_http_server(http_addr, router, waiter).await });
+            let tls = self
+                .config
+                .tls
+                .clone()
+                .map(|config| (run.handle.clone(), config));
+            tokio::spawn(async move { spawn_http_server(http_addr, router, tls, waiter).await });
         }
     }
 
     async fn shutdown(&self) {
         let run = self.status.lock().await.take().expect("already shutdown.");
         run.shutdown.shutdown();
+        run.handle.graceful_shutdown(Some(Duration::from_secs(2)));
     }
 }
 

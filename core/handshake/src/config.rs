@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -10,6 +11,7 @@ pub struct HandshakeConfig {
     #[serde(rename = "transport")]
     pub transports: Vec<TransportConfig>,
     pub http_address: SocketAddr,
+    pub tls: Option<TlsConfig>,
 }
 
 impl Default for HandshakeConfig {
@@ -22,6 +24,7 @@ impl Default for HandshakeConfig {
                 TransportConfig::Http(Default::default()),
             ],
             http_address: ([0, 0, 0, 0], 4220).into(),
+            tls: None,
         }
     }
 }
@@ -34,4 +37,10 @@ pub enum TransportConfig {
     WebRTC(transports::webrtc::WebRtcConfig),
     WebTransport(transports::webtransport::WebTransportConfig),
     Http(transports::http::Config),
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct TlsConfig {
+    pub cert: PathBuf,
+    pub key: PathBuf,
 }
