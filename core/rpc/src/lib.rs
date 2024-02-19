@@ -16,9 +16,9 @@ use lightning_interfaces::{
     ConfigConsumer,
     FetcherInterface,
     FetcherSocket,
+    KeystoreInterface,
     MempoolSocket,
     RpcInterface,
-    SignerInterface,
     WithStartAndShutdown,
 };
 use reqwest::StatusCode;
@@ -258,7 +258,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore: C::BlockStoreInterface,
         fetcher: &C::FetcherInterface,
-        signer: &C::SignerInterface,
+        keystore: C::KeystoreInterface,
         archive_socket: Option<ArchiveSocket<C>>,
     ) -> anyhow::Result<Self> {
         let data: Arc<Data<C>> = Arc::new(Data {
@@ -266,8 +266,8 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
             mempool_socket: mempool,
             fetcher_socket: fetcher.get_socket(),
             _blockstore: blockstore,
-            node_public_key: signer.get_ed25519_pk(),
-            consensus_public_key: signer.get_bls_pk(),
+            node_public_key: keystore.get_ed25519_pk(),
+            consensus_public_key: keystore.get_bls_pk(),
             archive_socket,
             event_handler: EventDistributor::spawn(),
         });
