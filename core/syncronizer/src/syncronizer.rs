@@ -18,8 +18,8 @@ use lightning_interfaces::{
     BlockStoreServerInterface,
     BlockStoreServerSocket,
     ConfigConsumer,
+    KeystoreInterface,
     Notification,
-    SignerInterface,
     SyncQueryRunnerInterface,
     SyncronizerInterface,
     WithStartAndShutdown,
@@ -103,7 +103,7 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
         config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         blockstore_server: &C::BlockStoreServerInterface,
-        signer: &C::SignerInterface,
+        keystore: C::KeystoreInterface,
         rx_epoch_change: Receiver<Notification>,
     ) -> Result<Self> {
         let mut genesis_committee = query_runner.get_genesis_committee();
@@ -111,7 +111,7 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
         // network a bit of diversity on which bootstrap node they try first
         genesis_committee.shuffle(&mut rand::thread_rng());
 
-        let our_public_key = signer.get_ed25519_pk();
+        let our_public_key = keystore.get_ed25519_pk();
 
         let rpc_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(5))
