@@ -1,0 +1,10 @@
+{
+  "tasks": {
+    "demo:watch-resnet": "deno bundle --watch ./resnet/main.ts ./resnet/main.js",
+    "demo:serve-resnet": "deno run --allow-net --allow-read https://deno.land/std@0.201.0/http/file_server.ts resnet",
+    "dev-resnet": "deno task demo:watch-resnet & deno task demo:serve-resnet"
+  },
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "dom.asynciterable", "deno.ns"]
+  }
+}
