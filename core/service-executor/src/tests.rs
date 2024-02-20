@@ -27,6 +27,7 @@ use lightning_interfaces::{
     BroadcastInterface,
     ConsensusInterface,
     FetcherInterface,
+    KeystoreInterface,
     NotifierInterface,
     OriginProviderInterface,
     PoolInterface,
@@ -46,8 +47,9 @@ use lightning_rep_collector::aggregator::ReputationAggregator;
 use lightning_rep_collector::config::Config as RepCollConfig;
 use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
-use lightning_signer::{Config as SignerConfig, Signer};
+use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_topology::{Config as TopologyConfig, Topology};
 use serial_test::serial;
 use tokio::sync::mpsc;
@@ -61,6 +63,7 @@ partial!(TestBinding {
     BroadcastInterface = Broadcast<Self>;
     BlockStoreInterface = Blockstore<Self>;
     BlockStoreServerInterface = BlockStoreServer<Self>;
+    KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     ResolverInterface = Resolver<Self>;
     ApplicationInterface = Application<Self>;
@@ -109,11 +112,13 @@ async fn init_service_executor(
     app.start().await;
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let keystore = EphemeralKeystore::default();
     let mut signer =
-        Signer::<TestBinding>::init(SignerConfig::test(), query_runner.clone()).unwrap();
+        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
+            .unwrap();
     let topology = Topology::<TestBinding>::init(
         TopologyConfig::default(),
-        signer.get_ed25519_pk(),
+        keystore.get_ed25519_pk(),
         query_runner.clone(),
     )
     .unwrap();
@@ -138,7 +143,7 @@ async fn init_service_executor(
     };
     let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         config,
-        &signer,
+        keystore.clone(),
         query_runner.clone(),
         notifier.clone(),
         topology,
@@ -149,7 +154,7 @@ async fn init_service_executor(
     let broadcast = Broadcast::<TestBinding>::init(
         BroadcastConfig::default(),
         query_runner.clone(),
-        &signer,
+        keystore.clone(),
         rep_aggregator.get_reporter(),
         &pool,
     )
@@ -157,6 +162,7 @@ async fn init_service_executor(
 
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
+        keystore.clone(),
         &signer,
         update_socket,
         query_runner.clone(),
@@ -179,7 +185,7 @@ async fn init_service_executor(
     };
     let resolver = Resolver::<TestBinding>::init(
         config,
-        &signer,
+        keystore,
         broadcast.get_pubsub(Topic::Resolver),
         app.sync_query(),
     )
