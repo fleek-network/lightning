@@ -9,14 +9,10 @@ use crate::args::KeySubCmd;
 
 pub async fn exec<C: Collection>(cmd: KeySubCmd, config_path: ResolvedPathBuf) -> Result<()> {
     let provider = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
+    let config = provider.get::<C::KeystoreInterface>();
 
-    if cmd == KeySubCmd::Generate {
-        C::KeystoreInterface::generate_keys(provider.get::<C::KeystoreInterface>(), false)?;
+    match cmd {
+        KeySubCmd::Generate => C::KeystoreInterface::generate_keys(config, false),
+        KeySubCmd::Show => C::KeystoreInterface::init(config).map(|_| ()),
     }
-
-    let keystore = C::KeystoreInterface::init(provider.get::<C::KeystoreInterface>())?;
-    println!("Node Public Key: {}", keystore.get_ed25519_pk());
-    println!("Consensus Public Key: {}", keystore.get_bls_pk());
-
-    Ok(())
 }

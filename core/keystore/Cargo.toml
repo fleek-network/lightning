@@ -10,6 +10,7 @@ fleek-crypto.workspace = true
 anyhow.workspace = true
 tokio.workspace = true
 serde.workspace = true
+tracing.workspace = true
 resolved-pathbuf.workspace = true
 triomphe = "0.1"
 

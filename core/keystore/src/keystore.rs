@@ -14,6 +14,7 @@ use fleek_crypto::{
 };
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{ConfigConsumer, KeystoreInterface};
+use tracing::info;
 use triomphe::Arc;
 
 use crate::KeystoreConfig;
@@ -32,7 +33,7 @@ impl<C> ConfigConsumer for Keystore<C> {
 
 impl<C: Collection> KeystoreInterface<C> for Keystore<C> {
     fn init(config: Self::Config) -> anyhow::Result<Self> {
-        let node = if config.node_key_path.exists() {
+        let node = Arc::new(if config.node_key_path.exists() {
             let encoded =
                 read_to_string(&config.node_key_path).context("Failed to read node pem file")?;
             let sk =
@@ -40,10 +41,9 @@ impl<C: Collection> KeystoreInterface<C> for Keystore<C> {
             (sk.to_pk(), sk)
         } else {
             bail!("Node secret key does not exist. Use the CLI to generate keys.");
-        }
-        .into();
+        });
 
-        let consensus = if config.consensus_key_path.exists() {
+        let consensus = Arc::new(if config.consensus_key_path.exists() {
             let encoded = read_to_string(&config.consensus_key_path)
                 .context("Failed to read consensus pem file")?;
             let sk = ConsensusSecretKey::decode_pem(&encoded)
@@ -51,8 +51,10 @@ impl<C: Collection> KeystoreInterface<C> for Keystore<C> {
             (sk.to_pk(), sk)
         } else {
             bail!("Consensus secret key does not exist. Use the CLI to generate keys.");
-        }
-        .into();
+        });
+
+        info!("Node public key: {}", node.0);
+        info!("Consensus public key: {}", consensus.0);
 
         Ok(Self {
             node,
@@ -100,10 +102,12 @@ impl<C: Collection> KeystoreInterface<C> for Keystore<C> {
 
         if !node_exists {
             let node_secret_key = NodeSecretKey::generate();
+            info!("Generated node key: {}", node_secret_key.to_pk());
             save(&config.node_key_path, node_secret_key.encode_pem())?;
         }
         if !consensus_exists {
             let consensus_secret_key = ConsensusSecretKey::generate();
+            info!("Generated consensus key: {}", consensus_secret_key.to_pk());
             save(
                 &config.consensus_key_path,
                 consensus_secret_key.encode_pem(),

@@ -15,7 +15,7 @@ pub struct Args {
     #[arg(long, global = true, default_value_t = false)]
     pub with_console: bool,
     /// Enable code locations when printing logs.
-    #[arg(long, global = true, default_value_t = true)]
+    #[arg(long, global = true, default_value_t = false)]
     pub with_log_locations: bool,
     /// Increases the level of verbosity (the max level is -vvv).
     #[arg(short, global = true, action = ArgAction::Count)]
