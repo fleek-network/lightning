@@ -81,7 +81,7 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
         let ctx = Arc::new(Context {
             kill: Arc::new(Notify::new()),
             blockstore_path: blockstore.get_root_dir(),
-            ipc_path: config.ipc_path.clone(),
+            ipc_path: config.ipc_path.to_path_buf(),
             fetcher_socket,
             query_runner,
         });
@@ -98,7 +98,7 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     fn get_provider(&self) -> Self::Provider {
         Provider {
             collection: self.collection.clone(),
-            ipc_dir: self.config.ipc_path.clone(),
+            ipc_dir: self.config.ipc_path.to_path_buf(),
         }
     }
 

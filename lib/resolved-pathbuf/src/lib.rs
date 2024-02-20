@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf};
 
 use derive_more::{AsRef, Deref};
 use resolve_path::PathResolveExt;
@@ -15,7 +16,7 @@ mod std_impl;
 ///
 /// Preserving the original allows us to avoid modifying the user configuration when serializing
 /// the configuration back to the disk.
-#[derive(Deref, AsRef)]
+#[derive(Deref, AsRef, Clone)]
 pub struct ResolvedPathBuf {
     #[as_ref]
     #[deref]
@@ -24,6 +25,52 @@ pub struct ResolvedPathBuf {
     /// of the original. This can happen if the original path is already an
     /// absolute path.
     original: Option<PathBuf>,
+}
+
+impl ResolvedPathBuf {
+    /// See: [`PathBuf::push`]
+    pub fn push<P: AsRef<Path>>(&mut self, path: P) {
+        let path = path.as_ref();
+        self.resolved.push(path);
+        if let Some(o) = &mut self.original {
+            o.push(path);
+        }
+    }
+
+    /// See: [`PathBuf::pop`]
+    pub fn pop(&mut self) -> bool {
+        if let Some(o) = &mut self.original {
+            if o.parent().is_none() || self.resolved.parent().is_none() {
+                return false;
+            }
+            debug_assert!(o.pop());
+            debug_assert!(self.resolved.pop());
+            true
+        } else {
+            self.resolved.pop()
+        }
+    }
+
+    /// See: [`PathBuf::set_file_name`]
+    pub fn set_file_name<S: AsRef<OsStr>>(&mut self, file_name: S) {
+        let file_name = file_name.as_ref();
+        if let Some(o) = &mut self.original {
+            o.set_file_name(file_name);
+        }
+        self.resolved.set_file_name(file_name);
+    }
+
+    /// See: [`PathBuf::set_extension`]
+    pub fn set_extension<S: AsRef<OsStr>>(&mut self, extension: S) -> bool {
+        let extension = extension.as_ref();
+        if let Some(o) = &mut self.original {
+            if !o.set_extension(extension) {
+                // early return.
+                return false;
+            }
+        }
+        self.resolved.set_extension(extension)
+    }
 }
 
 impl TryFrom<PathBuf> for ResolvedPathBuf {

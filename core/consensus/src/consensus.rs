@@ -155,7 +155,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         let (committee, worker_cache, epoch, epoch_end) = self.get_epoch_info();
 
         // Make or open store specific to current epoch
-        let mut store_path = self.store_path.clone();
+        let mut store_path = self.store_path.to_path_buf();
         store_path.push(format!("{epoch}"));
         // TODO(dalton): This store takes an optional cache metrics struct that can give us metrics
         // on hits/miss
