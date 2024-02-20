@@ -11,7 +11,13 @@ mod tests {
 
     use blake3_tree::blake3::tree::{HashTree, HashTreeBuilder};
     use blake3_tree::ProofBuf;
-    use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
+    use fleek_crypto::{
+        AccountOwnerSecretKey,
+        ConsensusSecretKey,
+        NodePublicKey,
+        NodeSecretKey,
+        SecretKey,
+    };
     use lightning_application::app::Application;
     use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
     use lightning_application::genesis::{Genesis, GenesisNode};
@@ -25,14 +31,16 @@ mod tests {
         ConsensusInterface,
         IncrementalPutInterface,
         IndexerInterface,
+        KeystoreInterface,
         NotifierInterface,
         SignerInterface,
         SyncQueryRunnerInterface,
         WithStartAndShutdown,
     };
     use lightning_notifier::Notifier;
-    use lightning_signer::{Config as SignerConfig, Signer};
+    use lightning_signer::Signer;
     use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+    use lightning_test_utils::keys::EphemeralKeystore;
     use tokio::sync::mpsc;
     use tokio::test;
 
@@ -41,7 +49,8 @@ mod tests {
 
     struct AppState {
         app: Application<TestBinding>,
-        signer: Signer<TestBinding>,
+        node_public_key: NodePublicKey,
+        _signer: Signer<TestBinding>,
         _consensus: MockConsensus<TestBinding>,
         blockstore: Blockstore<TestBinding>,
         temp_dir_path: PathBuf,
@@ -58,6 +67,7 @@ mod tests {
     partial!(TestBinding {
         ApplicationInterface = Application<Self>;
         BlockStoreInterface = Blockstore<Self>;
+        KeystoreInterface = EphemeralKeystore<Self>;
         SignerInterface = Signer<Self>;
         ConsensusInterface = MockConsensus<Self>;
         IndexerInterface = Indexer<Self>;
@@ -86,8 +96,9 @@ mod tests {
     }
 
     async fn create_app_state(test_name: String) -> AppState {
-        let signer_config = SignerConfig::test();
-        let (consensus_secret_key, node_secret_key) = signer_config.load_test_keys();
+        let keystore = EphemeralKeystore::default();
+        let (consensus_secret_key, node_secret_key) =
+            (keystore.get_bls_sk(), keystore.get_ed25519_sk());
         let node_public_key = node_secret_key.to_pk();
         let consensus_public_key = consensus_secret_key.to_pk();
         let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -171,7 +182,9 @@ mod tests {
 
         let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-        let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+        let mut signer =
+            Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
+                .unwrap();
 
         let notifier = Notifier::<TestBinding>::init(&app);
 
@@ -185,6 +198,7 @@ mod tests {
 
         let consensus = MockConsensus::<TestBinding>::init(
             consensus_config,
+            keystore.clone(),
             &signer,
             update_socket,
             query_runner.clone(),
@@ -202,7 +216,8 @@ mod tests {
         notifier.notify_on_new_block(new_block_tx);
 
         let indexer =
-            Indexer::<TestBinding>::init(Default::default(), query_runner, &signer).unwrap();
+            Indexer::<TestBinding>::init(Default::default(), query_runner, keystore, &signer)
+                .unwrap();
         blockstore.provide_indexer(indexer);
 
         signer.start().await;
@@ -210,7 +225,8 @@ mod tests {
 
         AppState {
             app,
-            signer,
+            node_public_key,
+            _signer: signer,
             _consensus: consensus,
             blockstore,
             temp_dir_path: path,
@@ -425,9 +441,10 @@ mod tests {
         }
 
         // Then: content registry was updated.
-        let (_, sk) = state.signer.get_sk();
         let query_runner = state.app.sync_query();
-        let local_index = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
+        let local_index = query_runner
+            .pubkey_to_index(&state.node_public_key)
+            .unwrap();
 
         let mut interval = tokio::time::interval(Duration::from_secs(1));
         loop {
