@@ -29,6 +29,7 @@ tracing.workspace = true
 rand.workspace = true
 
 [dev-dependencies]
+lightning-test-utils = { path = "../test-utils" }
 lightning-signer = { path = "../signer" }
 lightning-application = { path = "../application", features = ["test"] }
 lightning-pool = { path = "../pool" }

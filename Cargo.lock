@@ -5596,6 +5596,7 @@ dependencies = [
  "lightning-pool",
  "lightning-rep-collector",
  "lightning-signer",
+ "lightning-test-utils",
  "lightning-topology",
  "mini-moka",
  "quick_cache",

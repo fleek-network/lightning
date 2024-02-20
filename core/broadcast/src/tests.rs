@@ -2,13 +2,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use fleek_crypto::{
-    AccountOwnerSecretKey,
-    ConsensusSecretKey,
-    NodeSecretKey,
-    NodeSignature,
-    SecretKey,
-};
+use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, NodeSignature, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
@@ -19,6 +13,7 @@ use lightning_interfaces::{
     partial,
     ApplicationInterface,
     BroadcastInterface,
+    KeystoreInterface,
     NotifierInterface,
     PoolInterface,
     PubSub,
@@ -31,7 +26,8 @@ use lightning_interfaces::{
 use lightning_notifier::Notifier;
 use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::ReputationAggregator;
-use lightning_signer::{utils, Config as SignerConfig, Signer};
+use lightning_signer::Signer;
+use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_topology::{Config as TopologyConfig, Topology};
 use tokio::sync::oneshot;
 
@@ -40,6 +36,7 @@ use crate::{Broadcast, Config};
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
     PoolInterface = PoolProvider<Self>;
+    KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     NotifierInterface = Notifier<Self>;
     TopologyInterface = Topology<Self>;
@@ -61,7 +58,7 @@ async fn get_broadcasts(
     port_offset: u16,
     num_peers: usize,
 ) -> (Vec<Peer<TestBinding>>, Application<TestBinding>, PathBuf) {
-    let mut signers_configs = Vec::new();
+    let mut keystores = Vec::new();
     let mut genesis = Genesis::load().unwrap();
     let path = std::env::temp_dir()
         .join("lightning-broadcast-test")
@@ -76,18 +73,10 @@ async fn get_broadcasts(
 
     // Create signer configs and add nodes to state.
     for i in 0..num_peers {
-        let node_secret_key = NodeSecretKey::generate();
-        let consensus_secret_key = ConsensusSecretKey::generate();
-        let node_key_path = path.join(format!("node{i}/node.pem"));
-        let consensus_key_path = path.join(format!("node{i}/cons.pem"));
-        utils::save(&node_key_path, node_secret_key.encode_pem()).unwrap();
-        utils::save(&consensus_key_path, consensus_secret_key.encode_pem()).unwrap();
-        let signer_config = SignerConfig {
-            node_key_path: node_key_path.try_into().unwrap(),
-            consensus_key_path: consensus_key_path.try_into().unwrap(),
-        };
-
-        signers_configs.push(signer_config);
+        let keystore = EphemeralKeystore::default();
+        let (consensus_secret_key, node_secret_key) =
+            (keystore.get_bls_sk(), keystore.get_ed25519_sk());
+        keystores.push(keystore);
 
         genesis.node_info.push(GenesisNode::new(
             owner_public_key.into(),
@@ -127,11 +116,11 @@ async fn get_broadcasts(
 
     // Create peers.
     let mut peers = Vec::new();
-    for (i, signer_config) in signers_configs.into_iter().enumerate() {
+    for (i, keystore) in keystores.into_iter().enumerate() {
         let address: SocketAddr = format!("0.0.0.0:{}", port_offset + i as u16)
             .parse()
             .unwrap();
-        let peer = create_peer(&app, signer_config, address, true).await;
+        let peer = create_peer(&app, keystore, address, true).await;
         peers.push(peer);
     }
 
@@ -140,16 +129,20 @@ async fn get_broadcasts(
 
 async fn create_peer(
     app: &Application<TestBinding>,
-    signer_config: SignerConfig,
+    keystore: EphemeralKeystore<TestBinding>,
     address: SocketAddr,
     in_state: bool,
 ) -> Peer<TestBinding> {
     let query_runner = app.sync_query();
-    let signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+    let node_secret_key = keystore.get_ed25519_sk();
+    let node_public_key = node_secret_key.to_pk();
+    let signer =
+        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
+            .unwrap();
     let notifier = Notifier::<TestBinding>::init(app);
     let topology = Topology::<TestBinding>::init(
         TopologyConfig::default(),
-        signer.get_ed25519_pk(),
+        node_public_key,
         query_runner.clone(),
     )
     .unwrap();
@@ -168,7 +161,7 @@ async fn create_peer(
     };
     let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         config,
-        &signer,
+        keystore.clone(),
         query_runner.clone(),
         notifier.clone(),
         topology,
@@ -176,7 +169,6 @@ async fn create_peer(
     )
     .unwrap();
 
-    let node_public_key = signer.get_ed25519_pk();
     let node_index = if in_state {
         query_runner.pubkey_to_index(&node_public_key).unwrap()
     } else {
@@ -188,13 +180,11 @@ async fn create_peer(
     let broadcast = Broadcast::<TestBinding>::init(
         config,
         query_runner,
-        &signer,
+        keystore,
         rep_aggregator.get_reporter(),
         &pool,
     )
     .unwrap();
-
-    let (_, node_secret_key) = signer.get_sk();
 
     Peer::<TestBinding> {
         _rep_aggregator: rep_aggregator,
