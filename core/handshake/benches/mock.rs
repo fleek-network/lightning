@@ -12,8 +12,9 @@ use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::{partial, ServiceExecutorInterface};
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_service_executor::test_services::io_stress;
+use lightning_signer::Signer;
 use lightning_test_utils::json_config::JsonConfigProvider;
-use lightning_test_utils::keys::KeyOnlySigner;
+use lightning_test_utils::keys::EphemeralKeystore;
 use serde_json::json;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
@@ -21,7 +22,8 @@ use tokio::task::JoinHandle;
 static MB: usize = 1024 * 1024;
 
 partial!(TestBinding {
-    SignerInterface = KeyOnlySigner;
+    KeystoreInterface = EphemeralKeystore<Self>;
+    SignerInterface = Signer<Self>;
     BlockStoreInterface = Blockstore<Self>;
     ConfigProviderInterface = JsonConfigProvider;
     HandshakeInterface = Handshake<Self>;

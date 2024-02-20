@@ -307,24 +307,20 @@ mod tests {
     use lightning_blockstore::blockstore::Blockstore;
     use lightning_interfaces::{partial, BlockStoreInterface};
     use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
-    use lightning_test_utils::keys::KeyOnlySigner;
+    use lightning_test_utils::keys::EphemeralKeystore;
 
     use super::*;
 
     partial!(TestBinding {
         HandshakeInterface = Handshake<Self>;
         ServiceExecutorInterface = ServiceExecutor<Self>;
-        SignerInterface = KeyOnlySigner;
+        KeystoreInterface = EphemeralKeystore<Self>;
         BlockStoreInterface = Blockstore<Self>;
     });
 
     #[tokio::test]
     async fn restart() -> Result<()> {
-        let signer = <KeyOnlySigner as SignerInterface<TestBinding>>::init(
-            Default::default(),
-            Default::default(),
-        )
-        .unwrap();
+        let keystore = EphemeralKeystore::default();
         let blockstore = Blockstore::init(lightning_blockstore::config::Config::default())?;
         let service_executor = ServiceExecutor::<TestBinding>::init(
             ServiceExecutorConfig::test_default(),
@@ -332,13 +328,13 @@ mod tests {
             affair::Socket::raw_bounded(1).0,
             Default::default(),
         )?;
-        signer.start().await;
+
         service_executor.start().await;
 
         // Startup handshake
         let handshake = Handshake::<TestBinding>::init(
             HandshakeConfig::default(),
-            &signer,
+            keystore.clone(),
             service_executor.get_provider(),
         )?;
         handshake.start().await;
@@ -351,7 +347,7 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(500)).await;
         let handshake = Handshake::<TestBinding>::init(
             HandshakeConfig::default(),
-            &signer,
+            keystore,
             service_executor.get_provider(),
         )?;
         handshake.start().await;
