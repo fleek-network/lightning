@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use cid::Cid;
-use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
+use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
@@ -29,6 +29,7 @@ use lightning_interfaces::{
     ConsensusInterface,
     FetcherInterface,
     IndexerInterface,
+    KeystoreInterface,
     NotifierInterface,
     OriginProviderInterface,
     PoolInterface,
@@ -47,8 +48,9 @@ use lightning_rep_collector::aggregator::ReputationAggregator;
 use lightning_rep_collector::config::Config as RepCollConfig;
 use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
-use lightning_signer::{utils, Config as SignerConfig, Signer};
+use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_test_utils::server::spawn_server;
 use lightning_topology::{Config as TopologyConfig, Topology};
 use tokio::sync::{mpsc, oneshot};
@@ -62,6 +64,7 @@ partial!(TestBinding {
     BroadcastInterface = Broadcast<Self>;
     BlockStoreInterface = Blockstore<Self>;
     BlockStoreServerInterface = BlockStoreServer<Self>;
+    KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     ResolverInterface = Resolver<Self>;
     ApplicationInterface = Application<Self>;
@@ -91,7 +94,7 @@ async fn get_fetchers(
     gateway_port_offset: u16,
     num_peers: usize,
 ) -> (Vec<Peer<TestBinding>>, Application<TestBinding>, PathBuf) {
-    let mut signers_configs = Vec::new();
+    let mut keystores = Vec::new();
     let mut genesis = Genesis::load().unwrap();
     let path = std::env::temp_dir()
         .join("lightning-fetcher-test")
@@ -105,17 +108,10 @@ async fn get_fetchers(
     genesis.node_info = vec![];
 
     for i in 0..num_peers {
-        let node_secret_key = NodeSecretKey::generate();
-        let consensus_secret_key = ConsensusSecretKey::generate();
-        let node_key_path = path.join(format!("node{i}/node.pem"));
-        let consensus_key_path = path.join(format!("node{i}/cons.pem"));
-        utils::save(&node_key_path, node_secret_key.encode_pem()).unwrap();
-        utils::save(&consensus_key_path, consensus_secret_key.encode_pem()).unwrap();
-        let signer_config = SignerConfig {
-            node_key_path: node_key_path.try_into().unwrap(),
-            consensus_key_path: consensus_key_path.try_into().unwrap(),
-        };
-        signers_configs.push(signer_config);
+        let keystore = EphemeralKeystore::default();
+        let (consensus_secret_key, node_secret_key) =
+            (keystore.get_bls_sk(), keystore.get_ed25519_sk());
+        keystores.push(keystore);
 
         genesis.node_info.push(GenesisNode::new(
             owner_public_key.into(),
@@ -159,21 +155,28 @@ async fn get_fetchers(
 
     let update_socket = app.transaction_executor();
     let mut peers = Vec::new();
-    for (i, signer_config) in signers_configs.into_iter().enumerate() {
+    for (i, keystore) in keystores.into_iter().enumerate() {
+        let node_public_key = keystore.get_ed25519_pk();
         let query_runner = app.sync_query();
-        let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+        let mut signer =
+            Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
+                .unwrap();
         let topology = Topology::<TestBinding>::init(
             TopologyConfig::default(),
-            signer.get_ed25519_pk(),
+            node_public_key,
             query_runner.clone(),
         )
         .unwrap();
 
         let notifier = Notifier::<TestBinding>::init(&app);
 
-        let indexer =
-            Indexer::<TestBinding>::init(Default::default(), query_runner.clone(), &signer)
-                .unwrap();
+        let indexer = Indexer::<TestBinding>::init(
+            Default::default(),
+            query_runner.clone(),
+            keystore.clone(),
+            &signer,
+        )
+        .unwrap();
 
         let rep_coll_config = RepCollConfig {
             reporter_buffer_size: 1,
@@ -195,7 +198,7 @@ async fn get_fetchers(
         };
         let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
             config,
-            &signer,
+            keystore.clone(),
             query_runner.clone(),
             notifier.clone(),
             topology,
@@ -206,7 +209,7 @@ async fn get_fetchers(
         let broadcast = Broadcast::<TestBinding>::init(
             BroadcastConfig::default(),
             query_runner.clone(),
-            &signer,
+            keystore.clone(),
             rep_aggregator.get_reporter(),
             &pool,
         )
@@ -214,6 +217,7 @@ async fn get_fetchers(
 
         let consensus = MockConsensus::<TestBinding>::init(
             ConsensusConfig::default(),
+            keystore.clone(),
             &signer,
             update_socket.clone(),
             query_runner,
@@ -236,7 +240,7 @@ async fn get_fetchers(
         };
         let resolver = Resolver::<TestBinding>::init(
             config,
-            &signer,
+            keystore,
             broadcast.get_pubsub(Topic::Resolver),
             app.sync_query(),
         )
