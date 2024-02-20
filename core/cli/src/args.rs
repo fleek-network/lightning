@@ -66,7 +66,7 @@ pub enum DevSubCmd {
     },
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, PartialEq, Eq)]
 pub enum KeySubCmd {
     /// Print the node's public keys.
     Show,
