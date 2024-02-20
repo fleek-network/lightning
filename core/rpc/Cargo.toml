@@ -42,6 +42,7 @@ futures.workspace = true
 
 [dev-dependencies]
 reqwest = { workspace = true, features = ["json"] }
+lightning-test-utils = { path = "../test-utils" }
 lightning-application = { path = "../application" }
 lightning-fetcher = { path = "../fetcher" }
 lightning-blockstore = { path = "../blockstore" }
