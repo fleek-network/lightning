@@ -12,6 +12,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     ConsensusInterface,
+    KeystoreInterface,
     NotifierInterface,
     PoolInterface,
     ReputationAggregatorInterface,
@@ -22,8 +23,9 @@ use lightning_interfaces::{
 use lightning_notifier::Notifier;
 use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::ReputationAggregator;
-use lightning_signer::{Config as SignerConfig, Signer};
+use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+use lightning_test_utils::keys::EphemeralKeystore;
 use tokio::sync::mpsc;
 
 use crate::config::Config;
@@ -32,6 +34,7 @@ use crate::resolver::Resolver;
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
     ConsensusInterface = MockConsensus<Self>;
+    KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     BroadcastInterface = Broadcast<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
@@ -41,8 +44,9 @@ partial!(TestBinding {
 
 #[tokio::test]
 async fn test_start_shutdown() {
-    let signer_config = SignerConfig::test();
-    let (consensus_secret_key, node_secret_key) = signer_config.load_test_keys();
+    let keystore = EphemeralKeystore::default();
+    let (consensus_secret_key, node_secret_key) =
+        (keystore.get_bls_sk(), keystore.get_ed25519_sk());
     let node_public_key = node_secret_key.to_pk();
     let consensus_public_key = consensus_secret_key.to_pk();
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -86,7 +90,9 @@ async fn test_start_shutdown() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+    let mut signer =
+        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
+            .unwrap();
 
     let notifier = Notifier::<TestBinding>::init(&app);
 
@@ -100,7 +106,7 @@ async fn test_start_shutdown() {
 
     let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         PoolConfig::default(),
-        &signer,
+        keystore.clone(),
         app.sync_query(),
         notifier.clone(),
         Default::default(),
@@ -111,7 +117,7 @@ async fn test_start_shutdown() {
     let broadcast = Broadcast::<TestBinding>::init(
         BroadcastConfig::default(),
         query_runner.clone(),
-        &signer,
+        keystore.clone(),
         rep_aggregator.get_reporter(),
         &pool,
     )
@@ -119,6 +125,7 @@ async fn test_start_shutdown() {
 
     let consensus = MockConsensus::<TestBinding>::init(
         ConsensusConfig::default(),
+        keystore.clone(),
         &signer,
         update_socket,
         query_runner,
@@ -149,7 +156,7 @@ async fn test_start_shutdown() {
     };
     let resolver = Resolver::<TestBinding>::init(
         config,
-        &signer,
+        keystore,
         broadcast.get_pubsub(Topic::Resolver),
         app.sync_query(),
     )
