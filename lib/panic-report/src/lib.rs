@@ -59,8 +59,14 @@ macro_rules! setup {
             if std::env::var("RUST_BACKTRACE").ok().is_none() {
                 std::panic::set_hook(Box::new(|info: &std::panic::PanicInfo| {
                     let backtrace = std::backtrace::Backtrace::force_capture();
-                    let report_path = $crate::Report::new(info, &backtrace, $name, $version).save();
-                    $crate::print_default_panic($name, $homepage, $contacts, report_path);
+                    let report = $crate::Report::new(info, &backtrace, $name, $version);
+                    $crate::print_default_panic(
+                        $name,
+                        $homepage,
+                        $contacts,
+                        &report.cause,
+                        report.save()
+                    );
                 }));
             }
         }
@@ -81,7 +87,6 @@ macro_rules! setup {
 /// ```
 #[inline(always)]
 pub fn add_context(_key: impl ToString, _value: impl serde::Serialize) {
-    #[cfg(not(debug_assertions))]
     CONTEXT
         .lock()
         .expect("poisoned lock")
@@ -99,6 +104,7 @@ pub fn print_default_panic<S: ToString>(
     name: &str,
     homepage: &str,
     contacts: impl AsRef<[S]>,
+    cause: &str,
     report_path: PathBuf,
 ) {
     use std::io::Write;
@@ -111,9 +117,11 @@ pub fn print_default_panic<S: ToString>(
     writeln!(
         stderr,
         "
-Uh oh, `{name}` had a problem and crashed.
+Uh oh, `{name}` had a problem and crashed:
 
-A report has been saved to `{report_path:?}`.
+{cause}
+
+A report has been saved to {report_path:?}.
 
 To help diagnose the problem, you can submit a crash report as an issue or via email.
 "

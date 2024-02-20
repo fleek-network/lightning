@@ -25,8 +25,8 @@ fn main() -> Result<()> {
     }
 
     panic_report::setup! {
-        name: "lightning-node".into(),
-        version: lightning_cli::VERSION.into(),
+        name: "lightning-node",
+        version: lightning_cli::VERSION,
         homepage: "https://github.com/fleek-network/lightning",
         contacts: ["Fleek Network Team <reports@fleek.network>".to_string()]
     };
