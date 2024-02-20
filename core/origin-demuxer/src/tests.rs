@@ -17,14 +17,16 @@ use lightning_interfaces::{
     BlockStoreInterface,
     ConsensusInterface,
     IndexerInterface,
+    KeystoreInterface,
     NotifierInterface,
     OriginProviderInterface,
     SignerInterface,
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
-use lightning_signer::{Config as SignerConfig, Signer};
+use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_test_utils::server;
 use tokio::sync::mpsc;
 
@@ -33,6 +35,7 @@ use crate::OriginDemuxer;
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
     BlockStoreInterface = Blockstore<Self>;
+    KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     ConsensusInterface = MockConsensus<Self>;
     IndexerInterface = Indexer<Self>;
@@ -59,8 +62,9 @@ impl Drop for AppState {
 // Todo: This is the same one used in blockstore, indexer and possbily others
 // so it might be useful to create a test factory.
 async fn create_app_state(test_name: String) -> AppState {
-    let signer_config = SignerConfig::test();
-    let (consensus_secret_key, node_secret_key) = signer_config.load_test_keys();
+    let keystore = EphemeralKeystore::default();
+    let (consensus_secret_key, node_secret_key) =
+        (keystore.get_bls_sk(), keystore.get_ed25519_sk());
     let node_public_key = node_secret_key.to_pk();
     let consensus_public_key = consensus_secret_key.to_pk();
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -144,7 +148,9 @@ async fn create_app_state(test_name: String) -> AppState {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+    let mut signer =
+        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
+            .unwrap();
     let notifier = Notifier::<TestBinding>::init(&app);
 
     let consensus_config = ConsensusConfig {
@@ -157,6 +163,7 @@ async fn create_app_state(test_name: String) -> AppState {
 
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
+        keystore.clone(),
         &signer,
         update_socket,
         query_runner.clone(),
@@ -173,7 +180,8 @@ async fn create_app_state(test_name: String) -> AppState {
     signer.provide_new_block_notify(new_block_rx);
     notifier.notify_on_new_block(new_block_tx);
 
-    let indexer = Indexer::<TestBinding>::init(Default::default(), query_runner, &signer).unwrap();
+    let indexer =
+        Indexer::<TestBinding>::init(Default::default(), query_runner, keystore, &signer).unwrap();
     blockstore.provide_indexer(indexer);
 
     signer.start().await;
