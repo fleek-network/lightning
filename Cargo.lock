@@ -6138,6 +6138,7 @@ dependencies = [
  "lightning-pool",
  "lightning-rep-collector",
  "lightning-signer",
+ "lightning-test-utils",
  "lightning-topology",
  "lightning-utils",
  "quinn",

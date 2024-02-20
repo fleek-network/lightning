@@ -5,13 +5,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use bytes::Bytes;
-use fleek_crypto::{
-    AccountOwnerSecretKey,
-    ConsensusSecretKey,
-    NodePublicKey,
-    NodeSecretKey,
-    SecretKey,
-};
+use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use futures::StreamExt;
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
@@ -22,6 +16,7 @@ use lightning_interfaces::{
     partial,
     ApplicationInterface,
     EventHandlerInterface,
+    KeystoreInterface,
     NotifierInterface,
     PoolInterface,
     ReputationAggregatorInterface,
@@ -37,7 +32,8 @@ use lightning_interfaces::{
 };
 use lightning_notifier::Notifier;
 use lightning_rep_collector::ReputationAggregator;
-use lightning_signer::{utils, Config as SignerConfig, Signer};
+use lightning_signer::Signer;
+use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_topology::{Config as TopologyConfig, Topology};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
@@ -46,9 +42,11 @@ use tokio_util::sync::CancellationToken;
 use crate::endpoint::EndpointTask;
 use crate::event::{Event, EventReceiver, Param};
 use crate::{muxer, provider, Config, PoolProvider};
+
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
     PoolInterface = PoolProvider<Self>;
+    KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     NotifierInterface = Notifier<Self>;
     TopologyInterface = Topology<Self>;
@@ -61,8 +59,8 @@ pub struct Peer<C: Collection> {
     // race condition which causes the pool to stop.
     _rep_aggregator: C::ReputationAggregatorInterface,
     _notifier: C::NotifierInterface,
+    _signer: Signer<C>,
     pool: C::PoolInterface,
-    signer: Signer<C>,
     topology: C::TopologyInterface,
     pub node_public_key: NodePublicKey,
     pub node_index: NodeIndex,
@@ -88,7 +86,7 @@ async fn get_pools(
     Application<TestBinding>,
     PathBuffWrapper,
 ) {
-    let mut signers_configs = Vec::new();
+    let mut keystores = Vec::new();
     let mut genesis = Genesis::load().unwrap();
     let path = std::env::temp_dir()
         .join("lightning-pool-test")
@@ -103,18 +101,10 @@ async fn get_pools(
 
     // Create signer configs and add nodes to state.
     for i in 0..num_peers {
-        let node_secret_key = NodeSecretKey::generate();
-        let consensus_secret_key = ConsensusSecretKey::generate();
-        let node_key_path = path.join(format!("node{i}/node.pem"));
-        let consensus_key_path = path.join(format!("node{i}/cons.pem"));
-        utils::save(&node_key_path, node_secret_key.encode_pem()).unwrap();
-        utils::save(&consensus_key_path, consensus_secret_key.encode_pem()).unwrap();
-        let signer_config = SignerConfig {
-            node_key_path: node_key_path.try_into().unwrap(),
-            consensus_key_path: consensus_key_path.try_into().unwrap(),
-        };
-
-        signers_configs.push(signer_config);
+        let keystore = EphemeralKeystore::<TestBinding>::default();
+        let (consensus_secret_key, node_secret_key) =
+            (keystore.get_bls_sk(), keystore.get_ed25519_sk());
+        keystores.push(keystore);
 
         genesis.node_info.push(GenesisNode::new(
             owner_public_key.into(),
@@ -154,13 +144,13 @@ async fn get_pools(
 
     // Create peers.
     let mut peers = Vec::new();
-    for (i, signer_config) in signers_configs.into_iter().enumerate() {
+    for (i, keystore) in keystores.into_iter().enumerate() {
         let address: SocketAddr = format!("0.0.0.0:{}", port_offset + i as u16)
             .parse()
             .unwrap();
         let peer = create_peer(
             &app,
-            signer_config,
+            keystore,
             address,
             true,
             state_server_address_port.map(|port| port + i as u16),
@@ -172,38 +162,27 @@ async fn get_pools(
 }
 
 // Create a peer that is not in state.
-fn create_unknown_peer(
-    path: PathBuf,
-    app: &Application<TestBinding>,
-    peer_id: usize,
-    address: SocketAddr,
-) -> Peer<TestBinding> {
-    let node_secret_key = NodeSecretKey::generate();
-    let consensus_secret_key = ConsensusSecretKey::generate();
-    let node_key_path = path.join(format!("node{peer_id}/node.pem"));
-    let consensus_key_path = path.join(format!("node{peer_id}/cons.pem"));
-    utils::save(&node_key_path, node_secret_key.encode_pem()).unwrap();
-    utils::save(&consensus_key_path, consensus_secret_key.encode_pem()).unwrap();
-    let signer_config = SignerConfig {
-        node_key_path: node_key_path.try_into().unwrap(),
-        consensus_key_path: consensus_key_path.try_into().unwrap(),
-    };
-    create_peer(app, signer_config, address, false, None)
+fn create_unknown_peer(app: &Application<TestBinding>, address: SocketAddr) -> Peer<TestBinding> {
+    let keystore = EphemeralKeystore::default();
+    create_peer(app, keystore, address, false, None)
 }
 
 fn create_peer(
     app: &Application<TestBinding>,
-    signer_config: SignerConfig,
+    keystore: EphemeralKeystore<TestBinding>,
     address: SocketAddr,
     in_state: bool,
     state_server_address_port: Option<u16>,
 ) -> Peer<TestBinding> {
     let query_runner = app.sync_query();
-    let signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+    let node_public_key = keystore.get_ed25519_pk();
+    let signer =
+        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
+            .unwrap();
     let notifier = Notifier::<TestBinding>::init(app);
     let topology = Topology::<TestBinding>::init(
         TopologyConfig::default(),
-        signer.get_ed25519_pk(),
+        node_public_key,
         query_runner.clone(),
     )
     .unwrap();
@@ -225,7 +204,7 @@ fn create_peer(
     };
     let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         config,
-        &signer,
+        keystore.clone(),
         query_runner.clone(),
         notifier.clone(),
         topology.clone(),
@@ -233,7 +212,6 @@ fn create_peer(
     )
     .unwrap();
 
-    let node_public_key = signer.get_ed25519_pk();
     let node_index = if in_state {
         query_runner.pubkey_to_index(&node_public_key).unwrap()
     } else {
@@ -243,7 +221,7 @@ fn create_peer(
     Peer::<TestBinding> {
         _rep_aggregator: rep_aggregator,
         _notifier: notifier,
-        signer,
+        _signer: signer,
         topology,
         pool,
         node_public_key,
@@ -265,8 +243,7 @@ fn event_receiver(
     let query_runner = app.sync_query();
     let topology = peer.topology.clone();
     let notifier = peer._notifier.clone();
-    let (_, sk) = peer.signer.get_sk();
-    let pk = sk.to_pk();
+    let pk = peer.node_public_key;
 
     let (event_tx, event_rx) = mpsc::channel(8);
     let (endpoint_task_tx, endpoint_task_rx) = mpsc::channel(8);
@@ -334,9 +311,7 @@ async fn test_send_to_all() {
     let port_offset = 49000;
     let (peers, app, path) = get_pools("send_to_all", port_offset, 4, None).await;
     let unknown_peer = create_unknown_peer(
-        path.0.clone(),
         &app,
-        peers.len(),
         format!("0.0.0.0:{}", port_offset + peers.len() as u16)
             .parse()
             .unwrap(),
