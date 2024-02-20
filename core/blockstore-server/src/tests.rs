@@ -4,13 +4,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use blake3_tree::ProofBuf;
-use fleek_crypto::{
-    AccountOwnerSecretKey,
-    ConsensusSecretKey,
-    NodePublicKey,
-    NodeSecretKey,
-    SecretKey,
-};
+use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
@@ -31,6 +25,7 @@ use lightning_interfaces::{
     BlockStoreServerInterface,
     IncrementalPutInterface,
     IndexerInterface,
+    KeystoreInterface,
     NotifierInterface,
     PoolInterface,
     ReputationAggregatorInterface,
@@ -42,7 +37,8 @@ use lightning_interfaces::{
 use lightning_notifier::Notifier;
 use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::ReputationAggregator;
-use lightning_signer::{utils, Config as SignerConfig, Signer};
+use lightning_signer::Signer;
+use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_topology::{Config as TopologyConfig, Topology};
 
 use super::BlockStoreServer;
@@ -54,6 +50,7 @@ partial!(TestBinding {
     BlockStoreServerInterface = BlockStoreServer<Self>;
     ApplicationInterface = Application<Self>;
     PoolInterface = PoolProvider<Self>;
+    KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     NotifierInterface = Notifier<Self>;
     TopologyInterface = Topology<Self>;
@@ -81,7 +78,7 @@ async fn get_peers(
     port_offset: u16,
     num_peers: usize,
 ) -> (Vec<Peer<TestBinding>>, Application<TestBinding>, PathBuf) {
-    let mut signers_configs = Vec::new();
+    let mut keystores = Vec::new();
     let mut genesis = Genesis::load().unwrap();
     let path = std::env::temp_dir()
         .join("blockstore-server-test")
@@ -94,17 +91,10 @@ async fn get_peers(
 
     genesis.node_info = vec![];
     for i in 0..num_peers {
-        let node_secret_key = NodeSecretKey::generate();
-        let consensus_secret_key = ConsensusSecretKey::generate();
-        let node_key_path = path.join(format!("node{i}/node.pem"));
-        let consensus_key_path = path.join(format!("node{i}/cons.pem"));
-        utils::save(&node_key_path, node_secret_key.encode_pem()).unwrap();
-        utils::save(&consensus_key_path, consensus_secret_key.encode_pem()).unwrap();
-        let signer_config = SignerConfig {
-            node_key_path: node_key_path.try_into().unwrap(),
-            consensus_key_path: consensus_key_path.try_into().unwrap(),
-        };
-        signers_configs.push(signer_config);
+        let keystore = EphemeralKeystore::default();
+        let (consensus_secret_key, node_secret_key) =
+            (keystore.get_bls_sk(), keystore.get_ed25519_sk());
+        keystores.push(keystore);
 
         genesis.node_info.push(GenesisNode::new(
             owner_public_key.into(),
@@ -146,13 +136,16 @@ async fn get_peers(
     app.start().await;
 
     let mut peers = Vec::new();
-    for (i, signer_config) in signers_configs.into_iter().enumerate() {
+    for (i, keystore) in keystores.into_iter().enumerate() {
+        let node_public_key = keystore.get_ed25519_pk();
         let query_runner = app.sync_query();
-        let signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+        let signer =
+            Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
+                .unwrap();
         let notifier = Notifier::<TestBinding>::init(&app);
         let topology = Topology::<TestBinding>::init(
             TopologyConfig::default(),
-            signer.get_ed25519_pk(),
+            node_public_key,
             query_runner.clone(),
         )
         .unwrap();
@@ -164,9 +157,13 @@ async fn get_peers(
         )
         .unwrap();
 
-        let indexer =
-            Indexer::<TestBinding>::init(Default::default(), query_runner.clone(), &signer)
-                .unwrap();
+        let indexer = Indexer::<TestBinding>::init(
+            Default::default(),
+            query_runner.clone(),
+            keystore.clone(),
+            &signer,
+        )
+        .unwrap();
 
         let config = PoolConfig {
             max_idle_timeout: Duration::from_secs(5),
@@ -177,7 +174,7 @@ async fn get_peers(
         };
         let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
             config,
-            &signer,
+            keystore,
             query_runner,
             notifier,
             topology,
@@ -208,7 +205,7 @@ async fn get_peers(
             blockstore,
             blockstore_server,
             _rep_aggregator: rep_aggregator,
-            node_public_key: signer.get_ed25519_pk(),
+            node_public_key,
         };
         peers.push(peer);
     }

@@ -19,6 +19,7 @@ tracing.workspace = true
 thiserror = "1.0"
 
 [dev-dependencies]
+lightning-test-utils = { path = "../test-utils" }
 lightning-application = { path="../application", features = ["test"] }
 lightning-blockstore = { path = "../blockstore" }
 lightning-indexer = { path = "../indexer" }
