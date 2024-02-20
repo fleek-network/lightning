@@ -1,7 +1,6 @@
 use std::fs::{self, create_dir_all, read_to_string, File};
 use std::io::Write;
 use std::marker::PhantomData;
-use std::ops::Deref;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
@@ -21,8 +20,8 @@ use crate::KeystoreConfig;
 
 #[derive(Clone)]
 pub struct Keystore<C> {
-    node_secret_key: Arc<NodeSecretKey>,
-    consensus_secret_key: Arc<ConsensusSecretKey>,
+    node: Arc<(NodePublicKey, NodeSecretKey)>,
+    consensus: Arc<(ConsensusPublicKey, ConsensusSecretKey)>,
     _p: PhantomData<C>,
 }
 
@@ -33,46 +32,49 @@ impl<C> ConfigConsumer for Keystore<C> {
 
 impl<C: Collection> KeystoreInterface<C> for Keystore<C> {
     fn init(config: Self::Config) -> anyhow::Result<Self> {
-        let node_secret_key = if config.node_key_path.exists() {
+        let node = if config.node_key_path.exists() {
             let encoded =
                 read_to_string(&config.node_key_path).context("Failed to read node pem file")?;
-            NodeSecretKey::decode_pem(&encoded).context("Failed to decode node pem file")?
+            let sk =
+                NodeSecretKey::decode_pem(&encoded).context("Failed to decode node pem file")?;
+            (sk.to_pk(), sk)
         } else {
             bail!("Node secret key does not exist. Use the CLI to generate keys.");
         }
         .into();
 
-        let consensus_secret_key = if config.consensus_key_path.exists() {
+        let consensus = if config.consensus_key_path.exists() {
             let encoded = read_to_string(&config.consensus_key_path)
                 .context("Failed to read consensus pem file")?;
-            ConsensusSecretKey::decode_pem(&encoded)
-                .context("Failed to decode consensus pem file")?
+            let sk = ConsensusSecretKey::decode_pem(&encoded)
+                .context("Failed to decode consensus pem file")?;
+            (sk.to_pk(), sk)
         } else {
             bail!("Consensus secret key does not exist. Use the CLI to generate keys.");
         }
         .into();
 
         Ok(Self {
-            node_secret_key,
-            consensus_secret_key,
+            node,
+            consensus,
             _p: PhantomData,
         })
     }
 
     fn get_ed25519_pk(&self) -> NodePublicKey {
-        self.node_secret_key.to_pk()
+        self.node.0
     }
 
     fn get_ed25519_sk(&self) -> NodeSecretKey {
-        self.node_secret_key.deref().clone()
+        self.node.1.clone()
     }
 
     fn get_bls_pk(&self) -> ConsensusPublicKey {
-        self.consensus_secret_key.to_pk()
+        self.consensus.0
     }
 
     fn get_bls_sk(&self) -> ConsensusSecretKey {
-        self.consensus_secret_key.deref().clone()
+        self.consensus.1.clone()
     }
 
     fn generate_keys(config: Self::Config, accept_partial: bool) -> anyhow::Result<()> {
