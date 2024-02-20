@@ -19,6 +19,7 @@ lightning-service-executor = { path = "../service-executor" }
 lightning-topology = { path = "../topology" }
 lightning-pool = { path = "../pool" }
 lightning-rep-collector = { path = "../rep-collector" }
+lightning-keystore = { path = "../keystore" }
 lightning-signer = { path = "../signer" }
 lightning-blockstore = { path = "../blockstore" }
 lightning-blockstore-server = { path = "../blockstore-server" }

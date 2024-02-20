@@ -6,10 +6,8 @@ use std::time::Duration;
 use fleek_crypto::{
     AccountOwnerSecretKey,
     ConsensusPublicKey,
-    ConsensusSecretKey,
     EthAddress,
     NodePublicKey,
-    NodeSecretKey,
     SecretKey,
 };
 use futures::future::try_join_all;
@@ -29,7 +27,8 @@ use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::webrtc::WebRtcConfig;
 use lightning_interfaces::types::{Blake3Hash, NodePorts, Staking};
-use lightning_interfaces::ConfigProviderInterface;
+use lightning_interfaces::{ConfigProviderInterface, KeystoreInterface};
+use lightning_keystore::{Keystore, KeystoreConfig};
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
 use lightning_pinger::{Config as PingerConfig, Pinger};
@@ -41,7 +40,6 @@ use lightning_resolver::resolver::Resolver;
 use lightning_rpc::config::Config as RpcConfig;
 use lightning_rpc::Rpc;
 use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
-use lightning_signer::{utils, Config as SignerConfig, Signer};
 use lightning_syncronizer::config::Config as SyncronizerConfig;
 use lightning_syncronizer::syncronizer::Syncronizer;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -366,7 +364,7 @@ fn build_config(
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<Signer<FinalTypes>>(SignerConfig {
+    config.inject::<Keystore<FinalTypes>>(KeystoreConfig {
         node_key_path: root
             .join("keys/node.pem")
             .try_into()
@@ -437,19 +435,9 @@ fn build_config(
 fn generate_and_store_node_secret(
     config: &TomlConfigProvider<FinalTypes>,
 ) -> (NodePublicKey, ConsensusPublicKey) {
-    let config = config.get::<Signer<FinalTypes>>();
-
-    let node_secret_key = NodeSecretKey::generate();
-    let node_consensus_secret_key = ConsensusSecretKey::generate();
-
-    utils::save(&config.node_key_path, node_secret_key.encode_pem())
-        .expect("Failed to save node secret key.");
-
-    utils::save(
-        &config.consensus_key_path,
-        node_consensus_secret_key.encode_pem(),
-    )
-    .expect("Failed to save consensus secret key.");
-
-    (node_secret_key.to_pk(), node_consensus_secret_key.to_pk())
+    Keystore::<FinalTypes>::generate_keys(config.get::<Keystore<FinalTypes>>(), true)
+        .expect("failed to ensure keys are generated");
+    let keystore = Keystore::<FinalTypes>::init(config.get::<Keystore<FinalTypes>>())
+        .expect("failed to load keystore");
+    (keystore.get_ed25519_pk(), keystore.get_bls_pk())
 }
