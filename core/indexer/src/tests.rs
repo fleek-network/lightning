@@ -12,20 +12,23 @@ use lightning_interfaces::{
     ApplicationInterface,
     ConsensusInterface,
     IndexerInterface,
+    KeystoreInterface,
     NotifierInterface,
     SignerInterface,
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
-use lightning_signer::{Config as SignerConfig, Signer};
+use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+use lightning_test_utils::keys::EphemeralKeystore;
 use tokio::sync::mpsc;
 
 use crate::Indexer;
 
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
+    KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     ConsensusInterface = MockConsensus<Self>;
     IndexerInterface = Indexer<Self>;
@@ -35,8 +38,9 @@ partial!(TestBinding {
 #[tokio::test]
 async fn test_submission() {
     // Given: some state.
-    let signer_config = SignerConfig::test();
-    let (consensus_secret_key, node_secret_key) = signer_config.load_test_keys();
+    let keystore = EphemeralKeystore::default();
+    let (consensus_secret_key, node_secret_key) =
+        (keystore.get_bls_sk(), keystore.get_ed25519_sk());
     let node_public_key = node_secret_key.to_pk();
     let consensus_public_key = consensus_secret_key.to_pk();
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -113,7 +117,9 @@ async fn test_submission() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+    let mut signer =
+        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
+            .unwrap();
 
     let notifier = Notifier::<TestBinding>::init(&app);
 
@@ -127,6 +133,7 @@ async fn test_submission() {
 
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
+        keystore.clone(),
         &signer,
         update_socket,
         query_runner.clone(),
@@ -147,12 +154,12 @@ async fn test_submission() {
     consensus.start().await;
 
     // Given: our index.
-    let (_, sk) = signer.get_sk();
-    let us = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
+    let us = query_runner.pubkey_to_index(&node_public_key).unwrap();
 
     // Given: an indexer.
     let indexer =
-        Indexer::<TestBinding>::init(Default::default(), query_runner.clone(), &signer).unwrap();
+        Indexer::<TestBinding>::init(Default::default(), query_runner.clone(), keystore, &signer)
+            .unwrap();
 
     // When: we register a cid.
     let cid = [0u8; 32];
