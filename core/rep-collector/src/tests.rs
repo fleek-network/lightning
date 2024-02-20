@@ -18,14 +18,16 @@ use lightning_interfaces::signer::SignerInterface;
 use lightning_interfaces::types::{Block, NodePorts, UpdateMethod, UpdatePayload, UpdateRequest};
 use lightning_interfaces::{
     partial,
+    KeystoreInterface,
     ReputationQueryInteface,
     SyncQueryRunnerInterface,
     ToDigest,
     Weight,
 };
 use lightning_notifier::Notifier;
-use lightning_signer::{Config as SignerConfig, Signer};
+use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::mpsc;
 
@@ -38,27 +40,21 @@ partial!(TestBinding {
     ApplicationInterface = Application<Self>;
     NotifierInterface = Notifier<Self>;
     ConsensusInterface = MockConsensus<Self>;
+    KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
 });
 
-// TODO(matthias): the same struct and `get_genesis_committee` already exist in the application
-// tests. This should be moved to test-utils, however, fot his to work, we have to move the genesis
-// structs to the types interface.
-struct GenesisCommitteeKeystore {
-    _owner_secret_key: AccountOwnerSecretKey,
-    node_secret_key: NodeSecretKey,
-    _consensus_secret_key: ConsensusSecretKey,
-    _worker_secret_key: NodeSecretKey,
-}
-
-fn get_genesis_committee(num_members: usize) -> (Vec<GenesisNode>, Vec<GenesisCommitteeKeystore>) {
-    let mut keystore = Vec::new();
+fn get_genesis_committee(
+    num_members: usize,
+) -> (Vec<GenesisNode>, Vec<EphemeralKeystore<TestBinding>>) {
+    let mut keystores = Vec::new();
     let mut committee = Vec::new();
     (0..num_members).for_each(|i| {
-        let node_secret_key = NodeSecretKey::generate();
-        let node_public_key = node_secret_key.to_pk();
-        let consensus_secret_key = ConsensusSecretKey::generate();
-        let consensus_public_key = consensus_secret_key.to_pk();
+        let keystore = EphemeralKeystore::default();
+        let (consensus_secret_key, node_secret_key) =
+            (keystore.get_bls_sk(), keystore.get_ed25519_sk());
+        let (consensus_public_key, node_public_key) =
+            (consensus_secret_key.to_pk(), node_secret_key.to_pk());
         let owner_secret_key = AccountOwnerSecretKey::generate();
         let owner_public_key = owner_secret_key.to_pk();
 
@@ -81,22 +77,18 @@ fn get_genesis_committee(num_members: usize) -> (Vec<GenesisNode>, Vec<GenesisCo
             None,
             true,
         ));
-        keystore.push(GenesisCommitteeKeystore {
-            _owner_secret_key: owner_secret_key,
-            _worker_secret_key: node_secret_key.clone(),
-            node_secret_key,
-            _consensus_secret_key: consensus_secret_key,
-        });
+        keystores.push(keystore);
     });
-    (committee, keystore)
+    (committee, keystores)
 }
 
 #[tokio::test]
 async fn test_query() {
-    let signer_config = SignerConfig::test();
-    let (consensus_secret_key, node_secret_key) = signer_config.load_test_keys();
-    let node_public_key = node_secret_key.to_pk();
-    let consensus_public_key = consensus_secret_key.to_pk();
+    let keystore = EphemeralKeystore::default();
+    let (consensus_secret_key, node_secret_key) =
+        (keystore.get_bls_sk(), keystore.get_ed25519_sk());
+    let (consensus_public_key, node_public_key) =
+        (consensus_secret_key.to_pk(), node_secret_key.to_pk());
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
@@ -138,7 +130,9 @@ async fn test_query() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+    let mut signer =
+        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
+            .unwrap();
 
     let notifier = Notifier::<TestBinding>::init(&app);
 
@@ -152,6 +146,7 @@ async fn test_query() {
 
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
+        keystore,
         &signer,
         update_socket,
         query_runner.clone(),
@@ -222,10 +217,11 @@ async fn test_query() {
 
 #[tokio::test]
 async fn test_submit_measurements() {
-    let signer_config = SignerConfig::test();
-    let (consensus_secret_key, node_secret_key) = signer_config.load_test_keys();
-    let node_public_key = node_secret_key.to_pk();
-    let consensus_public_key = consensus_secret_key.to_pk();
+    let keystore = EphemeralKeystore::default();
+    let (consensus_secret_key, node_secret_key) =
+        (keystore.get_bls_sk(), keystore.get_ed25519_sk());
+    let (consensus_public_key, node_public_key) =
+        (consensus_secret_key.to_pk(), node_secret_key.to_pk());
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
@@ -300,7 +296,9 @@ async fn test_submit_measurements() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer = Signer::<TestBinding>::init(signer_config, query_runner.clone()).unwrap();
+    let mut signer =
+        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
+            .unwrap();
 
     let notifier = Notifier::<TestBinding>::init(&app);
 
@@ -313,6 +311,7 @@ async fn test_submit_measurements() {
     };
     let consensus = MockConsensus::<TestBinding>::init(
         consensus_config,
+        keystore,
         &signer,
         update_socket,
         query_runner.clone(),
@@ -395,12 +394,14 @@ async fn test_reputation_calculation_and_query() {
     // have reported measurements. Therefore, we need to create two reputation aggregators, two
     // signers, and two consensus services that will receive a socket for the same application
     // service.
-    let signer_config1 = SignerConfig::test();
-    let signer_config2 = SignerConfig::test2();
-    let (consensus_secret_key1, node_secret_key1) = signer_config1.load_test_keys();
-    let (consensus_secret_key2, node_secret_key2) = signer_config2.load_test_keys();
+    let keystore1 = EphemeralKeystore::default();
+    let keystore2 = EphemeralKeystore::default();
+    let (consensus_secret_key1, node_secret_key1) =
+        (keystore1.get_bls_sk(), keystore1.get_ed25519_sk());
+    let (consensus_secret_key2, node_secret_key2) =
+        (keystore2.get_bls_sk(), keystore2.get_ed25519_sk());
 
-    let (committee, mut keystore) = get_genesis_committee(4);
+    let (committee, mut keystores) = get_genesis_committee(4);
     let mut genesis = Genesis::load().unwrap();
     let chain_id = genesis.chain_id;
 
@@ -430,12 +431,7 @@ async fn test_reputation_calculation_and_query() {
         None,
         true,
     ));
-    keystore.push(GenesisCommitteeKeystore {
-        _owner_secret_key: owner_secret_key1,
-        node_secret_key: node_secret_key1.clone(),
-        _consensus_secret_key: consensus_secret_key1,
-        _worker_secret_key: node_secret_key1.clone(),
-    });
+    keystores.push(keystore1.clone());
 
     let node_public_key2 = node_secret_key2.to_pk();
     let consensus_public_key2 = consensus_secret_key2.to_pk();
@@ -461,12 +457,7 @@ async fn test_reputation_calculation_and_query() {
         None,
         true,
     ));
-    keystore.push(GenesisCommitteeKeystore {
-        _owner_secret_key: owner_secret_key2,
-        node_secret_key: node_secret_key2.clone(),
-        _consensus_secret_key: consensus_secret_key2,
-        _worker_secret_key: node_secret_key2.clone(),
-    });
+    keystores.push(keystore2.clone());
 
     let epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -491,8 +482,12 @@ async fn test_reputation_calculation_and_query() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer1 = Signer::<TestBinding>::init(signer_config1, query_runner.clone()).unwrap();
-    let mut signer2 = Signer::<TestBinding>::init(signer_config2, query_runner.clone()).unwrap();
+    let mut signer1 =
+        Signer::<TestBinding>::init(Default::default(), keystore1.clone(), query_runner.clone())
+            .unwrap();
+    let mut signer2 =
+        Signer::<TestBinding>::init(Default::default(), keystore2.clone(), query_runner.clone())
+            .unwrap();
 
     let notifier1 = Notifier::<TestBinding>::init(&app);
     let notifier2 = Notifier::<TestBinding>::init(&app);
@@ -508,6 +503,7 @@ async fn test_reputation_calculation_and_query() {
     let update_socket = update_socket;
     let consensus1 = MockConsensus::<TestBinding>::init(
         consensus_config.clone(),
+        keystore1.clone(),
         &signer1,
         update_socket.clone(),
         query_runner.clone(),
@@ -519,6 +515,7 @@ async fn test_reputation_calculation_and_query() {
 
     let consensus2 = MockConsensus::<TestBinding>::init(
         consensus_config,
+        keystore2.clone(),
         &signer2,
         update_socket.clone(),
         query_runner.clone(),
@@ -576,10 +573,10 @@ async fn test_reputation_calculation_and_query() {
     // note(dalton): Refactored to not include measurements for non white listed nodes so have to
     // switch Alice and bob to the keys we added to the committee
     let alice = query_runner
-        .pubkey_to_index(&keystore[0].node_secret_key.to_pk())
+        .pubkey_to_index(&keystores[0].get_ed25519_pk())
         .unwrap();
     let bob = query_runner
-        .pubkey_to_index(&keystore[1].node_secret_key.to_pk())
+        .pubkey_to_index(&keystores[1].get_ed25519_pk())
         .unwrap();
     rep_reporter1.report_sat(alice, Weight::Strong);
     rep_reporter1.report_ping(alice, Some(Duration::from_millis(100)));
@@ -618,26 +615,25 @@ async fn test_reputation_calculation_and_query() {
     }
 
     // Change epoch to trigger reputation score calculation.
-    let required_signals = 2 * keystore.len() / 3 + 1;
-    for node in keystore.iter().take(required_signals) {
+    let required_signals = 2 * keystores.len() / 3 + 1;
+    for node in keystores.iter().take(required_signals) {
+        let sk = node.get_ed25519_sk();
         let method = UpdateMethod::ChangeEpoch { epoch: 0 };
         // If the committee member is either one of the nodes from this test, we have to increment
         // the nonce, since the nodes already send a transaction containing the measurements.
-        let nonce = if node.node_secret_key == node_secret_key1
-            || node.node_secret_key == node_secret_key2
-        {
+        let nonce = if sk == node_secret_key1 || sk == node_secret_key2 {
             2
         } else {
             1
         };
         let payload = UpdatePayload {
-            sender: node.node_secret_key.to_pk().into(),
+            sender: node.get_ed25519_pk().into(),
             nonce,
             method,
             chain_id,
         };
         let digest = payload.to_digest();
-        let signature = node.node_secret_key.sign(&digest);
+        let signature = sk.sign(&digest);
         let req = UpdateRequest {
             signature: signature.into(),
             payload,
