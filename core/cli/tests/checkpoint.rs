@@ -22,6 +22,7 @@ use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::webrtc::WebRtcConfig;
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::{ApplicationInterface, ConfigProviderInterface};
+use lightning_keystore::{Keystore, KeystoreConfig};
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
 use lightning_pinger::{Config as PingerConfig, Pinger};
@@ -32,7 +33,6 @@ use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
 use lightning_rpc::{Config as RpcConfig, Rpc};
 use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
-use lightning_signer::{Config as SignerConfig, Signer};
 use lightning_syncronizer::config::Config as SyncronizerConfig;
 use lightning_syncronizer::syncronizer::Syncronizer;
 use lightning_types::{HandshakePorts, NodePorts};
@@ -45,7 +45,7 @@ const NUM_RESTARTS: u16 = 3;
 fn build_config(
     path: &Path,
     genesis: Genesis,
-    signer_config: SignerConfig,
+    keystore_config: KeystoreConfig,
     ports: NodePorts,
 ) -> TomlConfigProvider<FinalTypes> {
     let config = TomlConfigProvider::<FinalTypes>::default();
@@ -85,7 +85,7 @@ fn build_config(
     //        .expect("Failed to resolve path"),
     //});
 
-    config.inject::<Signer<FinalTypes>>(signer_config);
+    config.inject::<Keystore<FinalTypes>>(keystore_config);
 
     config.inject::<Broadcast<FinalTypes>>(BroadcastConfig {});
 
@@ -151,7 +151,7 @@ async fn node_checkpointing() -> Result<()> {
         std::fs::remove_dir_all(&path).unwrap();
     }
 
-    let signer_config = SignerConfig::test();
+    let signer_config = KeystoreConfig::test();
     let node_secret_key =
         read_to_string(&signer_config.node_key_path).context("Failed to read node pem file")?;
     let node_secret_key =

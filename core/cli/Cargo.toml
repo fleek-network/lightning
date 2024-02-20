@@ -13,9 +13,8 @@ lightning-types = { path = "../types" }
 lightning-utils = { path = "../utils" }
 mock = { path = "../mock" }
 
-# TODO: cli ideally shouldn't depend on these directly
+# TODO: cli ideally shouldn't depend on this directly
 lightning-application = { path = "../application" }
-lightning-signer = { path = "../signer" }
 
 fleek-crypto.workspace = true
 resolved-pathbuf.workspace = true
@@ -46,6 +45,7 @@ lightning-handshake = { path = "../handshake" }
 lightning-service-executor = { path = "../service-executor" }
 lightning-pool = { path = "../pool" }
 lightning-rep-collector = { path = "../rep-collector" }
+lightning-keystore = { path = "../keystore" }
 lightning-signer = { path = "../signer" }
 lightning-blockstore = { path = "../blockstore" }
 lightning-blockstore-server = { path = "../blockstore-server" }

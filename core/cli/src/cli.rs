@@ -3,7 +3,6 @@ use clap::Parser;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::{FinalTypes, WithMockConsensus};
-use lightning_signer::Signer;
 use resolved_pathbuf::ResolvedPathBuf;
 use tracing::{info, warn};
 use tracing_subscriber::prelude::*;
@@ -43,7 +42,7 @@ impl Cli {
 
     pub async fn exec_with_custom_start_shutdown<C>(self, cb: CustomStartShutdown<C>) -> Result<()>
     where
-        C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterface = Signer<C>>,
+        C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
     {
         self.setup_logging(false);
         let config_path = self.resolve_config_path()?;
@@ -56,7 +55,7 @@ impl Cli {
         custom_start_shutdown: Option<CustomStartShutdown<C>>,
     ) -> Result<()>
     where
-        C: Collection<ConfigProviderInterface = TomlConfigProvider<C>, SignerInterface = Signer<C>>,
+        C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
     {
         match self.args.cmd {
             Command::Run => run::exec::<C>(config_path, custom_start_shutdown).await,

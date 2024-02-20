@@ -1,6 +1,4 @@
-use std::fs::read_to_string;
 use std::io::stdin;
-use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, Context, Result};
@@ -14,9 +12,8 @@ use fleek_crypto::{
 use lightning_application::genesis::Genesis;
 use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::ToDigest;
+use lightning_interfaces::{KeystoreInterface, ToDigest};
 use lightning_node::config::TomlConfigProvider;
-use lightning_signer::Signer;
 use lightning_types::{
     ChainId,
     Epoch,
@@ -35,10 +32,7 @@ use serde_json::json;
 
 use crate::args::OptSubCmd;
 
-pub async fn exec<C: Collection<SignerInterface = Signer<C>>>(
-    cmd: OptSubCmd,
-    config_path: ResolvedPathBuf,
-) -> Result<()> {
+pub async fn exec<C: Collection>(cmd: OptSubCmd, config_path: ResolvedPathBuf) -> Result<()> {
     match cmd {
         OptSubCmd::In => opt_in::<C>(config_path).await,
         OptSubCmd::Out => opt_out::<C>(config_path).await,
@@ -46,17 +40,13 @@ pub async fn exec<C: Collection<SignerInterface = Signer<C>>>(
     }
 }
 
-async fn opt_in<C: Collection<SignerInterface = Signer<C>>>(
-    config_path: ResolvedPathBuf,
-) -> Result<()> {
+async fn opt_in<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
     println!(
         "After sending the OptIn transaction, you are expected to start your node immediately. Is your node built and ready to start? (y/N)"
     );
     get_user_confirmation();
 
-    let config = Arc::new(TomlConfigProvider::<C>::load_or_write_config(config_path).await?);
-    let secret_key = load_secret_key(config.clone())?;
-    let public_key = secret_key.to_pk();
+    let (public_key, secret_key) = load_secret_key::<C>(config_path).await?;
 
     let rpc_client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
@@ -116,17 +106,13 @@ async fn opt_in<C: Collection<SignerInterface = Signer<C>>>(
     Ok(())
 }
 
-async fn opt_out<C: Collection<SignerInterface = Signer<C>>>(
-    config_path: ResolvedPathBuf,
-) -> Result<()> {
+async fn opt_out<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
     println!(
         "Even after sending the OptOut transaction, your node is expected to stay online until the end of the current epoch. Do you want to continue? (y/N)"
     );
     get_user_confirmation();
 
-    let config = Arc::new(TomlConfigProvider::<C>::load_or_write_config(config_path).await?);
-    let secret_key = load_secret_key(config.clone())?;
-    let public_key = secret_key.to_pk();
+    let (public_key, secret_key) = load_secret_key::<C>(config_path).await?;
 
     let rpc_client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
@@ -176,12 +162,8 @@ async fn opt_out<C: Collection<SignerInterface = Signer<C>>>(
     Ok(())
 }
 
-async fn status<C: Collection<SignerInterface = Signer<C>>>(
-    config_path: ResolvedPathBuf,
-) -> Result<()> {
-    let config = Arc::new(TomlConfigProvider::<C>::load_or_write_config(config_path).await?);
-    let secret_key = load_secret_key(config.clone())?;
-    let public_key = secret_key.to_pk();
+async fn status<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
+    let (public_key, _secret_key) = load_secret_key::<C>(config_path).await?;
 
     let rpc_client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
@@ -247,19 +229,15 @@ async fn get_epoch_end_delta(
     Ok(Duration::from_millis(delta))
 }
 
-fn load_secret_key<C: Collection<SignerInterface = Signer<C>>>(
-    config: Arc<TomlConfigProvider<C>>,
-) -> Result<NodeSecretKey> {
-    let signer_config = config.get::<C::SignerInterface>();
-    if signer_config.node_key_path.exists() {
-        let node_secret_key =
-            read_to_string(&signer_config.node_key_path).context("Failed to read node pem file")?;
-        let node_secret_key = NodeSecretKey::decode_pem(&node_secret_key)
-            .context("Failed to decode node pem file")?;
-        Ok(node_secret_key)
-    } else {
-        Err(anyhow::anyhow!("Node public key does not exist"))
-    }
+async fn load_secret_key<C: Collection>(
+    config_path: ResolvedPathBuf,
+) -> Result<(NodePublicKey, NodeSecretKey)> {
+    let provider = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
+    let config = provider.get::<C::KeystoreInterface>();
+    C::KeystoreInterface::init(config).map(|keystore| {
+        let sk = keystore.get_ed25519_sk();
+        (sk.to_pk(), sk)
+    })
 }
 
 fn create_update_request(
