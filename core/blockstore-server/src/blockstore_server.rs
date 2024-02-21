@@ -37,6 +37,7 @@ use lightning_interfaces::{
     ServiceScope,
     WithStartAndShutdown,
 };
+use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, Notify};
 use tokio::task::JoinSet;
@@ -192,6 +193,11 @@ impl<C: Collection> BlockstoreServerInner<C> {
                                                 num_responses,
                                                 rep_reporter,
                                             ).await;
+
+                                            increment_counter!(
+                                                "blockstore_server_handle_request",
+                                                Some("Counter for number of blockstore requests handled by this node")
+                                            );
                                         });
                                     } else {
                                         self.num_responses.fetch_sub(1, Ordering::Release);
@@ -221,13 +227,27 @@ impl<C: Collection> BlockstoreServerInner<C> {
                                 let peer_request_ = peer_request.clone();
                                 let rep_reporter = self.rep_reporter.clone();
                                 tasks.spawn(async move {
-                                    send_request::<C>(
+                                    let res = send_request::<C>(
                                         task.request.peer,
                                         peer_request_,
                                         blockstore,
                                         pool_requester,
                                         rep_reporter,
-                                    ).await
+                                    ).await;
+
+                                    if res.is_ok() {
+                                        increment_counter!(
+                                           "blockstore_server_send_request_ok",
+                                           Some("Counter for the number of successful blockstore requests made")
+                                        );
+                                    } else {
+                                        increment_counter!(
+                                            "blockstore_servier_send_request_err",
+                                            Some("Counter for the number of failed blockstore requests made")
+                                        );
+                                    }
+
+                                    res
                                 });
                             } else {
                                 queue.push_back(peer_request.clone());
@@ -411,6 +431,7 @@ async fn handle_request<C: Collection>(
     } else {
         request.reject(RejectReason::ContentNotFound);
     }
+
     num_responses.fetch_sub(1, Ordering::Release);
 }
 
