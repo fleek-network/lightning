@@ -18,6 +18,7 @@ use lightning_interfaces::{
     SubmitTxSocket,
     WithStartAndShutdown,
 };
+use lightning_metrics::increment_counter_by;
 use queue_file::QueueFile;
 use tokio::sync::{mpsc, Notify};
 use tracing::error;
@@ -155,6 +156,13 @@ impl AggregatorInner {
                             }
                         });
                     }
+
+                    increment_counter_by!(
+                        num_dacks_taken,
+                        "dack_aggregator_processed",
+                        Some("Number of delivery acknowledgments aggregated")
+                    );
+
                     // After sending the transaction, we remove the DACKs we sent from the queue.
                     (0..num_dacks_taken).for_each(|_| {
                         // TODO(matthias): should we only remove them after we verified that the transaction was
