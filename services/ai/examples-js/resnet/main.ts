@@ -1,4 +1,7 @@
 import { CLASSES } from "./imagenet.ts";
+import {
+  deserialize, serialize
+} from "https://deno.land/x/mongo@v0.31.0/deps.ts";
 
 const input = document.querySelector("input");
 const output = document.querySelector("output");
@@ -14,6 +17,12 @@ interface Outputs {
 
 input!.addEventListener("change", async () => {
   if (input!.files && input!.files.length > 0) {
+    const serializedImage = await input!.files[0].arrayBuffer()
+    const body = serialize({
+      "type": "array",
+      "encoding": "raw",
+      "data": new Uint8Array(serializedImage),
+    });
     const resp = await fetch(
       "http://127.0.0.1:4220/services/2/blake3/f2700c0d695006d953ca920b7eb73602b5aef7dbe7b6506d296528f13ebf0d95",
       {
@@ -21,13 +30,14 @@ input!.addEventListener("change", async () => {
         headers: {
           accept: "application/json",
         },
-        body: await input!.files[0].arrayBuffer(),
+        body: body,
       },
     );
 
-    const results: SessionOutput = await resp.json();
-    const array = results.outputs["output"];
-    const bestPrediction = array.indexOf(Math.max(...array));
+    const payload = await resp.arrayBuffer();
+    const bson = deserialize(new Uint8Array(payload));
+    const logits = bson.outputs.logits;
+    const bestPrediction = logits.indexOf(Math.max(...logits));
     const name = CLASSES[bestPrediction];
 
     if (output) {
