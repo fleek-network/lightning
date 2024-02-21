@@ -25,12 +25,12 @@ impl Session {
     pub fn run(&self, input: Bytes) -> anyhow::Result<Output> {
         let input = bson::from_slice::<Input>(&input).context("failed to deserialize input")?;
         let (_encoding, outputs) = match input {
-            Input::Array { encoding, data }  => {
+            Input::Array { encoding, data } => {
                 let tensor = numpy::load_tensor_from_mem(&data)?;
                 let value: Value = tensor.try_into()?;
                 (encoding, self.onnx.run(SessionInputs::from([value]))?)
             },
-            Input::Map { encoding, data} => {
+            Input::Map { encoding, data } => {
                 let session_input = process_map_input(data)?;
                 (encoding, self.onnx.run(session_input)?)
             },

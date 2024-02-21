@@ -3472,6 +3472,7 @@ dependencies = [
  "anyhow",
  "base64 0.21.5",
  "bincode",
+ "bson",
  "common",
  "image",
  "ndarray",
@@ -3479,7 +3480,6 @@ dependencies = [
  "npyz",
  "raqote",
  "reqwest",
- "serde_json",
  "tokio",
 ]
 

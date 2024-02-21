@@ -3,8 +3,10 @@ use std::path::Path;
 
 use anyhow::bail;
 use base64::Engine;
+use bson::spec::BinarySubtype;
+use bson::{Binary, Document};
 use common::imagenet::CLASSES;
-use common::{to_array_d, Input, Output};
+use common::to_array_d;
 use image::GenericImageView;
 use ndarray::{Array, Axis};
 use ndarray_npy::WriteNpyExt;
@@ -39,11 +41,15 @@ async fn main() -> anyhow::Result<()> {
     let mut buffer = Vec::new();
     input.write_npy(Cursor::new(&mut buffer))?;
 
-    let payload = serde_json::to_string(&Input::Raw(buffer.into()))?;
+    let payload = bson::bson!({
+        "type": "array",
+        "encoding": "npy",
+        "data": bson::Bson::Binary(Binary { subtype: BinarySubtype::Generic, bytes: buffer })
+    });
 
     // Send service a request.
     let resp = reqwest::Client::new().post("http://127.0.0.1:4220/services/2/blake3/f2700c0d695006d953ca920b7eb73602b5aef7dbe7b6506d296528f13ebf0d95")
-        .body(Body::from(payload.into_bytes()))
+        .body(Body::from(bson::to_vec(&payload)?))
         .send().await?;
 
     if !resp.status().is_success() {
@@ -53,10 +59,11 @@ async fn main() -> anyhow::Result<()> {
 
     // Process json response and prepare output.
     let data = resp.bytes().await?;
-    let outputs: Output = serde_json::from_slice(data.as_ref())?;
+    let outputs = Document::from_reader(Cursor::new(data))?;
+    let outputs = outputs.get_document("outputs")?;
 
     // Decode output.
-    let npy = base64::prelude::BASE64_STANDARD.decode(outputs.outputs.get("output").unwrap())?;
+    let npy = base64::prelude::BASE64_STANDARD.decode(outputs.get_str("output").unwrap())?;
     let npy_file = npyz::NpyFile::new(Cursor::new(npy)).unwrap();
 
     // Conver to ndarray::Array.

@@ -14,7 +14,7 @@ ndarray-npy = "0.8"
 npyz = "0.8"
 raqote = { version = "0.8", default-features = false }
 reqwest = "0.11"
-serde_json.workspace = true
+bson = "2.9"
 tokio.workspace = true
 common = { path = "../common" }
 
