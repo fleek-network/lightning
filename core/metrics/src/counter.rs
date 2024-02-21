@@ -10,11 +10,27 @@ static COUNTERS: Lazy<DashMap<String, IntCounterVec>> = Lazy::new(DashMap::new);
 pub use stdext::function_name;
 
 pub trait Counter {
-    fn increment(family: &str, description: Option<&str>, labels: &[&str], label_values: &[&str]);
+    fn increment_by(
+        count: u64,
+        family: &str,
+        description: Option<&str>,
+        labels: &[&str],
+        label_values: &[&str],
+    );
+
+    fn increment(family: &str, description: Option<&str>, labels: &[&str], label_values: &[&str]) {
+        Self::increment_by(1, family, description, labels, label_values);
+    }
 }
 
 impl Counter for Labels {
-    fn increment(family: &str, description: Option<&str>, labels: &[&str], label_values: &[&str]) {
+    fn increment_by(
+        count: u64,
+        family: &str,
+        description: Option<&str>,
+        labels: &[&str],
+        label_values: &[&str],
+    ) {
         let existing_labels: Option<Vec<_>> = {
             if let Some(existing_counter) = COUNTERS.get(family) {
                 let families = existing_counter.clone().collect();
@@ -50,13 +66,13 @@ impl Counter for Labels {
             register_int_counter_vec!(family, description.unwrap_or_default(), labels).unwrap()
         });
 
-        counter.with_label_values(label_values).inc();
+        counter.with_label_values(label_values).inc_by(count);
     }
 }
 
 #[macro_export]
-macro_rules! increment_counter {
-    ($family:expr, $description:expr $(, $($label:expr => $value:expr),*)?) => {
+macro_rules! increment_counter_by {
+    ($count:expr, $family:expr, $description:expr $(, $($label:expr => $value:expr),*)?) => {
         {
             let function =
                 $crate::labels::Labels::extract_fn_name($crate::histogram::function_name!());
@@ -71,9 +87,16 @@ macro_rules! increment_counter {
             let all_values: Vec<_> = default_labels
                 .iter().map(|a| a.1).chain(additional_values).collect();
 
-            <$crate::labels::Labels as $crate::counter::Counter>::increment(
-                $family, $description, &all_labels, &all_values
+            <$crate::labels::Labels as $crate::counter::Counter>::increment_by(
+                $count, $family, $description, &all_labels, &all_values
             );
         }
+    };
+}
+
+#[macro_export]
+macro_rules! increment_counter {
+    ($family:expr, $description:expr $(, $($label:expr => $value:expr),*)?) => {
+        $crate::increment_counter_by!(1u64, $family, $description$(, $($label => $value),*)?)
     };
 }
