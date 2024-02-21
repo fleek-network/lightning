@@ -15,7 +15,6 @@ ndarray-npy = "0.8"
 npyz = "0.8"
 rand = "0.8"
 reqwest = "0.11"
-serde_json.workspace = true
 tokenizers = { version = "0.15", default-features = false, features = [ "onig", "http" ] }
 tokio.workspace = true
 common = { path = "../common" }
