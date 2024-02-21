@@ -9,10 +9,27 @@ use crate::utils::{is_valid_proof_len, Digest, OwnedDigest};
 
 pub struct IncrementalVerifier<const COLLECT: bool> {
     iv: IV,
-    stack: SmallVec<[[u8; 32]; 8]>,
+    /// static capacity of 12 allows for:
+    /// 1. 64 hashes if `COLLECT`
+    /// 2. 4096 hashes otherwise
+    /// without a need for heap allocation.
+    stack: SmallVec<[[u8; 32]; 12]>,
+    /// Number of items in the stack that are a result of a merge, which is basically
+    /// the current depth of the tree.
     parent_count: u8,
-    // Used as a counter if `COLLECT` otherwise is only treated as a boolean indicating
-    // `!could_be_root`.
+    /// Used as a counter if `COLLECT` otherwise is only treated as a boolean indicating
+    /// `!could_be_root`.
+    counter: usize,
+    tree: Vec<[u8; 32]>,
+}
+
+trait CollectorStorage {
+    const COLLECT: bool;
+
+    fn advance(&mut self) -> u8;
+}
+
+pub struct CollectToVec {
     counter: usize,
     tree: Vec<[u8; 32]>,
 }
@@ -94,8 +111,8 @@ impl<const COLLECT: bool> IncrementalVerifier<COLLECT> {
         // Now we have to reverse the extension we made to both stacks.
         self.stack[old_stack_len..].reverse();
         if !COLLECT {
-            // if !collect counter is simply used to indicate `could_be_root`.
-            self.counter = 1;
+            // if !collect parent_count is simply used to indicate `could_be_root`.
+            self.parent_count = 1;
         }
 
         Ok(())
@@ -145,7 +162,9 @@ impl<const COLLECT: bool> IncrementalVerifier<COLLECT> {
         let right = stack.pop().unwrap();
         let left = stack.pop().unwrap();
         let hash = self.iv.merge(&left, &right, is_root);
-        self.parent_count += 1;
+        if COLLECT {
+            self.parent_count += 1;
+        }
 
         if hash != expected_hash {
             return Err(VerificationError::HashMismatch(
@@ -199,7 +218,12 @@ impl<const COLLECT: bool> IncrementalVerifier<COLLECT> {
 
     /// Returns true if the given hasher is meant to be finalized with the root flag set to true.
     pub fn is_root(&self) -> bool {
-        self.stack.len() == 1 && self.counter == 0
+        self.stack.len() == 1
+            && if COLLECT {
+                self.counter == 0
+            } else {
+                self.parent_count == 0
+            }
     }
 
     /// Returns true if the verifier has met all the content and is in a terminating state.
@@ -338,22 +362,70 @@ mod tests {
         // println!("{}", std::mem::size_of::<IncrementalVerifier<false>>());
     }
 
+    #[test]
+    fn is_root() {
+        let tree_buffer = dir_hash_tree(1);
+        let hashtree = HashTree::try_from(&tree_buffer).unwrap();
+        let mut verifier = IncrementalVerifier::<true>::dir();
+        verifier.set_root_hash(*hashtree.root());
+        verifier
+            .feed_proof(hashtree.generate_proof(Mode::Initial, 0).as_slice())
+            .unwrap();
+        assert!(verifier.is_root());
+
+        let tree_buffer = dir_hash_tree(1);
+        let hashtree = HashTree::try_from(&tree_buffer).unwrap();
+        let mut verifier = IncrementalVerifier::<false>::dir();
+        verifier.set_root_hash(*hashtree.root());
+        verifier
+            .feed_proof(hashtree.generate_proof(Mode::Initial, 0).as_slice())
+            .unwrap();
+        assert!(verifier.is_root());
+
+        let tree_buffer = dir_hash_tree(2);
+        let hashtree = HashTree::try_from(&tree_buffer).unwrap();
+        let mut verifier = IncrementalVerifier::<true>::dir();
+        verifier.set_root_hash(*hashtree.root());
+        verifier
+            .feed_proof(hashtree.generate_proof(Mode::Initial, 0).as_slice())
+            .unwrap();
+        assert!(!verifier.is_root());
+
+        let tree_buffer = dir_hash_tree(2);
+        let hashtree = HashTree::try_from(&tree_buffer).unwrap();
+        let mut verifier = IncrementalVerifier::<false>::dir();
+        verifier.set_root_hash(*hashtree.root());
+        verifier
+            .feed_proof(hashtree.generate_proof(Mode::Initial, 0).as_slice())
+            .unwrap();
+        assert!(!verifier.is_root());
+
+        let tree_buffer = dir_hash_tree(2);
+        let hashtree = HashTree::try_from(&tree_buffer).unwrap();
+        let mut verifier = IncrementalVerifier::<false>::dir();
+        verifier.set_root_hash(*hashtree.root());
+        verifier
+            .feed_proof(hashtree.generate_proof(Mode::Initial, 1).as_slice())
+            .unwrap();
+        assert!(!verifier.is_root());
+    }
+
     // #[test]
     // fn x() {
     //     for n in 1..256 {
     //         let example_tree = dir_hash_tree(n);
     //         let example_hashtree = HashTree::try_from(&example_tree).unwrap();
-
+    //
     //         let mut verifier = IncrementalVerifier::<true>::dir();
     //         verifier.set_root_hash(*example_hashtree.root());
-
+    //
     //         let proof = example_hashtree.generate_proof(Mode::Initial, 0);
     //         verifier.feed_proof(proof.as_slice()).unwrap();
-    //         println!(
-    //             "n={n} -> pc={} -> s={}",
-    //             verifier.parent_count,
-    //             example_hashtree.len()
-    //         );
+    //         // println!(
+    //         //     "n={n} -> pc={} -> s={}",
+    //         //     verifier.parent_count,
+    //         //     example_hashtree.len()
+    //         // );
     //     }
     // }
 }

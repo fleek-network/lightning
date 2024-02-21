@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use arrayvec::ArrayString;
 
-/// Convert a hash digest to a human readable string.
+/// Convert a hash digest to a human-readable string.
 #[inline]
 pub fn to_hex(slice: &[u8; 32]) -> ArrayString<64> {
     let mut s = ArrayString::new();
@@ -26,6 +26,35 @@ pub const fn previous_pow_of_two(n: usize) -> usize {
 #[inline(always)]
 pub const fn tree_index(block_counter: usize) -> usize {
     2 * block_counter - block_counter.count_ones() as usize
+}
+
+/// Inverse of [`tree_index`].
+pub const fn block_counter_from_tree_index(a: usize) -> Option<usize> {
+    // we can prove these bounds
+    let mut lo = a / 2;
+    let mut hi = lo + (usize::BITS as usize);
+    if hi > a + 1 {
+        hi = a + 1;
+    }
+
+    loop {
+        let mid = (hi + lo) / 2;
+        let n = tree_index(mid);
+
+        if n == a {
+            return Some(mid);
+        }
+
+        if mid == hi || mid == lo {
+            return None;
+        }
+
+        if n > a {
+            hi = mid;
+        } else {
+            lo = mid;
+        }
+    }
 }
 
 /// Given the number of hashes, returns the count of items in the hash tree.
@@ -136,5 +165,12 @@ mod tests {
         assert!(is_valid_proof_len(65));
         assert!(!is_valid_proof_len(66));
         assert!(!is_valid_proof_len(33));
+    }
+
+    #[test]
+    fn tree_index_inv() {
+        for i in 0..10_000 {
+            assert_eq!(Some(i), block_counter_from_tree_index(tree_index(i)));
+        }
     }
 }
