@@ -19,6 +19,7 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
+use lightning_metrics::histogram;
 use lightning_utils::application::QueryRunnerExt;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
@@ -200,9 +201,16 @@ impl<C: Collection> PingerInner<C> {
                                             // the app state?
                                             let key = &(sender, id); // thank you clippy
                                             if let Some(instant) = pending_req.remove(key) {
-                                                let rtt = instant.elapsed();
+                                                let rtt = instant.elapsed() / 2;
+
+                                                histogram!(
+                                                    "pinger_latency",
+                                                    Some("Histogram of all pinger latency measurements"),
+                                                    rtt.as_millis() as f64 / 1000f64
+                                                );
+
                                                 self.rep_reporter
-                                                    .report_ping(sender, Some(rtt / 2));
+                                                    .report_ping(sender, Some(rtt));
                                             }
                                         }
                                     }
