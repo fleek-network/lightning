@@ -7,10 +7,9 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use bytes::Bytes;
 use ort::{SessionInputs, SessionOutputs, TensorElementType, Value, ValueType};
-use serde::{Deserialize, Serialize};
 
 use crate::tensor::numpy;
-use crate::{Encoding, Output};
+use crate::{Encoding, Input, Output};
 
 pub struct Session {
     onnx: ort::Session,
@@ -24,17 +23,16 @@ impl Session {
 
     /// Runs model on the input.
     pub fn run(&self, input: Bytes) -> anyhow::Result<Output> {
-        let input = serde_json::from_slice::<Input>(input.as_ref())
-            .context("failed to deserialize input")?;
-        let outputs = match input {
-            Input::Raw(input) => {
-                let tensor = numpy::load_tensor_from_mem(&input)?;
+        let input = bson::from_slice::<Input>(&input).context("failed to deserialize input")?;
+        let (_encoding, outputs) = match input {
+            Input::Array { encoding, data }  => {
+                let tensor = numpy::load_tensor_from_mem(&data)?;
                 let value: Value = tensor.try_into()?;
-                self.onnx.run(SessionInputs::from([value]))?
+                (encoding, self.onnx.run(SessionInputs::from([value]))?)
             },
-            Input::Map(input) => {
-                let session_input = process_map_input(input)?;
-                self.onnx.run(session_input)?
+            Input::Map { encoding, data} => {
+                let session_input = process_map_input(data)?;
+                (encoding, self.onnx.run(session_input)?)
             },
         };
         serialize_session_outputs(outputs)
@@ -121,12 +119,6 @@ fn serialize_session_outputs(outputs: SessionOutputs) -> anyhow::Result<Output> 
         encoding: Encoding::Npy,
         outputs: result,
     })
-}
-
-#[derive(Deserialize, Serialize)]
-pub enum Input {
-    Raw(Bytes),
-    Map(HashMap<String, Bytes>),
 }
 
 fn process_map_input(input: HashMap<String, Bytes>) -> anyhow::Result<SessionInputs<'static>> {

@@ -1286,6 +1286,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "bson"
+version = "2.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce21468c1c9c154a85696bb25c20582511438edb6ad67f846ba1378ffdd80222"
+dependencies = [
+ "ahash 0.8.7",
+ "base64 0.13.1",
+ "bitvec",
+ "hex",
+ "indexmap 2.1.0",
+ "js-sys",
+ "once_cell",
+ "rand 0.8.5",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "time",
+ "uuid 1.6.1",
+]
+
+[[package]]
 name = "bulletproofs"
 version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3718,6 +3739,7 @@ dependencies = [
  "anyhow",
  "base64 0.21.5",
  "bincode",
+ "bson",
  "bytes",
  "derive_more",
  "fn-sdk",
@@ -3727,7 +3749,6 @@ dependencies = [
  "npyz",
  "ort",
  "serde",
- "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",

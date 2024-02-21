@@ -34,10 +34,9 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
 
         // Run inference.
         let output = session.run(body.into())?;
-        let json_output = serde_json::to_string(&output)?;
+        let serialized_output = bson::to_vec(&output)?;
 
-        // println!("json_output len: {}", json_output.as_bytes().len());
-        connection.write_payload(json_output.as_bytes()).await?;
+        connection.write_payload(&serialized_output).await?;
 
         return Ok(());
     }
@@ -57,8 +56,8 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
     // Process incoming inference requests.
     while let Some(payload) = connection.read_payload().await {
         let output = session.run(payload.freeze())?;
-        let json_output = serde_json::to_string(&output)?;
-        connection.write_payload(json_output.as_bytes()).await?;
+        let serialized_output = bson::to_vec(&output)?;
+        connection.write_payload(&serialized_output).await?;
     }
 
     Ok(())
