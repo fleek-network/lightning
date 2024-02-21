@@ -3,12 +3,11 @@ use std::io::Cursor;
 use std::ops::Deref;
 
 use anyhow::{bail, Context};
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use base64::Engine;
 use bytes::Bytes;
+use ndarray::Array1;
 use ort::{SessionInputs, SessionOutputs, TensorElementType, Value, ValueType};
 
-use crate::tensor::numpy;
+use crate::tensor::{numpy, Tensor};
 use crate::{Encoding, Input, Output};
 
 pub struct Session {
@@ -24,28 +23,36 @@ impl Session {
     /// Runs model on the input.
     pub fn run(&self, input: Bytes) -> anyhow::Result<Output> {
         let input = bson::from_slice::<Input>(&input).context("failed to deserialize input")?;
-        let (_encoding, outputs) = match input {
+        let (encoding, outputs) = match input {
             Input::Array { encoding, data } => {
-                let tensor = numpy::load_tensor_from_mem(&data)?;
+                let tensor = decode_tensor(data, &encoding)?;
                 let value: Value = tensor.try_into()?;
                 (encoding, self.onnx.run(SessionInputs::from([value]))?)
             },
             Input::Map { encoding, data } => {
-                let session_input = process_map_input(data)?;
+                let mut session_input: HashMap<String, Value> = HashMap::new();
+                for (input_name, bytes) in data.into_iter() {
+                    let tensor = decode_tensor(bytes, &encoding)?;
+                    session_input.insert(input_name, tensor.try_into()?);
+                }
+                let session_input: SessionInputs<'static> = session_input.into();
                 (encoding, self.onnx.run(session_input)?)
             },
         };
-        serialize_session_outputs(outputs)
+        serialize_session_outputs(outputs, encoding)
     }
 }
 
-fn serialize_session_outputs(outputs: SessionOutputs) -> anyhow::Result<Output> {
+fn serialize_session_outputs(
+    outputs: SessionOutputs,
+    encoding: Encoding,
+) -> anyhow::Result<Output> {
     let mut result = HashMap::new();
     for (name, value) in outputs.deref().iter() {
         let mut buffer = Vec::new();
         match value.dtype()? {
             ValueType::Tensor { ty, .. } => {
-                let tensor = match ty {
+                let tensor: Tensor = match ty {
                     TensorElementType::Int8 => value
                         .extract_tensor::<i8>()?
                         .view()
@@ -108,24 +115,31 @@ fn serialize_session_outputs(outputs: SessionOutputs) -> anyhow::Result<Output> 
                         .into(),
                     _ => bail!("unsupported value type"),
                 };
-                numpy::convert_to_numpy(Cursor::new(&mut buffer), tensor)?;
+
+                match encoding {
+                    Encoding::Raw => {
+                        buffer = tensor.try_into()?;
+                    },
+                    Encoding::Npy => {
+                        numpy::convert_to_numpy(Cursor::new(&mut buffer), tensor)?;
+                    },
+                }
             },
             _ => bail!("unsupported type for output"),
         }
-        result.insert(name.to_string(), BASE64_STANDARD.encode(buffer));
+        result.insert(name.to_string(), buffer);
     }
 
     Ok(Output {
-        encoding: Encoding::Npy,
+        encoding,
         outputs: result,
     })
 }
 
-fn process_map_input(input: HashMap<String, Bytes>) -> anyhow::Result<SessionInputs<'static>> {
-    let mut mapped_values: HashMap<String, Value> = HashMap::new();
-    for (input_name, bytes) in input.into_iter() {
-        let tensor = numpy::load_tensor_from_mem(&bytes)?;
-        mapped_values.insert(input_name, tensor.try_into()?);
+#[inline]
+fn decode_tensor(data: Bytes, encoding: &Encoding) -> anyhow::Result<Tensor> {
+    match encoding {
+        Encoding::Raw => Ok(Tensor::Uint8D1(Array1::<u8>::from(data.to_vec()))),
+        Encoding::Npy => numpy::load_tensor_from_mem(&data),
     }
-    Ok(mapped_values.into())
 }

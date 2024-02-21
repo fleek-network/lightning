@@ -61,7 +61,7 @@ pub enum Encoding {
 #[derive(Deserialize, Serialize)]
 pub struct Output {
     pub encoding: Encoding,
-    pub outputs: HashMap<String, String>,
+    pub outputs: HashMap<String, Vec<u8>>,
 }
 
 #[tokio::main]

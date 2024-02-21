@@ -1,6 +1,6 @@
 pub mod numpy;
 
-use ndarray::ArrayD;
+use ndarray::{Array1, ArrayD};
 use ort::Value;
 
 // Todo: add support for remaining types.
@@ -13,6 +13,7 @@ pub enum Tensor {
     Uint16(ArrayD<u16>),
     Uint32(ArrayD<u32>),
     Uint64(ArrayD<u64>),
+    Uint8D1(Array1<u8>),
     Float32(ArrayD<f32>),
     Float64(ArrayD<f64>),
 }
@@ -77,6 +78,27 @@ impl From<ArrayD<u64>> for Tensor {
     }
 }
 
+impl From<Array1<u8>> for Tensor {
+    fn from(value: Array1<u8>) -> Self {
+        Self::Uint8D1(value)
+    }
+}
+
+impl TryFrom<Tensor> for Vec<u8> {
+    type Error = std::io::Error;
+
+    fn try_from(value: Tensor) -> Result<Self, Self::Error> {
+        if let Tensor::Uint8D1(array) = value {
+            Ok(array.to_vec())
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "unsupported serialization for tensor variant",
+            ))
+        }
+    }
+}
+
 impl TryFrom<Tensor> for Value {
     type Error = std::io::Error;
 
@@ -104,6 +126,9 @@ impl TryFrom<Tensor> for Value {
                 .try_into()
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
             Tensor::Uint64(array) => array
+                .try_into()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
+            Tensor::Uint8D1(array) => array
                 .try_into()
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
             Tensor::Float32(array) => array
