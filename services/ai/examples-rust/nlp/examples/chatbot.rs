@@ -3,18 +3,19 @@
 // See https://huggingface.co/docs/transformers/en/serialization#exporting-a--transformers-model-to-onnx-with-cli.
 // You can find more info about the model here https://huggingface.co/microsoft/DialoGPT-medium.
 // `tokenizer.json` should be included when you export the model.
-use std::collections::HashMap;
 use std::io;
 use std::io::{Cursor, Write};
 use std::net::SocketAddr;
 
 use anyhow::{anyhow, bail};
 use base64::Engine;
+use bson::spec::BinarySubtype;
+use bson::{Binary, Bson, Document};
 use cdk_rust::schema::ResponseFrame;
 use cdk_rust::transport::tcp::TcpTransport;
 use cdk_rust::Builder;
 use common::service_api::{Device, Origin, StartSession};
-use common::{to_array_d, Input, Output};
+use common::to_array_d;
 use ndarray::{s, Array1, Axis};
 use ndarray_npy::WriteNpyExt;
 use tokenizers::Tokenizer;
@@ -38,9 +39,7 @@ async fn main() -> anyhow::Result<()> {
         origin: Origin::Blake3,
         device: Device::Cpu,
     };
-    sender
-        .send(bincode::serialize(&start_session)?.into())
-        .await?;
+    sender.send(bson::to_vec(&start_session)?.into()).await?;
 
     let mut stdout = io::stdout();
 
@@ -107,22 +106,32 @@ async fn main() -> anyhow::Result<()> {
             input_ids.write_npy(Cursor::new(&mut buffer_input_ids))?;
 
             // Build payload.
-            let mut inputs = HashMap::new();
-            inputs.insert("input_ids".to_string(), buffer_input_ids.into());
-            inputs.insert("attention_mask".to_string(), buffer_attention_mask.into());
-            inputs.insert("position_ids".to_string(), buffer_position_ids.into());
-            let payload = serde_json::to_string(&Input::Map(inputs))?;
+            let inputs = bson::bson!({
+                "input_ids": Bson::Binary(Binary{ subtype: BinarySubtype::Generic, bytes: buffer_input_ids }),
+                "attention_mask": Bson::Binary(Binary{ subtype: BinarySubtype::Generic, bytes: buffer_attention_mask }),
+                "position_ids": Bson::Binary(Binary{ subtype: BinarySubtype::Generic, bytes: buffer_position_ids })
+            });
+            let bson = bson::bson!({
+                "type": "map",
+                "encoding": "npy",
+                "data": inputs,
+            });
+            let payload = bson::to_vec(&bson)?;
 
             // Send service a request.
-            sender.send(payload.into_bytes().into()).await?;
+            sender.send(payload.into()).await?;
             let resp = receiver
                 .recv()
                 .await
                 .ok_or(anyhow!("expected a response from the service"))??;
-            let outputs: Output = match resp {
+            let npy = match resp {
                 ResponseFrame::ServicePayload { bytes } => {
                     // Process json response and prepare output.
-                    serde_json::from_slice(bytes.as_ref())?
+                    let document = Document::from_reader(Cursor::new(bytes))?;
+                    let outputs = document.get_document("outputs")?;
+                    base64::prelude::BASE64_STANDARD
+                        .decode(outputs.get_str("logits")?)
+                        .unwrap()
                 },
                 ResponseFrame::Termination { reason } => {
                     bail!("service terminated the connection: {reason:?}")
@@ -131,9 +140,6 @@ async fn main() -> anyhow::Result<()> {
             };
 
             // Decode output.
-            let npy = base64::prelude::BASE64_STANDARD
-                .decode(outputs.outputs.get("logits").unwrap())
-                .unwrap();
             let npy_file = npyz::NpyFile::new(Cursor::new(npy)).unwrap();
 
             // Convert to ndarray::Array.

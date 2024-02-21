@@ -8,6 +8,7 @@ publish = false
 anyhow = "1.0"
 base64 = "0.21"
 bincode.workspace = true
+bson = "2.9"
 cdk-rust = { path = "../../../../lib/cdk-rust" }
 ndarray = "0.15"
 ndarray-npy = "0.8"

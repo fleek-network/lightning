@@ -46,8 +46,8 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
         return Ok(());
     };
 
-    let message: StartSession =
-        bincode::deserialize(&initial_message).context("Could not deserialize initial message")?;
+    let message = bson::from_slice::<StartSession>(initial_message.as_ref())
+        .context("Could not deserialize initial message")?;
 
     // Load model.
     let model = load_model(message.model, message.origin).await?;
