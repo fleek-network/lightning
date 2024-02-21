@@ -11,6 +11,7 @@ pub use config::WebTransportConfig;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::StreamExt;
 use lightning_interfaces::ExecutorProviderInterface;
+use lightning_metrics::increment_counter;
 use tokio::sync::mpsc::{self, Receiver};
 use tracing::{error, info, warn};
 use wtransport::tls::Certificate;
@@ -84,6 +85,12 @@ impl Transport for WebTransport {
         let (frame, (frame_writer, frame_reader)) = self.conn_rx.recv().await?;
         let (data_tx, data_rx) = async_channel::unbounded();
         tokio::spawn(connection::sender_loop(data_rx, frame_writer));
+
+        increment_counter!(
+            "handshake_webtransport_sessions",
+            Some("Counter for number of handshake sessions accepted over webtransport")
+        );
+
         Some((
             frame,
             WebTransportSender {

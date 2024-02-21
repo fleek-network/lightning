@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use axum::Router;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use lightning_interfaces::ExecutorProviderInterface;
+use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
@@ -73,7 +74,14 @@ impl Transport for TcpTransport {
     async fn accept(
         &mut self,
     ) -> Option<(schema::HandshakeRequestFrame, Self::Sender, Self::Receiver)> {
-        self.rx.recv().await
+        let res = self.rx.recv().await?;
+
+        increment_counter!(
+            "handshake_tcp_sessions",
+            Some("Counter for number of handshake sessions accepted over tcp")
+        );
+
+        Some(res)
     }
 }
 

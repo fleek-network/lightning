@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
 lightning-schema = { path = "../schema" }
+lightning-metrics = { path = "../metrics" }
 fn-sdk = { path = "../../lib/sdk" }
 tracing.workspace = true
 anyhow.workspace = true

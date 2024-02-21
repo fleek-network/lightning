@@ -9,6 +9,7 @@ use axum::Router;
 use bytes::Bytes;
 use dashmap::DashMap;
 use lightning_interfaces::ExecutorProviderInterface;
+use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 use stunclient::StunClient;
 use tokio::sync::mpsc::{channel, Receiver};
@@ -113,6 +114,11 @@ impl Transport for WebRtcTransport {
             current_write: 0,
         };
         let receiver = WebRtcReceiver(receiver);
+
+        increment_counter!(
+            "handshake_webrtc_sessions",
+            Some("Counter for number of handshake sessions accepted over webrtc")
+        );
 
         Some((req, sender, receiver))
     }

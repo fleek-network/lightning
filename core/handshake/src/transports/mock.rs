@@ -6,6 +6,7 @@ use axum::Router;
 use bytes::{BufMut, Bytes, BytesMut};
 use dashmap::DashMap;
 use lightning_interfaces::ExecutorProviderInterface;
+use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
 
@@ -97,6 +98,11 @@ impl Transport for MockTransport {
         // decode handshake frame
         let bytes = receiver.rx.recv().await.ok()?;
         let frame = schema::HandshakeRequestFrame::decode(&bytes).ok()?;
+
+        increment_counter!(
+            "handshake_mock_sessions",
+            Some("Counter for number of handshake sessions accepted over the mock transport")
+        );
 
         Some((frame, sender, receiver))
     }

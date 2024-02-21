@@ -11,6 +11,7 @@ use bytes::Bytes;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use fn_sdk::header::{HttpMethod, TransportDetail};
 use lightning_interfaces::ExecutorProviderInterface;
+use lightning_metrics::increment_counter;
 use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame};
 use tokio::sync::oneshot;
 use url::Url;
@@ -72,6 +73,11 @@ pub async fn handler<P: ExecutorProviderInterface>(
             "unexpected error".to_string(),
         )
     })?;
+
+    increment_counter!(
+        "handshake_http_sessions",
+        Some("Counter for number of handshake sessions accepted over http")
+    );
 
     provider
         .handle_new_connection(handshake_frame, sender, receiver)
