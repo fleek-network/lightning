@@ -10,6 +10,7 @@ use ort::{SessionInputs, SessionOutputs, TensorElementType, Value, ValueType};
 use serde::{Deserialize, Serialize};
 
 use crate::tensor::numpy;
+use crate::{Encoding, Output};
 
 pub struct Session {
     onnx: ort::Session,
@@ -38,12 +39,6 @@ impl Session {
         };
         serialize_session_outputs(outputs)
     }
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Output {
-    pub format: String,
-    pub outputs: HashMap<String, String>,
 }
 
 fn serialize_session_outputs(outputs: SessionOutputs) -> anyhow::Result<Output> {
@@ -123,7 +118,7 @@ fn serialize_session_outputs(outputs: SessionOutputs) -> anyhow::Result<Output> 
     }
 
     Ok(Output {
-        format: "npy".to_string(),
+        encoding: Encoding::Npy,
         outputs: result,
     })
 }
