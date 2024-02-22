@@ -19,15 +19,18 @@ fn build_userspace_application(release: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn run(target: Target, release: bool) -> Result<(), anyhow::Error> {
+pub fn run(target: Target, release: bool, xdp_args: Vec<String>) -> Result<(), anyhow::Error> {
     build::build_bpf_program(target, release)?;
     build_userspace_application(release)?;
 
     let mode = if release { "release" } else { "debug" };
     let bin_path = format!("target/{mode}/xdp-lightning-app");
 
+    let mut xdp_args = xdp_args.iter().map(String::as_str).collect();
+
     let mut args: Vec<_> = vec!["sudo", "-E"];
     args.push(bin_path.as_str());
+    args.append(&mut xdp_args);
 
     let status = Command::new(args.first().expect("args are hardcoded"))
         .args(args.iter().skip(1))

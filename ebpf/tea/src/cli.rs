@@ -12,7 +12,11 @@ impl Cli {
     pub fn exec(self) -> anyhow::Result<()> {
         match self.command {
             Command::Build { target, release } => build::build_bpf_program(target, release),
-            Command::Run { target, release } => run::run(target, release),
+            Command::Run {
+                target,
+                release,
+                xdp_args,
+            } => run::run(target, release, xdp_args),
         }
     }
 }
@@ -36,6 +40,9 @@ pub enum Command {
         /// Run in release mode.
         #[clap(long)]
         release: bool,
+        /// Arguments to pass to the xdp user-space application.
+        #[clap(name = "xdp-args", last = true)]
+        xdp_args: Vec<String>,
     },
 }
 
