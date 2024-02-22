@@ -9,6 +9,8 @@ authors = ["M. Meier <miguel@fleek.xyz>"]
 [dependencies]
 aya-bpf = { git = "https://github.com/aya-rs/aya" }
 aya-log-ebpf = { git = "https://github.com/aya-rs/aya" }
+memoffset = "0.9"
+network-types = "0.0.5"
 
 [profile.dev]
 opt-level = 3

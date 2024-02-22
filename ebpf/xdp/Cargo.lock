@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "autocfg"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
+
+[[package]]
 name = "aya-bpf"
 version = "0.1.0"
 source = "git+https://github.com/aya-rs/aya#0f6a7343926b23190483bed49855fdc9bb10988d"
@@ -74,6 +80,21 @@ source = "git+https://github.com/aya-rs/aya#0f6a7343926b23190483bed49855fdc9bb10
 dependencies = [
  "aya-log-common",
 ]
+
+[[package]]
+name = "memoffset"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a634b1c61a95585bd15607c6ab0c4e5b226e695ff2800ba0cdccddf208c406c"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
+name = "network-types"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f07952b48f02537f3088f517a3cf87372a25372d51991328938531b83a31cb3a"
 
 [[package]]
 name = "num_enum"
@@ -171,4 +192,6 @@ version = "0.0.0"
 dependencies = [
  "aya-bpf",
  "aya-log-ebpf",
+ "memoffset",
+ "network-types",
 ]
