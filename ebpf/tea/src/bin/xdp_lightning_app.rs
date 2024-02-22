@@ -2,10 +2,20 @@ use anyhow::Context;
 use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
+use clap::Parser;
 use tokio::signal;
+
+#[derive(Debug, Parser)]
+struct Opts {
+    /// Interface to attach xdp program to.
+    #[clap(short, long, default_value = "eth0")]
+    iface: String,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    let opt = Opts::parse();
+
     env_logger::init();
 
     #[cfg(debug_assertions)]
@@ -27,7 +37,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .try_into()?;
     program.load()?;
     program
-        .attach("enp0s31f6", XdpFlags::default())
+        .attach(&opt.iface, XdpFlags::default())
         .context("failed to attach the XDP program")?;
 
     log::info!("Enter Ctrl-C to shutdown");
