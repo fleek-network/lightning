@@ -7,6 +7,7 @@ pub mod pairing;
 mod tests;
 
 use std::collections::{BTreeSet, HashMap};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -15,28 +16,31 @@ use divisive::DivisiveHierarchy;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::Participation;
-use lightning_interfaces::{ApplicationInterface, ConfigConsumer, TopologyInterface};
+use lightning_interfaces::{
+    ApplicationInterface,
+    ConfigConsumer,
+    Notification,
+    NotifierInterface,
+    TopologyInterface,
+    WithStartAndShutdown,
+};
 use lightning_utils::application::QueryRunnerExt;
 use ndarray::{Array, Array2};
 use rand::SeedableRng;
-use tracing::info;
+use tokio::sync::{mpsc, Notify};
+use tracing::{error, info};
 
+#[derive(Clone)]
 pub struct Topology<C: Collection> {
     inner: Arc<TopologyInner<C>>,
-}
-
-impl<C: Collection> Clone for Topology<C> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
-    }
+    is_running: Arc<AtomicBool>,
+    shutdown_notify: Arc<Notify>,
 }
 
 struct TopologyInner<C: Collection> {
     query: c!(C::ApplicationInterface::SyncExecutor),
     #[allow(unused)]
-    notifier: C::NotifierInterface,
+    notifier_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
     our_public_key: NodePublicKey,
     // TODO(qti3e): Use ArcSwap instead.
     current_peers: Mutex<Arc<Vec<Vec<NodePublicKey>>>>,
@@ -44,6 +48,7 @@ struct TopologyInner<C: Collection> {
     current_epoch: Mutex<u64>,
     target_k: usize,
     min_nodes: usize,
+    shutdown_notify: Arc<Notify>,
 }
 
 impl<C: Collection> TopologyInner<C> {
@@ -135,6 +140,25 @@ impl<C: Collection> TopologyInner<C> {
 
         current.clone()
     }
+
+    async fn start(&self) {
+        let mut notifier_rx = self.notifier_rx.lock().unwrap().take().unwrap();
+        loop {
+            tokio::select! {
+                _ = self.shutdown_notify.notified() => {
+                    break;
+                }
+                notify = notifier_rx.recv() => {
+                    let Some(_notify) = notify else {
+                        info!("Notifier was dropped");
+                        break;
+                    };
+                    // TODO(matthias): recompute topology
+                }
+            }
+        }
+        *self.notifier_rx.lock().unwrap() = Some(notifier_rx);
+    }
 }
 
 impl<C: Collection> TopologyInterface<C> for Topology<C> {
@@ -144,22 +168,52 @@ impl<C: Collection> TopologyInterface<C> for Topology<C> {
         notifier: C::NotifierInterface,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self> {
+        let (notifier_tx, notifier_rx) = mpsc::channel(16);
+        notifier.notify_on_new_epoch(notifier_tx);
+        let shutdown_notify = Arc::new(Notify::new());
         let inner = TopologyInner {
             target_k: config.testing_target_k,
             min_nodes: config.testing_min_nodes,
             query: query_runner,
-            notifier,
+            notifier_rx: Arc::new(Mutex::new(Some(notifier_rx))),
             current_epoch: Mutex::new(u64::MAX),
             current_peers: Mutex::new(Arc::new(Vec::new())),
             our_public_key,
+            shutdown_notify: shutdown_notify.clone(),
         };
         Ok(Self {
             inner: Arc::new(inner),
+            is_running: Arc::new(AtomicBool::new(false)),
+            shutdown_notify,
         })
     }
 
     fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>> {
         self.inner.suggest_connections()
+    }
+}
+
+impl<C: Collection> WithStartAndShutdown for Topology<C> {
+    fn is_running(&self) -> bool {
+        self.is_running.load(Ordering::Relaxed)
+    }
+
+    async fn start(&self) {
+        if !self.is_running() {
+            let inner = self.inner.clone();
+            let is_running = self.is_running.clone();
+            tokio::spawn(async move {
+                inner.start().await;
+                is_running.store(false, Ordering::Relaxed);
+            });
+            self.is_running.store(true, Ordering::Relaxed);
+        } else {
+            error!("Cannot start topology because it is already running");
+        }
+    }
+
+    async fn shutdown(&self) {
+        self.shutdown_notify.notify_one();
     }
 }
 

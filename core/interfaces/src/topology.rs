@@ -10,6 +10,7 @@ use crate::{
     ConfigProviderInterface,
     KeystoreInterface,
     NotifierInterface,
+    WithStartAndShutdown,
 };
 
 /// The algorithm used for clustering our network and dynamically creating a network topology.
@@ -17,7 +18,9 @@ use crate::{
 /// is required. The gossip layer is an example of a component that can feed the data this
 /// algorithm generates.
 #[infusion::service]
-pub trait TopologyInterface<C: Collection>: ConfigConsumer + Sized + Send + Sync + Clone {
+pub trait TopologyInterface<C: Collection>:
+    WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync + Clone
+{
     fn _init(
         config: ::ConfigProviderInterface,
         signer: ::KeystoreInterface,

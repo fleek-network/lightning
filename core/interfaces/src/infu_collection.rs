@@ -100,6 +100,7 @@ impl<C: Collection> Node<C> {
 forward!(async fn start_or_shutdown_node(this, start: bool) on [
     BlockStoreServerInterface,
     SignerInterface,
+    TopologyInterface,
     PoolInterface,
     ApplicationInterface,
     SyncronizerInterface,
