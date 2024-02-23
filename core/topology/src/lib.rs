@@ -27,7 +27,7 @@ use lightning_interfaces::{
 use lightning_utils::application::QueryRunnerExt;
 use ndarray::{Array, Array2};
 use rand::SeedableRng;
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::{mpsc, watch, Notify};
 use tracing::{error, info};
 
 #[derive(Clone)]
@@ -41,6 +41,8 @@ struct TopologyInner<C: Collection> {
     query: c!(C::ApplicationInterface::SyncExecutor),
     #[allow(unused)]
     notifier_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
+    topology_tx: watch::Sender<Vec<Vec<NodePublicKey>>>,
+    topology_rx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
     our_public_key: NodePublicKey,
     // TODO(qti3e): Use ArcSwap instead.
     current_peers: Mutex<Arc<Vec<Vec<NodePublicKey>>>>,
@@ -95,6 +97,11 @@ impl<C: Collection> TopologyInner<C> {
         }
 
         (matrix, index_to_pubkey, our_index)
+    }
+
+    fn suggest_connections_new(&self) -> Vec<Vec<NodePublicKey>> {
+        // very temporary solution
+        Arc::into_inner(self.suggest_connections()).unwrap()
     }
 
     fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>> {
@@ -170,12 +177,16 @@ impl<C: Collection> TopologyInterface<C> for Topology<C> {
     ) -> anyhow::Result<Self> {
         let (notifier_tx, notifier_rx) = mpsc::channel(16);
         notifier.notify_on_new_epoch(notifier_tx);
+
+        let (topology_tx, topology_rx) = watch::channel(Vec::new());
         let shutdown_notify = Arc::new(Notify::new());
         let inner = TopologyInner {
             target_k: config.testing_target_k,
             min_nodes: config.testing_min_nodes,
             query: query_runner,
             notifier_rx: Arc::new(Mutex::new(Some(notifier_rx))),
+            topology_tx,
+            topology_rx,
             current_epoch: Mutex::new(u64::MAX),
             current_peers: Mutex::new(Arc::new(Vec::new())),
             our_public_key,
@@ -190,6 +201,10 @@ impl<C: Collection> TopologyInterface<C> for Topology<C> {
 
     fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>> {
         self.inner.suggest_connections()
+    }
+
+    fn get_receiver(&self) -> watch::Receiver<Vec<Vec<NodePublicKey>>> {
+        self.inner.topology_rx.clone()
     }
 }
 
