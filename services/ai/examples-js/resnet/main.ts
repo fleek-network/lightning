@@ -1,30 +1,31 @@
 import { CLASSES } from "./imagenet.ts";
+import { deserialize } from "https://esm.sh/borsh@2.0.0";
 import {
-  deserialize, serialize
-} from "https://deno.land/x/mongo@v0.31.0/deps.ts";
+  decode,
+  encode,
+  ExtData,
+} from "https://deno.land/x/msgpack@v1.2/mod.ts";
 
-const input = document.querySelector("input");
-const output = document.querySelector("output");
+const inputElement = document.querySelector("input");
+const outputElement = document.querySelector("output");
 
-interface SessionOutput {
-  format: string;
-  outputs: Outputs;
+interface Output {
+  outputs: {
+    squeezed: ExtData;
+  };
 }
 
-interface Outputs {
-  [outputs: string]: Float32Array;
-}
-
-input!.addEventListener("change", async () => {
-  if (input!.files && input!.files.length > 0) {
-    const serializedImage = await input!.files[0].arrayBuffer()
-    const body = serialize({
-      "type": "array",
-      "encoding": "raw",
-      "data": new Uint8Array(serializedImage),
+inputElement!.addEventListener("change", async () => {
+  if (inputElement!.files && inputElement!.files.length > 0) {
+    const serializedImage = await inputElement!.files[0].arrayBuffer();
+    const body = encode({
+      array: {
+        "encoding": "raw",
+        "data": new Uint8Array(serializedImage),
+      },
     });
     const resp = await fetch(
-      "http://127.0.0.1:4220/services/2/blake3/f2700c0d695006d953ca920b7eb73602b5aef7dbe7b6506d296528f13ebf0d95",
+      "http://127.0.0.1:4220/services/2/blake3/c0a9b26955bf5175802624d94f07e6d87d844d3d29aadbe11902ec0830a30e37",
       {
         method: "POST",
         headers: {
@@ -35,15 +36,22 @@ input!.addEventListener("change", async () => {
     );
 
     const payload = await resp.arrayBuffer();
-    const bson = deserialize(new Uint8Array(payload));
-    const logits = bson.outputs.logits;
-    const bestPrediction = logits.indexOf(Math.max(...logits));
-    const name = CLASSES[bestPrediction];
+    const output = decode(new Uint8Array(payload)) as Output;
+    const encodedData = output.outputs.squeezed.data;
 
-    if (output) {
-      output.innerHTML = `<div class="image"><img src="${
-        URL.createObjectURL(input!.files[0])
-      }" alt="image"></div><div>${name}</div>`;
+    const schema = { array: { type: "f32" } };
+    const decoded = deserialize(schema, encodedData);
+
+    if (decoded) {
+      const logits = new Float32Array(decoded as ArrayBuffer);
+      const bestPrediction = logits.indexOf(Math.max(...logits));
+      const name = CLASSES[bestPrediction];
+
+      if (outputElement) {
+        outputElement.innerHTML = `<div class="image"><img src="${
+          URL.createObjectURL(inputElement!.files[0])
+        }" alt="image"></div><div>${name}</div>`;
+      }
     }
   }
 });

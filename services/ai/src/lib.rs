@@ -63,7 +63,6 @@ pub enum Encoding {
 /// Output from a session run.
 #[derive(Deserialize, Serialize)]
 pub struct Output {
-    pub encoding: Encoding,
     pub outputs: HashMap<String, EncodedArrayExt>,
 }
 

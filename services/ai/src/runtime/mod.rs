@@ -26,11 +26,11 @@ impl Session {
     pub fn run(&self, input: Bytes) -> anyhow::Result<Output> {
         let input = rmp_serde::from_slice::<Input>(input.as_ref())
             .context("failed to deserialize input")?;
-        let (encoding, outputs) = match input {
+        let outputs = match input {
             Input::Array { encoding, data } => {
                 let tensor = decode_tensor(data, &encoding)?;
                 let value: Value = tensor.try_into()?;
-                (encoding, self.onnx.run(SessionInputs::from([value]))?)
+                self.onnx.run(SessionInputs::from([value]))?
             },
             Input::Map { encoding, data } => {
                 let mut session_input: HashMap<String, Value> = HashMap::new();
@@ -39,17 +39,14 @@ impl Session {
                     session_input.insert(input_name, tensor.try_into()?);
                 }
                 let session_input: SessionInputs<'static> = session_input.into();
-                (encoding, self.onnx.run(session_input)?)
+                self.onnx.run(session_input)?
             },
         };
-        serialize_session_outputs(outputs, encoding)
+        serialize_session_outputs(outputs)
     }
 }
 
-fn serialize_session_outputs(
-    outputs: SessionOutputs,
-    encoding: Encoding,
-) -> anyhow::Result<Output> {
+fn serialize_session_outputs(outputs: SessionOutputs) -> anyhow::Result<Output> {
     let mut result = HashMap::new();
     for (name, value) in outputs.deref().iter() {
         let dtype = value.dtype()?;
@@ -133,10 +130,7 @@ fn serialize_session_outputs(
         result.insert(name.to_string(), EncodedArrayExt((encoding as i8, array)));
     }
 
-    Ok(Output {
-        encoding,
-        outputs: result,
-    })
+    Ok(Output { outputs: result })
 }
 
 #[inline]
