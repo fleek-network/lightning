@@ -8,7 +8,7 @@ pub enum Device {
     Cuda(usize),
 }
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Origin {
     Blake3,
@@ -26,11 +26,4 @@ impl From<&str> for Origin {
             _ => Self::Unknown,
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[repr(u8)]
-pub enum Backend {
-    LibTorch,
-    Onnx,
 }

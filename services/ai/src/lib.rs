@@ -24,8 +24,7 @@ pub struct StartSession {
 /// Input for inference.
 ///
 /// Note: for each variant, the same encoding will be used for the output.
-#[derive(Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[derive(Deserialize, Serialize)]
 pub enum Input {
     /// The input is an array.
     #[serde(rename = "array")]
@@ -42,27 +41,35 @@ pub enum Input {
 }
 
 /// Input encoding.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize, Serialize)]
+#[repr(u8)]
 pub enum Encoding {
-    /// Input is an 8-bit unsigned-int array.
+    /// Data is an 8-bit unsigned-int array.
     ///
-    /// This input will be interpreted as an array of dimension 1
+    /// This input will be interpreted as an u8 array of dimension 1
     /// before feeding it to the model.
     #[serde(rename = "raw")]
     Raw,
-    /// Input is a npy file.
+    /// Data is a npy file.
     ///
     /// This input will be converted into an `ndarray`.
     #[serde(rename = "npy")]
     Npy,
+    /// Data is encoded using Borsh.
+    #[serde(rename = "borsh")]
+    Borsh,
 }
 
 /// Output from a session run.
 #[derive(Deserialize, Serialize)]
 pub struct Output {
     pub encoding: Encoding,
-    pub outputs: HashMap<String, Vec<u8>>,
+    pub outputs: HashMap<String, EncodedArrayExt>,
 }
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename = "_ExtStruct")]
+pub struct EncodedArrayExt(pub (i8, Bytes));
 
 #[tokio::main]
 pub async fn main() {

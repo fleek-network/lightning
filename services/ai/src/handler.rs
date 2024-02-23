@@ -34,7 +34,7 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
 
         // Run inference.
         let output = session.run(body.into())?;
-        let serialized_output = bson::to_vec(&output)?;
+        let serialized_output = rmp_serde::to_vec_named(&output)?;
 
         connection.write_payload(&serialized_output).await?;
 
@@ -46,7 +46,7 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
         return Ok(());
     };
 
-    let message = bson::from_slice::<StartSession>(initial_message.as_ref())
+    let message = rmp_serde::from_slice::<StartSession>(initial_message.as_ref())
         .context("Could not deserialize initial message")?;
 
     // Load model.
@@ -56,7 +56,7 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
     // Process incoming inference requests.
     while let Some(payload) = connection.read_payload().await {
         let output = session.run(payload.freeze())?;
-        let serialized_output = bson::to_vec(&output)?;
+        let serialized_output = rmp_serde::to_vec_named(&output)?;
         connection.write_payload(&serialized_output).await?;
     }
 
