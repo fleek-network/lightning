@@ -6396,6 +6396,7 @@ dependencies = [
  "infusion",
  "lightning-application",
  "lightning-interfaces",
+ "lightning-notifier",
  "lightning-utils",
  "mcmf",
  "ndarray",

@@ -161,14 +161,14 @@ async fn get_fetchers(
         let mut signer =
             Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
                 .unwrap();
+        let notifier = Notifier::<TestBinding>::init(&app);
         let topology = Topology::<TestBinding>::init(
             TopologyConfig::default(),
             node_public_key,
+            notifier.clone(),
             query_runner.clone(),
         )
         .unwrap();
-
-        let notifier = Notifier::<TestBinding>::init(&app);
 
         let indexer = Indexer::<TestBinding>::init(
             Default::default(),

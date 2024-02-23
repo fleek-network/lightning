@@ -146,6 +146,7 @@ async fn get_peers(
         let topology = Topology::<TestBinding>::init(
             TopologyConfig::default(),
             node_public_key,
+            notifier.clone(),
             query_runner.clone(),
         )
         .unwrap();

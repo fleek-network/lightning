@@ -15,9 +15,11 @@ use lightning_interfaces::types::NodePorts;
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
+    NotifierInterface,
     TopologyInterface,
     WithStartAndShutdown,
 };
+use lightning_notifier::Notifier;
 
 use crate::config::Config;
 use crate::Topology;
@@ -25,6 +27,7 @@ use crate::Topology;
 partial!(TestBinding {
     TopologyInterface = Topology<Self>;
     ApplicationInterface = Application<Self>;
+    NotifierInterface = Notifier<Self>;
 });
 
 #[tokio::test]
@@ -163,8 +166,10 @@ async fn test_build_latency_matrix() {
     let query_runner = app.sync_query();
     app.start().await;
 
+    let notifier = Notifier::<TestBinding>::init(&app);
     let topology =
-        Topology::<TestBinding>::init(Config::default(), our_public_key, query_runner).unwrap();
+        Topology::<TestBinding>::init(Config::default(), our_public_key, notifier, query_runner)
+            .unwrap();
     let (matrix, index_to_pubkey, our_index) = topology.inner.build_latency_matrix();
     let pubkey_to_index: HashMap<NodePublicKey, usize> = index_to_pubkey
         .iter()

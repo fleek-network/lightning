@@ -15,19 +15,14 @@ use divisive::DivisiveHierarchy;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::Participation;
-use lightning_interfaces::{
-    ApplicationInterface,
-    ConfigConsumer,
-    SyncQueryRunnerInterface,
-    TopologyInterface,
-};
+use lightning_interfaces::{ApplicationInterface, ConfigConsumer, TopologyInterface};
 use lightning_utils::application::QueryRunnerExt;
 use ndarray::{Array, Array2};
 use rand::SeedableRng;
 use tracing::info;
 
 pub struct Topology<C: Collection> {
-    inner: Arc<TopologyInner<c![C::ApplicationInterface::SyncExecutor]>>,
+    inner: Arc<TopologyInner<C>>,
 }
 
 impl<C: Collection> Clone for Topology<C> {
@@ -38,8 +33,10 @@ impl<C: Collection> Clone for Topology<C> {
     }
 }
 
-struct TopologyInner<Q: SyncQueryRunnerInterface + 'static> {
-    query: Q,
+struct TopologyInner<C: Collection> {
+    query: c!(C::ApplicationInterface::SyncExecutor),
+    #[allow(unused)]
+    notifier: C::NotifierInterface,
     our_public_key: NodePublicKey,
     // TODO(qti3e): Use ArcSwap instead.
     current_peers: Mutex<Arc<Vec<Vec<NodePublicKey>>>>,
@@ -49,7 +46,7 @@ struct TopologyInner<Q: SyncQueryRunnerInterface + 'static> {
     min_nodes: usize,
 }
 
-impl<Q: SyncQueryRunnerInterface> TopologyInner<Q> {
+impl<C: Collection> TopologyInner<C> {
     /// Build a latency matrix according to the current application state.
     /// Returns the matrix, a map of node ids to public keys, and an optional node index for
     /// ourselves if we're included in the topology.
@@ -144,12 +141,14 @@ impl<C: Collection> TopologyInterface<C> for Topology<C> {
     fn init(
         config: Self::Config,
         our_public_key: NodePublicKey,
+        notifier: C::NotifierInterface,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self> {
         let inner = TopologyInner {
             target_k: config.testing_target_k,
             min_nodes: config.testing_min_nodes,
             query: query_runner,
+            notifier,
             current_epoch: Mutex::new(u64::MAX),
             current_peers: Mutex::new(Arc::new(Vec::new())),
             our_public_key,

@@ -116,14 +116,14 @@ async fn init_service_executor(
     let mut signer =
         Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
             .unwrap();
+    let notifier = Notifier::<TestBinding>::init(&app);
     let topology = Topology::<TestBinding>::init(
         TopologyConfig::default(),
         keystore.get_ed25519_pk(),
+        notifier.clone(),
         query_runner.clone(),
     )
     .unwrap();
-
-    let notifier = Notifier::<TestBinding>::init(&app);
 
     let rep_coll_config = RepCollConfig {
         reporter_buffer_size: 1,
