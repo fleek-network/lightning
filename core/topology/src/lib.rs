@@ -1,5 +1,6 @@
 pub mod clustering;
 pub mod config;
+mod core;
 pub mod divisive;
 pub mod pairing;
 
@@ -11,6 +12,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use anyhow::anyhow;
 pub use config::Config;
 use divisive::DivisiveHierarchy;
 use fleek_crypto::NodePublicKey;
@@ -99,9 +101,33 @@ impl<C: Collection> TopologyInner<C> {
         (matrix, index_to_pubkey, our_index)
     }
 
-    fn suggest_connections_new(&self) -> Vec<Vec<NodePublicKey>> {
-        // very temporary solution
-        Arc::into_inner(self.suggest_connections()).unwrap()
+    async fn suggest_connections_new(&self) -> anyhow::Result<Vec<Vec<NodePublicKey>>> {
+        let epoch = self.query.get_current_epoch();
+        let our_public_key = self.our_public_key;
+        let latencies = self.query.get_current_latencies();
+        let valid_pubkeys: BTreeSet<NodePublicKey> = self
+            .query
+            .get_node_registry(None)
+            .into_iter()
+            .filter(|node_info| node_info.info.participation == Participation::True)
+            .map(|node_info| node_info.info.public_key)
+            .collect();
+        let min_nodes = self.min_nodes;
+        let target_k = self.target_k;
+
+        // TODO(matthias): use rayon?
+        tokio::task::spawn_blocking(move || {
+            core::suggest_connections(
+                epoch,
+                our_public_key,
+                latencies,
+                valid_pubkeys,
+                min_nodes,
+                target_k,
+            )
+        })
+        .await
+        .map_err(|e| anyhow!("Failed to join blocking task: {e:?}"))
     }
 
     fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>> {
@@ -156,11 +182,18 @@ impl<C: Collection> TopologyInner<C> {
                     break;
                 }
                 notify = notifier_rx.recv() => {
-                    let Some(_notify) = notify else {
+                    let Some(notify) = notify else {
                         info!("Notifier was dropped");
                         break;
                     };
-                    // TODO(matthias): recompute topology
+                    if let Notification::NewEpoch = notify {
+                        // This only fails if joining the blocking task fails, which only
+                        // happens if something is already wrong.
+                        let conns = self.suggest_connections_new().await.expect("Failed to compute topology");
+                        if let Err(e) = self.topology_tx.send(conns) {
+                            error!("All receivers have been dropped: {e:?}");
+                        }
+                    }
                 }
             }
         }
