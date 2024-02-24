@@ -5,16 +5,13 @@ edition = "2021"
 publish = false
 
 [dependencies]
-anyhow = "1.0"
-base64 = "0.21"
-bincode.workspace = true
-bson = "2.9"
 cdk-rust = { path = "../../../../lib/cdk-rust" }
 ndarray = "0.15"
 ndarray-npy = "0.8"
 npyz = "0.8"
 rand = "0.8"
 reqwest = "0.11"
+rmp-serde = "1.1"
 tokenizers = { version = "0.15", default-features = false, features = [ "onig", "http" ] }
 tokio.workspace = true
 common = { path = "../common" }

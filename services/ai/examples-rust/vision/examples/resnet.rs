@@ -1,19 +1,16 @@
+use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::Path;
 
-use anyhow::bail;
-use base64::Engine;
-use bson::spec::BinarySubtype;
-use bson::{Binary, Document};
 use common::imagenet::CLASSES;
+use common::service_api::{EncodedArrayExt, Input};
 use common::to_array_d;
 use image::GenericImageView;
 use ndarray::{Array, Axis};
 use ndarray_npy::WriteNpyExt;
-use reqwest::Body;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() {
     let mut args = std::env::args();
     args.next();
 
@@ -23,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Open image.
-    let original_img = image::open(Path::new(&path))?;
+    let original_img = image::open(Path::new(&path)).unwrap();
 
     // Preprocessing.
     let img = original_img.thumbnail(224, 224);
@@ -39,32 +36,33 @@ async fn main() -> anyhow::Result<()> {
 
     // Encode input into npy.
     let mut buffer = Vec::new();
-    input.write_npy(Cursor::new(&mut buffer))?;
+    input.write_npy(Cursor::new(&mut buffer)).unwrap();
 
-    let payload = bson::bson!({
-        "type": "array",
-        "encoding": "npy",
-        "data": bson::Bson::Binary(Binary { subtype: BinarySubtype::Generic, bytes: buffer })
-    });
+    let payload_buffer = rmp_serde::to_vec_named(&Input::Array {
+        data: EncodedArrayExt((1, buffer.into())),
+    })
+    .unwrap();
 
     // Send service a request.
     let resp = reqwest::Client::new().post("http://127.0.0.1:4220/services/2/blake3/f2700c0d695006d953ca920b7eb73602b5aef7dbe7b6506d296528f13ebf0d95")
-        .body(Body::from(bson::to_vec(&payload)?))
-        .send().await?;
+        .body(payload_buffer)
+        .send().await.unwrap();
 
     if !resp.status().is_success() {
-        let msg = String::from_utf8(resp.bytes().await?.into())?;
-        bail!("invalid response status: {:?}", msg);
+        let msg = String::from_utf8(resp.bytes().await.unwrap().into()).unwrap();
+        panic!("invalid response status: {:?}", msg);
     }
 
-    // Process json response and prepare output.
-    let data = resp.bytes().await?;
-    let outputs = Document::from_reader(Cursor::new(data))?;
-    let outputs = outputs.get_document("outputs")?;
+    // Process response and extract encoded array.
+    let data = resp.bytes().await.unwrap();
+    let mut outputs =
+        rmp_serde::from_slice::<HashMap<String, EncodedArrayExt>>(data.as_ref()).unwrap();
+    let EncodedArrayExt((encoding, encoded_array)) = outputs.remove("output").unwrap();
+    // Assert that the array was encoded as a npy file.
+    assert_eq!(encoding, 1);
 
     // Decode output.
-    let npy = base64::prelude::BASE64_STANDARD.decode(outputs.get_str("output").unwrap())?;
-    let npy_file = npyz::NpyFile::new(Cursor::new(npy)).unwrap();
+    let npy_file = npyz::NpyFile::new(Cursor::new(encoded_array)).unwrap();
 
     // Conver to ndarray::Array.
     let shape = npy_file.shape().to_vec();
@@ -85,6 +83,4 @@ async fn main() -> anyhow::Result<()> {
         .map(|(i, v)| (v, CLASSES[i]))
         .collect::<Vec<_>>();
     println!("{:?}", output);
-
-    Ok(())
 }

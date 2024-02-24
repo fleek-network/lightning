@@ -10,9 +10,7 @@ const outputElement = document.querySelector("output");
 const RawEncoding: number = 0;
 
 interface Output {
-  outputs: {
     squeezed: ExtData;
-  };
 }
 
 inputElement!.addEventListener("change", async () => {
@@ -38,7 +36,7 @@ inputElement!.addEventListener("change", async () => {
 
     const payload = await resp.arrayBuffer();
     const output = decode(new Uint8Array(payload)) as Output;
-    const encodedData = output.outputs.squeezed.data;
+    const encodedData = output.squeezed.data;
 
     const schema = { array: { type: "f32" } };
     const decoded = deserialize(schema, encodedData);
