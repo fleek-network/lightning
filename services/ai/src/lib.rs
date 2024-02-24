@@ -24,51 +24,28 @@ pub struct StartSession {
 /// Input for inference.
 ///
 /// Note: for each variant, the same encoding will be used for the output.
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub enum Input {
     /// The input is an array.
     #[serde(rename = "array")]
-    Array { encoding: Encoding, data: Bytes },
+    Array { data: EncodedArrayExt },
     /// The input is a hash map.
     ///
     /// Keys will be passed directly to the session
     /// along with their corresponding value.
     #[serde(rename = "map")]
     Map {
-        encoding: Encoding,
-        data: HashMap<String, Bytes>,
+        data: HashMap<String, EncodedArrayExt>,
     },
 }
 
-/// Input encoding.
-#[derive(Deserialize, Serialize)]
-#[repr(u8)]
-pub enum Encoding {
-    /// Data is an 8-bit unsigned-int array.
-    ///
-    /// This input will be interpreted as an u8 array of dimension 1
-    /// before feeding it to the model.
-    #[serde(rename = "raw")]
-    Raw,
-    /// Data is a npy file.
-    ///
-    /// This input will be converted into an `ndarray`.
-    #[serde(rename = "npy")]
-    Npy,
-    /// Data is encoded using Borsh.
-    #[serde(rename = "borsh")]
-    Borsh,
-}
-
 /// Output from a session run.
-#[derive(Deserialize, Serialize)]
-pub struct Output {
-    pub outputs: HashMap<String, EncodedArrayExt>,
-}
+pub type Output = HashMap<String, EncodedArrayExt>;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(rename = "_ExtStruct")]
-pub struct EncodedArrayExt(pub (i8, Bytes));
+// See https://docs.rs/rmp-serde/latest/rmp_serde/constant.MSGPACK_EXT_STRUCT_NAME.html.
+pub struct EncodedArrayExt((i8, Bytes));
 
 #[tokio::main]
 pub async fn main() {

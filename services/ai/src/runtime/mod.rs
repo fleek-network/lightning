@@ -7,8 +7,9 @@ use bytes::Bytes;
 use ndarray::Array1;
 use ort::{SessionInputs, SessionOutputs, TensorElementType, Value, ValueType};
 
+use crate::opts::Encoding;
 use crate::tensor::{numpy, Tensor};
-use crate::{EncodedArrayExt, Encoding, Input, Output};
+use crate::{EncodedArrayExt, Input, Output};
 
 pub struct Session {
     onnx: ort::Session,
@@ -27,15 +28,15 @@ impl Session {
         let input = rmp_serde::from_slice::<Input>(input.as_ref())
             .context("failed to deserialize input")?;
         let outputs = match input {
-            Input::Array { encoding, data } => {
-                let tensor = decode_tensor(data, &encoding)?;
+            Input::Array { data } => {
+                let tensor = decode_tensor(data.0.1, &(data.0.0.try_into()?))?;
                 let value: Value = tensor.try_into()?;
                 self.onnx.run(SessionInputs::from([value]))?
             },
-            Input::Map { encoding, data } => {
+            Input::Map { data } => {
                 let mut session_input: HashMap<String, Value> = HashMap::new();
                 for (input_name, bytes) in data.into_iter() {
-                    let tensor = decode_tensor(bytes, &encoding)?;
+                    let tensor = decode_tensor(bytes.0.1, &(bytes.0.0.try_into()?))?;
                     session_input.insert(input_name, tensor.try_into()?);
                 }
                 let session_input: SessionInputs<'static> = session_input.into();
@@ -130,7 +131,7 @@ fn serialize_session_outputs(outputs: SessionOutputs) -> anyhow::Result<Output> 
         result.insert(name.to_string(), EncodedArrayExt((encoding as i8, array)));
     }
 
-    Ok(Output { outputs: result })
+    Ok(result)
 }
 
 #[inline]
