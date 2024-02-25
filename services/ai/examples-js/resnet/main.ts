@@ -10,7 +10,7 @@ const outputElement = document.querySelector("output");
 const RawEncoding: number = 0;
 
 interface Output {
-    squeezed: ExtData;
+  squeezed: ExtData;
 }
 
 inputElement!.addEventListener("change", async () => {

@@ -3719,7 +3719,6 @@ name = "fleek-service-ai"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "bincode",
  "borsh",
  "bytes",
  "derive_more",
