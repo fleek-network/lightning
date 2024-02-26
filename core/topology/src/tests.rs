@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use fleek_crypto::{
     AccountOwnerSecretKey,
@@ -11,7 +11,7 @@ use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisLatency, GenesisNode};
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::NodePorts;
+use lightning_interfaces::types::{NodePorts, Participation};
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
@@ -20,8 +20,10 @@ use lightning_interfaces::{
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
+use lightning_utils::application::QueryRunnerExt;
 
 use crate::config::Config;
+use crate::core::build_latency_matrix;
 use crate::Topology;
 
 partial!(TestBinding {
@@ -166,11 +168,17 @@ async fn test_build_latency_matrix() {
     let query_runner = app.sync_query();
     app.start().await;
 
-    let notifier = Notifier::<TestBinding>::init(&app);
-    let topology =
-        Topology::<TestBinding>::init(Config::default(), our_public_key, notifier, query_runner)
-            .unwrap();
-    let (matrix, index_to_pubkey, our_index) = topology.inner.build_latency_matrix();
+    let latencies = query_runner.get_current_latencies();
+    let valid_pubkeys: BTreeSet<NodePublicKey> = query_runner
+        .get_node_registry(None)
+        .into_iter()
+        .filter(|node_info| node_info.info.participation == Participation::True)
+        .map(|node_info| node_info.info.public_key)
+        .collect();
+
+    let (matrix, index_to_pubkey, our_index) =
+        build_latency_matrix(our_public_key, latencies, valid_pubkeys);
+    //let (matrix, index_to_pubkey, our_index) = topology.inner.build_latency_matrix();
     let pubkey_to_index: HashMap<NodePublicKey, usize> = index_to_pubkey
         .iter()
         .map(|(index, pubkey)| (*pubkey, *index))
@@ -189,4 +197,41 @@ async fn test_build_latency_matrix() {
     assert_eq!(matrix[[our_index, index1]], 1000);
     assert_eq!(matrix[[our_index, index2]], 3000);
     assert_eq!(matrix[[index1, index2]], 2000);
+}
+
+#[tokio::test]
+async fn test_receive_connections() {
+    let app = Application::<TestBinding>::init(
+        AppConfig {
+            genesis: None,
+            mode: Mode::Test,
+            testnet: false,
+            storage: StorageConfig::InMemory,
+            db_path: None,
+            db_options: None,
+        },
+        Default::default(),
+    )
+    .unwrap();
+    let query_runner = app.sync_query();
+    app.start().await;
+
+    let our_secret_key = NodeSecretKey::generate();
+    let our_public_key = our_secret_key.to_pk();
+    let notifier = Notifier::<TestBinding>::init(&app);
+    let topology =
+        Topology::<TestBinding>::init(Config::default(), our_public_key, notifier, query_runner)
+            .unwrap();
+
+    let mut topology_rx = topology.get_receiver();
+    let connections = topology_rx.borrow_and_update().clone();
+    // The topology sends an empty vec in its init function because the tokio watch channel has to
+    // be initialized with a value.
+    assert!(connections.is_empty());
+
+    topology.start().await;
+    // Once the topology starts, it will compute the actual connections and send them.
+    topology_rx.changed().await.unwrap();
+    let connections = topology_rx.borrow_and_update().clone();
+    assert!(!connections.is_empty());
 }

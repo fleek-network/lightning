@@ -175,6 +175,13 @@ impl<C: Collection> TopologyInner<C> {
     }
 
     async fn start(&self) {
+        let conns = self
+            .suggest_connections_new()
+            .await
+            .expect("Failed to compute topology");
+        if let Err(e) = self.topology_tx.send(conns) {
+            error!("All receivers have been dropped: {e:?}");
+        }
         let mut notifier_rx = self.notifier_rx.lock().unwrap().take().unwrap();
         loop {
             tokio::select! {

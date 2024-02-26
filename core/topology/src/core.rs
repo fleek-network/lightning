@@ -8,7 +8,7 @@ use rand::SeedableRng;
 
 use crate::divisive::DivisiveHierarchy;
 
-fn build_latency_matrix(
+pub(crate) fn build_latency_matrix(
     our_public_key: NodePublicKey,
     latencies: HashMap<(NodePublicKey, NodePublicKey), Duration>,
     valid_pubkeys: BTreeSet<NodePublicKey>,
