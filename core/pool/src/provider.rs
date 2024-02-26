@@ -22,6 +22,7 @@ use lightning_interfaces::{
     RequesterInterface,
     ResponderInterface,
     ResponseInterface,
+    TopologyInterface,
     WithStartAndShutdown,
 };
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -227,10 +228,12 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
         let shutdown = CancellationToken::new();
         let (endpoint_task_tx, endpoint_task_rx) = mpsc::channel(1024);
         let (event_tx, event_rx) = mpsc::channel(1024);
+        let topology_rx = topology.get_receiver();
         let receiver = EventReceiver::<C>::new(
             sync_query.clone(),
             topology,
             notifier,
+            topology_rx,
             event_rx,
             endpoint_task_tx.clone(),
             public_key,

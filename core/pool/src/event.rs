@@ -17,7 +17,7 @@ use lightning_interfaces::{
 };
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use x509_parser::nom::AsBytes;
@@ -69,6 +69,9 @@ pub struct EventReceiver<C: Collection> {
     pub(crate) handler: LogicalPool<C>,
     /// Epoch event receiver.
     notifier: Receiver<Notification>,
+    /// Topology update receiver.
+    #[allow(unused)]
+    topology_tx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
     /// Writer side of queue for actual pool tasks.
     endpoint_queue: Sender<EndpointTask>,
     /// Service handles.
@@ -84,10 +87,12 @@ impl<C> EventReceiver<C>
 where
     C: Collection,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         topology: c!(C::TopologyInterface),
         notifier: c!(C::NotifierInterface),
+        topology_tx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
         event_queue: Receiver<Event>,
         pool_queue: Sender<EndpointTask>,
         public_key: NodePublicKey,
@@ -102,6 +107,7 @@ where
             event_queue,
             handler: logical_pool,
             notifier: notifier_rx,
+            topology_tx,
             endpoint_queue: pool_queue,
             broadcast_service_handles: HashMap::new(),
             send_request_service_handles: HashMap::new(),

@@ -250,12 +250,13 @@ fn event_receiver(
     let (endpoint_task_tx, endpoint_task_rx) = mpsc::channel(8);
 
     let shutdown = CancellationToken::new();
-
+    let topology_rx = topology.get_receiver();
     (
         EventReceiver::<TestBinding>::new(
             query_runner,
             topology,
             notifier.clone(),
+            topology_rx,
             event_rx,
             endpoint_task_tx,
             pk,
