@@ -39,7 +39,7 @@ async fn main() {
     input.write_npy(Cursor::new(&mut buffer)).unwrap();
 
     let payload_buffer = rmp_serde::to_vec_named(&Input::Array {
-        data: EncodedArrayExt((1, buffer.into())),
+        data: EncodedArrayExt((10, buffer.into())),
     })
     .unwrap();
 
@@ -59,7 +59,7 @@ async fn main() {
         rmp_serde::from_slice::<HashMap<String, EncodedArrayExt>>(data.as_ref()).unwrap();
     let EncodedArrayExt((encoding, encoded_array)) = outputs.remove("output").unwrap();
     // Assert that the array was encoded as a npy file.
-    assert_eq!(encoding, 1);
+    assert_eq!(encoding, 10);
 
     // Decode output.
     let npy_file = npyz::NpyFile::new(Cursor::new(encoded_array)).unwrap();

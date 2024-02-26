@@ -32,20 +32,21 @@ impl From<&str> for Origin {
 #[derive(Deserialize, Serialize)]
 #[repr(u8)]
 pub enum Encoding {
-    /// Data is an 8-bit unsigned-int array.
-    ///
-    /// This input will be interpreted as an u8 array of dimension 1
-    /// before feeding it to the model.
-    #[serde(rename = "raw")]
-    Raw,
-    /// Data is a npy file.
-    ///
-    /// This input will be converted into an `ndarray`.
-    #[serde(rename = "npy")]
-    Npy,
     /// Data is encoded using Borsh.
     #[serde(rename = "borsh")]
-    Borsh,
+    BorshInt8 = 0x00,
+    BorshInt16 = 0x01,
+    BorshInt32 = 0x02,
+    BorshInt64 = 0x03,
+    BorshUint8 = 0x04,
+    BorshUint16 = 0x05,
+    BorshUint32 = 0x06,
+    BorshUint64 = 0x07,
+    BorshFloat32 = 0x08,
+    BorshFloat64 = 0x09,
+    /// Data is a npy file.
+    #[serde(rename = "npy")]
+    Npy = 0x0A,
 }
 
 impl TryFrom<i8> for Encoding {
@@ -59,9 +60,17 @@ impl TryFrom<i8> for Encoding {
             ));
         }
         let encoding = match value {
-            0 => Encoding::Raw,
-            1 => Encoding::Npy,
-            2 => Encoding::Borsh,
+            0x00 => Encoding::BorshInt8,
+            0x01 => Encoding::BorshInt16,
+            0x02 => Encoding::BorshInt32,
+            0x03 => Encoding::BorshInt64,
+            0x04 => Encoding::BorshUint8,
+            0x05 => Encoding::BorshUint16,
+            0x06 => Encoding::BorshUint32,
+            0x07 => Encoding::BorshUint64,
+            0x08 => Encoding::BorshFloat32,
+            0x09 => Encoding::BorshFloat64,
+            0x0A => Encoding::Npy,
             _ => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,

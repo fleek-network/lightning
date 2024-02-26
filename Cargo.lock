@@ -3729,6 +3729,7 @@ dependencies = [
  "npyz",
  "ort",
  "rmp-serde",
+ "rmpv",
  "serde",
  "tokio",
  "tracing",
@@ -9575,6 +9576,16 @@ dependencies = [
  "byteorder",
  "rmp",
  "serde",
+]
+
+[[package]]
+name = "rmpv"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e0e0214a4a2b444ecce41a4025792fc31f77c7bb89c46d253953ea8c65701ec"
+dependencies = [
+ "num-traits",
+ "rmp",
 ]
 
 [[package]]

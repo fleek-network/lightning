@@ -1,7 +1,7 @@
+mod array;
 mod handler;
 mod opts;
 mod runtime;
-mod tensor;
 
 use std::collections::HashMap;
 

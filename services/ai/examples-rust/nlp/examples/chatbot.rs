@@ -114,15 +114,15 @@ async fn main() {
             let mut inputs = HashMap::new();
             inputs.insert(
                 "input_ids".to_string(),
-                EncodedArrayExt((1, buffer_input_ids.into())),
+                EncodedArrayExt((10, buffer_input_ids.into())),
             );
             inputs.insert(
                 "attention_mask".to_string(),
-                EncodedArrayExt((1, buffer_attention_mask.into())),
+                EncodedArrayExt((10, buffer_attention_mask.into())),
             );
             inputs.insert(
                 "position_ids".to_string(),
-                EncodedArrayExt((1, buffer_position_ids.into())),
+                EncodedArrayExt((10, buffer_position_ids.into())),
             );
             let payload = rmp_serde::to_vec_named(&Input::Map { data: inputs }).unwrap();
 
@@ -140,7 +140,7 @@ async fn main() {
                             .unwrap();
                     let EncodedArrayExt((encoding, data)) = outputs.remove("logits").unwrap();
                     // Assert that the array was encoded as a npy file.
-                    assert_eq!(encoding, 1);
+                    assert_eq!(encoding, 10);
                     data
                 },
                 ResponseFrame::Termination { reason } => {
