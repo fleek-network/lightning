@@ -208,7 +208,7 @@ fn create_peer(
         keystore.clone(),
         query_runner.clone(),
         notifier.clone(),
-        topology.clone(),
+        topology.get_receiver(),
         rep_aggregator.get_reporter(),
     )
     .unwrap();
@@ -254,7 +254,6 @@ fn event_receiver(
     (
         EventReceiver::<TestBinding>::new(
             query_runner,
-            topology,
             notifier.clone(),
             topology_rx,
             event_rx,

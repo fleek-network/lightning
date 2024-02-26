@@ -18,6 +18,7 @@ use lightning_interfaces::{
     ReputationAggregatorInterface,
     ResolverInterface,
     SignerInterface,
+    TopologyInterface,
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
@@ -26,6 +27,7 @@ use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use lightning_test_utils::keys::EphemeralKeystore;
+use lightning_topology::{Config as TopologyConfig, Topology};
 use tokio::sync::mpsc;
 
 use crate::config::Config;
@@ -104,12 +106,20 @@ async fn test_start_shutdown() {
     )
     .unwrap();
 
+    let topology = Topology::<TestBinding>::init(
+        TopologyConfig::default(),
+        node_public_key,
+        notifier.clone(),
+        query_runner.clone(),
+    )
+    .unwrap();
+
     let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         PoolConfig::default(),
         keystore.clone(),
         app.sync_query(),
         notifier.clone(),
-        Default::default(),
+        topology.get_receiver(),
         rep_aggregator.get_reporter(),
     )
     .unwrap();

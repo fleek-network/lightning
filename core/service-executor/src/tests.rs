@@ -146,7 +146,7 @@ async fn init_service_executor(
         keystore.clone(),
         query_runner.clone(),
         notifier.clone(),
-        topology,
+        topology.get_receiver(),
         rep_aggregator.get_reporter(),
     )
     .unwrap();

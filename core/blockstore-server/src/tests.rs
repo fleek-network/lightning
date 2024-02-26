@@ -69,6 +69,7 @@ struct Peer<C: Collection> {
     pool: C::PoolInterface,
     blockstore: Blockstore<C>,
     blockstore_server: C::BlockStoreServerInterface,
+    topology: C::TopologyInterface,
     _rep_aggregator: C::ReputationAggregatorInterface,
     node_public_key: NodePublicKey,
 }
@@ -178,7 +179,7 @@ async fn get_peers(
             keystore,
             query_runner,
             notifier,
-            topology,
+            topology.get_receiver(),
             rep_aggregator.get_reporter(),
         )
         .unwrap();
@@ -205,6 +206,7 @@ async fn get_peers(
             pool,
             blockstore,
             blockstore_server,
+            topology,
             _rep_aggregator: rep_aggregator,
             node_public_key,
         };
@@ -284,6 +286,7 @@ async fn test_send_and_receive() {
     let (peers, app, path) = get_peers("send_and_receive", 49200, 2).await;
     let query_runner = app.sync_query();
     for peer in &peers {
+        peer.topology.start().await;
         peer.pool.start().await;
         peer.blockstore_server.start().await;
     }
@@ -303,6 +306,7 @@ async fn test_send_and_receive() {
 
     // Send a request from peer 2 to peer 1
     let socket = peers[1].blockstore_server.get_socket();
+    println!("send request");
     let mut res = socket
         .run(ServerRequest {
             hash,

@@ -52,5 +52,6 @@ lightning-origin-demuxer = { path = "../origin-demuxer" }
 lightning-signer = { path = "../signer" }
 lightning-notifier = { path = "../notifier" }
 lightning-pool = { path = "../pool" }
+lightning-topology = { path = "../topology" }
 lightning-rep-collector = { path = "../rep-collector" }
 infusion.workspace = true

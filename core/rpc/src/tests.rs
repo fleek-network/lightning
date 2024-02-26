@@ -44,6 +44,7 @@ use lightning_interfaces::{
     BlockStoreServerInterface,
     FetcherInterface,
     IndexerInterface,
+    KeystoreInterface,
     MempoolSocket,
     NotifierInterface,
     OriginProviderInterface,
@@ -53,6 +54,7 @@ use lightning_interfaces::{
     RpcInterface,
     SignerInterface,
     SyncQueryRunnerInterface,
+    TopologyInterface,
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
@@ -61,6 +63,7 @@ use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::Signer;
 use lightning_test_utils::keys::EphemeralKeystore;
+use lightning_topology::{Config as TopologyConfig, Topology};
 use lightning_types::Event;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::rpc as utils;
@@ -145,12 +148,20 @@ fn init_rpc(app: Application<TestBinding>, port: u16) -> Result<(Rpc<TestBinding
     )
     .unwrap();
 
+    let topology = Topology::<TestBinding>::init(
+        TopologyConfig::default(),
+        keystore.get_ed25519_pk(),
+        notifier.clone(),
+        app.sync_query(),
+    )
+    .unwrap();
+
     let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
         PoolConfig::default(),
         keystore.clone(),
         app.sync_query(),
         notifier,
-        Default::default(),
+        topology.get_receiver(),
         rep_aggregator.get_reporter(),
     )
     .unwrap();

@@ -2,8 +2,10 @@ use std::io;
 
 use anyhow::{bail, Error};
 use bytes::Bytes;
+use fleek_crypto::NodePublicKey;
 use lightning_types::NodeIndex;
 pub use lightning_types::RejectReason;
+use tokio::sync::watch;
 use tokio_stream::Stream;
 
 use crate::infu_collection::{c, Collection};
@@ -62,7 +64,7 @@ pub trait PoolInterface<C: Collection>:
             keystore.clone(),
             app.sync_query(),
             notifier.clone(),
-            topology.clone(),
+            topology.get_receiver(),
             rep_aggregator.get_reporter(),
         )
     }
@@ -76,7 +78,7 @@ pub trait PoolInterface<C: Collection>:
         keystore: C::KeystoreInterface,
         sqr: c!(C::ApplicationInterface::SyncExecutor),
         notifier: c!(C::NotifierInterface),
-        topology: c!(C::TopologyInterface),
+        topology_rx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     ) -> anyhow::Result<Self>;
 

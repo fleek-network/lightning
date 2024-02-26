@@ -47,6 +47,7 @@ partial!(TestBinding {
 pub struct Peer<C: Collection> {
     _rep_aggregator: C::ReputationAggregatorInterface,
     _notifier: C::NotifierInterface,
+    topology: C::TopologyInterface,
     pool: C::PoolInterface,
     broadcast: C::BroadcastInterface,
     pub node_secret_key: NodeSecretKey,
@@ -155,6 +156,7 @@ async fn create_peer(
     )
     .unwrap();
     rep_aggregator.start().await;
+
     let config = PoolConfig {
         max_idle_timeout: Duration::from_secs(5),
         address,
@@ -165,7 +167,7 @@ async fn create_peer(
         keystore.clone(),
         query_runner.clone(),
         notifier.clone(),
-        topology,
+        topology.get_receiver(),
         rep_aggregator.get_reporter(),
     )
     .unwrap();
@@ -190,6 +192,7 @@ async fn create_peer(
     Peer::<TestBinding> {
         _rep_aggregator: rep_aggregator,
         _notifier: notifier,
+        topology,
         pool,
         broadcast,
         node_secret_key,
@@ -204,6 +207,7 @@ async fn test_send() {
     let query_runner = app.sync_query();
 
     for peer in &peers {
+        peer.topology.start().await;
         peer.broadcast.start().await;
         peer.pool.start().await;
     }

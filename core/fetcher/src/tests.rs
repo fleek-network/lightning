@@ -80,6 +80,7 @@ struct Peer<C: Collection> {
     fetcher: C::FetcherInterface,
     _consensus: C::ConsensusInterface,
     _pool: C::PoolInterface,
+    _topology: C::TopologyInterface,
     _broadcast: C::BroadcastInterface,
     _blockstore_server: C::BlockStoreServerInterface,
     _rep_aggregator: C::ReputationAggregatorInterface,
@@ -201,7 +202,7 @@ async fn get_fetchers(
             keystore.clone(),
             query_runner.clone(),
             notifier.clone(),
-            topology,
+            topology.get_receiver(),
             rep_aggregator.get_reporter(),
         )
         .unwrap();
@@ -293,6 +294,7 @@ async fn get_fetchers(
         signer.start().await;
         consensus.start().await;
         fetcher.start().await;
+        topology.start().await;
         pool.start().await;
         rep_aggregator.start().await;
         blockstore_server.start().await;
@@ -300,6 +302,7 @@ async fn get_fetchers(
         let peer = Peer::<TestBinding> {
             fetcher,
             _consensus: consensus,
+            _topology: topology,
             _pool: pool,
             _broadcast: broadcast,
             _blockstore_server: blockstore_server,

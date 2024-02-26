@@ -9,12 +9,7 @@ use fleek_crypto::NodePublicKey;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{
-    ApplicationInterface,
-    ServiceScope,
-    SyncQueryRunnerInterface,
-    TopologyInterface,
-};
+use lightning_interfaces::{ApplicationInterface, ServiceScope, SyncQueryRunnerInterface};
 use lightning_metrics::histogram;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
@@ -28,8 +23,6 @@ use crate::state::NodeInfo;
 pub struct LogicalPool<C: Collection> {
     /// Peers that we are currently connected to.
     pub(crate) pool: HashMap<NodeIndex, ConnectionInfo>,
-    /// Source of pool state.
-    topology: c![C::TopologyInterface],
     /// Query Runner.
     sync_query: c![C::ApplicationInterface::SyncExecutor],
     /// Local node index.
@@ -44,18 +37,13 @@ impl<C> LogicalPool<C>
 where
     C: Collection,
 {
-    pub fn new(
-        sync_query: c!(C::ApplicationInterface::SyncExecutor),
-        topology: c!(C::TopologyInterface),
-        pk: NodePublicKey,
-    ) -> Self {
+    pub fn new(sync_query: c!(C::ApplicationInterface::SyncExecutor), pk: NodePublicKey) -> Self {
         Self {
             pool: HashMap::new(),
             sync_query,
             index: OnceCell::new(),
             stats: Stats::default(),
             pk,
-            topology,
         }
     }
 
@@ -171,10 +159,8 @@ where
         }
     }
 
-    pub fn update_connections(&mut self) -> EndpointTask {
-        let peers = self
-            .topology
-            .suggest_connections()
+    pub fn update_connections(&mut self, connections: Vec<Vec<NodePublicKey>>) -> EndpointTask {
+        let peers = connections
             .iter()
             .flatten()
             .filter_map(|pk| self.pubkey_to_index(*pk))

@@ -5,7 +5,7 @@ use std::task::Poll;
 
 use anyhow::{Context, Result};
 use bytes::Bytes;
-use fleek_crypto::SecretKey;
+use fleek_crypto::{NodePublicKey, SecretKey};
 use futures::{SinkExt, Stream};
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
@@ -22,11 +22,10 @@ use lightning_interfaces::{
     RequesterInterface,
     ResponderInterface,
     ResponseInterface,
-    TopologyInterface,
     WithStartAndShutdown,
 };
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
@@ -207,7 +206,7 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
         keystore: C::KeystoreInterface,
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         notifier: c!(C::NotifierInterface),
-        topology: c!(C::TopologyInterface),
+        topology_rx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
         _: c!(C::ReputationAggregatorInterface::ReputationReporter),
     ) -> Result<PoolProvider<C, QuinnMuxer>> {
         let sk = keystore.get_ed25519_sk();
@@ -228,10 +227,8 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
         let shutdown = CancellationToken::new();
         let (endpoint_task_tx, endpoint_task_rx) = mpsc::channel(1024);
         let (event_tx, event_rx) = mpsc::channel(1024);
-        let topology_rx = topology.get_receiver();
         let receiver = EventReceiver::<C>::new(
             sync_query.clone(),
-            topology,
             notifier,
             topology_rx,
             event_rx,

@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::io;
+use std::time::{Duration, Instant};
 
 use bytes::{BufMut, Bytes, BytesMut};
 use fleek_crypto::NodePublicKey;
 use futures::stream::FuturesUnordered;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::NodeIndex;
+use lightning_interfaces::types::{NodeIndex, Participation};
 use lightning_interfaces::{
     ApplicationInterface,
     Notification,
@@ -15,17 +16,25 @@ use lightning_interfaces::{
     RequestHeader,
     ServiceScope,
 };
+use lightning_utils::application::QueryRunnerExt;
+use rand::seq::SliceRandom;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
+use tracing::info;
 use x509_parser::nom::AsBytes;
 
 use crate::endpoint::EndpointTask;
 use crate::logical_pool::LogicalPool;
 use crate::provider::{Request, Response};
 use crate::state::{ConnectionInfo, EventReceiverInfo};
+
+#[cfg(all(not(test), not(debug_assertions)))]
+const MAX_TOPOLOGY_WAIT: Duration = Duration::from_secs(10);
+#[cfg(any(test, debug_assertions))]
+const MAX_TOPOLOGY_WAIT: Duration = Duration::from_millis(500);
 
 /// Events.
 pub enum Event {
@@ -69,9 +78,10 @@ pub struct EventReceiver<C: Collection> {
     pub(crate) handler: LogicalPool<C>,
     /// Epoch event receiver.
     notifier: Receiver<Notification>,
+    /// Application query runner.
+    sync_query: c!(C::ApplicationInterface::SyncExecutor),
     /// Topology update receiver.
-    #[allow(unused)]
-    topology_tx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
+    topology_rx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
     /// Writer side of queue for actual pool tasks.
     endpoint_queue: Sender<EndpointTask>,
     /// Service handles.
@@ -80,6 +90,8 @@ pub struct EventReceiver<C: Collection> {
     send_request_service_handles: HashMap<ServiceScope, Sender<(RequestHeader, Request)>>,
     /// Ongoing asynchronous tasks.
     ongoing_async_tasks: FuturesUnordered<JoinHandle<anyhow::Result<()>>>,
+    /// Our public key.
+    public_key: NodePublicKey,
     shutdown: CancellationToken,
 }
 
@@ -90,9 +102,8 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
-        topology: c!(C::TopologyInterface),
         notifier: c!(C::NotifierInterface),
-        topology_tx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
+        topology_rx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
         event_queue: Receiver<Event>,
         pool_queue: Sender<EndpointTask>,
         public_key: NodePublicKey,
@@ -101,17 +112,19 @@ where
         let (notifier_tx, notifier_rx) = mpsc::channel(16);
         notifier.notify_on_new_epoch(notifier_tx);
 
-        let logical_pool = LogicalPool::<C>::new(sync_query, topology, public_key);
+        let logical_pool = LogicalPool::<C>::new(sync_query.clone(), public_key);
 
         Self {
             event_queue,
             handler: logical_pool,
             notifier: notifier_rx,
-            topology_tx,
+            sync_query,
+            topology_rx,
             endpoint_queue: pool_queue,
             broadcast_service_handles: HashMap::new(),
             send_request_service_handles: HashMap::new(),
             ongoing_async_tasks: FuturesUnordered::new(),
+            public_key,
             shutdown,
         }
     }
@@ -134,8 +147,8 @@ where
         rx
     }
 
-    fn setup_state(&mut self) {
-        let endpoint_task = self.handler.update_connections();
+    fn setup_state(&mut self, connections: Vec<Vec<NodePublicKey>>) {
+        let endpoint_task = self.handler.update_connections(connections);
         self.enqueue_endpoint_task(endpoint_task);
     }
 
@@ -182,17 +195,13 @@ where
     }
 
     #[inline]
-    fn handle_new_epoch(&mut self, epoch_event: Notification) -> anyhow::Result<()> {
-        match epoch_event {
-            Notification::NewEpoch => {
-                let endpoint_task = self.handler.update_connections();
-                self.enqueue_endpoint_task(endpoint_task);
-            },
-            _ => {
-                unreachable!("we're only registered for new epoch events")
-            },
-        }
-        Ok(())
+    fn handle_new_topology(&mut self) {
+        // We clone the reference to the underlying value because
+        // outstanding borrows hold a read lock which can cause
+        // the sender to block.
+        let conns = self.topology_rx.borrow_and_update().clone();
+        let endpoint_task = self.handler.update_connections(conns);
+        self.enqueue_endpoint_task(endpoint_task);
     }
 
     #[inline]
@@ -382,7 +391,39 @@ where
         // If there is an error while setting up the state,
         // there is nothing else to do and
         // we should not allow start to proceed.
-        self.setup_state();
+
+        let now = Instant::now();
+        let conns = loop {
+            if now.elapsed() > MAX_TOPOLOGY_WAIT {
+                // We waited the maximum time for the topology,
+                // now we go with a temporary topology
+                let nodes: Vec<NodePublicKey> = self
+                    .sync_query
+                    .get_node_registry(None)
+                    .into_iter()
+                    .filter(|node_info| node_info.info.public_key != self.public_key)
+                    .filter(|node_info| node_info.info.participation == Participation::True)
+                    .map(|node_info| node_info.info.public_key)
+                    .collect();
+
+                let mut rng = &mut rand::thread_rng();
+                // TODO(matthias): make sure that at least one validator is included?
+                let conns: Vec<NodePublicKey> =
+                    nodes.choose_multiple(&mut rng, 8).copied().collect();
+                break vec![conns];
+            }
+
+            {
+                let conns = self.topology_rx.borrow_and_update();
+                if !conns.is_empty() {
+                    break conns.clone();
+                }
+            }
+
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        };
+
+        self.setup_state(conns);
 
         loop {
             tokio::select! {
@@ -390,12 +431,12 @@ where
                 _ = self.shutdown.cancelled() => {
                     break;
                 }
-                next = self.notifier.recv() => {
-                    let Some(event) = next else {
-                        println!("notifier was dropped");
+                next = self.topology_rx.changed() => {
+                    if let Err(e) = next {
+                        info!("topology was dropped: {e:?}");
                         break;
-                    };
-                    let _ = self.handle_new_epoch(event);
+                    }
+                    self.handle_new_topology();
                 }
                 next = self.event_queue.recv() => {
                     let Some(event) = next else {
