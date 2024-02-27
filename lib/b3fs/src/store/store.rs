@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use bytes::Bytes;
+use tokio::io::AsyncWriteExt;
 use triomphe::Arc;
 
 use super::directory::Directory;
@@ -13,6 +14,10 @@ use super::layout::get_header_path;
 pub struct Store {
     root_path: PathBuf,
     in_memory_storage: Option<Arc<HashMap<PathBuf, Bytes>>>,
+}
+
+pub(crate) enum Fd {
+    Tokio(tokio::fs::File),
 }
 
 impl Store {
@@ -29,6 +34,17 @@ impl Store {
         Self {
             root_path: "/fleek/store".into(),
             in_memory_storage: Some(Arc::new(HashMap::new())),
+        }
+    }
+
+    pub(crate) async fn open(&self, path: PathBuf) -> Result<Fd, std::io::Error> {
+        let file = std::fs::File::options().write(true).open(path);
+        todo!()
+    }
+
+    pub(crate) async fn write(&self, fd: &mut Fd, src: &[u8]) -> Result<usize, std::io::Error> {
+        match fd {
+            Fd::Tokio(file) => file.write(src).await,
         }
     }
 
