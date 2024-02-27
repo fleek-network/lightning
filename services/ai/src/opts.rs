@@ -28,7 +28,6 @@ impl From<&str> for Origin {
     }
 }
 
-/// Input encoding.
 #[derive(Deserialize, Serialize)]
 #[repr(u8)]
 pub enum Encoding {

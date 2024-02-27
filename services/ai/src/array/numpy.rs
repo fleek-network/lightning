@@ -1,27 +1,8 @@
-//! Utils to convert tensors to Numpy arrays.
 use std::io::Cursor;
 
 use anyhow::bail;
 use npyz::{DType, TypeChar};
 use ort::Value;
-
-// pub fn convert_to_numpy<W: io::Write>(writer: W, tensor: Tensor) -> anyhow::Result<()> {
-//     match tensor {
-//         Tensor::Int8(arr) => arr.write_npy(writer)?,
-//         Tensor::Int16(arr) => arr.write_npy(writer)?,
-//         Tensor::Int32(arr) => arr.write_npy(writer)?,
-//         Tensor::Int64(arr) => arr.write_npy(writer)?,
-//         Tensor::Uint8(arr) => arr.write_npy(writer)?,
-//         Tensor::Uint16(arr) => arr.write_npy(writer)?,
-//         Tensor::Uint32(arr) => arr.write_npy(writer)?,
-//         Tensor::Uint64(arr) => arr.write_npy(writer)?,
-//         Tensor::Uint8D1(arr) => arr.write_npy(writer)?,
-//         Tensor::Float32(arr) => arr.write_npy(writer)?,
-//         Tensor::Float64(arr) => arr.write_npy(writer)?,
-//     }
-//
-//     Ok(())
-// }
 
 // Todo: add support for remaining dtypes.
 pub fn parse_from_mem(data: &[u8]) -> anyhow::Result<Value> {

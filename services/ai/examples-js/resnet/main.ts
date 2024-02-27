@@ -1,5 +1,5 @@
 import { CLASSES } from "./imagenet.ts";
-import { deserialize } from "https://esm.sh/borsh@2.0.0";
+import { deserialize, serialize } from "https://esm.sh/borsh@2.0.0";
 import { decode, encode } from "https://deno.land/x/msgpack@v1.2/mod.ts";
 import { ExtData } from "https://deno.land/x/msgpack@v1.4/ExtData.ts";
 import { ExtensionCodec } from "https://deno.land/x/msgpack@v1.4/mod.ts";
@@ -7,7 +7,7 @@ import { ExtensionCodec } from "https://deno.land/x/msgpack@v1.4/mod.ts";
 const inputElement = document.querySelector("input");
 const outputElement = document.querySelector("output");
 
-const RawEncoding: number = 0;
+const BorshUint8Encoding: number = 4;
 
 interface Output {
   squeezed: ExtData;
@@ -17,9 +17,14 @@ inputElement!.addEventListener("change", async () => {
   if (inputElement!.files && inputElement!.files.length > 0) {
     const serializedImage = await inputElement!.files[0].arrayBuffer();
     const extensionCodec = ExtensionCodec.defaultCodec;
+    const inputSchema = { array: { type: "u8" } };
+    const serializedInput = serialize(
+      inputSchema,
+      new Uint8Array(serializedImage),
+    );
     const body = encode({
       array: {
-        data: new ExtData(RawEncoding, new Uint8Array(serializedImage)),
+        data: new ExtData(BorshUint8Encoding, new Uint8Array(serializedInput)),
       },
     }, { extensionCodec });
 
@@ -38,11 +43,11 @@ inputElement!.addEventListener("change", async () => {
     const output = decode(new Uint8Array(payload)) as Output;
     const encodedData = output.squeezed.data;
 
-    const schema = { array: { type: "f32" } };
-    const decoded = deserialize(schema, encodedData);
+    const outputSchema = { array: { type: "f32" } };
+    const deserializedOutput = deserialize(outputSchema, encodedData);
 
-    if (decoded) {
-      const logits = new Float32Array(decoded as ArrayBuffer);
+    if (deserializedOutput) {
+      const logits = new Float32Array(deserializedOutput as ArrayBuffer);
       const bestPrediction = logits.indexOf(Math.max(...logits));
       const name = CLASSES[bestPrediction];
 

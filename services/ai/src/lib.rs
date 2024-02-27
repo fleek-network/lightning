@@ -22,8 +22,6 @@ pub struct StartSession {
 }
 
 /// Input for inference.
-///
-/// Note: for each variant, the same encoding will be used for the output.
 #[derive(Deserialize, Serialize, Debug)]
 pub enum Input {
     /// The input is an array.
@@ -39,7 +37,7 @@ pub enum Input {
     },
 }
 
-/// Output from a session run.
+/// Output from an inference run.
 pub type Output = HashMap<String, EncodedArrayExt>;
 
 #[derive(Deserialize, Serialize, Debug)]
