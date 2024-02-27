@@ -206,7 +206,7 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
         keystore: C::KeystoreInterface,
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         notifier: c!(C::NotifierInterface),
-        topology_rx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
+        topology_rx: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
         _: c!(C::ReputationAggregatorInterface::ReputationReporter),
     ) -> Result<PoolProvider<C, QuinnMuxer>> {
         let sk = keystore.get_ed25519_sk();

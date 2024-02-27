@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::io;
+use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use fleek_crypto::NodePublicKey;
@@ -71,7 +72,7 @@ pub struct EventReceiver<C: Collection> {
     /// Epoch event receiver.
     notifier: Receiver<Notification>,
     /// Topology update receiver.
-    topology_rx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
+    topology_rx: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
     /// Writer side of queue for actual pool tasks.
     endpoint_queue: Sender<EndpointTask>,
     /// Service handles.
@@ -92,7 +93,7 @@ where
     pub fn new(
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
         notifier: c!(C::NotifierInterface),
-        topology_rx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
+        topology_rx: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
         event_queue: Receiver<Event>,
         pool_queue: Sender<EndpointTask>,
         public_key: NodePublicKey,
@@ -134,7 +135,7 @@ where
         rx
     }
 
-    fn setup_state(&mut self, connections: Vec<Vec<NodePublicKey>>) {
+    fn setup_state(&mut self, connections: Arc<Vec<Vec<NodePublicKey>>>) {
         let endpoint_task = self.handler.update_connections(connections);
         self.enqueue_endpoint_task(endpoint_task);
     }

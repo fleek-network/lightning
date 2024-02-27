@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use fleek_crypto::NodePublicKey;
 use infusion::c;
 use tokio::sync::watch;
@@ -55,5 +57,5 @@ pub trait TopologyInterface<C: Collection>:
     ///
     /// The list of connections is a 2-dimensional array, the first dimension determines the
     /// closeness of the nodes, the further items are the outer layer of the connections.
-    fn get_receiver(&self) -> watch::Receiver<Vec<Vec<NodePublicKey>>>;
+    fn get_receiver(&self) -> watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>;
 }

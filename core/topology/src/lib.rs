@@ -38,8 +38,8 @@ pub struct Topology<C: Collection> {
 struct TopologyInner<C: Collection> {
     query: c!(C::ApplicationInterface::SyncExecutor),
     notifier_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
-    topology_tx: watch::Sender<Vec<Vec<NodePublicKey>>>,
-    topology_rx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
+    topology_tx: watch::Sender<Arc<Vec<Vec<NodePublicKey>>>>,
+    topology_rx: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
     our_public_key: NodePublicKey,
     target_k: usize,
     min_nodes: usize,
@@ -81,7 +81,7 @@ impl<C: Collection> TopologyInner<C> {
             .suggest_connections()
             .await
             .expect("Failed to compute topology");
-        if let Err(e) = self.topology_tx.send(conns) {
+        if let Err(e) = self.topology_tx.send(Arc::new(conns)) {
             error!("All receivers have been dropped: {e:?}");
         }
         let mut notifier_rx = self.notifier_rx.lock().unwrap().take().unwrap();
@@ -99,7 +99,7 @@ impl<C: Collection> TopologyInner<C> {
                         // This only fails if joining the blocking task fails, which only
                         // happens if something is already wrong.
                         let conns = self.suggest_connections().await.expect("Failed to compute topology");
-                        if let Err(e) = self.topology_tx.send(conns) {
+                        if let Err(e) = self.topology_tx.send(Arc::new(conns)) {
                             error!("All receivers have been dropped: {e:?}");
                         }
                     }
@@ -120,7 +120,7 @@ impl<C: Collection> TopologyInterface<C> for Topology<C> {
         let (notifier_tx, notifier_rx) = mpsc::channel(16);
         notifier.notify_on_new_epoch(notifier_tx);
 
-        let (topology_tx, topology_rx) = watch::channel(Vec::new());
+        let (topology_tx, topology_rx) = watch::channel(Arc::new(Vec::new()));
         let shutdown_notify = Arc::new(Notify::new());
         let inner = TopologyInner {
             target_k: config.testing_target_k,
@@ -139,7 +139,7 @@ impl<C: Collection> TopologyInterface<C> for Topology<C> {
         })
     }
 
-    fn get_receiver(&self) -> watch::Receiver<Vec<Vec<NodePublicKey>>> {
+    fn get_receiver(&self) -> watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>> {
         self.inner.topology_rx.clone()
     }
 }

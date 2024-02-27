@@ -3,6 +3,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
@@ -159,7 +160,10 @@ where
         }
     }
 
-    pub fn update_connections(&mut self, connections: Vec<Vec<NodePublicKey>>) -> EndpointTask {
+    pub fn update_connections(
+        &mut self,
+        connections: Arc<Vec<Vec<NodePublicKey>>>,
+    ) -> EndpointTask {
         let peers = connections
             .iter()
             .flatten()

@@ -1,4 +1,5 @@
 use std::io;
+use std::sync::Arc;
 
 use anyhow::{bail, Error};
 use bytes::Bytes;
@@ -78,7 +79,7 @@ pub trait PoolInterface<C: Collection>:
         keystore: C::KeystoreInterface,
         sqr: c!(C::ApplicationInterface::SyncExecutor),
         notifier: c!(C::NotifierInterface),
-        topology_rx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
+        topology_rx: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     ) -> anyhow::Result<Self>;
 
