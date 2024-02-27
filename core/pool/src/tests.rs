@@ -288,7 +288,14 @@ async fn test_send_to_one() {
 
     for peer in &peers {
         peer.pool.start().await;
+        peer.topology.start().await;
     }
+    // Since we made the topology push based, the pool will start immediately without waiting for
+    // the topology to finish calculating. This means that the pool won't connect to other peers
+    // until the received the connections from the topology. We have to wait briefly for the
+    // topology to send the connections, otherwise receiving the message will block, because there
+    // are no connections.
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     // When: one of the peers sends a message to the other peer.
     let msg = Bytes::from("hello");
@@ -327,9 +334,17 @@ async fn test_send_to_all() {
         .iter()
         .map(|peer| peer.pool.open_event(ServiceScope::Broadcast))
         .collect();
+
     for peer in &peers {
         peer.pool.start().await;
+        peer.topology.start().await;
     }
+    // Since we made the topology push based, the pool will start immediately without waiting for
+    // the topology to finish calculating. This means that the pool won't connect to other peers
+    // until the received the connections from the topology. We have to wait briefly for the
+    // topology to send the connections, otherwise receiving the message will block, because there
+    // are no connections.
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Given: we start an unknown node.
     let mut event_handlers_unknown_peer = unknown_peer.pool.open_event(ServiceScope::Broadcast);
@@ -766,6 +781,18 @@ async fn test_log_pool_only_broadcast_to_one_peer() {
         None,
     )
     .await;
+
+    for peer in &peers {
+        peer.pool.start().await;
+        peer.topology.start().await;
+    }
+    // Since we made the topology push based, the pool will start immediately without waiting for
+    // the topology to finish calculating. This means that the pool won't connect to other peers
+    // until the received the connections from the topology. We have to wait briefly for the
+    // topology to send the connections, otherwise receiving the message will block, because there
+    // are no connections.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
     let (mut event_receiver, mut state) = event_receiver(app, &peers[0]);
 
     // Given: we connect to all peers.
@@ -841,7 +868,14 @@ async fn test_start_shutdown() {
     // Given: we start the peers.
     for peer in &peers {
         peer.pool.start().await;
+        peer.topology.start().await;
     }
+    // Since we made the topology push based, the pool will start immediately without waiting for
+    // the topology to finish calculating. This means that the pool won't connect to other peers
+    // until the received the connections from the topology. We have to wait briefly for the
+    // topology to send the connections, otherwise receiving the message will block, because there
+    // are no connections.
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Given: we exchange data over the network.
     let msg = Bytes::from("hello");

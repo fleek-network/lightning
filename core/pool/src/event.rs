@@ -1,14 +1,13 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::io;
-use std::time::{Duration, Instant};
 
 use bytes::{BufMut, Bytes, BytesMut};
 use fleek_crypto::NodePublicKey;
 use futures::stream::FuturesUnordered;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::{NodeIndex, Participation};
+use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{
     ApplicationInterface,
     Notification,
@@ -16,8 +15,6 @@ use lightning_interfaces::{
     RequestHeader,
     ServiceScope,
 };
-use lightning_utils::application::QueryRunnerExt;
-use rand::seq::SliceRandom;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, watch};
@@ -30,11 +27,6 @@ use crate::endpoint::EndpointTask;
 use crate::logical_pool::LogicalPool;
 use crate::provider::{Request, Response};
 use crate::state::{ConnectionInfo, EventReceiverInfo};
-
-#[cfg(all(not(test), not(debug_assertions)))]
-const MAX_TOPOLOGY_WAIT: Duration = Duration::from_secs(10);
-#[cfg(any(test, debug_assertions))]
-const MAX_TOPOLOGY_WAIT: Duration = Duration::from_millis(500);
 
 /// Events.
 pub enum Event {
@@ -78,8 +70,6 @@ pub struct EventReceiver<C: Collection> {
     pub(crate) handler: LogicalPool<C>,
     /// Epoch event receiver.
     notifier: Receiver<Notification>,
-    /// Application query runner.
-    sync_query: c!(C::ApplicationInterface::SyncExecutor),
     /// Topology update receiver.
     topology_rx: watch::Receiver<Vec<Vec<NodePublicKey>>>,
     /// Writer side of queue for actual pool tasks.
@@ -91,7 +81,6 @@ pub struct EventReceiver<C: Collection> {
     /// Ongoing asynchronous tasks.
     ongoing_async_tasks: FuturesUnordered<JoinHandle<anyhow::Result<()>>>,
     /// Our public key.
-    public_key: NodePublicKey,
     shutdown: CancellationToken,
 }
 
@@ -118,13 +107,11 @@ where
             event_queue,
             handler: logical_pool,
             notifier: notifier_rx,
-            sync_query,
             topology_rx,
             endpoint_queue: pool_queue,
             broadcast_service_handles: HashMap::new(),
             send_request_service_handles: HashMap::new(),
             ongoing_async_tasks: FuturesUnordered::new(),
-            public_key,
             shutdown,
         }
     }
@@ -391,38 +378,7 @@ where
         // If there is an error while setting up the state,
         // there is nothing else to do and
         // we should not allow start to proceed.
-
-        let now = Instant::now();
-        let conns = loop {
-            if now.elapsed() > MAX_TOPOLOGY_WAIT {
-                // We waited the maximum time for the topology,
-                // now we go with a temporary topology
-                let nodes: Vec<NodePublicKey> = self
-                    .sync_query
-                    .get_node_registry(None)
-                    .into_iter()
-                    .filter(|node_info| node_info.info.public_key != self.public_key)
-                    .filter(|node_info| node_info.info.participation == Participation::True)
-                    .map(|node_info| node_info.info.public_key)
-                    .collect();
-
-                let mut rng = &mut rand::thread_rng();
-                // TODO(matthias): make sure that at least one validator is included?
-                let conns: Vec<NodePublicKey> =
-                    nodes.choose_multiple(&mut rng, 8).copied().collect();
-                break vec![conns];
-            }
-
-            {
-                let conns = self.topology_rx.borrow_and_update();
-                if !conns.is_empty() {
-                    break conns.clone();
-                }
-            }
-
-            tokio::time::sleep(Duration::from_millis(500)).await;
-        };
-
+        let conns = self.topology_rx.borrow_and_update().clone();
         self.setup_state(conns);
 
         loop {
