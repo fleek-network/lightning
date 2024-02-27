@@ -8,6 +8,9 @@ use rand::SeedableRng;
 
 use crate::divisive::DivisiveHierarchy;
 
+/// Build a latency matrix according to the current application state.
+/// Returns the matrix, a map of node ids to public keys, and an optional node index for
+/// ourselves if we're included in the topology.
 pub(crate) fn build_latency_matrix(
     our_public_key: NodePublicKey,
     latencies: HashMap<(NodePublicKey, NodePublicKey), Duration>,

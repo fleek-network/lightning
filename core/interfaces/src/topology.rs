@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use fleek_crypto::NodePublicKey;
 use infusion::c;
 use tokio::sync::watch;
@@ -51,18 +49,9 @@ pub trait TopologyInterface<C: Collection>:
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self>;
 
-    /// Suggest a list of connections that our current node must connect to. This should be
-    /// according to the `our_public_key` value passed during the initialization.
-    ///
-    /// The result of this call is a 2-dimensional array, the first dimension determines the
-    /// closeness of the nodes, the further items are the outer layer of the connections.
-    ///
-    /// This should return the result for the latest epoch. The [`TopologyInterface`] is poll
-    /// based and implementations are recommended to cache the result of this computation.
-    fn suggest_connections(&self) -> Arc<Vec<Vec<NodePublicKey>>>;
-
     /// Get a receiver that will periodically receive the new list of connections that our current
-    /// node must connect to. This list will be sent after the epoch changes.
+    /// node must connect to. This list will be sent after the epoch changes, but can also be sent
+    /// more frequently.
     ///
     /// The list of connections is a 2-dimensional array, the first dimension determines the
     /// closeness of the nodes, the further items are the outer layer of the connections.
