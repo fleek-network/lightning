@@ -29,6 +29,7 @@ mod tests {
         ApplicationInterface,
         BlockStoreInterface,
         ConsensusInterface,
+        ForwarderInterface,
         IncrementalPutInterface,
         IndexerInterface,
         KeystoreInterface,
@@ -39,7 +40,11 @@ mod tests {
     };
     use lightning_notifier::Notifier;
     use lightning_signer::Signer;
-    use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+    use lightning_test_utils::consensus::{
+        Config as ConsensusConfig,
+        MockConsensus,
+        MockForwarder,
+    };
     use lightning_test_utils::keys::EphemeralKeystore;
     use tokio::sync::mpsc;
     use tokio::test;
@@ -182,9 +187,19 @@ mod tests {
 
         let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-        let mut signer =
-            Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
-                .unwrap();
+        let forwarder = MockForwarder::<TestBinding>::init(
+            Default::default(),
+            keystore.get_bls_pk(),
+            query_runner.clone(),
+        )
+        .unwrap();
+        let mut signer = Signer::<TestBinding>::init(
+            Default::default(),
+            keystore.clone(),
+            query_runner.clone(),
+            forwarder.mempool_socket(),
+        )
+        .unwrap();
 
         let notifier = Notifier::<TestBinding>::init(&app);
 
@@ -207,8 +222,6 @@ mod tests {
             &notifier,
         )
         .unwrap();
-
-        signer.provide_mempool(consensus.mempool());
 
         let (new_block_tx, new_block_rx) = mpsc::channel(10);
 
