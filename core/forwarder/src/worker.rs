@@ -9,7 +9,6 @@ use std::collections::HashMap;
 
 use affair::AsyncWorker;
 use anyhow::{bail, Result};
-use fastcrypto::bls12381::min_sig::BLS12381PublicKey;
 use fleek_crypto::ConsensusPublicKey;
 use lightning_interfaces::types::{Epoch, EpochInfo, NodeInfo, TransactionRequest};
 use lightning_interfaces::SyncQueryRunnerInterface;
@@ -23,7 +22,7 @@ use tracing::error;
 const TARGETED_CONNECTION_NUM: usize = 10;
 const TIMEOUT_DURATION: Duration = Duration::new(4, 0);
 
-pub struct Forwarder<Q: SyncQueryRunnerInterface> {
+pub struct Worker<Q: SyncQueryRunnerInterface> {
     /// Query runner used to read application state
     query_runner: Q,
     /// The public key of this node
@@ -43,11 +42,11 @@ pub struct Forwarder<Q: SyncQueryRunnerInterface> {
     active_connections: HashMap<usize, TransactionsClient<Channel>>,
 }
 
-impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
-    pub fn new(query_runner: Q, primary_name: BLS12381PublicKey) -> Self {
+impl<Q: SyncQueryRunnerInterface> Worker<Q> {
+    pub fn new(primary_name: ConsensusPublicKey, query_runner: Q) -> Self {
         Self {
             query_runner,
-            primary_name: primary_name.into(),
+            primary_name,
             epoch: 0,
             committee: Vec::new(),
             cursor: 0,
@@ -173,7 +172,7 @@ impl<Q: SyncQueryRunnerInterface> Forwarder<Q> {
     }
 }
 
-impl<Q: SyncQueryRunnerInterface + 'static> AsyncWorker for Forwarder<Q> {
+impl<Q: SyncQueryRunnerInterface + 'static> AsyncWorker for Worker<Q> {
     type Request = TransactionRequest;
     type Response = ();
 

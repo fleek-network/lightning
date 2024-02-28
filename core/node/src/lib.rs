@@ -7,6 +7,7 @@ use lightning_blockstore_server::BlockStoreServer;
 use lightning_broadcast::Broadcast;
 use lightning_consensus::consensus::Consensus;
 use lightning_fetcher::fetcher::Fetcher;
+use lightning_forwarder::Forwarder;
 use lightning_handshake::handshake::Handshake;
 use lightning_indexer::Indexer;
 use lightning_interfaces::infu_collection::{
@@ -44,6 +45,7 @@ impl CollectionBase for FinalTypes {
     type BroadcastInterface<C: Collection> = Broadcast<C>;
     type TopologyInterface<C: Collection> = Topology<C>;
     type ArchiveInterface<C: Collection> = Archive<C>;
+    type ForwarderInterface<C: Collection> = Forwarder<C>;
     type ConsensusInterface<C: Collection> = Consensus<C>;
     type HandshakeInterface<C: Collection> = Handshake<C>;
     type NotifierInterface<C: Collection> = Notifier<C>;

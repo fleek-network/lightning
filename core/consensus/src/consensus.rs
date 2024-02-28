@@ -3,13 +3,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
-use affair::{Executor, TokioSpawn};
 use derive_more::{From, IsVariant, TryInto};
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey, SecretKey};
 use lightning_interfaces::application::ExecutionEngineSocket;
 use lightning_interfaces::common::WithStartAndShutdown;
 use lightning_interfaces::config::ConfigConsumer;
-use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
+use lightning_interfaces::consensus::ConsensusInterface;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
 use lightning_interfaces::types::{Epoch, EpochInfo, Event, UpdateMethod};
@@ -42,7 +41,6 @@ use typed_store::DBMetrics;
 use crate::config::Config;
 use crate::edge_node::consensus::EdgeConsensus;
 use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Digest, Execution};
-use crate::forwarder::Forwarder;
 use crate::narwhal::{NarwhalArgs, NarwhalService};
 
 pub struct Consensus<C: Collection> {
@@ -59,9 +57,6 @@ pub struct Consensus<C: Collection> {
             >,
         >,
     >,
-    /// This socket receives signed transactions and forwards them to an active committee member to
-    /// be ordered
-    mempool_socket: MempoolSocket,
     /// Timestamp of the narwhal certificate that caused an epoch change
     /// is sent through this channel to notify that epoch chould change.
     reconfigure_notify: Arc<Notify>,
@@ -409,7 +404,6 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
         let reconfigure_notify = Arc::new(Notify::new());
         let networking_keypair = NetworkKeyPair::from(primary_sk);
         let primary_keypair = KeyPair::from(consensus_sk);
-        let forwarder = Forwarder::new(query_runner.clone(), primary_keypair.public().clone());
         let narwhal_args = NarwhalArgs {
             primary_keypair,
             primary_network_keypair: networking_keypair.copy(),
@@ -447,19 +441,11 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
 
         Ok(Self {
             epoch_state: Mutex::new(Some(epoch_state)),
-            mempool_socket: TokioSpawn::spawn_async(forwarder),
             reconfigure_notify,
             shutdown_notify,
             shutdown_notify_epoch_state,
             is_running: AtomicBool::new(false),
         })
-    }
-
-    /// Returns a socket that can be used to submit transactions to the consensus,
-    /// this can be used by any other systems that are interested in posting some
-    /// transaction to the consensus.
-    fn mempool(&self) -> MempoolSocket {
-        self.mempool_socket.clone()
     }
 
     fn set_event_tx(&mut self, tx: tokio::sync::mpsc::Sender<Vec<Event>>) {

@@ -5806,6 +5806,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-forwarder"
+version = "0.0.0"
+dependencies = [
+ "affair 0.1.2",
+ "anyhow",
+ "fleek-crypto",
+ "futures",
+ "infusion",
+ "lightning-interfaces",
+ "lightning-test-utils",
+ "lightning-utils",
+ "narwhal-types",
+ "rand 0.8.5",
+ "serde",
+ "tokio",
+ "tonic 0.8.3",
+ "tracing",
+]
+
+[[package]]
 name = "lightning-handshake"
 version = "0.0.0"
 dependencies = [
@@ -5956,6 +5976,7 @@ dependencies = [
  "lightning-broadcast",
  "lightning-consensus",
  "lightning-fetcher",
+ "lightning-forwarder",
  "lightning-handshake",
  "lightning-indexer",
  "lightning-interfaces",
