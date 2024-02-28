@@ -23,7 +23,7 @@ tokio.workspace = true
 tokio-stream.workspace = true
 scc.workspace = true
 tokio-util = { workspace = true, features = ["codec"] }
-affair = "0.1.2"
+affair.workspace = true
 der = { version = "0.7", features = ["alloc", "derive"] }
 fleek-blake3 = "1.5"
 ring = "0.16.20"

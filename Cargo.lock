@@ -83,17 +83,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "affair"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d4a8c16d48095831f850a7220cb8211aee6615e6fee2b7d194ef2215b94e163"
-dependencies = [
- "async-trait",
- "futures",
- "tokio",
-]
-
-[[package]]
 name = "ahash"
 version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5470,7 +5459,7 @@ dependencies = [
 name = "lightning-application"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "atomo",
  "atomo-rocks",
@@ -5501,7 +5490,7 @@ dependencies = [
 name = "lightning-archive"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "atomo",
  "atomo-rocks",
@@ -5553,7 +5542,7 @@ dependencies = [
 name = "lightning-blockstore-server"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "blake3-tree",
  "bytes",
@@ -5581,7 +5570,7 @@ dependencies = [
 name = "lightning-broadcast"
 version = "0.1.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "arrayref",
  "bytes",
@@ -5663,7 +5652,7 @@ dependencies = [
 name = "lightning-consensus"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "async-trait",
  "bincode",
@@ -5707,7 +5696,7 @@ dependencies = [
 name = "lightning-dack-aggregator"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "bincode",
  "fleek-crypto",
@@ -5775,7 +5764,7 @@ dependencies = [
 name = "lightning-fetcher"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "blake3-tree",
  "bytes",
@@ -5809,7 +5798,7 @@ dependencies = [
 name = "lightning-forwarder"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "fleek-crypto",
  "futures",
@@ -5829,7 +5818,7 @@ dependencies = [
 name = "lightning-handshake"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "arrayref",
  "async-channel",
@@ -5905,7 +5894,7 @@ dependencies = [
 name = "lightning-interfaces"
 version = "0.1.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "atomo",
  "atomo-rocks",
@@ -6045,7 +6034,7 @@ dependencies = [
 name = "lightning-origin-demuxer"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "cid 0.10.1",
  "derive_more",
@@ -6077,7 +6066,7 @@ dependencies = [
 name = "lightning-origin-http"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "fast-sri",
  "fleek-crypto",
@@ -6099,7 +6088,7 @@ dependencies = [
 name = "lightning-origin-ipfs"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "bytes",
  "cid 0.10.1",
@@ -6152,7 +6141,7 @@ dependencies = [
 name = "lightning-pool"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "affair",
  "anyhow",
  "axum 0.7.4",
  "bytes",
@@ -6252,7 +6241,7 @@ dependencies = [
 name = "lightning-rpc"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "alloy-primitives",
  "anyhow",
  "async-trait",
@@ -6311,7 +6300,7 @@ dependencies = [
 name = "lightning-service-executor"
 version = "0.1.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "arrayref",
  "bincode",
@@ -6355,7 +6344,7 @@ dependencies = [
 name = "lightning-signer"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "fleek-crypto",
  "futures",
@@ -6394,7 +6383,7 @@ dependencies = [
 name = "lightning-test-utils"
 version = "0.0.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "axum 0.6.20",
  "ethers",
@@ -6812,7 +6801,7 @@ dependencies = [
 name = "mock"
 version = "0.1.0"
 dependencies = [
- "affair 0.1.2",
+ "affair",
  "anyhow",
  "axum 0.6.20",
  "dashmap",

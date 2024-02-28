@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use affair::Socket;
 use bytes::Bytes;
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use futures::StreamExt;
@@ -177,9 +178,13 @@ fn create_peer(
 ) -> Peer<TestBinding> {
     let query_runner = app.sync_query();
     let node_public_key = keystore.get_ed25519_pk();
-    let signer =
-        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
-            .unwrap();
+    let signer = Signer::<TestBinding>::init(
+        Default::default(),
+        keystore.clone(),
+        query_runner.clone(),
+        Socket::raw_bounded(128).0,
+    )
+    .unwrap();
     let notifier = Notifier::<TestBinding>::init(app);
     let topology = Topology::<TestBinding>::init(
         TopologyConfig::default(),
