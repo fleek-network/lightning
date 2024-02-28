@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use affair::{Executor, TokioSpawn, Worker};
+use affair::{Executor, Socket, TokioSpawn, Worker};
 use anyhow::Result;
 use fleek_crypto::{
     AccountOwnerSecretKey,
@@ -125,9 +125,13 @@ fn init_rpc(app: Application<TestBinding>, port: u16) -> Result<(Rpc<TestBinding
         OriginDemuxer::<TestBinding>::init(Default::default(), blockstore.clone()).unwrap();
 
     let keystore = EphemeralKeystore::default();
-    let signer =
-        Signer::<TestBinding>::init(Default::default(), keystore.clone(), app.sync_query())
-            .unwrap();
+    let signer = Signer::<TestBinding>::init(
+        Default::default(),
+        keystore.clone(),
+        app.sync_query(),
+        Socket::raw_bounded(128).0,
+    )
+    .unwrap();
 
     let indexer = Indexer::<TestBinding>::init(
         Default::default(),
