@@ -17,6 +17,7 @@ use lightning_interfaces::{
     ApplicationInterface,
     BlockStoreInterface,
     ConsensusInterface,
+    ForwarderInterface,
     IndexerInterface,
     KeystoreInterface,
     NotifierInterface,
@@ -25,7 +26,7 @@ use lightning_interfaces::{
 };
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
-use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_test_utils::server::spawn_server;
 use tokio::sync::mpsc;
@@ -145,9 +146,20 @@ async fn create_app_state(test_name: String) -> AppState {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer =
-        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
-            .unwrap();
+    let forwarder = MockForwarder::<TestBinding>::init(
+        Default::default(),
+        consensus_public_key,
+        query_runner.clone(),
+    )
+    .unwrap();
+
+    let mut signer = Signer::<TestBinding>::init(
+        Default::default(),
+        keystore.clone(),
+        query_runner.clone(),
+        forwarder.mempool_socket(),
+    )
+    .unwrap();
     let notifier = Notifier::<TestBinding>::init(&app);
 
     let consensus_config = ConsensusConfig {
@@ -169,8 +181,6 @@ async fn create_app_state(test_name: String) -> AppState {
         &notifier,
     )
     .unwrap();
-
-    signer.provide_mempool(consensus.mempool());
 
     let (new_block_tx, new_block_rx) = mpsc::channel(10);
 
