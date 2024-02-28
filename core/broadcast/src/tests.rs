@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use affair::Socket;
 use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, NodeSignature, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
@@ -137,9 +138,13 @@ async fn create_peer(
     let query_runner = app.sync_query();
     let node_secret_key = keystore.get_ed25519_sk();
     let node_public_key = node_secret_key.to_pk();
-    let signer =
-        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
-            .unwrap();
+    let signer = Signer::<TestBinding>::init(
+        Default::default(),
+        keystore.clone(),
+        query_runner.clone(),
+        Socket::raw_bounded(128).0,
+    )
+    .unwrap();
     let notifier = Notifier::<TestBinding>::init(app);
     let topology = Topology::<TestBinding>::init(
         TopologyConfig::default(),
