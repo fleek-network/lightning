@@ -4,14 +4,14 @@ use infusion::c;
 use tokio::sync::mpsc;
 
 use crate::config::ConfigConsumer;
-use crate::consensus::MempoolSocket;
 use crate::infu_collection::Collection;
 use crate::types::UpdateMethod;
 use crate::{
     ApplicationInterface,
     ConfigProviderInterface,
-    ConsensusInterface,
+    ForwarderInterface,
     KeystoreInterface,
+    MempoolSocket,
     Notification,
     NotifierInterface,
     WithStartAndShutdown,
@@ -32,17 +32,19 @@ pub trait SignerInterface<C: Collection>:
         config: ::ConfigProviderInterface,
         keystore: ::KeystoreInterface,
         app: ::ApplicationInterface,
+        forwarder: ::ForwarderInterface,
     ) {
-        Self::init(config.get::<Self>(), keystore.clone(), app.sync_query())
+        Self::init(
+            config.get::<Self>(),
+            keystore.clone(),
+            app.sync_query(),
+            forwarder.mempool_socket(),
+        )
     }
 
-    fn _post(&mut self, c: ::ConsensusInterface, n: ::NotifierInterface) {
-        self.provide_mempool(c.mempool());
-
+    fn _post(&mut self, n: ::NotifierInterface) {
         let (new_block_tx, new_block_rx) = mpsc::channel(10);
-
         self.provide_new_block_notify(new_block_rx);
-
         n.notify_on_new_block(new_block_tx);
     }
 
@@ -51,11 +53,8 @@ pub trait SignerInterface<C: Collection>:
         config: Self::Config,
         keystore: C::KeystoreInterface,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        mempool_socket: MempoolSocket,
     ) -> anyhow::Result<Self>;
-
-    /// Provide the signer service with the mempool socket after initialization, this function
-    /// should only be called once.
-    fn provide_mempool(&mut self, mempool: MempoolSocket);
 
     // Provide the signer service with a new block notifications channel's receiver to get notified
     // when a block of transactions has been processed at the application.
@@ -64,10 +63,6 @@ pub trait SignerInterface<C: Collection>:
     /// Returns a socket that can be used to submit transactions to the mempool, these
     /// transactions are signed by the node and a proper nonce is assigned by the
     /// implementation.
-    ///
-    /// # Panics
-    ///
-    /// This function can panic if there has not been a prior call to `provide_mempool`.
     fn get_socket(&self) -> SubmitTxSocket;
 
     /// Sign the provided raw digest and return a signature.

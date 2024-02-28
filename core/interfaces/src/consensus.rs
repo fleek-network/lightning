@@ -1,4 +1,3 @@
-use affair::Socket;
 use infusion::c;
 use lightning_schema::LightningMessage;
 
@@ -7,7 +6,7 @@ use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
 use crate::signer::SignerInterface;
-use crate::types::{Event, TransactionRequest};
+use crate::types::Event;
 use crate::{
     ApplicationInterface,
     ArchiveInterface,
@@ -18,16 +17,6 @@ use crate::{
     NotifierInterface,
     RpcInterface,
 };
-
-/// A socket that gives services and other sub-systems the required functionality to
-/// submit messages/transactions to the consensus.
-///
-/// # Safety
-///
-/// This socket is safe to freely pass around, sending transactions through this socket
-/// does not guarantee their execution on the application layer. You can think about
-/// this as if the current node was only an external client to the network.
-pub type MempoolSocket = Socket<TransactionRequest, ()>;
 
 #[infusion::service]
 pub trait ConsensusInterface<C: Collection>:
@@ -76,12 +65,6 @@ pub trait ConsensusInterface<C: Collection>:
         indexer_socket: Option<IndexSocket>,
         notifier: &c!(C::NotifierInterface),
     ) -> anyhow::Result<Self>;
-
-    /// Returns a socket that can be used to submit transactions to the consensus,
-    /// this can be used by any other systems that are interested in posting some
-    /// transaction to the consensus.
-    #[blank = Socket::raw_bounded(64).0]
-    fn mempool(&self) -> MempoolSocket;
 
     fn set_event_tx(&mut self, tx: tokio::sync::mpsc::Sender<Vec<Event>>);
 }

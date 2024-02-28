@@ -17,6 +17,7 @@ collection!([
     BroadcastInterface,
     TopologyInterface,
     ArchiveInterface,
+    ForwarderInterface,
     ConsensusInterface,
     HandshakeInterface,
     NotifierInterface,
@@ -77,12 +78,14 @@ impl<C: Collection> Node<C> {
     /// initialization.
     pub fn fill_configuration<T: Collection>(provider: &impl ConfigProviderInterface<T>) {
         provider.get::<C::BlockStoreServerInterface>();
+        provider.get::<C::KeystoreInterface>();
         provider.get::<C::SignerInterface>();
         provider.get::<C::ApplicationInterface>();
         provider.get::<C::BlockStoreInterface>();
         provider.get::<C::BroadcastInterface>();
         provider.get::<C::TopologyInterface>();
         provider.get::<C::ArchiveInterface>();
+        provider.get::<C::ForwarderInterface>();
         provider.get::<C::ConsensusInterface>();
         provider.get::<C::HandshakeInterface>();
         provider.get::<C::OriginProviderInterface>();

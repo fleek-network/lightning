@@ -3,7 +3,6 @@ use tokio::sync::mpsc;
 
 use crate::common::WithStartAndShutdown;
 use crate::config::ConfigConsumer;
-use crate::consensus::MempoolSocket;
 use crate::infu_collection::Collection;
 use crate::types::Event;
 use crate::{
@@ -12,9 +11,10 @@ use crate::{
     ArchiveSocket,
     BlockStoreInterface,
     ConfigProviderInterface,
-    ConsensusInterface,
     FetcherInterface,
+    ForwarderInterface,
     KeystoreInterface,
+    MempoolSocket,
 };
 
 /// The interface for the *RPC* server. Which is supposed to be opening a public
@@ -25,7 +25,7 @@ pub trait RpcInterface<C: Collection>:
 {
     fn _init(
         config: ::ConfigProviderInterface,
-        consensus: ::ConsensusInterface,
+        forwarder: ::ForwarderInterface,
         app: ::ApplicationInterface,
         blockstore: ::BlockStoreInterface,
         fetcher: ::FetcherInterface,
@@ -34,7 +34,7 @@ pub trait RpcInterface<C: Collection>:
     ) {
         Self::init(
             config.get::<Self>(),
-            consensus.mempool(),
+            forwarder.mempool_socket(),
             app.sync_query(),
             blockstore.clone(),
             fetcher,
