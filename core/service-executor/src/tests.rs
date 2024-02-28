@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use affair::Socket;
 use fleek_crypto::{
     AccountOwnerSecretKey,
     ClientPublicKey,
@@ -25,7 +26,6 @@ use lightning_interfaces::{
     BlockStoreInterface,
     BlockStoreServerInterface,
     BroadcastInterface,
-    ConsensusInterface,
     FetcherInterface,
     KeystoreInterface,
     NotifierInterface,
@@ -48,7 +48,6 @@ use lightning_rep_collector::config::Config as RepCollConfig;
 use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
 use lightning_signer::Signer;
-use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_topology::{Config as TopologyConfig, Topology};
 use serial_test::serial;
@@ -111,11 +110,17 @@ async fn init_service_executor(
     .unwrap();
     app.start().await;
 
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let (_, query_runner) = (app.transaction_executor(), app.sync_query());
     let keystore = EphemeralKeystore::default();
-    let mut signer =
-        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
-            .unwrap();
+
+    let mut signer = Signer::<TestBinding>::init(
+        Default::default(),
+        keystore.clone(),
+        query_runner.clone(),
+        Socket::raw_bounded(128).0,
+    )
+    .unwrap();
+
     let notifier = Notifier::<TestBinding>::init(&app);
     let topology = Topology::<TestBinding>::init(
         TopologyConfig::default(),
@@ -159,20 +164,6 @@ async fn init_service_executor(
         &pool,
     )
     .unwrap();
-
-    let consensus = MockConsensus::<TestBinding>::init(
-        ConsensusConfig::default(),
-        keystore.clone(),
-        &signer,
-        update_socket,
-        query_runner.clone(),
-        broadcast.get_pubsub(Topic::Consensus),
-        None,
-        &notifier,
-    )
-    .unwrap();
-
-    signer.provide_mempool(consensus.mempool());
 
     let (new_block_tx, new_block_rx) = mpsc::channel(10);
 
